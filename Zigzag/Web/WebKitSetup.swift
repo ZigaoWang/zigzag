@@ -39,6 +39,7 @@ enum WebKitSetup {
             for script in PageScripts.all { configuration.userContentController.addUserScript(script) }
             // Runs in its own world, invisible to the page.
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
+            ContentBlocker.attach(to: configuration)
         }
     }
 }

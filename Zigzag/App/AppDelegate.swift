@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = Library.shared
         _ = HistoryStore.shared
+        ContentBlocker.prepare()
         if #available(macOS 15.4, *) {
             ExtensionHost.shared.loadInstalled()
             KnownExtension.setUpIfNeeded()

@@ -36,6 +36,7 @@
 		8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253D16FCBE561D267ED6957C /* BrowserRootView.swift */; };
 		99F15C29E28C9FA9B038B3A8 /* FindBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */; };
 		9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEBEA6141A8688342F56A56 /* SidebarView.swift */; };
+		A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91506D36CD561CBD7E11897D /* ContentBlocker.swift */; };
 		A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */; };
 		A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */; };
 		A6B3999818FDB11071ED1832 /* SidebarMenus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */; };
@@ -92,6 +93,7 @@
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
 		88F9F8B1C1119171EFC0072B /* DebugBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBridge.swift; sourceTree = "<group>"; };
+		91506D36CD561CBD7E11897D /* ContentBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentBlocker.swift; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenus.swift; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				7A6A928496FC897893B22DF7 /* BrowserWebView.swift */,
+				91506D36CD561CBD7E11897D /* ContentBlocker.swift */,
 				CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */,
 				D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
@@ -413,6 +416,7 @@
 				F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */,
 				407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */,
 				C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */,
+				A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */,
 				10324776656E836D07CD1B27 /* Controls.swift in Sources */,
 				2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */,
 				3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */,
