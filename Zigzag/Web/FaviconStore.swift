@@ -136,19 +136,30 @@ final class FaviconStore {
               let data = ctx.data else { return nil }
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
         let pixels = data.bindMemory(to: UInt8.self, capacity: side * side * 4)
-        var r = 0.0, g = 0.0, b = 0.0, weight = 0.0
+        // Bucket saturated pixels by hue; a logo has a color only if one hue clearly dominates.
+        let bins = 12
+        var weight = [Double](repeating: 0, count: bins)
+        var sums = [(Double, Double, Double)](repeating: (0, 0, 0), count: bins)
         for i in 0..<(side * side) {
             let a = Double(pixels[i * 4 + 3]) / 255
             guard a > 0.5 else { continue }
             let pr = Double(pixels[i * 4]) / 255 / a, pg = Double(pixels[i * 4 + 1]) / 255 / a, pb = Double(pixels[i * 4 + 2]) / 255 / a
-            let maxC = max(pr, pg, pb), minC = min(pr, pg, pb)
-            let saturation = maxC == 0 ? 0 : (maxC - minC) / maxC
-            let w = saturation * saturation + 0.001
-            r += pr * w; g += pg * w; b += pb * w; weight += w
+            let c = NSColor(srgbRed: pr, green: pg, blue: pb, alpha: 1)
+            guard c.saturationComponent > 0.3, c.brightnessComponent > 0.25 else { continue }
+            let bin = min(bins - 1, Int(c.hueComponent * Double(bins)))
+            let w = c.saturationComponent
+            weight[bin] += w
+            sums[bin].0 += pr * w; sums[bin].1 += pg * w; sums[bin].2 += pb * w
         }
-        guard weight > 0.5 else { return nil }
-        let color = NSColor(srgbRed: r / weight, green: g / weight, blue: b / weight, alpha: 1)
-        return color.saturationComponent > 0.25 ? color : nil
+        let total = weight.reduce(0, +)
+        guard total > 4, let best = weight.indices.max(by: { weight[$0] < weight[$1] }) else { return nil }
+        // Neighboring bins belong to the same hue.
+        let neighbors = [(best + bins - 1) % bins, best, (best + 1) % bins]
+        let share = neighbors.map { weight[$0] }.reduce(0, +) / total
+        guard share > 0.7 else { return nil }
+        let w = weight[best]
+        let color = NSColor(srgbRed: sums[best].0 / w, green: sums[best].1 / w, blue: sums[best].2 / w, alpha: 1)
+        return color.saturationComponent > 0.35 ? color : nil
     }
 }
 

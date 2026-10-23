@@ -18,6 +18,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var commandBar = CommandBarController(window: self)
     lazy var findBar = FindBarController(window: self)
     lazy var desk = DeskController(window: self)
+    lazy var previews = TabPreviewController(controller: self)
     var peekController: PeekController?
 
     init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
@@ -93,6 +94,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             showSelectedTab()
         case .space:
             spaceChanged()
+        case .content:
+            break
         }
         onStateChange?()
     }
@@ -124,6 +127,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSelectedTab() {
+        previews.hide()
         let tab = tabManager.selectedTab
         if tab !== shownTab {
             shownTab = tab
@@ -293,7 +297,9 @@ extension BrowserWindowController: SidebarDelegate {
     func listOpenBookmark(_ bookmark: Bookmark) { tabManager.openBookmark(bookmark) }
     func listClose(_ tab: Tab) { tabManager.close(tab) }
     func listNewTab() { commandBar.show(mode: .newTab) }
-    func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {}
+    func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
+        previews.hover(tab, row: row, bookmark: bookmark)
+    }
     func listRenameSpace() { renameSpace(nil) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() { sidebar.clearDropTargets() }
@@ -317,6 +323,10 @@ extension BrowserWindowController: SidebarDelegate {
 // MARK: - Debug hooks
 
 extension BrowserWindowController {
-    func debugHover(index: Int) {}
+    func debugHover(index: Int) {
+        let tabs = tabManager.currentTabs
+        guard tabs.indices.contains(index), let row = sidebar.list.row(for: tabs[index]) else { return }
+        previews.hover(tabs[index], row: row, bookmark: nil)
+    }
     func debugSwitcher() {}
 }

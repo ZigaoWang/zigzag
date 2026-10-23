@@ -8,6 +8,8 @@ final class TabManager {
         case structure
         case selection
         case space
+        /// A tab navigated or changed title: nothing to redraw here, but worth saving.
+        case content
     }
 
     private(set) var tabsBySpace: [UUID: [Tab]] = [:]
@@ -24,6 +26,14 @@ final class TabManager {
     let changed = Signal<Change>()
 
     private var libraryToken: SignalToken?
+    private var tabTokens: [UUID: SignalToken] = [:]
+
+    /// Watches a tab so navigation inside it gets saved for crash recovery.
+    private func watch(_ tab: Tab) {
+        tabTokens[tab.id] = tab.changed.observe { [weak self] change in
+            if change == .url || change == .title { self?.changed.send(.content) }
+        }
+    }
     private var suspendTimer: Timer?
 
     struct ClosedTab {
@@ -80,6 +90,7 @@ final class TabManager {
         let space = spaceID ?? currentSpaceID
         let tab = Tab(url: url, title: title, spaceID: space, configuration: configuration)
         tab.host = host
+        watch(tab)
         tab.opener = opener
         // New tabs go on top. The list never reorders itself after that.
         tabsBySpace[space, default: []].insert(tab, at: 0)
@@ -97,7 +108,7 @@ final class TabManager {
 
     /// Inserts already-built tabs (session restore, imports) without selecting.
     func adopt(_ tabs: [Tab], in spaceID: UUID) {
-        for tab in tabs { tab.host = host }
+        for tab in tabs { tab.host = host; watch(tab) }
         tabsBySpace[spaceID, default: []].append(contentsOf: tabs)
         recentTabIDs.append(contentsOf: tabs.sorted { $0.lastActivated > $1.lastActivated }.map(\.id))
     }
@@ -107,6 +118,7 @@ final class TabManager {
         tab.bookmarkID = bookmarkID
         bookmarkTabs[bookmarkID] = tab
         recentTabIDs.append(tab.id)
+        watch(tab)
     }
 
     func restoreSelection(_ selection: [UUID: UUID], currentSpaceID: UUID) {
@@ -230,6 +242,7 @@ final class TabManager {
         let spaceID = Library.shared.spaceID(ofBookmark: bookmark.id) ?? currentSpaceID
         let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: spaceID)
         tab.host = host
+        watch(tab)
         tab.bookmarkID = bookmark.id
         bookmarkTabs[bookmark.id] = tab
         changed.send(.structure)
@@ -336,6 +349,7 @@ final class TabManager {
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState)
         tab.host = host
+        watch(tab)
         var list = tabsBySpace[space] ?? []
         list.insert(tab, at: min(closed.index, list.count))
         tabsBySpace[space] = list
