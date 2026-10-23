@@ -243,10 +243,16 @@ final class SeparatorRowView: NSView {
 }
 
 enum SiteTint {
+    private static var iconColors: [ObjectIdentifier: NSColor?] = [:]
+
     static func color(for tab: Tab) -> NSColor? {
         if let theme = tab.themeColor, let usable = usable(theme) { return usable }
-        if let icon = tab.favicon { return FaviconStore.shared.dominantColor(of: icon) }
-        return nil
+        guard let icon = tab.favicon else { return nil }
+        let key = ObjectIdentifier(icon)
+        if let cached = iconColors[key] { return cached }
+        let color = FaviconStore.shared.dominantColor(of: icon)
+        iconColors[key] = color
+        return color
     }
 
     /// Ignores pale, gray and near-black theme colors: they say nothing about the site,

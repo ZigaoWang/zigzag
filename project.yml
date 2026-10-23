@@ -24,6 +24,8 @@ settings:
   configs:
     Debug:
       CODE_SIGN_IDENTITY: "-"
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+      ENABLE_HARDENED_RUNTIME: NO
     Release:
       CODE_SIGN_IDENTITY: "Developer ID Application"
       SPARKLE_PUBLIC_KEY: fcLCAtuyhCGTC62F2cDfj/vAMXgFvrpQSyF3540+hq0=

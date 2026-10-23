@@ -101,18 +101,18 @@ enum Tokens {
 
     enum Motion {
         /// Hover and press feedback.
-        static let quick: TimeInterval = 0.12
+        static let quick: TimeInterval = 0.1
         /// Most UI transitions: sidebar slide, command bar, row moves.
-        static let standard: TimeInterval = 0.28
+        static let standard: TimeInterval = 0.2
         /// Large surface moves: desk view zoom.
-        static let large: TimeInterval = 0.38
+        static let large: TimeInterval = 0.3
         /// Delay before a hover preview appears.
-        static let previewDelay: TimeInterval = 0.45
+        static let previewDelay: TimeInterval = 0.35
         /// Delay before the hidden sidebar slides in from the edge.
         static let edgeRevealDelay: TimeInterval = 0
         static let edgeHideDelay: TimeInterval = 0.15
         /// Sidebar slides in and out: fast enough to feel attached to the pointer.
-        static let slideDuration: TimeInterval = 0.22
+        static let slideDuration: TimeInterval = 0.18
 
         /// A motion style: how long, and which curve. Every curve is a fast-out, no-overshoot spring shape,
         /// run by Core Animation on the render server so it stays smooth while pages are busy.

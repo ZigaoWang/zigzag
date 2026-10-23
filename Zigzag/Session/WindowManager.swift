@@ -89,7 +89,7 @@ final class WindowManager {
     private func windowClosed(_ controller: BrowserWindowController) {
         guard !isTerminating else { return }
         // Keep the last window's tabs for next launch even if it is closed before quitting.
-        if controllers.count == 1 { saveNow() }
+        if controllers.count == 1 { saveNow(synchronously: true) }
         controllers.removeAll { $0 === controller }
         if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
         controller.tabManager.invalidate()
@@ -112,26 +112,38 @@ final class WindowManager {
         saveDebouncer.call { [weak self] in self?.saveNow() }
     }
 
-    func saveNow() {
+    func saveNow(synchronously: Bool = false) {
         saveDebouncer.cancel()
         guard !controllers.isEmpty else { return }
         let state = SessionState(windows: controllers.map(windowState))
         JSONStore.save(state, to: Paths.session)
-        // Back/forward lists live in their own files: opaque and occasionally large.
+        // Back/forward lists live in their own files: opaque and occasionally large. Only changed ones are
+        // written, and never on the main thread.
         var keep = Set<UUID>()
+        var writes: [(URL, Data)] = []
         for controller in controllers {
             for tab in controller.tabManager.allTabs {
                 keep.insert(tab.id)
-                if let data = tab.interactionStateForSaving {
-                    try? data.write(to: Paths.tabState.appendingPathComponent(tab.id.uuidString), options: .atomic)
-                }
+                guard let data = tab.interactionStateForSaving else { continue }
+                let hash = data.hashValue
+                if savedStateHashes[tab.id] == hash { continue }
+                savedStateHashes[tab.id] = hash
+                writes.append((Paths.tabState.appendingPathComponent(tab.id.uuidString), data))
             }
         }
-        let files = (try? FileManager.default.contentsOfDirectory(at: Paths.tabState, includingPropertiesForKeys: nil)) ?? []
-        for file in files where UUID(uuidString: file.lastPathComponent).map({ !keep.contains($0) }) ?? true {
-            try? FileManager.default.removeItem(at: file)
+        for id in savedStateHashes.keys where !keep.contains(id) { savedStateHashes[id] = nil }
+        let directory = Paths.tabState
+        let work = {
+            for (url, data) in writes { try? data.write(to: url, options: .atomic) }
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+            for file in files where UUID(uuidString: file.lastPathComponent).map({ !keep.contains($0) }) ?? true {
+                try? FileManager.default.removeItem(at: file)
+            }
         }
+        if synchronously { work() } else { DispatchQueue.global(qos: .utility).async(execute: work) }
     }
+
+    private var savedStateHashes: [UUID: Int] = [:]
 
     private func windowState(_ controller: BrowserWindowController) -> SessionState.WindowState {
         let manager = controller.tabManager
@@ -194,7 +206,7 @@ final class WindowManager {
     }
 
     func prepareForTermination() {
-        saveNow()
+        saveNow(synchronously: true)
         isTerminating = true
         Library.shared.saveNow()
     }
