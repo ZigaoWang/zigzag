@@ -4,6 +4,15 @@ import AppKit
 /// `xcrun swift -e` or the bundled `zz` script posts "app.zigzag.debug" with a command string.
 enum DebugBridge {
     static var hovered: [NSView] = []
+    private static var scrollLog: [String] = []
+
+    static func recordScroll(_ event: NSEvent) {
+        scrollLog.append(String(format: "%.3f phase=%lu mom=%lu dx=%.1f dy=%.1f precise=%d swipeEnabled=%d",
+                                event.timestamp, event.phase.rawValue, event.momentumPhase.rawValue,
+                                event.scrollingDeltaX, event.scrollingDeltaY, event.hasPreciseScrollingDeltas ? 1 : 0,
+                                NSEvent.isSwipeTrackingFromScrollEventsEnabled ? 1 : 0))
+        if scrollLog.count > 300 { scrollLog.removeFirst(scrollLog.count - 300) }
+    }
 
     static func start() {
         #if DEBUG
@@ -171,12 +180,14 @@ enum DebugBridge {
                 cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phaseless ? 0 : phase)
                 cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
                 cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(d))
+                cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds) + UInt64(i) * 16_000_000
                 if let event = NSEvent(cgEvent: cg) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { NSApp.postEvent(event, atStart: false) }
                 }
             }
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
+        case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

@@ -164,6 +164,18 @@ enum Tokens {
 
         /// Slides a view horizontally into its current (final) position from `offset` points away, on the
         /// render server. Returns how long the slide takes, 0 if it was skipped.
+        /// Vertical companion to `slide`, always animated (used for feedback like toasts).
+        static func slideVertically(_ view: NSView, fromOffsetY offset: CGFloat, curve: Curve = snappy) {
+            guard let layer = view.layer, !reduceMotion else { return }
+            let animation = CABasicAnimation(keyPath: "transform.translation.y")
+            animation.fromValue = view.isFlipped ? offset : -offset
+            animation.toValue = 0
+            animation.duration = curve.duration
+            animation.timingFunction = curve.timing
+            animation.fillMode = .backwards
+            layer.add(animation, forKey: "slideY")
+        }
+
         @discardableResult
         static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy) -> TimeInterval {
             guard let layer = view.layer, offset != 0, !isKeyboardDriven, !reduceMotion else { return 0 }

@@ -330,6 +330,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
+        #if DEBUG
+        if event.type == .scrollWheel, sidebarContains(event) { DebugBridge.recordScroll(event) }
+        #endif
         if event.type == .scrollWheel, !desk.isVisible, sidebarContains(event), sidebar.handleSwipe(event) { return true }
         if event.type == .magnify || event.type == .gesture, desk.handleMagnify(event) { return true }
         if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,

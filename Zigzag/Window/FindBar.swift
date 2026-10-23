@@ -216,20 +216,33 @@ class FloatingPanelView: NSView {
         }
     }
 
-    /// Springs in: a short scale up from 97% with a fade.
-    func present() {
+    /// Springs in: a short scale up from 97% with a fade. Skipped for keyboard actions unless `always`.
+    func present(always: Bool = false) {
         layoutSubtreeIfNeeded()
-        guard let layer, !Tokens.Motion.isKeyboardDriven else { alphaValue = 1; return }
+        guard let layer, always || !Tokens.Motion.isKeyboardDriven else { alphaValue = 1; return }
         alphaValue = 0
         let scale = Tokens.Motion.springAnimation(keyPath: "transform")
         let from = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-bounds.midX, -bounds.midY, 0), CATransform3DMakeScale(0.97, 0.97, 1)), CATransform3DMakeTranslation(bounds.midX, bounds.midY, 0))
         scale.fromValue = from
         scale.toValue = CATransform3DIdentity
         layer.add(scale, forKey: "present")
-        Tokens.Motion.animate(Tokens.Motion.feedback) { self.animator().alphaValue = 1 }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = Tokens.Motion.quick
+            self.animator().alphaValue = 1
+        }
     }
 
-    func dismiss(completion: (() -> Void)? = nil) {
+    func dismiss(always: Bool = false, completion: (() -> Void)? = nil) {
+        let fade = { self.animator().alphaValue = 0 }
+        let done = {
+            self.removeFromSuperview()
+            self.alphaValue = 1
+            completion?()
+        }
+        if always {
+            NSAnimationContext.runAnimationGroup({ ctx in ctx.duration = Tokens.Motion.standard; fade() }, completionHandler: done)
+            return
+        }
         Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: {
             self.removeFromSuperview()
             self.alphaValue = 1
@@ -296,9 +309,16 @@ enum Toast {
         toast.needsLayout = true
         if isNew {
             controller.root.overlay.addSubview(toast)
-            toast.present()
+            toast.present(always: true)
+            Tokens.Motion.slideVertically(toast, fromOffsetY: -Tokens.Space.x2)
+        } else {
+            // A repeat (zoom 90% → 80%) gives a small pulse so the change registers.
+            let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
+            pulse.values = [1, 1.04, 1]
+            pulse.duration = Tokens.Motion.standard
+            toast.layer?.add(pulse, forKey: "pulse")
         }
         current = toast
-        hide.call { [weak toast] in toast?.dismiss() }
+        hide.call { [weak toast] in toast?.dismiss(always: true) }
     }
 }
