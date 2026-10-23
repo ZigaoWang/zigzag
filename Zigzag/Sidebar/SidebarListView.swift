@@ -69,6 +69,8 @@ final class SidebarListView: NSView {
         var targetSection: Section
         var targetIndex: Int
         var hoverSpace: UUID?
+        /// Where horizontal travel is measured from; reset after each space change.
+        var anchorX: CGFloat
     }
 
     enum Section { case bookmarks, tabs }
@@ -323,7 +325,7 @@ final class SidebarListView: NSView {
         delegate?.listHover(nil, row: nil, bookmark: nil)
         let start = convert(event.locationInWindow, from: nil)
         let (section, index) = target(at: start.y, dragging: item)
-        drag = DragState(item: item, view: view, grabOffset: start.y - view.frame.minY, targetSection: section, targetIndex: index)
+        drag = DragState(item: item, view: view, grabOffset: start.y - view.frame.minY, targetSection: section, targetIndex: index, anchorX: start.x)
         (view as? SidebarRowView)?.isLifted = true
         view.removeFromSuperview()
         addSubview(view)
@@ -347,10 +349,23 @@ final class SidebarListView: NSView {
         guard var drag else { return }
         let point = convert(event.locationInWindow, from: nil)
         let maxY = max(0, contentHeight - drag.view.frame.height)
+        // The row follows the pointer both ways. Carry it far enough sideways and the next space opens.
+        let dx = point.x - drag.anchorX
+        let threshold = bounds.width * 0.3
         Tokens.Motion.withoutAnimation {
             drag.view.frame.origin.y = min(max(point.y - drag.grabOffset, 0), maxY)
+            drag.view.frame.origin.x = max(-bounds.width * 0.5, min(bounds.width * 0.5, dx))
         }
         autoscroll(with: event)
+        if abs(dx) > threshold, let neighbor = neighborSpace(direction: dx > 0 ? 1 : -1) {
+            delegate?.listSwitchSpaceDuringDrag(neighbor)
+            drag.anchorX = point.x
+            self.drag = drag
+            apply(items: displayItems(), animated: false)
+            // The new space's list slides in from the side the tab was carried toward.
+            if let scroll = enclosingScrollView { Tokens.Motion.slide(scroll, fromOffsetX: dx > 0 ? bounds.width : -bounds.width, curve: Tokens.Motion.slide) }
+            Tokens.Motion.animate(Tokens.Motion.snappy) { drag.view.animator().frame.origin.x = 0 }
+        }
 
         let hovered = delegate?.listDragHoverSpace(at: event.locationInWindow)
         if hovered != drag.hoverSpace {
@@ -375,6 +390,13 @@ final class SidebarListView: NSView {
         drag.targetIndex = index
         self.drag = drag
         if changed { apply(items: displayItems(), animated: true) }
+    }
+
+    private func neighborSpace(direction: Int) -> UUID? {
+        guard let manager else { return nil }
+        let spaces = Library.shared.spaces
+        guard let index = spaces.firstIndex(where: { $0.id == manager.currentSpaceID }), spaces.indices.contains(index + direction) else { return nil }
+        return spaces[index + direction].id
     }
 
     private func endDrag(with event: NSEvent) {
