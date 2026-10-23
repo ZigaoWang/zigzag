@@ -355,8 +355,9 @@ final class TabManager {
 
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
 
-    func reopenClosedTab() {
-        guard let closed = closedTabs.popLast() else { return }
+    @discardableResult
+    func reopenClosedTab() -> Tab? {
+        guard let closed = closedTabs.popLast() else { return nil }
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState)
         tab.host = host
@@ -366,6 +367,7 @@ final class TabManager {
         tabsBySpace[space] = list
         changed.send(.structure)
         select(tab)
+        return tab
     }
 
     // MARK: Moving

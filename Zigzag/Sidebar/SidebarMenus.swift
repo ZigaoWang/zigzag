@@ -28,7 +28,7 @@ enum SidebarMenus {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
         })
-        menu.addItem(Item("Bookmark", enabled: tab.url != nil) { manager.bookmarkTab(tab) })
+        menu.addItem(Item("Bookmark", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
         menu.addItem(Item("Duplicate") {
             if let url = tab.url { manager.newTab(url: url) }
         })
@@ -41,13 +41,13 @@ enum SidebarMenus {
             let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
             let sub = NSMenu()
             for space in Library.shared.spaces where space.id != tab.spaceID {
-                sub.addItem(Item(space.name) { manager.moveTabToSpace(tab, spaceID: space.id) })
+                sub.addItem(Item(space.name) { controller.moveWithUndo(tab, to: 0, in: space.id) })
             }
             move.submenu = sub
             menu.addItem(move)
         }
         menu.addItem(.separator())
-        menu.addItem(Item("Close Tab") { manager.close(tab) })
+        menu.addItem(Item("Close Tab") { controller.closeWithUndo(tab) })
         let tabs = manager.tabs(in: tab.spaceID)
         if let index = tabs.firstIndex(where: { $0 === tab }) {
             let below = Array(tabs.dropFirst(index + 1))
@@ -88,7 +88,7 @@ enum SidebarMenus {
         if let live {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
-        menu.addItem(Item("Remove Bookmark") { manager.unbookmark(bookmark.id) })
+        menu.addItem(Item("Remove Bookmark") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
         return menu
     }
 

@@ -20,6 +20,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
     lazy var switcher = TabSwitcher(controller: self)
+    /// ⌘Z for sidebar actions; also the window's undo manager, so page text editing shares it.
+    let sidebarUndo = UndoManager()
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
     lazy var peek = PeekController(controller: self)
     var peekController: PeekController? { peek }
@@ -407,13 +409,51 @@ extension BrowserWindowController: SidebarDelegate {
     func listOpenBookmark(_ bookmark: Bookmark) { tabManager.openBookmark(bookmark) }
     func listClose(_ tab: Tab) { closeWithUndo(tab) }
 
-    /// Closing one tab offers a quiet way back (and teaches ⇧⌘T without saying so).
+    // MARK: Undo (⌘Z) for sidebar actions
+
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { sidebarUndo }
+
+    /// Closes a tab; ⌘Z brings it back with its history, ⇧⌘Z closes it again.
     func closeWithUndo(_ tab: Tab) {
         let wasBookmark = tab.bookmarkID != nil
         tabManager.close(tab)
         guard !wasBookmark else { return }
-        Toast.show("Tab Closed", symbol: "xmark.circle", action: ("Undo", { [weak self] in self?.tabManager.reopenClosedTab() }),
-                   duration: 3, in: self)
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            guard let reopened = controller.tabManager.reopenClosedTab() else { return }
+            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.closeWithUndo(reopened) }
+            controller.sidebarUndo.setActionName("Close Tab")
+        }
+        sidebarUndo.setActionName("Close Tab")
+    }
+
+    /// Moves a tab within or between spaces, undoably.
+    func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID) {
+        let oldSpace = tab.spaceID
+        let oldIndex = tabManager.tabs(in: oldSpace).firstIndex { $0 === tab } ?? 0
+        if spaceID == oldSpace { tabManager.move(tab, to: index) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID) }
+        sidebarUndo.registerUndo(withTarget: self) { $0.moveWithUndo(tab, to: oldIndex, in: oldSpace) }
+        sidebarUndo.setActionName(spaceID == oldSpace ? "Move Tab" : "Move to Space")
+    }
+
+    /// Turns a tab into a bookmark, undoably.
+    func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
+        let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
+        tabManager.bookmarkTab(tab, at: index, in: spaceID)
+        guard let bookmarkID = tab.bookmarkID else { return }
+        sidebarUndo.registerUndo(withTarget: self) { $0.unbookmarkWithUndo(bookmarkID, to: oldIndex) }
+        sidebarUndo.setActionName("Bookmark")
+    }
+
+    /// Turns a bookmark back into a tab, undoably.
+    func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
+        let spaceID = Library.shared.spaceID(ofBookmark: bookmarkID) ?? tabManager.currentSpaceID
+        let oldIndex = Library.shared.bookmarks(in: spaceID).firstIndex { $0.id == bookmarkID }
+        let liveTab = tabManager.bookmarkTab(for: bookmarkID)
+        tabManager.unbookmark(bookmarkID, toIndex: index)
+        if let liveTab {
+            sidebarUndo.registerUndo(withTarget: self) { $0.bookmarkWithUndo(liveTab, at: oldIndex, in: spaceID) }
+            sidebarUndo.setActionName("Remove Bookmark")
+        }
     }
     func listNewTab() { commandBar.show(mode: .newTab) }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
@@ -423,6 +463,9 @@ extension BrowserWindowController: SidebarDelegate {
     func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() { sidebar.clearDropTargets() }
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
+    func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
 
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {

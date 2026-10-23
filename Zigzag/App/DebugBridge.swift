@@ -200,6 +200,14 @@ enum DebugBridge {
                                           eventNumber: 0, clickCount: 0, pressure: 0) {
                 webView.mouseMoved(with: e)
             }
+        case "closetab": controller.closeTab(nil)
+        case "pip":
+            controller.selectedWebView?.callAsyncJavaScript("const v = [...document.querySelectorAll('video')].find(v => !v.paused); if (!v) return 'no video'; v.webkitSetPresentationMode('picture-in-picture'); await new Promise(r => setTimeout(r, 800)); return v.webkitPresentationMode;", arguments: [:], in: nil, in: .page) { result in
+                debugLog("pip => \(result)")
+            }
+        case "undo":
+            controller.sidebarUndo.undo()
+            debugLog("after undo selected=\(controller.tabManager.selectedTab?.url?.absoluteString ?? "nil")")
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

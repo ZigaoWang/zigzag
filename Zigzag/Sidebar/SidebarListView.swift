@@ -13,6 +13,9 @@ protocol SidebarListDelegate: AnyObject {
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID?
     func listDragEnded()
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID)
+    func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID)
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int)
 }
 
 enum SidebarItem: Hashable {
@@ -359,7 +362,7 @@ final class SidebarListView: NSView {
         if let space = drag.hoverSpace, space != manager.currentSpaceID {
             // Dropped on another space's dot.
             switch drag.item {
-            case .tab(let id): if let tab = manager.tab(with: id) { manager.moveTabToSpace(tab, spaceID: space) }
+            case .tab(let id): if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: 0, in: space) }
             case .bookmark(let id): Library.shared.moveBookmark(id, to: Int.max, in: space)
             default: break
             }
@@ -369,16 +372,16 @@ final class SidebarListView: NSView {
 
         switch (drag.item, drag.targetSection) {
         case (.tab(let id), .tabs):
-            if let tab = manager.tab(with: id) { manager.move(tab, to: drag.targetIndex) }
+            if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: drag.targetIndex, in: tab.spaceID) }
         case (.tab(let id), .bookmarks):
-            if let tab = manager.tab(with: id) { manager.bookmarkTab(tab, at: drag.targetIndex, in: manager.currentSpaceID) }
+            if let tab = manager.tab(with: id) { delegate?.listBookmark(tab, at: drag.targetIndex, in: manager.currentSpaceID) }
         case (.bookmark(let id), .bookmarks):
             Library.shared.moveBookmark(id, to: drag.targetIndex, in: manager.currentSpaceID)
         case (.bookmark(let id), .tabs):
             // The row changes identity; the new tab row takes the placeholder's spot.
             rows[.bookmark(id)] = nil
             drag.view.removeFromSuperview()
-            manager.unbookmark(id, toIndex: drag.targetIndex)
+            delegate?.listUnbookmark(id, to: drag.targetIndex)
         default:
             break
         }

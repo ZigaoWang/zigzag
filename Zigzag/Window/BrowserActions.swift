@@ -177,10 +177,10 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func toggleBookmark(_ sender: Any?) {
         guard let tab = selectedTab else { return }
         if let bookmarkID = tab.bookmarkID {
-            tabManager.unbookmark(bookmarkID)
+            unbookmarkWithUndo(bookmarkID, to: 0)
             Toast.show("Bookmark Removed", symbol: "bookmark.slash", in: self)
         } else {
-            tabManager.bookmarkTab(tab)
+            bookmarkWithUndo(tab, at: nil, in: tab.spaceID)
             Toast.show("Bookmarked", symbol: "bookmark.fill", in: self)
         }
     }
