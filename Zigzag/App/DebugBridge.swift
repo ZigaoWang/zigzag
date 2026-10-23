@@ -258,6 +258,7 @@ enum DebugBridge {
         case "flash":
             func walk(_ v: NSView) { if let s = v as? NSScrollView { s.flashScrollers() }; v.subviews.forEach(walk) }
             if let root = controller.window?.contentView { walk(root) }
+        case "private": WindowManager.shared.newWindow(url: URL(string: arg), isPrivate: true)
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
