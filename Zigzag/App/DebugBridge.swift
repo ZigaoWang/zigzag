@@ -269,6 +269,7 @@ enum DebugBridge {
                 if index >= 0 { menu.performActionForItem(at: index) }
                 debugLog("pasteboard=\(NSPasteboard.general.string(forType: .string) ?? "nil")")
             } else { debugLog("menutest: no bookmarks") }
+        case "sundo": _ = controller.handleUndoKey(redo: arg == "redo")
         case "favorite":
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
         case "unfavorite":
