@@ -7,7 +7,7 @@ class SidebarRowView: InteractiveView {
     /// Soft color from the site's own theme.
     var siteTint: NSColor? { didSet { stateDidChange(animated: false) } }
     /// 1 = just looked at, down to the faded floor for tabs left alone a long time.
-    var freshness: CGFloat = 1 { didSet { if oldValue != freshness { stateDidChange(animated: false) } } }
+    var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
 
@@ -48,15 +48,9 @@ class SidebarRowView: InteractiveView {
             base = nil
         }
         var fill = base.map { cgColor($0) }
-        if let siteTint {
-            if isSelected || isLifted {
-                fill = cgColor(SidebarRowView.tinted(selectedFill: base ?? Tokens.Color.selectedFill, with: siteTint, appearance: effectiveAppearance))
-            } else {
-                // A whisper of the site's color, so tabs are recognizable before they're read.
-                let dark = effectiveAppearance.isDark
-                let wash = siteTint.withAlphaComponent((dark ? 0.10 : 0.08) * freshness + (isHovered ? 0.04 : 0) + (isPressed ? 0.04 : 0))
-                fill = cgColor(wash)
-            }
+        // The site's color shows only on the tab you're on.
+        if let siteTint, isSelected || isLifted {
+            fill = cgColor(SidebarRowView.tinted(selectedFill: base ?? Tokens.Color.selectedFill, with: siteTint, appearance: effectiveAppearance))
         }
         layer?.set(backgroundColor: fill, animated: animated && !isHovered)
         let shadowed = isSelected || isLifted
