@@ -11,6 +11,13 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var name: String
     var color: SpaceColor
     var bookmarks: [Bookmark] = []
+    /// A custom tint picked on the hue slider (0…1). Overrides `color` when set.
+    var hue: Double? = nil
+
+    /// The window frame color for this space.
+    var background: NSColor { hue.map(SpaceColor.background(hue:)) ?? color.background }
+    /// The strong version, for dots and swatches.
+    var swatch: NSColor { hue.map(SpaceColor.swatch(hue:)) ?? color.swatch }
 }
 
 enum SearchEngine: String, Codable, CaseIterable {
@@ -135,6 +142,13 @@ final class Library {
     func setColor(_ color: SpaceColor, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].color = color
+        spaces[i].hue = nil
+        commit()
+    }
+
+    func setHue(_ hue: Double, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].hue = hue
         commit()
     }
 

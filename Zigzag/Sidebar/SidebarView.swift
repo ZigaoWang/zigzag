@@ -276,7 +276,7 @@ final class SidebarView: NSView {
         }
         for dot in dots {
             guard let space = Library.shared.space(dot.spaceID) else { continue }
-            dot.color = space.color.swatch
+            dot.color = space.swatch
             dot.isSelected = space.id == current
             dot.toolTip = space.name
             dot.setAccessibilityLabel("Space \(space.name)")
@@ -284,6 +284,12 @@ final class SidebarView: NSView {
         // A single space needs no switcher.
         dots.forEach { $0.isHidden = false }
         layoutBottomBar()
+    }
+
+    func dot(for spaceID: UUID) -> NSView? { dots.first { $0.spaceID == spaceID } }
+
+    func previewDotColor(_ color: NSColor, for spaceID: UUID) {
+        dots.first { $0.spaceID == spaceID }?.color = color
     }
 
     func updateDownloads(active: Int, hasAny: Bool) {

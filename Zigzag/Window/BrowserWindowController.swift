@@ -126,9 +126,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.list.reload(animated: true)
     }
 
+    /// Live preview while dragging the hue slider: recolors without saving.
+    func previewSpaceColor(background: NSColor, swatch: NSColor, for spaceID: UUID) {
+        if spaceID == tabManager.currentSpaceID {
+            root.setColor(background, animated: false)
+            root.sidebarContainer.tint = background
+        }
+        sidebar.previewDotColor(swatch, for: spaceID)
+    }
+
+    /// Opens the editor for a space next to the sidebar, aligned with the row that asked.
+    func openSpaceEditor(_ spaceID: UUID, anchor: NSView?) {
+        let rect = anchor.map { $0.convert($0.bounds, to: root.overlay) } ?? NSRect(x: 0, y: root.bounds.height / 3, width: 1, height: 1)
+        SpaceEditorPanel.open(spaceID: spaceID, anchor: rect, in: self)
+    }
+
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
-        let color = tabManager.currentSpace.color.background
+        let color = tabManager.currentSpace.background
         root.setColor(color, animated: animated && !Tokens.Motion.isKeyboardDriven)
         root.sidebarContainer.tint = color
     }
@@ -390,6 +405,7 @@ extension BrowserWindowController: SidebarDelegate {
         previews.hover(tab, row: row, bookmark: bookmark)
     }
     func listRenameSpace() { renameSpace(nil) }
+    func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() { sidebar.clearDropTargets() }
 

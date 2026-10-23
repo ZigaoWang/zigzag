@@ -219,7 +219,15 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x4, height: h)
+        label.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - Tokens.Space.x4), height: h)
+    }
+
+    /// The name is a button: it opens the space editor.
+    override func stateDidChange(animated: Bool) {
+        layer?.cornerRadius = Tokens.Radius.control
+        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }
 

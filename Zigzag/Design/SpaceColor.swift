@@ -36,6 +36,23 @@ enum SpaceColor: String, Codable, CaseIterable {
         Tokens.Color.dynamic(light: Tokens.Color.hex(pair.light), dark: Tokens.Color.hex(pair.dark))
     }
 
+    /// Any hue, at the same tuned lightness as the curated tints, so every choice looks right in both modes.
+    static func background(hue: Double) -> NSColor {
+        Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.13, brightness: 0.95, alpha: 1),
+                             dark: NSColor(hue: hue, saturation: 0.32, brightness: 0.17, alpha: 1))
+    }
+
+    static func swatch(hue: Double) -> NSColor {
+        Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.5, brightness: 0.8, alpha: 1),
+                             dark: NSColor(hue: hue, saturation: 0.45, brightness: 0.85, alpha: 1))
+    }
+
+    /// The hue of this tint, for placing it on the slider.
+    var hue: Double {
+        let c = (swatch.usingColorSpace(.sRGB) ?? swatch)
+        return Double(c.hueComponent)
+    }
+
     /// A saturated version used for small swatches and the space dot.
     var swatch: NSColor {
         switch self {

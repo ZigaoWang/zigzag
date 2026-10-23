@@ -9,6 +9,7 @@ protocol SidebarListDelegate: AnyObject {
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
     func listMenu(for item: SidebarItem) -> NSMenu?
     func listRenameSpace()
+    func listEditSpace(anchor: NSView)
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID?
     func listDragEnded()
@@ -168,7 +169,10 @@ final class SidebarListView: NSView {
         switch item {
         case .header:
             let header = SpaceHeaderView()
-            header.onDoubleClick = { [weak self] in self?.delegate?.listRenameSpace() }
+            header.onClick = { [weak self, weak header] _ in
+                guard let header else { return }
+                self?.delegate?.listEditSpace(anchor: header)
+            }
             header.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: .header) }
             return header
         case .separator, .placeholder:
@@ -249,6 +253,8 @@ final class SidebarListView: NSView {
     func refreshRows() {
         for (item, view) in rows { configure(view, for: item) }
     }
+
+    var headerView: NSView? { rows[.header] }
 
     func row(for tab: Tab) -> NSView? {
         if let bookmarkID = tab.bookmarkID { return rows[.bookmark(bookmarkID)] }

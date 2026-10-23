@@ -37,6 +37,9 @@ final class SwatchPicker: NSView {
     }
 
     private func refresh() { buttons.forEach { $0.isSelected = $0.color == selected } }
+
+    /// No curated tint is chosen (a custom hue is in use).
+    func clearSelection() { buttons.forEach { $0.isSelected = false } }
 }
 
 final class SwatchButton: InteractiveView {

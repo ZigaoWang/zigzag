@@ -95,7 +95,7 @@ final class DeskController {
         controller.commandBar.dismiss(restoringFocus: false)
         controller.tabManager.selectedTab?.captureSnapshot { [weak self] in self?.cards.values.forEach { $0.refreshImage() } }
         let root = controller.root
-        backdrop.color = controller.tabManager.currentSpace.color.background
+        backdrop.color = controller.tabManager.currentSpace.background
         backdrop.frame = root.bounds
         backdrop.autoresizingMask = [.width, .height]
         scrollView.frame = backdrop.bounds.insetBy(dx: 0, dy: 0)
@@ -260,7 +260,7 @@ final class DeskController {
             header.label.stringValue = space.name
             let count = manager?.tabs(in: id).count ?? 0
             header.count.stringValue = count == 1 ? "1 tab" : "\(count) tabs"
-            header.dot.color = space.color.swatch
+            header.dot.color = space.swatch
             if let frame = layout.headers[id] {
                 header.isHidden = false
                 var f = frame

@@ -96,20 +96,11 @@ enum SidebarMenus {
         let menu = NSMenu()
         menu.autoenablesItems = false
         guard let space = Library.shared.space(id) else { return menu }
-        menu.addItem(Item("Rename Space…") {
-            controller.tabManager.switchToSpace(id)
-            SpaceEditor.rename(spaceID: id, in: controller)
+        menu.addItem(Item("Edit Space…") {
+            let anchor = controller.sidebar.dot(for: id) ?? controller.sidebar.list.headerView
+            controller.openSpaceEditor(id, anchor: anchor)
         })
-        let colorItem = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
-        let colors = NSMenu()
-        for color in SpaceColor.allCases {
-            let item = Item(color.name) { Library.shared.setColor(color, for: id) }
-            item.image = swatch(color.swatch)
-            item.state = space.color == color ? .on : .off
-            colors.addItem(item)
-        }
-        colorItem.submenu = colors
-        menu.addItem(colorItem)
+        _ = space
         menu.addItem(.separator())
         menu.addItem(Item("New Space") { controller.newSpace(nil) })
         menu.addItem(Item("Delete Space", enabled: Library.shared.spaces.count > 1) {

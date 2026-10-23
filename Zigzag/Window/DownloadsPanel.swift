@@ -197,6 +197,8 @@ final class TextButton: InteractiveView {
     private let label: Label
     /// Shows a quiet fill even at rest, so the button reads as a button (used in Settings).
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
+    /// Overrides the label color (destructive actions).
+    var textColor: NSColor? { didSet { stateDidChange(animated: false) } }
 
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
         label = Label(title, font: font, color: Tokens.Color.textSecondary)
@@ -227,7 +229,7 @@ final class TextButton: InteractiveView {
         let rest: NSColor? = showsFillAtRest ? Tokens.Color.fieldFill : nil
         let fill: NSColor? = !isEnabled ? (showsFillAtRest ? nil : nil) : isPressed ? Tokens.Color.pressedFill : isHovered ? (showsFillAtRest ? Tokens.Color.highlight : Tokens.Color.hoverFill) : rest
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        label.textColor = showsFillAtRest ? Tokens.Color.textPrimary : (isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary)
+        label.textColor = textColor ?? (showsFillAtRest ? Tokens.Color.textPrimary : (isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary))
         label.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 
