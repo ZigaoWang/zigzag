@@ -17,12 +17,12 @@ final class HueSlider: NSView {
         track.cornerCurve = .continuous
         layer?.addSublayer(track)
         knob.shadowOpacity = 1
-        knob.shadowRadius = 3
+        knob.shadowRadius = 4
         knob.shadowOffset = CGSize(width: 0, height: -1)
         layer?.addSublayer(knob)
         knob.addSublayer(knobFill)
         setAccessibilityRole(.slider)
-        setAccessibilityLabel("Space color")
+        setAccessibilityLabel("Custom color")
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -31,14 +31,14 @@ final class HueSlider: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    private let knobSize: CGFloat = Tokens.Space.x5
+    private let knobSize: CGFloat = Tokens.Space.x6
     private var trackInset: CGFloat { knobSize / 2 }
 
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
-            let h: CGFloat = Tokens.Space.x2
-            track.frame = NSRect(x: trackInset, y: (bounds.height - h) / 2, width: bounds.width - trackInset * 2, height: h)
+            let h: CGFloat = Tokens.Space.x3
+            track.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
             track.cornerRadius = h / 2
             track.colors = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { cgColor(SpaceColor.swatch(hue: $0)) }
             let x = trackInset + CGFloat(hue) * (bounds.width - trackInset * 2)
@@ -46,7 +46,7 @@ final class HueSlider: NSView {
             knob.cornerRadius = knobSize / 2
             knob.backgroundColor = .white
             knob.shadowColor = cgColor(Tokens.Color.panelShadow)
-            knobFill.frame = knob.bounds.insetBy(dx: 4, dy: 4)
+            knobFill.frame = knob.bounds.insetBy(dx: 3, dy: 3)
             knobFill.cornerRadius = knobFill.frame.width / 2
             knobFill.backgroundColor = cgColor(SpaceColor.swatch(hue: hue))
         }
@@ -90,44 +90,106 @@ final class HueSlider: NSView {
     }
 }
 
-/// Edits one space: its name and its color. Opens next to the sidebar; the window itself is the preview.
+/// One round choice in the tint row: a curated tint, or the custom wheel.
+final class TintSwatch: InteractiveView {
+    enum Kind { case tint(SpaceColor), custom }
+    let kind: Kind
+    private let fill = CALayer()
+    private let wheel = CAGradientLayer()
+    private let ring = CALayer()
+
+    init(kind: Kind) {
+        self.kind = kind
+        super.init(frame: .zero)
+        layer?.addSublayer(ring)
+        if case .custom = kind {
+            wheel.type = .conic
+            wheel.startPoint = CGPoint(x: 0.5, y: 0.5)
+            wheel.endPoint = CGPoint(x: 0.5, y: 0)
+            layer?.addSublayer(wheel)
+            toolTip = "Custom"
+            setAccessibilityLabel("Custom color")
+        } else if case .tint(let color) = kind {
+            layer?.addSublayer(fill)
+            toolTip = color.name
+            setAccessibilityLabel(color.name)
+        }
+        setAccessibilityRole(.radioButton)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        Tokens.Motion.withoutAnimation {
+            ring.frame = bounds
+            ring.cornerRadius = bounds.width / 2
+            ring.borderWidth = 2
+            ring.borderColor = cgColor(isSelected ? Tokens.Color.textPrimary : .clear)
+            // The chosen swatch sits inside its ring; the others grow slightly under the pointer.
+            let inset: CGFloat = isSelected ? 4 : (isHovered ? 1 : 2)
+            let inner = bounds.insetBy(dx: inset, dy: inset)
+            fill.frame = inner
+            fill.cornerRadius = inner.width / 2
+            wheel.frame = inner
+            wheel.cornerRadius = inner.width / 2
+            wheel.masksToBounds = true
+            wheel.colors = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { cgColor(SpaceColor.swatch(hue: $0)) }
+            if case .tint(let color) = kind { fill.backgroundColor = cgColor(color.swatch) }
+        }
+        setAccessibilityValue(isSelected ? "selected" : nil)
+    }
+}
+
+/// Edits one space: its name and its tint. Rises from the space dots; the window itself is the preview.
 final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
-    private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Space name")
-    private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
-    private let swatches: SwatchPicker
+    private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
+    private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x6 + Tokens.Space.x1, toolTip: "Delete Space")
+    private var swatches: [TintSwatch] = []
     private let slider = HueSlider()
-    private let colorLabel = Label("Color", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
-    private let deleteButton = TextButton(title: "Delete Space", font: Tokens.Font.body(.medium))
+    private var showsSlider = false
     private var monitor: Any?
-    static let width: CGFloat = 288
 
     init(spaceID: UUID, controller: BrowserWindowController) {
         self.spaceID = spaceID
         self.controller = controller
-        let space = Library.shared.space(spaceID)
-        swatches = SwatchPicker(selected: space?.color ?? .sky)
         super.init(frame: .zero)
+        let space = Library.shared.space(spaceID)
         nameField.stringValue = space?.name ?? ""
         nameField.delegate = self
-        nameBackground.wantsLayer = true
-        nameBackground.layer?.cornerRadius = Tokens.Radius.row
-        nameBackground.layer?.cornerCurve = .continuous
-        slider.hue = space?.hue ?? space?.color.hue ?? 0.6
-        if space?.hue != nil { swatches.selected = .graphite; swatches.clearSelection() }
-        [nameBackground, nameField, colorLabel, swatches, slider, deleteButton].forEach { addSubview($0) }
+        swatches = SpaceColor.allCases.map { TintSwatch(kind: .tint($0)) } + [TintSwatch(kind: .custom)]
+        [nameField, deleteButton, slider].forEach { addSubview($0) }
+        swatches.forEach { addSubview($0) }
         deleteButton.isHidden = Library.shared.spaces.count < 2
-        deleteButton.textColor = Tokens.Color.destructive
+        deleteButton.tint = Tokens.Color.textSecondary
+        showsSlider = space?.hue != nil
+        slider.hue = space?.hue ?? space?.color.hue ?? 0.6
+        slider.isHidden = !showsSlider
+        refreshSelection()
 
-        swatches.onPick = { [weak self] color in
-            guard let self else { return }
-            Library.shared.setColor(color, for: self.spaceID)
-            self.slider.hue = color.hue
+        for swatch in swatches {
+            swatch.onClick = { [weak self, weak swatch] _ in
+                guard let self, let swatch else { return }
+                switch swatch.kind {
+                case .tint(let color):
+                    Library.shared.setColor(color, for: self.spaceID)
+                    self.slider.hue = color.hue
+                    self.setSliderVisible(false)
+                case .custom:
+                    Library.shared.setHue(self.slider.hue, for: self.spaceID)
+                    self.setSliderVisible(true)
+                }
+                self.refreshSelection()
+            }
         }
         slider.onChange = { [weak self] hue, final in
             guard let self else { return }
-            self.swatches.clearSelection()
             if final {
                 Library.shared.setHue(hue, for: self.spaceID)
             } else {
@@ -136,48 +198,76 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
         deleteButton.onClick = { [weak self] _ in
             guard let self, let controller = self.controller else { return }
+            let id = self.spaceID
             self.close()
-            SpaceEditor.confirmDelete(spaceID: self.spaceID, in: controller)
+            SpaceEditor.confirmDelete(spaceID: id, in: controller)
         }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private let pad = Tokens.Space.x4
+    private func refreshSelection() {
+        let space = Library.shared.space(spaceID)
+        for swatch in swatches {
+            switch swatch.kind {
+            case .tint(let color): swatch.isSelected = space?.hue == nil && space?.color == color
+            case .custom: swatch.isSelected = space?.hue != nil
+            }
+        }
+    }
 
-    var contentHeight: CGFloat {
-        pad + Tokens.Space.x10 + Tokens.Space.x4 + colorLabel.lineHeight + Tokens.Space.x2 + Tokens.Space.x6
-            + Tokens.Space.x3 + Tokens.Space.x6 + (deleteButton.isHidden ? 0 : Tokens.Space.x3 + Tokens.Space.x8) + pad
+    private let pad = Tokens.Space.x3
+    private let swatchSize = Tokens.Space.x6
+
+    private var height: CGFloat {
+        pad + Tokens.Space.x8 + Tokens.Space.x3 + swatchSize + (showsSlider ? Tokens.Space.x3 + Tokens.Space.x6 : 0) + pad + Tokens.Space.x1
     }
 
     private func layoutContent() {
         let width = bounds.width - pad * 2
-        var y = pad
-        nameBackground.frame = NSRect(x: pad, y: y, width: width, height: Tokens.Space.x10)
+        let b = deleteButton.frame.width
+        deleteButton.frame.origin = NSPoint(x: bounds.width - pad - b + Tokens.Space.x1, y: pad + (Tokens.Space.x8 - b) / 2)
         let fh = ceil(nameField.intrinsicContentSize.height)
-        nameField.frame = NSRect(x: pad + Tokens.Space.x3, y: y + (Tokens.Space.x10 - fh) / 2, width: width - Tokens.Space.x6, height: fh)
-        y = nameBackground.frame.maxY + Tokens.Space.x4
-        colorLabel.frame = NSRect(x: pad, y: y, width: width, height: colorLabel.lineHeight)
-        y = colorLabel.frame.maxY + Tokens.Space.x2
-        let sw = swatches.fittingWidth
-        swatches.frame = NSRect(x: pad + (width - sw) / 2, y: y, width: sw, height: Tokens.Space.x6)
-        y = swatches.frame.maxY + Tokens.Space.x3
-        slider.frame = NSRect(x: pad, y: y, width: width, height: Tokens.Space.x6)
-        y = slider.frame.maxY + Tokens.Space.x3
-        let dw = deleteButton.fittingWidth
-        deleteButton.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: dw, height: Tokens.Space.x8)
+        let nameRight = deleteButton.isHidden ? bounds.width - pad : deleteButton.frame.minX - Tokens.Space.x2
+        nameField.frame = NSRect(x: pad + Tokens.Space.x1, y: pad + (Tokens.Space.x8 - fh) / 2, width: nameRight - pad - Tokens.Space.x1, height: fh)
+        // Swatches spread evenly across the full width.
+        let y = pad + Tokens.Space.x8 + Tokens.Space.x3
+        let count = CGFloat(swatches.count)
+        let gap = (width - count * swatchSize) / max(count - 1, 1)
+        for (i, swatch) in swatches.enumerated() {
+            swatch.frame = NSRect(x: pad + CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
+        }
+        slider.frame = NSRect(x: pad, y: y + swatchSize + Tokens.Space.x3, width: width, height: Tokens.Space.x6)
     }
 
-    func show(near anchor: NSRect) {
+    private func setSliderVisible(_ visible: Bool) {
+        guard visible != showsSlider, let controller else { return }
+        showsSlider = visible
+        slider.isHidden = !visible
+        var frame = self.frame
+        let newHeight = height
+        frame.origin.y -= newHeight - frame.height
+        frame.size.height = newHeight
+        _ = controller
+        Tokens.Motion.animate(Tokens.Motion.snappy) { self.animator().frame = frame }
+        if visible {
+            slider.alphaValue = 0
+            Tokens.Motion.animate(Tokens.Motion.snappy) { self.slider.animator().alphaValue = 1 }
+        }
+    }
+
+    /// Opens just above the space dots, spanning the sidebar.
+    func show(above anchor: NSRect, sidebarFrame: NSRect) {
         guard let controller else { return }
         let overlay = controller.root.overlay
-        let x = controller.root.sidebarContainer.frame.maxX + Tokens.Space.x2
-        let height = contentHeight
-        let y = max(Tokens.Metric.cardInset * 2, min(anchor.minY - Tokens.Space.x2, overlay.bounds.height - height - Tokens.Metric.cardInset * 2))
-        frame = NSRect(x: x, y: y, width: Self.width, height: height)
+        let inset = Tokens.Space.x2
+        let width = sidebarFrame.width - inset * 2
+        let h = height
+        frame = NSRect(x: sidebarFrame.minX + inset, y: anchor.minY - h - Tokens.Space.x1, width: width, height: h)
         overlay.addSubview(self)
         present()
+        Tokens.Motion.slideVertically(self, fromOffsetY: Tokens.Space.x2)
         controller.window?.makeFirstResponder(nameField)
         nameField.currentEditor()?.selectAll(nil)
         controller.root.holdReveal = true
@@ -195,7 +285,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         controller?.root.holdReveal = false
         dismiss()
         if let webView = controller?.selectedWebView { controller?.window?.makeFirstResponder(webView) }
-        SpaceEditorPanel.current = nil
+        if SpaceEditorPanel.current === self { SpaceEditorPanel.current = nil }
     }
 
     private func commitName() {
@@ -215,7 +305,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     static weak var current: SpaceEditorPanel?
 
-    static func open(spaceID: UUID, anchor: NSRect, in controller: BrowserWindowController) {
+    static func open(spaceID: UUID, above anchor: NSRect, sidebarFrame: NSRect, in controller: BrowserWindowController) {
         if let current {
             let same = current.spaceID == spaceID
             current.close()
@@ -223,6 +313,6 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
         let panel = SpaceEditorPanel(spaceID: spaceID, controller: controller)
         current = panel
-        panel.show(near: anchor)
+        panel.show(above: anchor, sidebarFrame: sidebarFrame)
     }
 }

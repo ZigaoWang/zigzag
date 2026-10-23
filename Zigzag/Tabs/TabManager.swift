@@ -31,7 +31,7 @@ final class TabManager {
     /// Watches a tab so navigation inside it gets saved for crash recovery.
     private func watch(_ tab: Tab) {
         tabTokens[tab.id] = tab.changed.observe { [weak self] change in
-            if change == .url || change == .title { self?.changed.send(.content) }
+            if change == .url || change == .title || change == .audio { self?.changed.send(.content) }
         }
     }
     private var suspendTimer: Timer?

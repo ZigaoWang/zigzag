@@ -54,6 +54,7 @@
 		DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9088949B9C029636E9E355 /* Updater.swift */; };
 		E38366D663CE427B640F71A5 /* PeekController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB43BE39C48B06C807284C2 /* PeekController.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
+		EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */; };
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
 /* End PBXBuildFile section */
@@ -85,6 +86,7 @@
 		6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBar.swift; sourceTree = "<group>"; };
 		66958B9657E4B52FE56AA408 /* TabPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPreview.swift; sourceTree = "<group>"; };
 		672B7AF38828D9E9738B29FD /* LinkStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkStatus.swift; sourceTree = "<group>"; };
+		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		765C1F36BCEE463F8B5316BE /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paths.swift; sourceTree = "<group>"; };
 		77478845778FB285ADD29C14 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
@@ -162,6 +164,7 @@
 			isa = PBXGroup;
 			children = (
 				192303361A76A758A8F9346F /* FaviconView.swift */,
+				6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */,
 				15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */,
 				9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */,
 				32D47467F8351F9270BAE20A /* SidebarRows.swift */,
@@ -425,6 +428,7 @@
 				CF63705B985B423D3B9EC482 /* Library.swift in Sources */,
 				B739E540C2AEA048EEC341DE /* LinkStatus.swift in Sources */,
 				75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */,
+				EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */,
 				55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */,
 				696A9156848EC86706D34804 /* PageDialogs.swift in Sources */,
 				C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */,

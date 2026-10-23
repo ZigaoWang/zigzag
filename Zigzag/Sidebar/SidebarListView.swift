@@ -232,6 +232,7 @@ final class SidebarListView: NSView {
         switch item {
         case .header:
             (view as? SpaceHeaderView)?.label.stringValue = Library.shared.space(shownSpaceID ?? manager.currentSpaceID)?.name ?? ""
+            view.needsLayout = true
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }

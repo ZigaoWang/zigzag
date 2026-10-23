@@ -38,7 +38,7 @@ final class DockTileView: NSView {
     var progress: Double = 0
 
     override func draw(_ dirtyRect: NSRect) {
-        NSApp.applicationIconImage.draw(in: bounds)
+        NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath).draw(in: bounds)
         let barHeight = bounds.height * 0.09
         let inset = bounds.width * 0.14
         let track = NSRect(x: inset, y: bounds.height * 0.12, width: bounds.width - inset * 2, height: barHeight)

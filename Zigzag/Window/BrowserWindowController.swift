@@ -48,6 +48,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.onSlide = { [weak self] duration in self?.sidebarSliding(duration) }
 
         sidebar.delegate = self
+        sidebar.onEditSpace = { [weak self] id in self?.openSpaceEditor(id) }
         sidebar.onSwipeSpace = { [weak self] offset in
             guard let self else { return false }
             let before = self.tabManager.currentSpaceID
@@ -57,6 +58,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
+        sidebar.nowPlaying.onClick = { [weak self] _ in
+            if let tab = self?.nowPlayingTab { self?.tabManager.select(tab) }
+        }
+        sidebar.nowPlaying.playButton.onClick = { [weak self] _ in
+            guard let tab = self?.nowPlayingTab else { return }
+            tab.setPlaybackPaused(!tab.isPlaybackPaused)
+        }
+        sidebar.nowPlaying.muteButton.onClick = { [weak self] _ in
+            guard let tab = self?.nowPlayingTab else { return }
+            tab.setMuted(!tab.isMuted)
+        }
         sidebar.reloadButton.onClick = { [weak self] _ in
             guard let tab = self?.tabManager.selectedTab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()
@@ -104,7 +116,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .space:
             spaceChanged()
         case .content:
-            break
+            updateNowPlaying()
         }
         onStateChange?()
     }
@@ -139,9 +151,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Opens the editor for a space next to the sidebar, aligned with the row that asked.
-    func openSpaceEditor(_ spaceID: UUID, anchor: NSView?) {
-        let rect = anchor.map { $0.convert($0.bounds, to: root.overlay) } ?? NSRect(x: 0, y: root.bounds.height / 3, width: 1, height: 1)
-        SpaceEditorPanel.open(spaceID: spaceID, anchor: rect, in: self)
+    func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
+        // The editor always rises from the space dots, whichever control opened it.
+        if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
+        let dots = sidebar.dotsAnchor
+        let rect = dots.convert(dots.bounds, to: root.overlay)
+        SpaceEditorPanel.open(spaceID: spaceID, above: rect, sidebarFrame: root.sidebarContainer.frame, in: self)
     }
 
     private func applySpaceColor(animated: Bool) {
@@ -168,6 +183,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.list.refreshRows()
         updateWindowTitle()
         refreshExtensionActions()
+        updateNowPlaying()
+    }
+
+    private weak var nowPlayingTab: Tab?
+
+    /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at.
+    private func updateNowPlaying() {
+        let selected = tabManager.selectedTab
+        let candidates = tabManager.recentTabs.filter { ($0.isPlayingAudio || $0.isPlaybackPaused) && $0 !== selected }
+        let tab = candidates.first
+        nowPlayingTab = tab
+        sidebar.setNowPlaying(tab, paused: tab?.isPlaybackPaused ?? false)
     }
 
     func refreshExtensionActions() {

@@ -44,6 +44,7 @@ targets:
       path: Zigzag/Info.plist
       properties:
         CFBundleDisplayName: Zigzag
+        CFBundleIconName: AppIcon
         CFBundleName: Zigzag
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)

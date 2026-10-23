@@ -135,6 +135,7 @@ final class SidebarView: NSView {
     private let scrollView = NSScrollView()
 
     private let bottomBar = NSView()
+    let nowPlaying = NowPlayingView()
     private let downloadsButton = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
     private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
     private var dots: [SpaceDotView] = []
@@ -171,6 +172,8 @@ final class SidebarView: NSView {
         addSubview(topSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
 
+        nowPlaying.isHidden = true
+        addSubview(nowPlaying)
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
@@ -219,7 +222,10 @@ final class SidebarView: NSView {
         let bottomHeight = Tokens.Metric.bottomBarHeight
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight - pad, width: width, height: bottomHeight)
         let listTop = address.frame.maxY + Tokens.Metric.sectionGap
-        scrollView.frame = NSRect(x: pad, y: listTop, width: width - pad * 2, height: bottomBar.frame.minY - listTop)
+        let playingHeight = Tokens.Space.x10
+        nowPlaying.frame = NSRect(x: pad, y: bottomBar.frame.minY - playingHeight, width: width - pad * 2, height: playingHeight)
+        let listBottom = nowPlaying.isHidden ? bottomBar.frame.minY : nowPlaying.frame.minY - Tokens.Space.x1
+        scrollView.frame = NSRect(x: pad, y: listTop, width: width - pad * 2, height: listBottom - listTop)
         topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
         if list.frame.width != scrollView.contentSize.width {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
@@ -233,9 +239,10 @@ final class SidebarView: NSView {
         let h = bottomBar.bounds.height
         downloadsButton.frame = NSRect(x: pad, y: (h - button) / 2, width: button, height: button)
         newSpaceButton.frame = NSRect(x: bottomBar.bounds.width - pad - button, y: (h - button) / 2, width: button, height: button)
-        let dotSize = Tokens.Space.x6
+        let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
+        let dotSize = min(Tokens.Space.x6, floor(available / CGFloat(max(dots.count, 1))))
         let total = CGFloat(dots.count) * dotSize
-        var x = (bottomBar.bounds.width - total) / 2
+        var x = downloadsButton.frame.maxX + Tokens.Space.x1 + (available - total) / 2
         for dot in dots {
             dot.frame = NSRect(x: x, y: (h - dotSize) / 2, width: dotSize, height: dotSize)
             x += dotSize
@@ -268,7 +275,12 @@ final class SidebarView: NSView {
             dots.forEach { $0.removeFromSuperview() }
             dots = spaces.map { space in
                 let dot = SpaceDotView(spaceID: space.id)
-                dot.onClick = { [weak self] _ in self?.delegate?.sidebarSwitchSpace(space.id) }
+                dot.onClick = { [weak self, weak dot] _ in
+                    guard let self, let dot else { return }
+                    // Clicking the space you're in edits it; clicking another switches to it.
+                    if dot.isSelected { self.onEditSpace?(space.id) } else { self.delegate?.sidebarSwitchSpace(space.id) }
+                }
+                dot.onDoubleClick = { [weak self] in self?.onEditSpace?(space.id) }
                 dot.onRightClick = { [weak self] _ in self?.delegate?.sidebarSpaceMenu(for: space.id) }
                 bottomBar.addSubview(dot)
                 return dot
@@ -287,6 +299,23 @@ final class SidebarView: NSView {
     }
 
     func dot(for spaceID: UUID) -> NSView? { dots.first { $0.spaceID == spaceID } }
+
+    /// The row of space dots, which the space editor rises from.
+    var dotsAnchor: NSView { bottomBar }
+    var onEditSpace: ((UUID) -> Void)?
+
+    /// Shows (or hides) the now-playing control, sliding the list up to make room.
+    func setNowPlaying(_ tab: Tab?, paused: Bool) {
+        let show = tab != nil
+        if let tab { nowPlaying.isPaused = paused; nowPlaying.show(tab) }
+        guard show == nowPlaying.isHidden else { return }
+        nowPlaying.isHidden = !show
+        needsLayout = true
+        if show {
+            nowPlaying.alphaValue = 0
+            Tokens.Motion.animate(Tokens.Motion.snappy) { self.nowPlaying.animator().alphaValue = 1 }
+        }
+    }
 
     func previewDotColor(_ color: NSColor, for spaceID: UUID) {
         dots.first { $0.spaceID == spaceID }?.color = color

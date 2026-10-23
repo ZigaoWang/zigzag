@@ -233,6 +233,16 @@ final class Tab: NSObject {
         changed.send(.audio)
     }
 
+    /// Pauses (or resumes) everything the page is playing, through WebKit's own media control.
+    private(set) var isPlaybackPaused = false
+
+    func setPlaybackPaused(_ paused: Bool) {
+        guard let webView else { return }
+        isPlaybackPaused = paused
+        webView.setAllMediaPlaybackSuspended(paused) { }
+        changed.send(.audio)
+    }
+
     // MARK: Snapshots
 
     func captureSnapshot(_ completion: (() -> Void)? = nil) {

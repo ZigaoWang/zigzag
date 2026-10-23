@@ -231,7 +231,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         renameSpace(nil)
     }
     @objc func renameSpace(_ sender: Any?) {
-        openSpaceEditor(tabManager.currentSpaceID, anchor: sidebar.list.headerView)
+        openSpaceEditor(tabManager.currentSpaceID)
     }
 
     // MARK: Validation
