@@ -80,7 +80,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     enum Mode { case newTab, editCurrent, history }
 
     private weak var controller: BrowserWindowController?
-    private let scrim = ScrimView()
+    /// Catches clicks outside the bar; it doesn't dim the page.
+    private let scrim = ScrimView(dims: false)
     private let panel = FloatingPanelView()
     private let field = PlainTextField(font: Tokens.Font.large(), placeholder: "Search or enter address")
     private let fieldIcon = NSImageView()
@@ -88,7 +89,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var rows: [CommandRowView] = []
     private var results: [CommandResult] = []
     private var selectedIndex = 0
-    private var mode: Mode = .newTab
+    private(set) var mode: Mode = .newTab
     private var suggestions: [String] = []
     private let fetcher = SuggestionFetcher()
     /// Text the user actually typed; the field may also hold an inline completion after it.
@@ -382,8 +383,8 @@ extension CommandBarController {
 final class ScrimView: ColorView {
     var onClick: (() -> Void)?
 
-    init() {
-        super.init(color: Tokens.Color.scrim)
+    init(dims: Bool = true) {
+        super.init(color: dims ? Tokens.Color.scrim : nil)
         layer?.cornerRadius = Tokens.Radius.card
         layer?.cornerCurve = .continuous
     }

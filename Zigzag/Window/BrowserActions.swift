@@ -8,8 +8,15 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: File
 
-    @objc func newTab(_ sender: Any?) { commandBar.show(mode: .newTab) }
-    @objc func openLocation(_ sender: Any?) { commandBar.show(mode: .editCurrent) }
+    /// Pressing the same shortcut again closes the command bar, like Raycast.
+    @objc func newTab(_ sender: Any?) {
+        if commandBar.isVisible && commandBar.mode == .newTab { commandBar.dismiss(); return }
+        commandBar.show(mode: .newTab)
+    }
+    @objc func openLocation(_ sender: Any?) {
+        if commandBar.isVisible && commandBar.mode == .editCurrent { commandBar.dismiss(); return }
+        commandBar.show(mode: .editCurrent)
+    }
     @objc func closeTab(_ sender: Any?) {
         if commandBar.isVisible { commandBar.dismiss(); return }
         if dismissFloatingContent() { return }
@@ -90,7 +97,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: View
 
-    @objc func toggleSidebar(_ sender: Any?) {
+    @objc func toggleBrowserSidebar(_ sender: Any?) {
         root.setSidebarVisible(!root.sidebarVisible, animated: true)
         onStateChange?()
     }
@@ -160,7 +167,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let peek = peekController, peek.isVisible { peek.goForward(); return }
         selectedTab?.goForward()
     }
-    @objc func searchHistory(_ sender: Any?) { commandBar.show(mode: .history) }
+    @objc func searchHistory(_ sender: Any?) {
+        if commandBar.isVisible && commandBar.mode == .history { commandBar.dismiss(); return }
+        commandBar.show(mode: .history)
+    }
 
     // MARK: Bookmarks
 
@@ -240,7 +250,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return tab != nil && findBar.hasQuery
         case #selector(stopLoading(_:)): return tab?.isLoading ?? false
         case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
-        case #selector(toggleSidebar(_:)):
+        case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
             return true
         case #selector(toggleBookmark(_:)):

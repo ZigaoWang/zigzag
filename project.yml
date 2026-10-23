@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     macOS: "15.0"
   createIntermediateGroups: true
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.6.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -11,6 +15,7 @@ settings:
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     MACOSX_DEPLOYMENT_TARGET: "15.0"
     MARKETING_VERSION: "0.1.0"
+    SPARKLE_PUBLIC_KEY: ""
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
@@ -21,6 +26,8 @@ settings:
       CODE_SIGN_IDENTITY: "-"
     Release:
       CODE_SIGN_IDENTITY: "Developer ID Application"
+      SPARKLE_PUBLIC_KEY: fcLCAtuyhCGTC62F2cDfj/vAMXgFvrpQSyF3540+hq0=
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
       OTHER_CODE_SIGN_FLAGS: "--timestamp"
 targets:
   Zigzag:
@@ -28,7 +35,8 @@ targets:
     platform: macOS
     sources:
       - path: Zigzag
-    resources: []
+    dependencies:
+      - package: Sparkle
     info:
       path: Zigzag/Info.plist
       properties:
@@ -37,6 +45,11 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
+        SUFeedURL: https://github.com/ZigaoWang/zigzag/releases/latest/download/appcast.xml
+        SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
+        SUEnableAutomaticChecks: true
+        SUAutomaticallyUpdate: true
+        SUScheduledCheckInterval: 86400
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true

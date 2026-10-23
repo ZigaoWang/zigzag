@@ -42,6 +42,12 @@ final class BrowserWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
+    /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let menu = NSApp.mainMenu, menu.performKeyEquivalent(with: event) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if let eventInterceptor, eventInterceptor(event) { return }
         super.sendEvent(event)
@@ -55,6 +61,7 @@ final class BrowserWindow: NSWindow {
     var trafficLightsHidden = false {
         didSet { buttons.forEach { $0.isHidden = trafficLightsHidden } }
     }
+
 
     /// Moves the system buttons into our top row. AppKit re-lays them out on resize, so this runs often.
     func layoutTrafficLights() {
@@ -79,8 +86,22 @@ final class BrowserWindow: NSWindow {
         for (index, button) in buttons.enumerated() {
             let x = origin.x + CGFloat(index) * spacing
             let y = titlebar.frame.height - origin.y - height
-            if button.frame.origin != NSPoint(x: x, y: y) { button.setFrameOrigin(NSPoint(x: x, y: y)) }
+            if button.frame.origin != NSPoint(x: x, y: y) {
+                button.setFrameOrigin(NSPoint(x: x, y: y))
+            }
         }
+    }
+
+    /// A picture of the three buttons, so they can travel with the sidebar while it slides.
+    func trafficLightsImage() -> NSImage? {
+        guard let close = standardWindowButton(.closeButton), let zoom = standardWindowButton(.zoomButton),
+              let titlebar = close.superview, !close.isHidden else { return nil }
+        let rect = NSRect(x: close.frame.minX, y: close.frame.minY, width: zoom.frame.maxX - close.frame.minX, height: close.frame.height)
+        guard let rep = titlebar.bitmapImageRepForCachingDisplay(in: rect) else { return nil }
+        titlebar.cacheDisplay(in: rect, to: rep)
+        let image = NSImage(size: rect.size)
+        image.addRepresentation(rep)
+        return image
     }
 
     /// Width the traffic lights take up, including their trailing gap.

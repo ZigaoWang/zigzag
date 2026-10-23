@@ -221,7 +221,7 @@ final class Label: NSTextField {
     /// Exact width of the text, plus the cell's own padding.
     var textWidth: CGFloat {
         let width = (stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width
-        return ceil(width) + Tokens.Space.x1
+        return ceil(width) + Tokens.Space.x2
     }
 
     /// Height of one line in this label's font.

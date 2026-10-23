@@ -117,8 +117,23 @@ enum Tokens {
         static var gentle: Animation { .spring(duration: large, bounce: 0.04) }
         static var feedback: Animation { .spring(duration: quick, bounce: 0) }
 
+        /// True while handling a keypress. Keyboard actions take effect instantly; only pointer actions animate
+        /// (the Raycast rule: the keyboard is for speed).
+        static var isKeyboardDriven: Bool {
+            guard let type = NSApp.currentEvent?.type else { return false }
+            return type == .keyDown || type == .keyUp || type == .flagsChanged
+        }
+
         /// Runs AppKit animator() changes with a spring.
         static func animate(_ animation: Animation = snappy, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+            if isKeyboardDriven {
+                NSAnimationContext.runAnimationGroup({ ctx in
+                    ctx.duration = 0
+                    ctx.allowsImplicitAnimation = false
+                    changes()
+                }, completionHandler: completion)
+                return
+            }
             if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
                 NSAnimationContext.runAnimationGroup({ ctx in
                     ctx.duration = quick

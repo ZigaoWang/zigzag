@@ -25,7 +25,7 @@ enum DebugBridge {
         case "open": if let url = URL(string: arg) { controller.open(url, disposition: .foregroundTab, allowSwitch: false) }
         case "bg": if let url = URL(string: arg) { controller.open(url, disposition: .backgroundTab, allowSwitch: false) }
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
-        case "sidebar": controller.toggleSidebar(nil)
+        case "sidebar": controller.toggleBrowserSidebar(nil)
         case "reveal": controller.root.reveal(true)
         case "commandbar": controller.commandBar.show(mode: .newTab); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "enter": controller.commandBar.debugEnter()
@@ -124,6 +124,50 @@ enum DebugBridge {
         case "linkfrom":
             // Simulates a Cmd-click on a link in the current page.
             if let tab = controller.tabManager.selectedTab, let url = URL(string: arg) { controller.tab(tab, openURL: url, disposition: .foregroundTab) }
+        case "arcimport":
+            let r = ArcImporter.importAll()
+            debugLog("arc import: spaces=\(r.result.spaces) bookmarks=\(r.result.bookmarks) history=\(r.result.historyEntries)")
+            if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
+        case "welcome": controller.showWelcome()
+        case "key":
+            // key <char> [cmd|shift|ctrl|opt...] — goes through the real event path, menus included.
+            let f = arg.split(separator: " ").map(String.init)
+            guard let ch = f.first, let window = controller.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            for m in f.dropFirst() {
+                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
+            }
+            let chars = ch == "esc" ? "\u{1b}" : ch == "tab" ? "\t" : ch
+            let codes: [String: UInt16] = ["s": 1, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3]
+            if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                        windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                        isARepeat: false, keyCode: codes[ch] ?? 0) {
+                NSApp.postEvent(e, atStart: false)
+            }
+        case "tlshot":
+            if let image = (controller.window as? BrowserWindow)?.trafficLightsImage(), let tiff = image.tiffRepresentation,
+               let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
+                try? png.write(to: URL(fileURLWithPath: arg))
+            }
+        case "swipe":
+            // swipe <dx per step>: a synthetic two-finger horizontal swipe over the sidebar.
+            guard let window = controller.window, let dx = Int32(arg) else { break }
+            let screenPoint = window.convertPoint(toScreen: NSPoint(x: 100, y: window.frame.height - 300))
+            let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
+            var phases: [Int64] = [1]
+            phases += Array(repeating: 2, count: 12)
+            phases.append(4)
+            for (i, phase) in phases.enumerated() {
+                let d: Int32 = phase == 2 ? dx : 0
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
+                cg.location = flipped
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(d))
+                if let event = NSEvent(cgEvent: cg) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
+                }
+            }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

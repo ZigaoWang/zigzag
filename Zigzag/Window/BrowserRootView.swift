@@ -82,6 +82,8 @@ final class BrowserRootView: ColorView {
     var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
+    /// Called with true when the sidebar starts sliding and false when it stops.
+    var onSlide: ((Bool) -> Void)?
     var onSidebarWidthChange: ((CGFloat) -> Void)?
 
     private var trackingArea: NSTrackingArea?
@@ -152,14 +154,16 @@ final class BrowserRootView: ColorView {
         let wasRevealed = sidebarRevealed
         sidebarVisible = visible
         sidebarRevealed = false
+        watchPointer(false)
         if !visible && wasRevealed { sidebarRevealed = false }
-        guard animated else { needsLayout = true; return }
+        guard animated, !Tokens.Motion.isKeyboardDriven else { needsLayout = true; return }
         sidebarContainer.isFloating = !visible
-        onLayoutChange?()
+        onSlide?(true)
         Tokens.Motion.animate(Tokens.Motion.snappy, {
             self.card.animator().frame = self.cardFrame
             self.sidebarContainer.animator().frame = visible ? self.sidebarFrame : NSRect(x: -self.sidebarWidth, y: 0, width: self.sidebarWidth, height: self.bounds.height)
         }, completion: {
+            self.onSlide?(false)
             self.needsLayout = true
             self.onLayoutChange?()
         })
@@ -196,14 +200,46 @@ final class BrowserRootView: ColorView {
         revealDebouncer.cancel()
     }
 
+    private var pointerTimer: Timer?
+
+    /// While the sidebar floats, follow the pointer itself: web views swallow mouse-moved events,
+    /// so tracking areas alone can't tell when you've left.
+    private func watchPointer(_ on: Bool) {
+        pointerTimer?.invalidate()
+        pointerTimer = nil
+        guard on else { return }
+        pointerTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let window = self.window, self.sidebarRevealed else { return }
+                let point = self.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+                let keep = self.sidebarContainer.frame.insetBy(dx: -Tokens.Space.x2, dy: -Tokens.Space.x2).contains(point)
+                if keep || self.holdReveal || NSEvent.pressedMouseButtons != 0 {
+                    self.pointerLeftAt = nil
+                } else if let left = self.pointerLeftAt {
+                    if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { self.pointerLeftAt = nil; self.reveal(false) }
+                } else {
+                    self.pointerLeftAt = Date()
+                }
+            }
+        }
+    }
+
+    private var pointerLeftAt: Date?
+
     func reveal(_ show: Bool) {
         guard !sidebarVisible, show != sidebarRevealed else { return }
         if !show && holdReveal { return }
         sidebarRevealed = show
-        onLayoutChange?()
+        watchPointer(show)
+        // The real traffic lights can't animate; a picture of them rides along inside the sliding sidebar.
+        onSlide?(true)
+        let target = sidebarFrame
         Tokens.Motion.animate(Tokens.Motion.snappy, {
-            self.sidebarContainer.animator().frame = self.sidebarFrame
-        }, completion: { self.onLayoutChange?() })
+            self.sidebarContainer.animator().frame = target
+        }, completion: {
+            self.onSlide?(false)
+            self.onLayoutChange?()
+        })
     }
 
     /// True while the sidebar is in its floating, slid-in state.

@@ -42,6 +42,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.peek.reposition()
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
+        root.onSlide = { [weak self] sliding in self?.sidebarSliding(sliding) }
 
         sidebar.delegate = self
         sidebar.onSwipeSpace = { [weak self] offset in
@@ -51,6 +52,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return before != self.tabManager.currentSpaceID
         }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
+        sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
         sidebar.reloadButton.onClick = { [weak self] _ in
             guard let tab = self?.tabManager.selectedTab else { return }
@@ -72,6 +74,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
+        sidebar.currentSpaceID = tabManager.currentSpaceID
         sidebar.list.reload(animated: false)
         showSelectedTab()
         downloadsChanged()
@@ -111,6 +114,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let newIndex = spaces.firstIndex { $0.id == tabManager.currentSpaceID } ?? 0
         let snapshot = sidebar.listSnapshot()
         lastSpaceID = tabManager.currentSpaceID
+        sidebar.currentSpaceID = tabManager.currentSpaceID
         applySpaceColor(animated: true)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
@@ -125,13 +129,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
         let color = tabManager.currentSpace.color.background
-        root.setColor(color, animated: animated)
+        root.setColor(color, animated: animated && !Tokens.Motion.isKeyboardDriven)
         root.sidebarContainer.tint = color
     }
 
     private func showSelectedTab() {
         previews.hide()
         let tab = tabManager.selectedTab
+        if tab != nil { dismissWelcome() }
         if tab !== shownTab {
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
@@ -188,8 +193,32 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Traffic lights
 
+    private var isSliding = false
+    private var trafficLightsPicture: NSImage?
+
+    /// While the sidebar slides, the real buttons hide and their picture moves with the sidebar.
+    private var slideSafety: DispatchWorkItem?
+
+    private func sidebarSliding(_ sliding: Bool) {
+        isSliding = sliding
+        slideSafety?.cancel()
+        if sliding {
+            // Whatever happens to the animation, the real buttons come back.
+            let safety = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.sidebarSliding(false) } }
+            slideSafety = safety
+            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.large + 0.2, execute: safety)
+            if let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
+            sidebar.showTrafficLightsPicture(trafficLightsPicture)
+            browserWindow.trafficLightsHidden = true
+        } else {
+            sidebar.showTrafficLightsPicture(nil)
+            layoutTrafficLights()
+        }
+    }
+
     private func layoutTrafficLights() {
         let window = browserWindow
+        if isSliding { return }
         let floating = root.isSidebarFloatingVisible
         let docked = root.sidebarVisible
         window.trafficLightsHidden = !(docked || floating)
@@ -198,6 +227,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let x = (docked ? 0 : container.minX) + Tokens.Metric.sidebarPadding + Tokens.Space.x2
         let y = (docked ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
+        if docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        sidebar.trafficLightsWidth = window.trafficLightsWidth
+        sidebar.sidebarButton.toolTip = docked ? "Hide Sidebar (⌃⌘S)" : "Show Sidebar (⌃⌘S)"
+        sidebar.sidebarButton.isSelected = false
     }
 
     func windowDidResize(_ notification: Notification) { layoutTrafficLights(); onStateChange?() }
@@ -242,6 +275,38 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab)
     }
 
+    private var welcome: WelcomeView?
+
+    /// First launch on a Mac with Arc: offer the one-step import inside the empty page.
+    func showWelcome() {
+        let view = WelcomeView()
+        view.frame = root.card.bounds
+        view.autoresizingMask = [.width, .height]
+        root.card.addSubview(view)
+        welcome = view
+        view.onImport = { [weak self] in
+            self?.dismissWelcome()
+            ArcImporter.runInteractive()
+        }
+        view.onSkip = { [weak self] in
+            UserDefaults.standard.set(true, forKey: "ArcOfferDismissed")
+            self?.dismissWelcome()
+            self?.commandBar.show(mode: .newTab)
+        }
+    }
+
+    private func dismissWelcome() {
+        guard let welcome else { return }
+        self.welcome = nil
+        Tokens.Motion.animate(Tokens.Motion.feedback, { welcome.animator().alphaValue = 0 }, completion: { welcome.removeFromSuperview() })
+    }
+
+    private func sidebarContains(_ event: NSEvent) -> Bool {
+        let container = root.sidebarContainer
+        guard root.sidebarVisible || root.isSidebarFloatingVisible else { return false }
+        return container.bounds.contains(container.convert(event.locationInWindow, from: nil))
+    }
+
     /// Closes peek, find, previews: whatever floats above the page. Returns true if something closed.
     func dismissFloatingContent() -> Bool {
         if peek.isVisible { peek.close(); return true }
@@ -253,6 +318,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
+        if event.type == .scrollWheel {
+            debugLog("scroll phase=\(event.phase.rawValue) mom=\(event.momentumPhase.rawValue) dx=\(event.scrollingDeltaX) dy=\(event.scrollingDeltaY) precise=\(event.hasPreciseScrollingDeltas) inSidebar=\(sidebarContains(event))")
+        }
+        if event.type == .scrollWheel, !desk.isVisible, sidebarContains(event), sidebar.handleSwipe(event) { return true }
         if event.type == .magnify || event.type == .gesture, desk.handleMagnify(event) { return true }
         if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
            ExtensionHost.shared.performCommand(for: event) {

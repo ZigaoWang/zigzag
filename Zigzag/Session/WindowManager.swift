@@ -69,6 +69,8 @@ final class WindowManager {
         controller.showWindow(nil)
         if let url {
             manager.newTab(url: url)
+        } else if !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ArcOfferDismissed"), ArcImporter.isAvailable {
+            controller.showWelcome()
         } else if showCommandBar {
             controller.commandBar.show(mode: .newTab)
         }

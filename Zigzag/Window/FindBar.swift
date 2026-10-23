@@ -218,9 +218,9 @@ class FloatingPanelView: NSView {
 
     /// Springs in: a short scale up from 97% with a fade.
     func present() {
-        alphaValue = 0
         layoutSubtreeIfNeeded()
-        guard let layer else { alphaValue = 1; return }
+        guard let layer, !Tokens.Motion.isKeyboardDriven else { alphaValue = 1; return }
+        alphaValue = 0
         let scale = Tokens.Motion.springAnimation(keyPath: "transform")
         let from = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-bounds.midX, -bounds.midY, 0), CATransform3DMakeScale(0.97, 0.97, 1)), CATransform3DMakeTranslation(bounds.midX, bounds.midY, 0))
         scale.fromValue = from

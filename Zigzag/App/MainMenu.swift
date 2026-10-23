@@ -86,7 +86,7 @@ enum MainMenu {
         ]))
 
         main.addItem(submenu("View", [
-            item("Hide Sidebar", #selector(C.toggleSidebar(_:)), "s"),
+            item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.command, .control]),
             item("Show All Tabs", #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             .separator(),
             item("Reload Page", #selector(C.reloadPage(_:)), "r"),
