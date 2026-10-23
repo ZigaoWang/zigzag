@@ -435,6 +435,8 @@ final class SidebarListView: NSView {
         panel.hasShadow = true
         panel.level = .floating
         panel.ignoresMouseEvents = true
+        // See-through enough to show where it's going.
+        panel.alphaValue = 0.6
         panel.appearance = window?.effectiveAppearance
         let content = ColorView(color: Tokens.Color.panelBackground)
         content.wantsLayer = true
