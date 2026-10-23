@@ -37,9 +37,12 @@ enum SpaceColor: String, Codable, CaseIterable {
     }
 
     /// Any hue, at the same tuned lightness as the curated tints, so every choice looks right in both modes.
-    static func background(hue: Double) -> NSColor {
-        Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.13, brightness: 0.95, alpha: 1),
-                             dark: NSColor(hue: hue, saturation: 0.32, brightness: 0.17, alpha: 1))
+    static let defaultIntensity = 0.4
+
+    static func background(hue: Double, intensity: Double = defaultIntensity) -> NSColor {
+        let t = min(max(intensity, 0), 1)
+        return Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.04 + 0.26 * t, brightness: 0.96 - 0.04 * t, alpha: 1),
+                                    dark: NSColor(hue: hue, saturation: 0.12 + 0.45 * t, brightness: 0.15 + 0.06 * t, alpha: 1))
     }
 
     static func swatch(hue: Double) -> NSColor {
