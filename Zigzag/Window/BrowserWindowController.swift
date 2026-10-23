@@ -58,6 +58,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
+        sidebar.address.captureButton.onClick = { [weak self] _ in
+            guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
+            let menu = NSMenu()
+            menu.addItem(SidebarMenus.Item("Stop Camera and Microphone") { tab.stopCapture() })
+            menu.addItem(SidebarMenus.Item("Ask Again Next Time") { SitePermissions.forget(host: host) })
+            let button = self.sidebar.address.captureButton
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+        }
         sidebar.nowPlaying.onClick = { [weak self] _ in
             if let tab = self?.nowPlayingTab { self?.tabManager.select(tab) }
         }
@@ -186,6 +194,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.update(tab: tab)
         sidebar.list.refreshRows()
+        sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
         refreshExtensionActions()
         updateNowPlaying()
@@ -223,6 +232,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateWindowTitle()
         case .webView:
             if let webView = tab.webView, root.card.webView !== webView { root.card.show(webView) }
+        case .capture:
+            sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
         default:
             break
         }

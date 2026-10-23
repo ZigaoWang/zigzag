@@ -12,6 +12,17 @@ protocol SidebarDelegate: SidebarListDelegate {
 final class AddressView: InteractiveView {
     private let label = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
+    /// Shows while the page uses the camera or microphone; click for options.
+    let captureButton = IconButton(symbol: "video.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Using your camera")
+
+    func setCapture(camera: Bool, microphone: Bool) {
+        captureButton.isHidden = !(camera || microphone)
+        captureButton.symbol = camera ? "video.fill" : "mic.fill"
+        captureButton.tint = .systemOrange
+        captureButton.toolTip = camera && microphone ? "Using your camera and microphone" : camera ? "Using your camera" : "Using your microphone"
+        needsLayout = true
+    }
+
     /// Extension buttons (1Password) at the trailing end, like Safari's address bar.
     private(set) var actionButtons: [IconButton] = []
 
@@ -35,6 +46,8 @@ final class AddressView: InteractiveView {
         lock.contentTintColor = Tokens.Color.textTertiary
         addSubview(lock)
         addSubview(label)
+        captureButton.isHidden = true
+        addSubview(captureButton)
         setAccessibilityRole(.button)
         setAccessibilityHelp("Opens the command bar")
     }
@@ -67,12 +80,12 @@ final class AddressView: InteractiveView {
             x = lock.frame.maxX + Tokens.Space.x1
         }
         var right = bounds.width - Tokens.Space.x1
-        for button in actionButtons.reversed() {
+        for button in (actionButtons + (captureButton.isHidden ? [] : [captureButton])).reversed() {
             let side = Tokens.Space.x6
             button.frame = NSRect(x: right - side, y: (bounds.height - side) / 2, width: side, height: side)
             right = button.frame.minX
         }
-        let trailing = actionButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
+        let trailing = actionButtons.isEmpty && captureButton.isHidden ? bounds.width - pad : right - Tokens.Space.x1
         let h = ceil(label.intrinsicContentSize.height)
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: trailing - x, height: h)
     }

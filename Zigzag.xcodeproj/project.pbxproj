@@ -28,6 +28,7 @@
 		66E5020894B420AEB3943EAC /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 256245226DA14768B001589E /* Tokens.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
+		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
 		75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C34787271E39E26E0156FC /* MainMenu.swift */; };
 		793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */; };
 		7C8E072F95543D8F9533BB85 /* BrowserActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */; };
@@ -107,6 +108,7 @@
 		CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageDialogs.swift; sourceTree = "<group>"; };
 		CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarModel.swift; sourceTree = "<group>"; };
 		CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
+		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
 		D3EF002AF6A129FB4291D7A1 /* Zigzag.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zigzag.entitlements; sourceTree = "<group>"; };
 		D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconStore.swift; sourceTree = "<group>"; };
 		DF9088949B9C029636E9E355 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
@@ -238,6 +240,7 @@
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
 				CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */,
 				1EE88C88464115895D3647DF /* PopupWindowController.swift */,
+				CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */,
 				1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */,
 			);
 			path = Web;
@@ -444,6 +447,7 @@
 				D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */,
 				9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */,
 				6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */,
+				6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */,
 				D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */,
 				0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */,
 				8CB207822183B9D650B3F443 /* Tab.swift in Sources */,

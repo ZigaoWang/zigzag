@@ -23,7 +23,7 @@ enum OpenDisposition {
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
-        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView
+        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture
     }
 
     let id: UUID
@@ -249,6 +249,16 @@ final class Tab: NSObject {
         changed.send(.audio)
     }
 
+    // MARK: Camera and microphone
+
+    var isUsingCamera: Bool { webView?.cameraCaptureState == .active }
+    var isUsingMicrophone: Bool { webView?.microphoneCaptureState == .active }
+
+    func stopCapture() {
+        webView?.setCameraCaptureState(.none) { }
+        webView?.setMicrophoneCaptureState(.none) { }
+    }
+
     // MARK: Snapshots
 
     func captureSnapshot(_ completion: (() -> Void)? = nil) {
@@ -313,6 +323,12 @@ final class Tab: NSObject {
                     self?.canGoForward = wv.canGoForward
                     self?.changed.send(.navigation)
                 }
+            },
+            webView.observe(\.cameraCaptureState, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.changed.send(.capture) }
+            },
+            webView.observe(\.microphoneCaptureState, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.changed.send(.capture) }
             },
             webView.observe(\.themeColor, options: [.new]) { [weak self] wv, _ in
                 MainActor.assumeIsolated {
@@ -493,6 +509,6 @@ extension Tab: WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType) async -> WKPermissionDecision {
-        .prompt
+        await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate)
     }
 }
