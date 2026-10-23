@@ -1,214 +1,25 @@
 import AppKit
 
-/// A row of round color swatches. Clicking one picks it.
-final class SwatchPicker: NSView {
-    var selected: SpaceColor { didSet { needsDisplay = true; refresh() } }
-    var onPick: ((SpaceColor) -> Void)?
-    private var buttons: [SwatchButton] = []
-    static let size = Tokens.Space.x5
-    static let gap = Tokens.Space.x2
+// MARK: - Grouped form, the way System Settings lays things out
 
-    init(selected: SpaceColor) {
-        self.selected = selected
-        super.init(frame: .zero)
-        buttons = SpaceColor.allCases.map { color in
-            let button = SwatchButton(color: color)
-            button.onClick = { [weak self] _ in
-                self?.selected = color
-                self?.onPick?(color)
-            }
-            addSubview(button)
-            return button
-        }
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    var fittingWidth: CGFloat { CGFloat(buttons.count) * Self.size + CGFloat(buttons.count - 1) * Self.gap }
-
-    override func layout() {
-        super.layout()
-        for (i, button) in buttons.enumerated() {
-            button.frame = NSRect(x: CGFloat(i) * (Self.size + Self.gap), y: (bounds.height - Self.size) / 2, width: Self.size, height: Self.size)
-        }
-    }
-
-    private func refresh() { buttons.forEach { $0.isSelected = $0.color == selected } }
-
-    /// No curated tint is chosen (a custom hue is in use).
-    func clearSelection() { buttons.forEach { $0.isSelected = false } }
-}
-
-final class SwatchButton: InteractiveView {
-    let color: SpaceColor
-    private let fill = CALayer()
-    private let ring = CALayer()
-
-    init(color: SpaceColor) {
-        self.color = color
-        super.init(frame: .zero)
-        layer?.addSublayer(ring)
-        layer?.addSublayer(fill)
-        toolTip = color.name
-        setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(color.name)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func layout() {
-        super.layout()
-        stateDidChange(animated: false)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        Tokens.Motion.withoutAnimation {
-            ring.frame = bounds
-            ring.cornerRadius = bounds.width / 2
-            ring.borderWidth = 2
-            ring.borderColor = cgColor(isSelected ? Tokens.Color.textPrimary : (isHovered ? Tokens.Color.textTertiary : .clear))
-            let inset: CGFloat = isSelected || isHovered ? 4 : 2
-            fill.frame = bounds.insetBy(dx: inset, dy: inset)
-            fill.cornerRadius = fill.frame.width / 2
-            fill.backgroundColor = cgColor(color.swatch)
-        }
-        setAccessibilityValue(isSelected ? "selected" : nil)
-    }
-}
-
-/// A row in the settings window: a label on the left, a control on the right.
-final class SettingsRow: NSView {
-    let title: Label
-    let detail: Label?
-    let control: NSView
-
-    init(title: String, detail: String? = nil, control: NSView) {
-        self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-        self.detail = detail.map { Label($0, font: Tokens.Font.small(), color: Tokens.Color.textSecondary) }
-        self.control = control
-        super.init(frame: .zero)
-        addSubview(self.title)
-        if let d = self.detail { addSubview(d) }
-        addSubview(control)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    static let height = Tokens.Space.x12
-
-    override func layout() {
-        super.layout()
-        let controlSize = control.fittingSize.width > 0 ? control.fittingSize : control.frame.size
-        let cw = (control as? SwatchPicker)?.fittingWidth ?? (control as? TextButton)?.fittingWidth ?? (control as? SettingsMenuButton)?.fittingWidth ?? (control as? Label)?.textWidth ?? controlSize.width
-        let ch = (control is SwatchPicker) ? SwatchPicker.size + 8 : Tokens.Space.x8
-        control.frame = NSRect(x: bounds.width - cw, y: (bounds.height - ch) / 2, width: cw, height: ch)
-        let available = control.frame.minX - Tokens.Space.x4
-        if let detail {
-            let total = title.lineHeight + detail.lineHeight
-            title.frame = NSRect(x: 0, y: (bounds.height - total) / 2, width: available, height: title.lineHeight)
-            detail.frame = NSRect(x: 0, y: title.frame.maxY, width: available, height: detail.lineHeight)
-        } else {
-            title.frame = NSRect(x: 0, y: (bounds.height - title.lineHeight) / 2, width: available, height: title.lineHeight)
-        }
-    }
-}
-
-/// A button that shows the current choice and opens a native menu of options.
-final class SettingsMenuButton: InteractiveView {
-    private let label = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    private let chevron = NSImageView()
-    var options: [(String, () -> Void)] = []
-    var value: String = "" { didSet { label.stringValue = value; needsLayout = true } }
+/// A rounded group of rows separated by hairlines.
+final class FormGroup: NSView {
+    private(set) var rows: [NSView] = []
+    private var lines: [NSView] = []
+    private let background = ColorView(color: Tokens.Color.formGroup)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.control
-        layer?.cornerCurve = .continuous
-        chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)
-        chevron.contentTintColor = Tokens.Color.textSecondary
-        chevron.imageScaling = .scaleNone
-        addSubview(label)
-        addSubview(chevron)
-        onClick = { [weak self] _ in self?.showMenu() }
-        setAccessibilityRole(.popUpButton)
+        background.wantsLayer = true
+        background.layer?.cornerRadius = Tokens.Radius.panel - 2
+        background.layer?.cornerCurve = .continuous
+        background.layer?.borderWidth = Tokens.Metric.hairline
+        addSubview(background)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    var fittingWidth: CGFloat { Tokens.Space.x3 + label.textWidth + Tokens.Space.x1 + Tokens.Space.x3 + Tokens.Space.x2 }
-
-    override func layout() {
-        super.layout()
-        let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x3, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
-        chevron.frame = NSRect(x: bounds.width - Tokens.Space.x3 - Tokens.Space.x2, y: 0, width: Tokens.Space.x3, height: bounds.height)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
-    }
-
-    private func showMenu() {
-        let menu = NSMenu()
-        for (title, action) in options {
-            let item = SidebarMenus.Item(title, action)
-            item.state = title == value ? .on : .off
-            menu.addItem(item)
-        }
-        menu.popUp(positioning: menu.items.first { $0.state == .on }, at: NSPoint(x: 0, y: bounds.height - 4), in: self)
-    }
-}
-
-/// A choice chip (search engines): filled when chosen.
-final class ChipButton: InteractiveView {
-    private let label: Label
-
-    init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-        super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.row
-        layer?.cornerCurve = .continuous
-        addSubview(label)
-        setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(title)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x5 }
-
-    override func layout() {
-        super.layout()
-        let h = label.lineHeight
-        label.frame = NSRect(x: (bounds.width - label.textWidth) / 2, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        let fill: NSColor = isSelected ? Tokens.Color.accent : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
-        layer?.set(backgroundColor: cgColor(fill), animated: false)
-        label.textColor = isSelected ? .white : Tokens.Color.textPrimary
-        setAccessibilityValue(isSelected ? "selected" : nil)
-    }
-}
-
-/// A rounded group of rows with hairlines between them.
-final class SettingsCard: ColorView {
-    private var rows: [NSView] = []
-    private var lines: [ColorView] = []
-
-    init() {
-        super.init(color: Tokens.Color.fieldFill)
-        layer?.cornerRadius = Tokens.Radius.panel
-        layer?.cornerCurve = .continuous
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
 
     func add(_ row: NSView) {
         if !rows.isEmpty {
@@ -220,142 +31,429 @@ final class SettingsCard: ColorView {
         addSubview(row)
     }
 
-    var fittingHeight: CGFloat { CGFloat(rows.count) * SettingsRow.height }
+    func removeAllRows() {
+        (rows + lines).forEach { $0.removeFromSuperview() }
+        rows = []
+        lines = []
+    }
+
+    var fittingHeight: CGFloat { rows.map { $0.frame.height }.reduce(0, +) }
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x4
+        background.frame = bounds
+        background.layer?.borderColor = background.cgColor(Tokens.Color.formGroupEdge)
+        var y: CGFloat = 0
         for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: pad, y: CGFloat(i) * SettingsRow.height, width: bounds.width - pad * 2, height: SettingsRow.height)
+            let h = row.frame.height
+            row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
+            y += h
+            if i < lines.count {
+                lines[i].frame = NSRect(x: Tokens.Space.x3, y: y, width: bounds.width - Tokens.Space.x3, height: Tokens.Metric.hairline)
+            }
         }
-        for (i, line) in lines.enumerated() {
-            line.frame = NSRect(x: pad, y: CGFloat(i + 1) * SettingsRow.height, width: bounds.width - pad, height: Tokens.Metric.hairline)
-        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
     }
 }
 
-/// Settings: the search engine, default browser and Arc import. Spaces are edited where they live,
-/// at the dots in the sidebar. Nothing else, on purpose.
-final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    static let shared = SettingsWindowController()
-    private let content = ColorView(color: Tokens.Color.panelBackground)
-    private let width: CGFloat = 480
+/// A form row: a title (and optional explanation) on the left, a control on the right.
+final class FormRow: NSView {
+    private let title = NSTextField(labelWithString: "")
+    private let detail = NSTextField(labelWithString: "")
+    let control: NSView
 
-    private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 400),
-                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
-        window.title = "Settings"
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
-        window.isReleasedWhenClosed = false
-        window.tabbingMode = .disallowed
-        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        window.standardWindowButton(.zoomButton)?.isHidden = true
-        super.init(window: window)
-        window.delegate = self
-        window.contentView = content
+    init(title: String, detail: String? = nil, control: NSView) {
+        self.control = control
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: detail == nil ? Tokens.Space.x10 + Tokens.Space.x1 : Tokens.Space.x12 + Tokens.Space.x2))
+        self.title.stringValue = title
+        self.title.font = .systemFont(ofSize: NSFont.systemFontSize)
+        self.detail.stringValue = detail ?? ""
+        self.detail.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        self.detail.textColor = .secondaryLabelColor
+        self.detail.isHidden = detail == nil
+        addSubview(self.title)
+        addSubview(self.detail)
+        addSubview(control)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        let pad = Tokens.Space.x3
+        let size = control.fittingSize
+        control.frame = NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
+        let titleHeight = title.fittingSize.height
+        let textWidth = control.frame.minX - pad - Tokens.Space.x3
+        if detail.isHidden {
+            title.frame = NSRect(x: pad, y: round((bounds.height - titleHeight) / 2), width: textWidth, height: titleHeight)
+        } else {
+            let detailHeight = detail.fittingSize.height
+            let top = round((bounds.height - titleHeight - detailHeight - 1) / 2)
+            title.frame = NSRect(x: pad, y: top, width: textWidth, height: titleHeight)
+            detail.frame = NSRect(x: pad, y: title.frame.maxY + 1, width: textWidth, height: detailHeight)
+        }
+    }
+}
+
+// MARK: - Spaces list
+
+/// A space in Settings: its color (click to change), its name (edit in place), delete on hover, drag to reorder.
+final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
+    let spaceID: UUID
+    private let swatchButton = InteractiveView()
+    private let swatchFill = NSView()
+    private let name = NSTextField()
+    private let grip = NSImageView()
+    private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
+
+    init(space: SpaceInfo) {
+        spaceID = space.id
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Space.x10 + Tokens.Space.x1))
+        name.stringValue = space.name
+        name.isBordered = false
+        name.drawsBackground = false
+        name.focusRingType = .none
+        name.font = .systemFont(ofSize: NSFont.systemFontSize)
+        name.delegate = self
+        name.placeholderString = "Name"
+        grip.image = Tokens.Symbol.image("line.3.horizontal", size: Tokens.TypeSize.small)
+        grip.contentTintColor = .tertiaryLabelColor
+        grip.imageScaling = .scaleNone
+        grip.toolTip = "Drag to reorder"
+        deleteButton.isHidden = true
+        deleteButton.isEnabled = Library.shared.spaces.count > 1
+        swatchFill.wantsLayer = true
+        swatchButton.addSubview(swatchFill)
+        [swatchButton, name, grip, deleteButton].forEach { addSubview($0) }
+        swatchFill.layer?.backgroundColor = swatchFill.cgColor(space.swatch)
+        swatchButton.toolTip = "Change color"
+        swatchButton.onClick = { [weak self] _ in self?.openColorPicker() }
+        deleteButton.onClick = { [weak self] _ in
+            guard let self, let window = self.window else { return }
+            SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
+        }
+        setAccessibilityRole(.row)
+        setAccessibilityLabel(space.name)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        let pad = Tokens.Space.x3
+        let swatch = Tokens.Space.x5
+        swatchButton.frame = NSRect(x: pad - 2, y: (bounds.height - swatch - 4) / 2, width: swatch + 4, height: swatch + 4)
+        swatchButton.layer?.cornerRadius = (swatch + 4) / 2
+        swatchFill.frame = swatchButton.bounds.insetBy(dx: 2, dy: 2)
+        swatchFill.layer?.cornerRadius = swatch / 2
+        grip.frame = NSRect(x: bounds.width - pad - Tokens.Space.x4, y: 0, width: Tokens.Space.x4, height: bounds.height)
+        let b = deleteButton.frame.width
+        deleteButton.frame.origin = NSPoint(x: grip.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
+        let nameHeight = name.fittingSize.height
+        let x = swatchButton.frame.maxX + Tokens.Space.x2
+        name.frame = NSRect(x: x, y: round((bounds.height - nameHeight) / 2), width: deleteButton.frame.minX - x - Tokens.Space.x2, height: nameHeight)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        deleteButton.isHidden = !isHovered
+        grip.alphaValue = isHovered ? 1 : 0.5
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        Library.shared.renameSpace(spaceID, to: name.stringValue)
+    }
+
+    private func openColorPicker() {
+        let popover = NSPopover()
+        popover.contentViewController = TintPickerController(spaceID: spaceID)
+        popover.behavior = .transient
+        popover.show(relativeTo: swatchButton.bounds, of: swatchButton, preferredEdge: .maxY)
+    }
+
+    static func confirmDelete(_ id: UUID, window: NSWindow) {
+        guard let space = Library.shared.space(id), Library.shared.spaces.count > 1 else { return }
+        let alert = NSAlert()
+        alert.messageText = "Delete “\(space.name)”?"
+        alert.informativeText = "Its bookmarks and tabs will be closed."
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { Library.shared.removeSpace(id) }
+        }
+    }
+}
+
+/// The tint row and custom hue slider in a popover, for Settings.
+final class TintPickerController: NSViewController {
+    private let spaceID: UUID
+    private var swatches: [TintSwatch] = []
+    private let slider = HueSlider()
+
+    init(spaceID: UUID) {
+        self.spaceID = spaceID
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func loadView() {
+        let size = Tokens.Space.x6
+        let gap = Tokens.Space.x2
+        let pad = Tokens.Space.x4
+        swatches = SpaceColor.allCases.map { TintSwatch(kind: .tint($0)) } + [TintSwatch(kind: .custom)]
+        let width = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap + pad * 2
+        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: pad * 2 + size + Tokens.Space.x3 + size))
+        for (i, swatch) in swatches.enumerated() {
+            swatch.frame = NSRect(x: pad + CGFloat(i) * (size + gap), y: pad, width: size, height: size)
+            view.addSubview(swatch)
+            swatch.onClick = { [weak self, weak swatch] _ in
+                guard let self, let swatch else { return }
+                switch swatch.kind {
+                case .tint(let color):
+                    Library.shared.setColor(color, for: self.spaceID)
+                    self.slider.hue = color.hue
+                case .custom:
+                    Library.shared.setHue(self.slider.hue, for: self.spaceID)
+                }
+                self.refresh()
+            }
+        }
+        slider.frame = NSRect(x: pad, y: pad + size + Tokens.Space.x3, width: width - pad * 2, height: size)
+        let space = Library.shared.space(spaceID)
+        slider.hue = space?.hue ?? space?.color.hue ?? 0.6
+        slider.onChange = { [weak self] hue, final in
+            guard let self, final else { return }
+            Library.shared.setHue(hue, for: self.spaceID)
+            self.refresh()
+        }
+        view.addSubview(slider)
+        self.view = view
+        refresh()
+    }
+
+    private func refresh() {
+        let space = Library.shared.space(spaceID)
+        for swatch in swatches {
+            switch swatch.kind {
+            case .tint(let color): swatch.isSelected = space?.hue == nil && space?.color == color
+            case .custom: swatch.isSelected = space?.hue != nil
+            }
+        }
+    }
+}
+
+// MARK: - Window
+
+/// Settings in the System Settings style: grouped rows and native controls. What lives here:
+/// the search engine, default browser, spaces, and importing from Arc. Nothing else, on purpose.
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+    static let shared = SettingsWindowController()
+    private let scroll = NSScrollView()
+    private let documentView = FlippedView()
+    private let generalGroup = FormGroup()
+    private let spacesGroup = FormGroup()
+    private let importGroup = FormGroup()
+    private let engine = NSPopUpButton()
+    private let defaultButton = NSButton(title: "Make Default", target: nil, action: nil)
+    private let defaultStatus = NSTextField(labelWithString: "")
+    private let addSpaceButton = NSButton(title: "Add Space", target: nil, action: nil)
+    private var token: SignalToken?
+    private let width: CGFloat = 540
+    private var spaceRows: [SpaceSettingsRow] = []
+
+    private init() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 520),
+                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
+        window.title = "Settings"
+        window.titlebarAppearsTransparent = true
+        window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
+        window.backgroundColor = Tokens.Color.formBackground
+        super.init(window: window)
+        window.delegate = self
+        build()
+        token = Library.shared.changed.observe { [weak self] in
+            guard let self, self.window?.isVisible == true else { return }
+            self.reloadSpaces()
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func header(_ text: String) -> NSTextField {
+        let field = NSTextField(labelWithString: text)
+        field.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        return field
+    }
+
+    private func build() {
+        engine.addItems(withTitles: SearchEngine.allCases.map(\.name))
+        engine.target = self
+        engine.action = #selector(engineChanged)
+        defaultButton.target = self
+        defaultButton.action = #selector(makeDefault)
+        defaultButton.bezelStyle = .push
+        defaultStatus.textColor = .secondaryLabelColor
+
+        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
+        let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
+        defaultControl.spacing = Tokens.Space.x2
+        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
+
+        addSpaceButton.target = self
+        addSpaceButton.action = #selector(addSpace)
+        addSpaceButton.bezelStyle = .push
+        addSpaceButton.controlSize = .small
+
+        if ArcImporter.isAvailable {
+            let button = NSButton(title: "Import…", target: self, action: #selector(importArc))
+            button.bezelStyle = .push
+            importGroup.add(FormRow(title: "Import from Arc", detail: "Spaces, pinned tabs and history. Arc isn’t changed.", control: button))
+        }
+
+        scroll.drawsBackground = false
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = documentView
+        window?.contentView = scroll
+        reloadSpaces()
+    }
+
+    private func reloadSpaces() {
+        spacesGroup.removeAllRows()
+        spaceRows = Library.shared.spaces.map { space in
+            let row = SpaceSettingsRow(space: space)
+            row.onDragStart = { [weak self, weak row] event in
+                guard let self, let row else { return false }
+                return self.beginDrag(row, event: event)
+            }
+            spacesGroup.add(row)
+            return row
+        }
+        layoutDocument()
+    }
+
+    private func layoutDocument() {
+        documentView.subviews.forEach { $0.removeFromSuperview() }
+        let pad = Tokens.Space.x6
+        let contentWidth = width - pad * 2
+        var y: CGFloat = Tokens.Space.x12
+
+        func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
+            if let title {
+                let label = header(title)
+                label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: 300, height: label.fittingSize.height)
+                documentView.addSubview(label)
+                if let accessory {
+                    let size = accessory.fittingSize
+                    accessory.frame = NSRect(x: width - pad - size.width, y: y + (label.frame.height - size.height) / 2, width: size.width, height: size.height)
+                    documentView.addSubview(accessory)
+                }
+                y = label.frame.maxY + Tokens.Space.x2
+            }
+            group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight)
+            group.needsLayout = true
+            documentView.addSubview(group)
+            y = group.frame.maxY + Tokens.Space.x6
+        }
+
+        section(nil, generalGroup)
+        section("Spaces", spacesGroup, accessory: addSpaceButton)
+        if !importGroup.rows.isEmpty { section(nil, importGroup) }
+
+        documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
+        guard let window else { return }
+        let maxHeight = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        let height = min(y, maxHeight * 0.85)
+        let top = window.frame.maxY
+        window.setContentSize(NSSize(width: width, height: height))
+        if window.isVisible { window.setFrameTopLeftPoint(NSPoint(x: window.frame.minX, y: top)) }
+        scroll.frame = NSRect(x: 0, y: 0, width: width, height: height)
+    }
+
+    private func refresh() {
+        engine.selectItem(withTitle: Library.shared.searchEngine.name)
+        let isDefault = Self.isDefaultBrowser
+        defaultStatus.stringValue = "Zigzag opens your links"
+        defaultStatus.isHidden = !isDefault
+        defaultButton.isHidden = isDefault
+        generalGroup.rows.forEach { $0.needsLayout = true }
+    }
+
     func show() {
-        rebuild()
+        refresh()
+        reloadSpaces()
         if window?.isVisible != true { window?.center() }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+        // Nothing is focused until you click it; a settings window shouldn't start in edit mode.
+        window?.makeFirstResponder(nil)
     }
 
-    private func rebuild() {
-        content.subviews.forEach { $0.removeFromSuperview() }
-        let pad = Tokens.Space.x6
-        var y: CGFloat = Tokens.Space.x12
+    func windowDidBecomeKey(_ notification: Notification) { refresh() }
 
-        // Identity: icon, name, version.
-        let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
-        icon.frame = NSRect(x: (width - 64) / 2, y: y, width: 64, height: 64)
-        content.addSubview(icon)
-        y = icon.frame.maxY + Tokens.Space.x2
-        let name = Label("Zigzag", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-        name.alignment = .center
-        name.frame = NSRect(x: pad, y: y, width: width - pad * 2, height: name.lineHeight)
-        content.addSubview(name)
-        y = name.frame.maxY
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        let versionLabel = Label("Version \(version)", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-        versionLabel.alignment = .center
-        versionLabel.frame = NSRect(x: pad, y: y + Tokens.Space.x1, width: width - pad * 2, height: versionLabel.lineHeight)
-        content.addSubview(versionLabel)
-        y = versionLabel.frame.maxY + Tokens.Space.x8
+    // MARK: Reordering spaces
 
-        // Search engine: chips, one tap to choose.
-        let searchTitle = Label("Search with", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
-        searchTitle.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: 200, height: searchTitle.lineHeight)
-        content.addSubview(searchTitle)
-        y = searchTitle.frame.maxY + Tokens.Space.x2
-        let chips = SearchEngine.allCases.map { engine -> ChipButton in
-            let chip = ChipButton(title: engine.name)
-            chip.isSelected = Library.shared.searchEngine == engine
-            chip.onClick = { [weak self] _ in
-                Library.shared.searchEngine = engine
-                self?.rebuild()
+    private func beginDrag(_ row: SpaceSettingsRow, event: NSEvent) -> Bool {
+        guard let window, let startIndex = spaceRows.firstIndex(where: { $0 === row }) else { return false }
+        let start = spacesGroup.convert(event.locationInWindow, from: nil)
+        let rowHeight = row.frame.height
+        row.removeFromSuperview()
+        spacesGroup.addSubview(row)
+        row.layer?.backgroundColor = row.cgColor(Tokens.Color.formGroup)
+        row.layer?.cornerRadius = Tokens.Radius.row
+        row.layer?.shadowOpacity = 1
+        row.layer?.shadowRadius = 8
+        row.layer?.shadowColor = row.cgColor(Tokens.Color.panelShadow)
+        let originY = row.frame.minY
+        var target = startIndex
+        window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
+            guard let event else { return }
+            if event.type == .leftMouseUp { stop.pointee = true; return }
+            let point = self.spacesGroup.convert(event.locationInWindow, from: nil)
+            let y = min(max(originY + point.y - start.y, 0), self.spacesGroup.bounds.height - rowHeight)
+            Tokens.Motion.withoutAnimation { row.frame.origin.y = y }
+            let newTarget = min(max(Int((y + rowHeight / 2) / rowHeight), 0), self.spaceRows.count - 1)
+            if newTarget != target {
+                target = newTarget
+                var others = self.spaceRows.filter { $0 !== row }
+                others.insert(row, at: target)
+                Tokens.Motion.animate(Tokens.Motion.snappy) {
+                    for (i, other) in others.enumerated() where other !== row {
+                        other.animator().frame.origin.y = CGFloat(i) * rowHeight
+                    }
+                }
             }
-            return chip
         }
-        let chipHeight = Tokens.Space.x8
-        let gap = Tokens.Space.x2
-        var x = pad
-        for chip in chips {
-            let w = chip.fittingWidth
-            if x + w > width - pad { x = pad; y += chipHeight + gap }
-            chip.frame = NSRect(x: x, y: y, width: w, height: chipHeight)
-            content.addSubview(chip)
-            x += w + gap
-        }
-        y += chipHeight + Tokens.Space.x6
-
-        // Default browser and Arc, grouped.
-        let card = SettingsCard()
-        let isDefault = Self.isDefaultBrowser
-        let defaultControl: NSView
-        if isDefault {
-            let done = Label("Default", font: Tokens.Font.body(.medium), color: Tokens.Color.textTertiary)
-            done.frame.size = NSSize(width: done.textWidth, height: Tokens.Space.x8)
-            defaultControl = done
-        } else {
-            let button = TextButton(title: "Make Default", font: Tokens.Font.body(.medium))
-            button.showsFillAtRest = true
-            button.onClick = { [weak self] _ in
-                DefaultBrowser.make()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self?.rebuild() }
-            }
-            defaultControl = button
-        }
-        card.add(SettingsRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
-        if ArcImporter.isAvailable {
-            let arc = TextButton(title: Library.shared.importedFromArc ? "Import Again" : "Import", font: Tokens.Font.body(.medium))
-            arc.showsFillAtRest = true
-            arc.onClick = { _ in ArcImporter.runInteractive() }
-            card.add(SettingsRow(title: "Arc", detail: "Spaces, pinned tabs and history.", control: arc))
-        }
-        card.frame = NSRect(x: pad, y: y, width: width - pad * 2, height: card.fittingHeight)
-        content.addSubview(card)
-        y = card.frame.maxY + Tokens.Space.x4
-
-        let hint = Label("Click a space’s dot in the sidebar to rename it or change its color.", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-        hint.alignment = .center
-        hint.frame = NSRect(x: pad, y: y, width: width - pad * 2, height: hint.lineHeight)
-        content.addSubview(hint)
-        y = hint.frame.maxY + Tokens.Space.x6
-
-        guard let window else { return }
-        var frame = window.frame
-        let newFrame = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: width, height: y))
-        frame.origin.y += frame.height - newFrame.height
-        frame.size = newFrame.size
-        window.setFrame(frame, display: true)
-        content.frame = NSRect(x: 0, y: 0, width: width, height: y)
+        if target != startIndex { Library.shared.moveSpace(row.spaceID, to: target) } else { reloadSpaces() }
+        return true
     }
+
+    // MARK: Actions
+
+    @objc private func engineChanged() {
+        if let engine = SearchEngine.allCases.first(where: { $0.name == engine.titleOfSelectedItem }) {
+            Library.shared.searchEngine = engine
+        }
+    }
+
+    @objc private func makeDefault() {
+        DefaultBrowser.make()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh() }
+    }
+
+    @objc private func addSpace() { Library.shared.addSpace() }
+
+    @objc private func importArc() { ArcImporter.runInteractive() }
 
     static var isDefaultBrowser: Bool {
         guard let url = URL(string: "https://example.com"),
@@ -363,6 +461,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         return app.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL
             || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
     }
+}
+
+final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }
 
 enum DefaultBrowser {

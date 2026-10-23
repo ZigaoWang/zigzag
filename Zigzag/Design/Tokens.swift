@@ -282,6 +282,11 @@ enum Tokens {
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
         static let accent = NSColor.controlAccentColor
+
+        /// Settings: the window behind grouped rows, and the groups themselves (System Settings proportions).
+        static let formBackground = dynamic(light: hex(0xF2F2F4), dark: hex(0x1E1E20))
+        static let formGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
+        static let formGroupEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06))
         static let progress = dynamic(light: hex(0x000000, alpha: 0.28), dark: hex(0xFFFFFF, alpha: 0.32))
         static let destructive = NSColor.systemRed
     }

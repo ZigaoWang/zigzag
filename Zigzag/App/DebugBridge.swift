@@ -208,6 +208,25 @@ enum DebugBridge {
         case "undo":
             controller.sidebarUndo.undo()
             debugLog("after undo selected=\(controller.tabManager.selectedTab?.url?.absoluteString ?? "nil")")
+        case "menuaudit":
+            var lines: [String] = []
+            func walk(_ menu: NSMenu, _ path: String) {
+                for item in menu.items where !item.isSeparatorItem {
+                    let name = path + " > " + item.title
+                    if let sub = item.submenu { walk(sub, name); continue }
+                    guard let action = item.action else { lines.append("NO ACTION: \(name)"); continue }
+                    var chain: [NSObject] = []
+                    if let t = item.target as? NSObject { chain.append(t) }
+                    if let w = controller.selectedWebView { chain.append(w) }
+                    if let w = controller.window { chain.append(w) }
+                    chain += [controller, NSApp, NSApp.delegate as! NSObject]
+                    let target: Any? = chain.first { $0.responds(to: action) }
+                    if target == nil { lines.append("NO TARGET: \(name) [\(action)]") }
+                    else if let v = target as? NSMenuItemValidation, !v.validateMenuItem(item) { lines.append("disabled: \(name)") }
+                }
+            }
+            if let main = NSApp.mainMenu { walk(main, "") }
+            try? lines.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

@@ -59,6 +59,19 @@ enum ArcImporter {
         result.spaces = newSpaces.count
         result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)
 
+        // Importing again merges: spaces with the same name gain only the bookmarks they don't have yet.
+        var merged = 0
+        newSpaces = newSpaces.filter { incoming in
+            guard let existing = Library.shared.spaces.first(where: { $0.name == incoming.name }) else { return true }
+            let known = Set(existing.bookmarks.map { TabManager.normalize($0.url) })
+            for bookmark in incoming.bookmarks where !known.contains(TabManager.normalize(bookmark.url)) {
+                Library.shared.addBookmark(url: bookmark.url, title: bookmark.title, to: existing.id)
+                merged += 1
+            }
+            return false
+        }
+        result.spaces = newSpaces.count
+        result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +) + merged
         if !newSpaces.isEmpty {
             // A fresh install's empty default space gives way to the imported ones.
             let pristine = Library.shared.spaces.filter { space in

@@ -79,10 +79,13 @@ enum MainMenu {
                 item("Use Selection for Find", #selector(C.useSelectionForFind(_:)), "e"),
             ]),
             submenu("Spelling and Grammar", [
+                item("Show Spelling and Grammar", #selector(NSText.showGuessPanel(_:)), ":"),
+                item("Check Document Now", #selector(NSText.checkSpelling(_:)), ";"),
+                .separator(),
                 item("Check Spelling While Typing", #selector(NSTextView.toggleContinuousSpellChecking(_:)), ""),
+                item("Check Grammar With Spelling", #selector(NSTextView.toggleGrammarChecking(_:)), ""),
+                item("Correct Spelling Automatically", #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), ""),
             ]),
-            item("Start Dictation", Selector(("startDictation:")), ""),
-            item("Emoji & Symbols", #selector(NSApplication.orderFrontCharacterPalette(_:)), " ", [.command, .control]),
         ]))
 
         main.addItem(submenu("View", [
