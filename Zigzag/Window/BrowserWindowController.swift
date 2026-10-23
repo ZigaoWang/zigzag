@@ -19,7 +19,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var findBar = FindBarController(window: self)
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
-    var peekController: PeekController?
+    lazy var peek = PeekController(controller: self)
+    var peekController: PeekController? { peek }
 
     init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
         self.tabManager = tabManager
@@ -37,6 +38,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.layoutTrafficLights()
             self.commandBar.reposition()
             self.findBar.reposition()
+            self.peek.reposition()
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
 
@@ -233,15 +235,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    @discardableResult
     func showPeek(url: URL?, configuration: WKWebViewConfiguration?) -> WKWebView? {
-        // Filled in by Peek milestone; for now Peek opens a foreground tab.
-        if let url { tabManager.newTab(url: url, opener: tabManager.selectedTab) }
-        return nil
+        commandBar.dismiss(restoringFocus: false)
+        return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab)
     }
 
     /// Closes peek, find, previews: whatever floats above the page. Returns true if something closed.
     func dismissFloatingContent() -> Bool {
-        if let peek = peekController, peek.isVisible { peek.close(); return true }
+        if peek.isVisible { peek.close(); return true }
         if findBar.isVisible { findBar.hide(); return true }
         return false
     }
@@ -263,6 +265,15 @@ extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+        // Inside peek, another peek just navigates the card.
+        if tab.isPeek, disposition == .peek { tab.load(url); return }
+        // A result opened from a search page keeps the search one Back away.
+        if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
+           let history = tab.interactionStateForSaving {
+            let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host())
+            newTab.restoreHistory(history, thenLoad: url)
+            return
+        }
         open(url, disposition: disposition, opener: tab, allowSwitch: false)
     }
 
@@ -272,6 +283,18 @@ extension BrowserWindowController: TabHost {
             if pending == .peek { return showPeek(url: nil, configuration: configuration) }
             let newTab = tabManager.newTab(url: action.request.url, select: false, configuration: configuration, opener: tab)
             return newTab.ensureWebView()
+        }
+        // Peeked pages open their links in the card itself.
+        if tab.isPeek, features.width == nil, features.height == nil, let url = action.request.url {
+            tab.load(url)
+            return nil
+        }
+        // Search folding: a result that wants a new tab replaces the search instead, so Back returns to it.
+        if action.navigationType == .linkActivated, action.modifierFlags.intersection([.command, .shift, .option]).isEmpty,
+           features.width == nil, features.height == nil,
+           let current = tab.url, SearchFolding.isSearchResultsPage(current), let url = action.request.url {
+            tab.load(url)
+            return nil
         }
         // Sized window.open() calls are sign-in and payment popups: give them a real small window.
         if features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {

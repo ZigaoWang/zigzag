@@ -120,6 +120,10 @@ enum DebugBridge {
                 let t = tab.themeColor?.usingColorSpace(.sRGB)
                 debugLog("theme \(tab.displayTitle.prefix(20)): \(t.map { "h\($0.hueComponent) s\($0.saturationComponent) b\($0.brightnessComponent)" } ?? "nil") tint=\(SiteTint.color(for: tab).map { String(describing: $0) } ?? "nil")")
             }
+        case "peekexpand": controller.peek.openAsTab()
+        case "linkfrom":
+            // Simulates a Cmd-click on a link in the current page.
+            if let tab = controller.tabManager.selectedTab, let url = URL(string: arg) { controller.tab(tab, openURL: url, disposition: .foregroundTab) }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

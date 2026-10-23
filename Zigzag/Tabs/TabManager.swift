@@ -106,6 +106,17 @@ final class TabManager {
         return tab
     }
 
+    /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
+    func insert(_ tab: Tab) {
+        tab.host = host
+        tab.spaceID = currentSpaceID
+        watch(tab)
+        tabsBySpace[currentSpaceID, default: []].insert(tab, at: 0)
+        if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
+        changed.send(.structure)
+        select(tab)
+    }
+
     /// Inserts already-built tabs (session restore, imports) without selecting.
     func adopt(_ tabs: [Tab], in spaceID: UUID) {
         for tab in tabs { tab.host = host; watch(tab) }
