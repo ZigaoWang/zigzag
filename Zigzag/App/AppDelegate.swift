@@ -14,6 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = Library.shared
         _ = HistoryStore.shared
+        if #available(macOS 15.4, *) {
+            ExtensionHost.shared.loadInstalled()
+            KnownExtension.setUpIfNeeded()
+        }
         let restored = WindowManager.shared.restoreSession()
         launched = true
         if !pendingURLs.isEmpty {

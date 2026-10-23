@@ -12,6 +12,20 @@ protocol SidebarDelegate: SidebarListDelegate {
 final class AddressView: InteractiveView {
     private let label = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
+    /// Extension buttons (1Password) at the trailing end, like Safari's address bar.
+    private(set) var actionButtons: [IconButton] = []
+
+    func setActions(_ items: [(image: NSImage?, label: String, action: (NSView) -> Void)]) {
+        actionButtons.forEach { $0.removeFromSuperview() }
+        actionButtons = items.map { item in
+            let button = IconButton(symbol: "puzzlepiece.extension", size: Tokens.Space.x6, toolTip: item.label)
+            button.image = item.image
+            button.onClick = { [weak button] _ in if let button { item.action(button) } }
+            addSubview(button)
+            return button
+        }
+        needsLayout = true
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -52,8 +66,15 @@ final class AddressView: InteractiveView {
             lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
             x = lock.frame.maxX + Tokens.Space.x1
         }
+        var right = bounds.width - Tokens.Space.x1
+        for button in actionButtons.reversed() {
+            let side = Tokens.Space.x6
+            button.frame = NSRect(x: right - side, y: (bounds.height - side) / 2, width: side, height: side)
+            right = button.frame.minX
+        }
+        let trailing = actionButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
         let h = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: bounds.width - x - pad, height: h)
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: trailing - x, height: h)
     }
 
     override func stateDidChange(animated: Bool) {

@@ -143,6 +143,13 @@ class InteractiveView: NSView {
 final class IconButton: InteractiveView {
     private let imageView = NSImageView()
     var symbol: String { didSet { imageView.image = Tokens.Symbol.image(symbol, size: symbolSize) } }
+    /// A full-color image instead of a symbol (extension icons).
+    var image: NSImage? {
+        didSet {
+            imageView.image = image ?? Tokens.Symbol.image(symbol, size: symbolSize)
+            imageView.imageScaling = image == nil ? .scaleNone : .scaleProportionallyDown
+        }
+    }
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
     var radius: CGFloat = Tokens.Radius.control { didSet { layer?.cornerRadius = radius } }
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
@@ -168,13 +175,18 @@ final class IconButton: InteractiveView {
 
     override func layout() {
         super.layout()
-        imageView.frame = bounds
+        if image != nil {
+            let side = Tokens.Metric.favicon
+            imageView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
+        } else {
+            imageView.frame = bounds
+        }
     }
 
     override func stateDidChange(animated: Bool) {
         let fill: NSColor? = !isEnabled ? nil : isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.hoverFill : showsFillAtRest ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        imageView.contentTintColor = tint
+        imageView.contentTintColor = image == nil ? tint : nil
         imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 

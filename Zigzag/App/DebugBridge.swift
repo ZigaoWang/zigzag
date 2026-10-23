@@ -100,6 +100,21 @@ enum DebugBridge {
                 if let v = view as? InteractiveView { v.isHovered = true; DebugBridge.hovered = [v] } else { DebugBridge.hovered = [] }
             default: break
             }
+        case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
+        case "action": controller.sidebar.address.actionButtons.first?.onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
+        case "popupjs":
+            if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
+                webView.evaluateJavaScript(arg) { result, error in
+                    debugLog("popupjs => \(String(describing: result).prefix(2000)) \(String(describing: error))")
+                }
+            } else { debugLog("popupjs: no popup") }
+        case "js":
+            controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
+                debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
+            }
+        case "endsheet": if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet, returnCode: .cancel) }
+        case "zoomin": controller.zoomIn(nil)
+        case "zoomreset": controller.actualSize(nil)
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

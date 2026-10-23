@@ -32,6 +32,9 @@ enum WebKitSetup {
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        if #available(macOS 15.4, *), configuration.webExtensionController == nil {
+            configuration.webExtensionController = ExtensionHost.shared.controller
+        }
         if configuration.userContentController.userScripts.isEmpty {
             for script in PageScripts.all { configuration.userContentController.addUserScript(script) }
         }

@@ -72,7 +72,15 @@ final class Tab: NSObject {
         super.init()
         if let url { favicon = FaviconStore.shared.cachedIcon(for: url) }
         snapshot = SnapshotStore.load(id)
+        if #available(macOS 15.4, *) {
+            extensionToken = changed.observe { [weak self] change in
+                guard let self else { return }
+                ExtensionHost.shared.tabChanged(self, change)
+            }
+        }
     }
+
+    private var extensionToken: SignalToken?
 
     var isSuspended: Bool { webView == nil }
     var displayTitle: String {
@@ -114,9 +122,9 @@ final class Tab: NSObject {
             webView.interactionState = state as NSData
             pendingInteractionState = nil
             // Interaction state restores history but may not start a load on its own.
-            if webView.url == nil, let url { webView.load(URLRequest(url: url)) }
+            if webView.url == nil, let url { Self.load(url, in: webView) }
         } else if let url, !fromWebKit {
-            webView.load(URLRequest(url: url))
+            Self.load(url, in: webView)
         }
         changed.send(.webView)
         return webView
@@ -167,7 +175,16 @@ final class Tab: NSObject {
         self.url = url
         changed.send(.url)
         let webView = ensureWebView()
-        webView.load(URLRequest(url: url))
+        Self.load(url, in: webView)
+    }
+
+    /// Local files need read access granted to their folder; everything else is a plain request.
+    static func load(_ url: URL, in webView: WKWebView) {
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
     }
 
     func goBack() { webView?.goBack() }
@@ -354,15 +371,28 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
         DownloadManager.shared.track(download, window: host?.hostWindow)
+        closeIfOnlyADownload(webView)
     }
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         DownloadManager.shared.track(download, window: host?.hostWindow)
+        closeIfOnlyADownload(webView)
+    }
+
+    /// A tab opened just to fetch a file has nothing to show; it goes away once the download starts.
+    private func closeIfOnlyADownload(_ webView: WKWebView) {
+        guard !hasLoadedOnce, webView.backForwardList.currentItem == nil, bookmarkID == nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.host?.tabDidRequestClose(self)
+        }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         hasLoadedOnce = true
         if let url = webView.url {
+            let zoom = ZoomLevels.zoom(for: url)
+            if webView.pageZoom != zoom { webView.pageZoom = zoom }
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
             HistoryStore.shared.recordVisit(url: url, title: webView.title)
         }

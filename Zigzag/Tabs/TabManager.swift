@@ -83,6 +83,7 @@ final class TabManager {
         tab.opener = opener
         // New tabs go on top. The list never reorders itself after that.
         tabsBySpace[space, default: []].insert(tab, at: 0)
+        if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
         changed.send(.structure)
         if select {
             self.select(tab)
@@ -130,6 +131,7 @@ final class TabManager {
         tab.markActivated()
         promote(tab)
         tab.ensureWebView()
+        if #available(macOS 15.4, *), previous !== tab { ExtensionHost.shared.tabActivated(tab, previous: previous) }
         changed.send(.selection)
     }
 
@@ -284,6 +286,7 @@ final class TabManager {
 
     func close(_ tab: Tab) {
         let wasSelected = selectedTab === tab
+        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
             // Closing a bookmark only unloads its page; the bookmark stays.
             bookmarkTabs[bookmarkID] = nil

@@ -57,6 +57,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
+        if #available(macOS 15.4, *) {
+            tokens.append(ExtensionHost.shared.changed.observe { [weak self] in self?.refreshExtensionActions() })
+        }
 
         // Fading is slow; checking once a minute is plenty.
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -134,6 +137,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.update(tab: tab)
         sidebar.list.refreshRows()
         updateWindowTitle()
+        refreshExtensionActions()
+    }
+
+    func refreshExtensionActions() {
+        guard #available(macOS 15.4, *) else { return }
+        let tab = tabManager.selectedTab
+        let items = ExtensionHost.shared.actions(for: tab).map { item in
+            (image: item.icon, label: item.label, action: { (anchor: NSView) in
+                ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor)
+            })
+        }
+        sidebar.address.setActions(items)
     }
 
     private func selectedTabChanged(_ change: Tab.Change) {
@@ -230,7 +245,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Event interception
 
     private func intercept(_ event: NSEvent) -> Bool {
-        false
+        if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+           ExtensionHost.shared.performCommand(for: event) {
+            return true
+        }
+        return false
     }
 }
 

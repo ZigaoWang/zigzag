@@ -49,7 +49,10 @@ final class WindowManager {
         return lastKey ?? controllers.last
     }
 
-    func windowBecameKey(_ controller: BrowserWindowController) { lastKey = controller }
+    func windowBecameKey(_ controller: BrowserWindowController) {
+        lastKey = controller
+        if #available(macOS 15.4, *) { ExtensionHost.shared.windowFocused(controller) }
+    }
 
     // MARK: Creating
 
@@ -77,6 +80,7 @@ final class WindowManager {
         controller.onClose = { [weak self] closed in self?.windowClosed(closed) }
         controller.onStateChange = { [weak self] in self?.scheduleSave() }
         controllers.append(controller)
+        if #available(macOS 15.4, *) { ExtensionHost.shared.windowOpened(controller) }
         return controller
     }
 
@@ -85,6 +89,7 @@ final class WindowManager {
         // Keep the last window's tabs for next launch even if it is closed before quitting.
         if controllers.count == 1 { saveNow() }
         controllers.removeAll { $0 === controller }
+        if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
         controller.tabManager.invalidate()
         if !controllers.isEmpty { scheduleSave() }
     }
