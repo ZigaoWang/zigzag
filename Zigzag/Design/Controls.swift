@@ -61,6 +61,20 @@ class InteractiveView: NSView {
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
+    /// Decorative children (icons, labels, layers) never take clicks; they belong to this control.
+    /// Only nested controls of our own, or editable text, keep their clicks.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        var view: NSView? = hit
+        while let current = view, current !== self {
+            if current is InteractiveView { return hit }
+            if let field = current as? NSTextField, field.isEditable { return hit }
+            if current is NSButton || current is NSPopUpButton || current is NSSlider { return hit }
+            view = current.superview
+        }
+        return self
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea { removeTrackingArea(trackingArea) }
