@@ -255,6 +255,9 @@ enum DebugBridge {
                 let hit = frameView.hitTest(frameView.convert(p, from: nil))
                 debugLog("hit at \(n): \(hit.map { String(describing: type(of: $0)) } ?? "nil")")
             }
+        case "flash":
+            func walk(_ v: NSView) { if let s = v as? NSScrollView { s.flashScrollers() }; v.subviews.forEach(walk) }
+            if let root = controller.window?.contentView { walk(root) }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
