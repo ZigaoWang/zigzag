@@ -118,6 +118,8 @@ enum Tokens {
         /// run by Core Animation on the render server so it stays smooth while pages are busy.
         struct Curve {
             let duration: TimeInterval
+            /// When set, slides use a real spring with this much bounce instead of an eased curve.
+            var bounce: CGFloat? = nil
             var timing: CAMediaTimingFunction { CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1) }
         }
 
@@ -125,6 +127,8 @@ enum Tokens {
         static let slide = Curve(duration: slideDuration)
         /// Finishing a swipe: the fingers already did most of the travel, so the rest is quick.
         static let snap = Curve(duration: 0.14)
+        /// Switching spaces: quick, with a small spring settle so it feels alive.
+        static let spaceSwitch = Curve(duration: 0.26, bounce: 0.12)
         static let gentle = Curve(duration: large)
         static let feedback = Curve(duration: quick)
 
@@ -181,14 +185,22 @@ enum Tokens {
         @discardableResult
         static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy) -> TimeInterval {
             guard let layer = view.layer, offset != 0, !isKeyboardDriven, !reduceMotion else { return 0 }
-            let animation = CABasicAnimation(keyPath: "transform.translation.x")
+            let animation: CABasicAnimation
+            if let bounce = curve.bounce {
+                let spring = CASpringAnimation(perceptualDuration: curve.duration, bounce: bounce)
+                spring.duration = spring.settlingDuration
+                animation = spring
+            } else {
+                animation = CABasicAnimation()
+                animation.duration = curve.duration
+                animation.timingFunction = curve.timing
+            }
+            animation.keyPath = "transform.translation.x"
             animation.fromValue = offset
             animation.toValue = 0
-            animation.duration = curve.duration
-            animation.timingFunction = curve.timing
             animation.fillMode = .backwards
             layer.add(animation, forKey: "slide")
-            return curve.duration
+            return animation.duration
         }
 
         /// Applies changes immediately with no implicit animation.

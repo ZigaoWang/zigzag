@@ -329,9 +329,17 @@ final class SidebarView: NSView {
         var ghostEnd = finalFrame
         ghostEnd.origin.x -= direction * width
         Tokens.Motion.withoutAnimation { ghost.frame = ghostEnd }
-        let curve = Tokens.Motion.snap
+        let curve = Tokens.Motion.spaceSwitch
         let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve)
         Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve)
+        // The outgoing list fades as it leaves, so the two never compete.
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = 0.18
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        ghost.layer?.add(fade, forKey: "fade")
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) { ghost.removeFromSuperview() }
     }
 
