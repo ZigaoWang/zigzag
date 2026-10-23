@@ -398,6 +398,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
                 guard let self, let option else { return }
                 let value: String? = option.mode == .light ? "light" : option.mode == .dark ? "dark" : nil
                 Library.shared.setAppearance(value, for: self.spaceID)
+                self.edited = true
                 self.refreshAppearance()
             }
         }
@@ -408,6 +409,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             guard let self else { return }
             if final {
                 Library.shared.setHue(hue, intensity: intensity, for: self.spaceID)
+                self.edited = true
             } else {
                 let background = SpaceColor.background(hue: hue, intensity: intensity)
                 self.controller?.previewSpaceColor(background: background, swatch: SpaceColor.swatch(hue: hue), for: self.spaceID)
@@ -419,6 +421,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             swatch.onClick = { [weak self, weak swatch] _ in
                 guard let self, let swatch, case .tint(let color) = swatch.kind else { return }
                 Library.shared.setColor(color, for: self.spaceID)
+                self.edited = true
                 self.canvas.hue = color.hue
                 self.canvas.intensity = SpaceColor.defaultIntensity
                 self.showPreviews(color.background)
@@ -508,10 +511,15 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
+    /// The space as it was when the editor opened; closing registers one ⌘Z for everything changed.
+    private let before = Library.shared.snapshot
+    private var edited = false
+
     func close() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         commitName()
+        if edited { controller?.recordLibraryUndo("Edit Space", before: before) }
         controller?.root.holdReveal = false
         dismiss()
         if let webView = controller?.selectedWebView { controller?.window?.makeFirstResponder(webView) }
@@ -520,7 +528,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     private func commitName() {
         let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !name.isEmpty, name != Library.shared.space(spaceID)?.name { Library.shared.renameSpace(spaceID, to: name) }
+        if !name.isEmpty, name != Library.shared.space(spaceID)?.name {
+            Library.shared.renameSpace(spaceID, to: name)
+            edited = true
+        }
     }
 
     func controlTextDidChange(_ obj: Notification) { commitName() }

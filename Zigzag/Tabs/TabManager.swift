@@ -574,6 +574,16 @@ final class TabManager {
         splits[index].ratio = min(max(ratio, 0.2), 0.8)
     }
 
+    /// Puts back a split exactly as it was (undo).
+    func restoreSplit(_ pair: SplitPair) {
+        guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return }
+        unsplit(left, notify: false)
+        unsplit(right, notify: false)
+        splits.append(pair)
+        changed.send(.structure)
+        changed.send(.selection)
+    }
+
     func restoreSplits(_ pairs: [SplitPair]) {
         splits = pairs.filter { tab(with: $0.left) != nil && tab(with: $0.right) != nil }
     }

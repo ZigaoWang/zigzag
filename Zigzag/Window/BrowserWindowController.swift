@@ -88,6 +88,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             tab.isLoading ? tab.stopLoading() : tab.reload()
         }
 
+        UndoClock.start()
         tabManager.host = self
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
@@ -124,8 +125,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.sidebar.list.externalHover(at: nil)
             guard overList else { return false }
             // Dragged down into the list: it's a regular tab again, right where it was dropped.
-            self.tabManager.unbookmark(favorite.id, toIndex: index)
+            self.unfavoriteWithUndo(favorite.id, to: index)
             return true
+        }
+        sidebar.favorites.onReorder = { [weak self] favorite, index in
+            self?.libraryChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
         }
         reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID
@@ -266,8 +270,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.showsHeader = true
             root.card.header.show(left)
             root.secondCard.header.show(right)
-            root.card.header.close.onClick = { [weak self] _ in self?.tabManager.unsplit(left, keep: right) }
-            root.secondCard.header.close.onClick = { [weak self] _ in self?.tabManager.unsplit(right, keep: left) }
+            root.card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(left, keep: right) }
+            root.secondCard.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(right, keep: left) }
         } else {
             root.splitRatio = nil
             root.card.show(tab?.ensureWebView())
@@ -596,6 +600,10 @@ extension BrowserWindowController: SidebarDelegate {
     func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() { sidebar.clearDropTargets() }
+    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
+    func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
+        libraryChange("Move Bookmark") { Library.shared.moveBookmark(id, to: index, in: spaceID) }
+    }
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
@@ -636,7 +644,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listDropOnFavorites(_ tab: Tab) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
         sidebar.favorites.isDropTarget = false
-        tabManager.favoriteTab(tab)
+        favoriteWithUndo(tab)
         return true
     }
 
@@ -650,7 +658,7 @@ extension BrowserWindowController: SidebarDelegate {
         let side = root.splitDropHint.side
         root.splitDropHint.show(nil)
         guard let side, let current = tabManager.selectedTab, current !== tab else { return false }
-        tabManager.makeSplit(current, with: tab, otherOnRight: side == .right)
+        splitWithUndo(current, with: tab, otherOnRight: side == .right)
         return true
     }
 

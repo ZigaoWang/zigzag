@@ -29,11 +29,11 @@ enum SidebarMenus {
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
         })
         menu.addItem(Item("Bookmark", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
-        menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { manager.favoriteTab(tab) })
+        menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
         if manager.split(for: tab) != nil {
-            menu.addItem(Item("Close Split View") { manager.unsplit(tab) })
+            menu.addItem(Item("Close Split View") { controller.unsplitWithUndo(tab) })
         } else if let current = manager.selectedTab, current !== tab {
-            menu.addItem(Item("Open in Split View") { manager.makeSplit(current, with: tab) })
+            menu.addItem(Item("Open in Split View") { controller.splitWithUndo(current, with: tab) })
         }
         menu.addItem(Item("Duplicate") {
             if let url = tab.url { manager.newTab(url: url) }
@@ -57,9 +57,9 @@ enum SidebarMenus {
         let tabs = manager.tabs(in: tab.spaceID)
         if let index = tabs.firstIndex(where: { $0 === tab }) {
             let below = Array(tabs.dropFirst(index + 1))
-            menu.addItem(Item("Close Tabs Below", enabled: !below.isEmpty) { manager.close(below) })
+            menu.addItem(Item("Close Tabs Below", enabled: !below.isEmpty) { controller.closeManyWithUndo(below) })
             let others = tabs.filter { $0 !== tab }
-            menu.addItem(Item("Close Other Tabs", enabled: !others.isEmpty) { manager.close(others) })
+            menu.addItem(Item("Close Other Tabs", enabled: !others.isEmpty) { controller.closeManyWithUndo(others) })
         }
         return menu
     }
@@ -73,7 +73,7 @@ enum SidebarMenus {
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item("Go Back to Bookmarked Page") { manager.resetBookmarkTab(bookmark.id) })
             menu.addItem(Item("Use Current Page as Bookmark") {
-                Library.shared.updateBookmark(bookmark.id, url: url)
+                controller.libraryChange("Update Bookmark") { Library.shared.updateBookmark(bookmark.id, url: url) }
             })
         }
         menu.addItem(Item("Copy Link") {
@@ -81,7 +81,7 @@ enum SidebarMenus {
             NSPasteboard.general.setString(bookmark.url.absoluteString, forType: .string)
         })
         menu.addItem(Item("Add to Favorites") {
-            Library.shared.makeFavorite(bookmark.id)
+            controller.libraryChange("Add to Favorites") { Library.shared.makeFavorite(bookmark.id) }
             live?.isFavorite = true
         })
         if Library.shared.spaces.count > 1 {
@@ -89,7 +89,9 @@ enum SidebarMenus {
             let sub = NSMenu()
             let current = Library.shared.spaceID(ofBookmark: bookmark.id)
             for space in Library.shared.spaces where space.id != current {
-                sub.addItem(Item(space.name) { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) })
+                sub.addItem(Item(space.name) {
+                    controller.libraryChange("Move to Space") { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) }
+                })
             }
             move.submenu = sub
             menu.addItem(move)
@@ -114,15 +116,12 @@ enum SidebarMenus {
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
             menu.addItem(Item("Go Back to Favorite Page") { manager.resetBookmarkTab(favorite.id) })
         }
-        menu.addItem(Item("Move to Tabs") { manager.unbookmark(favorite.id, toIndex: 0) })
+        menu.addItem(Item("Move to Tabs") { controller.unfavoriteWithUndo(favorite.id, to: 0) })
         menu.addItem(.separator())
         if let live {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
-        menu.addItem(Item("Remove from Favorites") {
-            if let live { manager.close(live) }
-            Library.shared.removeBookmark(favorite.id)
-        })
+        menu.addItem(Item("Remove from Favorites") { controller.removeFavoriteWithUndo(favorite.id) })
         return menu
     }
 
@@ -158,23 +157,13 @@ enum SpaceEditor {
     static func rename(spaceID: UUID, in controller: BrowserWindowController) {
         guard let space = Library.shared.space(spaceID) else { return }
         TextPrompt.ask(title: "Rename Space", value: space.name, in: controller) { name in
-            Library.shared.renameSpace(spaceID, to: name)
+            controller.libraryChange("Rename Space") { Library.shared.renameSpace(spaceID, to: name) }
         }
     }
 
+    /// Deletes right away: ⌘Z brings the space back with its tabs, so there's nothing to confirm.
     static func confirmDelete(spaceID: UUID, in controller: BrowserWindowController) {
-        guard let space = Library.shared.space(spaceID), let window = controller.window else { return }
-        let count = controller.tabManager.tabs(in: spaceID).count + space.bookmarks.count
-        if count == 0 { Library.shared.removeSpace(spaceID); return }
-        let alert = NSAlert()
-        alert.messageText = "Delete “\(space.name)”?"
-        alert.informativeText = "Its \(count) tab\(count == 1 ? "" : "s") and bookmark\(count == 1 ? "" : "s") will be closed."
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons.first?.hasDestructiveAction = true
-        alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn { Library.shared.removeSpace(spaceID) }
-        }
+        controller.removeSpaceWithUndo(spaceID)
     }
 }
 
@@ -182,7 +171,7 @@ enum BookmarkEditor {
     static func edit(_ id: UUID, in controller: BrowserWindowController) {
         guard let bookmark = Library.shared.bookmark(id) else { return }
         TextPrompt.ask(title: "Rename Bookmark", value: bookmark.title, in: controller) { title in
-            Library.shared.updateBookmark(id, title: title)
+            controller.libraryChange("Rename Bookmark") { Library.shared.updateBookmark(id, title: title) }
         }
     }
 }

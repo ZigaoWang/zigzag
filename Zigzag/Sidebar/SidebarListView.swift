@@ -22,6 +22,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool
     /// A tab dropped into another window's sidebar at an index. Returns true if handled.
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
+    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
+    func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID)
     /// A tab or bookmark dragged over the favorites grid. Returns true while it's over it.
     func listDragOverFavorites(at windowPoint: NSPoint) -> Bool
     /// Dropped on the favorites grid. Returns true if it became a favorite.
@@ -674,7 +676,7 @@ final class SidebarListView: NSView {
         // Onto another tab's row: the two open side by side.
         if case .tab(let id) = drag.item, let split = drag.splitTarget,
            let tab = manager.tab(with: id), let target = manager.tab(with: split.id) {
-            manager.makeSplit(target, with: tab, otherOnRight: split.onRight)
+            delegate?.listSplit(target, with: tab, otherOnRight: split.onRight)
             reload(animated: true)
             return
         }
@@ -714,7 +716,7 @@ final class SidebarListView: NSView {
             // Dropped on another space's dot.
             switch drag.item {
             case .tab(let id): if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: 0, in: space) }
-            case .bookmark(let id): Library.shared.moveBookmark(id, to: Int.max, in: space)
+            case .bookmark(let id): delegate?.listMoveBookmark(id, to: Int.max, in: space)
             default: break
             }
             reload(animated: true)
@@ -730,7 +732,7 @@ final class SidebarListView: NSView {
                 delegate?.listBookmark(tab, at: drag.targetIndex, in: manager.currentSpaceID)
             }
         case (.bookmark(let id), .bookmarks?):
-            Library.shared.moveBookmark(id, to: drag.targetIndex, in: manager.currentSpaceID)
+            delegate?.listMoveBookmark(id, to: drag.targetIndex, in: manager.currentSpaceID)
         case (.bookmark(let id), .tabs?):
             // The row changes identity; the new tab row takes the placeholder's spot.
             rows[.bookmark(id)] = nil

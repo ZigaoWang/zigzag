@@ -300,6 +300,22 @@ final class Library {
         commit()
     }
 
+    /// Spaces, bookmarks and favorites as they are now, for undo.
+    struct Snapshot {
+        fileprivate let spaces: [SpaceInfo]
+        fileprivate let favorites: [Bookmark]
+
+        func favoriteIndex(of id: UUID) -> Int? { favorites.firstIndex { $0.id == id } }
+    }
+
+    var snapshot: Snapshot { Snapshot(spaces: spaces, favorites: favorites) }
+
+    func restore(_ snapshot: Snapshot) {
+        spaces = snapshot.spaces
+        favorites = snapshot.favorites
+        commit()
+    }
+
     func appendSpaces(_ newSpaces: [SpaceInfo]) {
         spaces.append(contentsOf: newSpaces)
         commit()

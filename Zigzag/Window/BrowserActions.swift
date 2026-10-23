@@ -162,7 +162,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func closeSplitView(_ sender: Any?) {
-        if let tab = selectedTab { tabManager.unsplit(tab) }
+        if let tab = selectedTab { unsplitWithUndo(tab) }
     }
 
     // MARK: History
@@ -234,7 +234,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         tabManager.switchToSpace(spaces[index].id)
     }
     @objc func newSpace(_ sender: Any?) {
-        let space = Library.shared.addSpace()
+        var created: SpaceInfo?
+        libraryChange("New Space") { created = Library.shared.addSpace() }
+        guard let space = created else { return }
         tabManager.switchToSpace(space.id)
         renameSpace(nil)
     }

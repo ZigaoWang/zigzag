@@ -167,7 +167,9 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
     }
 
     func controlTextDidEndEditing(_ obj: Notification) {
-        Library.shared.renameSpace(spaceID, to: name.stringValue)
+        let name = name.stringValue
+        guard name != Library.shared.space(spaceID)?.name else { return }
+        BrowserWindowController.undoTarget?.libraryChange("Rename Space") { Library.shared.renameSpace(spaceID, to: name) }
     }
 
     private func openColorPicker() {
@@ -186,7 +188,7 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
         alert.addButton(withTitle: "Cancel")
         alert.buttons.first?.hasDestructiveAction = true
         alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn { Library.shared.removeSpace(id) }
+            if response == .alertFirstButtonReturn { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
         }
     }
 }
@@ -218,7 +220,7 @@ final class TintPickerController: NSViewController {
                 guard let self, let swatch else { return }
                 switch swatch.kind {
                 case .tint(let color):
-                    Library.shared.setColor(color, for: self.spaceID)
+                    BrowserWindowController.undoTarget?.libraryChange("Space Color") { Library.shared.setColor(color, for: self.spaceID) }
                     self.slider.hue = color.hue
                 case .custom:
                     Library.shared.setHue(self.slider.hue, for: self.spaceID)
@@ -441,7 +443,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
         }
-        if target != startIndex { Library.shared.moveSpace(row.spaceID, to: target) } else { reloadSpaces() }
+        if target != startIndex {
+            BrowserWindowController.undoTarget?.libraryChange("Move Space") { Library.shared.moveSpace(row.spaceID, to: target) }
+        } else {
+            reloadSpaces()
+        }
         return true
     }
 
@@ -458,7 +464,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh() }
     }
 
-    @objc private func addSpace() { Library.shared.addSpace() }
+    @objc private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
 
     @objc private func importArc() { ArcImporter.runInteractive() }
 

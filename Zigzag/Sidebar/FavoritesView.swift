@@ -20,6 +20,7 @@ final class FavoritesView: NSView {
     var onDragMove: ((Bookmark, NSPoint) -> Void)?
     /// Dropped somewhere outside the grid. Returns true if it was handled.
     var onDrop: ((Bookmark, NSPoint) -> Bool)?
+    var onReorder: ((Bookmark, Int) -> Void)?
 
     static let tileHeight = Tokens.Space.x10 + Tokens.Space.x2
     static let maxColumns = 4
@@ -112,7 +113,7 @@ final class FavoritesView: NSView {
         if bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local) {
             let to = index(at: local)
             let from = tiles.firstIndex { $0 === tile } ?? 0
-            Library.shared.moveFavorite(favorite.id, to: to > from ? to - 1 : to)
+            if to != from && to != from + 1 { onReorder?(favorite, to > from ? to - 1 : to) }
             _ = onDrop?(favorite, NSPoint(x: -10_000, y: -10_000))
         } else {
             _ = onDrop?(favorite, last)
