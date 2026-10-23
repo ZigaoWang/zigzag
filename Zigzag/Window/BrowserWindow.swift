@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// A window with no title bar and no toolbar. The traffic lights live in the sidebar's top row.
 final class BrowserWindow: NSWindow {
@@ -44,11 +45,20 @@ final class BrowserWindow: NSWindow {
 
     /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // ⌘Z / ⇧⌘Z: the sidebar's undo, unless you were just typing on the page or in a field.
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if event.charactersIgnoringModifiers?.lowercased() == "z", mods == .command || mods == [.command, .shift],
+           let controller = windowController as? BrowserWindowController, controller.handleUndoKey(redo: mods.contains(.shift)) {
+            return true
+        }
         if let menu = NSApp.mainMenu, menu.performKeyEquivalent(with: event) { return true }
         return super.performKeyEquivalent(with: event)
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, !event.modifierFlags.contains(.command), firstResponder is WKWebView {
+            UndoClock.lastPageEdit = Date()
+        }
         if let eventInterceptor, eventInterceptor(event) { return }
         if routeTitlebarEvent(event) { return }
         super.sendEvent(event)
