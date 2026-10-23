@@ -153,6 +153,8 @@ final class PeekController {
         })
     }
 
+    var contentFrame: NSRect { panel.frame }
+
     func goBack() { tab?.goBack() }
     func goForward() { tab?.goForward() }
 }

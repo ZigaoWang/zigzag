@@ -8,6 +8,7 @@ protocol TabHost: AnyObject {
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView?
     func tabDidRequestClose(_ tab: Tab)
     func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool)
+    func tab(_ tab: Tab, hoveringLink url: URL?)
 }
 
 enum OpenDisposition {
@@ -452,6 +453,11 @@ extension Tab: WKUIDelegate {
 
     func webViewDidClose(_ webView: WKWebView) {
         host?.tabDidRequestClose(self)
+    }
+
+    /// Reported by our hover script: the link under the pointer, or nil.
+    func hoveredLinkChanged(_ url: URL?) {
+        host?.tab(self, hoveringLink: url)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {

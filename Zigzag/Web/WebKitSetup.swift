@@ -37,13 +37,36 @@ enum WebKitSetup {
         }
         if configuration.userContentController.userScripts.isEmpty {
             for script in PageScripts.all { configuration.userContentController.addUserScript(script) }
+            // Runs in its own world, invisible to the page.
+            configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
         }
     }
 }
 
 /// Small scripts injected into every page.
 enum PageScripts {
-    static var all: [WKUserScript] { [] }
+    static var all: [WKUserScript] {
+        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient)]
+    }
+
+    /// Tells the browser which link the pointer is over, for the link preview in the corner.
+    static let linkHover = """
+    (() => {
+      let current = null;
+      const send = (url) => {
+        if (url === current) return;
+        current = url;
+        try { window.webkit.messageHandlers.zigzagHover.postMessage(url || ''); } catch (e) {}
+      };
+      document.addEventListener('mouseover', (e) => {
+        const a = e.target && e.target.closest ? e.target.closest('a[href], area[href]') : null;
+        send(a ? a.href : null);
+      }, true);
+      document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) send(null); }, true);
+      window.addEventListener('blur', () => send(null));
+      window.addEventListener('pagehide', () => send(null));
+    })();
+    """
 
     /// Collects the page's declared icons, best first.
     static let iconLinks = """
@@ -52,4 +75,15 @@ enum PageScripts {
       return links.map(l => ({ href: l.href, sizes: l.getAttribute('sizes') || '', rel: l.rel, type: l.type || '' }));
     })();
     """
+}
+
+/// Receives messages from our page scripts and routes them to the tab that sent them.
+final class PageMessages: NSObject, WKScriptMessageHandler {
+    static let shared = PageMessages()
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "zigzagHover", let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return }
+        let text = message.body as? String ?? ""
+        tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+    }
 }

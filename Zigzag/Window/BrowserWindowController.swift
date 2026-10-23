@@ -20,6 +20,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
     lazy var switcher = TabSwitcher(controller: self)
+    lazy var linkStatus = LinkStatusController(overlay: root.overlay)
     lazy var peek = PeekController(controller: self)
     var peekController: PeekController? { peek }
 
@@ -392,6 +393,11 @@ extension BrowserWindowController: TabHost {
     }
 
     func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool) {}
+
+    func tab(_ tab: Tab, hoveringLink url: URL?) {
+        guard tab === tabManager.selectedTab || tab.isPeek else { return }
+        linkStatus.show(url, in: tab.isPeek ? peek.contentFrame : root.cardFrame)
+    }
 }
 
 // MARK: - SidebarDelegate

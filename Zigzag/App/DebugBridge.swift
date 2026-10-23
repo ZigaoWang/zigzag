@@ -192,6 +192,14 @@ enum DebugBridge {
         case "settingsid":
             if let w = SettingsWindowController.shared.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
         case "editspace": controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
+        case "pagemove":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2, let window = controller.window, let webView = controller.selectedWebView,
+               let e = NSEvent.mouseEvent(with: .mouseMoved, location: NSPoint(x: n[0], y: window.frame.height - n[1]), modifierFlags: [],
+                                          timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                          eventNumber: 0, clickCount: 0, pressure: 0) {
+                webView.mouseMoved(with: e)
+            }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
