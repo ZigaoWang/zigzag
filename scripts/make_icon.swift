@@ -15,9 +15,9 @@ let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _
     squircle.addClip()
 
     // The sidebar: everything left of the seam.
-    let seamX: CGFloat = 404
-    let amplitude: CGFloat = 46
-    let teeth = 4
+    let seamX: CGFloat = 420
+    let amplitude: CGFloat = 110
+    let teeth = 2
     let top = tile.maxY, bottom = tile.minY
     let step = (top - bottom) / CGFloat(teeth * 2)
     let sidebar = NSBezierPath()
