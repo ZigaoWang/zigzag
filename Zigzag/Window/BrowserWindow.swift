@@ -50,7 +50,56 @@ final class BrowserWindow: NSWindow {
 
     override func sendEvent(_ event: NSEvent) {
         if let eventInterceptor, eventInterceptor(event) { return }
+        if routeTitlebarEvent(event) { return }
         super.sendEvent(event)
+    }
+
+    /// Our controls sit where the title bar would be. AppKit sends presses there to the title bar first,
+    /// so presses that land on one of our controls are delivered to it directly.
+    private weak var titlebarTarget: NSView?
+
+    private func routeTitlebarEvent(_ event: NSEvent) -> Bool {
+        switch event.type {
+        case .leftMouseDown, .rightMouseDown:
+            guard let target = control(at: event.locationInWindow) else { return false }
+            titlebarTarget = target
+            if event.type == .leftMouseDown {
+                makeKeyAndOrderFront(nil)
+                target.mouseDown(with: event)
+            } else if let menu = target.menu(for: event) {
+                NSMenu.popUpContextMenu(menu, with: event, for: target)
+            }
+            return true
+        case .leftMouseDragged:
+            guard let target = titlebarTarget else { return false }
+            target.mouseDragged(with: event)
+            return true
+        case .leftMouseUp:
+            guard let target = titlebarTarget else { return false }
+            titlebarTarget = nil
+            target.mouseUp(with: event)
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The control under a point in the title bar strip, if it's one of ours.
+    private func control(at point: NSPoint) -> NSView? {
+        guard let container = standardWindowButton(.closeButton)?.superview?.superview,
+              container.frame.contains(point),
+              let content = contentView else { return nil }
+        // The system buttons keep their own behavior.
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            if let b = standardWindowButton(button), !b.isHidden, b.convert(b.bounds, to: nil).contains(point) { return nil }
+        }
+        let hit = content.hitTest(content.superview?.convert(point, from: nil) ?? point)
+        var view = hit
+        while let current = view, current !== content {
+            if current is InteractiveView { return current }
+            view = current.superview
+        }
+        return nil
     }
 
     private var buttons: [NSButton] {
