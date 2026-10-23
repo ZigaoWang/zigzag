@@ -77,11 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func checkForUpdates(_ sender: Any?) { Updater.shared.checkForUpdates() }
 
-    @objc func makeDefaultBrowser(_ sender: Any?) {
-        let app = Bundle.main.bundleURL
-        NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "http") { _ in }
-        NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in }
-    }
+    @objc func makeDefaultBrowser(_ sender: Any?) { DefaultBrowser.make() }
 
     @objc func importFromArc(_ sender: Any?) { ArcImporter.runInteractive() }
 }

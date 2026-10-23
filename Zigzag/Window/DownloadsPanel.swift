@@ -195,6 +195,8 @@ final class DownloadsPanelView: FloatingPanelView {
 /// A small text-only button ("Clear", "Open as Tab").
 final class TextButton: InteractiveView {
     private let label: Label
+    /// Shows a quiet fill even at rest, so the button reads as a button (used in Settings).
+    var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
 
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
         label = Label(title, font: font, color: Tokens.Color.textSecondary)
@@ -222,9 +224,10 @@ final class TextButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = !isEnabled ? nil : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        let rest: NSColor? = showsFillAtRest ? Tokens.Color.fieldFill : nil
+        let fill: NSColor? = !isEnabled ? (showsFillAtRest ? nil : nil) : isPressed ? Tokens.Color.pressedFill : isHovered ? (showsFillAtRest ? Tokens.Color.highlight : Tokens.Color.hoverFill) : rest
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        label.textColor = showsFillAtRest ? Tokens.Color.textPrimary : (isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary)
         label.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 

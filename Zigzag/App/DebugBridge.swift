@@ -188,6 +188,9 @@ enum DebugBridge {
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        case "settings": SettingsWindowController.shared.show()
+        case "settingsid":
+            if let w = SettingsWindowController.shared.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break

@@ -41,6 +41,7 @@
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
 		C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */; };
 		C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765C1F36BCEE463F8B5316BE /* Paths.swift */; };
+		C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */; };
 		C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175D363890A811683DC2D9E7 /* TabSwitcher.swift */; };
 		C6A5D03B30E566FF6F00A2E5 /* KnownExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B459AF88430335A87C59598 /* KnownExtension.swift */; };
 		CF63705B985B423D3B9EC482 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77478845778FB285ADD29C14 /* Library.swift */; };
@@ -68,6 +69,7 @@
 		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
 		253D16FCBE561D267ED6957C /* BrowserRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRootView.swift; sourceTree = "<group>"; };
 		256245226DA14768B001589E /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
+		2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		32289A47E7257A31AC82FCB0 /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controls.swift; sourceTree = "<group>"; };
 		32D47467F8351F9270BAE20A /* SidebarRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRows.swift; sourceTree = "<group>"; };
 		34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarController.swift; sourceTree = "<group>"; };
@@ -190,6 +192,14 @@
 			path = Extensions;
 			sourceTree = "<group>";
 		};
+		91D29C3019C13466CD1CC5A3 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		9DC22EE06DF1214E46F4D147 /* Peek */ = {
 			isa = PBXGroup;
 			children = (
@@ -241,6 +251,7 @@
 				85A5F772A833404217E58966 /* Extensions */,
 				B066F09313656E4EA7FC33E2 /* Import */,
 				9DC22EE06DF1214E46F4D147 /* Peek */,
+				91D29C3019C13466CD1CC5A3 /* Resources */,
 				7F46711B14040569495FEF80 /* Session */,
 				AD198676FC355DA00F18BD4B /* Settings */,
 				45578458512E00D5EB7061BF /* Sidebar */,
@@ -313,6 +324,7 @@
 			buildConfigurationList = 7B7D9D32B12052ADC170A186 /* Build configuration list for PBXNativeTarget "Zigzag" */;
 			buildPhases = (
 				05DD779813C016C2EA23F3B0 /* Sources */,
+				A1441208B36A4091641A7B3F /* Resources */,
 				A9BECF73074118ECCC037D04 /* Frameworks */,
 			);
 			buildRules = (
@@ -363,6 +375,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1441208B36A4091641A7B3F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		05DD779813C016C2EA23F3B0 /* Sources */ = {
@@ -423,6 +446,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -507,6 +531,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
