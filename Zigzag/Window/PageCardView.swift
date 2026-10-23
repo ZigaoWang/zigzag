@@ -8,6 +8,9 @@ final class PageCardView: NSView {
     private(set) weak var webView: WKWebView?
     /// In split view, the pane you're working in gets a quiet accent edge.
     var isFocusedPane = false { didSet { refreshColors() } }
+    /// In split view each pane gets its own small toolbar.
+    let header = PaneHeaderView()
+    var showsHeader = false { didSet { header.isHidden = !showsHeader; needsLayout = true } }
     /// Shown while a suspended tab wakes up so the card never flashes blank.
     private let placeholder = NSImageView()
 
@@ -35,6 +38,8 @@ final class PageCardView: NSView {
         edge.borderWidth = Tokens.Metric.hairline
         edge.zPosition = 10
         clip.layer?.addSublayer(edge)
+        header.isHidden = true
+        clip.addSubview(header)
         refreshColors()
     }
 
@@ -46,8 +51,12 @@ final class PageCardView: NSView {
         super.layout()
         Tokens.Motion.withoutAnimation {
             clip.frame = bounds
-            webView?.frame = clip.bounds
-            placeholder.frame = clip.bounds
+            let top = showsHeader ? PaneHeaderView.height : 0
+            // The clip isn't flipped: the header sits at its top edge, the page fills the rest below.
+            header.frame = NSRect(x: 0, y: clip.bounds.height - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
+            let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
+            webView?.frame = content
+            placeholder.frame = content
             edge.frame = clip.bounds
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Tokens.Radius.card, cornerHeight: Tokens.Radius.card, transform: nil)
         }
@@ -72,7 +81,8 @@ final class PageCardView: NSView {
         guard newWebView !== webView else { return }
         let old = webView
         if let newWebView {
-            newWebView.frame = clip.bounds
+            let top = showsHeader ? PaneHeaderView.height : 0
+            newWebView.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             newWebView.autoresizingMask = [.width, .height]
             clip.addSubview(newWebView, positioned: .below, relativeTo: placeholder)
         }

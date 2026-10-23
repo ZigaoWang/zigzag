@@ -222,12 +222,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.show(right.ensureWebView())
             root.card.isFocusedPane = left === tab
             root.secondCard.isFocusedPane = right === tab
+            root.card.showsHeader = true
+            root.secondCard.showsHeader = true
+            root.card.header.show(left)
+            root.secondCard.header.show(right)
+            root.card.header.close.onClick = { [weak self] _ in self?.tabManager.unsplit(left, keep: right) }
+            root.secondCard.header.close.onClick = { [weak self] _ in self?.tabManager.unsplit(right, keep: left) }
         } else {
             root.splitRatio = nil
             root.card.show(tab?.ensureWebView())
             root.secondCard.show(nil)
             root.card.isFocusedPane = false
             root.secondCard.isFocusedPane = false
+            root.card.showsHeader = false
+            root.secondCard.showsHeader = false
         }
     }
 

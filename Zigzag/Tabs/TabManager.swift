@@ -535,6 +535,13 @@ final class TabManager {
         }
     }
 
+    /// Takes one pane out of its split and shows the other on its own.
+    func unsplit(_ tab: Tab, keep other: Tab) {
+        unsplit(tab, notify: false)
+        changed.send(.structure)
+        select(other)
+    }
+
     func setSplitRatio(_ ratio: Double, for tab: Tab) {
         guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
         splits[index].ratio = min(max(ratio, 0.2), 0.8)
