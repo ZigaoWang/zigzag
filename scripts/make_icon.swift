@@ -1,37 +1,72 @@
 import AppKit
-// Draws Zigzag's app icon at 1024px: a sky squircle with a single white zigzag stroke.
+// Zigzag's icon: one ribbon of paper, folded twice into a zigzag, on a warm paper tile.
+// The two folds are shaded like the underside of the strip, so it reads as an object, not a letter.
 let size: CGFloat = 1024
+
+func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
+    NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+}
+
+func poly(_ points: [NSPoint]) -> NSBezierPath {
+    let p = NSBezierPath()
+    p.move(to: points[0])
+    points.dropFirst().forEach { p.line(to: $0) }
+    p.close()
+    return p
+}
+
 let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
     let ctx = NSGraphicsContext.current!.cgContext
-    let inset: CGFloat = 100
-    let rect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
-    let radius: CGFloat = 185
-    let squircle = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-    // Soft drop shadow, as on every macOS icon.
+    let tile = NSRect(x: 100, y: 100, width: 824, height: 824)
+    let squircle = NSBezierPath(roundedRect: tile, xRadius: 186, yRadius: 186)
+
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: NSColor.black.withAlphaComponent(0.28).cgColor)
-    NSColor(srgbRed: 0.33, green: 0.52, blue: 0.82, alpha: 1).setFill()
+    ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 26, color: color(0x000000, 0.25).cgColor)
+    color(0xF3EEE6).setFill()
     squircle.fill()
     ctx.restoreGState()
-    // Gentle top-to-bottom light, the way Apple's own icons are lit.
+
     squircle.addClip()
-    let gradient = NSGradient(colors: [NSColor(srgbRed: 0.47, green: 0.68, blue: 0.94, alpha: 1),
-                                       NSColor(srgbRed: 0.27, green: 0.46, blue: 0.80, alpha: 1)])!
-    gradient.draw(in: rect, angle: -90)
-    // The mark: one confident zigzag.
-    let path = NSBezierPath()
-    path.move(to: NSPoint(x: 312, y: 646))
-    path.line(to: NSPoint(x: 712, y: 646))
-    path.line(to: NSPoint(x: 312, y: 378))
-    path.line(to: NSPoint(x: 712, y: 378))
-    path.lineWidth = 92
-    path.lineCapStyle = .round
-    path.lineJoinStyle = .round
-    ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 18, color: NSColor.black.withAlphaComponent(0.18).cgColor)
-    NSColor.white.setStroke()
-    path.stroke()
+    NSGradient(colors: [color(0xFBF8F3), color(0xEDE6DB)])!.draw(in: tile, angle: -90)
+
+    // The ribbon: top strip, a diagonal fold back, bottom strip. Band height t.
+    let t: CGFloat = 132
+    let left: CGFloat = 268, right: CGFloat = 756
+    let topY: CGFloat = 640, bottomY: CGFloat = 252
+    let top = poly([NSPoint(x: left, y: topY), NSPoint(x: right, y: topY), NSPoint(x: right, y: topY + t), NSPoint(x: left, y: topY + t)])
+    let bottom = poly([NSPoint(x: left, y: bottomY), NSPoint(x: right, y: bottomY), NSPoint(x: right, y: bottomY + t), NSPoint(x: left, y: bottomY + t)])
+    // The diagonal runs from under the top strip's right end to over the bottom strip's left end.
+    let diagonal = poly([NSPoint(x: right - t * 1.7, y: topY), NSPoint(x: right, y: topY),
+                         NSPoint(x: left + t * 1.7, y: bottomY + t), NSPoint(x: left, y: bottomY + t)])
+
+    let face = color(0xF0603A)       // the front of the ribbon
+    let faceLight = color(0xFF8257)
+    let back = color(0xB83E22)       // the underside, seen on the diagonal
+
+    // Soft shadow the ribbon casts on the paper.
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: color(0x6B2A14, 0.30).cgColor)
+    face.setFill()
+    top.fill(); bottom.fill(); diagonal.fill()
+    ctx.restoreGState()
+
+    // Diagonal: the underside, darker toward the folds.
+    NSGradient(colors: [back, color(0xD24E2C), back])!.draw(in: diagonal, angle: -40)
+    // Strips: lit from above.
+    NSGradient(colors: [faceLight, face])!.draw(in: top, angle: -90)
+    NSGradient(colors: [faceLight, face])!.draw(in: bottom, angle: -90)
+
+    // Fold creases: a thin shadow where each strip turns.
+    ctx.saveGState()
+    color(0x000000, 0.18).setStroke()
+    let crease1 = NSBezierPath(); crease1.move(to: NSPoint(x: right - t * 1.7, y: topY)); crease1.line(to: NSPoint(x: right, y: topY))
+    let crease2 = NSBezierPath(); crease2.move(to: NSPoint(x: left, y: bottomY + t)); crease2.line(to: NSPoint(x: left + t * 1.7, y: bottomY + t))
+    crease1.lineWidth = 6; crease2.lineWidth = 6
+    crease1.stroke(); crease2.stroke()
+    ctx.restoreGState()
     return true
 }
+
 let out = CommandLine.arguments[1]
 for px in [16, 32, 64, 128, 256, 512, 1024] {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8, samplesPerPixel: 4,
