@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 
 /// The single source of truth for every visual decision in Zigzag.
 /// Views never use literal numbers or colors; they reach in here.
@@ -110,12 +109,22 @@ enum Tokens {
         /// Delay before a hover preview appears.
         static let previewDelay: TimeInterval = 0.45
         /// Delay before the hidden sidebar slides in from the edge.
-        static let edgeRevealDelay: TimeInterval = 0.06
-        static let edgeHideDelay: TimeInterval = 0.25
+        static let edgeRevealDelay: TimeInterval = 0
+        static let edgeHideDelay: TimeInterval = 0.15
+        /// Sidebar slides in and out: fast enough to feel attached to the pointer.
+        static let slideDuration: TimeInterval = 0.22
 
-        static var snappy: Animation { .spring(duration: standard, bounce: 0) }
-        static var gentle: Animation { .spring(duration: large, bounce: 0.04) }
-        static var feedback: Animation { .spring(duration: quick, bounce: 0) }
+        /// A motion style: how long, and which curve. Every curve is a fast-out, no-overshoot spring shape,
+        /// run by Core Animation on the render server so it stays smooth while pages are busy.
+        struct Curve {
+            let duration: TimeInterval
+            var timing: CAMediaTimingFunction { CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1) }
+        }
+
+        static let snappy = Curve(duration: standard)
+        static let slide = Curve(duration: slideDuration)
+        static let gentle = Curve(duration: large)
+        static let feedback = Curve(duration: quick)
 
         /// True while handling a keypress. Keyboard actions take effect instantly; only pointer actions animate
         /// (the Raycast rule: the keyboard is for speed).
@@ -124,8 +133,9 @@ enum Tokens {
             return type == .keyDown || type == .keyUp || type == .flagsChanged
         }
 
-        /// Runs AppKit animator() changes with a spring.
-        static func animate(_ animation: Animation = snappy, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+        /// Runs AppKit animator() changes. Frames jump to their final values right away (so layout and
+        /// hit-testing always see the truth); only what's drawn animates.
+        static func animate(_ curve: Curve = snappy, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
             if isKeyboardDriven {
                 NSAnimationContext.runAnimationGroup({ ctx in
                     ctx.duration = 0
@@ -142,7 +152,29 @@ enum Tokens {
                 }, completionHandler: completion)
                 return
             }
-            NSAnimationContext.animate(animation, changes: changes, completion: completion)
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = curve.duration
+                ctx.timingFunction = curve.timing
+                ctx.allowsImplicitAnimation = true
+                changes()
+            }, completionHandler: completion)
+        }
+
+        static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+        /// Slides a view horizontally into its current (final) position from `offset` points away, on the
+        /// render server. Returns how long the slide takes, 0 if it was skipped.
+        @discardableResult
+        static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy) -> TimeInterval {
+            guard let layer = view.layer, offset != 0, !isKeyboardDriven, !reduceMotion else { return 0 }
+            let animation = CABasicAnimation(keyPath: "transform.translation.x")
+            animation.fromValue = offset
+            animation.toValue = 0
+            animation.duration = curve.duration
+            animation.timingFunction = curve.timing
+            animation.fillMode = .backwards
+            layer.add(animation, forKey: "slide")
+            return curve.duration
         }
 
         /// Applies changes immediately with no implicit animation.

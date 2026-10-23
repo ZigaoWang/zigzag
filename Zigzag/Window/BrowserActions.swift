@@ -73,14 +73,14 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let url = selectedTab?.url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show("Copied link", in: self)
+        Toast.show("Link Copied", symbol: "link", in: self)
     }
 
     @objc func copyPageURLAsMarkdown(_ sender: Any?) {
         guard let tab = selectedTab, let url = tab.url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("[\(tab.displayTitle)](\(url.absoluteString))", forType: .string)
-        Toast.show("Copied link as Markdown", in: self)
+        Toast.show("Markdown Link Copied", symbol: "link", in: self)
     }
 
     @objc func showFindBar(_ sender: Any?) { findBar.show() }
@@ -129,7 +129,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let webView = selectedWebView, let url = selectedTab?.url else { return }
         webView.pageZoom = zoom
         ZoomLevels.set(zoom, for: url)
-        Toast.show("\(Int((zoom * 100).rounded()))%", in: self)
+        Toast.show("\(Int((zoom * 100).rounded()))%", symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass", in: self)
     }
 
     @objc func showWebInspector(_ sender: Any?) {
@@ -178,10 +178,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let tab = selectedTab else { return }
         if let bookmarkID = tab.bookmarkID {
             tabManager.unbookmark(bookmarkID)
-            Toast.show("Removed bookmark", in: self)
+            Toast.show("Bookmark Removed", symbol: "bookmark.slash", in: self)
         } else {
             tabManager.bookmarkTab(tab)
-            Toast.show("Bookmarked", in: self)
+            Toast.show("Bookmarked", symbol: "bookmark.fill", in: self)
         }
     }
 

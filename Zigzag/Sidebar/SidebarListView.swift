@@ -43,6 +43,9 @@ enum SidebarItem: Hashable {
 /// The scrolling list of bookmarks and tabs. Rows are reused by identity and animate between layouts.
 final class SidebarListView: NSView {
     weak var delegate: SidebarListDelegate?
+    /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
+    var spaceOverride: UUID?
+    private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
 
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
@@ -69,12 +72,13 @@ final class SidebarListView: NSView {
     private func buildItems(includeEmptyBookmarkSection: Bool = false) -> [SidebarItem] {
         guard let manager else { return [] }
         var result: [SidebarItem] = [.header]
-        let bookmarks = Library.shared.bookmarks(in: manager.currentSpaceID)
+        let spaceID = spaceOverride ?? manager.currentSpaceID
+        let bookmarks = Library.shared.bookmarks(in: spaceID)
         result += bookmarks.map { .bookmark($0.id) }
         if bookmarks.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
         if !bookmarks.isEmpty || includeEmptyBookmarkSection { result.append(.separator) }
         result.append(.newTab)
-        result += manager.currentTabs.map { .tab($0.id) }
+        result += manager.tabs(in: spaceID).map { .tab($0.id) }
         return result
     }
 
@@ -217,10 +221,11 @@ final class SidebarListView: NSView {
 
     private func configure(_ view: NSView, for item: SidebarItem) {
         guard let manager else { return }
-        let selected = manager.selectedTab
+        let selected = manager.selectedTab(in: shownSpaceID ?? manager.currentSpaceID)
         switch item {
         case .header:
-            (view as? SpaceHeaderView)?.label.stringValue = manager.currentSpace.name
+            (view as? SpaceHeaderView)?.label.stringValue = Library.shared.space(shownSpaceID ?? manager.currentSpaceID)?.name ?? ""
+
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
             row.configure(tab: tab)

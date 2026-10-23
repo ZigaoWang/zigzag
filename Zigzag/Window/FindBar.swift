@@ -238,26 +238,67 @@ class FloatingPanelView: NSView {
     }
 }
 
-/// A brief confirmation at the bottom of the page ("Copied link"). Quiet, and gone in a moment.
-enum Toast {
-    private static weak var current: FloatingPanelView?
-    private static let hide = Debouncer(delay: 1.4)
+/// A brief confirmation pill at the top of the page ("Link Copied", "90%"). Shown at once, gone in a moment;
+/// pressing the same shortcut again updates it in place instead of stacking another.
+final class ToastView: FloatingPanelView {
+    let icon = NSImageView()
+    let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
 
-    static func show(_ text: String, in controller: BrowserWindowController) {
-        current?.removeFromSuperview()
-        let label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-        let size = NSSize(width: label.textWidth, height: label.lineHeight)
-        let panel = FloatingPanelView()
-        panel.radius = Tokens.Radius.row
-        let width = ceil(size.width) + Tokens.Space.x8
-        let height = Tokens.Space.x8 + Tokens.Space.x1
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        icon.imageScaling = .scaleNone
+        icon.contentTintColor = Tokens.Color.icon
+        addSubview(icon)
+        addSubview(label)
+        onLayout = { [weak self] in self?.layoutContent() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    static let height = Tokens.Space.x8 + Tokens.Space.x1
+
+    var fittingWidth: CGFloat {
+        Tokens.Space.x3 + (icon.image == nil ? 0 : Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth + Tokens.Space.x3
+    }
+
+    private func layoutContent() {
+        var x = Tokens.Space.x3
+        if icon.image != nil {
+            icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
+            x = icon.frame.maxX + Tokens.Space.x2
+        }
+        let h = label.lineHeight
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: bounds.width - x - Tokens.Space.x3, height: h)
+    }
+}
+
+enum Toast {
+    private static weak var current: ToastView?
+    private static let hide = Debouncer(delay: 1.3)
+
+    static func show(_ text: String, symbol: String? = nil, in controller: BrowserWindowController) {
+        let toast: ToastView
+        let isNew: Bool
+        if let existing = current, existing.superview === controller.root.overlay {
+            toast = existing
+            isNew = false
+        } else {
+            toast = ToastView()
+            toast.radius = ToastView.height / 2
+            isNew = true
+        }
+        toast.label.stringValue = text
+        toast.icon.image = symbol.map { Tokens.Symbol.image($0) }
+        let width = ceil(toast.fittingWidth)
         let card = controller.root.cardFrame
-        panel.frame = NSRect(x: card.midX - width / 2, y: card.maxY - height - Tokens.Space.x4, width: width, height: height)
-        panel.addSubview(label)
-        label.frame = NSRect(x: Tokens.Space.x4, y: (height - ceil(size.height)) / 2, width: ceil(size.width), height: ceil(size.height))
-        controller.root.overlay.addSubview(panel)
-        panel.present()
-        current = panel
-        hide.call { [weak panel] in panel?.dismiss() }
+        // Top center of the page: where your eyes already are, clear of the content you're reading.
+        toast.frame = NSRect(x: round(card.midX - width / 2), y: card.minY + Tokens.Space.x3, width: width, height: ToastView.height)
+        toast.needsLayout = true
+        if isNew {
+            controller.root.overlay.addSubview(toast)
+            toast.present()
+        }
+        current = toast
+        hide.call { [weak toast] in toast?.dismiss() }
     }
 }

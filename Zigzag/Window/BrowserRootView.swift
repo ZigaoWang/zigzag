@@ -82,8 +82,8 @@ final class BrowserRootView: ColorView {
     var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
-    /// Called with true when the sidebar starts sliding and false when it stops.
-    var onSlide: ((Bool) -> Void)?
+    /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation).
+    var onSlide: ((TimeInterval) -> Void)?
     var onSidebarWidthChange: ((CGFloat) -> Void)?
 
     private var trackingArea: NSTrackingArea?
@@ -150,22 +150,25 @@ final class BrowserRootView: ColorView {
         guard visible != sidebarVisible else { return }
         hideDebouncer.cancel()
         revealDebouncer.cancel()
-        // Hiding a floating sidebar should not slide it in first.
-        let wasRevealed = sidebarRevealed
+        let oldSidebar = sidebarContainer.frame
         sidebarVisible = visible
         sidebarRevealed = false
         watchPointer(false)
-        if !visible && wasRevealed { sidebarRevealed = false }
-        guard animated, !Tokens.Motion.isKeyboardDriven else { needsLayout = true; return }
         sidebarContainer.isFloating = !visible
-        onSlide?(true)
-        Tokens.Motion.animate(Tokens.Motion.snappy, {
+        guard animated, !Tokens.Motion.isKeyboardDriven, !Tokens.Motion.reduceMotion else {
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+            return
+        }
+        // The page card resizes with AppKit's animator; the sidebar slides on the render server.
+        let targetSidebar = visible ? sidebarFrame : NSRect(x: -sidebarWidth, y: 0, width: sidebarWidth, height: bounds.height)
+        Tokens.Motion.withoutAnimation { sidebarContainer.frame = targetSidebar }
+        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide)
+        onSlide?(duration)
+        Tokens.Motion.animate(Tokens.Motion.slide, {
             self.card.animator().frame = self.cardFrame
-            self.sidebarContainer.animator().frame = visible ? self.sidebarFrame : NSRect(x: -self.sidebarWidth, y: 0, width: self.sidebarWidth, height: self.bounds.height)
         }, completion: {
-            self.onSlide?(false)
             self.needsLayout = true
-            self.onLayoutChange?()
         })
     }
 
@@ -186,7 +189,7 @@ final class BrowserRootView: ColorView {
         if !sidebarRevealed {
             if point.x <= Tokens.Metric.edgeRevealWidth {
                 hideDebouncer.cancel()
-                revealDebouncer.call { [weak self] in self?.reveal(true) }
+                reveal(true)
             } else {
                 revealDebouncer.cancel()
             }
@@ -229,17 +232,15 @@ final class BrowserRootView: ColorView {
     func reveal(_ show: Bool) {
         guard !sidebarVisible, show != sidebarRevealed else { return }
         if !show && holdReveal { return }
+        let old = sidebarContainer.frame
         sidebarRevealed = show
         watchPointer(show)
-        // The real traffic lights can't animate; a picture of them rides along inside the sliding sidebar.
-        onSlide?(true)
         let target = sidebarFrame
-        Tokens.Motion.animate(Tokens.Motion.snappy, {
-            self.sidebarContainer.animator().frame = target
-        }, completion: {
-            self.onSlide?(false)
-            self.onLayoutChange?()
-        })
+        Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
+        // Frames are final at once; only the drawing slides. The real traffic lights can't follow,
+        // so a picture of them rides inside the sidebar until the slide ends.
+        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: old.minX - target.minX, curve: Tokens.Motion.slide)
+        onSlide?(duration)
     }
 
     /// True while the sidebar is in its floating, slid-in state.

@@ -27,6 +27,11 @@ enum DebugBridge {
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
         case "reveal": controller.root.reveal(true)
+        case "unreveal": controller.root.reveal(false)
+        case "lights":
+            let w = controller.window as? BrowserWindow
+            let b = w?.standardWindowButton(.closeButton)
+            debugLog("lights hidden=\(b?.isHidden ?? true) frame=\(b?.frame ?? .zero) revealed=\(controller.root.isSidebarFloatingVisible) container=\(controller.root.sidebarContainer.frame.minX)")
         case "commandbar": controller.commandBar.show(mode: .newTab); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
@@ -151,7 +156,9 @@ enum DebugBridge {
             }
         case "swipe":
             // swipe <dx per step>: a synthetic two-finger horizontal swipe over the sidebar.
-            guard let window = controller.window, let dx = Int32(arg) else { break }
+            let parts = arg.split(separator: " ")
+            guard let window = controller.window, let first = parts.first, let dx = Int32(first) else { break }
+            let phaseless = parts.contains("nophase")
             let screenPoint = window.convertPoint(toScreen: NSPoint(x: 100, y: window.frame.height - 300))
             let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
             var phases: [Int64] = [1]
@@ -161,13 +168,15 @@ enum DebugBridge {
                 let d: Int32 = phase == 2 ? dx : 0
                 guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
                 cg.location = flipped
-                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phaseless ? 0 : phase)
                 cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
                 cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(d))
                 if let event = NSEvent(cgEvent: cg) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
                 }
             }
+        case "copylink": controller.copyPageURL(nil)
+        case "zoomout": controller.zoomOut(nil)
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
