@@ -29,6 +29,7 @@ struct SessionState: Codable {
         var spaces: [SpaceTabs]
         var bookmarkTabs: [BookmarkTabState]
         var isFullScreen: Bool?
+        var splits: [TabManager.SplitPair]?
     }
 
     var windows: [WindowState]
@@ -172,7 +173,8 @@ final class WindowManager {
                                         sidebarWidth: Double(controller.root.sidebarWidth),
                                         currentSpaceID: manager.currentSpaceID,
                                         spaces: spaces, bookmarkTabs: bookmarkTabs,
-                                        isFullScreen: controller.window?.styleMask.contains(.fullScreen))
+                                        isFullScreen: controller.window?.styleMask.contains(.fullScreen),
+                                        splits: manager.splits)
     }
 
     // MARK: Restoring
@@ -202,6 +204,7 @@ final class WindowManager {
             if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
             let controller = makeController(manager: manager, frame: frame, sidebarVisible: windowState.sidebarVisible,
                                             sidebarWidth: CGFloat(windowState.sidebarWidth))
+            manager.restoreSplits(windowState.splits ?? [])
             manager.restoreSelection(selection, currentSpaceID: windowState.currentSpaceID)
             controller.showWindow(nil)
             if windowState.isFullScreen == true { controller.window?.toggleFullScreen(nil) }

@@ -22,6 +22,10 @@ protocol SidebarListDelegate: AnyObject {
     func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool
     /// A tab dropped into another window's sidebar at an index. Returns true if handled.
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
+    /// A tab dragged over the page: show which half it would open in.
+    func listDragOverPage(at windowPoint: NSPoint, tab: Tab)
+    /// Dropped on the page: open it in split view beside the current page. Returns true if it did.
+    func listDropOnPage(_ tab: Tab) -> Bool
 }
 
 enum SidebarItem: Hashable {
@@ -257,7 +261,8 @@ final class SidebarListView: NSView {
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
             row.configure(tab: tab)
-            row.isSelected = tab === selected
+            // Both halves of a split show as open.
+            row.isSelected = tab === selected || (selected.map { manager.partner(of: $0) === tab } ?? false)
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
@@ -493,6 +498,13 @@ final class SidebarListView: NSView {
             externalTarget = nil
         }
 
+        // Over this window's page (not the sidebar): offer to open the tab beside it.
+        if hit == nil, Self.window(at: mouse) === window.windowController, case .tab(let id) = drag.item, let tab = manager?.tab(with: id) {
+            delegate?.listDragOverPage(at: window.convertPoint(fromScreen: mouse), tab: tab)
+        } else if case .tab(let id) = drag.item, let tab = manager?.tab(with: id) {
+            delegate?.listDragOverPage(at: NSPoint(x: -1000, y: -1000), tab: tab)
+        }
+
         var section: Section? = nil
         var index = drag.targetIndex
         if let (_, list) = hit, list === self {
@@ -555,6 +567,13 @@ final class SidebarListView: NSView {
         let external = externalTarget
         externalTarget = nil
         external?.externalHover(at: nil)
+
+        // Onto this window's page: open it in split view beside what's showing.
+        if case .tab(let id) = drag.item, let tab = manager.tab(with: id), Self.list(at: mouse) == nil,
+           Self.window(at: mouse) === window?.windowController, delegate?.listDropOnPage(tab) == true {
+            reload(animated: true)
+            return
+        }
 
         // Into another window's sidebar, at the gap that opened there.
         if case .tab(let id) = drag.item, let tab = manager.tab(with: id), let external,

@@ -115,6 +115,7 @@ final class TabManager {
     /// Takes a tab out of this window without closing its page, so another window can adopt it.
     func detach(_ tab: Tab) {
         guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return }
+        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
         let wasSelected = selectedTab === tab
         tabsBySpace[tab.spaceID]?.remove(at: index)
         recentTabIDs.removeAll { $0 == tab.id }
@@ -336,6 +337,15 @@ final class TabManager {
     // MARK: Closing
 
     func close(_ tab: Tab) {
+        let partnerTab = partner(of: tab)
+        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+        // Closing one half of a split shows the other half.
+        if selectedTab === tab, let partnerTab {
+            if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+            closeKeepingSelection(tab)
+            select(partnerTab)
+            return
+        }
         let wasSelected = selectedTab === tab
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
@@ -357,6 +367,21 @@ final class TabManager {
         tab.close()
         changed.send(.structure)
         if wasSelected { selectAfterClosing(tab, index: index) }
+    }
+
+    /// Removes a tab without choosing a new selection (the caller does).
+    private func closeKeepingSelection(_ tab: Tab) {
+        if let bookmarkID = tab.bookmarkID {
+            bookmarkTabs[bookmarkID] = nil
+        } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
+            closedTabs.append(ClosedTab(url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
+                                        interactionState: tab.interactionStateForSaving))
+            list.remove(at: index)
+            tabsBySpace[tab.spaceID] = list
+        }
+        recentTabIDs.removeAll { $0 == tab.id }
+        tab.close()
+        changed.send(.structure)
     }
 
     func close(_ tabs: [Tab]) {
@@ -442,6 +467,60 @@ final class TabManager {
         let key = Self.normalize(url)
         let candidates = navigableTabs + allTabs
         return candidates.first { tab in tab.url.map(Self.normalize) == key }
+    }
+
+    // MARK: Split view
+
+    struct SplitPair: Codable, Equatable {
+        var left: UUID
+        var right: UUID
+        /// Share of the width the left pane gets.
+        var ratio: Double = 0.5
+    }
+
+    private(set) var splits: [SplitPair] = []
+
+    func split(for tab: Tab) -> SplitPair? {
+        splits.first { $0.left == tab.id || $0.right == tab.id }
+    }
+
+    func partner(of tab: Tab) -> Tab? {
+        guard let pair = split(for: tab) else { return nil }
+        return self.tab(with: pair.left == tab.id ? pair.right : pair.left)
+    }
+
+    /// Puts `other` beside `tab` (on the right or left), ending any splits either was in.
+    func makeSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
+        guard tab !== other else { return }
+        unsplit(tab, notify: false)
+        unsplit(other, notify: false)
+        if other.spaceID != tab.spaceID, other.bookmarkID == nil {
+            removeFromList(other)
+            other.spaceID = tab.spaceID
+            tabsBySpace[tab.spaceID, default: []].insert(other, at: 0)
+        }
+        splits.append(otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id))
+        other.ensureWebView()
+        changed.send(.structure)
+        select(other)
+    }
+
+    func unsplit(_ tab: Tab, notify: Bool = true) {
+        let before = splits.count
+        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+        if notify, splits.count != before {
+            changed.send(.structure)
+            changed.send(.selection)
+        }
+    }
+
+    func setSplitRatio(_ ratio: Double, for tab: Tab) {
+        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
+        splits[index].ratio = min(max(ratio, 0.2), 0.8)
+    }
+
+    func restoreSplits(_ pairs: [SplitPair]) {
+        splits = pairs.filter { tab(with: $0.left) != nil && tab(with: $0.right) != nil }
     }
 
     // MARK: Suspension

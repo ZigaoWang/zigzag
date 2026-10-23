@@ -29,6 +29,11 @@ enum SidebarMenus {
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
         })
         menu.addItem(Item("Bookmark", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
+        if manager.split(for: tab) != nil {
+            menu.addItem(Item("Close Split View") { manager.unsplit(tab) })
+        } else if let current = manager.selectedTab, current !== tab {
+            menu.addItem(Item("Open in Split View") { manager.makeSplit(current, with: tab) })
+        }
         menu.addItem(Item("Duplicate") {
             if let url = tab.url { manager.newTab(url: url) }
         })

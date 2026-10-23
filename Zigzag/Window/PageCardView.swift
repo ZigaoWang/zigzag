@@ -6,6 +6,8 @@ final class PageCardView: NSView {
     private let clip = NSView()
     private let edge = CALayer()
     private(set) weak var webView: WKWebView?
+    /// In split view, the pane you're working in gets a quiet accent edge.
+    var isFocusedPane = false { didSet { refreshColors() } }
     /// Shown while a suspended tab wakes up so the card never flashes blank.
     private let placeholder = NSImageView()
 
@@ -59,7 +61,8 @@ final class PageCardView: NSView {
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
             clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
-            edge.borderColor = cgColor(Tokens.Color.cardEdge)
+            edge.borderColor = cgColor(isFocusedPane ? Tokens.Color.accent.withAlphaComponent(0.55) : Tokens.Color.cardEdge)
+            edge.borderWidth = isFocusedPane ? 2 : Tokens.Metric.hairline
             layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
         }
     }

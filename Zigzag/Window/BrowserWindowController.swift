@@ -46,6 +46,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onSlide = { [weak self] duration in self?.sidebarSliding(duration) }
+        root.onSplitRatioChange = { [weak self] ratio, final in
+            guard let self, final, let tab = self.tabManager.selectedTab else { return }
+            self.tabManager.setSplitRatio(Double(ratio), for: tab)
+            self.onStateChange?()
+        }
 
         sidebar.delegate = self
         sidebar.onEditSpace = { [weak self] id in self?.openSpaceEditor(id) }
@@ -192,12 +197,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if tab !== shownTab {
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
-            let webView = tab?.ensureWebView()
-            root.card.show(webView, placeholderImage: nil)
-            if let webView, window?.isKeyWindow == true, !commandBar.isVisible {
-                window?.makeFirstResponder(webView)
+            if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
+                DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(webView) }
             }
         }
+        showPages()
         sidebar.update(tab: tab)
         sidebar.list.refreshRows()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
@@ -207,6 +211,37 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private weak var nowPlayingTab: Tab?
+
+    /// Puts the selected tab in the page card, or both halves of its split side by side.
+    private func showPages() {
+        let tab = tabManager.selectedTab
+        if let tab, let pair = tabManager.split(for: tab),
+           let left = tabManager.tab(with: pair.left), let right = tabManager.tab(with: pair.right) {
+            root.splitRatio = CGFloat(pair.ratio)
+            root.card.show(left.ensureWebView())
+            root.secondCard.show(right.ensureWebView())
+            root.card.isFocusedPane = left === tab
+            root.secondCard.isFocusedPane = right === tab
+        } else {
+            root.splitRatio = nil
+            root.card.show(tab?.ensureWebView())
+            root.secondCard.show(nil)
+            root.card.isFocusedPane = false
+            root.secondCard.isFocusedPane = false
+        }
+    }
+
+    /// In split view, clicking a pane makes its tab the one you're working in.
+    func focusPane(at windowPoint: NSPoint) {
+        guard let tab = tabManager.selectedTab, let partner = tabManager.partner(of: tab), let pair = tabManager.split(for: tab) else { return }
+        let panes = root.paneFrames
+        let point = root.convert(windowPoint, from: nil)
+        let clickedLeft = panes.left.contains(point)
+        let clickedRight = panes.right?.contains(point) ?? false
+        guard clickedLeft || clickedRight else { return }
+        let clickedID = clickedLeft ? pair.left : pair.right
+        if clickedID == partner.id { tabManager.select(partner) }
+    }
 
     /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at.
     private func updateNowPlaying() {
@@ -237,7 +272,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .title:
             updateWindowTitle()
         case .webView:
-            if let webView = tab.webView, root.card.webView !== webView { root.card.show(webView) }
+            showPages()
         case .capture:
             sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
         default:
@@ -379,6 +414,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
+        if event.type == .leftMouseDown, root.splitRatio != nil { focusPane(at: event.locationInWindow) }
         #if DEBUG
         if event.type == .scrollWheel, sidebarContains(event) { DebugBridge.recordScroll(event) }
         #endif
@@ -533,6 +569,20 @@ extension BrowserWindowController: SidebarDelegate {
         tabManager.detach(tab)
         target.tabManager.insert(tab)
         target.window?.makeKeyAndOrderFront(nil)
+        return true
+    }
+
+    func listDragOverPage(at windowPoint: NSPoint, tab: Tab) {
+        // Only another tab can open beside the current page.
+        guard let current = tabManager.selectedTab, current !== tab else { root.splitDropHint.show(nil); return }
+        root.splitDropHint.show(root.splitDropHint.side(at: windowPoint))
+    }
+
+    func listDropOnPage(_ tab: Tab) -> Bool {
+        let side = root.splitDropHint.side
+        root.splitDropHint.show(nil)
+        guard let side, let current = tabManager.selectedTab, current !== tab else { return false }
+        tabManager.makeSplit(current, with: tab, otherOnRight: side == .right)
         return true
     }
 

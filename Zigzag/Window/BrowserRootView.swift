@@ -47,10 +47,11 @@ final class SidebarContainer: NSView {
     }
 }
 
-/// Invisible strip between sidebar and page for resizing the sidebar.
+/// Invisible strip for resizing: between sidebar and page, and between split panes.
 final class ResizeHandle: NSView {
     var onDrag: ((CGFloat) -> Void)?
     var onEnd: (() -> Void)?
+    var onDoubleClick: (() -> Void)?
     private var startX: CGFloat = 0
 
     override func resetCursorRects() {
@@ -61,6 +62,7 @@ final class ResizeHandle: NSView {
 
     override func mouseDown(with event: NSEvent) {
         startX = event.locationInWindow.x
+        if event.clickCount == 2 { onDoubleClick?() }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -74,6 +76,14 @@ final class ResizeHandle: NSView {
 final class BrowserRootView: ColorView {
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
+    /// The second page in split view.
+    let secondCard = PageCardView()
+    private let splitHandle = ResizeHandle()
+    /// Share of the page area the left pane takes; nil when not split.
+    var splitRatio: CGFloat? { didSet { needsLayout = true } }
+    var onSplitRatioChange: ((CGFloat, Bool) -> Void)?
+    /// Highlights where a dragged tab would open beside the current page.
+    let splitDropHint = SplitDropHint()
     private let resizeHandle = ResizeHandle()
     /// Floating surfaces (command bar, previews, peek) live here, above everything.
     let overlay = PassthroughView()
@@ -96,8 +106,28 @@ final class BrowserRootView: ColorView {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
         super.init(color: SpaceColor.sky.background)
         addSubview(card)
+        secondCard.isHidden = true
+        addSubview(secondCard)
+        splitHandle.isHidden = true
+        addSubview(splitHandle)
+        splitHandle.onDrag = { [weak self] x in
+            guard let self else { return }
+            let area = self.cardFrame
+            self.splitRatio = min(max((x - area.minX) / area.width, 0.2), 0.8)
+            self.layoutSubtreeIfNeeded()
+            self.onSplitRatioChange?(self.splitRatio ?? 0.5, false)
+        }
+        splitHandle.onEnd = { [weak self] in
+            guard let self, let ratio = self.splitRatio else { return }
+            self.onSplitRatioChange?(ratio, true)
+        }
+        splitHandle.onDoubleClick = { [weak self] in
+            self?.splitRatio = 0.5
+            self?.onSplitRatioChange?(0.5, true)
+        }
         addSubview(resizeHandle)
         addSubview(sidebarContainer)
+        addSubview(splitDropHint)
         addSubview(overlay)
         resizeHandle.onDrag = { [weak self] x in
             guard let self else { return }
@@ -127,6 +157,32 @@ final class BrowserRootView: ColorView {
         return bounds.insetBy(dx: inset, dy: inset)
     }
 
+    /// The left (or only) pane and the right pane, inside the page area.
+    var paneFrames: (left: NSRect, right: NSRect?) {
+        let area = cardFrame
+        guard let ratio = splitRatio else { return (area, nil) }
+        let gap = Tokens.Metric.cardInset
+        let leftWidth = floor((area.width - gap) * ratio)
+        let left = NSRect(x: area.minX, y: area.minY, width: leftWidth, height: area.height)
+        let right = NSRect(x: left.maxX + gap, y: area.minY, width: area.maxX - left.maxX - gap, height: area.height)
+        return (left, right)
+    }
+
+    private func layoutCards() {
+        let panes = paneFrames
+        card.frame = panes.left
+        if let right = panes.right {
+            secondCard.isHidden = false
+            secondCard.frame = right
+            splitHandle.isHidden = false
+            splitHandle.frame = NSRect(x: panes.left.maxX - 2, y: right.minY, width: right.minX - panes.left.maxX + 4, height: right.height)
+        } else {
+            secondCard.isHidden = true
+            splitHandle.isHidden = true
+        }
+        splitDropHint.frame = cardFrame
+    }
+
     var sidebarFrame: NSRect {
         let inset = Tokens.Metric.cardInset
         if sidebarVisible { return NSRect(x: 0, y: 0, width: sidebarWidth, height: bounds.height) }
@@ -136,7 +192,7 @@ final class BrowserRootView: ColorView {
 
     override func layout() {
         super.layout()
-        card.frame = cardFrame
+        layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible
         let handleWidth = Tokens.Metric.resizeHandleWidth
@@ -166,7 +222,8 @@ final class BrowserRootView: ColorView {
         let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide)
         onSlide?(duration)
         Tokens.Motion.animate(Tokens.Motion.slide, {
-            self.card.animator().frame = self.cardFrame
+            self.card.animator().frame = self.paneFrames.left
+            if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
         }, completion: {
             self.needsLayout = true
         })
@@ -254,5 +311,56 @@ final class PassthroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         let hit = super.hitTest(point)
         return hit === self ? nil : hit
+    }
+}
+
+/// Shown while a tab is dragged over the page: which half it would open in, beside what's there.
+final class SplitDropHint: NSView {
+    enum Side { case left, right }
+    private let zone = ColorView()
+    private let label = Label("", font: Tokens.Font.body(.semibold), color: .white)
+    private(set) var side: Side?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        zone.wantsLayer = true
+        zone.layer?.cornerRadius = Tokens.Radius.card
+        zone.layer?.cornerCurve = .continuous
+        zone.layer?.borderWidth = 2
+        addSubview(zone)
+        zone.addSubview(label)
+        label.alignment = .center
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func show(_ side: Side?) {
+        guard side != self.side else { return }
+        self.side = side
+        isHidden = side == nil
+        guard let side else { return }
+        let half = bounds.width / 2
+        let target = NSRect(x: side == .left ? 0 : half, y: 0, width: half, height: bounds.height).insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
+        zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
+        zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
+        label.stringValue = side == .left ? "Open on the Left" : "Open on the Right"
+        label.textColor = Tokens.Color.accent
+        Tokens.Motion.animate(Tokens.Motion.feedback) { self.zone.animator().frame = target }
+        if zone.frame.isEmpty { zone.frame = target }
+        let h = label.lineHeight
+        label.frame = NSRect(x: 0, y: (target.height - h) / 2, width: target.width, height: h)
+    }
+
+    /// Which half of the page a window point is over, or nil if it isn't over the page.
+    func side(at windowPoint: NSPoint) -> Side? {
+        guard let superview else { return nil }
+        let p = convert(windowPoint, from: nil)
+        _ = superview
+        guard bounds.contains(p) else { return nil }
+        return p.x < bounds.midX ? .left : .right
     }
 }

@@ -157,6 +157,10 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func toggleDeskView(_ sender: Any?) { desk.toggle() }
 
+    @objc func closeSplitView(_ sender: Any?) {
+        if let tab = selectedTab { tabManager.unsplit(tab) }
+    }
+
     // MARK: History
 
     @objc func goBack(_ sender: Any?) {
@@ -249,6 +253,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)):
             return tab != nil && findBar.hasQuery
         case #selector(stopLoading(_:)): return tab?.isLoading ?? false
+        case #selector(closeSplitView(_:)): return tab.map { tabManager.split(for: $0) != nil } ?? false
         case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
         case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
