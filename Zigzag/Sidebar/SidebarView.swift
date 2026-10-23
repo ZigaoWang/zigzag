@@ -149,6 +149,8 @@ final class SidebarView: NSView {
 
     private let bottomBar = NSView()
     let nowPlaying = NowPlayingView()
+    let spaceEditor = SpaceEditorInline()
+    var isEditingSpace: Bool { !spaceEditor.isHidden }
     private let downloadsButton = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
     private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
     private var dots: [SpaceDotView] = []
@@ -188,6 +190,12 @@ final class SidebarView: NSView {
 
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
+        spaceEditor.isHidden = true
+        spaceEditor.onHeightChange = { [weak self] in
+            guard let self else { return }
+            Tokens.Motion.animate(Tokens.Motion.snappy) { self.layoutSubtreeIfNeeded(); self.needsLayout = true; self.layoutAnimated() }
+        }
+        addSubview(spaceEditor)
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
@@ -236,9 +244,10 @@ final class SidebarView: NSView {
         let bottomHeight = Tokens.Metric.bottomBarHeight
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight - pad, width: width, height: bottomHeight)
         let listTop = address.frame.maxY + Tokens.Metric.sectionGap
-        let playingHeight = Tokens.Space.x10
-        nowPlaying.frame = NSRect(x: pad, y: bottomBar.frame.minY - playingHeight, width: width - pad * 2, height: playingHeight)
-        let listBottom = nowPlaying.isHidden ? bottomBar.frame.minY : nowPlaying.frame.minY - Tokens.Space.x1
+        let frames = bottomFrames()
+        nowPlaying.frame = frames.nowPlaying
+        spaceEditor.frame = frames.editor
+        let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad, y: listTop, width: width - pad * 2, height: listBottom - listTop)
         topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
         if list.frame.width != scrollView.contentSize.width {
@@ -313,6 +322,57 @@ final class SidebarView: NSView {
     }
 
     func dot(for spaceID: UUID) -> NSView? { dots.first { $0.spaceID == spaceID } }
+
+    /// The bottom stack: the space editor (when open) and the now-playing control sit above the dots.
+    private func bottomFrames() -> (editor: NSRect, nowPlaying: NSRect, listBottom: CGFloat) {
+        let pad = Tokens.Metric.sidebarPadding
+        var bottom = bottomBar.frame.minY
+        let editorHeight = spaceEditor.isHidden ? 0 : spaceEditor.fittingHeight
+        let editor = NSRect(x: 0, y: bottom - editorHeight, width: bounds.width, height: editorHeight)
+        bottom = editor.minY
+        let playingHeight = Tokens.Space.x10
+        let playing = NSRect(x: pad, y: bottom - (nowPlaying.isHidden ? 0 : playingHeight), width: bounds.width - pad * 2, height: playingHeight)
+        if !nowPlaying.isHidden { bottom = playing.minY - Tokens.Space.x1 }
+        return (editor, playing, bottom)
+    }
+
+    /// Re-lays the bottom stack and list with animation (editor opening, slider appearing).
+    private func layoutAnimated() {
+        let frames = bottomFrames()
+        spaceEditor.animator().frame = frames.editor
+        nowPlaying.animator().frame = frames.nowPlaying
+        var listFrame = scrollView.frame
+        listFrame.size.height = frames.listBottom - listFrame.minY
+        scrollView.animator().frame = listFrame
+    }
+
+    /// Opens the space editor in place, or closes it if it's already showing that space.
+    func toggleSpaceEditor(_ spaceID: UUID) {
+        if isEditingSpace, spaceEditor.spaceID == spaceID { closeSpaceEditor(); return }
+        spaceEditor.edit(spaceID)
+        let wasHidden = spaceEditor.isHidden
+        spaceEditor.isHidden = false
+        if wasHidden {
+            spaceEditor.alphaValue = 0
+            Tokens.Motion.animate(Tokens.Motion.snappy) {
+                self.layoutAnimated()
+                self.spaceEditor.animator().alphaValue = 1
+            }
+        }
+        spaceEditor.focusName()
+    }
+
+    func closeSpaceEditor() {
+        guard isEditingSpace else { return }
+        spaceEditor.finish()
+        Tokens.Motion.animate(Tokens.Motion.snappy, {
+            self.spaceEditor.animator().alphaValue = 0
+        }, completion: {
+            self.spaceEditor.isHidden = true
+            self.spaceEditor.alphaValue = 1
+            Tokens.Motion.animate(Tokens.Motion.snappy) { self.layoutAnimated() }
+        })
+    }
 
     /// The row of space dots, which the space editor rises from.
     var dotsAnchor: NSView { bottomBar }

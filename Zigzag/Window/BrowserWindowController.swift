@@ -23,6 +23,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// ⌘Z for sidebar actions; also the window's undo manager, so page text editing shares it.
     let sidebarUndo = UndoManager()
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
+    var spaceEditorMonitor: Any?
     lazy var peek = PeekController(controller: self)
     var peekController: PeekController? { peek }
 
@@ -49,6 +50,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
         sidebar.delegate = self
         sidebar.onEditSpace = { [weak self] id in self?.openSpaceEditor(id) }
+        sidebar.spaceEditor.onClose = { [weak self] in self?.closeSpaceEditor() }
+        sidebar.spaceEditor.onPreview = { [weak self] background, swatch, id in
+            self?.previewSpaceColor(background: background, swatch: swatch, for: id)
+        }
         sidebar.onSwipeSpace = { [weak self] offset in
             guard let self else { return false }
             let before = self.tabManager.currentSpaceID
@@ -163,13 +168,32 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.previewDotColor(swatch, for: spaceID)
     }
 
-    /// Opens the editor for a space next to the sidebar, aligned with the row that asked.
+    /// Opens the space editor in place at the bottom of the sidebar.
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
-        // The editor always rises from the space dots, whichever control opened it.
         if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
-        let dots = sidebar.dotsAnchor
-        let rect = dots.convert(dots.bounds, to: root.overlay)
-        SpaceEditorPanel.open(spaceID: spaceID, above: rect, sidebarFrame: root.sidebarContainer.frame, in: self)
+        previews.hide()
+        sidebar.toggleSpaceEditor(spaceID)
+        root.holdReveal = sidebar.isEditingSpace
+        guard sidebar.isEditingSpace else { return }
+        // Clicking anywhere outside the editor finishes editing.
+        if spaceEditorMonitor == nil {
+            spaceEditorMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                let editor = self.sidebar.spaceEditor
+                let insideEditor = editor.bounds.contains(editor.convert(event.locationInWindow, from: nil))
+                let dots = self.sidebar.dotsAnchor
+                let onDots = dots.bounds.contains(dots.convert(event.locationInWindow, from: nil))
+                if !insideEditor && !onDots { self.closeSpaceEditor() }
+                return event
+            }
+        }
+    }
+
+    func closeSpaceEditor() {
+        sidebar.closeSpaceEditor()
+        root.holdReveal = false
+        if let monitor = spaceEditorMonitor { NSEvent.removeMonitor(monitor) }
+        spaceEditorMonitor = nil
     }
 
     private func applySpaceColor(animated: Bool) {
