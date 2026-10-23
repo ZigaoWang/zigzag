@@ -318,3 +318,24 @@ final class DropZoneView: NSView {
         label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
     }
 }
+
+/// Where a dragged tab will land: a short accent line with round ends.
+final class InsertionLineView: NSView {
+    private let line = ColorView(color: Tokens.Color.accent)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        line.wantsLayer = true
+        line.layer?.cornerRadius = 1
+        addSubview(line)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        line.frame = NSRect(x: Tokens.Space.x2, y: floor((bounds.height - 2) / 2), width: bounds.width - Tokens.Space.x4, height: 2)
+    }
+}

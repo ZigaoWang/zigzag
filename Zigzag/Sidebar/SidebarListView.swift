@@ -38,7 +38,8 @@ enum SidebarItem: Hashable {
         switch self {
         case .header: Tokens.Space.x6 + Tokens.Space.x1
         case .separator: Tokens.Space.x3
-        case .placeholder, .bookmark, .newTab, .tab, .bookmarkDropZone: Tokens.Metric.rowHeight
+        case .placeholder: Tokens.Space.x2
+        case .bookmark, .newTab, .tab, .bookmarkDropZone: Tokens.Metric.rowHeight
         }
     }
 
@@ -143,7 +144,6 @@ final class SidebarListView: NSView {
 
         var changes: [() -> Void] = []
         for (item, frame) in layout {
-            if item == .placeholder { continue }
             if let view = rows[item] {
                 configure(view, for: item)
                 if view === drag?.view { continue }
@@ -192,8 +192,10 @@ final class SidebarListView: NSView {
             header.onClick = { [weak self] _ in self?.toggleCollapsed() }
             header.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: .header) }
             return header
-        case .separator, .placeholder:
+        case .separator:
             return SeparatorRowView()
+        case .placeholder:
+            return InsertionLineView()
         case .bookmarkDropZone:
             return DropZoneView(text: "Drop here to bookmark")
         case .newTab:
@@ -457,6 +459,27 @@ final class SidebarListView: NSView {
     }
 
     private weak var externalTarget: SidebarListView?
+    private var edgeDirection: Int?
+    private var edgeWork: DispatchWorkItem?
+
+    /// Flips to the neighboring space after a short hold at the edge, and keeps flipping while held.
+    private func scheduleEdgeFlip(_ direction: Int) {
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.drag != nil, self.edgeDirection == direction, let manager = self.manager else { return }
+                let spaces = Library.shared.spaces
+                guard let index = spaces.firstIndex(where: { $0.id == manager.currentSpaceID }), spaces.indices.contains(index + direction) else { return }
+                self.delegate?.listSwitchSpaceDuringDrag(spaces[index + direction].id)
+                self.apply(items: self.displayItems(), animated: false)
+                if let scroll = self.enclosingScrollView {
+                    Tokens.Motion.slide(scroll, fromOffsetX: CGFloat(direction) * self.bounds.width, curve: Tokens.Motion.slide)
+                }
+                self.scheduleEdgeFlip(direction)
+            }
+        }
+        edgeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
 
     private func dragMoved(to event: NSEvent) {
         guard var drag, let window else { return }
@@ -480,6 +503,21 @@ final class SidebarListView: NSView {
             autoscroll(with: event)
             let y = convert(window.convertPoint(fromScreen: mouse), from: nil).y
             (section, index) = target(at: y, dragging: drag.item)
+        }
+
+        // Carry the tab to the sidebar's left or right edge and hold: the space flips that way.
+        if let (controller, list) = hit, list === self {
+            let container = controller.root.sidebarContainer
+            let x = container.convert(window.convertPoint(fromScreen: mouse), from: nil).x
+            let edge: Int? = x < Tokens.Space.x4 ? -1 : x > container.bounds.width - Tokens.Space.x4 ? 1 : nil
+            if edge != edgeDirection {
+                edgeDirection = edge
+                edgeWork?.cancel()
+                if let edge { scheduleEdgeFlip(edge) }
+            }
+        } else if edgeDirection != nil {
+            edgeDirection = nil
+            edgeWork?.cancel()
         }
 
         // Holding over another space's dot opens that space, so you can drop the tab in place there.
@@ -511,6 +549,8 @@ final class SidebarListView: NSView {
         guard let drag, let manager else { return }
         self.drag = nil
         springWork?.cancel()
+        edgeWork?.cancel()
+        edgeDirection = nil
         drag.panel.orderOut(nil)
         drag.view.alphaValue = 1
         delegate?.listDragEnded()
