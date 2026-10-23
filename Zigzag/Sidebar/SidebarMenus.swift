@@ -6,12 +6,12 @@ enum SidebarMenus {
     final class Handler: NSObject {
         let run: () -> Void
         init(_ run: @escaping () -> Void) { self.run = run }
-        @objc func perform(_ sender: Any?) { run() }
+        @objc func runAction(_ sender: Any?) { run() }
     }
 
     static func Item(_ title: String, symbol: String? = nil, enabled: Bool = true, _ handler: @escaping () -> Void) -> NSMenuItem {
         let target = Handler(handler)
-        let item = NSMenuItem(title: title, action: #selector(Handler.perform(_:)), keyEquivalent: "")
+        let item = NSMenuItem(title: title, action: #selector(Handler.runAction(_:)), keyEquivalent: "")
         item.target = target
         item.representedObject = target
         item.isEnabled = enabled
