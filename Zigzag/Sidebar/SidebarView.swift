@@ -377,9 +377,8 @@ final class SidebarView: NSView {
         finalFrame.origin.x = Tokens.Metric.sidebarPadding
         let animate = snapshot != nil && direction != 0 && !Tokens.Motion.reduceMotion && (!Tokens.Motion.isKeyboardDriven || fromSwipe != 0)
         Tokens.Motion.withoutAnimation { scrollView.frame = finalFrame }
-        // Mid-drag the list keeps its dragged row; the drag redraws itself for the new space.
-        if list.isDragging { return }
-        list.reload(animated: false)
+        // Mid-drag the list keeps its gap and hidden row; otherwise it simply reloads.
+        if list.isDragging { list.refreshDuringDrag() } else { list.reload(animated: false) }
         guard animate, let snapshot else { return }
         let width = bounds.width
         let ghost = NSImageView(frame: finalFrame)

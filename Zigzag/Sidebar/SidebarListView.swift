@@ -470,15 +470,11 @@ final class SidebarListView: NSView {
                 let spaces = Library.shared.spaces
                 guard let index = spaces.firstIndex(where: { $0.id == manager.currentSpaceID }), spaces.indices.contains(index + direction) else { return }
                 self.delegate?.listSwitchSpaceDuringDrag(spaces[index + direction].id)
-                self.apply(items: self.displayItems(), animated: false)
-                if let scroll = self.enclosingScrollView {
-                    Tokens.Motion.slide(scroll, fromOffsetX: CGFloat(direction) * self.bounds.width, curve: Tokens.Motion.slide)
-                }
                 self.scheduleEdgeFlip(direction)
             }
         }
         edgeWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
 
     private func dragMoved(to event: NSEvent) {
@@ -506,10 +502,12 @@ final class SidebarListView: NSView {
         }
 
         // Carry the tab to the sidebar's left or right edge and hold: the space flips that way.
-        if let (controller, list) = hit, list === self {
-            let container = controller.root.sidebarContainer
-            let x = container.convert(window.convertPoint(fromScreen: mouse), from: nil).x
-            let edge: Int? = x < Tokens.Space.x4 ? -1 : x > container.bounds.width - Tokens.Space.x4 ? 1 : nil
+        let container = (window.windowController as? BrowserWindowController)?.root.sidebarContainer
+        let local = container.map { $0.convert(window.convertPoint(fromScreen: mouse), from: nil) }
+        if let container, let local, local.y >= 0, local.y <= container.bounds.height,
+           local.x > -Tokens.Space.x6, local.x < container.bounds.width + Tokens.Space.x12 {
+            let zone = Tokens.Space.x10
+            let edge: Int? = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
             if edge != edgeDirection {
                 edgeDirection = edge
                 edgeWork?.cancel()
@@ -530,7 +528,6 @@ final class SidebarListView: NSView {
                         guard let self, self.drag?.hoverSpace == hovered else { return }
                         self.delegate?.listSwitchSpaceDuringDrag(hovered)
                         self.drag?.hoverSpace = nil
-                        self.apply(items: self.displayItems(), animated: false)
                     }
                 }
                 springWork = work
@@ -608,6 +605,12 @@ final class SidebarListView: NSView {
             break
         }
         reload(animated: true)
+    }
+
+    /// Redraws for a new space while a drag is in progress (the space slide is animated by the sidebar).
+    func refreshDuringDrag() {
+        guard drag != nil else { return }
+        apply(items: displayItems(), animated: false)
     }
 
     /// Where a tab from another window would land, for a screen point over this list.
