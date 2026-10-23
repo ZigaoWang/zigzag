@@ -81,6 +81,8 @@ final class SidebarListView: NSView {
         var targetIndex: Int
         var hoverSpace: UUID?
         let panel: NSPanel
+        /// A tab row the dragged tab is over the right half of: dropping opens them side by side.
+        var splitTarget: UUID?
     }
 
     /// A tab being carried in from another window: where its gap opens in this list.
@@ -104,7 +106,9 @@ final class SidebarListView: NSView {
         if bookmarks.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
         if (!bookmarks.isEmpty && !collapsed) || includeEmptyBookmarkSection { result.append(.separator) }
         result.append(.newTab)
-        result += manager.tabs(in: spaceID).map { .tab($0.id) }
+        // The right half of a split rides in its left half's row.
+        let rightHalves = Set(manager.splits.map(\.right))
+        result += manager.tabs(in: spaceID).filter { !rightHalves.contains($0.id) }.map { .tab($0.id) }
         return result
     }
 
@@ -209,8 +213,13 @@ final class SidebarListView: NSView {
         case .tab(let id):
             let row = TabRowView()
             row.onClick = { [weak self, weak row] event in
-                guard let self, let tab = row?.tab else { return }
-                self.delegate?.listSelect(tab)
+                guard let self, let row, let tab = row.tab else { return }
+                // A split row: each half selects its own page.
+                if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1, let partner = row.partner {
+                    self.delegate?.listSelect(partner)
+                } else {
+                    self.delegate?.listSelect(tab)
+                }
                 _ = id
             }
             row.onMiddleClick = { [weak self, weak row] in
@@ -262,7 +271,10 @@ final class SidebarListView: NSView {
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
             row.configure(tab: tab)
             // Both halves of a split show as open.
-            row.isSelected = tab === selected || (selected.map { manager.partner(of: $0) === tab } ?? false)
+            let partner = manager.partner(of: tab)
+            row.configure(partner: partner)
+            row.isSelected = tab === selected || (partner != nil && partner === selected)
+            row.focusedHalf = partner != nil && partner === selected ? 1 : 0
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
@@ -463,6 +475,18 @@ final class SidebarListView: NSView {
         return true
     }
 
+    /// The tab whose row's right half is under the point, if dropping there would make a split.
+    private func splitTarget(at point: NSPoint, dragging item: SidebarItem) -> UUID? {
+        guard case .tab(let draggedID) = item, let manager else { return nil }
+        for (candidate, view) in rows {
+            guard case .tab(let id) = candidate, id != draggedID, let row = view as? TabRowView, row.partner == nil,
+                  view.frame.insetBy(dx: 0, dy: 4).contains(point) else { continue }
+            let tab = manager.tab(with: id)
+            return point.x > view.frame.minX + view.frame.width * 0.45 && tab?.url != nil ? id : nil
+        }
+        return nil
+    }
+
     private weak var externalTarget: SidebarListView?
     private var edgeDirection: Int?
     private var edgeWork: DispatchWorkItem?
@@ -507,10 +531,21 @@ final class SidebarListView: NSView {
 
         var section: Section? = nil
         var index = drag.targetIndex
+        var splitTarget: UUID?
         if let (_, list) = hit, list === self {
             autoscroll(with: event)
-            let y = convert(window.convertPoint(fromScreen: mouse), from: nil).y
-            (section, index) = target(at: y, dragging: drag.item)
+            let point = convert(window.convertPoint(fromScreen: mouse), from: nil)
+            splitTarget = self.splitTarget(at: point, dragging: drag.item)
+            if splitTarget == nil {
+                (section, index) = target(at: point.y, dragging: drag.item)
+            } else {
+                // Hold the gap still so the row under the pointer doesn't move away.
+                (section, index) = (drag.targetSection, drag.targetIndex)
+            }
+        }
+        if splitTarget != drag.splitTarget {
+            for (item, view) in rows { (view as? TabRowView)?.showsSplitDrop = item == splitTarget.map { .tab($0) } }
+            drag.splitTarget = splitTarget
         }
 
         // Carry the tab to the sidebar's left or right edge and hold: the space flips that way.
@@ -562,6 +597,15 @@ final class SidebarListView: NSView {
         edgeDirection = nil
         drag.panel.orderOut(nil)
         drag.view.alphaValue = 1
+        for view in rows.values { (view as? TabRowView)?.showsSplitDrop = false }
+
+        // Onto another tab's row: the two open side by side.
+        if case .tab(let id) = drag.item, let targetID = drag.splitTarget,
+           let tab = manager.tab(with: id), let target = manager.tab(with: targetID) {
+            manager.makeSplit(target, with: tab)
+            reload(animated: true)
+            return
+        }
         delegate?.listDragEnded()
         let mouse = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
         let external = externalTarget
