@@ -133,17 +133,23 @@ final class WindowManager {
         }
         for id in savedStateHashes.keys where !keep.contains(id) { savedStateHashes[id] = nil }
         let directory = Paths.tabState
-        let work = {
-            for (url, data) in writes { try? data.write(to: url, options: .atomic) }
-            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-            for file in files where UUID(uuidString: file.lastPathComponent).map({ !keep.contains($0) }) ?? true {
-                try? FileManager.default.removeItem(at: file)
-            }
+        if synchronously {
+            Self.writeTabStates(writes, keeping: keep, in: directory)
+        } else {
+            DispatchQueue.global(qos: .utility).async { Self.writeTabStates(writes, keeping: keep, in: directory) }
         }
-        if synchronously { work() } else { DispatchQueue.global(qos: .utility).async(execute: work) }
     }
 
     private var savedStateHashes: [UUID: Int] = [:]
+
+    /// Runs off the main thread: writes changed back/forward lists and removes ones for closed tabs.
+    nonisolated private static func writeTabStates(_ writes: [(URL, Data)], keeping keep: Set<UUID>, in directory: URL) {
+        for (url, data) in writes { try? data.write(to: url, options: .atomic) }
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where UUID(uuidString: file.lastPathComponent).map({ !keep.contains($0) }) ?? true {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
 
     private func windowState(_ controller: BrowserWindowController) -> SessionState.WindowState {
         let manager = controller.tabManager

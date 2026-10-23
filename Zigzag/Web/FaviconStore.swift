@@ -178,11 +178,15 @@ enum SnapshotStore {
 
     static func save(_ image: NSImage, for id: UUID) {
         memory[id] = image
-        DispatchQueue.global(qos: .utility).async { [image] in
-            guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-                  let jpg = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else { return }
-            try? jpg.write(to: file(id), options: .atomic)
-        }
+        guard let tiff = image.tiffRepresentation else { return }
+        let url = file(id)
+        DispatchQueue.global(qos: .utility).async { writeJPEG(tiff, to: url) }
+    }
+
+    nonisolated private static func writeJPEG(_ tiff: Data, to url: URL) {
+        guard let rep = NSBitmapImageRep(data: tiff),
+              let jpg = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else { return }
+        try? jpg.write(to: url, options: .atomic)
     }
 
     static func remove(_ id: UUID) {

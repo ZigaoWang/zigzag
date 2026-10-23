@@ -121,7 +121,7 @@ final class SpaceDotView: InteractiveView {
 /// The sidebar: navigation, address, bookmarks, tabs and spaces. Drawn entirely by us.
 final class SidebarView: NSView {
     weak var delegate: SidebarDelegate? {
-        didSet { list.delegate = delegate; neighborList.delegate = delegate }
+        didSet { list.delegate = delegate }
     }
 
     let backButton = IconButton(symbol: "chevron.left", toolTip: "Back")
@@ -133,11 +133,7 @@ final class SidebarView: NSView {
     let address = AddressView()
     let list = SidebarListView()
     private let scrollView = NSScrollView()
-    /// The space next door, which slides in beside the current one while you swipe.
-    private let neighborList = SidebarListView()
-    private let neighborScroll = NSScrollView()
-    /// Reports swipe progress toward a neighbor space (nil when none), from 0 to 1.
-    var onSwipeProgress: ((UUID?, CGFloat) -> Void)?
+
     private let bottomBar = NSView()
     private let downloadsButton = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
     private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
@@ -147,9 +143,6 @@ final class SidebarView: NSView {
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
     var showsTrafficLights = true { didSet { needsLayout = true } }
 
-    /// Translation while a two-finger swipe between spaces is in progress.
-    private var swipeOffset: CGFloat = 0
-    private var swipeTracking = false
     private var swipeDecided: Bool?
 
     override init(frame: NSRect) {
@@ -174,12 +167,6 @@ final class SidebarView: NSView {
         scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.documentView = list
         addSubview(scrollView)
-        neighborScroll.drawsBackground = false
-        neighborScroll.hasVerticalScroller = false
-        neighborScroll.documentView = neighborList
-        neighborScroll.isHidden = true
-        neighborScroll.wantsLayer = true
-        addSubview(neighborScroll)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
@@ -232,7 +219,7 @@ final class SidebarView: NSView {
         let bottomHeight = Tokens.Metric.bottomBarHeight
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight - pad, width: width, height: bottomHeight)
         let listTop = address.frame.maxY + Tokens.Metric.sectionGap
-        scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: bottomBar.frame.minY - listTop)
+        scrollView.frame = NSRect(x: pad, y: listTop, width: width - pad * 2, height: bottomBar.frame.minY - listTop)
         topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
         if list.frame.width != scrollView.contentSize.width {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
@@ -342,8 +329,9 @@ final class SidebarView: NSView {
         var ghostEnd = finalFrame
         ghostEnd.origin.x -= direction * width
         Tokens.Motion.withoutAnimation { ghost.frame = ghostEnd }
-        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: Tokens.Motion.slide)
-        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: Tokens.Motion.slide)
+        let curve = Tokens.Motion.snap
+        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve)
+        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve)
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) { ghost.removeFromSuperview() }
     }
 
@@ -360,232 +348,64 @@ final class SidebarView: NSView {
 
     var onSwipeSpace: ((Int) -> Bool)?
 
-    /// Called by the window for every scroll over the sidebar. Claims clearly horizontal two-finger swipes
-    /// (switching spaces) and lets everything else scroll the list. Returns true when it handled the event.
-    ///
-    /// Trackpads don't always mark gesture phases, so a swipe is recognized from the deltas themselves and
-    /// ends either on its phase or when the fingers stop sending events.
+    /// Called by the window for every scroll over the sidebar. A clearly horizontal two-finger swipe switches
+    /// space right away, like Arc: there is no halfway state. The rest of that gesture is then ignored.
+    /// Vertical scrolling passes through to the list. Returns true when it handled the event.
     func handleSwipe(_ event: NSEvent) -> Bool {
-        if systemSwipeActive { return true }
+        let now = event.timestamp > 0 ? event.timestamp : ProcessInfo.processInfo.systemUptime
+        let gap = now - lastSwipeEventTime
+        lastSwipeEventTime = now
+
         // A mouse wheel that tilts sideways: one notch, one space.
         if !event.hasPreciseScrollingDeltas {
             guard abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY), event.scrollingDeltaX != 0 else { return false }
-            let now = ProcessInfo.processInfo.systemUptime
             if now - lastWheelSwitch > 0.35 {
                 lastWheelSwitch = now
                 _ = onSwipeSpace?(event.scrollingDeltaX > 0 ? -1 : 1)
             }
             return true
         }
-        // Trackpads and Magic Mouse: hand the gesture to AppKit's own swipe tracking (what Safari uses),
-        // as soon as it is clearly horizontal. It follows the fingers and finishes with system physics.
-        if NSEvent.isSwipeTrackingFromScrollEventsEnabled, event.momentumPhase == [], !swipeTracking,
-           event.phase == .began || event.phase == .changed,
-           abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY), abs(event.scrollingDeltaX) > 0.5 {
-            beginSystemSwipe(event)
-            return true
-        }
-        // Momentum after a swipe belongs to the swipe; swallow it so the list doesn't drift.
-        if event.momentumPhase != [] { return swipeDecided == true }
 
-        let now = event.timestamp > 0 ? event.timestamp : ProcessInfo.processInfo.systemUptime
-        let gap = now - lastSwipeEventTime
-        lastSwipeEventTime = now
-        if !swipeTracking && (event.phase == .began || event.phase == .mayBegin || gap > 0.25) {
+        // A new gesture starts on its first phase, or after the fingers have been still for a moment.
+        let starts = event.phase == .began || event.phase == .mayBegin || (event.phase == [] && event.momentumPhase == [] && gap > 0.2)
+        if starts {
             swipeDecided = nil
+            swipeConsumed = false
             swipeAccumX = 0
             swipeAccumY = 0
         }
-        if event.phase == .ended || event.phase == .cancelled {
-            if swipeTracking { finishSwipe(cancelled: event.phase == .cancelled); return true }
-            swipeDecided = nil
-            return false
+        if swipeConsumed {
+            // Swallow the rest of the gesture, momentum included, so one swipe is one space.
+            if event.phase == .ended || event.phase == .cancelled || event.momentumPhase == .ended { swipeConsumed = false }
+            return true
         }
+        if event.momentumPhase != [] { return false }
+        if swipeDecided == false { return false }
 
-        let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
-        if swipeDecided == nil {
-            swipeAccumX += dx
-            swipeAccumY += dy
-            if abs(swipeAccumX) > 4, abs(swipeAccumX) > abs(swipeAccumY) * 1.3 {
-                swipeDecided = true
-                swipeTracking = true
-                swipeOffset = 0
-                swipeSamples = []
-                moveSwipe(by: swipeAccumX, at: now)
-                scheduleSwipeEnd()
-                return true
-            } else if abs(swipeAccumY) > 4 {
-                swipeDecided = false
-            }
+        swipeAccumX += event.scrollingDeltaX
+        swipeAccumY += event.scrollingDeltaY
+        if abs(swipeAccumY) > 6, abs(swipeAccumY) > abs(swipeAccumX) {
+            swipeDecided = false
             return false
         }
-        guard swipeTracking else { return false }
-        moveSwipe(by: dx, at: now)
-        scheduleSwipeEnd()
+        guard abs(swipeAccumX) > 14, abs(swipeAccumX) > abs(swipeAccumY) * 1.5 else {
+            // Still deciding; hold horizontal movement so the list doesn't twitch.
+            return abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+        }
+        swipeDecided = true
+        swipeConsumed = true
+        // Content follows the fingers: moving them right reveals the space on the left.
+        _ = onSwipeSpace?(swipeAccumX > 0 ? -1 : 1)
         return true
     }
 
     private var lastSwipeEventTime: TimeInterval = 0
     private var lastWheelSwitch: TimeInterval = 0
-    private var systemSwipeActive = false
-    private var lastSystemSwipeUpdate: TimeInterval = 0
-
-    /// If the system tracker ever goes quiet without finishing, put the list back and let scrolling through.
-    private func watchSystemSwipe() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self, self.systemSwipeActive else { return }
-            if ProcessInfo.processInfo.systemUptime - self.lastSystemSwipeUpdate > 0.8 {
-                self.systemSwipeActive = false
-                self.swipeOffset = 0
-                self.neighborScroll.isHidden = true
-                Tokens.Motion.withoutAnimation {
-                    var frame = self.scrollView.frame
-                    frame.origin.x = Tokens.Metric.sidebarPadding
-                    self.scrollView.frame = frame
-                }
-                self.onSwipeProgress?(nil, 0)
-            } else {
-                self.watchSystemSwipe()
-            }
-        }
-    }
-
-    private func beginSystemSwipe(_ event: NSEvent) {
-        let spaces = Library.shared.spaces
-        let index = spaces.firstIndex { $0.id == currentSpaceID } ?? 0
-        // Positive amounts (content moving right) reveal the space on the left.
-        let maxAmount: CGFloat = index > 0 ? 1 : 0
-        let minAmount: CGFloat = index < spaces.count - 1 ? -1 : 0
-        systemSwipeActive = true
-        swipeOffset = 0
-        var finished = false
-        lastSystemSwipeUpdate = ProcessInfo.processInfo.systemUptime
-        watchSystemSwipe()
-        event.trackSwipeEvent(options: [.lockDirection, .clampGestureAmount], dampenAmountThresholdMin: minAmount, max: maxAmount) { [weak self] amount, _, isComplete, _ in
-            MainActor.assumeIsolated {
-                guard let self, !finished else { return }
-                self.lastSystemSwipeUpdate = ProcessInfo.processInfo.systemUptime
-                self.swipeOffset = amount * self.bounds.width
-                Tokens.Motion.withoutAnimation {
-                    var frame = self.scrollView.frame
-                    frame.origin.x = Tokens.Metric.sidebarPadding + self.swipeOffset
-                    self.scrollView.frame = frame
-                }
-                self.updateNeighbor()
-                guard isComplete else { return }
-                finished = true
-                self.systemSwipeActive = false
-                if abs(amount) >= 0.99 {
-                    // The neighbor already sits where the current list was; switching just makes it real.
-                    self.neighborScroll.isHidden = true
-                    _ = self.onSwipeSpace?(amount > 0 ? -1 : 1)
-                    self.swipeOffset = 0
-                } else {
-                    self.swipeOffset = 0
-                    self.neighborScroll.isHidden = true
-                    Tokens.Motion.withoutAnimation {
-                        var frame = self.scrollView.frame
-                        frame.origin.x = Tokens.Metric.sidebarPadding
-                        self.scrollView.frame = frame
-                    }
-                    self.onSwipeProgress?(nil, 0)
-                }
-            }
-        }
-    }
     private var swipeAccumX: CGFloat = 0
     private var swipeAccumY: CGFloat = 0
-    private var swipeSamples: [(time: TimeInterval, dx: CGFloat)] = []
-    private var swipeEndWork: DispatchWorkItem?
-
-    private func moveSwipe(by dx: CGFloat, at time: TimeInterval) {
-        let spaces = Library.shared.spaces
-        let index = spaces.firstIndex { $0.id == currentSpaceID } ?? 0
-        var next = swipeOffset + dx
-        // Rubber-band past the first and last space.
-        let atStart = index == 0 && next > 0, atEnd = index == spaces.count - 1 && next < 0
-        if atStart || atEnd { next = swipeOffset + dx * 0.3 }
-        let limit = bounds.width
-        swipeOffset = max(-limit, min(limit, next))
-        swipeSamples.append((time, dx))
-        swipeSamples.removeAll { time - $0.time > 0.1 }
-        Tokens.Motion.withoutAnimation {
-            var frame = scrollView.frame
-            frame.origin.x = Tokens.Metric.sidebarPadding + swipeOffset
-            scrollView.frame = frame
-        }
-        updateNeighbor()
-    }
-
-    /// Keeps the neighbor space's list exactly one sidebar-width away from the current list.
-    private func updateNeighbor() {
-        let spaces = Library.shared.spaces
-        let index = spaces.firstIndex { $0.id == currentSpaceID } ?? 0
-        let neighborIndex = swipeOffset < 0 ? index + 1 : index - 1
-        guard swipeOffset != 0, spaces.indices.contains(neighborIndex) else {
-            neighborScroll.isHidden = true
-            onSwipeProgress?(nil, 0)
-            return
-        }
-        let neighbor = spaces[neighborIndex].id
-        if neighborList.spaceOverride != neighbor || neighborScroll.isHidden {
-            neighborList.spaceOverride = neighbor
-            neighborScroll.frame = scrollView.frame
-            neighborList.frame.size.width = neighborScroll.contentSize.width
-            neighborList.reload(animated: false)
-        }
-        neighborScroll.isHidden = false
-        Tokens.Motion.withoutAnimation {
-            var frame = scrollView.frame
-            frame.origin.x += swipeOffset < 0 ? bounds.width : -bounds.width
-            neighborScroll.frame = frame
-        }
-        onSwipeProgress?(neighbor, min(1, abs(swipeOffset) / bounds.width))
-    }
-
-    private func scheduleSwipeEnd() {
-        swipeEndWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.finishSwipe(cancelled: false) } }
-        swipeEndWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
-    }
-
-    private func finishSwipe(cancelled: Bool) {
-        swipeEndWork?.cancel()
-        guard swipeTracking else { return }
-        swipeTracking = false
-        // A quick flick counts even if it didn't travel far.
-        let velocity = swipeSamples.map(\.dx).reduce(0, +)
-        let far = abs(swipeOffset) > bounds.width * 0.15
-        let flick = abs(velocity) > 24 && (velocity > 0) == (swipeOffset > 0)
-        var switched = false
-        if !cancelled, far || flick {
-            // Content follows the fingers: dragging right reveals the space on the left.
-            switched = onSwipeSpace?(swipeOffset > 0 ? -1 : 1) ?? false
-        }
-        let offset = swipeOffset
-        swipeOffset = 0
-        if !switched {
-            var frame = scrollView.frame
-            frame.origin.x = Tokens.Metric.sidebarPadding
-            Tokens.Motion.withoutAnimation { scrollView.frame = frame }
-            Tokens.Motion.slide(scrollView, fromOffsetX: offset, curve: Tokens.Motion.slide)
-            if !neighborScroll.isHidden {
-                var neighborFrame = frame
-                neighborFrame.origin.x += offset < 0 ? bounds.width : -bounds.width
-                Tokens.Motion.withoutAnimation { neighborScroll.frame = neighborFrame }
-                let duration = Tokens.Motion.slide(neighborScroll, fromOffsetX: offset, curve: Tokens.Motion.slide)
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in self?.neighborScroll.isHidden = true }
-            }
-            onSwipeProgress?(nil, 0)
-        } else {
-            neighborScroll.isHidden = true
-        }
-    }
+    private var swipeConsumed = false
 
     /// The space this sidebar shows; set by the window.
     var currentSpaceID: UUID?
 
-    /// Where a space switch triggered by a swipe should start sliding in from.
-    var currentSwipeOffset: CGFloat { swipeOffset }
 }

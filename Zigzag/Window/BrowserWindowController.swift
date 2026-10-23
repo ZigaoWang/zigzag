@@ -43,7 +43,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onSlide = { [weak self] duration in self?.sidebarSliding(duration) }
-        sidebar.onSwipeProgress = { [weak self] neighbor, progress in self?.blendSpaceColor(toward: neighbor, progress: progress) }
 
         sidebar.delegate = self
         sidebar.onSwipeSpace = { [weak self] offset in
@@ -125,23 +124,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         applySpaceColor(animated: true)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.list.reload(animated: true)
-    }
-
-    /// The frame color follows the fingers during a swipe, blending toward the next space.
-    private func blendSpaceColor(toward neighbor: UUID?, progress: CGFloat) {
-        let current = tabManager.currentSpace.color.background
-        guard let neighbor, let next = Library.shared.space(neighbor)?.color.background else {
-            root.setColor(current, animated: false)
-            root.sidebarContainer.tint = current
-            return
-        }
-        var blended = current
-        root.effectiveAppearance.performAsCurrentDrawingAppearance {
-            let a = current.usingColorSpace(.sRGB) ?? current, b = next.usingColorSpace(.sRGB) ?? next
-            blended = a.blended(withFraction: progress, of: b) ?? a
-        }
-        root.setColor(blended, animated: false)
-        root.sidebarContainer.tint = blended
     }
 
     private func applySpaceColor(animated: Bool) {

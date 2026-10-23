@@ -182,7 +182,7 @@ enum DebugBridge {
                 cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(d))
                 cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds) + UInt64(i) * 16_000_000
                 if let event = NSEvent(cgEvent: cg) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { NSApp.postEvent(event, atStart: false) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
                 }
             }
         case "copylink": controller.copyPageURL(nil)

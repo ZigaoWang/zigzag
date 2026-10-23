@@ -123,6 +123,8 @@ enum Tokens {
 
         static let snappy = Curve(duration: standard)
         static let slide = Curve(duration: slideDuration)
+        /// Finishing a swipe: the fingers already did most of the travel, so the rest is quick.
+        static let snap = Curve(duration: 0.14)
         static let gentle = Curve(duration: large)
         static let feedback = Curve(duration: quick)
 
