@@ -205,29 +205,39 @@ final class NewTabRowView: SidebarRowView {
     }
 }
 
-/// The space name above its bookmarks and tabs.
+/// The space name above its bookmarks. Click it to fold the bookmarks away; a chevron says so.
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
+    private let chevron = NSImageView()
+    var isCollapsed = false { didSet { stateDidChange(animated: false) } }
+    /// Only spaces with bookmarks can fold.
+    var canCollapse = false { didSet { stateDidChange(animated: false) } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        chevron.imageScaling = .scaleNone
+        chevron.contentTintColor = Tokens.Color.textTertiary
         addSubview(label)
+        addSubview(chevron)
+        setAccessibilityRole(.button)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override func layout() {
         super.layout()
-        let h = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - Tokens.Space.x4), height: h)
+        let h = label.lineHeight
+        let x = Tokens.Space.x2
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
+        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
     }
 
-    /// The name is a button: it opens the space editor.
     override func stateDidChange(animated: Bool) {
-        layer?.cornerRadius = Tokens.Radius.control
-        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        label.textColor = isHovered && canCollapse ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small - 2)
+        // The chevron shows on hover, and stays while folded so you know something is tucked away.
+        chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
+        setAccessibilityLabel(label.stringValue + (isCollapsed ? ", bookmarks hidden" : ""))
     }
 }
 

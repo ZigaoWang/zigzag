@@ -86,9 +86,10 @@ final class SidebarListView: NSView {
         var result: [SidebarItem] = [.header]
         let spaceID = spaceOverride ?? manager.currentSpaceID
         let bookmarks = Library.shared.bookmarks(in: spaceID)
-        result += bookmarks.map { .bookmark($0.id) }
+        let collapsed = Self.isCollapsed(spaceID) && !includeEmptyBookmarkSection
+        if !collapsed { result += bookmarks.map { .bookmark($0.id) } }
         if bookmarks.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
-        if !bookmarks.isEmpty || includeEmptyBookmarkSection { result.append(.separator) }
+        if (!bookmarks.isEmpty && !collapsed) || includeEmptyBookmarkSection { result.append(.separator) }
         result.append(.newTab)
         result += manager.tabs(in: spaceID).map { .tab($0.id) }
         return result
@@ -180,10 +181,7 @@ final class SidebarListView: NSView {
         switch item {
         case .header:
             let header = SpaceHeaderView()
-            header.onClick = { [weak self, weak header] _ in
-                guard let header else { return }
-                self?.delegate?.listEditSpace(anchor: header)
-            }
+            header.onClick = { [weak self] _ in self?.toggleCollapsed() }
             header.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: .header) }
             return header
         case .separator, .placeholder:
@@ -239,7 +237,10 @@ final class SidebarListView: NSView {
         let selected = manager.selectedTab(in: shownSpaceID ?? manager.currentSpaceID)
         switch item {
         case .header:
-            let spaceName = Library.shared.space(shownSpaceID ?? manager.currentSpaceID)?.name ?? ""
+            let spaceID = shownSpaceID ?? manager.currentSpaceID
+            let spaceName = Library.shared.space(spaceID)?.name ?? ""
+            (view as? SpaceHeaderView)?.canCollapse = !Library.shared.bookmarks(in: spaceID).isEmpty
+            (view as? SpaceHeaderView)?.isCollapsed = Self.isCollapsed(spaceID)
             (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "Private · \(spaceName)" : spaceName
             view.needsLayout = true
 
@@ -268,6 +269,23 @@ final class SidebarListView: NSView {
     }
 
     var headerView: NSView? { rows[.header] }
+
+    // MARK: Folding bookmarks
+
+    private static let collapsedKey = "CollapsedBookmarkSpaces"
+
+    static func isCollapsed(_ spaceID: UUID) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: collapsedKey) ?? []).contains(spaceID.uuidString)
+    }
+
+    private func toggleCollapsed() {
+        guard let manager, !Library.shared.bookmarks(in: manager.currentSpaceID).isEmpty else { return }
+        var set = Set(UserDefaults.standard.stringArray(forKey: Self.collapsedKey) ?? [])
+        let id = manager.currentSpaceID.uuidString
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        UserDefaults.standard.set(Array(set), forKey: Self.collapsedKey)
+        reload(animated: true)
+    }
 
     func row(for tab: Tab) -> NSView? {
         if let bookmarkID = tab.bookmarkID { return rows[.bookmark(bookmarkID)] }
