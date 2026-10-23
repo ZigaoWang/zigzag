@@ -173,6 +173,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
+        if !tabManager.isPrivate {
+            switch tabManager.currentSpace.appearance {
+            case "light": window?.appearance = NSAppearance(named: .aqua)
+            case "dark": window?.appearance = NSAppearance(named: .darkAqua)
+            default: window?.appearance = nil
+            }
+        }
         let color = tabManager.isPrivate ? SpaceColor.graphite.background : tabManager.currentSpace.background
         root.setColor(color, animated: animated && !Tokens.Motion.isKeyboardDriven)
         root.sidebarContainer.tint = color
@@ -508,6 +515,27 @@ extension BrowserWindowController: SidebarDelegate {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
+    func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool {
+        guard !tabManager.isPrivate else { return false }
+        let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
+        let target: BrowserWindowController
+        if let existing = others.first(where: { $0.window?.frame.contains(screenPoint) == true }) {
+            target = existing
+        } else {
+            // A new window, roughly where the tab was let go.
+            target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
+            if let window = target.window {
+                var frame = window.frame
+                frame.origin = NSPoint(x: screenPoint.x - 120, y: screenPoint.y - frame.height + 40)
+                window.setFrame(frame, display: true)
+            }
+        }
+        tabManager.detach(tab)
+        target.tabManager.insert(tab)
+        target.window?.makeKeyAndOrderFront(nil)
+        return true
+    }
+
     func listSwitchSpaceDuringDrag(_ spaceID: UUID) {
         // Switch without changing the selected tab, so the page doesn't jump while you drag.
         tabManager.showSpaceKeepingPage(spaceID)

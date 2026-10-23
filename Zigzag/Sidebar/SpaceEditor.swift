@@ -195,7 +195,7 @@ final class ColorCanvas: NSView {
             hues.colors = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { cgColor(SpaceColor.swatch(hue: $0)) }
             // Toward the bottom the tint fades to the page color: less intense.
             let base = cgColor(Tokens.Color.panelBackground)
-            fade.colors = [base.copy(alpha: 0) ?? base, base.copy(alpha: 0.85) ?? base]
+            fade.colors = [base.copy(alpha: 0) ?? base, base.copy(alpha: 0.55) ?? base]
             drawDots()
             let x = CGFloat(hue) * bounds.width
             let y = (1 - CGFloat(intensity)) * bounds.height
@@ -257,24 +257,92 @@ final class ColorCanvas: NSView {
     }
 }
 
-/// A tiny window in light or dark, tinted like the space: a quick check that the color works both ways.
-final class TintPreview: NSView {
+/// One appearance choice for a space: a tiny window drawn in that mode, tinted like the space.
+/// "Auto" is drawn half light, half dark. Click to choose.
+final class AppearanceOption: InteractiveView {
+    enum Mode: CaseIterable { case auto, light, dark }
+    let mode: Mode
+    private let lightHalf = MiniWindow(dark: false)
+    private let darkHalf = MiniWindow(dark: true)
+    private let clip = NSView()
+    private let ring = CALayer()
+    private let label: Label
+
+    init(mode: Mode) {
+        self.mode = mode
+        label = Label(mode == .auto ? "Auto" : mode == .light ? "Light" : "Dark", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+        label.alignment = .center
+        super.init(frame: .zero)
+        clip.wantsLayer = true
+        clip.layer?.cornerRadius = Tokens.Radius.control + 1
+        clip.layer?.cornerCurve = .continuous
+        clip.layer?.masksToBounds = true
+        addSubview(clip)
+        if mode != .dark { clip.addSubview(lightHalf) }
+        if mode != .light { clip.addSubview(darkHalf) }
+        addSubview(label)
+        ring.borderWidth = 2
+        ring.cornerRadius = Tokens.Radius.control + 4
+        ring.cornerCurve = .continuous
+        layer?.addSublayer(ring)
+        ring.zPosition = 5
+        setAccessibilityRole(.radioButton)
+        setAccessibilityLabel(label.stringValue + " appearance")
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func show(_ background: NSColor) {
+        lightHalf.show(background)
+        darkHalf.show(background)
+    }
+
+    override func layout() {
+        super.layout()
+        let labelHeight = label.lineHeight
+        let preview = NSRect(x: 3, y: 3, width: bounds.width - 6, height: bounds.height - labelHeight - Tokens.Space.x2 - 3)
+        clip.frame = preview
+        switch mode {
+        case .auto:
+            lightHalf.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height)
+            darkHalf.frame = NSRect(x: clip.bounds.width / 2, y: 0, width: clip.bounds.width / 2, height: clip.bounds.height)
+            darkHalf.offset = clip.bounds.width / 2
+        case .light: lightHalf.frame = clip.bounds
+        case .dark: darkHalf.frame = clip.bounds
+        }
+        label.frame = NSRect(x: 0, y: preview.maxY + Tokens.Space.x1, width: bounds.width, height: labelHeight)
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        Tokens.Motion.withoutAnimation {
+            ring.frame = clip.frame.insetBy(dx: -3, dy: -3)
+            ring.borderColor = cgColor(isSelected ? Tokens.Color.accent : (isHovered ? Tokens.Color.textTertiary : .clear))
+        }
+        label.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        setAccessibilityValue(isSelected ? "selected" : nil)
+    }
+}
+
+/// A tiny window in light or dark: frame tint, sidebar lines, page card.
+final class MiniWindow: NSView {
     private let frameView = ColorView()
     private let card = ColorView()
-    private let sidebarLines: [ColorView] = (0..<3).map { _ in ColorView() }
+    private let lines: [ColorView] = (0..<3).map { _ in ColorView() }
+    /// For the dark half of "Auto": draw as if this view started this far into the full preview.
+    var offset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(dark: Bool) {
         super.init(frame: .zero)
         appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-        frameView.wantsLayer = true
-        frameView.layer?.cornerRadius = Tokens.Radius.control
-        frameView.layer?.cornerCurve = .continuous
+        wantsLayer = true
+        layer?.masksToBounds = true
         card.wantsLayer = true
         card.layer?.cornerRadius = 3
         card.color = Tokens.Color.cardBackground
         addSubview(frameView)
         frameView.addSubview(card)
-        for line in sidebarLines {
+        for line in lines {
             line.wantsLayer = true
             line.layer?.cornerRadius = 1.5
             line.color = Tokens.Color.textTertiary
@@ -290,11 +358,12 @@ final class TintPreview: NSView {
 
     override func layout() {
         super.layout()
-        frameView.frame = bounds
-        let sidebarWidth = bounds.width * 0.3
-        card.frame = NSRect(x: sidebarWidth, y: 4, width: bounds.width - sidebarWidth - 4, height: bounds.height - 8)
-        for (i, line) in sidebarLines.enumerated() {
-            line.frame = NSRect(x: 5, y: 8 + CGFloat(i) * 7, width: sidebarWidth - 10 - CGFloat(i % 2) * 4, height: 3)
+        let full = bounds.width + offset
+        frameView.frame = NSRect(x: -offset, y: 0, width: full, height: bounds.height)
+        let sidebarWidth = full * 0.3
+        card.frame = NSRect(x: sidebarWidth, y: 4, width: full - sidebarWidth - 4, height: bounds.height - 8)
+        for (i, line) in lines.enumerated() {
+            line.frame = NSRect(x: 5, y: 7 + CGFloat(i) * 6, width: sidebarWidth - 10 - CGFloat(i % 2) * 4, height: 3)
         }
     }
 }
@@ -306,8 +375,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     let spaceID: UUID
     private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
     private let canvas = ColorCanvas()
-    private let lightPreview = TintPreview(dark: false)
-    private let darkPreview = TintPreview(dark: true)
+    private let appearanceOptions = AppearanceOption.Mode.allCases.map { AppearanceOption(mode: $0) }
     private var swatches: [TintSwatch] = []
     private var monitor: Any?
     static let width: CGFloat = 304
@@ -323,7 +391,17 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         canvas.hue = space?.hue ?? space?.color.hue ?? 0.6
         canvas.intensity = space?.intensity ?? SpaceColor.defaultIntensity
         swatches = SpaceColor.allCases.map { TintSwatch(kind: .tint($0)) }
-        [nameField, canvas, lightPreview, darkPreview].forEach { addSubview($0) }
+        [nameField, canvas].forEach { addSubview($0) }
+        appearanceOptions.forEach { addSubview($0) }
+        for option in appearanceOptions {
+            option.onClick = { [weak self, weak option] _ in
+                guard let self, let option else { return }
+                let value: String? = option.mode == .light ? "light" : option.mode == .dark ? "dark" : nil
+                Library.shared.setAppearance(value, for: self.spaceID)
+                self.refreshAppearance()
+            }
+        }
+        refreshAppearance()
         swatches.forEach { addSubview($0) }
 
         canvas.onChange = { [weak self] hue, intensity, final in
@@ -356,7 +434,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     private let pad = Tokens.Space.x4
     private let canvasHeight: CGFloat = 148
-    private let previewHeight = Tokens.Space.x10
+    private let previewHeight = Tokens.Space.x16
     private let swatchSize = Tokens.Space.x6
 
     var contentHeight: CGFloat {
@@ -364,8 +442,18 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
 
     private func showPreviews(_ background: NSColor) {
-        lightPreview.show(background)
-        darkPreview.show(background)
+        appearanceOptions.forEach { $0.show(background) }
+    }
+
+    private func refreshAppearance() {
+        let current = Library.shared.space(spaceID)?.appearance
+        for option in appearanceOptions {
+            switch option.mode {
+            case .auto: option.isSelected = current == nil
+            case .light: option.isSelected = current == "light"
+            case .dark: option.isSelected = current == "dark"
+            }
+        }
     }
 
     private func refreshSelection() {
@@ -383,14 +471,16 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         y += Tokens.Space.x8 + Tokens.Space.x3
         canvas.frame = NSRect(x: pad, y: y, width: width, height: canvasHeight)
         y = canvas.frame.maxY + Tokens.Space.x3
-        let previewWidth = (width - Tokens.Space.x2) / 2
-        lightPreview.frame = NSRect(x: pad, y: y, width: previewWidth, height: previewHeight)
-        darkPreview.frame = NSRect(x: lightPreview.frame.maxX + Tokens.Space.x2, y: y, width: previewWidth, height: previewHeight)
-        y = lightPreview.frame.maxY + Tokens.Space.x4
+        let gap = Tokens.Space.x2
+        let optionWidth = (width - gap * 2) / 3
+        for (i, option) in appearanceOptions.enumerated() {
+            option.frame = NSRect(x: pad + CGFloat(i) * (optionWidth + gap), y: y, width: optionWidth, height: previewHeight)
+        }
+        y += previewHeight + Tokens.Space.x4
         let count = CGFloat(swatches.count)
-        let gap = (width - count * swatchSize) / max(count - 1, 1)
+        let swatchGap = (width - count * swatchSize) / max(count - 1, 1)
         for (i, swatch) in swatches.enumerated() {
-            swatch.frame = NSRect(x: pad + CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
+            swatch.frame = NSRect(x: pad + CGFloat(i) * (swatchSize + swatchGap), y: y, width: swatchSize, height: swatchSize)
         }
     }
 

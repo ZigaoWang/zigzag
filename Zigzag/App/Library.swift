@@ -15,6 +15,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var hue: Double? = nil
     /// How strong a custom tint is (0 = barely there, 1 = rich). Only used with `hue`.
     var intensity: Double? = nil
+    /// "light" or "dark" to force the window's appearance in this space; nil follows the system.
+    var appearance: String? = nil
 
     /// The window frame color for this space.
     var background: NSColor { hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background }
@@ -163,6 +165,12 @@ final class Library {
         spaces[i].color = color
         spaces[i].hue = nil
         spaces[i].intensity = nil
+        commit()
+    }
+
+    func setAppearance(_ appearance: String?, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].appearance = appearance
         commit()
     }
 
