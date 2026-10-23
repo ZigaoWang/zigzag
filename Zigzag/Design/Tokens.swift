@@ -107,7 +107,7 @@ enum Tokens {
         /// Large surface moves: desk view zoom.
         static let large: TimeInterval = 0.3
         /// Delay before a hover preview appears.
-        static let previewDelay: TimeInterval = 0.35
+        static let previewDelay: TimeInterval = 0.6
         /// Delay before the hidden sidebar slides in from the edge.
         static let edgeRevealDelay: TimeInterval = 0
         static let edgeHideDelay: TimeInterval = 0.15
