@@ -323,6 +323,11 @@ final class TabManager {
 
     /// Turns a bookmark's live tab back into a normal tab, removing the bookmark.
     func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil) {
+        if Library.shared.isFavorite(bookmarkID) {
+            // A favorite comes back as a tab in the space you're in.
+            bookmarkTabs[bookmarkID]?.spaceID = currentSpaceID
+            bookmarkTabs[bookmarkID]?.isFavorite = false
+        }
         if let tab = bookmarkTabs[bookmarkID] {
             bookmarkTabs[bookmarkID] = nil
             tab.bookmarkID = nil
@@ -331,6 +336,7 @@ final class TabManager {
         } else if let bookmark = Library.shared.bookmark(bookmarkID), let index {
             let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID)
             tab.host = host
+            watch(tab)
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: min(index, tabsBySpace[tab.spaceID]?.count ?? 0))
         }
         Library.shared.removeBookmark(bookmarkID)

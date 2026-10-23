@@ -22,6 +22,10 @@ protocol SidebarListDelegate: AnyObject {
     func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool
     /// A tab dropped into another window's sidebar at an index. Returns true if handled.
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
+    /// A tab or bookmark dragged over the favorites grid. Returns true while it's over it.
+    func listDragOverFavorites(at windowPoint: NSPoint) -> Bool
+    /// Dropped on the favorites grid. Returns true if it became a favorite.
+    func listDropOnFavorites(_ tab: Tab) -> Bool
     /// A tab dragged over the page: show which half it would open in.
     func listDragOverPage(at windowPoint: NSPoint, tab: Tab)
     /// Dropped on the page: open it in split view beside the current page. Returns true if it did.
@@ -528,6 +532,12 @@ final class SidebarListView: NSView {
             externalTarget = nil
         }
 
+        // Over the favorites grid: it opens a slot for the tab, and the list closes its gap.
+        var overFavorites = false
+        if case .tab = drag.item, Self.window(at: mouse) === window.windowController {
+            overFavorites = delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse)) ?? false
+        }
+
         // Over this window's page (not the sidebar): offer to open the tab beside it.
         if hit == nil, Self.window(at: mouse) === window.windowController, case .tab(let id) = drag.item, let tab = manager?.tab(with: id) {
             delegate?.listDragOverPage(at: window.convertPoint(fromScreen: mouse), tab: tab)
@@ -538,7 +548,7 @@ final class SidebarListView: NSView {
         var section: Section? = nil
         var index = drag.targetIndex
         var splitTarget: UUID?
-        if let (_, list) = hit, list === self {
+        if let (_, list) = hit, list === self, !overFavorites {
             autoscroll(with: event)
             let point = convert(window.convertPoint(fromScreen: mouse), from: nil)
             if !bookmarkZoneOpen, let newTab = rows[.newTab], point.y < newTab.frame.maxY {
@@ -607,6 +617,14 @@ final class SidebarListView: NSView {
         drag.panel.orderOut(nil)
         drag.view.alphaValue = 1
         for view in rows.values { (view as? TabRowView)?.showsSplitDrop = false }
+
+        // Onto the favorites grid.
+        if case .tab(let id) = drag.item, let tab = manager.tab(with: id), delegate?.listDropOnFavorites(tab) == true {
+            rows[drag.item] = nil
+            drag.view.removeFromSuperview()
+            reload(animated: true)
+            return
+        }
 
         // Onto another tab's row: the two open side by side.
         if case .tab(let id) = drag.item, let targetID = drag.splitTarget,

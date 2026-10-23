@@ -108,6 +108,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
+        sidebar.favorites.onOpen = { [weak self] favorite in self?.tabManager.openBookmark(favorite) }
+        sidebar.favorites.onMenu = { [weak self] favorite in
+            guard let self else { return nil }
+            return SidebarMenus.favoriteMenu(for: favorite, controller: self)
+        }
+        sidebar.favorites.onDragMove = { [weak self] _, point in
+            guard let self else { return }
+            self.sidebar.list.externalHover(at: self.isOverList(point) ? point : nil)
+        }
+        sidebar.favorites.onDrop = { [weak self] favorite, point in
+            guard let self else { return false }
+            let overList = self.isOverList(point)
+            let index = self.sidebar.list.dropIndex(at: point)
+            self.sidebar.list.externalHover(at: nil)
+            guard overList else { return false }
+            // Dragged down into the list: it's a regular tab again, right where it was dropped.
+            self.tabManager.unbookmark(favorite.id, toIndex: index)
+            return true
+        }
+        reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID
         sidebar.list.reload(animated: false)
         showSelectedTab()
@@ -154,7 +174,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
     }
 
+    private func isOverList(_ screenPoint: NSPoint) -> Bool {
+        guard let window else { return false }
+        let list = sidebar.list.enclosingScrollView ?? sidebar.list
+        return list.convert(list.bounds, to: nil).contains(window.convertPoint(fromScreen: screenPoint))
+    }
+
+    private func reloadFavorites() {
+        let favorites = Library.shared.favorites
+        let open = Set(favorites.map(\.id).filter { tabManager.bookmarkTab(for: $0) != nil })
+        sidebar.favorites.reload(favorites: favorites, openIDs: open, selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil)
+        sidebar.needsLayout = true
+    }
+
     private func libraryChanged() {
+        reloadFavorites()
         applySpaceColor(animated: true)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.list.reload(animated: true)
@@ -204,6 +238,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showPages()
         sidebar.update(tab: tab)
         sidebar.list.refreshRows()
+        reloadFavorites()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
         refreshExtensionActions()
@@ -582,6 +617,26 @@ extension BrowserWindowController: SidebarDelegate {
         tabManager.detach(tab)
         target.tabManager.insert(tab)
         target.window?.makeKeyAndOrderFront(nil)
+        return true
+    }
+
+    func listDragOverFavorites(at windowPoint: NSPoint) -> Bool {
+        let favorites = sidebar.favorites
+        // An empty grid still takes drops in the band under the address.
+        var zone = favorites.convert(favorites.bounds, to: nil)
+        if favorites.isHidden {
+            let address = sidebar.address.convert(sidebar.address.bounds, to: nil)
+            zone = NSRect(x: address.minX, y: address.minY - Tokens.Space.x10, width: address.width, height: Tokens.Space.x10)
+        }
+        let over = zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
+        favorites.isDropTarget = over
+        return over
+    }
+
+    func listDropOnFavorites(_ tab: Tab) -> Bool {
+        guard sidebar.favorites.isDropTarget else { return false }
+        sidebar.favorites.isDropTarget = false
+        tabManager.favoriteTab(tab)
         return true
     }
 

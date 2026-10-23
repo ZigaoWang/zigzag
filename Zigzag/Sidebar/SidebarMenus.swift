@@ -29,6 +29,7 @@ enum SidebarMenus {
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
         })
         menu.addItem(Item("Bookmark", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
+        menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { manager.favoriteTab(tab) })
         if manager.split(for: tab) != nil {
             menu.addItem(Item("Close Split View") { manager.unsplit(tab) })
         } else if let current = manager.selectedTab, current !== tab {
@@ -79,6 +80,10 @@ enum SidebarMenus {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(bookmark.url.absoluteString, forType: .string)
         })
+        menu.addItem(Item("Add to Favorites") {
+            Library.shared.makeFavorite(bookmark.id)
+            live?.isFavorite = true
+        })
         if Library.shared.spaces.count > 1 {
             let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
             let sub = NSMenu()
@@ -94,6 +99,30 @@ enum SidebarMenus {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
         menu.addItem(Item("Remove Bookmark") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+        return menu
+    }
+
+    static func favoriteMenu(for favorite: Bookmark, controller: BrowserWindowController) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let manager = controller.tabManager
+        let live = manager.bookmarkTab(for: favorite.id)
+        menu.addItem(Item("Copy Link") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(favorite.url.absoluteString, forType: .string)
+        })
+        if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
+            menu.addItem(Item("Go Back to Favorite Page") { manager.resetBookmarkTab(favorite.id) })
+        }
+        menu.addItem(Item("Move to Tabs") { manager.unbookmark(favorite.id, toIndex: 0) })
+        menu.addItem(.separator())
+        if let live {
+            menu.addItem(Item("Unload Page") { manager.close(live) })
+        }
+        menu.addItem(Item("Remove from Favorites") {
+            if let live { manager.close(live) }
+            Library.shared.removeBookmark(favorite.id)
+        })
         return menu
     }
 

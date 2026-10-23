@@ -144,6 +144,7 @@ final class SidebarView: NSView {
     private let trafficLightsPicture = NSImageView()
     let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar (⌃⌘S)")
     let address = AddressView()
+    let favorites = FavoritesView()
     let list = SidebarListView()
     private let scrollView = NSScrollView()
 
@@ -170,6 +171,8 @@ final class SidebarView: NSView {
         trafficLightsPicture.isHidden = true
         addSubview(trafficLightsPicture)
         addSubview(address)
+        addSubview(favorites)
+        favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
 
         scrollView.drawsBackground = false
         scrollView.hasHorizontalScroller = false
@@ -237,7 +240,10 @@ final class SidebarView: NSView {
 
         let bottomHeight = Tokens.Metric.bottomBarHeight
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight - pad, width: width, height: bottomHeight)
-        let listTop = address.frame.maxY + Tokens.Metric.sectionGap
+        let favoritesHeight = favorites.preferredHeight
+        favorites.isHidden = favoritesHeight == 0
+        favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: favoritesHeight)
+        let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : address.frame.maxY) + Tokens.Metric.sectionGap
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
