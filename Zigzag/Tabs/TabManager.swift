@@ -204,10 +204,28 @@ final class TabManager {
         select(index >= list.count ? list[list.count - 1] : list[index])
     }
 
-    /// Bookmarks then tabs, in sidebar order: what Cmd+Option+Up/Down and Cmd+1…9 walk.
+    /// Favorites, bookmarks, then tabs, in sidebar order: what Cmd+Option+Up/Down walk.
     var navigableTabs: [Tab] {
+        let favoriteLive = Library.shared.favorites.compactMap { bookmarkTabs[$0.id] }
         let bookmarkLive = Library.shared.bookmarks(in: currentSpaceID).compactMap { bookmarkTabs[$0.id] }
-        return bookmarkLive + currentTabs
+        return favoriteLive + bookmarkLive + currentTabs
+    }
+
+    /// Turns a tab into a favorite at a position. Its page stays open behind the tile.
+    func favoriteTab(_ tab: Tab, at index: Int? = nil) {
+        guard let url = tab.url else { return }
+        if let bookmarkID = tab.bookmarkID {
+            Library.shared.makeFavorite(bookmarkID)
+            if let index { Library.shared.moveFavorite(bookmarkID, to: index) }
+            tab.isFavorite = true
+            return
+        }
+        removeFromList(tab)
+        let id = UUID()
+        tab.bookmarkID = id
+        tab.isFavorite = true
+        bookmarkTabs[id] = tab
+        Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id)
     }
 
     // MARK: Spaces
@@ -248,7 +266,7 @@ final class TabManager {
             tabsBySpace[id] = nil
         }
         // A removed bookmark keeps its page around as a normal tab, so nothing disappears unexpectedly.
-        let bookmarkIDs = Set(Library.shared.allBookmarks.map(\.0.id))
+        let bookmarkIDs = Library.shared.allBookmarkIDs
         for (id, tab) in bookmarkTabs where !bookmarkIDs.contains(id) {
             bookmarkTabs[id] = nil
             tab.bookmarkID = nil
@@ -275,11 +293,14 @@ final class TabManager {
     /// Opens the bookmark's live tab, creating it on first use.
     func openBookmark(_ bookmark: Bookmark) {
         if let tab = bookmarkTabs[bookmark.id] {
+            // Favorites belong to every space: they open in the one you're in.
+            if Library.shared.isFavorite(bookmark.id) { tab.spaceID = currentSpaceID }
             select(tab)
             return
         }
         let spaceID = Library.shared.spaceID(ofBookmark: bookmark.id) ?? currentSpaceID
         let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: spaceID)
+        tab.isFavorite = Library.shared.isFavorite(bookmark.id)
         tab.host = host
         watch(tab)
         tab.bookmarkID = bookmark.id

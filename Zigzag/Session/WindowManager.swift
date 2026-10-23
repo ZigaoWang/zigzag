@@ -194,8 +194,10 @@ final class WindowManager {
                 allIDs.formUnion(tabs.map(\.id))
             }
             for bookmarkState in windowState.bookmarkTabs {
-                guard let spaceID = Library.shared.spaceID(ofBookmark: bookmarkState.bookmarkID) else { continue }
+                let isFavorite = Library.shared.isFavorite(bookmarkState.bookmarkID)
+                guard let spaceID = Library.shared.spaceID(ofBookmark: bookmarkState.bookmarkID) ?? (isFavorite ? windowState.currentSpaceID : nil) else { continue }
                 let tab = restoreTab(bookmarkState.tab, spaceID: spaceID)
+                tab.isFavorite = isFavorite
                 manager.adoptBookmarkTab(tab, bookmarkID: bookmarkState.bookmarkID)
                 allIDs.insert(tab.id)
             }

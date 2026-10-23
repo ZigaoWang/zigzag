@@ -51,11 +51,9 @@ enum ArcImporter {
         var result = Result()
         let (spaces, favorites) = readSidebar()
         var newSpaces = spaces
-        if !favorites.isEmpty {
-            if newSpaces.isEmpty { newSpaces = [SpaceInfo(name: "Personal", color: .sky)] }
-            // Arc's Favorites were global; they become bookmarks at the top of the first space.
-            newSpaces[0].bookmarks = favorites + newSpaces[0].bookmarks
-        }
+        // Arc's Favorites are global, like ours.
+        Library.shared.appendFavorites(favorites)
+        for favorite in favorites { FaviconStore.shared.prefetch(for: favorite.url) }
         result.spaces = newSpaces.count
         result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)
 
@@ -71,7 +69,7 @@ enum ArcImporter {
             return false
         }
         result.spaces = newSpaces.count
-        result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +) + merged
+        result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +) + merged + favorites.count
         if !newSpaces.isEmpty {
             // A fresh install's empty default space gives way to the imported ones.
             let pristine = Library.shared.spaces.filter { space in

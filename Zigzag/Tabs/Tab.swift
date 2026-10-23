@@ -30,6 +30,8 @@ final class Tab: NSObject {
     var spaceID: UUID
     /// Set when this tab is the live page behind a bookmark. Such tabs live in the bookmark row, not the tab list.
     var bookmarkID: UUID?
+    /// Set when this tab is the live page behind a favorite tile.
+    var isFavorite = false
 
     private(set) var url: URL?
     private(set) var title: String

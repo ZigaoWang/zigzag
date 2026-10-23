@@ -96,11 +96,14 @@ final class Library {
 
     private struct Stored: Codable {
         var spaces: [SpaceInfo]
+        var favorites: [Bookmark]?
         var searchEngine: SearchEngine
         var importedFromArc: Bool?
     }
 
     private(set) var spaces: [SpaceInfo]
+    /// Favorites: tiles at the top of the sidebar, the same in every space.
+    private(set) var favorites: [Bookmark] = []
     var searchEngine: SearchEngine { didSet { save() } }
     var importedFromArc: Bool { didSet { save() } }
 
@@ -110,6 +113,7 @@ final class Library {
     private init() {
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = stored.spaces
+            favorites = stored.favorites ?? []
             searchEngine = stored.searchEngine
             importedFromArc = stored.importedFromArc ?? false
         } else {
@@ -128,7 +132,7 @@ final class Library {
 
     func saveNow() {
         saveDebouncer.cancel()
-        JSONStore.save(Stored(spaces: spaces, searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
+        JSONStore.save(Stored(spaces: spaces, favorites: favorites, searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
     }
 
     private func commit() {
@@ -198,13 +202,53 @@ final class Library {
 
     func bookmarks(in spaceID: UUID) -> [Bookmark] { space(spaceID)?.bookmarks ?? [] }
 
+    /// Space bookmarks with their space (favorites are separate: `favorites`).
     var allBookmarks: [(Bookmark, SpaceInfo)] {
         spaces.flatMap { space in space.bookmarks.map { ($0, space) } }
     }
 
     func bookmark(_ id: UUID) -> Bookmark? {
+        if let favorite = favorites.first(where: { $0.id == id }) { return favorite }
         for space in spaces { if let b = space.bookmarks.first(where: { $0.id == id }) { return b } }
         return nil
+    }
+
+    // MARK: Favorites
+
+    func isFavorite(_ id: UUID) -> Bool { favorites.contains { $0.id == id } }
+
+    /// Every bookmark and favorite id, for checking what still exists.
+    var allBookmarkIDs: Set<UUID> {
+        Set(favorites.map(\.id) + spaces.flatMap { $0.bookmarks.map(\.id) })
+    }
+
+    @discardableResult
+    func addFavorite(url: URL, title: String, at index: Int? = nil, id: UUID = UUID()) -> Bookmark {
+        let favorite = Bookmark(id: id, url: url, title: title)
+        favorites.insert(favorite, at: min(index ?? favorites.count, favorites.count))
+        commit()
+        return favorite
+    }
+
+    func moveFavorite(_ id: UUID, to index: Int) {
+        guard let from = favorites.firstIndex(where: { $0.id == id }) else { return }
+        let favorite = favorites.remove(at: from)
+        favorites.insert(favorite, at: max(0, min(index, favorites.count)))
+        commit()
+    }
+
+    /// Turns a space bookmark into a favorite, keeping its id (and so its live page).
+    func makeFavorite(_ bookmarkID: UUID) {
+        guard let bookmark = bookmark(bookmarkID), !isFavorite(bookmarkID) else { return }
+        for s in spaces.indices { spaces[s].bookmarks.removeAll { $0.id == bookmarkID } }
+        favorites.append(bookmark)
+        commit()
+    }
+
+    func appendFavorites(_ new: [Bookmark]) {
+        let known = Set(favorites.map { $0.url.absoluteString })
+        favorites += new.filter { !known.contains($0.url.absoluteString) }
+        commit()
     }
 
     func spaceID(ofBookmark id: UUID) -> UUID? {
@@ -222,11 +266,16 @@ final class Library {
     }
 
     func removeBookmark(_ id: UUID) {
+        favorites.removeAll { $0.id == id }
         for s in spaces.indices { spaces[s].bookmarks.removeAll { $0.id == id } }
         commit()
     }
 
     func updateBookmark(_ id: UUID, title: String? = nil, url: URL? = nil) {
+        if let f = favorites.firstIndex(where: { $0.id == id }) {
+            if let title { favorites[f].title = title }
+            if let url { favorites[f].url = url }
+        }
         for s in spaces.indices {
             if let b = spaces[s].bookmarks.firstIndex(where: { $0.id == id }) {
                 if let title { spaces[s].bookmarks[b].title = title }
