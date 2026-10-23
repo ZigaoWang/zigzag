@@ -261,6 +261,14 @@ enum DebugBridge {
         case "private": WindowManager.shared.newWindow(url: URL(string: arg), isPrivate: true)
         case "removespace":
             if let space = Library.shared.spaces.first(where: { $0.name == arg }) { Library.shared.removeSpace(space.id) }
+        case "menutest":
+            if let bookmark = Library.shared.allBookmarks.first?.0 {
+                let menu = SidebarMenus.bookmarkMenu(for: bookmark, controller: controller)
+                let index = menu.indexOfItem(withTitle: arg)
+                debugLog("menutest \(arg) index=\(index) target=\(String(describing: menu.item(at: max(index,0))?.target))")
+                if index >= 0 { menu.performActionForItem(at: index) }
+                debugLog("pasteboard=\(NSPasteboard.general.string(forType: .string) ?? "nil")")
+            } else { debugLog("menutest: no bookmarks") }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
