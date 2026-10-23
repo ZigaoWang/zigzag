@@ -269,6 +269,11 @@ enum DebugBridge {
                 if index >= 0 { menu.performActionForItem(at: index) }
                 debugLog("pasteboard=\(NSPasteboard.general.string(forType: .string) ?? "nil")")
             } else { debugLog("menutest: no bookmarks") }
+        case "split":
+            let tabs = controller.tabManager.currentTabs
+            if let current = controller.tabManager.selectedTab, let other = tabs.first(where: { $0 !== current }) {
+                controller.tabManager.makeSplit(current, with: other)
+            }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
