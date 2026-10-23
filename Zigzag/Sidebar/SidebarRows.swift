@@ -92,6 +92,23 @@ final class TabRowView: SidebarRowView {
     var fixedTitle: String? { didSet { refresh() } }
     var isBookmark = false
     var isUnloaded = false { didSet { refreshTitleColor() } }
+    /// The other half of a split: shown in the same row, to the right.
+    private(set) var partner: Tab?
+    /// Which half you're working in, when split (0 = left, 1 = right).
+    var focusedHalf = 0 { didSet { refreshTitleColor() } }
+    private var partnerToken: SignalToken?
+    private let partnerIcon = FaviconView()
+    private let partnerTitle = Label()
+    private let divider = ColorView(color: Tokens.Color.separator)
+    /// While another tab is dragged over this row's right half: where it would open.
+    private let dropHalf = ColorView()
+    var showsSplitDrop = false {
+        didSet {
+            guard oldValue != showsSplitDrop else { return }
+            needsLayout = true
+            Tokens.Motion.animate(Tokens.Motion.feedback) { self.dropHalf.animator().alphaValue = self.showsSplitDrop ? 1 : 0 }
+        }
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -103,8 +120,41 @@ final class TabRowView: SidebarRowView {
             tab.setMuted(!tab.isMuted)
         }
         audioButton.isHidden = true
+        dropHalf.wantsLayer = true
+        dropHalf.layer?.cornerRadius = Tokens.Radius.row - 2
+        dropHalf.layer?.cornerCurve = .continuous
+        dropHalf.layer?.borderWidth = 1.5
+        dropHalf.alphaValue = 0
+        addSubview(dropHalf, positioned: .below, relativeTo: icon)
+        partnerIcon.isHidden = true
+        partnerTitle.isHidden = true
+        divider.isHidden = true
+        [partnerIcon, partnerTitle, divider].forEach { addSubview($0) }
         addSubview(audioButton)
         addSubview(closeButton)
+    }
+
+    func configure(partner: Tab?) {
+        guard partner !== self.partner else { return }
+        self.partner = partner
+        partnerToken = partner?.changed.observe { [weak self] change in
+            if change == .title || change == .favicon || change == .loading || change == .url { self?.refreshPartner() }
+        }
+        [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = partner == nil }
+        refreshPartner()
+    }
+
+    private func refreshPartner() {
+        partnerTitle.stringValue = partner?.displayTitle ?? ""
+        partnerIcon.image = partner?.favicon
+        partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
+        refreshTitleColor()
+        needsLayout = true
+    }
+
+    /// Which half of a split row a point (in this view) falls in.
+    func half(at point: NSPoint) -> Int {
+        partner != nil && point.x > bounds.midX ? 1 : 0
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -147,7 +197,12 @@ final class TabRowView: SidebarRowView {
 
     private func refreshTitleColor() {
         title.textColor = isUnloaded && !isSelected ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
-        title.font = Tokens.Font.body(isSelected ? .medium : .regular)
+        let split = partner != nil
+        title.font = Tokens.Font.body(isSelected && (!split || focusedHalf == 0) ? .medium : .regular)
+        partnerTitle.textColor = Tokens.Color.textPrimary
+        partnerTitle.font = Tokens.Font.body(isSelected && focusedHalf == 1 ? .medium : .regular)
+        dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
+        dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))
     }
 
     private func refreshAccessories() {
@@ -172,6 +227,18 @@ final class TabRowView: SidebarRowView {
         closeButton.frame.origin = NSPoint(x: x, y: y)
         if !closeButton.isHidden { x -= size.width + Tokens.Space.x1 }
         audioButton.frame.origin = NSPoint(x: x, y: y)
+        let inset: CGFloat = 3
+        dropHalf.frame = NSRect(x: bounds.midX, y: inset, width: bounds.width / 2 - inset, height: bounds.height - inset * 2)
+
+        // A split shows both pages in one row: left half, a hairline, right half.
+        guard partner != nil else { return }
+        let mid = bounds.midX
+        title.frame.size.width = max(0, mid - Tokens.Space.x1 - title.frame.minX)
+        divider.frame = NSRect(x: mid, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
+        partnerIcon.frame = icon.frame.offsetBy(dx: mid, dy: 0)
+        let titleX = partnerIcon.frame.maxX + Tokens.Space.x2
+        let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : Tokens.Space.x2
+        partnerTitle.frame = NSRect(x: titleX, y: title.frame.minY, width: max(0, bounds.width - titleX - trailing), height: title.frame.height)
     }
 }
 
