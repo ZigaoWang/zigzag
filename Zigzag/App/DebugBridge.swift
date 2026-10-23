@@ -269,6 +269,14 @@ enum DebugBridge {
                 if index >= 0 { menu.performActionForItem(at: index) }
                 debugLog("pasteboard=\(NSPasteboard.general.string(forType: .string) ?? "nil")")
             } else { debugLog("menutest: no bookmarks") }
+        case "favorite":
+            if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
+        case "unfavorite":
+            // unfavorite <title>: back to a tab, in whichever window holds its page.
+            if let favorite = Library.shared.favorites.first(where: { $0.title == arg }) {
+                let owner = WindowManager.shared.controllers.first { $0.tabManager.bookmarkTab(for: favorite.id) != nil } ?? controller
+                owner.tabManager.unbookmark(favorite.id, toIndex: 0)
+            }
         case "split":
             let tabs = controller.tabManager.currentTabs
             if let current = controller.tabManager.selectedTab, let other = tabs.first(where: { $0 !== current }) {
