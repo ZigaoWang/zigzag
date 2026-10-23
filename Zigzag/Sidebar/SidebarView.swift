@@ -167,6 +167,7 @@ final class SidebarView: NSView {
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.documentView = list
+        scrollView.useSlimScroller()
         addSubview(scrollView)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)

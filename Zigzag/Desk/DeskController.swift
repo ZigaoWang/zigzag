@@ -73,6 +73,7 @@ final class DeskController {
         scrollView.scrollerStyle = .overlay
         scrollView.autohidesScrollers = true
         scrollView.documentView = canvas
+        scrollView.useSlimScroller()
         backdrop.addSubview(scrollView)
         actionBar.radius = Tokens.Radius.row + Tokens.Space.x1
         actionBar.addSubview(closeButton)

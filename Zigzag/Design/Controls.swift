@@ -271,3 +271,46 @@ class ColorView: NSView {
         refresh(animated: false)
     }
 }
+
+/// Our scroll bar: a slim rounded thumb, no track, visible only while scrolling.
+final class SlimScroller: NSScroller {
+    override class var isCompatibleWithOverlayScrollers: Bool { true }
+
+    override class func scrollerWidth(for controlSize: NSControl.ControlSize, scrollerStyle: NSScroller.Style) -> CGFloat {
+        Tokens.Space.x2 + Tokens.Space.x1
+    }
+
+    override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {}
+
+    override func drawKnob() {
+        let knob = rect(for: .knob)
+        let width: CGFloat = isHovered ? 6 : 4
+        let rect = NSRect(x: knob.maxX - width - 2, y: knob.minY + 2, width: width, height: max(knob.height - 4, width))
+        Tokens.Color.textTertiary.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: width / 2, yRadius: width / 2).fill()
+    }
+
+    private var isHovered = false
+    private var trackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { super.mouseEntered(with: event); isHovered = true; needsDisplay = true }
+    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); isHovered = false; needsDisplay = true }
+}
+
+extension NSScrollView {
+    /// Swaps in our slim scroller.
+    func useSlimScroller() {
+        scrollerStyle = .overlay
+        verticalScroller = SlimScroller()
+        hasVerticalScroller = true
+        autohidesScrollers = true
+    }
+}

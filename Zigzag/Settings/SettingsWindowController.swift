@@ -324,6 +324,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.documentView = documentView
+        scroll.useSlimScroller()
         window?.contentView = scroll
         reloadSpaces()
     }
