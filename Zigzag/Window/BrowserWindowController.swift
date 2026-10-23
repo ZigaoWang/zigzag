@@ -509,6 +509,10 @@ extension BrowserWindowController: SidebarDelegate {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
+    func listSwitchSpaceDuringDrag(_ spaceID: UUID) {
+        // Switch without changing the selected tab, so the page doesn't jump while you drag.
+        tabManager.showSpaceKeepingPage(spaceID)
+    }
 
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {

@@ -210,6 +210,13 @@ final class TabManager {
         changed.send(.selection)
     }
 
+    /// Shows another space's list without leaving the page you're on (used while dragging a tab).
+    func showSpaceKeepingPage(_ id: UUID) {
+        guard id != currentSpaceID, Library.shared.space(id) != nil else { return }
+        currentSpaceID = id
+        changed.send(.space)
+    }
+
     func switchSpace(by offset: Int) {
         let spaces = Library.shared.spaces
         guard let index = spaces.firstIndex(where: { $0.id == currentSpaceID }) else { return }

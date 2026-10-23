@@ -16,6 +16,8 @@ protocol SidebarListDelegate: AnyObject {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID)
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID)
     func listUnbookmark(_ bookmarkID: UUID, to index: Int)
+    /// While dragging, hovering a space's dot opens that space so the tab can be dropped into place.
+    func listSwitchSpaceDuringDrag(_ spaceID: UUID)
 }
 
 enum SidebarItem: Hashable {
@@ -56,6 +58,8 @@ final class SidebarListView: NSView {
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?
+    private var springWork: DispatchWorkItem?
+    var isDragging: Bool { drag != nil }
     private let rowGap: CGFloat = Tokens.Space.x1
 
     struct DragState {
@@ -348,7 +352,23 @@ final class SidebarListView: NSView {
         }
         autoscroll(with: event)
 
-        drag.hoverSpace = delegate?.listDragHoverSpace(at: event.locationInWindow)
+        let hovered = delegate?.listDragHoverSpace(at: event.locationInWindow)
+        if hovered != drag.hoverSpace {
+            springWork?.cancel()
+            if let hovered, hovered != manager?.currentSpaceID {
+                let work = DispatchWorkItem { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.drag?.hoverSpace == hovered else { return }
+                        self.delegate?.listSwitchSpaceDuringDrag(hovered)
+                        self.drag?.hoverSpace = nil
+                        self.apply(items: self.displayItems(), animated: false)
+                    }
+                }
+                springWork = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
+            }
+        }
+        drag.hoverSpace = hovered
         let (section, index) = target(at: point.y, dragging: drag.item)
         let changed = section != drag.targetSection || index != drag.targetIndex
         drag.targetSection = section
@@ -360,6 +380,7 @@ final class SidebarListView: NSView {
     private func endDrag(with event: NSEvent) {
         guard let drag, let manager else { return }
         self.drag = nil
+        springWork?.cancel()
         (drag.view as? SidebarRowView)?.isLifted = false
         delegate?.listDragEnded()
 
@@ -376,9 +397,12 @@ final class SidebarListView: NSView {
 
         switch (drag.item, drag.targetSection) {
         case (.tab(let id), .tabs):
-            if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: drag.targetIndex, in: tab.spaceID) }
+            if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: drag.targetIndex, in: manager.currentSpaceID) }
         case (.tab(let id), .bookmarks):
-            if let tab = manager.tab(with: id) { delegate?.listBookmark(tab, at: drag.targetIndex, in: manager.currentSpaceID) }
+            if let tab = manager.tab(with: id) {
+                if tab.spaceID != manager.currentSpaceID { delegate?.listMove(tab, to: 0, in: manager.currentSpaceID) }
+                delegate?.listBookmark(tab, at: drag.targetIndex, in: manager.currentSpaceID)
+            }
         case (.bookmark(let id), .bookmarks):
             Library.shared.moveBookmark(id, to: drag.targetIndex, in: manager.currentSpaceID)
         case (.bookmark(let id), .tabs):
