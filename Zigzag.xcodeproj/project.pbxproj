@@ -40,6 +40,7 @@
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
 		C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */; };
 		C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765C1F36BCEE463F8B5316BE /* Paths.swift */; };
+		C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175D363890A811683DC2D9E7 /* TabSwitcher.swift */; };
 		C6A5D03B30E566FF6F00A2E5 /* KnownExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B459AF88430335A87C59598 /* KnownExtension.swift */; };
 		CF63705B985B423D3B9EC482 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77478845778FB285ADD29C14 /* Library.swift */; };
 		CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192303361A76A758A8F9346F /* FaviconView.swift */; };
@@ -57,6 +58,7 @@
 		106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserActions.swift; sourceTree = "<group>"; };
 		15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarListView.swift; sourceTree = "<group>"; };
 		16FC91D0E7086B1EC211FD6F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		175D363890A811683DC2D9E7 /* TabSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcher.swift; sourceTree = "<group>"; };
 		192303361A76A758A8F9346F /* FaviconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconView.swift; sourceTree = "<group>"; };
 		1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceColor.swift; sourceTree = "<group>"; };
 		1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebKitSetup.swift; sourceTree = "<group>"; };
@@ -100,6 +102,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		0DA4CA999A3CAEBA6DD1E436 /* Switcher */ = {
+			isa = PBXGroup;
+			children = (
+				175D363890A811683DC2D9E7 /* TabSwitcher.swift */,
+			);
+			path = Switcher;
+			sourceTree = "<group>";
+		};
 		12003C50E27ADE7FF7DF6102 /* CommandBar */ = {
 			isa = PBXGroup;
 			children = (
@@ -220,6 +230,7 @@
 				AD198676FC355DA00F18BD4B /* Settings */,
 				45578458512E00D5EB7061BF /* Sidebar */,
 				1A4CDB5B71DD2C4947122E55 /* Support */,
+				0DA4CA999A3CAEBA6DD1E436 /* Switcher */,
 				B5D091B4DB5A1AF40C949AA9 /* Tabs */,
 				AFF355173E201043FA2E138C /* Web */,
 				F5DB143908BDB3FB1FB3440B /* Window */,
@@ -375,6 +386,7 @@
 				8CB207822183B9D650B3F443 /* Tab.swift in Sources */,
 				C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */,
 				36BC4DAF8C508734F781BA47 /* TabPreview.swift in Sources */,
+				C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */,
 				66E5020894B420AEB3943EAC /* Tokens.swift in Sources */,
 				DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */,
 				82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */,

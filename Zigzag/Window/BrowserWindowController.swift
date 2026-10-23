@@ -19,6 +19,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var findBar = FindBarController(window: self)
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
+    lazy var switcher = TabSwitcher(controller: self)
     lazy var peek = PeekController(controller: self)
     var peekController: PeekController? { peek }
 
@@ -251,6 +252,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Event interception
 
     private func intercept(_ event: NSEvent) -> Bool {
+        if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
+        if event.type == .magnify || event.type == .gesture, desk.handleMagnify(event) { return true }
         if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
            ExtensionHost.shared.performCommand(for: event) {
             return true
@@ -351,5 +354,9 @@ extension BrowserWindowController {
         guard tabs.indices.contains(index), let row = sidebar.list.row(for: tabs[index]) else { return }
         previews.hover(tabs[index], row: row, bookmark: nil)
     }
-    func debugSwitcher() {}
+    func debugSwitcher() {
+        let down = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.control], timestamp: 0, windowNumber: window?.windowNumber ?? 0,
+                                    context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48)!
+        _ = switcher.handle(down)
+    }
 }
