@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WindowManager.shared.newWindow()
         }
         Updater.shared.start()
+        offerDefaultBrowserOnce()
         DockProgress.shared.start()
         DebugBridge.start()
     }
@@ -60,6 +61,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard launched else { pendingURLs.append(url); return }
         WindowManager.shared.openExternal(url)
         NSApp.activate()
+    }
+
+    /// One quiet offer, on the second launch, never repeated: by then you know whether you like it here.
+    private func offerDefaultBrowserOnce() {
+        let defaults = UserDefaults.standard
+        let launches = defaults.integer(forKey: "LaunchCount") + 1
+        defaults.set(launches, forKey: "LaunchCount")
+        guard launches >= 2, !defaults.bool(forKey: "DefaultBrowserOffered"), !SettingsWindowController.isDefaultBrowser else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            guard let controller = WindowManager.shared.keyController else { return }
+            defaults.set(true, forKey: "DefaultBrowserOffered")
+            Toast.show("Open links in Zigzag?", symbol: "safari", action: ("Make Default", { DefaultBrowser.make() }),
+                       duration: 8, in: controller)
+        }
     }
 
     // MARK: App menu actions
