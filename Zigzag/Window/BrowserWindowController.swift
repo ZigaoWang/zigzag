@@ -405,7 +405,16 @@ extension BrowserWindowController: TabHost {
 extension BrowserWindowController: SidebarDelegate {
     func listSelect(_ tab: Tab) { tabManager.select(tab) }
     func listOpenBookmark(_ bookmark: Bookmark) { tabManager.openBookmark(bookmark) }
-    func listClose(_ tab: Tab) { tabManager.close(tab) }
+    func listClose(_ tab: Tab) { closeWithUndo(tab) }
+
+    /// Closing one tab offers a quiet way back (and teaches ⇧⌘T without saying so).
+    func closeWithUndo(_ tab: Tab) {
+        let wasBookmark = tab.bookmarkID != nil
+        tabManager.close(tab)
+        guard !wasBookmark else { return }
+        Toast.show("Tab Closed", symbol: "xmark.circle", action: ("Undo", { [weak self] in self?.tabManager.reopenClosedTab() }),
+                   duration: 3, in: self)
+    }
     func listNewTab() { commandBar.show(mode: .newTab) }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         previews.hover(tab, row: row, bookmark: bookmark)

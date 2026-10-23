@@ -24,7 +24,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             window?.performClose(sender)
             return
         }
-        tabManager.close(tab)
+        closeWithUndo(tab)
     }
     @objc func closeWindow(_ sender: Any?) { window?.performClose(sender) }
     @objc func reopenClosedTab(_ sender: Any?) { tabManager.reopenClosedTab() }

@@ -24,6 +24,7 @@
 		4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EE88C88464115895D3647DF /* PopupWindowController.swift */; };
 		55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979ECE3AE8285E787E972E3E /* PageCardView.swift */; };
 		6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0657DD4DA14F56BD051BC34 /* Signal.swift */; };
+		65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3073C0E2D268EC8C3B767 /* DockProgress.swift */; };
 		66E5020894B420AEB3943EAC /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 256245226DA14768B001589E /* Tokens.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
@@ -72,6 +73,7 @@
 		253D16FCBE561D267ED6957C /* BrowserRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRootView.swift; sourceTree = "<group>"; };
 		256245226DA14768B001589E /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
 		27025355902590144D7FABA3 /* SpaceEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceEditor.swift; sourceTree = "<group>"; };
+		27F3073C0E2D268EC8C3B767 /* DockProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockProgress.swift; sourceTree = "<group>"; };
 		2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		32289A47E7257A31AC82FCB0 /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controls.swift; sourceTree = "<group>"; };
 		32D47467F8351F9270BAE20A /* SidebarRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRows.swift; sourceTree = "<group>"; };
@@ -283,6 +285,7 @@
 			children = (
 				16FC91D0E7086B1EC211FD6F /* AppDelegate.swift */,
 				88F9F8B1C1119171EFC0072B /* DebugBridge.swift */,
+				27F3073C0E2D268EC8C3B767 /* DockProgress.swift */,
 				77478845778FB285ADD29C14 /* Library.swift */,
 				4363A8C97194CFB82618511C /* main.swift */,
 				A9C34787271E39E26E0156FC /* MainMenu.swift */,
@@ -410,6 +413,7 @@
 				10324776656E836D07CD1B27 /* Controls.swift in Sources */,
 				2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */,
 				3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */,
+				65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */,
 				A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */,
 				3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */,
 				0104054FA97C0D01FC9A422C /* ExtensionHost.swift in Sources */,

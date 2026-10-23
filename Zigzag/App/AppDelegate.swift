@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WindowManager.shared.newWindow()
         }
         Updater.shared.start()
+        DockProgress.shared.start()
         DebugBridge.start()
     }
 

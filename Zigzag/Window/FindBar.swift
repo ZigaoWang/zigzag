@@ -256,6 +256,7 @@ class FloatingPanelView: NSView {
 final class ToastView: FloatingPanelView {
     let icon = NSImageView()
     let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+    let actionButton = TextButton(title: "", font: Tokens.Font.body(.semibold))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -263,6 +264,9 @@ final class ToastView: FloatingPanelView {
         icon.contentTintColor = Tokens.Color.icon
         addSubview(icon)
         addSubview(label)
+        addSubview(actionButton)
+        actionButton.textColor = Tokens.Color.accent
+        actionButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -271,7 +275,8 @@ final class ToastView: FloatingPanelView {
     static let height = Tokens.Space.x8 + Tokens.Space.x1
 
     var fittingWidth: CGFloat {
-        Tokens.Space.x3 + (icon.image == nil ? 0 : Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth + Tokens.Space.x3
+        Tokens.Space.x3 + (icon.image == nil ? 0 : Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth
+            + (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1 + actionButton.fittingWidth + Tokens.Space.x1)
     }
 
     private func layoutContent() {
@@ -281,15 +286,20 @@ final class ToastView: FloatingPanelView {
             x = icon.frame.maxX + Tokens.Space.x2
         }
         let h = label.lineHeight
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: bounds.width - x - Tokens.Space.x3, height: h)
+        let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
+        if !actionButton.isHidden {
+            actionButton.frame = NSRect(x: bounds.width - Tokens.Space.x1 - actionWidth, y: (bounds.height - Tokens.Space.x6) / 2, width: actionWidth, height: Tokens.Space.x6)
+        }
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
     }
 }
 
 enum Toast {
     private static weak var current: ToastView?
-    private static let hide = Debouncer(delay: 1.3)
+    private static var hideWork: DispatchWorkItem?
 
-    static func show(_ text: String, symbol: String? = nil, in controller: BrowserWindowController) {
+    static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
+                     duration: TimeInterval = 1.3, in controller: BrowserWindowController) {
         let toast: ToastView
         let isNew: Bool
         if let existing = current, existing.superview === controller.root.overlay {
@@ -302,6 +312,14 @@ enum Toast {
         }
         toast.label.stringValue = text
         toast.icon.image = symbol.map { Tokens.Symbol.image($0) }
+        toast.actionButton.isHidden = action == nil
+        if let action {
+            toast.actionButton.title = action.title
+            toast.actionButton.onClick = { [weak toast] _ in
+                action.run()
+                toast?.dismiss(always: true)
+            }
+        }
         let width = ceil(toast.fittingWidth)
         let card = controller.root.cardFrame
         // Top center of the page: where your eyes already are, clear of the content you're reading.
@@ -319,6 +337,20 @@ enum Toast {
             toast.layer?.add(pulse, forKey: "pulse")
         }
         current = toast
-        hide.call { [weak toast] in toast?.dismiss(always: true) }
+        hideWork?.cancel()
+        // Toasts with an action wait for the pointer to leave before going.
+        let work = DispatchWorkItem { [weak toast] in
+            MainActor.assumeIsolated {
+                guard let toast, toast.superview != nil else { return }
+                if action != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
+                    Toast.hideWork = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak toast] in toast?.dismiss(always: true) }
+                    return
+                }
+                toast.dismiss(always: true)
+            }
+        }
+        hideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
     }
 }
