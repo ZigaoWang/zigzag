@@ -1,0 +1,141 @@
+import AppKit
+import WebKit
+
+final class DownloadItem {
+    enum State: Equatable { case downloading, finished, failed, cancelled }
+
+    let id = UUID()
+    fileprivate(set) var filename: String
+    fileprivate(set) var destination: URL?
+    fileprivate(set) var state: State = .downloading
+    fileprivate(set) var fractionCompleted: Double = 0
+    fileprivate(set) var totalBytes: Int64 = 0
+    fileprivate(set) var completedBytes: Int64 = 0
+    let started = Date()
+    fileprivate weak var download: WKDownload?
+    fileprivate var progressObservation: NSKeyValueObservation?
+    fileprivate var resumeData: Data?
+    fileprivate let sourceURL: URL?
+
+    init(filename: String, sourceURL: URL?) {
+        self.filename = filename
+        self.sourceURL = sourceURL
+    }
+}
+
+/// Files downloaded from pages. Saved straight to ~/Downloads, no questions asked.
+final class DownloadManager: NSObject {
+    static let shared = DownloadManager()
+
+    private(set) var items: [DownloadItem] = []
+    let changed = Signal<DownloadItem?>()
+
+    var activeCount: Int { items.filter { $0.state == .downloading }.count }
+    var overallProgress: Double {
+        let active = items.filter { $0.state == .downloading }
+        guard !active.isEmpty else { return 1 }
+        return active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
+    }
+
+    func track(_ download: WKDownload, window: NSWindow?) {
+        download.delegate = self
+        let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url)
+        item.download = download
+        item.progressObservation = download.progress.observe(\.fractionCompleted) { [weak self, weak item] progress, _ in
+            let fraction = progress.fractionCompleted
+            let completed = progress.completedUnitCount
+            let total = progress.totalUnitCount
+            DispatchQueue.main.async {
+                guard let item else { return }
+                item.fractionCompleted = fraction
+                item.completedBytes = completed
+                item.totalBytes = total
+                self?.changed.send(item)
+            }
+        }
+        items.insert(item, at: 0)
+        changed.send(item)
+    }
+
+    private func item(for download: WKDownload) -> DownloadItem? {
+        items.first { $0.download === download }
+    }
+
+    func cancel(_ item: DownloadItem) {
+        item.download?.cancel { [weak self] data in
+            MainActor.assumeIsolated {
+                item.resumeData = data
+                item.state = .cancelled
+                self?.changed.send(item)
+            }
+        }
+    }
+
+    func reveal(_ item: DownloadItem) {
+        guard let url = item.destination else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func open(_ item: DownloadItem) {
+        guard let url = item.destination, item.state == .finished else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    func remove(_ item: DownloadItem) {
+        if item.state == .downloading { cancel(item) }
+        items.removeAll { $0 === item }
+        changed.send(nil)
+    }
+
+    func clearFinished() {
+        items.removeAll { $0.state != .downloading }
+        changed.send(nil)
+    }
+
+    static func uniqueDestination(for filename: String) -> URL {
+        let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        let safe = filename.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        let base = (safe as NSString).deletingPathExtension
+        let ext = (safe as NSString).pathExtension
+        var candidate = folder.appendingPathComponent(safe)
+        var n = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            let name = ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)"
+            candidate = folder.appendingPathComponent(name)
+            n += 1
+        }
+        return candidate
+    }
+}
+
+extension DownloadManager: WKDownloadDelegate {
+    func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
+        let destination = Self.uniqueDestination(for: suggestedFilename.isEmpty ? "Download" : suggestedFilename)
+        if let item = item(for: download) {
+            item.filename = destination.lastPathComponent
+            item.destination = destination
+            changed.send(item)
+        }
+        return destination
+    }
+
+    func downloadDidFinish(_ download: WKDownload) {
+        guard let item = item(for: download) else { return }
+        item.state = .finished
+        item.fractionCompleted = 1
+        item.progressObservation = nil
+        if let destination = item.destination {
+            // Bounce the Downloads stack in the Dock, like every Mac browser.
+            DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
+        }
+        changed.send(item)
+    }
+
+    func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        guard let item = item(for: download) else { return }
+        item.resumeData = resumeData
+        item.progressObservation = nil
+        if item.state != .cancelled { item.state = .failed }
+        changed.send(item)
+    }
+}

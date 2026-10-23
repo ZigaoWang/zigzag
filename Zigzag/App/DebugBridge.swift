@@ -1,0 +1,106 @@
+import AppKit
+
+/// Debug builds only: lets scripts drive the UI (for screenshots and testing) via distributed notifications.
+/// `xcrun swift -e` or the bundled `zz` script posts "app.zigzag.debug" with a command string.
+enum DebugBridge {
+    static var hovered: [NSView] = []
+
+    static func start() {
+        #if DEBUG
+        DistributedNotificationCenter.default().addObserver(forName: .init("app.zigzag.debug"), object: nil, queue: .main) { note in
+            let command = (note.object as? String) ?? ""
+            MainActor.assumeIsolated { run(command) }
+        }
+        #endif
+    }
+
+    static func run(_ command: String) {
+        let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
+        guard let name = parts.first else { return }
+        let arg = parts.count > 1 ? parts[1] : ""
+        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        NSApp.activate()
+        controller.window?.makeKeyAndOrderFront(nil)
+        switch name {
+        case "open": if let url = URL(string: arg) { controller.open(url, disposition: .foregroundTab, allowSwitch: false) }
+        case "bg": if let url = URL(string: arg) { controller.open(url, disposition: .backgroundTab, allowSwitch: false) }
+        case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
+        case "sidebar": controller.toggleSidebar(nil)
+        case "reveal": controller.root.reveal(true)
+        case "commandbar": controller.commandBar.show(mode: .newTab); if !arg.isEmpty { controller.commandBar.debugType(arg) }
+        case "select": controller.tabManager.select(at: Int(arg) ?? 0)
+        case "space": controller.tabManager.switchSpace(by: Int(arg) ?? 1)
+        case "newspace":
+            let space = Library.shared.addSpace(name: arg.isEmpty ? nil : arg)
+            controller.tabManager.switchToSpace(space.id)
+        case "bookmark": if let tab = controller.tabManager.selectedTab { controller.tabManager.bookmarkTab(tab) }
+        case "hover": controller.debugHover(index: Int(arg) ?? 0)
+        case "desk": controller.toggleDeskView(nil)
+        case "find": controller.findBar.show(query: arg)
+        case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
+        case "switcher": controller.debugSwitcher()
+        case "appearance":
+            NSApp.appearance = arg == "dark" ? NSAppearance(named: .darkAqua) : arg == "light" ? NSAppearance(named: .aqua) : nil
+        case "resize":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2, let window = controller.window {
+                var frame = window.frame
+                frame.size = NSSize(width: n[0], height: n[1])
+                window.setFrame(frame, display: true)
+            }
+        case "age":
+            // Pretend the tab at index was last looked at N hours ago, to see fading.
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2, controller.tabManager.currentTabs.indices.contains(Int(n[0])) {
+                controller.tabManager.currentTabs[Int(n[0])].lastActivated = Date().addingTimeInterval(-n[1] * 3600)
+                controller.sidebar.list.refreshRows()
+            }
+        case "windowid":
+            if let window = controller.window {
+                let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+                let topLeftY = screenHeight - window.frame.maxY
+                let info = "\(window.windowNumber) \(ProcessInfo.processInfo.processIdentifier) \(Int(window.frame.minX)) \(Int(topLeftY))"
+                try? info.write(toFile: arg, atomically: true, encoding: .utf8)
+            }
+        case "dump":
+            var out = ""
+            func walk(_ v: NSView, _ depth: Int) {
+                out += String(repeating: "  ", count: depth) + "\(type(of: v)) \(v.frame) hidden=\(v.isHidden) alpha=\(v.alphaValue)\n"
+                if depth < 6 { v.subviews.forEach { walk($0, depth + 1) } }
+            }
+            if let frameView = controller.window?.contentView?.superview { walk(frameView, 0) }
+            try? out.write(toFile: arg, atomically: true, encoding: .utf8)
+        case "tl":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2 { (controller.window as? BrowserWindow)?.trafficLightOrigin = NSPoint(x: n[0], y: n[1]) }
+        case "mouse":
+            // mouse <down|drag|up|move|click|rclick> x y  (window points, top-left origin)
+            let f = arg.split(separator: " ").map(String.init)
+            guard f.count == 3, let x = Double(f[1]), let y = Double(f[2]), let window = controller.window else { break }
+            let point = NSPoint(x: x, y: window.frame.height - y)
+            func post(_ type: NSEvent.EventType, clicks: Int = 1) {
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1) {
+                    NSApp.postEvent(event, atStart: false)
+                }
+            }
+            switch f[0] {
+            case "down": post(.leftMouseDown)
+            case "drag": post(.leftMouseDragged)
+            case "up": post(.leftMouseUp)
+            case "click": post(.leftMouseDown); post(.leftMouseUp)
+            case "rclick": post(.rightMouseDown); post(.rightMouseUp)
+            case "move", "hover":
+                // Tracking areas follow the real cursor, so hover is simulated by telling the view directly.
+                var view = window.contentView?.hitTest(point)
+                while let v = view, !(v is InteractiveView) { view = v.superview }
+                for case let other as InteractiveView in DebugBridge.hovered where other !== view { other.isHovered = false }
+                if let v = view as? InteractiveView { v.isHovered = true; DebugBridge.hovered = [v] } else { DebugBridge.hovered = [] }
+            default: break
+            }
+        case "save": WindowManager.shared.saveNow()
+        case "quit": NSApp.terminate(nil)
+        default: break
+        }
+    }
+}

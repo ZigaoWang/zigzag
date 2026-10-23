@@ -1,0 +1,281 @@
+import AppKit
+import WebKit
+
+/// Menu actions. Every one of these is reachable from the menu bar with its shortcut shown.
+extension BrowserWindowController: NSMenuItemValidation {
+    var selectedTab: Tab? { tabManager.selectedTab }
+    var selectedWebView: WKWebView? { selectedTab?.webView }
+
+    // MARK: File
+
+    @objc func newTab(_ sender: Any?) { commandBar.show(mode: .newTab) }
+    @objc func openLocation(_ sender: Any?) { commandBar.show(mode: .editCurrent) }
+    @objc func closeTab(_ sender: Any?) {
+        if commandBar.isVisible { commandBar.dismiss(); return }
+        if dismissFloatingContent() { return }
+        guard let tab = selectedTab else {
+            window?.performClose(sender)
+            return
+        }
+        tabManager.close(tab)
+    }
+    @objc func closeWindow(_ sender: Any?) { window?.performClose(sender) }
+    @objc func reopenClosedTab(_ sender: Any?) { tabManager.reopenClosedTab() }
+
+    @objc func openDocument(_ sender: Any?) {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.html, .pdf, .webArchive, .image, .plainText, .svg]
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            self?.tabManager.newTab(url: url)
+        }
+    }
+
+    @objc func printPage(_ sender: Any?) {
+        guard let webView = selectedWebView, let window else { return }
+        let info = NSPrintInfo.shared.copy() as! NSPrintInfo
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        info.isHorizontallyCentered = false
+        info.isVerticallyCentered = false
+        info.topMargin = 36; info.bottomMargin = 36; info.leftMargin = 36; info.rightMargin = 36
+        let operation = webView.printOperation(with: info)
+        operation.view?.frame = webView.bounds
+        operation.showsPrintPanel = true
+        operation.showsProgressPanel = true
+        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
+
+    @objc func exportAsPDF(_ sender: Any?) {
+        guard let webView = selectedWebView, let window, let tab = selectedTab else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = tab.displayTitle.replacingOccurrences(of: "/", with: "-") + ".pdf"
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            webView.createPDF { result in
+                if case .success(let data) = result { try? data.write(to: url) }
+            }
+        }
+    }
+
+    // MARK: Edit
+
+    @objc func copyPageURL(_ sender: Any?) {
+        guard let url = selectedTab?.url else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        Toast.show("Copied link", in: self)
+    }
+
+    @objc func copyPageURLAsMarkdown(_ sender: Any?) {
+        guard let tab = selectedTab, let url = tab.url else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("[\(tab.displayTitle)](\(url.absoluteString))", forType: .string)
+        Toast.show("Copied link as Markdown", in: self)
+    }
+
+    @objc func showFindBar(_ sender: Any?) { findBar.show() }
+    @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
+    @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
+    @objc func useSelectionForFind(_ sender: Any?) {
+        selectedWebView?.evaluateJavaScript("window.getSelection().toString()") { [weak self] result, _ in
+            MainActor.assumeIsolated {
+                guard let text = result as? String, !text.isEmpty else { return }
+                self?.findBar.show(query: text)
+            }
+        }
+    }
+
+    // MARK: View
+
+    @objc func toggleSidebar(_ sender: Any?) {
+        root.setSidebarVisible(!root.sidebarVisible, animated: true)
+        onStateChange?()
+    }
+
+    @objc func reloadPage(_ sender: Any?) { selectedTab?.reload() }
+    @objc func reloadPageFromOrigin(_ sender: Any?) { selectedTab?.reloadFromOrigin() }
+    @objc func stopLoading(_ sender: Any?) { selectedTab?.stopLoading() }
+
+    private static let zoomSteps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
+
+    @objc func zoomIn(_ sender: Any?) {
+        guard let webView = selectedWebView else { return }
+        let next = Self.zoomSteps.first { $0 > webView.pageZoom + 0.001 } ?? Self.zoomSteps.last!
+        setZoom(next)
+    }
+
+    @objc func zoomOut(_ sender: Any?) {
+        guard let webView = selectedWebView else { return }
+        let next = Self.zoomSteps.last { $0 < webView.pageZoom - 0.001 } ?? Self.zoomSteps.first!
+        setZoom(next)
+    }
+
+    @objc func actualSize(_ sender: Any?) {
+        setZoom(1)
+        selectedWebView?.magnification = 1
+    }
+
+    private func setZoom(_ zoom: CGFloat) {
+        guard let webView = selectedWebView, let url = selectedTab?.url else { return }
+        webView.pageZoom = zoom
+        ZoomLevels.set(zoom, for: url)
+        Toast.show("\(Int((zoom * 100).rounded()))%", in: self)
+    }
+
+    @objc func showWebInspector(_ sender: Any?) {
+        guard let webView = selectedWebView else { return }
+        // There is no public API to open the inspector; WebKit's private one is stable and widely used.
+        let inspectorSelector = NSSelectorFromString("_inspector")
+        guard webView.responds(to: inspectorSelector),
+              let inspector = webView.perform(inspectorSelector)?.takeUnretainedValue() as? NSObject else { return }
+        let show = NSSelectorFromString("show")
+        if inspector.responds(to: show) { inspector.perform(show) }
+    }
+
+    @objc func viewSource(_ sender: Any?) {
+        guard let url = selectedTab?.url, url.scheme?.hasPrefix("http") == true else { return }
+        selectedWebView?.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] result, _ in
+            MainActor.assumeIsolated {
+                guard let html = result as? String, let self else { return }
+                let escaped = html.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+                let page = "<!doctype html><meta charset=utf-8><title>Source of \(url.host() ?? "")</title><style>:root{color-scheme:light dark}body{margin:16px;font:12px ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}</style>\(escaped)"
+                let tab = self.tabManager.newTab(url: nil, title: "Source of \(url.host() ?? "page")")
+                tab.ensureWebView().loadHTMLString(page, baseURL: nil)
+            }
+        }
+    }
+
+    @objc func toggleDeskView(_ sender: Any?) { desk.toggle() }
+
+    // MARK: History
+
+    @objc func goBack(_ sender: Any?) {
+        if let peek = peekController, peek.isVisible { peek.goBack(); return }
+        selectedTab?.goBack()
+    }
+    @objc func goForward(_ sender: Any?) {
+        if let peek = peekController, peek.isVisible { peek.goForward(); return }
+        selectedTab?.goForward()
+    }
+    @objc func searchHistory(_ sender: Any?) { commandBar.show(mode: .history) }
+
+    // MARK: Bookmarks
+
+    @objc func toggleBookmark(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        if let bookmarkID = tab.bookmarkID {
+            tabManager.unbookmark(bookmarkID)
+            Toast.show("Removed bookmark", in: self)
+        } else {
+            tabManager.bookmarkTab(tab)
+            Toast.show("Bookmarked", in: self)
+        }
+    }
+
+    // MARK: Tabs
+
+    @objc func selectNextTab(_ sender: Any?) { tabManager.selectNext(offset: 1) }
+    @objc func selectPreviousTab(_ sender: Any?) { tabManager.selectNext(offset: -1) }
+    @objc func selectTabByNumber(_ sender: NSMenuItem) {
+        // Cmd+9 always means the last tab, like every browser.
+        if sender.tag == 9 { tabManager.select(at: Int.max) } else { tabManager.select(at: sender.tag - 1) }
+    }
+    @objc func duplicateTab(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        let copy = tabManager.newTab(url: nil, title: tab.displayTitle)
+        if let state = tab.interactionStateForSaving {
+            copy.ensureWebView().interactionState = state as NSData
+        } else if let url = tab.url {
+            copy.load(url)
+        }
+    }
+    @objc func toggleMute(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        tab.setMuted(!tab.isMuted)
+    }
+    @objc func closeOtherTabs(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        tabManager.close(tabManager.currentTabs.filter { $0 !== tab })
+    }
+    @objc func closeTabsBelow(_ sender: Any?) {
+        guard let tab = selectedTab, let index = tabManager.currentTabs.firstIndex(where: { $0 === tab }) else { return }
+        tabManager.close(Array(tabManager.currentTabs.dropFirst(index + 1)))
+    }
+
+    // MARK: Spaces
+
+    @objc func nextSpace(_ sender: Any?) { tabManager.switchSpace(by: 1) }
+    @objc func previousSpace(_ sender: Any?) { tabManager.switchSpace(by: -1) }
+    @objc func selectSpaceByNumber(_ sender: NSMenuItem) {
+        let spaces = Library.shared.spaces
+        let index = sender.tag - 1
+        guard spaces.indices.contains(index) else { return }
+        tabManager.switchToSpace(spaces[index].id)
+    }
+    @objc func newSpace(_ sender: Any?) {
+        let space = Library.shared.addSpace()
+        tabManager.switchToSpace(space.id)
+        renameSpace(nil)
+    }
+    @objc func renameSpace(_ sender: Any?) {
+        SpaceEditor.rename(spaceID: tabManager.currentSpaceID, in: self)
+    }
+
+    // MARK: Validation
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let tab = selectedTab
+        switch item.action {
+        case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBack ?? false)
+        case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
+        case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
+             #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
+             #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(viewSource(_:)), #selector(duplicateTab(_:)),
+             #selector(useSelectionForFind(_:)):
+            return tab != nil
+        case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)):
+            return tab != nil && findBar.hasQuery
+        case #selector(stopLoading(_:)): return tab?.isLoading ?? false
+        case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
+        case #selector(toggleSidebar(_:)):
+            item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
+            return true
+        case #selector(toggleBookmark(_:)):
+            item.title = tab?.bookmarkID != nil ? "Remove Bookmark" : "Bookmark This Page"
+            return tab?.url != nil
+        case #selector(toggleMute(_:)):
+            item.title = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
+            return tab != nil
+        case #selector(closeOtherTabs(_:)), #selector(closeTabsBelow(_:)): return tab != nil && tab?.bookmarkID == nil
+        case #selector(selectSpaceByNumber(_:)):
+            let spaces = Library.shared.spaces
+            let index = item.tag - 1
+            item.isHidden = !spaces.indices.contains(index)
+            if spaces.indices.contains(index) { item.title = spaces[index].name }
+            item.state = spaces.indices.contains(index) && spaces[index].id == tabManager.currentSpaceID ? .on : .off
+            return spaces.indices.contains(index)
+        case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return Library.shared.spaces.count > 1
+        default: return true
+        }
+    }
+}
+
+/// Per-site zoom, remembered.
+enum ZoomLevels {
+    private static let key = "ZoomLevels"
+
+    static func zoom(for url: URL) -> CGFloat {
+        let levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        return CGFloat(levels[HistoryStore.normalizedHost(url)] ?? 1)
+    }
+
+    static func set(_ zoom: CGFloat, for url: URL) {
+        var levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        let host = HistoryStore.normalizedHost(url)
+        if abs(zoom - 1) < 0.001 { levels[host] = nil } else { levels[host] = Double(zoom) }
+        UserDefaults.standard.set(levels, forKey: key)
+    }
+}
