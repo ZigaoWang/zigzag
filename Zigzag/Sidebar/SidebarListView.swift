@@ -85,8 +85,8 @@ final class SidebarListView: NSView {
         var targetIndex: Int
         var hoverSpace: UUID?
         let panel: NSPanel
-        /// A tab row the dragged tab is over the right half of: dropping opens them side by side.
-        var splitTarget: UUID?
+        /// A tab row the dragged tab rests on: dropping opens them side by side.
+        var splitTarget: SplitDrop?
     }
 
     /// The bookmark area (and its drop zone) opens only once a drag heads up toward it, so rows don't jump when a drag starts.
@@ -485,16 +485,37 @@ final class SidebarListView: NSView {
         return true
     }
 
-    /// The tab whose row's right half is under the point, if dropping there would make a split.
-    private func splitTarget(at point: NSPoint, dragging item: SidebarItem) -> UUID? {
+    struct SplitDrop: Equatable {
+        let id: UUID
+        let onRight: Bool
+    }
+
+    /// The tab row whose middle the pointer is over, and which half: where a split would open.
+    /// The row's top and bottom edges stay free for reordering.
+    private func splitTarget(at point: NSPoint, dragging item: SidebarItem) -> SplitDrop? {
         guard case .tab(let draggedID) = item, let manager else { return nil }
         for (candidate, view) in rows {
             guard case .tab(let id) = candidate, id != draggedID, let row = view as? TabRowView, row.partner == nil,
-                  view.frame.insetBy(dx: 0, dy: 4).contains(point) else { continue }
-            let tab = manager.tab(with: id)
-            return point.x > view.frame.minX + view.frame.width * 0.45 && tab?.url != nil ? id : nil
+                  view.frame.insetBy(dx: 0, dy: 7).contains(point), manager.tab(with: id)?.url != nil else { continue }
+            return SplitDrop(id: id, onRight: point.x > view.frame.midX)
         }
         return nil
+    }
+
+    /// The row the pointer is resting on; it becomes a split target after a short pause.
+    private var splitCandidate: SplitDrop?
+    private var splitWork: DispatchWorkItem?
+
+    private func showSplitTarget(_ target: SplitDrop?) {
+        drag?.splitTarget = target
+        // One hint at a time: the gap stays, its line hides while a split is on offer.
+        if let line = rows[.placeholder] {
+            Tokens.Motion.animate(Tokens.Motion.feedback) { line.animator().alphaValue = target == nil ? 1 : 0 }
+        }
+        for (item, view) in rows {
+            guard let row = view as? TabRowView else { continue }
+            row.splitDropSide = target.flatMap { item == .tab($0.id) ? ($0.onRight ? 1 : 0) : nil }
+        }
     }
 
     private weak var externalTarget: SidebarListView?
@@ -547,24 +568,46 @@ final class SidebarListView: NSView {
 
         var section: Section? = nil
         var index = drag.targetIndex
-        var splitTarget: UUID?
+        var candidate: SplitDrop?
         if let (_, list) = hit, list === self, !overFavorites {
             autoscroll(with: event)
             let point = convert(window.convertPoint(fromScreen: mouse), from: nil)
             if !bookmarkZoneOpen, let newTab = rows[.newTab], point.y < newTab.frame.maxY {
                 bookmarkZoneOpen = true
             }
-            splitTarget = self.splitTarget(at: point, dragging: drag.item)
-            if splitTarget == nil {
+            candidate = self.splitTarget(at: point, dragging: drag.item)
+            if candidate == nil {
                 (section, index) = target(at: point.y, dragging: drag.item)
             } else {
                 // Hold the gap still so the row under the pointer doesn't move away.
                 (section, index) = (drag.targetSection, drag.targetIndex)
             }
         }
-        if splitTarget != drag.splitTarget {
-            for (item, view) in rows { (view as? TabRowView)?.showsSplitDrop = item == splitTarget.map { .tab($0) } }
-            drag.splitTarget = splitTarget
+        if candidate != splitCandidate {
+            splitCandidate = candidate
+            splitWork?.cancel()
+            if let active = drag.splitTarget, let candidate, active.id == candidate.id {
+                // Already split-targeting this row: switching halves is immediate.
+                drag.splitTarget = candidate
+                self.drag = drag
+                showSplitTarget(candidate)
+            } else {
+                drag.splitTarget = nil
+                self.drag = drag
+                showSplitTarget(nil)
+                if let candidate {
+                    let work = DispatchWorkItem { [weak self] in
+                        MainActor.assumeIsolated {
+                            guard let self, self.drag != nil, self.splitCandidate == candidate else { return }
+                            self.showSplitTarget(candidate)
+                        }
+                    }
+                    splitWork = work
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+                }
+            }
+            guard let refreshed = self.drag else { return }
+            drag = refreshed
         }
 
         // Carry the tab to the sidebar's left or right edge and hold: the space flips that way.
@@ -616,7 +659,9 @@ final class SidebarListView: NSView {
         edgeDirection = nil
         drag.panel.orderOut(nil)
         drag.view.alphaValue = 1
-        for view in rows.values { (view as? TabRowView)?.showsSplitDrop = false }
+        splitWork?.cancel()
+        splitCandidate = nil
+        for view in rows.values { (view as? TabRowView)?.splitDropSide = nil }
 
         // Onto the favorites grid.
         if case .tab(let id) = drag.item, let tab = manager.tab(with: id), delegate?.listDropOnFavorites(tab) == true {
@@ -627,9 +672,9 @@ final class SidebarListView: NSView {
         }
 
         // Onto another tab's row: the two open side by side.
-        if case .tab(let id) = drag.item, let targetID = drag.splitTarget,
-           let tab = manager.tab(with: id), let target = manager.tab(with: targetID) {
-            manager.makeSplit(target, with: tab)
+        if case .tab(let id) = drag.item, let split = drag.splitTarget,
+           let tab = manager.tab(with: id), let target = manager.tab(with: split.id) {
+            manager.makeSplit(target, with: tab, otherOnRight: split.onRight)
             reload(animated: true)
             return
         }

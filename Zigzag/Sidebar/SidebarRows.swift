@@ -102,12 +102,20 @@ final class TabRowView: SidebarRowView {
     private let divider = ColorView(color: Tokens.Color.separator)
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
-    var showsSplitDrop = false {
+    /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
+    var splitDropSide: Int? {
         didSet {
-            guard oldValue != showsSplitDrop else { return }
-            needsLayout = true
-            Tokens.Motion.animate(Tokens.Motion.feedback) { self.dropHalf.animator().alphaValue = self.showsSplitDrop ? 1 : 0 }
+            guard oldValue != splitDropSide else { return }
+            layoutDropHalf()
+            Tokens.Motion.animate(Tokens.Motion.feedback) { self.dropHalf.animator().alphaValue = self.splitDropSide == nil ? 0 : 1 }
         }
+    }
+
+    private func layoutDropHalf() {
+        let inset: CGFloat = 3
+        let width = bounds.width / 2 - inset
+        let x = splitDropSide == 0 ? inset : bounds.midX
+        Tokens.Motion.withoutAnimation { dropHalf.frame = NSRect(x: x, y: inset, width: width, height: bounds.height - inset * 2) }
     }
 
     override init(frame: NSRect) {
@@ -227,8 +235,7 @@ final class TabRowView: SidebarRowView {
         closeButton.frame.origin = NSPoint(x: x, y: y)
         if !closeButton.isHidden { x -= size.width + Tokens.Space.x1 }
         audioButton.frame.origin = NSPoint(x: x, y: y)
-        let inset: CGFloat = 3
-        dropHalf.frame = NSRect(x: bounds.midX, y: inset, width: bounds.width / 2 - inset, height: bounds.height - inset * 2)
+        layoutDropHalf()
 
         // A split shows both pages in one row: left half, a hairline, right half.
         guard partner != nil else { return }
