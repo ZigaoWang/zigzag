@@ -84,6 +84,30 @@ final class BrowserRootView: ColorView {
     /// Share of the page area the left pane takes; nil when not split.
     var splitRatio: CGFloat? { didSet { needsLayout = true } }
     var splitVertical = false { didSet { needsLayout = true; splitHandle.isVertical = splitVertical } }
+
+    /// Opens, closes or rotates the split. The pages slide to their new places; the new pane fades in beside.
+    func setSplit(ratio: CGFloat?, vertical: Bool, animated: Bool) {
+        let wasSplit = splitRatio != nil
+        guard ratio != splitRatio || vertical != splitVertical else { return }
+        let oldLeft = card.frame
+        splitRatio = ratio
+        splitVertical = vertical
+        guard animated, !Tokens.Motion.isKeyboardDriven, window != nil else { needsLayout = true; return }
+        layoutSubtreeIfNeeded()
+        let panes = paneFrames
+        card.frame = oldLeft
+        if let right = panes.right, !wasSplit {
+            secondCard.alphaValue = 0
+            secondCard.frame = vertical ? right.offsetBy(dx: 0, dy: Tokens.Space.x6) : right.offsetBy(dx: Tokens.Space.x6, dy: 0)
+        }
+        Tokens.Motion.animate(Tokens.Motion.gentle) {
+            self.card.animator().frame = panes.left
+            if let right = panes.right {
+                self.secondCard.animator().frame = right
+                self.secondCard.animator().alphaValue = 1
+            }
+        }
+    }
     var onSplitRatioChange: ((CGFloat, Bool) -> Void)?
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
