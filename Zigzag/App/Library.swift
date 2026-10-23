@@ -13,20 +13,23 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var bookmarks: [Bookmark] = []
     /// A custom tint picked on the hue slider (0…1). Overrides `color` when set.
     var hue: Double? = nil
+    /// How strong a custom tint is (0 = barely there, 1 = rich). Only used with `hue`.
+    var intensity: Double? = nil
 
     /// The window frame color for this space.
-    var background: NSColor { hue.map(SpaceColor.background(hue:)) ?? color.background }
+    var background: NSColor { hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background }
     /// The strong version, for dots and swatches.
     var swatch: NSColor { hue.map(SpaceColor.swatch(hue:)) ?? color.swatch }
 }
 
 enum SearchEngine: String, Codable, CaseIterable {
-    case google, duckDuckGo, bing, kagi, ecosia
+    case google, duckDuckGo, brave, bing, kagi, ecosia
 
     var name: String {
         switch self {
         case .google: "Google"
         case .duckDuckGo: "DuckDuckGo"
+        case .brave: "Brave Search"
         case .bing: "Bing"
         case .kagi: "Kagi"
         case .ecosia: "Ecosia"
@@ -38,12 +41,25 @@ enum SearchEngine: String, Codable, CaseIterable {
         switch self {
         case .google: components = URLComponents(string: "https://www.google.com/search")!
         case .duckDuckGo: components = URLComponents(string: "https://duckduckgo.com/")!
+        case .brave: components = URLComponents(string: "https://search.brave.com/search")!
         case .bing: components = URLComponents(string: "https://www.bing.com/search")!
         case .kagi: components = URLComponents(string: "https://kagi.com/search")!
         case .ecosia: components = URLComponents(string: "https://www.ecosia.org/search")!
         }
         components.queryItems = [URLQueryItem(name: "q", value: query)]
         return components.url!
+    }
+
+    /// The engine's home page, for its icon.
+    var homeURL: URL {
+        switch self {
+        case .google: URL(string: "https://www.google.com")!
+        case .duckDuckGo: URL(string: "https://duckduckgo.com")!
+        case .brave: URL(string: "https://search.brave.com")!
+        case .bing: URL(string: "https://www.bing.com")!
+        case .kagi: URL(string: "https://kagi.com")!
+        case .ecosia: URL(string: "https://www.ecosia.org")!
+        }
     }
 
     func suggestionsURL(_ query: String) -> URL? {
@@ -55,6 +71,9 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .duckDuckGo:
             components = URLComponents(string: "https://duckduckgo.com/ac/")!
             components.queryItems = [.init(name: "type", value: "list"), .init(name: "q", value: query)]
+        case .brave:
+            components = URLComponents(string: "https://search.brave.com/api/suggest")!
+            components.queryItems = [.init(name: "q", value: query)]
         case .bing:
             components = URLComponents(string: "https://api.bing.com/osjson.aspx")!
             components.queryItems = [.init(name: "query", value: query)]
@@ -143,12 +162,14 @@ final class Library {
         guard let i = index(of: id) else { return }
         spaces[i].color = color
         spaces[i].hue = nil
+        spaces[i].intensity = nil
         commit()
     }
 
-    func setHue(_ hue: Double, for id: UUID) {
+    func setHue(_ hue: Double, intensity: Double? = nil, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].hue = hue
+        if let intensity { spaces[i].intensity = intensity }
         commit()
     }
 

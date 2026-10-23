@@ -296,6 +296,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func build() {
         engine.addItems(withTitles: SearchEngine.allCases.map(\.name))
+        for (item, engine) in zip(engine.itemArray, SearchEngine.allCases) {
+            if let icon = FaviconStore.shared.cachedIcon(for: engine.homeURL) { item.image = icon } else { FaviconStore.shared.prefetch(for: engine.homeURL) }
+        }
         engine.target = self
         engine.action = #selector(engineChanged)
         defaultButton.target = self
@@ -382,6 +385,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func refresh() {
+        for (item, engine) in zip(engine.itemArray, SearchEngine.allCases) where item.image == nil {
+            item.image = FaviconStore.shared.cachedIcon(for: engine.homeURL)
+        }
         engine.selectItem(withTitle: Library.shared.searchEngine.name)
         let isDefault = Self.isDefaultBrowser
         defaultStatus.stringValue = "Zigzag opens your links"
