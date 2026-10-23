@@ -158,7 +158,6 @@ final class SidebarView: NSView {
         addSubview(address)
 
         scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.scrollerStyle = .overlay
         scrollView.autohidesScrollers = true
@@ -167,7 +166,8 @@ final class SidebarView: NSView {
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.documentView = list
-        scrollView.useSlimScroller()
+        // Like Arc, the sidebar scrolls without showing a scroll bar.
+        scrollView.hasVerticalScroller = false
         addSubview(scrollView)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
