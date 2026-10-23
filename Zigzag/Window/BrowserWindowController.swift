@@ -536,6 +536,14 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
+    func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool {
+        guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return false }
+        tabManager.detach(tab)
+        controller.tabManager.insert(tab, at: index)
+        controller.window?.makeKeyAndOrderFront(nil)
+        return true
+    }
+
     func listSwitchSpaceDuringDrag(_ spaceID: UUID) {
         // Switch without changing the selected tab, so the page doesn't jump while you drag.
         tabManager.showSpaceKeepingPage(spaceID)

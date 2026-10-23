@@ -18,6 +18,10 @@ protocol SidebarListDelegate: AnyObject {
     func listUnbookmark(_ bookmarkID: UUID, to index: Int)
     /// While dragging, hovering a space's dot opens that space so the tab can be dropped into place.
     func listSwitchSpaceDuringDrag(_ spaceID: UUID)
+    /// A tab dropped outside the window: into another window, or a new one. Returns true if handled.
+    func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool
+    /// A tab dropped into another window's sidebar at an index. Returns true if handled.
+    func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
 }
 
 enum SidebarItem: Hashable {
@@ -65,13 +69,17 @@ final class SidebarListView: NSView {
     struct DragState {
         let item: SidebarItem
         let view: NSView
-        var grabOffset: CGFloat
-        var targetSection: Section
+        /// Pointer position relative to the floating row's corner, in screen points.
+        var grab: NSPoint
+        /// Where it would land in this list; nil while the pointer is somewhere else.
+        var targetSection: Section?
         var targetIndex: Int
         var hoverSpace: UUID?
-        /// Where horizontal travel is measured from; reset after each space change.
-        var anchorX: CGFloat
+        let panel: NSPanel
     }
+
+    /// A tab being carried in from another window: where its gap opens in this list.
+    private var externalIndex: Int?
 
     enum Section { case bookmarks, tabs }
 
@@ -116,7 +124,7 @@ final class SidebarListView: NSView {
     func reload(animated: Bool) {
         guard drag == nil else { return }
         items = buildItems()
-        apply(items: items, animated: animated)
+        apply(items: displayItems(), animated: animated)
     }
 
     private func apply(items displayed: [SidebarItem], animated: Bool) {
@@ -306,31 +314,44 @@ final class SidebarListView: NSView {
     }
 
     // MARK: Dragging
+    //
+    // The dragged row lifts into its own small floating window, so it moves freely above everything:
+    // within the list, across spaces (hold over a dot), into another Zigzag window, or out to make a new one.
 
     private func displayItems() -> [SidebarItem] {
-        guard let drag else { return items }
-        var base = buildItems(includeEmptyBookmarkSection: true).filter { $0 != drag.item }
-        switch drag.targetSection {
+        if let drag {
+            return withPlaceholder(buildItems(includeEmptyBookmarkSection: drag.targetSection != nil).filter { $0 != drag.item },
+                                   section: drag.targetSection, index: drag.targetIndex)
+        }
+        if let externalIndex { return withPlaceholder(buildItems(), section: .tabs, index: externalIndex) }
+        return items
+    }
+
+    private func withPlaceholder(_ items: [SidebarItem], section: Section?, index: Int) -> [SidebarItem] {
+        var base = items
+        switch section {
         case .bookmarks:
             if let zone = base.firstIndex(of: .bookmarkDropZone) {
                 base[zone] = .placeholder
             } else {
                 let start = (base.firstIndex(of: .header) ?? 0) + 1
-                base.insert(.placeholder, at: start + drag.targetIndex)
+                base.insert(.placeholder, at: start + index)
             }
         case .tabs:
             let start = (base.firstIndex(of: .newTab) ?? base.count - 1) + 1
-            base.insert(.placeholder, at: min(start + drag.targetIndex, base.count))
+            base.insert(.placeholder, at: min(start + index, base.count))
+        case nil:
+            base.removeAll { $0 == .bookmarkDropZone }
         }
         return base
     }
 
     /// Works out where the dragged row would land from the pointer position, against the list without it.
-    private func target(at y: CGFloat, dragging item: SidebarItem) -> (Section, Int) {
-        let base = buildItems(includeEmptyBookmarkSection: true).filter { $0 != item }
+    private func target(at y: CGFloat, dragging item: SidebarItem?) -> (Section, Int) {
+        let base = buildItems(includeEmptyBookmarkSection: item != nil).filter { $0 != item }
         let layout = frames(for: base)
         let separatorMid = layout.first { $0.0 == .separator }.map { $0.1.midY } ?? 0
-        if y < separatorMid {
+        if item != nil, y < separatorMid {
             let count = layout.filter { if case .bookmark = $0.0 { return $0.1.midY < y } else { return false } }.count
             return (.bookmarks, count)
         }
@@ -338,15 +359,87 @@ final class SidebarListView: NSView {
         return (.tabs, count)
     }
 
+    /// The sidebar list under a screen point, in whichever window is in front there.
+    private static func list(at screenPoint: NSPoint) -> (BrowserWindowController, SidebarListView)? {
+        for window in NSApp.orderedWindows where window.isVisible && window.frame.contains(screenPoint) {
+            guard let controller = window.windowController as? BrowserWindowController else { return nil }
+            let container = controller.root.sidebarContainer
+            guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else { return nil }
+            let local = container.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
+            return container.bounds.contains(local) ? (controller, controller.sidebar.list) : nil
+        }
+        return nil
+    }
+
+    private static func window(at screenPoint: NSPoint) -> BrowserWindowController? {
+        NSApp.orderedWindows.first { $0.isVisible && $0.frame.contains(screenPoint) }?.windowController as? BrowserWindowController
+    }
+
+    /// Another window's tab hovering this list: open a gap where it would land (nil to close it).
+    func externalHover(at screenPoint: NSPoint?) {
+        var index: Int?
+        if let screenPoint, let window {
+            let y = convert(window.convertPoint(fromScreen: screenPoint), from: nil).y
+            index = target(at: y, dragging: nil).1
+        }
+        guard index != externalIndex else { return }
+        externalIndex = index
+        apply(items: displayItems(), animated: true)
+    }
+
+    private func liftedImage(of view: NSView) -> NSImage? {
+        guard let layer = view.layer else { return nil }
+        let scale = window?.backingScaleFactor ?? 2
+        let size = view.bounds.size
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        let cg = context.cgContext
+        cg.scaleBy(x: scale, y: scale)
+        // Layers draw flipped relative to the bitmap; flip so the row isn't upside down.
+        cg.translateBy(x: 0, y: size.height)
+        cg.scaleBy(x: 1, y: -1)
+        layer.render(in: cg)
+        let image = NSImage(size: size)
+        image.addRepresentation(rep)
+        return image
+    }
+
+    private func makePanel(for view: NSView, at screenRect: NSRect) -> NSPanel {
+        let panel = NSPanel(contentRect: screenRect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.ignoresMouseEvents = true
+        panel.appearance = window?.effectiveAppearance
+        let content = ColorView(color: Tokens.Color.panelBackground)
+        content.wantsLayer = true
+        content.layer?.cornerRadius = Tokens.Radius.row
+        content.layer?.cornerCurve = .continuous
+        content.layer?.masksToBounds = true
+        let imageView = NSImageView(frame: NSRect(origin: .zero, size: screenRect.size))
+        (view as? SidebarRowView)?.isLifted = true
+        imageView.image = liftedImage(of: view)
+        (view as? SidebarRowView)?.isLifted = false
+        content.addSubview(imageView)
+        panel.contentView = content
+        return panel
+    }
+
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
         guard let window, item.isDraggable else { return false }
         delegate?.listHover(nil, row: nil, bookmark: nil)
         let start = convert(event.locationInWindow, from: nil)
         let (section, index) = target(at: start.y, dragging: item)
-        drag = DragState(item: item, view: view, grabOffset: start.y - view.frame.minY, targetSection: section, targetIndex: index, anchorX: start.x)
-        (view as? SidebarRowView)?.isLifted = true
-        view.removeFromSuperview()
-        addSubview(view)
+        let rowScreen = window.convertToScreen(view.convert(view.bounds, to: nil))
+        let mouse = window.convertPoint(toScreen: event.locationInWindow)
+        let panel = makePanel(for: view, at: rowScreen)
+        drag = DragState(item: item, view: view, grab: NSPoint(x: mouse.x - rowScreen.minX, y: mouse.y - rowScreen.minY),
+                         targetSection: section, targetIndex: index, panel: panel)
+        view.alphaValue = 0
+        panel.orderFront(nil)
         apply(items: displayItems(), animated: true)
 
         var lastEvent = event
@@ -363,29 +456,34 @@ final class SidebarListView: NSView {
         return true
     }
 
+    private weak var externalTarget: SidebarListView?
+
     private func dragMoved(to event: NSEvent) {
-        guard var drag else { return }
-        let point = convert(event.locationInWindow, from: nil)
-        let maxY = max(0, contentHeight - drag.view.frame.height)
-        // The row follows the pointer both ways. Carry it far enough sideways and the next space opens.
-        let dx = point.x - drag.anchorX
-        let threshold = bounds.width * 0.3
-        Tokens.Motion.withoutAnimation {
-            drag.view.frame.origin.y = min(max(point.y - drag.grabOffset, 0), maxY)
-            drag.view.frame.origin.x = max(-bounds.width * 0.5, min(bounds.width * 0.5, dx))
-        }
-        autoscroll(with: event)
-        if abs(dx) > threshold, let neighbor = neighborSpace(direction: dx > 0 ? 1 : -1) {
-            delegate?.listSwitchSpaceDuringDrag(neighbor)
-            drag.anchorX = point.x
-            self.drag = drag
-            apply(items: displayItems(), animated: false)
-            // The new space's list slides in from the side the tab was carried toward.
-            if let scroll = enclosingScrollView { Tokens.Motion.slide(scroll, fromOffsetX: dx > 0 ? bounds.width : -bounds.width, curve: Tokens.Motion.slide) }
-            Tokens.Motion.animate(Tokens.Motion.snappy) { drag.view.animator().frame.origin.x = 0 }
+        guard var drag, let window else { return }
+        let mouse = window.convertPoint(toScreen: event.locationInWindow)
+        drag.panel.setFrameOrigin(NSPoint(x: mouse.x - drag.grab.x, y: mouse.y - drag.grab.y))
+
+        let hit = Self.list(at: mouse)
+        // Another window's list opens a gap for a tab; ours closes its gap meanwhile.
+        if let (_, list) = hit, list !== self, case .tab = drag.item {
+            if externalTarget !== list { externalTarget?.externalHover(at: nil) }
+            externalTarget = list
+            list.externalHover(at: mouse)
+        } else if externalTarget != nil {
+            externalTarget?.externalHover(at: nil)
+            externalTarget = nil
         }
 
-        let hovered = delegate?.listDragHoverSpace(at: event.locationInWindow)
+        var section: Section? = nil
+        var index = drag.targetIndex
+        if let (_, list) = hit, list === self {
+            autoscroll(with: event)
+            let y = convert(window.convertPoint(fromScreen: mouse), from: nil).y
+            (section, index) = target(at: y, dragging: drag.item)
+        }
+
+        // Holding over another space's dot opens that space, so you can drop the tab in place there.
+        let hovered = delegate?.listDragHoverSpace(at: window.convertPoint(fromScreen: mouse))
         if hovered != drag.hoverSpace {
             springWork?.cancel()
             if let hovered, hovered != manager?.currentSpaceID {
@@ -402,7 +500,6 @@ final class SidebarListView: NSView {
             }
         }
         drag.hoverSpace = hovered
-        let (section, index) = target(at: point.y, dragging: drag.item)
         let changed = section != drag.targetSection || index != drag.targetIndex
         drag.targetSection = section
         drag.targetIndex = index
@@ -410,19 +507,36 @@ final class SidebarListView: NSView {
         if changed { apply(items: displayItems(), animated: true) }
     }
 
-    private func neighborSpace(direction: Int) -> UUID? {
-        guard let manager else { return nil }
-        let spaces = Library.shared.spaces
-        guard let index = spaces.firstIndex(where: { $0.id == manager.currentSpaceID }), spaces.indices.contains(index + direction) else { return nil }
-        return spaces[index + direction].id
-    }
-
     private func endDrag(with event: NSEvent) {
         guard let drag, let manager else { return }
         self.drag = nil
         springWork?.cancel()
-        (drag.view as? SidebarRowView)?.isLifted = false
+        drag.panel.orderOut(nil)
+        drag.view.alphaValue = 1
         delegate?.listDragEnded()
+        let mouse = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
+        let external = externalTarget
+        externalTarget = nil
+        external?.externalHover(at: nil)
+
+        // Into another window's sidebar, at the gap that opened there.
+        if case .tab(let id) = drag.item, let tab = manager.tab(with: id), let external,
+           let (controller, list) = Self.list(at: mouse), list === external, controller.tabManager !== manager,
+           delegate?.listMoveToWindow(tab, controller: controller, index: list.dropIndex(at: mouse)) == true {
+            rows[drag.item] = nil
+            drag.view.removeFromSuperview()
+            reload(animated: true)
+            return
+        }
+
+        // Somewhere that isn't any Zigzag window: the tab becomes a new window there.
+        if case .tab(let id) = drag.item, let tab = manager.tab(with: id), Self.window(at: mouse) == nil,
+           delegate?.listDropOutside(tab, at: mouse) == true {
+            rows[drag.item] = nil
+            drag.view.removeFromSuperview()
+            reload(animated: true)
+            return
+        }
 
         if let space = drag.hoverSpace, space != manager.currentSpaceID {
             // Dropped on another space's dot.
@@ -436,16 +550,16 @@ final class SidebarListView: NSView {
         }
 
         switch (drag.item, drag.targetSection) {
-        case (.tab(let id), .tabs):
+        case (.tab(let id), .tabs?):
             if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: drag.targetIndex, in: manager.currentSpaceID) }
-        case (.tab(let id), .bookmarks):
+        case (.tab(let id), .bookmarks?):
             if let tab = manager.tab(with: id) {
                 if tab.spaceID != manager.currentSpaceID { delegate?.listMove(tab, to: 0, in: manager.currentSpaceID) }
                 delegate?.listBookmark(tab, at: drag.targetIndex, in: manager.currentSpaceID)
             }
-        case (.bookmark(let id), .bookmarks):
+        case (.bookmark(let id), .bookmarks?):
             Library.shared.moveBookmark(id, to: drag.targetIndex, in: manager.currentSpaceID)
-        case (.bookmark(let id), .tabs):
+        case (.bookmark(let id), .tabs?):
             // The row changes identity; the new tab row takes the placeholder's spot.
             rows[.bookmark(id)] = nil
             drag.view.removeFromSuperview()
@@ -454,5 +568,11 @@ final class SidebarListView: NSView {
             break
         }
         reload(animated: true)
+    }
+
+    /// Where a tab from another window would land, for a screen point over this list.
+    func dropIndex(at screenPoint: NSPoint) -> Int {
+        guard let window else { return 0 }
+        return target(at: convert(window.convertPoint(fromScreen: screenPoint), from: nil).y, dragging: nil).1
     }
 }

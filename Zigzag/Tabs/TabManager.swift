@@ -112,12 +112,26 @@ final class TabManager {
         return tab
     }
 
+    /// Takes a tab out of this window without closing its page, so another window can adopt it.
+    func detach(_ tab: Tab) {
+        guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return }
+        let wasSelected = selectedTab === tab
+        tabsBySpace[tab.spaceID]?.remove(at: index)
+        recentTabIDs.removeAll { $0 == tab.id }
+        tabTokens[tab.id] = nil
+        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+        changed.send(.structure)
+        if wasSelected { selectAfterClosing(tab, index: index) }
+    }
+
     /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
-    func insert(_ tab: Tab) {
+    func insert(_ tab: Tab, at index: Int = 0) {
         tab.host = host
         tab.spaceID = currentSpaceID
         watch(tab)
-        tabsBySpace[currentSpaceID, default: []].insert(tab, at: 0)
+        var list = tabsBySpace[currentSpaceID] ?? []
+        list.insert(tab, at: min(max(index, 0), list.count))
+        tabsBySpace[currentSpaceID] = list
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
         changed.send(.structure)
         select(tab)
