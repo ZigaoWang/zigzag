@@ -85,6 +85,9 @@ final class SidebarListView: NSView {
         var splitTarget: UUID?
     }
 
+    /// The bookmark area (and its drop zone) opens only once a drag heads up toward it, so rows don't jump when a drag starts.
+    private var bookmarkZoneOpen = false
+
     /// A tab being carried in from another window: where its gap opens in this list.
     private var externalIndex: Int?
 
@@ -339,7 +342,7 @@ final class SidebarListView: NSView {
 
     private func displayItems() -> [SidebarItem] {
         if let drag {
-            return withPlaceholder(buildItems(includeEmptyBookmarkSection: drag.targetSection != nil).filter { $0 != drag.item },
+            return withPlaceholder(buildItems(includeEmptyBookmarkSection: bookmarkZoneOpen && drag.targetSection != nil).filter { $0 != drag.item },
                                    section: drag.targetSection, index: drag.targetIndex)
         }
         if let externalIndex { return withPlaceholder(buildItems(), section: .tabs, index: externalIndex) }
@@ -367,7 +370,7 @@ final class SidebarListView: NSView {
 
     /// Works out where the dragged row would land from the pointer position, against the list without it.
     private func target(at y: CGFloat, dragging item: SidebarItem?) -> (Section, Int) {
-        let base = buildItems(includeEmptyBookmarkSection: item != nil).filter { $0 != item }
+        let base = buildItems(includeEmptyBookmarkSection: item != nil && bookmarkZoneOpen).filter { $0 != item }
         let layout = frames(for: base)
         let separatorMid = layout.first { $0.0 == .separator }.map { $0.1.midY } ?? 0
         if item != nil, y < separatorMid {
@@ -450,6 +453,7 @@ final class SidebarListView: NSView {
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
         guard let window, item.isDraggable else { return false }
         delegate?.listHover(nil, row: nil, bookmark: nil)
+        bookmarkZoneOpen = !Library.shared.bookmarks(in: manager?.currentSpaceID ?? UUID()).isEmpty && !Self.isCollapsed(manager?.currentSpaceID ?? UUID())
         let start = convert(event.locationInWindow, from: nil)
         let (section, index) = target(at: start.y, dragging: item)
         let rowScreen = window.convertToScreen(view.convert(view.bounds, to: nil))
@@ -535,6 +539,9 @@ final class SidebarListView: NSView {
         if let (_, list) = hit, list === self {
             autoscroll(with: event)
             let point = convert(window.convertPoint(fromScreen: mouse), from: nil)
+            if !bookmarkZoneOpen, let newTab = rows[.newTab], point.y < newTab.frame.maxY {
+                bookmarkZoneOpen = true
+            }
             splitTarget = self.splitTarget(at: point, dragging: drag.item)
             if splitTarget == nil {
                 (section, index) = target(at: point.y, dragging: drag.item)
