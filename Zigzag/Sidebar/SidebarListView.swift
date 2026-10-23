@@ -441,8 +441,6 @@ final class SidebarListView: NSView {
         panel.hasShadow = true
         panel.level = .floating
         panel.ignoresMouseEvents = true
-        // See-through enough to show where it's going.
-        panel.alphaValue = 0.6
         panel.appearance = window?.effectiveAppearance
         let content = ColorView(color: Tokens.Color.panelBackground)
         content.wantsLayer = true
@@ -470,7 +468,13 @@ final class SidebarListView: NSView {
         drag = DragState(item: item, view: view, grab: NSPoint(x: mouse.x - rowScreen.minX, y: mouse.y - rowScreen.minY),
                          targetSection: section, targetIndex: index, panel: panel)
         view.alphaValue = 0
+        panel.alphaValue = 1
         panel.orderFront(nil)
+        // Picked up: it lifts a touch and turns see-through, so you can see where it's going.
+        Tokens.Motion.animate(Tokens.Motion.feedback) {
+            panel.animator().setFrame(rowScreen.insetBy(dx: -3, dy: -1), display: true)
+            panel.animator().alphaValue = 0.6
+        }
         apply(items: displayItems(), animated: true)
 
         var lastEvent = event
@@ -654,13 +658,36 @@ final class SidebarListView: NSView {
     }
 
     private func endDrag(with event: NSEvent) {
-        guard let drag, let manager else { return }
+        guard let drag else { return }
+        drop(drag, event: event)
+        settle(drag)
+    }
+
+    /// The lifted row glides into the slot it landed in, then becomes the row again.
+    /// If it went somewhere else (a split, favorites, another window), it just fades.
+    private func settle(_ drag: DragState) {
+        let panel = drag.panel
+        if let row = rows[drag.item], row === drag.view, row.superview === self, let window, !Tokens.Motion.isKeyboardDriven {
+            let target = window.convertToScreen(row.convert(row.bounds, to: nil))
+            Tokens.Motion.animate(Tokens.Motion.snappy, {
+                panel.animator().setFrame(target, display: true)
+                panel.animator().alphaValue = 1
+            }, completion: {
+                row.alphaValue = 1
+                panel.orderOut(nil)
+            })
+        } else {
+            drag.view.alphaValue = 1
+            Tokens.Motion.animate(Tokens.Motion.feedback, { panel.animator().alphaValue = 0 }, completion: { panel.orderOut(nil) })
+        }
+    }
+
+    private func drop(_ drag: DragState, event: NSEvent) {
+        guard let manager else { return }
         self.drag = nil
         springWork?.cancel()
         edgeWork?.cancel()
         edgeDirection = nil
-        drag.panel.orderOut(nil)
-        drag.view.alphaValue = 1
         splitWork?.cancel()
         splitCandidate = nil
         for view in rows.values { (view as? TabRowView)?.splitDropSide = nil }
