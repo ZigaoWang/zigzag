@@ -148,7 +148,7 @@ final class PopupHeaderView: NSView {
 
     override func layout() {
         super.layout()
-        let textSize = label.intrinsicContentSize
+        let textSize = NSSize(width: label.textWidth, height: label.lineHeight)
         let lockWidth = Tokens.Space.x3
         let total = lockWidth + Tokens.Space.x1 + ceil(textSize.width)
         let x = max(Tokens.Space.x16 + Tokens.Space.x4, (bounds.width - total) / 2)

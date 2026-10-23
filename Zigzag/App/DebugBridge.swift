@@ -28,6 +28,8 @@ enum DebugBridge {
         case "sidebar": controller.toggleSidebar(nil)
         case "reveal": controller.root.reveal(true)
         case "commandbar": controller.commandBar.show(mode: .newTab); if !arg.isEmpty { controller.commandBar.debugType(arg) }
+        case "enter": controller.commandBar.debugEnter()
+        case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
         case "space": controller.tabManager.switchSpace(by: Int(arg) ?? 1)
         case "newspace":

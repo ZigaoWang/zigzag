@@ -69,7 +69,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         doneButton.frame = NSRect(x: b.width - Tokens.Space.x2 - button, y: y, width: button, height: button)
         nextButton.frame = NSRect(x: doneButton.frame.minX - button, y: y, width: button, height: button)
         previousButton.frame = NSRect(x: nextButton.frame.minX - button, y: y, width: button, height: button)
-        let countWidth = ceil(countLabel.intrinsicContentSize.width)
+        let countWidth = countLabel.textWidth
         let countHeight = ceil(countLabel.intrinsicContentSize.height)
         countLabel.frame = NSRect(x: previousButton.frame.minX - Tokens.Space.x2 - countWidth, y: (b.height - countHeight) / 2, width: countWidth, height: countHeight)
         let fieldHeight = ceil(field.intrinsicContentSize.height)
@@ -246,7 +246,7 @@ enum Toast {
     static func show(_ text: String, in controller: BrowserWindowController) {
         current?.removeFromSuperview()
         let label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-        let size = label.intrinsicContentSize
+        let size = NSSize(width: label.textWidth, height: label.lineHeight)
         let panel = FloatingPanelView()
         panel.radius = Tokens.Radius.row
         let width = ceil(size.width) + Tokens.Space.x8

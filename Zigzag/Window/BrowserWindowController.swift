@@ -31,7 +31,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
         root.sidebarWidth = sidebarWidth
-        root.onLayoutChange = { [weak self] in self?.layoutTrafficLights() }
+        root.onLayoutChange = { [weak self] in
+            guard let self else { return }
+            self.layoutTrafficLights()
+            self.commandBar.reposition()
+            self.findBar.reposition()
+        }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
 
         sidebar.delegate = self

@@ -205,6 +205,15 @@ final class Label: NSTextField {
     required init?(coder: NSCoder) { fatalError() }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    /// Exact width of the text, plus the cell's own padding.
+    var textWidth: CGFloat {
+        let width = (stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width
+        return ceil(width) + Tokens.Space.x1
+    }
+
+    /// Height of one line in this label's font.
+    var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
 }
 
 /// A view that paints a single flat color from a dynamic NSColor, following appearance changes.
