@@ -53,7 +53,11 @@ enum MainMenu {
             item("Open File…", #selector(C.openDocument(_:)), "o"),
             .separator(),
             item("Reopen Closed Tab", #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
+            item("Duplicate Tab", #selector(C.duplicateTab(_:)), "d", [.command, .option]),
+            item("Bookmark This Page", #selector(C.toggleBookmark(_:)), "d"),
+            .separator(),
             item("Close Tab", #selector(C.closeTab(_:)), "w"),
+            item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),
             item("Close Window", #selector(C.closeWindow(_:)), "w", [.command, .shift]),
             .separator(),
             item("Export as PDF…", #selector(C.exportAsPDF(_:)), ""),
@@ -89,18 +93,29 @@ enum MainMenu {
             ]),
         ]))
 
-        main.addItem(submenu("View", [
+        var viewItems: [NSMenuItem] = [
             item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.command, .control]),
             item("Show All Tabs", #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             .separator(),
+            item("Back", #selector(C.goBack(_:)), "["),
+            item("Forward", #selector(C.goForward(_:)), "]"),
             item("Reload Page", #selector(C.reloadPage(_:)), "r"),
-            item("Reload Page Ignoring Cache", #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .shift]),
+            item("Reload Ignoring Cache", #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .shift]),
             item("Stop", #selector(C.stopLoading(_:)), "."),
+            .separator(),
+            item("Next Tab", #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
+            item("Previous Tab", #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
+            item("Next Space", #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
+            item("Previous Space", #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
+            item("New Space", #selector(C.newSpace(_:)), ""),
+            item("Edit Space…", #selector(C.renameSpace(_:)), ""),
+            .separator(),
+            item("Search History…", #selector(C.searchHistory(_:)), "y"),
             .separator(),
             item("Actual Size", #selector(C.actualSize(_:)), "0"),
             item("Zoom In", #selector(C.zoomIn(_:)), "+"),
-            alternate(item("Zoom In", #selector(C.zoomIn(_:)), "=")),
             item("Zoom Out", #selector(C.zoomOut(_:)), "-"),
+            item("Mute Tab", #selector(C.toggleMute(_:)), "m", [.command, .shift]),
             .separator(),
             submenu("Developer", [
                 item("Web Inspector", #selector(C.showWebInspector(_:)), "i", [.command, .option]),
@@ -108,56 +123,21 @@ enum MainMenu {
             ]),
             .separator(),
             item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
-        ]))
-
-        main.addItem(submenu("History", [
-            item("Back", #selector(C.goBack(_:)), "["),
+        ]
+        // Shortcuts that don't need a visible menu line: they work, they just don't clutter the menu.
+        viewItems += [
+            alternate(item("Zoom In", #selector(C.zoomIn(_:)), "=")),
             alternate(item("Back", #selector(C.goBack(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!))),
-            item("Forward", #selector(C.goForward(_:)), "]"),
             alternate(item("Forward", #selector(C.goForward(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!))),
-            .separator(),
-            item("Search History…", #selector(C.searchHistory(_:)), "y"),
-        ]))
-
-        main.addItem(submenu("Bookmarks", [
-            item("Bookmark This Page", #selector(C.toggleBookmark(_:)), "d"),
-        ]))
-
-        var tabItems: [NSMenuItem] = [
-            item("Next Tab", #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
-            item("Previous Tab", #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
             alternate(item("Next Tab", #selector(C.selectNextTab(_:)), "}", [.command, .shift])),
             alternate(item("Previous Tab", #selector(C.selectPreviousTab(_:)), "{", [.command, .shift])),
-            .separator(),
+            alternate(item("Close Tabs Below", #selector(C.closeTabsBelow(_:)), "")),
         ]
         for n in 1...9 {
-            let title = n == 9 ? "Last Tab" : "Tab \(n)"
-            tabItems.append(item(title, #selector(C.selectTabByNumber(_:)), "\(n)", tag: n))
+            viewItems.append(alternate(item(n == 9 ? "Last Tab" : "Tab \(n)", #selector(C.selectTabByNumber(_:)), "\(n)", tag: n)))
+            viewItems.append(alternate(item("Space \(n)", #selector(C.selectSpaceByNumber(_:)), "\(n)", [.control], tag: n)))
         }
-        tabItems += [
-            .separator(),
-            item("Duplicate Tab", #selector(C.duplicateTab(_:)), "d", [.command, .option]),
-            item("Mute Tab", #selector(C.toggleMute(_:)), "m", [.command, .shift]),
-            .separator(),
-            item("Close Tabs Below", #selector(C.closeTabsBelow(_:)), ""),
-            item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),
-        ]
-        main.addItem(submenu("Tabs", tabItems))
-
-        var spaceItems: [NSMenuItem] = [
-            item("Next Space", #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
-            item("Previous Space", #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
-            .separator(),
-        ]
-        for n in 1...9 {
-            spaceItems.append(item("Space \(n)", #selector(C.selectSpaceByNumber(_:)), "\(n)", [.control], tag: n))
-        }
-        spaceItems += [
-            .separator(),
-            item("New Space", #selector(C.newSpace(_:)), ""),
-            item("Rename Space…", #selector(C.renameSpace(_:)), ""),
-        ]
-        main.addItem(submenu("Spaces", spaceItems))
+        main.addItem(submenu("View", viewItems))
 
         let window = submenu("Window", [
             item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"),

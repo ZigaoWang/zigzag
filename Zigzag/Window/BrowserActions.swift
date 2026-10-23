@@ -263,9 +263,6 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(selectSpaceByNumber(_:)):
             let spaces = Library.shared.spaces
             let index = item.tag - 1
-            item.isHidden = !spaces.indices.contains(index)
-            if spaces.indices.contains(index) { item.title = spaces[index].name }
-            item.state = spaces.indices.contains(index) && spaces[index].id == tabManager.currentSpaceID ? .on : .off
             return spaces.indices.contains(index)
         case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return Library.shared.spaces.count > 1
         default: return true
