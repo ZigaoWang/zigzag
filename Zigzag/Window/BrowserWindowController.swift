@@ -218,6 +218,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let tab, let pair = tabManager.split(for: tab),
            let left = tabManager.tab(with: pair.left), let right = tabManager.tab(with: pair.right) {
             root.splitRatio = CGFloat(pair.ratio)
+            root.splitVertical = pair.vertical
+            for card in [root.card, root.secondCard] {
+                card.header.setVertical(pair.vertical)
+                card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: left) }
+            }
             root.card.show(left.ensureWebView())
             root.secondCard.show(right.ensureWebView())
             root.card.isFocusedPane = left === tab

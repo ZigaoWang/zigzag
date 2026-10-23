@@ -52,10 +52,12 @@ final class ResizeHandle: NSView {
     var onDrag: ((CGFloat) -> Void)?
     var onEnd: (() -> Void)?
     var onDoubleClick: (() -> Void)?
+    /// Drags up and down (reporting y in window coordinates) instead of sideways.
+    var isVertical = false { didSet { window?.invalidateCursorRects(for: self) } }
     private var startX: CGFloat = 0
 
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .columnResize)
+        addCursorRect(bounds, cursor: isVertical ? .rowResize : .columnResize)
     }
 
     override var mouseDownCanMoveWindow: Bool { false }
@@ -66,7 +68,7 @@ final class ResizeHandle: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        onDrag?(event.locationInWindow.x)
+        onDrag?(isVertical ? event.locationInWindow.y : event.locationInWindow.x)
     }
 
     override func mouseUp(with event: NSEvent) { onEnd?() }
@@ -81,6 +83,7 @@ final class BrowserRootView: ColorView {
     private let splitHandle = ResizeHandle()
     /// Share of the page area the left pane takes; nil when not split.
     var splitRatio: CGFloat? { didSet { needsLayout = true } }
+    var splitVertical = false { didSet { needsLayout = true; splitHandle.isVertical = splitVertical } }
     var onSplitRatioChange: ((CGFloat, Bool) -> Void)?
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
@@ -110,10 +113,16 @@ final class BrowserRootView: ColorView {
         addSubview(secondCard)
         splitHandle.isHidden = true
         addSubview(splitHandle)
-        splitHandle.onDrag = { [weak self] x in
+        splitHandle.onDrag = { [weak self] value in
             guard let self else { return }
             let area = self.cardFrame
-            self.splitRatio = min(max((x - area.minX) / area.width, 0.2), 0.8)
+            if self.splitVertical {
+                // Window y runs bottom-up; this view is flipped.
+                let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
+                self.splitRatio = min(max((y - area.minY) / area.height, 0.2), 0.8)
+            } else {
+                self.splitRatio = min(max((value - area.minX) / area.width, 0.2), 0.8)
+            }
             self.layoutSubtreeIfNeeded()
             self.onSplitRatioChange?(self.splitRatio ?? 0.5, false)
         }
@@ -162,6 +171,11 @@ final class BrowserRootView: ColorView {
         let area = cardFrame
         guard let ratio = splitRatio else { return (area, nil) }
         let gap = Tokens.Metric.cardInset
+        if splitVertical {
+            let topHeight = floor((area.height - gap) * ratio)
+            let top = NSRect(x: area.minX, y: area.minY, width: area.width, height: topHeight)
+            return (top, NSRect(x: area.minX, y: top.maxY + gap, width: area.width, height: area.maxY - top.maxY - gap))
+        }
         let leftWidth = floor((area.width - gap) * ratio)
         let left = NSRect(x: area.minX, y: area.minY, width: leftWidth, height: area.height)
         let right = NSRect(x: left.maxX + gap, y: area.minY, width: area.maxX - left.maxX - gap, height: area.height)
@@ -175,7 +189,9 @@ final class BrowserRootView: ColorView {
             secondCard.isHidden = false
             secondCard.frame = right
             splitHandle.isHidden = false
-            splitHandle.frame = NSRect(x: panes.left.maxX - 2, y: right.minY, width: right.minX - panes.left.maxX + 4, height: right.height)
+            splitHandle.frame = splitVertical
+                ? NSRect(x: right.minX, y: panes.left.maxY - 2, width: right.width, height: right.minY - panes.left.maxY + 4)
+                : NSRect(x: panes.left.maxX - 2, y: right.minY, width: right.minX - panes.left.maxX + 4, height: right.height)
         } else {
             secondCard.isHidden = true
             splitHandle.isHidden = true

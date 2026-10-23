@@ -495,8 +495,23 @@ final class TabManager {
     struct SplitPair: Codable, Equatable {
         var left: UUID
         var right: UUID
-        /// Share of the width the left pane gets.
+        /// Share of the width (or height, when vertical) the first pane gets.
         var ratio: Double = 0.5
+        /// Stacked top and bottom instead of side by side.
+        var vertical = false
+
+        init(left: UUID, right: UUID) {
+            self.left = left
+            self.right = right
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            left = try c.decode(UUID.self, forKey: .left)
+            right = try c.decode(UUID.self, forKey: .right)
+            ratio = try c.decodeIfPresent(Double.self, forKey: .ratio) ?? 0.5
+            vertical = try c.decodeIfPresent(Bool.self, forKey: .vertical) ?? false
+        }
     }
 
     private(set) var splits: [SplitPair] = []
@@ -540,6 +555,12 @@ final class TabManager {
         unsplit(tab, notify: false)
         changed.send(.structure)
         select(other)
+    }
+
+    func toggleSplitOrientation(for tab: Tab) {
+        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
+        splits[index].vertical.toggle()
+        changed.send(.selection)
     }
 
     func setSplitRatio(_ ratio: Double, for tab: Tab) {
