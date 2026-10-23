@@ -81,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: App menu actions
 
     @objc func newWindow(_ sender: Any?) { WindowManager.shared.newWindow() }
+    @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
 
     @objc func showAbout(_ sender: Any?) {
         NSApp.orderFrontStandardAboutPanel(options: [

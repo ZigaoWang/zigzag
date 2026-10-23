@@ -30,6 +30,7 @@ final class TabManager {
 
     /// Watches a tab so navigation inside it gets saved for crash recovery.
     private func watch(_ tab: Tab) {
+        tab.privateStore = privateStore
         tabTokens[tab.id] = tab.changed.observe { [weak self] change in
             if change == .url || change == .title || change == .audio { self?.changed.send(.content) }
         }
@@ -44,7 +45,12 @@ final class TabManager {
         let interactionState: Data?
     }
 
-    init(spaceID: UUID? = nil) {
+    /// Private windows share one throwaway store between their tabs, gone when the window closes.
+    let privateStore: WKWebsiteDataStore?
+    var isPrivate: Bool { privateStore != nil }
+
+    init(spaceID: UUID? = nil, isPrivate: Bool = false) {
+        privateStore = isPrivate ? .nonPersistent() : nil
         let requested = spaceID.flatMap { Library.shared.space($0)?.id }
         currentSpaceID = requested ?? Library.shared.spaces[0].id
         libraryToken = Library.shared.changed.observe { [weak self] in self?.libraryDidChange() }

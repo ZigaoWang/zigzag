@@ -49,6 +49,8 @@ final class SidebarListView: NSView {
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
+    /// In a private window, the header says "Private" instead of the space name.
+    var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
 
     private var items: [SidebarItem] = []
@@ -231,7 +233,8 @@ final class SidebarListView: NSView {
         let selected = manager.selectedTab(in: shownSpaceID ?? manager.currentSpaceID)
         switch item {
         case .header:
-            (view as? SpaceHeaderView)?.label.stringValue = Library.shared.space(shownSpaceID ?? manager.currentSpaceID)?.name ?? ""
+            let spaceName = Library.shared.space(shownSpaceID ?? manager.currentSpaceID)?.name ?? ""
+            (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "Private · \(spaceName)" : spaceName
             view.needsLayout = true
 
         case .tab(let id):

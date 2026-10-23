@@ -57,8 +57,8 @@ final class WindowManager {
     // MARK: Creating
 
     @discardableResult
-    func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true) -> BrowserWindowController {
-        let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID)
+    func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false) -> BrowserWindowController {
+        let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate)
         var frame: NSRect?
         if let key = keyController?.window {
             // Cascade from the current window, like every Mac app.
@@ -69,6 +69,8 @@ final class WindowManager {
         controller.showWindow(nil)
         if let url {
             manager.newTab(url: url)
+        } else if isPrivate {
+            controller.commandBar.show(mode: .newTab)
         } else if !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ArcOfferDismissed"), ArcImporter.isAvailable {
             controller.showWelcome()
         } else if showCommandBar {
@@ -115,13 +117,16 @@ final class WindowManager {
     func saveNow(synchronously: Bool = false) {
         saveDebouncer.cancel()
         guard !controllers.isEmpty else { return }
-        let state = SessionState(windows: controllers.map(windowState))
+        // Private windows are never written down.
+        let saved = controllers.filter { !$0.tabManager.isPrivate }
+        guard !saved.isEmpty else { return }
+        let state = SessionState(windows: saved.map(windowState))
         JSONStore.save(state, to: Paths.session)
         // Back/forward lists live in their own files: opaque and occasionally large. Only changed ones are
         // written, and never on the main thread.
         var keep = Set<UUID>()
         var writes: [(URL, Data)] = []
-        for controller in controllers {
+        for controller in saved {
             for tab in controller.tabManager.allTabs {
                 keep.insert(tab.id)
                 guard let data = tab.interactionStateForSaving else { continue }

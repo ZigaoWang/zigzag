@@ -49,6 +49,9 @@ final class Tab: NSObject {
     var isSearchTab = false
     /// True while the page lives in the peek card rather than the tab list.
     var isPeek = false
+    /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
+    var privateStore: WKWebsiteDataStore?
+    var isPrivate: Bool { privateStore != nil }
     /// The tab that opened this one, so closing it can return there.
     weak var opener: Tab?
 
@@ -101,7 +104,10 @@ final class Tab: NSObject {
         let configuration = pendingConfiguration ?? WebKitSetup.makeConfiguration()
         let fromWebKit = pendingConfiguration != nil
         pendingConfiguration = nil
-        if !fromWebKit { WebKitSetup.configure(configuration) }
+        if !fromWebKit {
+            WebKitSetup.configure(configuration)
+            if let privateStore { configuration.websiteDataStore = privateStore }
+        }
 
         let webView = BrowserWebView(frame: NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize), configuration: configuration)
         webView.owner = self
@@ -254,7 +260,7 @@ final class Tab: NSObject {
             guard let self else { return }
             if let image {
                 self.snapshot = image
-                SnapshotStore.save(image, for: self.id)
+                if !self.isPrivate { SnapshotStore.save(image, for: self.id) }
                 self.changed.send(.snapshot)
             }
             completion?()
@@ -270,7 +276,7 @@ final class Tab: NSObject {
                     guard let self, let title = wv.title, !title.isEmpty else { return }
                     self.title = title
                     self.changed.send(.title)
-                    if let url = self.url { HistoryStore.shared.updateTitle(title, for: url) }
+                    if let url = self.url, !self.isPrivate { HistoryStore.shared.updateTitle(title, for: url) }
                 }
             },
             webView.observe(\.url, options: [.new]) { [weak self] wv, _ in
@@ -332,7 +338,7 @@ final class Tab: NSObject {
     }
 
     fileprivate func refreshFavicon() {
-        guard let webView, let pageURL = webView.url else { return }
+        guard let webView, let pageURL = webView.url, !isPrivate else { return }
         webView.evaluateJavaScript(PageScripts.iconLinks) { [weak self] result, _ in
             MainActor.assumeIsolated {
                 let links = (result as? [[String: String]]) ?? []
@@ -420,7 +426,7 @@ extension Tab: WKNavigationDelegate {
             let zoom = ZoomLevels.zoom(for: url)
             if webView.pageZoom != zoom { webView.pageZoom = zoom }
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
-            HistoryStore.shared.recordVisit(url: url, title: webView.title)
+            if !isPrivate { HistoryStore.shared.recordVisit(url: url, title: webView.title) }
         }
     }
 

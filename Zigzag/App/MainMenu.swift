@@ -48,6 +48,7 @@ enum MainMenu {
         main.addItem(submenu("File", [
             item("New Tab", #selector(C.newTab(_:)), "t"),
             item("New Window", #selector(AppDelegate.newWindow(_:)), "n"),
+            item("New Private Window", #selector(AppDelegate.newPrivateWindow(_:)), "n", [.command, .shift]),
             item("Open Location…", #selector(C.openLocation(_:)), "l"),
             item("Open File…", #selector(C.openDocument(_:)), "o"),
             .separator(),

@@ -87,6 +87,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             MainActor.assumeIsolated { self?.sidebar.list.refreshRows() }
         }
 
+        if tabManager.isPrivate {
+            // Private windows are always dark and say so, so you never wonder which one you're in.
+            window.appearance = NSAppearance(named: .darkAqua)
+            sidebar.list.privateLabel = true
+        }
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.currentSpaceID = tabManager.currentSpaceID
@@ -161,7 +166,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
-        let color = tabManager.currentSpace.background
+        let color = tabManager.isPrivate ? SpaceColor.graphite.background : tabManager.currentSpace.background
         root.setColor(color, animated: animated && !Tokens.Motion.isKeyboardDriven)
         root.sidebarContainer.tint = color
     }
