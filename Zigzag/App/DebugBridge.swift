@@ -227,6 +227,34 @@ enum DebugBridge {
             }
             if let main = NSApp.mainMenu { walk(main, "") }
             try? lines.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        case "audio":
+            for tab in controller.tabManager.allTabs where !tab.isSuspended {
+                let state: String
+                if let w = tab.webView, w.responds(to: NSSelectorFromString("_isPlayingAudio")) { state = "\(w.value(forKey: "_isPlayingAudio") ?? "?")" } else { state = "n/a" }
+                debugLog("audio \(tab.displayTitle.prefix(30)) playing=\(tab.isPlayingAudio) kvo=\(state)")
+            }
+        case "closeurl":
+            for tab in controller.tabManager.allTabs where tab.url?.absoluteString.contains(arg) == true { controller.tabManager.close(tab) }
+        case "controls":
+            // Every clickable control in the window, with its center in window coordinates (top-left origin).
+            var out = ""
+            func walk(_ v: NSView) {
+                if let iv = v as? InteractiveView, !iv.isHiddenOrHasHiddenAncestor, let window = controller.window {
+                    let r = iv.convert(iv.bounds, to: nil)
+                    let label = iv.accessibilityLabel() ?? iv.toolTip ?? ""
+                    out += String(format: "%@\t%.0f\t%.0f\t%@\n", "\(type(of: iv))", r.midX, window.frame.height - r.midY, label)
+                }
+                v.subviews.forEach(walk)
+            }
+            if let root = controller.window?.contentView { walk(root) }
+            try? out.write(toFile: arg, atomically: true, encoding: .utf8)
+        case "hit":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2, let window = controller.window, let frameView = window.contentView?.superview {
+                let p = NSPoint(x: n[0], y: window.frame.height - n[1])
+                let hit = frameView.hitTest(frameView.convert(p, from: nil))
+                debugLog("hit at \(n): \(hit.map { String(describing: type(of: $0)) } ?? "nil")")
+            }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
         default: break
