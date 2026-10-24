@@ -11,10 +11,11 @@ final class ConfirmSheet: NSView {
     private var monitor: Any?
     private var completion: (Bool) -> Void
 
-    private init(title: String, message: String, confirmTitle: String, completion: @escaping (Bool) -> Void) {
+    private init(title: String, message: String, confirmTitle: String, destructive: Bool, completion: @escaping (Bool) -> Void) {
         titleLabel = Label(title, font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
         body = NSTextField(wrappingLabelWithString: message)
         confirm = PrimaryButton(title: confirmTitle)
+        confirm.isDestructive = destructive
         self.completion = completion
         super.init(frame: .zero)
         wantsLayer = true
@@ -33,8 +34,8 @@ final class ConfirmSheet: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    static func show(in host: NSView, title: String, message: String, confirmTitle: String, completion: @escaping (Bool) -> Void) {
-        let sheet = ConfirmSheet(title: title, message: message, confirmTitle: confirmTitle, completion: completion)
+    static func show(in host: NSView, title: String, message: String, confirmTitle: String, destructive: Bool = false, completion: @escaping (Bool) -> Void) {
+        let sheet = ConfirmSheet(title: title, message: message, confirmTitle: confirmTitle, destructive: destructive, completion: completion)
         sheet.frame = host.bounds
         sheet.autoresizingMask = [.width, .height]
         host.addSubview(sheet)
@@ -64,9 +65,7 @@ final class ConfirmSheet: NSView {
     override func mouseDown(with event: NSEvent) {}
 
     private func updateBackdrop() {
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.black.withAlphaComponent(effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 0.4 : 0.18).cgColor
-        }
+        layer?.backgroundColor = cgColor(Tokens.Color.scrim)
     }
 
     override func viewDidChangeEffectiveAppearance() {

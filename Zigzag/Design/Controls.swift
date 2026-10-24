@@ -321,6 +321,8 @@ final class PrimaryButton: InteractiveView {
     private var themeToken: SignalToken?
     /// The space's accent unless set.
     var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
+    /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
+    var isDestructive = false { didSet { stateDidChange(animated: false) } }
 
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.current.onAccent)
@@ -352,8 +354,8 @@ final class PrimaryButton: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // The space's accent: the one primary action on a screen.
         let theme = fixedTheme ?? Brand.Theme.current
-        let base = theme.accent
-        label.textColor = theme.onAccent
+        let base = isDestructive ? Tokens.Color.destructive : theme.accent
+        label.textColor = isDestructive ? .white : theme.onAccent
         let color = !isEnabled ? base.withAlphaComponent(Tokens.Opacity.disabled) : isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
         layer?.set(backgroundColor: cgColor(color), animated: false)
     }
