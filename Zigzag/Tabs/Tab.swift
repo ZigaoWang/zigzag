@@ -474,12 +474,28 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
-        if let response = navigationResponse.response as? HTTPURLResponse,
-           let disposition = response.value(forHTTPHeaderField: "Content-Disposition"),
-           disposition.lowercased().hasPrefix("attachment") {
-            return .download
+        let response = navigationResponse.response
+        let mime = (response.mimeType ?? "").lowercased()
+        let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
+        // A web page is shown, always. WebKit can briefly say it can't show HTML (a response handed over by a
+        // service worker, as YouTube's first load does), and a page saved as "youtube.com.html" is never right.
+        let isWebPage = mime.isEmpty || ["text/html", "application/xhtml+xml", "text/plain", "application/json", "text/xml", "application/xml"].contains(mime)
+        let isAttachment = disposition.hasPrefix("attachment") && (!isWebPage || disposition.contains("filename"))
+        let policy: WKNavigationResponsePolicy
+        if isAttachment {
+            policy = .download
+        } else if isWebPage || navigationResponse.canShowMIMEType {
+            policy = .allow
+        } else {
+            // Files in frames aren't saved behind the person's back; only the page itself can start a download.
+            policy = navigationResponse.isForMainFrame ? .download : .cancel
         }
-        return navigationResponse.canShowMIMEType ? .allow : .download
+        #if DEBUG
+        if policy == .download {
+            debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(!disposition.isEmpty)")
+        }
+        #endif
+        return policy
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
