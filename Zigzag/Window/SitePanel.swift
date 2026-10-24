@@ -110,8 +110,9 @@ final class SitePanel: FloatingPanelView {
         if tab.isArticle || readerOn {
             specs.append(("doc.plaintext", readerOn ? "Close Reader" : "Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
         }
-        if tab.webView?.canTogglePictureInPicture ?? false {
-            specs.append(("pip", "Picture in Picture", false, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
+        let floating = tab.webView?.isPictureInPictureActive ?? false
+        if floating || tab.webView?.canTogglePictureInPicture ?? false {
+            specs.append(("pip", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
         if tab.foreignLanguage != nil || tab.isTranslated {
             specs.append(("translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
