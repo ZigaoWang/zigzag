@@ -311,12 +311,13 @@ final class ActionChip: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + 2 + 16 + Tokens.Space.x1 + label.textWidth + Tokens.Space.x1) }
+    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + 2 + 16 + Tokens.Space.x1 + 2 + label.inkWidth + Tokens.Space.x3) }
 
     override func layout() {
         super.layout()
         icon.frame = NSRect(x: Tokens.Space.x2 + 2, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        label.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x1, y: (bounds.height - label.lineHeight) / 2, width: label.textWidth, height: label.lineHeight)
+        label.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x1 + 2 - Label.inset, y: (bounds.height - label.lineHeight) / 2,
+                             width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) {

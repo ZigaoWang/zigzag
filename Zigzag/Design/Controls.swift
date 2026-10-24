@@ -238,6 +238,12 @@ final class Label: NSTextField {
         return ceil(width) + Tokens.Space.x2
     }
 
+    /// The text's own width, without the padding `textWidth` adds: for laying out text inside a pill.
+    var inkWidth: CGFloat { ceil((stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width) }
+
+    /// The label's built-in inset on each side, so text can sit exactly where it's placed.
+    static let inset: CGFloat = 2
+
     /// Height of one line in this label's font.
     var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
 }
@@ -461,7 +467,7 @@ final class ChoicePill: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     /// `textWidth` already carries the cell's padding, so only the check and the edges are added.
-    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + Tokens.Space.x3 + label.textWidth + Tokens.Space.x1) }
+    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + Tokens.Space.x3 + Tokens.Space.x1 + label.inkWidth + Tokens.Space.x3) }
 
     override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
 
@@ -470,7 +476,7 @@ final class ChoicePill: InteractiveView {
         let side = Tokens.Space.x3
         check.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - side) / 2, width: side, height: side)
         let h = label.lineHeight
-        label.frame = NSRect(x: check.frame.maxX + 2, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        label.frame = NSRect(x: check.frame.maxX + Tokens.Space.x1 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -503,13 +509,16 @@ final class SegmentedPills: NSView {
 
         required init?(coder: NSCoder) { fatalError() }
 
-        var fittingWidth: CGFloat { Tokens.Space.x3 + title.textWidth + (count.stringValue.isEmpty ? 0 : count.textWidth) + Tokens.Space.x2 }
+        private var hasCount: Bool { !count.stringValue.isEmpty }
+
+        var fittingWidth: CGFloat { Tokens.Space.x3 * 2 + title.inkWidth + (hasCount ? Tokens.Space.x1 + 2 + count.inkWidth : 0) }
 
         override func layout() {
             super.layout()
-            let x = Tokens.Space.x3 - 2
-            title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2, width: title.textWidth, height: title.lineHeight)
-            count.frame = NSRect(x: title.frame.maxX - 4, y: (bounds.height - count.lineHeight) / 2, width: count.textWidth, height: count.lineHeight)
+            let x = Tokens.Space.x3
+            title.frame = NSRect(x: x - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: title.inkWidth + Label.inset * 2, height: title.lineHeight)
+            count.frame = NSRect(x: x + title.inkWidth + Tokens.Space.x1 + 2 - Label.inset, y: (bounds.height - count.lineHeight) / 2,
+                                 width: count.inkWidth + Label.inset * 2, height: count.lineHeight)
         }
 
         override func stateDidChange(animated: Bool) {

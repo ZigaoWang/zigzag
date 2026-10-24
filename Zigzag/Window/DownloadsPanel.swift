@@ -250,7 +250,8 @@ final class TextButton: InteractiveView {
         return button
     }
 
-    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x4 }
+    /// `textWidth` already carries the label's own inset; the label is centered, so the padding is even.
+    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x3 }
 
     /// So stacks and form rows can size it like any control.
     override var intrinsicContentSize: NSSize { NSSize(width: ceil(fittingWidth), height: Tokens.Space.x7Height) }
@@ -258,7 +259,8 @@ final class TextButton: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x4, height: h)
+        label.alignment = .center
+        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
