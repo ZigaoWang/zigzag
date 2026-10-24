@@ -242,6 +242,11 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
+        case "clearsite":
+            // clearsite <cache|cookies> <site>
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1]); debugLog("cleared \(f[0]) for \(f[1])") } }
+        case "cmd": controller.commandBar.runAction(arg)
         case "settingsbottom":
             if let scroll = SettingsWindowController.shared.window?.contentView as? NSScrollView, let document = scroll.documentView {
                 document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
