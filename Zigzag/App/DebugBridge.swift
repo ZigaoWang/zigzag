@@ -313,6 +313,12 @@ enum DebugBridge {
         case "addextnow": Task { _ = await ExtensionStore.install(arg) }
         case "rmext": ExtensionStore.uninstall(arg)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }
+        case "extreinstall":
+            // Removes and freshly installs an extension, as a new user would get it.
+            if #available(macOS 15.4, *) {
+                ExtensionStore.uninstall(arg)
+                Task { let r = await ExtensionStore.install(arg); debugLog("extreinstall \(arg) \(r)") }
+            }
         case "extclickpanel":
             // As if clicked in the site panel.
             if #available(macOS 15.4, *), let panel = SitePanel.shown, let anchor = panel.subviews.first?.subviews.last ?? panel.subviews.first,
