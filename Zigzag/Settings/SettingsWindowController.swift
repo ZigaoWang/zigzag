@@ -296,12 +296,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let privacyGroup = FormGroup()
     private let saveSwitch = NSSwitch()
     private let fillSwitch = NSSwitch()
-    private let openPasswordsButton = TextButton.form("Open Passwords…")
+    private let openPasswordsButton = TextButton.form("Open Passwords")
     private let blockingSwitch = NSSwitch()
     private let pipSwitch = NSSwitch()
     private let extensionsGroup = FormGroup()
-    private let getExtensionsButton = TextButton.form("Get Extensions…")
-    private let loadUnpackedButton = TextButton.form("Load Unpacked…")
+    private let getExtensionsButton = TextButton.form("Get Extensions")
+    private let loadUnpackedButton = TextButton.form("Load Unpacked")
     private var extensionsToken: SignalToken?
     private let engine = NSPopUpButton()
     private let defaultButton = TextButton.form("Make Default")
@@ -381,7 +381,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         reloadPasswords()
         reloadPrivacy()
 
-        let importButton = TextButton.form("Import…")
+        let importButton = TextButton.form("Import")
         importButton.onClick = { [weak self] _ in self?.importBrowser() }
         importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
 
@@ -427,7 +427,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         var controls: [NSView] = []
         var targets: [AnyObject] = []
         if ExtensionStore.needsApproval(id) {
-            let review = TextButton.form("Review Update…")
+            let review = TextButton.form("Review Update")
             review.onClick = { _ in
                 guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
                 controller.window?.makeKeyAndOrderFront(nil)
@@ -683,7 +683,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     /// did, right where you clicked.
     private func reloadPrivacy() {
         privacyGroup.removeAllRows()
-        let history = TextButton.form("Clear History…")
+        let history = TextButton.form("Clear History")
         history.onClick = { [weak self, weak history] _ in
             self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, bookmarks and passwords stay.",
                           action: "Clear History") {
@@ -700,7 +700,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 cache?.flash("Cleared")
             }
         }
-        let cookies = TextButton.form("Clear Cookies…")
+        let cookies = TextButton.form("Clear Cookies")
         cookies.onClick = { [weak self, weak cookies] _ in
             self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, bookmarks and history stay.", action: "Clear Cookies") {
                 Task { @MainActor in
@@ -718,7 +718,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let media = SitePermissions.sites.count, zoom = ZoomLevels.count
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
         let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "camera and microphone choices"), phrase(zoom, "zoom set")].compactMap { $0 }
-        let reset = TextButton.form("Reset All…")
+        let reset = TextButton.form("Reset All")
         reset.isEnabled = !parts.isEmpty
         reset.onClick = { [weak self] _ in
             self?.confirm(title: "Reset every site’s exceptions?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera and microphone, and zoom goes back to 100%.",

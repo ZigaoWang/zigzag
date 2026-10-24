@@ -292,7 +292,7 @@ final class AutofillMenu: FloatingPanelView {
     }
 
     private var rows: [AutofillRow] = []
-    private let footer = TextButton(title: "Passwords…", font: Tokens.Font.small(.medium))
+    private let footer = TextButton(title: "Passwords", font: Tokens.Font.small(.medium))
     private let footerLine = ColorView(color: Tokens.Color.separator)
     private let hasFooter: Bool
     private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }

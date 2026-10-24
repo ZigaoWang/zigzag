@@ -304,7 +304,7 @@ final class PasswordsView: NSView {
         let count = credentials.count
         ConfirmSheet.show(in: self, title: "Export \(count) \(count == 1 ? "password" : "passwords")?",
                           message: "The file isn’t protected: anyone who opens it can read every password. Keep it somewhere safe and delete it when you’re done.",
-                          confirmTitle: "Export…") { [weak self] confirmed in
+                          confirmTitle: "Export") { [weak self] confirmed in
             guard confirmed, let self else { return }
             Task { @MainActor in
                 // Always asked fresh, even while unlocked.
@@ -558,7 +558,7 @@ private final class EmptyStateView: NSView {
     private let ribbon = RibbonView()
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let body = NSTextField(wrappingLabelWithString: "")
-    private let importButton = PrimaryButton(title: "Import Passwords…")
+    private let importButton = PrimaryButton(title: "Import Passwords")
     var onImport: (() -> Void)?
 
     override init(frame: NSRect) {

@@ -31,7 +31,7 @@ private final class AboutView: NSView {
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private let line = NSTextField(wrappingLabelWithString: "A calm browser for the Mac. Your spaces, passwords and pages, kept on this Mac and in your iCloud, nowhere else.")
-    private let updates = TextButton(title: "Check for Updates…", font: Tokens.Font.body(.medium))
+    private let updates = TextButton(title: "Check for Updates", font: Tokens.Font.body(.medium))
     private let copyright = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
 
     override init(frame: NSRect) {
