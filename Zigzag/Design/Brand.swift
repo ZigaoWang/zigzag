@@ -106,10 +106,12 @@ enum Brand {
     // MARK: Type
 
     /// Display type for brand moments: SF Pro, heavy, tight.
-    static func display(_ text: String, size: CGFloat, color: NSColor, alignment: NSTextAlignment = .natural) -> NSAttributedString {
+    /// `wraps` lets a heading run onto more lines instead of ending in "…"; use it wherever the text is a
+    /// sentence or a name of unknown length.
+    static func display(_ text: String, size: CGFloat, color: NSColor, alignment: NSTextAlignment = .natural, wraps: Bool = false) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = alignment
-        paragraph.lineBreakMode = .byTruncatingTail
+        paragraph.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
         return NSAttributedString(string: text, attributes: [
             .font: NSFont.systemFont(ofSize: size, weight: .heavy),
             .kern: -size * 0.025,
@@ -496,7 +498,14 @@ final class BrandBanner: NSView {
     private let wash = CAGradientLayer()
     let ribbonMark = RibbonView()
     private let titleLabel = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-    private let subtitleLabel = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let subtitleLabel: NSTextField = {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = Tokens.Font.body()
+        label.textColor = Tokens.Color.textSecondary
+        label.isSelectable = false
+        label.maximumNumberOfLines = 2
+        return label
+    }()
     private var hasDrawn = false
     private var themeToken: SignalToken?
     var fixedTheme: Brand.Theme? { didSet { applyTheme() } }
@@ -569,10 +578,12 @@ final class BrandBanner: NSView {
                                   width: markWidth, height: markHeight)
         ribbonMark.ribbonWidth = markWidth / (1 + Brand.weight * 1.05)
         let x = contentInset
+        // Text stops short of the ribbon, so the two never overlap.
+        let textWidth = ribbonMark.frame.minX - Tokens.Space.x5 - x
         let titleHeight = ceil(titleLabel.intrinsicContentSize.height)
-        let subtitleHeight = subtitleLabel.isHidden ? 0 : subtitleLabel.lineHeight
+        let subtitleHeight = subtitleLabel.isHidden ? 0 : ceil(subtitleLabel.sizeThatFits(NSSize(width: textWidth, height: 200)).height)
         let bottom = bounds.height - Tokens.Space.x4
-        subtitleLabel.frame = NSRect(x: x, y: bottom - subtitleHeight, width: bounds.width - x * 2, height: subtitleHeight)
-        titleLabel.frame = NSRect(x: x - 1, y: subtitleLabel.frame.minY - titleHeight - (subtitleHeight > 0 ? 2 : 0), width: bounds.width - x * 2, height: titleHeight)
+        subtitleLabel.frame = NSRect(x: x, y: bottom - subtitleHeight, width: textWidth, height: subtitleHeight)
+        titleLabel.frame = NSRect(x: x - 1, y: subtitleLabel.frame.minY - titleHeight - (subtitleHeight > 0 ? 2 : 0), width: textWidth, height: titleHeight)
     }
 }
