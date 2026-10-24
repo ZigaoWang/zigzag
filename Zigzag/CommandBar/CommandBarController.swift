@@ -122,7 +122,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let card = controller.root.cardFrame
         if !isVisible {
             isVisible = true
-            scrim.frame = card
+            scrim.frame = isAnchored ? controller.root.bounds : card
             controller.root.overlay.addSubview(scrim)
             controller.root.overlay.addSubview(panel)
             scrim.show()
@@ -155,7 +155,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     func reposition() {
         guard isVisible, let controller else { return }
-        scrim.frame = controller.root.cardFrame
+        scrim.frame = isAnchored ? controller.root.bounds : controller.root.cardFrame
         panel.frame = panelFrame()
     }
 
@@ -166,8 +166,23 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         return CGFloat(results.count) * Tokens.Metric.commandBarRowHeight + Tokens.Space.x2 * 2
     }
 
+    /// Editing the address you're on opens right where it is: over the address field in the sidebar, reaching
+    /// into the page, like a dropdown. New tabs and history keep the bar centered over the page.
+    private var isAnchored: Bool {
+        guard let controller else { return false }
+        return mode == .editCurrent && controller.root.sidebarVisible && !controller.root.isSidebarFloatingVisible
+    }
+
     private func panelFrame() -> NSRect {
         guard let controller else { return .zero }
+        if isAnchored {
+            let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
+            let width = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
+            let height = Tokens.Metric.commandBarFieldHeight + listHeight
+            // The field sits where the address was, so the text doesn't jump.
+            let y = address.midY - Tokens.Metric.commandBarFieldHeight / 2
+            return NSRect(x: address.minX - Tokens.Space.x1, y: max(Tokens.Space.x1, y), width: width, height: height)
+        }
         let card = controller.root.cardFrame
         let width = min(Tokens.Metric.commandBarWidth, card.width - Tokens.Space.x16)
         let height = Tokens.Metric.commandBarFieldHeight + listHeight
