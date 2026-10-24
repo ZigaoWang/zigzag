@@ -346,6 +346,24 @@ final class TabManager {
         Library.shared.removeBookmark(bookmarkID)
     }
 
+    /// True when a pinned tab has moved on from its pinned page.
+    func isAway(_ bookmarkID: UUID) -> Bool {
+        guard let tab = bookmarkTabs[bookmarkID], let url = tab.url, let bookmark = Library.shared.bookmark(bookmarkID) else { return false }
+        return TabManager.normalize(url) != TabManager.normalize(bookmark.url)
+    }
+
+    /// Turns the page a pinned tab moved on to into a tab of its own; the pinned item stays as it was, unloaded.
+    func separateBookmarkTab(_ bookmarkID: UUID) {
+        guard let tab = bookmarkTabs[bookmarkID] else { return }
+        bookmarkTabs[bookmarkID] = nil
+        tab.bookmarkID = nil
+        tab.isFavorite = false
+        tab.spaceID = currentSpaceID
+        tabsBySpace[currentSpaceID, default: []].insert(tab, at: 0)
+        changed.send(.structure)
+        select(tab)
+    }
+
     /// Sends a bookmark's page back to the bookmarked address.
     func resetBookmarkTab(_ bookmarkID: UUID) {
         guard let tab = bookmarkTabs[bookmarkID], let bookmark = Library.shared.bookmark(bookmarkID) else { return }
@@ -380,6 +398,11 @@ final class TabManager {
         let wasSelected = selectedTab === tab
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
+            // A pinned tab that moved on goes back to its pinned page first; closing it again unloads it.
+            if isAway(bookmarkID) {
+                resetBookmarkTab(bookmarkID)
+                return
+            }
             // Closing a bookmark only unloads its page; the bookmark stays.
             bookmarkTabs[bookmarkID] = nil
             recentTabIDs.removeAll { $0 == tab.id }
