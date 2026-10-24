@@ -15,6 +15,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private var target: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)?
     /// Bumped on every focus change, so a slow vault lookup for an old field never shows a menu.
     private var generation = 0
+    /// The new-password field's own rules, for the generator.
+    private var rules = PasswordGenerator.Rules()
 
     /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them.
     static var isOn: Bool {
@@ -42,6 +44,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let current = generation
             if body["isNew"] as? Bool == true {
                 guard !(webView.owner?.isPrivate ?? false) else { hide(); return }
+                rules = PasswordGenerator.Rules(passwordRules: body["rules"] as? String ?? "", minLength: body["minLength"] as? Int ?? -1,
+                                                maxLength: body["maxLength"] as? Int ?? -1)
                 show([.generate], under: field, in: webView, frame: frame, origin: origin)
                 return
             }
@@ -118,11 +122,17 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let origin = target.origin
         let webView = target.webView
         hide()
-        let password = PasswordGenerator.generate()
+        let candidates = PasswordGenerator.candidates(rules, count: 6)
         Task {
-            let arguments: [String: Any] = ["password": password.withUnsafeString { String($0) }]
-            let username = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? String
+            let arguments: [String: Any] = ["candidates": candidates.map { $0.withUnsafeString { String($0) } }]
+            let result = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
             let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
+            guard let index = result?["index"] as? Int, candidates.indices.contains(index) else {
+                if let controller { Toast.show("This site’s password rules didn’t fit a strong password. Type one yourself.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                return
+            }
+            let password = candidates[index]
+            let username = result?["username"] as? String
             do {
                 try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password)
                 if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key.fill", duration: 2, in: controller) }
@@ -181,7 +191,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       };
       const report = (el) => {
         const r = el.getBoundingClientRect();
-        post({ kind: 'focus', isNew: isNew(el) && !el.value, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
+        post({ kind: 'focus', isNew: isNew(el) && !el.value, rules: el.getAttribute('passwordrules') || '',
+               minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
       };
       const wanted = (el) => signIn(el) || isNew(el);
       document.addEventListener('focusin', (e) => { if (wanted(e.target)) report(e.target); }, true);
@@ -197,17 +208,39 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     })();
     """
 
-    /// Puts a new password in every new-password field of the focused form (the password and its confirmation),
-    /// and returns the username typed so far, if any.
+    /// Picks the first candidate the field accepts (its `pattern` and lengths), puts it in every new-password
+    /// field of the focused form (the password and its confirmation), and returns its index and the username
+    /// typed so far, if any.
     private static let generatedFiller = """
     const active = document.activeElement;
     const scope = (active && active.form) || document;
-    const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && !el.disabled && !el.readOnly; };
+    // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
+    const visible = (el) => {
+      if (el.disabled || el.readOnly || el.type === 'hidden') return false;
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+      const style = getComputedStyle(el);
+      return style.visibility === 'visible' && parseFloat(style.opacity) >= 0.1;
+    };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
     const passwords = inputs.filter((el) => el.type === 'password');
     const current = passwords.find((el) => /current-password/.test(el.autocomplete || ''));
     const fresh = passwords.filter((el) => el !== current && (/new-password/.test(el.autocomplete || '') || !/current-password/.test(el.autocomplete || '')));
     const targets = current || passwords.length < 3 ? fresh : fresh.slice(1);
+    const field = targets.includes(active) ? active : targets[0];
+    if (!field) return { index: -1 };
+    const fits = (value) => {
+      if (field.minLength > 0 && value.length < field.minLength) return false;
+      if (field.maxLength > 0 && value.length > field.maxLength) return false;
+      if (!field.pattern) return true;
+      try { return new RegExp('^(?:' + field.pattern + ')$', 'v').test(value); } catch (e) {
+        try { return new RegExp('^(?:' + field.pattern + ')$', 'u').test(value); } catch (e2) { return true; }
+      }
+    };
+    const index = candidates.findIndex(fits);
+    if (index < 0) return { index: -1 };
+    const password = candidates[index];
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
     for (const el of targets) {
       setter.call(el, password);
@@ -217,14 +250,22 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     const first = passwords[0];
     const users = inputs.filter((el) => ['text', 'email', 'tel', ''].includes(el.type) && el.value && inputs.indexOf(el) < inputs.indexOf(first));
     const marked = users.find((el) => /username|email/.test(el.autocomplete || '') || el.type === 'email');
-    return (marked || users[users.length - 1] || {}).value || '';
+    return { index, username: (marked || users[users.length - 1] || {}).value || '' };
     """
 
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
     private static let filler = """
     const active = document.activeElement;
     const scope = (active && active.form) || document;
-    const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && !el.disabled && !el.readOnly; };
+    // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
+    const visible = (el) => {
+      if (el.disabled || el.readOnly || el.type === 'hidden') return false;
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+      const style = getComputedStyle(el);
+      return style.visibility === 'visible' && parseFloat(style.opacity) >= 0.1;
+    };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
     const passwordField = inputs.find((el) => el.type === 'password' && !/new-password/.test(el.autocomplete || ''));
     const userFields = inputs.filter((el) => ['text', 'email', 'tel', ''].includes(el.type));
