@@ -67,14 +67,21 @@ final class WindowManager {
         }
         let controller = makeController(manager: manager, frame: frame, sidebarVisible: keyController?.root.sidebarVisible ?? true,
                                         sidebarWidth: keyController?.root.sidebarWidth ?? Tokens.Metric.sidebarWidth)
+        let firstLaunch = url == nil && !isPrivate && !Library.shared.importedFromArc && !UserDefaults.standard.bool(forKey: "ImportOfferDismissed")
+            && !UserDefaults.standard.bool(forKey: "ArcOfferDismissed")
+        if firstLaunch {
+            // First launch is its own moment: the welcome window, then the browser.
+            WelcomeWindowController.show { [weak controller] in
+                controller?.showWindow(nil)
+                controller?.commandBar.show(mode: .newTab)
+            }
+            return controller
+        }
         controller.showWindow(nil)
         if let url {
             manager.newTab(url: url)
         } else if isPrivate {
             controller.commandBar.show(mode: .newTab)
-        } else if !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ImportOfferDismissed"),
-                  !UserDefaults.standard.bool(forKey: "ArcOfferDismissed"), !ImportCoordinator.detectedSources().isEmpty {
-            controller.showWelcome()
         } else if showCommandBar {
             controller.commandBar.show(mode: .newTab)
         }
