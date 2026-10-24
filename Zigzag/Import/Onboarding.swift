@@ -143,6 +143,8 @@ class StepContent: NSView {
     var isBusy: Bool { false }
     /// What the step shows on the right: a Zigzag window that changes as you choose.
     let preview = LiveBrowser()
+    /// A picture of its own instead of the window, when the window wouldn't explain this step.
+    var picture: NSView? { nil }
     /// The main button: do what the step needs, then call `done` to move on (now, or once it's finished).
     func commit(_ done: @escaping () -> Void) { done() }
     override var isFlipped: Bool { true }
@@ -181,7 +183,7 @@ private final class StepPage: NSView {
         }
         [left, right].forEach { addSubview($0) }
         (bars + [title, body, content, back, skip, next] as [NSView]).forEach { addSubview($0) }
-        right.addSubview(content.preview)
+        right.addSubview(content.picture ?? content.preview)
         back.onClick = { [weak self] _ in self?.onBack?() }
         skip.onClick = { [weak self] _ in self?.onNext?() }
         next.onClick = { [weak self] _ in
@@ -234,8 +236,12 @@ private final class StepPage: NSView {
         back.frame = NSRect(x: pad - Tokens.Space.x2, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
         content.frame = NSRect(x: pad, y: top, width: inner, height: max(0, fy - 20 - top))
         // The window sits low and to the right, running off the edge, like a real one behind this.
-        let pw: CGFloat = 620, ph = min(440, bounds.height - 120)
-        content.preview.frame = NSRect(x: 48, y: (bounds.height - ph) / 2, width: pw, height: ph)
+        if let picture = content.picture {
+            picture.frame = right.bounds
+        } else {
+            let pw: CGFloat = 620, ph = min(440, bounds.height - 120)
+            content.preview.frame = NSRect(x: 48, y: (bounds.height - ph) / 2, width: pw, height: ph)
+        }
     }
 }
 
@@ -647,6 +653,8 @@ private final class BrowserRow: InteractiveView {
 /// The browsers on this Mac, each with a checkbox, what it holds, and how its import went. Anything macOS keeps
 /// private says so before you start, with the fix beside it.
 private final class BringPicker: StepContent {
+    private let arrow = IntoZigzag()
+    override var picture: NSView? { arrow }
     private let list = ColorView(color: Onboard.tint.withAlphaComponent(0.07))
     private var rows: [BrowserRow] = []
     private var separators: [ColorView] = []
@@ -675,6 +683,10 @@ private final class BringPicker: StepContent {
             pills.append((choice, pill))
         }
         fileLink.onClick = { [weak self] _ in self?.pickFile() }
+        // Everything comes over; choosing what (and password files) lives in the Import window in Settings.
+        pills.forEach { $0.1.isHidden = true }
+        fileLink.isHidden = true
+        bringLabel.isHidden = true
         refresh()
     }
 
@@ -714,9 +726,8 @@ private final class BringPicker: StepContent {
     private var choice: ImportCoordinator.Choice { pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } } }
 
     private func refresh() {
-        let arc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
-        pills.first { $0.0 == .tabs }?.1.isHidden = !arc
-        pills.forEach { $0.1.isLocked = isImporting }
+        pills.forEach { $0.1.isHidden = true }
+        arrow.show(rows.filter(\.isChosen).prefix(3).map(\.source.icon))
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
         hint.stringValue = isImporting ? "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
@@ -846,20 +857,58 @@ private final class BringPicker: StepContent {
             ry = 40
         }
         y += ry + Tokens.Space.x5
-        // What to bring: pills that wrap to a second line when the column is narrow.
-        bringLabel.isHidden = true
-        var px: CGFloat = 0
-        for (_, pill) in pills where !pill.isHidden {
-            let w = pill.fittingWidth
-            if px + w > width { px = 0; y += 34 }
-            pill.frame = NSRect(x: px, y: y, width: w, height: 28)
-            px += w + 6
-        }
-        y += 28 + Tokens.Space.x2
+        _ = y
         let fw = fileLink.fittingWidth
         fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: fw, height: Tokens.Space.x8)
         hint.alignment = .left
         hint.frame = NSRect(x: 0, y: bounds.height - hint.lineHeight, width: width, height: hint.lineHeight)
+    }
+}
+
+/// The import step's picture: the browsers you've picked, an arrow, and Zigzag.
+private final class IntoZigzag: NSView {
+    private var sources: [NSImageView] = []
+    private let arrow = NSImageView()
+    private let zigzag = NSImageView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        arrow.image = Tokens.Symbol.image("arrow.right", size: 30)
+        arrow.contentTintColor = Brand.ribbon.withAlphaComponent(0.7)
+        zigzag.image = NSApp.applicationIconImage
+        [arrow, zigzag].forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    func show(_ icons: [NSImage]) {
+        sources.forEach { $0.removeFromSuperview() }
+        sources = icons.map { image in
+            let view = NSImageView(image: image)
+            view.imageScaling = .scaleProportionallyUpOrDown
+            addSubview(view)
+            return view
+        }
+        arrow.isHidden = icons.isEmpty
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let big: CGFloat = 128, small: CGFloat = 96
+        // The browsers stacked a little, the arrow, then Zigzag, centered as one row.
+        let stack = sources.isEmpty ? 0 : small + CGFloat(sources.count - 1) * 36
+        let total = sources.isEmpty ? big : stack + 40 + 44 + 40 + big
+        var x = (bounds.width - total) / 2
+        let mid = bounds.height / 2
+        for (i, view) in sources.enumerated() {
+            view.frame = NSRect(x: x + CGFloat(i) * 36, y: mid - small / 2, width: small, height: small)
+        }
+        x += stack + 40
+        arrow.frame = NSRect(x: x, y: mid - 22, width: 44, height: 44)
+        if !sources.isEmpty { x += 44 + 40 }
+        zigzag.frame = NSRect(x: x, y: mid - big / 2, width: big, height: big)
     }
 }
 
