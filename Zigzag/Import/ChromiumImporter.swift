@@ -59,6 +59,13 @@ nonisolated enum ChromiumImporter {
     static func read(_ browser: Browser, _ choice: Choice) -> ImportBatch {
         var batch = ImportBatch()
         let profiles = profiles(of: browser)
+        // macOS protects some browsers' data (Chrome, Edge, Brave) from other apps, with no prompt; say so.
+        let files = profiles.flatMap { profile in ["Login Data", "Bookmarks", "History"].map { profile.appendingPathComponent($0) } }
+        if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) })
+            || (profiles.isEmpty && FileManager.default.fileExists(atPath: rootURL(of: browser).path)) {
+            batch.problems.append(ImportProblem(message: "macOS is keeping \(browser.name)'s data private. Give Zigzag Full Disk Access in System Settings, then try again.", fix: .fullDiskAccess))
+            return batch
+        }
         if choice.contains(.passwords) {
             switch safeStorageKey(browser) {
             case .success(let key):
