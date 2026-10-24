@@ -311,6 +311,7 @@ enum DebugBridge {
             if let pane = SettingsPane.allCases.first(where: { "\($0)" == arg }) { SettingsWindowController.shared.show(pane) }
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
+        case "storeadd": WebStoreOffer.debugAdd()
         case "addextnow": Task { _ = await ExtensionStore.install(arg) }
         case "rmext": ExtensionStore.uninstall(arg)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }
