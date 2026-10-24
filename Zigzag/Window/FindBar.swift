@@ -279,18 +279,37 @@ final class ToastView: FloatingPanelView {
             + (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1 + actionButton.fittingWidth + Tokens.Space.x1)
     }
 
+    /// The space around the text: the icon on the left, the action (or padding) on the right.
+    private var chromeWidth: CGFloat { fittingWidth - label.textWidth }
+
+    /// Fits `maxWidth`: one line when it can, two wrapped lines when it can't, never past the page.
+    func size(maxWidth: CGFloat) -> NSSize {
+        let width = min(ceil(fittingWidth), maxWidth)
+        let textWidth = width - chromeWidth
+        let wraps = label.textWidth > textWidth + 0.5
+        label.usesSingleLineMode = !wraps
+        label.maximumNumberOfLines = wraps ? 2 : 1
+        label.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
+        label.cell?.wraps = wraps
+        label.cell?.truncatesLastVisibleLine = true
+        let textHeight = wraps ? ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth, height: 200)).height ?? label.lineHeight * 2) : label.lineHeight
+        radius = wraps ? Tokens.Radius.panel : Self.height / 2
+        return NSSize(width: width, height: max(Self.height, textHeight + Tokens.Space.x4))
+    }
+
     private func layoutContent() {
         var x = Tokens.Space.x3
         if icon.image != nil {
             icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
             x = icon.frame.maxX + Tokens.Space.x2
         }
-        let h = label.lineHeight
         let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
         if !actionButton.isHidden {
             actionButton.frame = NSRect(x: bounds.width - Tokens.Space.x1 - actionWidth, y: (bounds.height - Tokens.Space.x6) / 2, width: actionWidth, height: Tokens.Space.x6)
         }
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        let textWidth = bounds.width - chromeWidth
+        let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: textWidth, height: h)
     }
 }
 
@@ -321,7 +340,6 @@ enum Toast {
             isNew = false
         } else {
             toast = ToastView()
-            toast.radius = ToastView.height / 2
             isNew = true
         }
         toast.label.stringValue = text
@@ -334,9 +352,9 @@ enum Toast {
                 toast?.dismiss(always: true)
             }
         }
-        let width = ceil(toast.fittingWidth)
+        let size = toast.size(maxWidth: max(160, area.width - Tokens.Space.x12))
         // Top center of the page: where your eyes already are, clear of the content you're reading.
-        toast.frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: ToastView.height)
+        toast.frame = NSRect(x: round(area.midX - size.width / 2), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
         toast.needsLayout = true
         if isNew {
             host.addSubview(toast)
