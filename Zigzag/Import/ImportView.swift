@@ -58,7 +58,7 @@ final class ImportView: NSView {
         [title, subtitle, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
         for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
             let box = ChoicePill(title: name)
-            box.tint = Brand.Theme.current.accent
+            box.tint = Brand.Theme.brand.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }
             addSubview(box)
             choiceButtons.append((choice, box))
@@ -341,7 +341,7 @@ private final class SourceRow: InteractiveView {
         detail.font = Tokens.Font.small()
         detail.textColor = Tokens.Color.textSecondary
         detail.isSelectable = false
-        spinner.color = Brand.Theme.current.accent
+        spinner.color = Brand.Theme.brand.accent
         spinner.isHidden = true
         check.isHidden = true
         [icon, name, detail, check, spinner].forEach { addSubview($0) }
@@ -401,7 +401,7 @@ private final class SourceRow: InteractiveView {
             detail.stringValue = preview
             check.isHidden = !isChosen
             check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.large)
-            check.contentTintColor = Brand.Theme.current.accent
+            check.contentTintColor = Brand.Theme.brand.accent
         case .waiting:
             detail.stringValue = "Waiting…"
         case .working:
@@ -493,7 +493,7 @@ private final class SourceRow: InteractiveView {
         let fill: NSColor? = isChosen ? Tokens.Color.fieldFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated)
         layer?.borderWidth = isChosen ? 1 : 0
-        layer?.borderColor = cgColor(Brand.Theme.current.accent.withAlphaComponent(0.55))
+        layer?.borderColor = cgColor(Brand.Theme.brand.accent.withAlphaComponent(0.55))
     }
 }
 
@@ -552,7 +552,7 @@ private final class ImportHero: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private var theme: Brand.Theme { Brand.Theme.current }
+    private var theme: Brand.Theme { Brand.Theme.brand }
 
     private func applyTheme() {
         wordmark.color = theme.tint

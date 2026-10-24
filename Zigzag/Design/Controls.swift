@@ -363,7 +363,7 @@ final class PrimaryButton: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         // The space's accent: the one primary action on a screen.
-        let theme = fixedTheme ?? Brand.Theme.current
+        let theme = fixedTheme ?? Brand.Theme.for(self)
         let base = isDestructive ? Tokens.Color.destructive : theme.accent
         label.textColor = isDestructive ? .white : theme.onAccent
         let color = !isEnabled ? base.withAlphaComponent(Tokens.Opacity.disabled) : isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
@@ -630,7 +630,7 @@ final class Toggle: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let off = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.13), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.18))
-        let track = isOn ? Tokens.Color.accent : off
+        let track = isOn ? Brand.Theme.for(self).accent : off
         layer?.set(backgroundColor: cgColor(isPressed ? (track.blended(withFraction: 0.08, of: .black) ?? track) : track), animated: animated)
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
@@ -723,7 +723,7 @@ final class StatusLabel: NSView {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
-        check.contentTintColor = Tokens.Color.accent
+        check.contentTintColor = Brand.Theme.for(self).accent
         [check, label].forEach { addSubview($0) }
     }
 

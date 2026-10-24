@@ -195,7 +195,7 @@ final class SpaceSettingsRow: InteractiveView {
         layer?.shadowRadius = 12
         layer?.shadowOffset = CGSize(width: 0, height: -4)
         layer?.borderWidth = isLifted ? 1 : 0
-        layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.5))
+        layer?.borderColor = cgColor(Brand.Theme.brand.accent.withAlphaComponent(0.5))
     }
 
     func openEditor() {
@@ -297,7 +297,7 @@ private final class PaneTab: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let accent = Tokens.Color.accent
+        let accent = Brand.Theme.brand.accent
         let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : 0.14) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
@@ -740,7 +740,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, developerGroup)
         case .shortcuts:
             shortcutSearch.frame = NSRect(x: pad, y: y, width: contentWidth, height: Tokens.Space.x8)
-            shortcutSearch.tint = Tokens.Color.accent
+            shortcutSearch.tint = Brand.Theme.brand.accent
             documentView.addSubview(shortcutSearch)
             y = shortcutSearch.frame.maxY + Tokens.Space.x5
             if shortcutGroups.isEmpty {

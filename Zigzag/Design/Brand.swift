@@ -94,6 +94,18 @@ enum Brand {
         }
 
         /// The space in front: the key browser window's, or the first one's.
+        /// Zigzag's own blue, for windows that belong to the app rather than a space: Settings, Passwords,
+        /// Import, Welcome and About.
+        static let brand = Theme(hue: Brand.navyHue)
+
+        /// The theme for a view: its browser window's space, or the brand blue in any other window.
+        /// A view not in a window yet gets the brand; views refresh when they join one.
+        @MainActor static func `for`(_ view: NSView?) -> Theme {
+            guard let window = view?.window else { return brand }
+            guard let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return brand }
+            return of(controller.tabManager.currentSpace)
+        }
+
         @MainActor static var current: Theme {
             let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
             return of(controller?.tabManager.currentSpace)
@@ -381,8 +393,13 @@ final class BrandSurface: NSView {
         return image
     }()
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        applyTheme()
+    }
+
     private func applyTheme() {
-        theme = fixedTheme ?? Brand.Theme.current
+        theme = fixedTheme ?? Brand.Theme.for(self)
         effectiveAppearance.performAsCurrentDrawingAppearance {
             let deep = (theme.deep.usingColorSpace(.sRGB) ?? theme.deep)
             let lit = deep.blended(withFraction: 0.12, of: .white) ?? deep
@@ -533,7 +550,6 @@ final class BrandBanner: NSView {
         label.maximumNumberOfLines = 2
         return label
     }()
-    private var hasDrawn = false
     private var themeToken: SignalToken?
     var fixedTheme: Brand.Theme? { didSet { applyTheme() } }
     private(set) var theme = Brand.Theme.navy
@@ -563,7 +579,7 @@ final class BrandBanner: NSView {
     override var isFlipped: Bool { true }
 
     private func applyTheme() {
-        theme = fixedTheme ?? Brand.Theme.current
+        theme = fixedTheme ?? Brand.Theme.for(self)
         let dark = effectiveAppearance.isDark
         effectiveAppearance.performAsCurrentDrawingAppearance {
             Tokens.Motion.withoutAnimation {
@@ -584,10 +600,6 @@ final class BrandBanner: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         applyTheme()
-        guard window != nil, !hasDrawn else { return }
-        hasDrawn = true
-        Brand.enter([titleLabel, subtitleLabel], delay: 0.05)
-        ribbonMark.drawIn(delay: 0.15)
     }
 
     override func layout() {

@@ -188,7 +188,7 @@ final class PasswordsView: NSView {
     }
 
     private func refreshCounts() {
-        filters.tint = Brand.Theme.current.accent
+        filters.tint = Brand.Theme.brand.accent
         for (index, category) in Category.allCases.enumerated() {
             switch category {
             case .all: filters.setCount(credentials.count, at: index)
@@ -198,7 +198,7 @@ final class PasswordsView: NSView {
             }
         }
         filters.selectedIndex = Category.allCases.firstIndex(of: category) ?? 0
-        search.tint = Brand.Theme.current.accent
+        search.tint = Brand.Theme.brand.accent
         let n = credentials.count
         header.subtitle = n == 0 ? "In your Keychain, synced with iCloud Keychain" : "\(n.formatted()) saved · in your Keychain, synced with iCloud Keychain"
     }
@@ -438,7 +438,7 @@ private final class LockedView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        badge.color = Brand.Theme.current.accent
+        badge.color = Brand.Theme.brand.accent
         title.attributedStringValue = Brand.display("Your passwords are locked", size: 22, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
         title.alignment = .center
         body.alignment = .center
@@ -457,7 +457,7 @@ private final class LockedView: NSView {
     override var isHidden: Bool {
         didSet {
             guard oldValue, !isHidden, window != nil else { return }
-            badge.color = Brand.Theme.current.accent
+            badge.color = Brand.Theme.brand.accent
             Brand.enter([title, body, button], delay: 0.05)
             badge.drawIn()
         }
@@ -466,7 +466,7 @@ private final class LockedView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, !isHidden else { return }
-        badge.color = Brand.Theme.current.accent
+        badge.color = Brand.Theme.brand.accent
         Brand.enter([title, body, button], delay: 0.05)
         badge.drawIn()
     }
@@ -527,7 +527,7 @@ private final class ListRow: InteractiveView {
     /// Selected with a soft fill of the space's accent.
 
     override func stateDidChange(animated: Bool) {
-        let accent = Brand.Theme.current.accent
+        let accent = Brand.Theme.brand.accent
         let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.2 : 0.13) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
@@ -583,7 +583,7 @@ private final class EmptyStateView: NSView {
     func setLoading() {
         icon.isHidden = true
         ribbon.isHidden = false
-        ribbon.color = Brand.Theme.current.accent
+        ribbon.color = Brand.Theme.brand.accent
         ribbon.startLooping()
         title.attributedStringValue = Brand.display("Opening your passwords…", size: 20, color: Tokens.Color.textPrimary, alignment: .center)
         body.stringValue = ""
@@ -598,7 +598,7 @@ private final class EmptyStateView: NSView {
         icon.image = Tokens.Symbol.image(symbol, size: 28)
         icon.isHidden = usesRibbon
         ribbon.isHidden = !usesRibbon
-        ribbon.color = Brand.Theme.current.accent.withAlphaComponent(0.85)
+        ribbon.color = Brand.Theme.brand.accent.withAlphaComponent(0.85)
         self.title.attributedStringValue = Brand.display(title, size: 20, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
         self.title.alignment = .center
         self.body.stringValue = body
