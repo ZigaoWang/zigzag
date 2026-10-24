@@ -241,7 +241,7 @@ final class ExtensionHost: NSObject {
         popupShownAt = nil
         let tabsBefore = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
         let context = item.context
-        Self.log.notice("action \(context.webExtension.displayName ?? "?", privacy: .public) popup=\(context.action(for: tab)?.presentsPopup ?? false)")
+        ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(context.action(for: tab)?.presentsPopup ?? false)")
         context.performAction(for: tab)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self, self.popupShownAt == nil else { return }
@@ -250,7 +250,7 @@ final class ExtensionHost: NSObject {
             let fallback = context.uniqueIdentifier == ExtensionStore.onePasswordID || context.webExtension.displayName == "1Password"
                 ? URL(string: "\(context.baseURL.absoluteString)app/app.html#/page/welcome")
                 : context.optionsPageURL
-            Self.log.notice("action did nothing; opening \(fallback?.absoluteString ?? "nothing", privacy: .public)")
+            ExtensionLog.write("click did nothing; opening \(fallback?.absoluteString ?? "nothing")")
             guard let fallback, let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
             controller.tabManager.newTab(url: fallback)
         }
@@ -384,7 +384,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         lastAction = action
         popupShownAt = Date()
-        Self.log.notice("popup \(context.webExtension.displayName ?? "?", privacy: .public) has=\(action.popupPopover != nil)")
+        ExtensionLog.write("popup \(context.webExtension.displayName ?? "?") has=\(action.popupPopover != nil)")
         guard let popover = action.popupPopover else { completionHandler(nil); return }
         // Asked by the page (1Password's "Unlock" button) rather than a click: the button pressed last may be
         // gone with its panel, so the popup comes from the address bar instead of not at all.
@@ -610,18 +610,61 @@ final class NativeMessagingHost {
 
     func connect(_ port: WKWebExtension.MessagePort, onClose: @escaping () -> Void) {
         let id = extensionID
+        var received = 0
+        var sent = 0
         let started = start(onMessage: { message in
+            received += 1
             ExtensionHost.shared.nativeHostReplied(message, for: id)
             port.sendMessage(message, completionHandler: nil)
         }, onExit: {
+            ExtensionLog.write("native host for \(id) exited after \(sent) sent, \(received) received")
             port.disconnect()
             onClose()
         })
+        ExtensionLog.write("native host for \(id) started=\(started)")
+        // The app took the connection but never answers (1Password waiting on something in its own window):
+        // let the extension go on without it, so its pages and popup still work, and say what to do.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self, weak port] in
+            guard let self, let port, received == 0, self.process?.isRunning == true else { return }
+            ExtensionLog.write("native host for \(id) silent after \(sent) sent; closing")
+            self.process?.terminate()
+            port.disconnect()
+            onClose()
+            if id == ExtensionStore.onePasswordID, let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
+                Toast.show("1Password’s app didn’t answer. Open 1Password, unlock it, then in Settings › Browser add Zigzag.",
+                           symbol: "exclamationmark.circle", action: ("Open 1Password", {
+                               if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
+                                   NSWorkspace.shared.openApplication(at: app, configuration: .init())
+                               }
+                           }), duration: 8, in: controller)
+            }
+        }
         guard started else { port.disconnect(); onClose(); return }
-        port.messageHandler = { [weak self] message, _ in self?.write(message) }
+        port.messageHandler = { [weak self] message, _ in
+            sent += 1
+            self?.write(message)
+        }
         port.disconnectHandler = { [weak self] _ in
             self?.process?.terminate()
             onClose()
+        }
+    }
+}
+
+/// A few lines about extensions, in every build, for finding out why one isn't working: what was clicked, whether
+/// a popup opened, how many messages a companion app sent. Never what any message said.
+enum ExtensionLog {
+    nonisolated static func write(_ line: String) {
+        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Zigzag", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent("extensions.log")
+        let text = "\(Date()) \(line)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(text.utf8))
+            try? handle.close()
+        } else {
+            try? Data(text.utf8).write(to: url)
         }
     }
 }
