@@ -17,8 +17,8 @@ final class ExtensionSheet: FloatingPanelView {
     private static weak var current: ExtensionSheet?
 
     private let iconView = NSImageView()
-    private let titleLabel: Label
-    private let subtitleLabel: Label
+    private let titleLabel: NSTextField
+    private let subtitleLabel: NSTextField
     private let headingLabel: Label
     private var rows: [(NSImageView, NSTextField)] = []
     private let limitsBox = ColorView(color: Tokens.Color.fieldFill)
@@ -33,8 +33,16 @@ final class ExtensionSheet: FloatingPanelView {
     static let width: CGFloat = 360
 
     private init(_ content: Content) {
-        titleLabel = Label(content.title, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-        subtitleLabel = Label(content.subtitle, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+        // Both wrap: an extension's name, or an update's sentence, can be longer than one line.
+        titleLabel = NSTextField(wrappingLabelWithString: content.title)
+        titleLabel.font = Tokens.Font.body(.semibold)
+        titleLabel.textColor = Tokens.Color.textPrimary
+        titleLabel.maximumNumberOfLines = 2
+        titleLabel.isSelectable = false
+        subtitleLabel = NSTextField(wrappingLabelWithString: content.subtitle)
+        subtitleLabel.font = Tokens.Font.small()
+        subtitleLabel.textColor = Tokens.Color.textSecondary
+        subtitleLabel.isSelectable = false
         headingLabel = Label(content.heading, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
         confirmButton = PrimaryButton(title: content.confirm)
         cancelButton = TextButton(title: content.cancel, font: Tokens.Font.body(.medium))
@@ -126,11 +134,14 @@ final class ExtensionSheet: FloatingPanelView {
         let iconSize = Tokens.Space.x10
         place(iconView, NSRect(x: pad, y: y, width: iconSize, height: iconSize))
         let textX = pad + iconSize + Tokens.Space.x3
-        let textHeight = titleLabel.lineHeight + 2 + subtitleLabel.lineHeight
-        let textY = y + (iconSize - textHeight) / 2
-        place(titleLabel, NSRect(x: textX, y: textY, width: Self.width - textX - pad, height: titleLabel.lineHeight))
-        place(subtitleLabel, NSRect(x: textX, y: textY + titleLabel.lineHeight + 2, width: Self.width - textX - pad, height: subtitleLabel.lineHeight))
-        y += iconSize + Tokens.Space.x4
+        let textWidth = Self.width - textX - pad
+        let titleHeight = ceil(titleLabel.sizeThatFits(NSSize(width: textWidth, height: 200)).height)
+        let subtitleHeight = ceil(subtitleLabel.sizeThatFits(NSSize(width: textWidth, height: 200)).height)
+        let textHeight = titleHeight + 2 + subtitleHeight
+        let textY = y + max(0, (iconSize - textHeight) / 2)
+        place(titleLabel, NSRect(x: textX, y: textY, width: textWidth, height: titleHeight))
+        place(subtitleLabel, NSRect(x: textX, y: textY + titleHeight + 2, width: textWidth, height: subtitleHeight))
+        y += max(iconSize, textHeight) + Tokens.Space.x4
         if !rows.isEmpty {
             place(headingLabel, NSRect(x: pad, y: y, width: inner, height: headingLabel.lineHeight))
             y += headingLabel.lineHeight + Tokens.Space.x2
