@@ -14,7 +14,7 @@ final class WindowTour: NSView {
              target: { $0.sidebar.list }),
         Stop(title: "Your spaces", body: "Each dot is a space with its own tabs and pins. Click one, or swipe with two fingers on the sidebar.",
              target: { $0.sidebar.dotsAnchor }),
-        Stop(title: "Go anywhere", body: "Type an address or a search here. From anywhere in Zigzag, ⌘T does the same.",
+        Stop(title: "Open a new website", body: "Press ⌘T anywhere, type an address or a search, and press Return. Getting started, on the right, walks you through the rest.",
              target: { $0.sidebar.address }),
     ]
 

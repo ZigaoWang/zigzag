@@ -76,11 +76,12 @@ final class WindowManager {
             WelcomeWindowController.show { [weak controller] in
                 guard let controller else { return }
                 controller.showWindow(nil)
-                // Straight after onboarding, a short tour of the window itself; then the address bar opens.
-                guard !WindowTour.hasRun else { controller.commandBar.show(mode: .newTab); return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak controller] in
+                // Straight after onboarding: Getting started open in a pinned tab, then a short tour of the window.
+                FirstRun.prepare(controller)
+                guard !WindowTour.hasRun else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak controller] in
                     guard let controller else { return }
-                    WindowTour.start(in: controller) { [weak controller] in controller?.commandBar.show(mode: .newTab) }
+                    WindowTour.start(in: controller) {}
                 }
             }
             return controller
