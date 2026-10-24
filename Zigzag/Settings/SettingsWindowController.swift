@@ -274,6 +274,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let generalGroup = FormGroup()
     private let spacesGroup = FormGroup()
     private let importGroup = FormGroup()
+    private let blockingSwitch = NSSwitch()
     private let extensionsGroup = FormGroup()
     private let getExtensionsButton = NSButton(title: "Get Extensions…", target: nil, action: nil)
     private var extensionsToken: SignalToken?
@@ -332,6 +333,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
+        blockingSwitch.controlSize = .small
+        blockingSwitch.target = self
+        blockingSwitch.action = #selector(blockingChanged)
+        // EasyList's licence asks for credit; this is where people look for what does the blocking.
+        generalGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingSwitch))
 
         addSpaceButton.target = self
         addSpaceButton.action = #selector(addSpace)
@@ -451,6 +457,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let isDefault = Self.isDefaultBrowser
         defaultStatus.stringValue = "Zigzag opens your links"
         defaultStatus.isHidden = !isDefault
+        blockingSwitch.state = ContentBlocker.isEnabled ? .on : .off
         defaultButton.isHidden = isDefault
         generalGroup.rows.forEach { $0.needsLayout = true }
     }
@@ -525,6 +532,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
 
     @objc private func importArc() { ArcImporter.runInteractive() }
+
+    @objc private func blockingChanged() { ContentBlocker.isEnabled = blockingSwitch.state == .on }
 
     @objc private func getExtensions() {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
