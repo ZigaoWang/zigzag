@@ -51,6 +51,9 @@ private final class WelcomeView: NSView {
     private var steps: [Label] = []
     private var dots: [CALayer] = []
     private let importView = ImportView(presentation: .welcome)
+    private let intro = WelcomeIntroView()
+    /// The first step says hello before asking for anything; Get Started moves on to bringing your stuff over.
+    private var showingIntro = true
     private var drewIn = false
 
     private let panelWidth: CGFloat = 330
@@ -77,12 +80,24 @@ private final class WelcomeView: NSView {
             dots.append(dot)
         }
         addSubview(importView)
+        addSubview(intro)
+        importView.isHidden = true
+        intro.onStart = { [weak self] in self?.startImport() }
         importView.onClose = { [weak self] in self?.onDone?() }
         importView.onStageChange = { [weak self] stage in self?.show(stage, animated: true) }
         show(.choose, animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private func startImport() {
+        showingIntro = false
+        intro.isHidden = true
+        importView.isHidden = false
+        show(.choose, animated: true)
+        Brand.enter([importView], delay: 0.05)
+        window?.makeFirstResponder(nil)
+    }
     override var isFlipped: Bool { true }
 
     private var theme: Brand.Theme { panel.theme }
@@ -90,12 +105,20 @@ private final class WelcomeView: NSView {
     private func show(_ stage: ImportView.Stage, animated: Bool) {
         let copy: (String, String, Int)
         switch stage {
+        case .choose where showingIntro:
+            copy = ("Welcome to Zigzag", "A calm browser for the Mac.", 0)
         case .choose:
-            copy = ("Welcome to Zigzag", "A calm browser for the Mac. Start by bringing your passwords, bookmarks and Arc spaces over. Your other browser stays exactly as it is.", 0)
+            copy = ("Bring your stuff", "Passwords, bookmarks and Arc spaces come over in a minute. Your other browser stays exactly as it is.", 1)
         case .importing:
             copy = ("Bringing it over", "This takes a moment. If macOS asks to let Zigzag open a browser’s saved passwords, choose Allow.", 1)
         case .done:
-            copy = ("You’re all set", "Your spaces and pinned tabs are in the sidebar, and your passwords are in Zigzag’s Passwords window.", 2)
+            let came = importView.summaries.contains { $0.passwords + $0.updatedPasswords + $0.bookmarks + $0.spaces + $0.history > 0 }
+            let stuck = importView.summaries.contains { !$0.problems.isEmpty }
+            copy = came
+                ? ("You’re all set", "Your spaces and pinned tabs are in the sidebar, and your passwords are in Zigzag’s Passwords window.", 2)
+                : stuck
+                ? ("Almost there", "Something kept your things from coming over. Fix it here, or start browsing and bring them over later from Settings.", 2)
+                : ("You’re all set", "Bring more over anytime from Settings › General.", 2)
         }
         heading.attributedStringValue = Brand.display(copy.0, size: 30, color: theme.tint, wraps: true)
         body.stringValue = copy.1
@@ -125,11 +148,11 @@ private final class WelcomeView: NSView {
         if !Brand.hasDrawnIn {
             wordmark.drawIn(delay: 0.3)
             Brand.enter([heading, body] + steps, delay: 1.2)
-            Brand.enter([importView], delay: 1.3)
+            Brand.enter([intro], delay: 1.3)
             Brand.hasDrawnIn = true
         } else {
             Brand.enter([wordmark, heading, body] + steps, delay: 0.05)
-            Brand.enter([importView], delay: 0.1)
+            Brand.enter([intro], delay: 0.1)
         }
     }
 
@@ -153,5 +176,73 @@ private final class WelcomeView: NSView {
             }
         }
         importView.frame = NSRect(x: panelWidth, y: 0, width: bounds.width - panelWidth, height: bounds.height)
+        intro.frame = importView.frame
+    }
+}
+
+/// The first thing you see: three things Zigzag does, in plain words, and one button to begin.
+private final class WelcomeIntroView: NSView {
+    var onStart: (() -> Void)?
+    private let title = NSTextField(wrappingLabelWithString: "")
+    private var rows: [(ColorView, NSImageView, Label, NSTextField)] = []
+    private let start = PrimaryButton(title: "Get Started")
+    private let note = Label("Takes about a minute.", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+
+    private static let points: [(String, String, String)] = [
+        ("square.stack", "A space for each part of your life", "Work, school and the rest stay apart, each with its own pinned tabs and color."),
+        ("key.fill", "Passwords, built in", "Saved in your Mac’s Keychain, filled in for you, and synced with iCloud Keychain."),
+        ("hand.raised.fill", "Quiet by default", "Ads and trackers are blocked. No account, and nothing about you is sent to us."),
+    ]
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        title.isSelectable = false
+        title.attributedStringValue = Brand.display("A browser that stays out of your way", size: 24, color: Tokens.Color.textPrimary, wraps: true)
+        addSubview(title)
+        let accent = Brand.Theme.brand.accent
+        for (symbol, heading, detail) in Self.points {
+            let tile = ColorView(color: accent.withAlphaComponent(0.12))
+            tile.wantsLayer = true
+            tile.layer?.cornerRadius = 10
+            tile.layer?.cornerCurve = .continuous
+            let icon = NSImageView(image: Tokens.Symbol.image(symbol, size: 17) ?? NSImage())
+            icon.contentTintColor = accent
+            tile.addSubview(icon)
+            let label = Label(heading, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+            let body = NSTextField(wrappingLabelWithString: detail)
+            body.font = Tokens.Font.body()
+            body.textColor = Tokens.Color.textSecondary
+            body.isSelectable = false
+            [tile, label, body].forEach { addSubview($0) }
+            rows.append((tile, icon, label, body))
+        }
+        start.onClick = { [weak self] _ in self?.onStart?() }
+        [start, note].forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        let pad = Tokens.Space.x12
+        let width = bounds.width - pad * 2
+        let titleHeight = ceil(title.sizeThatFits(NSSize(width: width, height: 200)).height)
+        title.frame = NSRect(x: pad, y: 96, width: width, height: titleHeight)
+        var y = title.frame.maxY + Tokens.Space.x10
+        let tileSize: CGFloat = 40
+        for (tile, icon, label, body) in rows {
+            tile.frame = NSRect(x: pad, y: y, width: tileSize, height: tileSize)
+            icon.frame = tile.bounds.insetBy(dx: 10, dy: 10)
+            let x = tile.frame.maxX + Tokens.Space.x4
+            label.frame = NSRect(x: x, y: y, width: bounds.width - x - pad, height: label.lineHeight)
+            let h = ceil(body.sizeThatFits(NSSize(width: bounds.width - x - pad, height: 200)).height)
+            body.frame = NSRect(x: x, y: label.frame.maxY + 2, width: bounds.width - x - pad, height: h)
+            y = max(tile.frame.maxY, body.frame.maxY) + Tokens.Space.x6
+        }
+        let h = Tokens.Space.x8 + Tokens.Space.x1
+        let w = max(start.fittingWidth, 132)
+        start.frame = NSRect(x: bounds.width - pad - w, y: bounds.height - Tokens.Space.x12 - h, width: w, height: h)
+        note.frame = NSRect(x: pad, y: start.frame.midY - note.lineHeight / 2, width: start.frame.minX - pad - Tokens.Space.x4, height: note.lineHeight)
     }
 }
