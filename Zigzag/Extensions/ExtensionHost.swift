@@ -203,6 +203,7 @@ final class ExtensionHost: NSObject {
     }
 
     private weak var actionAnchor: NSView?
+    private static var toldAboutVerification = false
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
     weak var lastAction: WKWebExtension.Action?
@@ -283,6 +284,17 @@ final class ExtensionHost: NSObject {
         let inner = (dict?["content"] as? [String: Any])?["content"] as? [String: Any]
         guard let type = inner?["type"] as? String else { return }
         ExtensionLog.write("1Password app replied: \(type)")
+        // Turned away: say so where you're looking, once a session, instead of leaving 1Password's spinner going.
+        if type == "BrowserVerificationFailed", !Self.toldAboutVerification,
+           let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
+            Self.toldAboutVerification = true
+            Toast.show("1Password doesn’t trust Zigzag yet. In 1Password, open Settings › Browser, click Add Browser, and choose Zigzag in Applications.",
+                       symbol: "exclamationmark.circle", action: ("Open 1Password", {
+                           if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
+                               NSWorkspace.shared.openApplication(at: app, configuration: .init())
+                           }
+                       }), duration: 15, in: controller)
+        }
         setAttention(type == "BrowserVerificationFailed" ? Attention(
             title: "Connect 1Password to Zigzag",
             message: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.",
@@ -597,10 +609,13 @@ final class NativeMessagingHost {
     }
 
     func sendOnce(_ message: Any, reply: @escaping (Any?, (any Error)?) -> Void) {
+        let id = extensionID
+        ExtensionLog.write("native message for \(id)")
         var replied = false
         let started = start(onMessage: { [weak self] response in
             guard !replied else { return }
             replied = true
+            ExtensionHost.shared.nativeHostReplied(response, for: id)
             reply(response, nil)
             self?.process?.terminate()
         }, onExit: {
