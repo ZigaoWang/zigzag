@@ -60,6 +60,8 @@ private enum Category: CaseIterable {
 }
 
 final class PasswordsView: NSView {
+    private let header = BrandBanner()
+    private let headerHeight: CGFloat = 116
     private let locked = LockedView()
     private let sidebar = FlippedView()
     private let search = FilledField(placeholder: "Search")
@@ -91,6 +93,10 @@ final class PasswordsView: NSView {
         super.init(frame: frame)
         [sidebar, listScroll, detail, empty, sidebarEdge, listEdge].forEach { addSubview($0) }
         addSubview(locked)
+        header.title = "Passwords"
+        header.subtitle = "In your Keychain, synced with iCloud Keychain"
+        header.contentInset = Tokens.Space.x5
+        addSubview(header, positioned: .below, relativeTo: nil)
         sidebar.addSubview(search)
         for category in Category.allCases {
             let row = CategoryRow(category: category)
@@ -196,6 +202,8 @@ final class PasswordsView: NSView {
             row.isSelected = row.category == category
         }
         exportButton.isEnabled = !credentials.isEmpty
+        let n = credentials.count
+        header.subtitle = n == 0 ? "In your Keychain, synced with iCloud Keychain" : "\(n.formatted()) saved · in your Keychain, synced with iCloud Keychain"
     }
 
     private func choose(_ category: Category) {
@@ -329,10 +337,12 @@ final class PasswordsView: NSView {
 
     override func layout() {
         super.layout()
-        locked.frame = bounds
-        let top: CGFloat = 52
+        header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
+        let below = NSRect(x: 0, y: headerHeight, width: bounds.width, height: bounds.height - headerHeight)
+        locked.frame = below
+        let top: CGFloat = headerHeight + Tokens.Space.x2
         sidebar.frame = NSRect(x: 0, y: 0, width: sidebarWidth, height: bounds.height)
-        sidebarEdge.frame = NSRect(x: sidebarWidth, y: 0, width: Tokens.Metric.hairline, height: bounds.height)
+        sidebarEdge.frame = NSRect(x: sidebarWidth, y: headerHeight, width: Tokens.Metric.hairline, height: below.height)
         let pad = Tokens.Space.x3
         search.frame = NSRect(x: pad, y: top, width: sidebarWidth - pad * 2, height: Tokens.Space.x8)
         var y = search.frame.maxY + Tokens.Space.x3
@@ -345,8 +355,8 @@ final class PasswordsView: NSView {
         exportButton.frame = NSRect(x: importButton.frame.maxX + Tokens.Space.x1, y: buttonY, width: exportButton.fittingWidth, height: Tokens.Space.x8)
 
         let listX = sidebarWidth + Tokens.Metric.hairline
-        listScroll.frame = NSRect(x: listX, y: top - Tokens.Space.x2, width: listWidth, height: bounds.height - top + Tokens.Space.x2)
-        listEdge.frame = NSRect(x: listX + listWidth, y: 0, width: Tokens.Metric.hairline, height: bounds.height)
+        listScroll.frame = NSRect(x: listX, y: headerHeight, width: listWidth, height: below.height)
+        listEdge.frame = NSRect(x: listX + listWidth, y: headerHeight, width: Tokens.Metric.hairline, height: below.height)
         let rowHeight = Tokens.Space.x12 + 2
         let rowWidth = listWidth - Tokens.Space.x4
         for (index, row) in rows.enumerated() {
@@ -354,8 +364,8 @@ final class PasswordsView: NSView {
         }
         list.frame = NSRect(x: 0, y: 0, width: listWidth, height: max(listScroll.contentSize.height, Tokens.Space.x4 + CGFloat(rows.count) * (rowHeight + 2)))
         let detailX = listX + listWidth + Tokens.Metric.hairline
-        detail.frame = NSRect(x: detailX, y: 0, width: bounds.width - detailX, height: bounds.height)
-        empty.frame = NSRect(x: listX, y: 0, width: bounds.width - listX, height: bounds.height)
+        detail.frame = NSRect(x: detailX, y: headerHeight, width: bounds.width - detailX, height: below.height)
+        empty.frame = NSRect(x: listX, y: headerHeight, width: bounds.width - listX, height: below.height)
     }
 }
 
@@ -386,8 +396,8 @@ extension PasswordsView: NSTextFieldDelegate {
 // MARK: - Locked
 
 private final class LockedView: NSView {
-    private let badge = NSImageView()
-    private let title = Label("Your passwords are locked", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let badge = RibbonView()
+    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let body = Label("Unlock with Touch ID or your Mac’s password.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private let button = PrimaryButton(title: "Unlock")
     var onUnlock: (() -> Void)?
@@ -395,8 +405,8 @@ private final class LockedView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        badge.image = Tokens.Symbol.image("lock.fill", size: 28)
-        badge.contentTintColor = Tokens.Color.accent
+        badge.color = Brand.Theme.current.accent
+        title.attributedStringValue = Brand.display("Your passwords are locked", size: 22, color: Tokens.Color.textPrimary, alignment: .center)
         title.alignment = .center
         body.alignment = .center
         [badge, title, body, button].forEach { addSubview($0) }
@@ -411,14 +421,32 @@ private final class LockedView: NSView {
         needsLayout = true
     }
 
+    override var isHidden: Bool {
+        didSet {
+            guard oldValue, !isHidden, window != nil else { return }
+            badge.color = Brand.Theme.current.accent
+            Brand.enter([title, body, button], delay: 0.05)
+            badge.drawIn()
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, !isHidden else { return }
+        badge.color = Brand.Theme.current.accent
+        Brand.enter([title, body, button], delay: 0.05)
+        badge.drawIn()
+    }
+
     override func layout() {
         super.layout()
-        let side: CGFloat = 40
+        let side: CGFloat = 52
         let total = side + Tokens.Space.x4 + title.lineHeight + Tokens.Space.x2 + body.lineHeight + Tokens.Space.x6 + Tokens.Space.x8
         var y = round((bounds.height - total) / 2)
         badge.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
         y = badge.frame.maxY + Tokens.Space.x4
-        title.frame = NSRect(x: 0, y: y, width: bounds.width, height: title.lineHeight)
+        let titleHeight = ceil(title.intrinsicContentSize.height)
+        title.frame = NSRect(x: 0, y: y, width: bounds.width, height: titleHeight)
         y = title.frame.maxY + Tokens.Space.x2
         body.frame = NSRect(x: 0, y: y, width: bounds.width, height: body.lineHeight)
         y = body.frame.maxY + Tokens.Space.x6
@@ -535,6 +563,8 @@ private enum SiteIcon {
 
 private final class EmptyStateView: NSView {
     private let icon = NSImageView()
+    /// Nothing saved yet gets the ribbon, written in; the calmer states keep a plain symbol.
+    private let ribbon = RibbonView()
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let body = NSTextField(wrappingLabelWithString: "")
     private let importButton = PrimaryButton(title: "Import Passwords…")
@@ -548,7 +578,7 @@ private final class EmptyStateView: NSView {
         body.textColor = Tokens.Color.textSecondary
         body.alignment = .center
         body.isSelectable = false
-        [icon, title, body, importButton].forEach { addSubview($0) }
+        [icon, ribbon, title, body, importButton].forEach { addSubview($0) }
         importButton.onClick = { [weak self] _ in self?.onImport?() }
     }
 
@@ -556,11 +586,21 @@ private final class EmptyStateView: NSView {
     override var isFlipped: Bool { true }
 
     func set(symbol: String, title: String, body: String, showsImport: Bool) {
+        let changed = self.title.stringValue != title
+        let usesRibbon = symbol == "key.fill"
         icon.image = Tokens.Symbol.image(symbol, size: 28)
-        self.title.stringValue = title
+        icon.isHidden = usesRibbon
+        ribbon.isHidden = !usesRibbon
+        ribbon.color = Brand.Theme.current.accent.withAlphaComponent(0.85)
+        self.title.attributedStringValue = Brand.display(title, size: 20, color: Tokens.Color.textPrimary, alignment: .center)
+        self.title.alignment = .center
         self.body.stringValue = body
         importButton.isHidden = !showsImport
         needsLayout = true
+        guard changed, window != nil, !isHidden else { return }
+        layoutSubtreeIfNeeded()
+        Brand.enter([icon, self.title, self.body, importButton].filter { !$0.isHidden })
+        if usesRibbon { ribbon.drawIn(delay: 0.05) }
     }
 
     override func layout() {
@@ -572,8 +612,9 @@ private final class EmptyStateView: NSView {
         var y = round((bounds.height - total) / 2)
         let x = round((bounds.width - width) / 2)
         icon.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
+        ribbon.frame = icon.frame.insetBy(dx: -4, dy: -4)
         y = icon.frame.maxY + Tokens.Space.x4
-        title.frame = NSRect(x: x, y: y, width: width, height: title.lineHeight)
+        title.frame = NSRect(x: x, y: y, width: width, height: ceil(title.intrinsicContentSize.height))
         y = title.frame.maxY + Tokens.Space.x2
         body.frame = NSRect(x: x, y: y, width: width, height: bodyHeight)
         y = body.frame.maxY + Tokens.Space.x6
@@ -824,7 +865,7 @@ private final class DetailView: NSView {
         let pad = Tokens.Space.x6
         let width = min(bounds.width - pad * 2, 520)
         let x = pad
-        var y: CGFloat = 52 + Tokens.Space.x2
+        var y: CGFloat = Tokens.Space.x6
         let side: CGFloat = 44
         icon.frame = NSRect(x: x, y: y, width: side, height: side)
         let textX = icon.frame.maxX + Tokens.Space.x4
