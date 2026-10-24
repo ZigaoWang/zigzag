@@ -42,7 +42,13 @@ final class PeekController {
     private let content = NSView()
     private(set) var tab: Tab?
     private var token: SignalToken?
-    private(set) var isVisible = false
+    private(set) var isVisible = false { didSet { if !isVisible { stopEsc() } } }
+    private var escMonitor: Any?
+
+    private func stopEsc() {
+        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        escMonitor = nil
+    }
 
     init(controller: BrowserWindowController) {
         self.controller = controller
@@ -101,6 +107,13 @@ final class PeekController {
             panel.frame = panelFrame()
             scrim.show()
             panel.present()
+            // Esc puts the peek away, the way it does a sheet; other keys go to the page as usual.
+            escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.isVisible, event.keyCode == 53, event.window === self.controller?.window,
+                      event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else { return event }
+                self.close()
+                return nil
+            }
         }
         controller.window?.makeFirstResponder(webView)
         return webView
