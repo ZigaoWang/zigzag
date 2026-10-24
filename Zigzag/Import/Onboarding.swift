@@ -65,13 +65,33 @@ final class OnboardingView: NSView {
         addSubview(view)
         refreshDots()
         guard animated, let old else { old?.removeFromSuperview(); return }
-        // A quick cross-fade between screens: nothing slides, nothing bounces.
-        view.alphaValue = 0
-        Tokens.Motion.animate(Tokens.Motion.feedback, {
-            old.animator().alphaValue = 0
-            view.animator().alphaValue = 1
-        }, completion: { old.removeFromSuperview() })
         window?.makeFirstResponder(nil)
+        slide(from: old, to: view)
+    }
+
+    /// Moving on: the screen you're leaving drifts a little left as it fades, the next arrives from the right.
+    /// One smooth ease-out, short, no bounce, so it reads as going forward and nothing more.
+    private func slide(from old: NSView, to new: NSView) {
+        [old, new].forEach { $0.wantsLayer = true }
+        guard let oldLayer = old.layer, let newLayer = new.layer else { old.removeFromSuperview(); return }
+        let distance: CGFloat = 36
+        let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
+        func animation(_ key: String, _ from: Any, _ to: Any, _ duration: CFTimeInterval) -> CABasicAnimation {
+            let a = CABasicAnimation(keyPath: key)
+            a.fromValue = from
+            a.toValue = to
+            a.duration = duration
+            a.timingFunction = curve
+            return a
+        }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { old.removeFromSuperview() }
+        oldLayer.opacity = 0
+        oldLayer.add(animation("opacity", 1, 0, 0.22), forKey: "leave.fade")
+        oldLayer.add(animation("transform.translation.x", 0, -distance, 0.38), forKey: "leave.move")
+        newLayer.add(animation("opacity", 0, 1, 0.34), forKey: "arrive.fade")
+        newLayer.add(animation("transform.translation.x", distance, 0, 0.42), forKey: "arrive.move")
+        CATransaction.commit()
     }
 
     /// Picking a color tints the whole window, so you see it before you start browsing.
@@ -165,22 +185,20 @@ private enum Onboard {
 
 // MARK: - 1. Hello
 
-/// The ribbon writes itself in, then the name, the line and the one button: a first moment with nothing to read.
+/// "Welcome to", then the wordmark writing itself in, then one button.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let ribbon = RibbonView()
-    private let title = Onboard.title("Welcome to Zigzag")
-    private let line = Onboard.line("Everything in its place.")
+    private let welcome = Label("Welcome to", font: .systemFont(ofSize: 17, weight: .medium), color: Onboard.dim(0.78))
+    private let wordmark = WordmarkView()
     private let start = Onboard.primary("Get Started")
     private var drewIn = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        ribbon.color = Onboard.ink
-        title.attributedStringValue = Brand.display("Welcome to Zigzag", size: 34, color: Onboard.ink, alignment: .center)
-        line.font = .systemFont(ofSize: 16)
+        welcome.alignment = .center
+        wordmark.color = Onboard.ink
         start.onClick = { [weak self] _ in self?.onStart?() }
-        [ribbon, title, line, start].forEach { addSubview($0) }
+        [welcome, wordmark, start].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -191,24 +209,22 @@ private final class HelloPage: NSView {
         guard window != nil, !drewIn else { return }
         drewIn = true
         layoutSubtreeIfNeeded()
-        // The ribbon writes itself, then the words arrive a beat apart.
-        ribbon.drawIn(delay: 0.25)
-        Brand.enter([title, line, start], delay: 0.9)
+        wordmark.drawIn(delay: 0.35)
+        Brand.enter([welcome], delay: 0.1)
+        Brand.enter([start], delay: 1.3)
     }
 
     override func layout() {
         super.layout()
-        let mark: CGFloat = 76
+        let markHeight: CGFloat = 64
+        let markWidth = markHeight * WordmarkView.aspect
         let h = Tokens.Space.x10
-        let th = ceil(title.sizeThatFits(NSSize(width: bounds.width, height: 100)).height)
-        let total = mark + Tokens.Space.x8 + th + Tokens.Space.x2 + 22 + Tokens.Space.x12 + h
+        let total = welcome.lineHeight + Tokens.Space.x4 + markHeight + Tokens.Space.x16 + h
         var y = round((bounds.height - total) / 2) - Tokens.Space.x4
-        ribbon.frame = NSRect(x: round((bounds.width - mark / Brand.aspect) / 2), y: y, width: round(mark / Brand.aspect), height: mark)
-        y = ribbon.frame.maxY + Tokens.Space.x8
-        title.frame = NSRect(x: 0, y: y, width: bounds.width, height: th)
-        y = title.frame.maxY + Tokens.Space.x2
-        line.frame = NSRect(x: 0, y: y, width: bounds.width, height: 22)
-        y = line.frame.maxY + Tokens.Space.x12
+        welcome.frame = NSRect(x: 0, y: y, width: bounds.width, height: welcome.lineHeight)
+        y = welcome.frame.maxY + Tokens.Space.x4
+        wordmark.frame = NSRect(x: round((bounds.width - markWidth) / 2), y: y, width: markWidth, height: markHeight)
+        y = wordmark.frame.maxY + Tokens.Space.x16
         let w: CGFloat = 176
         start.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: h)
     }
