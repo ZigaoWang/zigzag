@@ -28,7 +28,7 @@ final class LinkStatusController {
         hideDebouncer.cancel()
         label.stringValue = Self.describe(url)
         let height = Tokens.Space.x6
-        let width = min(label.textWidth + Tokens.Space.x4, area.width * 0.6)
+        let width = min(label.textWidth + Tokens.Space.x2, area.width * 0.6)
         pill.frame = NSRect(x: area.minX + Tokens.Space.x2, y: area.maxY - height - Tokens.Space.x2, width: ceil(width), height: height)
         pill.needsLayout = true
         if !visible {
