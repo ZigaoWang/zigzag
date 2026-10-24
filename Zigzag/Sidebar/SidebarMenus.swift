@@ -143,13 +143,10 @@ enum SidebarMenus {
     }
 }
 
-/// Renaming spaces and bookmarks: small native sheets with one field.
+/// Renaming spaces and bookmarks happens where they are: the space editor, or the row itself.
 enum SpaceEditor {
     static func rename(spaceID: UUID, in controller: BrowserWindowController) {
-        guard let space = Library.shared.space(spaceID) else { return }
-        TextPrompt.ask(title: "Rename Space", value: space.name, in: controller) { name in
-            controller.libraryChange("Rename Space") { Library.shared.renameSpace(spaceID, to: name) }
-        }
+        controller.openSpaceEditor(spaceID, anchor: controller.sidebar.list.headerView)
     }
 
     /// Deletes right away: ⌘Z brings the space back with its tabs, so there's nothing to confirm.
@@ -160,28 +157,66 @@ enum SpaceEditor {
 
 enum BookmarkEditor {
     static func edit(_ id: UUID, in controller: BrowserWindowController) {
+        // A favorite has no row to type in; it's renamed in a small field on the page instead.
+        if controller.sidebar.list.beginRenaming(bookmark: id) { return }
         guard let bookmark = Library.shared.bookmark(id) else { return }
-        TextPrompt.ask(title: "Rename Bookmark", value: bookmark.title, in: controller) { title in
+        RenamePanel.show(title: bookmark.title, in: controller) { title in
             controller.libraryChange("Rename Bookmark") { Library.shared.updateBookmark(id, title: title) }
         }
     }
 }
 
-enum TextPrompt {
-    static func ask(title: String, value: String, in controller: BrowserWindowController, done: @escaping (String) -> Void) {
-        guard let window = controller.window else { return }
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        let field = NSTextField(string: value)
-        field.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
-        alert.accessoryView = field
-        alert.window.initialFirstResponder = field
-        alert.beginSheetModal(for: window) { response in
-            guard response == .alertFirstButtonReturn else { return }
-            let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty { done(text) }
+/// One field in a small Zigzag panel, for renaming something that has no row of its own (a favorite).
+final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
+    private let field = FilledField(placeholder: "Name")
+    private let save = PrimaryButton(title: "Rename")
+    private var done: ((String) -> Void)?
+    private var monitor: Any?
+
+    static func show(title: String, in controller: BrowserWindowController, done: @escaping (String) -> Void) {
+        controller.closeFloatingPanels()
+        let panel = RenamePanel(frame: NSRect(x: 0, y: 0, width: 320, height: 64))
+        panel.done = done
+        panel.field.stringValue = title
+        let card = controller.root.cardFrame
+        panel.frame.origin = NSPoint(x: card.midX - 160, y: card.minY + Tokens.Space.x12)
+        controller.root.overlay.addSubview(panel)
+        panel.present(arrival: .fade)
+        controller.window?.makeFirstResponder(panel.field.field)
+        panel.field.field.currentEditor()?.selectAll(nil)
+        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
+            guard let panel else { return event }
+            if event.type == .keyDown {
+                if event.keyCode == 53 { panel.close(commit: false); return nil }
+                if event.keyCode == 36 || event.keyCode == 76 { panel.close(commit: true); return nil }
+                return event
+            }
+            if !panel.bounds.contains(panel.convert(event.locationInWindow, from: nil)) { panel.close(commit: false) }
+            return event
         }
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        [field, save].forEach { addSubview($0) }
+        save.onClick = { [weak self] _ in self?.close(commit: true) }
+        onLayout = { [weak self] in
+            guard let self else { return }
+            let pad = Tokens.Space.x3, h = Tokens.Space.x8
+            let bw = max(self.save.fittingWidth, 84)
+            self.save.frame = NSRect(x: self.bounds.width - pad - bw, y: (self.bounds.height - h) / 2, width: bw, height: h)
+            self.field.frame = NSRect(x: pad, y: (self.bounds.height - h) / 2, width: self.save.frame.minX - pad * 2, height: h)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func close(commit: Bool) {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if commit, !text.isEmpty { done?(text) }
+        done = nil
+        dismiss()
     }
 }

@@ -320,6 +320,13 @@ final class SidebarListView: NSView {
 
     var headerView: NSView? { rows[.header] }
 
+    /// Starts renaming a pinned page right in its row.
+    func beginRenaming(bookmark id: UUID) -> Bool {
+        guard let row = rows[.bookmark(id)] as? TabRowView else { return false }
+        row.beginRename()
+        return true
+    }
+
     /// The row showing a tab, for pointing at it (the Getting started guide).
     func rowView(for tab: Tab) -> NSView? { tab.bookmarkID.flatMap { rows[.bookmark($0)] } ?? rows[.tab(tab.id)] }
 
