@@ -42,6 +42,7 @@
 		4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EE88C88464115895D3647DF /* PopupWindowController.swift */; };
 		52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */ = {isa = PBXBuildFile; fileRef = 3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */; };
 		55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979ECE3AE8285E787E972E3E /* PageCardView.swift */; };
+		57456DF0F211F4F978E29567 /* SitePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B14798B8A091AAE19C57100 /* SitePanel.swift */; };
 		5825C6C1A2BFB78C050115ED /* PasswordHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6B64529E363AA584C30979 /* PasswordHealth.swift */; };
 		6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0657DD4DA14F56BD051BC34 /* Signal.swift */; };
 		654BFD1BB2CE1CC41CDFD065 /* Readability.js in Resources */ = {isa = PBXBuildFile; fileRef = 25F6D89709F01D7AD083FC85 /* Readability.js */; };
@@ -177,6 +178,7 @@
 		9875E3DF61E5A98363065101 /* PasswordCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordCapture.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackage.swift; sourceTree = "<group>"; };
+		9B14798B8A091AAE19C57100 /* SitePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanel.swift; sourceTree = "<group>"; };
 		9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenus.swift; sourceTree = "<group>"; };
 		A64A4FFBD5B64DD888870043 /* Brand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Brand.swift; sourceTree = "<group>"; };
 		A9C34787271E39E26E0156FC /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
@@ -495,6 +497,7 @@
 				979ECE3AE8285E787E972E3E /* PageCardView.swift */,
 				0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */,
 				95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */,
+				9B14798B8A091AAE19C57100 /* SitePanel.swift */,
 			);
 			path = Window;
 			sourceTree = "<group>";
@@ -695,6 +698,7 @@
 				37872776DAE6F6D005D98E10 /* SidebarUndo.swift in Sources */,
 				9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */,
 				6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */,
+				57456DF0F211F4F978E29567 /* SitePanel.swift in Sources */,
 				6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */,
 				D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */,
 				0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */,
