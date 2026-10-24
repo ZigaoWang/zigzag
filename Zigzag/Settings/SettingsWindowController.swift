@@ -360,11 +360,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loadUnpackedButton.bezelStyle = .push
         loadUnpackedButton.controlSize = .small
 
-        if ArcImporter.isAvailable {
-            let button = NSButton(title: "Import…", target: self, action: #selector(importArc))
-            button.bezelStyle = .push
-            importGroup.add(FormRow(title: "Import from Arc", detail: "Spaces, pinned tabs and history. Arc isn’t changed.", control: button))
-        }
+        let importButton = NSButton(title: "Import…", target: self, action: #selector(importBrowser))
+        importButton.bezelStyle = .push
+        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
 
         scroll.drawsBackground = false
         scroll.automaticallyAdjustsContentInsets = false
@@ -621,7 +619,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
 
-    @objc private func importArc() { ArcImporter.runInteractive() }
+    @objc private func importBrowser() { ImportWindowController.show() }
 
     @objc private func blockingChanged() { ContentBlocker.isEnabled = blockingSwitch.state == .on }
 

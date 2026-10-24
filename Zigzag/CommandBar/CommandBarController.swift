@@ -364,8 +364,20 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                 }
                 manager.openBookmark(bookmark)
             }
+        case .action(let id):
+            runAction(id)
+            return
         }
         if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+    }
+}
+
+extension CommandBarController {
+    func runAction(_ id: String) {
+        switch id {
+        case "import": ImportWindowController.show()
+        default: break
+        }
     }
 }
 

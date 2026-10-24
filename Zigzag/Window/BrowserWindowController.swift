@@ -776,21 +776,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab)
     }
 
-    private var welcome: WelcomeView?
+    private var welcome: ImportView?
 
-    /// First launch on a Mac with Arc: offer the one-step import inside the empty page.
+    /// First launch: offer to bring everything over from the browsers on this Mac, inside the empty page.
     func showWelcome() {
-        let view = WelcomeView()
+        let view = ImportView()
         view.frame = root.card.bounds
         view.autoresizingMask = [.width, .height]
         root.card.addSubview(view)
         welcome = view
-        view.onImport = { [weak self] in
-            self?.dismissWelcome()
-            ArcImporter.runInteractive()
-        }
-        view.onSkip = { [weak self] in
-            UserDefaults.standard.set(true, forKey: "ArcOfferDismissed")
+        view.onClose = { [weak self] in
+            UserDefaults.standard.set(true, forKey: "ImportOfferDismissed")
             self?.dismissWelcome()
             self?.commandBar.show(mode: .newTab)
         }

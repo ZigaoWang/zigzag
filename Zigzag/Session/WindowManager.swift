@@ -72,7 +72,8 @@ final class WindowManager {
             manager.newTab(url: url)
         } else if isPrivate {
             controller.commandBar.show(mode: .newTab)
-        } else if !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ArcOfferDismissed"), ArcImporter.isAvailable {
+        } else if !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ImportOfferDismissed"),
+                  !UserDefaults.standard.bool(forKey: "ArcOfferDismissed"), !ImportCoordinator.detectedSources().isEmpty {
             controller.showWelcome()
         } else if showCommandBar {
             controller.commandBar.show(mode: .newTab)

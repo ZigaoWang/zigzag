@@ -9,6 +9,8 @@ struct CommandResult: Equatable {
         case bookmark(UUID)
         case history(URL)
         case suggestion(String)
+        /// A Zigzag command ("Import from Another Browser…"), by its ID in `CommandRanker.actions`.
+        case action(String)
     }
 
     let kind: Kind
@@ -23,6 +25,7 @@ struct CommandResult: Equatable {
         case .search, .suggestion: "Search"
         case .switchTo: "Switch to Tab"
         case .bookmark: "Open Bookmark"
+        case .action: "Run"
         }
     }
 
@@ -80,6 +83,17 @@ enum CommandRanker {
         return nil
     }
 
+    struct Action {
+        let id: String
+        let title: String
+        let keywords: [String]
+        let symbol: String
+    }
+
+    static let actions: [Action] = [
+        Action(id: "import", title: "Import from Another Browser…", keywords: ["import", "bring", "move", "switch", "passwords", "bookmarks", "arc", "chrome", "safari", "firefox"], symbol: "square.and.arrow.down"),
+    ]
+
     static func results(for text: String, manager: TabManager, suggestions: [String], editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var results: [CommandResult] = []
@@ -110,6 +124,13 @@ enum CommandRanker {
 
         let words = query.lowercased().split(separator: " ").map(String.init)
         let engine = Library.shared.searchEngine
+
+        // Zigzag's own commands, when the words fit one. They come first: typing "import" means the command.
+        if !historyOnly {
+            for action in actions where words.allSatisfy({ word in action.keywords.contains { $0.hasPrefix(word) } }) {
+                add(CommandResult(kind: .action(action.id), title: action.title, detail: "", symbol: action.symbol), key: "action:\(action.id)")
+            }
+        }
 
         if !historyOnly {
             if let url = url(from: query) {
