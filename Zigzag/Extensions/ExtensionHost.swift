@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import os
 
 /// Runs browser extensions with WebKit's extension engine: Chrome Web Store extensions, and 1Password
 /// set up for you, so they work the way they do in other browsers.
@@ -202,6 +203,8 @@ final class ExtensionHost: NSObject {
     }
 
     private weak var actionAnchor: NSView?
+    private var popupShownAt: Date?
+    static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
     weak var lastAction: WKWebExtension.Action?
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
@@ -233,7 +236,24 @@ final class ExtensionHost: NSObject {
             ExtensionStore.setSiteAccess(item.id, .click, sites: ExtensionStore.accessSites(item.id) + [site])
             tab?.reload()
         }
-        item.context.performAction(for: tab)
+        // A click always does something: if the extension shows no popup and opens no page, its own options
+        // (or, for 1Password, its setup) page opens instead.
+        popupShownAt = nil
+        let tabsBefore = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
+        let context = item.context
+        Self.log.notice("action \(context.webExtension.displayName ?? "?", privacy: .public) popup=\(context.action(for: tab)?.presentsPopup ?? false)")
+        context.performAction(for: tab)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self, self.popupShownAt == nil else { return }
+            let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
+            guard tabsNow == tabsBefore else { return }
+            let fallback = context.uniqueIdentifier == ExtensionStore.onePasswordID || context.webExtension.displayName == "1Password"
+                ? URL(string: "\(context.baseURL.absoluteString)app/app.html#/page/welcome")
+                : context.optionsPageURL
+            Self.log.notice("action did nothing; opening \(fallback?.absoluteString ?? "nothing", privacy: .public)")
+            guard let fallback, let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            controller.tabManager.newTab(url: fallback)
+        }
     }
 
     // MARK: Needing attention
@@ -363,6 +383,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action,
                                 for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         lastAction = action
+        popupShownAt = Date()
+        Self.log.notice("popup \(context.webExtension.displayName ?? "?", privacy: .public) has=\(action.popupPopover != nil)")
         guard let popover = action.popupPopover else { completionHandler(nil); return }
         // Asked by the page (1Password's "Unlock" button) rather than a click: the button pressed last may be
         // gone with its panel, so the popup comes from the address bar instead of not at all.
