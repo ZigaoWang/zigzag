@@ -41,6 +41,8 @@ enum WebKitSetup {
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
             configuration.userContentController.addUserScript(PasswordCapture.script)
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
+            configuration.userContentController.addUserScript(Autofill.script)
+            configuration.userContentController.add(Autofill.shared, contentWorld: .defaultClient, name: Autofill.messageName)
             ContentBlocker.attach(to: configuration)
         }
     }

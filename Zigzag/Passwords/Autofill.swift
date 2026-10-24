@@ -1,0 +1,262 @@
+import AppKit
+import WebKit
+
+/// Offers saved logins when a sign-in field is focused, and fills the one picked. Only logins saved for the
+/// frame's exact origin (scheme, host and port) are offered, and the origin is checked again right before
+/// filling, so a page that navigated away in between gets nothing. Filling needs no Touch ID; showing or copying
+/// a password does.
+@MainActor
+final class Autofill: NSObject, WKScriptMessageHandler {
+    static let shared = Autofill()
+    static let messageName = "zigzagAutofill"
+
+    private var menu: AutofillMenu?
+    /// The frame and field the menu belongs to.
+    private var target: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)?
+    /// Bumped on every focus change, so a slow vault lookup for an old field never shows a menu.
+    private var generation = 0
+
+    /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them.
+    static var isOn: Bool {
+        get { UserDefaults.standard.object(forKey: "PasswordsAutofill") as? Bool ?? !PasswordManagers.isActive }
+        set { UserDefaults.standard.set(newValue, forKey: "PasswordsAutofill") }
+    }
+
+    static var script: WKUserScript {
+        WKUserScript(source: watcher, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient)
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName, let webView = message.webView as? BrowserWebView,
+              let body = message.body as? [String: Any], let kind = body["kind"] as? String else { return }
+        switch kind {
+        case "focus":
+            generation += 1
+            // Fields inside frames are positioned relative to the frame, which the page can't tell us reliably.
+            guard message.frameInfo.isMainFrame, Self.isOn,
+                  let rect = body["rect"] as? [String: Double], let x = rect["x"], let y = rect["y"], let w = rect["w"], let h = rect["h"] else { hide(); return }
+            let security = message.frameInfo.securityOrigin
+            let origin = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)
+            let field = NSRect(x: x, y: y, width: w, height: h)
+            let frame = message.frameInfo
+            let current = generation
+            Task {
+                let logins = ((try? await PasswordStore.shared.credentials(for: origin)) ?? [])
+                    .sorted { ($0.lastUsed ?? $0.modified) > ($1.lastUsed ?? $1.modified) }
+                guard current == self.generation, !logins.isEmpty else { if current == self.generation { self.hide() }; return }
+                self.show(logins, under: field, in: webView, frame: frame, origin: origin)
+            }
+        case "blur":
+            generation += 1
+            // A click on the menu blurs the field first; let the click land before hiding.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                guard let self, let menu = self.menu, !menu.isPointerInside else { return }
+                self.hide()
+            }
+        case "key":
+            guard let menu, let key = body["key"] as? String else { return }
+            switch key {
+            case "ArrowDown": menu.move(1)
+            case "ArrowUp": menu.move(-1)
+            case "Enter": if let login = menu.selected { fill(login) }
+            case "Escape": hide()
+            default: break
+            }
+        default: break
+        }
+    }
+
+    private func show(_ logins: [Credential], under field: NSRect, in webView: BrowserWebView, frame: WKFrameInfo, origin: Origin) {
+        guard let overlay = WindowManager.shared.controllers.first(where: { $0.window === webView.window })?.root.overlay else { return }
+        menu?.removeFromSuperview()
+        let menu = AutofillMenu(logins: Array(logins.prefix(5)), origin: origin)
+        menu.onPick = { [weak self] login in self?.fill(login) }
+        let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
+        let width = min(max(fieldInOverlay.width, 260), 360)
+        let height = menu.contentHeight
+        var y = fieldInOverlay.maxY + Tokens.Space.x1
+        if y + height > overlay.bounds.maxY - Tokens.Space.x2 { y = fieldInOverlay.minY - Tokens.Space.x1 - height }
+        let x = min(max(fieldInOverlay.minX, Tokens.Space.x2), overlay.bounds.maxX - width - Tokens.Space.x2)
+        menu.frame = NSRect(x: x, y: y, width: width, height: height)
+        overlay.addSubview(menu)
+        menu.present(always: true)
+        self.menu = menu
+        target = (webView, frame, origin)
+        setSuggesting(true)
+    }
+
+    func hide() {
+        guard let menu else { return }
+        setSuggesting(false)
+        self.menu = nil
+        target = nil
+        menu.dismiss(always: true)
+    }
+
+    /// While the menu is up, the page script hands arrow keys, Return and Escape to it.
+    private func setSuggesting(_ on: Bool) {
+        guard let target else { return }
+        target.webView.evaluateJavaScript("window.__zigzagSuggesting = \(on)", in: target.frame, in: .defaultClient)
+    }
+
+    private func fill(_ login: Credential) {
+        guard let target else { return }
+        let security = target.frame.securityOrigin
+        let now = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)
+        hide()
+        // The page may have moved on since the menu opened; only the exact origin the login belongs to gets it.
+        guard now == login.origin, now == target.origin else { return }
+        Task {
+            guard let password = try? await PasswordStore.shared.password(for: login.id) else {
+                if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
+                    Toast.show("Couldn’t open that password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                }
+                return
+            }
+            // Passed as an argument, never pasted into the script's source, and held only for the call.
+            let arguments: [String: Any] = ["username": login.username, "password": password.withUnsafeString { String($0) }]
+            _ = try? await target.webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
+            try? await PasswordStore.shared.markUsed(login.id)
+        }
+    }
+
+    /// Reports focus on sign-in fields (with the field's place on screen), blur, and the keys the menu takes.
+    private static let watcher = """
+    (() => {
+      if (window.__zigzagAutofillWatcher) return;
+      window.__zigzagAutofillWatcher = true;
+      const post = (m) => { try { window.webkit.messageHandlers.zigzagAutofill.postMessage(m); } catch (e) {} };
+      const signIn = (el) => {
+        if (!el || el.tagName !== 'INPUT' || el.disabled || el.readOnly) return false;
+        if (el.type === 'password') return !/new-password/.test(el.autocomplete || '');
+        if (!['text', 'email', 'tel', ''].includes(el.type)) return false;
+        if (/username|email/.test(el.autocomplete || '')) return true;
+        const scope = el.form || document;
+        return !!scope.querySelector('input[type=password]') && /user|login|email|account|id|name/i.test((el.name || '') + (el.id || '') + (el.placeholder || '') + (el.getAttribute('aria-label') || ''));
+      };
+      const report = (el) => {
+        const r = el.getBoundingClientRect();
+        post({ kind: 'focus', rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
+      };
+      document.addEventListener('focusin', (e) => { if (signIn(e.target)) report(e.target); }, true);
+      document.addEventListener('mousedown', (e) => { if (e.target === document.activeElement && signIn(e.target)) report(e.target); }, true);
+      document.addEventListener('focusout', (e) => { if (signIn(e.target)) post({ kind: 'blur' }); }, true);
+      document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && signIn(e.target)) post({ kind: 'blur' }); }, true);
+      window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
+      document.addEventListener('keydown', (e) => {
+        if (!window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+        e.preventDefault(); e.stopPropagation();
+        post({ kind: 'key', key: e.key });
+      }, true);
+    })();
+    """
+
+    /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
+    private static let filler = """
+    const active = document.activeElement;
+    const scope = (active && active.form) || document;
+    const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && !el.disabled && !el.readOnly; };
+    const inputs = [...scope.querySelectorAll('input')].filter(visible);
+    const passwordField = inputs.find((el) => el.type === 'password' && !/new-password/.test(el.autocomplete || ''));
+    const userFields = inputs.filter((el) => ['text', 'email', 'tel', ''].includes(el.type));
+    const userField = userFields.find((el) => /username|email/.test(el.autocomplete || ''))
+      || (passwordField ? userFields.filter((el) => inputs.indexOf(el) < inputs.indexOf(passwordField)).pop() : null)
+      || (active && userFields.includes(active) ? active : null);
+    const set = (el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      el.focus();
+      setter.call(el, value);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    if (userField && username) set(userField, username);
+    if (passwordField) set(passwordField, password);
+    """
+}
+
+/// The list under a sign-in field: one row per saved login, newest used first.
+final class AutofillMenu: FloatingPanelView {
+    private var rows: [AutofillRow] = []
+    private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }
+    var onPick: ((Credential) -> Void)?
+
+    private let pad = Tokens.Space.x1 + 2
+    private let rowHeight = Tokens.Space.x10 + Tokens.Space.x1
+
+    init(logins: [Credential], origin: Origin) {
+        super.init(frame: .zero)
+        radius = Tokens.Radius.panel
+        rows = logins.map { login in
+            let row = AutofillRow(login: login, icon: origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) })
+            row.onClick = { [weak self] _ in self?.onPick?(login) }
+            addSubview(row)
+            return row
+        }
+        setAccessibilityRole(.menu)
+        setAccessibilityLabel("Saved passwords")
+        onLayout = { [weak self] in self?.layoutRows() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    var contentHeight: CGFloat { pad * 2 + CGFloat(rows.count) * rowHeight }
+
+    var selected: Credential? { rows.indices.contains(selection) ? rows[selection].login : (rows.count == 1 ? rows[0].login : nil) }
+
+    var isPointerInside: Bool {
+        guard let window else { return false }
+        return bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+    }
+
+    func move(_ delta: Int) {
+        guard !rows.isEmpty else { return }
+        selection = selection < 0 ? (delta > 0 ? 0 : rows.count - 1) : (selection + delta + rows.count) % rows.count
+    }
+
+    private func layoutRows() {
+        for (index, row) in rows.enumerated() {
+            row.frame = NSRect(x: pad, y: pad + CGFloat(index) * rowHeight, width: bounds.width - pad * 2, height: rowHeight)
+        }
+    }
+}
+
+private final class AutofillRow: InteractiveView {
+    let login: Credential
+    private let icon = NSImageView()
+    private let name: Label
+    private let detail: Label
+    init(login: Credential, icon image: NSImage?) {
+        self.login = login
+        name = Label(login.username.isEmpty ? "No username" : login.username, font: Tokens.Font.body(.medium),
+                     color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
+        detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerCurve = .continuous
+        icon.image = image ?? Tokens.Symbol.image("key.fill")
+        icon.contentTintColor = Tokens.Color.textSecondary
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        [icon, name, detail].forEach { addSubview($0) }
+        setAccessibilityRole(.menuItem)
+        setAccessibilityLabel("Fill \(name.stringValue)")
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Space.x4
+        icon.frame = NSRect(x: Tokens.Space.x2 + 2, y: (bounds.height - side) / 2, width: side, height: side)
+        let x = icon.frame.maxX + Tokens.Space.x3
+        let total = name.lineHeight + detail.lineHeight
+        let top = (bounds.height - total) / 2
+        name.frame = NSRect(x: x, y: top, width: bounds.width - x - Tokens.Space.x2, height: name.lineHeight)
+        detail.frame = NSRect(x: x, y: name.frame.maxY, width: bounds.width - x - Tokens.Space.x2, height: detail.lineHeight)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+    }
+}
