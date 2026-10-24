@@ -13,6 +13,12 @@ final class OnboardingView: NSView {
     private var dots: [CALayer] = []
     private var startedImport = false
 
+    /// Set while you go to grant Full Disk Access: Zigzag reopens, and onboarding picks up on the import screen.
+    static var resumeOnBring: Bool {
+        get { UserDefaults.standard.bool(forKey: "OnboardingResumeOnBring") }
+        set { UserDefaults.standard.set(newValue, forKey: "OnboardingResumeOnBring") }
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
@@ -27,7 +33,8 @@ final class OnboardingView: NSView {
             layer?.addSublayer(dot)
             dots.append(dot)
         }
-        show(.hello, animated: false)
+        show(Self.resumeOnBring ? .bring : .hello, animated: false)
+        Self.resumeOnBring = false
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -232,55 +239,40 @@ private final class HelloPage: NSView {
 
 // MARK: - 2. Bring your stuff
 
+/// The browsers on this Mac in one list, each with a checkbox, what it holds, and how its import went. Anything
+/// macOS keeps private says so before you start, with the fix beside it; problems are written out in full.
 private final class BringPage: NSView {
     var onContinue: (() -> Void)?
     private let title = Onboard.title("Bring your stuff over")
-    private let line = Onboard.line("Passwords, bookmarks and history. Your other browser stays as it is.")
-    private var tiles: [BrowserTile] = []
+    private let line = Onboard.line("")
+    private let list = ColorView(color: Brand.ribbon.withAlphaComponent(0.07))
+    private var rows: [BrowserRow] = []
+    private var separators: [ColorView] = []
     private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
+    private let bringLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
+    private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
+    private let fileLink = Onboard.quiet("Import a password file")
     private let primary = Onboard.primary("Import")
     private let skip = Onboard.quiet("Not Now")
-    private let choose = Onboard.quiet("Choose what to bring")
-    private var pills: [(ImportCoordinator.Choice, ChoicePill)] = []
-    private var showsChoices = false
-    private var isDone = false
     private var isImporting = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [title, line, primary, skip].forEach { addSubview($0) }
-        let sources = Array(ImportCoordinator.detectedSources().prefix(6))
-        tiles = sources.enumerated().map { i, source in
-            let tile = BrowserTile(source: source)
-            // The first (Arc, when it's here) starts chosen; the rest wait to be picked.
-            tile.isChosen = i == 0
-            tile.onToggle = { [weak self] in self?.refresh() }
-            addSubview(tile)
-            return tile
-        }
-        if sources.isEmpty {
-            addSubview(empty)
-            primary.title = "Continue"
-            skip.isHidden = true
-            choose.isHidden = true
-        }
-        // Everything comes over unless you say otherwise; the choice is one click away for those who want it.
+        list.wantsLayer = true
+        list.layer?.cornerRadius = 14
+        list.layer?.cornerCurve = .continuous
+        list.layer?.borderWidth = 1
+        list.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.1).cgColor
+        [title, line, list, bringLabel, fileLink, primary, skip].forEach { addSubview($0) }
+        for (i, source) in ImportCoordinator.detectedSources().enumerated() { add(source, chosen: i == 0) }
+        if rows.isEmpty { addSubview(empty) }
         for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
-            let pill = ChoicePill(title: name)
-            pill.tint = Brand.ribbon
-            pill.isHidden = true
-            pill.onChange = { [weak self] _ in self?.refresh() }
+            let pill = DataToggle(name)
+            pill.onChange = { [weak self] in self?.refresh() }
             addSubview(pill)
             pills.append((choice, pill))
         }
-        addSubview(choose)
-        choose.onClick = { [weak self] _ in
-            guard let self else { return }
-            self.showsChoices.toggle()
-            self.choose.title = self.showsChoices ? "Bring everything" : "Choose what to bring"
-            if !self.showsChoices { self.pills.forEach { $0.1.isOn = true } }
-            self.refresh()
-        }
+        fileLink.onClick = { [weak self] _ in self?.pickFile() }
         primary.onClick = { [weak self] _ in self?.primaryAction() }
         skip.onClick = { [weak self] _ in self?.onContinue?() }
         refresh()
@@ -289,247 +281,391 @@ private final class BringPage: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private var chosen: [BrowserTile] { tiles.filter(\.isChosen) }
-
-    private var choice: ImportCoordinator.Choice {
-        pills.reduce(into: []) { result, pair in if pair.1.isOn { result.insert(pair.0) } }
+    @discardableResult
+    private func add(_ source: ImportCoordinator.Source, chosen: Bool) -> BrowserRow {
+        let row = BrowserRow(source: source)
+        row.isChosen = chosen
+        row.onChange = { [weak self] in self?.refresh() }
+        row.onFix = { [weak self, weak row] fix in
+            guard let self, let row else { return }
+            self.fix(fix, row)
+        }
+        list.addSubview(row)
+        rows.append(row)
+        if rows.count > 1 {
+            let line = ColorView(color: Brand.ribbon.withAlphaComponent(0.09))
+            list.addSubview(line)
+            separators.append(line)
+        }
+        return row
     }
 
+    private var waiting: [BrowserRow] { rows.filter { $0.isChosen && !$0.isFinished } }
+    private var choice: ImportCoordinator.Choice { pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } } }
+    private var anyImported: Bool { rows.contains(where: \.isFinished) }
+
     private func refresh() {
-        let arc = chosen.contains { $0.source.offers.contains(.tabs) }
-        for (kind, pill) in pills { pill.isHidden = !showsChoices || isImporting || isDone || (kind == .tabs && !arc) }
-        choose.isHidden = tiles.isEmpty || isImporting || isDone
-        primary.isEnabled = isDone || tiles.isEmpty || (!isImporting && !chosen.isEmpty && !choice.isEmpty)
+        let arc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
+        pills.first { $0.0 == .tabs }?.1.isHidden = !arc
+        pills.forEach { $0.1.isLocked = isImporting }
+        rows.forEach { $0.isLocked = isImporting }
+        let toDo = waiting.count
+        if isImporting {
+            primary.title = "Importing…"
+            primary.isEnabled = false
+        } else if toDo > 0 {
+            primary.title = "Import"
+            primary.isEnabled = !choice.isEmpty
+        } else {
+            primary.title = "Continue"
+            primary.isEnabled = true
+        }
+        skip.isHidden = anyImported || isImporting || rows.isEmpty
+        let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
+        line.stringValue = isImporting ? "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
+            : problems ? "Some of it didn’t come over yet. The fix is next to it."
+            : anyImported ? "Done. Pick another browser to bring more, or continue."
+            : "Pick the browsers to bring from. They stay exactly as they are."
         needsLayout = true
     }
 
     private func primaryAction() {
-        if isDone || tiles.isEmpty { onContinue?(); return }
-        run(chosen)
+        let toDo = waiting
+        if toDo.isEmpty { onContinue?(); return }
+        run(toDo)
     }
 
-    private func run(_ tiles: [BrowserTile]) {
+    private func run(_ rows: [BrowserRow]) {
         isImporting = true
-        primary.title = "Importing…"
-        skip.isHidden = true
-        line.stringValue = "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
-        self.tiles.forEach { $0.isLocked = true }
-        tiles.forEach { $0.state = .waiting }
+        rows.forEach { $0.state = .waiting }
         refresh()
         let choice = self.choice
         Task { @MainActor in
-            for tile in tiles {
-                tile.state = .working
-                let summary = await ImportCoordinator.run(tile.source, choice.intersection(tile.source.offers))
-                tile.state = .done(summary)
-                tile.onFix = { [weak self, weak tile] fix in
-                    guard let self, let tile else { return }
-                    self.fix(fix, tile)
-                }
+            for row in rows {
+                row.state = .working
+                let summary = await ImportCoordinator.run(row.source, choice.intersection(row.source.offers))
+                row.state = .done(summary)
+                self.needsLayout = true
             }
-            self.finish()
+            self.isImporting = false
+            self.refresh()
         }
     }
 
-    private func finish() {
-        isImporting = false
-        isDone = true
-        primary.title = "Continue"
-        let failed = tiles.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
-        line.stringValue = failed ? "Some of it didn’t come over. Fix it here, or bring it over later from Settings." : "It’s all in Zigzag now."
-        refresh()
-    }
-
-    private func fix(_ fix: ImportProblem.Fix, _ tile: BrowserTile) {
+    private func fix(_ fix: ImportProblem.Fix, _ row: BrowserRow) {
         switch fix {
         case .retry:
-            isDone = false
-            run([tile])
+            row.isChosen = true
+            run([row])
         case .fullDiskAccess:
+            // Access takes effect once Zigzag reopens; System Settings offers Quit & Reopen, and the
+            // onboarding comes back on this screen.
+            OnboardingView.resumeOnBring = true
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
-            tile.awaitsRetry = true
+            row.note("Turn on Zigzag in Full Disk Access, then choose Quit & Reopen. You’ll be back right here.")
         case .primaryPassword, .exportFromApplePasswords:
             // These need a password or an export file; the Import window walks through both.
             ImportWindowController.show()
         case .none:
             break
         }
+        needsLayout = true
+    }
+
+    /// A CSV from a password manager (1Password, Bitwarden…) or Safari's export.
+    private func pickFile() {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .zip]
+        panel.message = "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)."
+        panel.prompt = "Import"
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url, let self else { return }
+            let row = self.add(ImportCoordinator.fileSource(url), chosen: true)
+            self.run([row])
+        }
     }
 
     override func layout() {
         super.layout()
-        var y = Onboard.header(title, line, in: bounds, top: 72) + Tokens.Space.x8
-        let width: CGFloat = 460, gap = Tokens.Space.x3
+        let width: CGFloat = 520
         let x = (bounds.width - width) / 2
-        let tileWidth = (width - gap) / 2, tileHeight: CGFloat = 68
-        for (i, tile) in tiles.enumerated() {
-            let col = CGFloat(i % 2), row = CGFloat(i / 2)
-            tile.frame = NSRect(x: x + col * (tileWidth + gap), y: y + row * (tileHeight + gap), width: tileWidth, height: tileHeight)
+        var y = Onboard.header(title, line, in: bounds, top: 64, width: 560) + Tokens.Space.x6
+        // The list grows with its rows, and scrolls nothing: past six browsers the rows get shorter.
+        var ry: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            let h = row.height(for: width)
+            row.frame = NSRect(x: 0, y: ry, width: width, height: h)
+            ry += h
+            if i < separators.count { separators[i].frame = NSRect(x: 62, y: ry, width: width - 62, height: Tokens.Metric.hairline) }
         }
-        if !tiles.isEmpty { y = (tiles.last?.frame.maxY ?? y) + Tokens.Space.x5 }
-        if tiles.isEmpty {
+        list.isHidden = rows.isEmpty
+        list.frame = NSRect(x: x, y: y, width: width, height: ry)
+        y = rows.isEmpty ? y : list.frame.maxY + Tokens.Space.x5
+        if rows.isEmpty {
             empty.frame = NSRect(x: x, y: y, width: width, height: 40)
-            y = empty.frame.maxY + Tokens.Space.x5
+            y = empty.frame.maxY + Tokens.Space.x4
         }
-        let cw = choose.fittingWidth
-        choose.frame = NSRect(x: (bounds.width - cw) / 2, y: y, width: cw, height: Tokens.Space.x8)
-        if showsChoices {
-            let visible = pills.filter { !$0.1.isHidden }.map(\.1)
-            let widths = visible.map { $0.intrinsicContentSize.width }
-            let total = widths.reduce(0, +) + CGFloat(max(visible.count - 1, 0)) * Tokens.Space.x2
-            var px = (bounds.width - total) / 2
-            for (pill, w) in zip(visible, widths) {
-                pill.frame = NSRect(x: px, y: choose.frame.maxY + Tokens.Space.x2, width: w, height: Tokens.Space.x8)
-                px += w + Tokens.Space.x2
-            }
+        // What to bring, always in view, in one row.
+        bringLabel.frame = NSRect(x: x + 2, y: y + (Tokens.Space.x8 - bringLabel.lineHeight) / 2, width: 44, height: bringLabel.lineHeight)
+        var px = bringLabel.frame.maxX + Tokens.Space.x2
+        for (_, pill) in pills where !pill.isHidden {
+            let w = pill.fittingWidth
+            pill.frame = NSRect(x: px, y: y + 2, width: w, height: 28)
+            px += w + Tokens.Space.x2
         }
-        Onboard.footer(primary: primary, quiet: skip.isHidden ? nil : skip, in: bounds)
+        // Bottom row: a password manager's export on the left; Not Now beside Import on the right.
+        Onboard.footer(primary: primary, quiet: nil, in: bounds, width: width)
+        let fw = fileLink.fittingWidth
+        fileLink.frame = NSRect(x: x - Tokens.Space.x2, y: primary.frame.midY - Tokens.Space.x4, width: fw, height: Tokens.Space.x8)
+        let sw = skip.fittingWidth
+        skip.frame = NSRect(x: primary.frame.minX - Tokens.Space.x3 - sw, y: primary.frame.midY - Tokens.Space.x4, width: sw, height: Tokens.Space.x8)
     }
 }
 
-/// A browser you can bring over: its icon, its name, what it holds; then how the import went.
-private final class BrowserTile: InteractiveView {
+/// One kind of data to bring (passwords, bookmarks…): a check and a word, light on the blue.
+private final class DataToggle: InteractiveView {
+    var isOn = true { didSet { refresh() } }
+    var isLocked = false { didSet { refresh() } }
+    var onChange: (() -> Void)?
+    private let check = NSImageView()
+    private let label: Label
+
+    init(_ title: String) {
+        label = Label(title, font: Tokens.Font.small(.medium), color: Onboard.ink)
+        super.init(frame: .zero)
+        layer?.cornerRadius = 7
+        layer?.cornerCurve = .continuous
+        check.image = Tokens.Symbol.image("checkmark", size: 9)
+        [check, label].forEach { addSubview($0) }
+        onClick = { [weak self] _ in
+            guard let self, !self.isLocked else { return }
+            self.isOn.toggle()
+            self.onChange?()
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(title)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    var fittingWidth: CGFloat { ceil(Tokens.Space.x3 + 10 + Tokens.Space.x1 + label.inkWidth + Tokens.Space.x3) }
+
+    private func refresh() {
+        layer?.backgroundColor = Brand.ribbon.withAlphaComponent(isOn ? 0.16 : 0).cgColor
+        layer?.borderWidth = 1
+        layer?.borderColor = Brand.ribbon.withAlphaComponent(isOn ? 0 : 0.25).cgColor
+        label.textColor = isOn ? Onboard.ink : Onboard.dim(0.55)
+        check.contentTintColor = Onboard.ink
+        check.isHidden = !isOn
+        alphaValue = isLocked ? 0.5 : 1
+        needsLayout = true
+    }
+
+    override func stateDidChange(animated: Bool) {
+        guard !isLocked else { return }
+        if isHovered && !isOn { layer?.backgroundColor = Brand.ribbon.withAlphaComponent(0.07).cgColor } else { refresh() }
+    }
+
+    override func layout() {
+        super.layout()
+        let x = Tokens.Space.x3
+        check.frame = NSRect(x: x, y: (bounds.height - 10) / 2, width: 10, height: 10)
+        let lx = isOn ? check.frame.maxX + Tokens.Space.x1 : x + 7
+        label.frame = NSRect(x: lx - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+    }
+}
+
+/// One browser: checkbox, icon, name and what it holds; then progress, what came over, or the problem in full.
+private final class BrowserRow: InteractiveView {
     enum State { case idle, waiting, working, done(ImportCoordinator.Summary) }
     let source: ImportCoordinator.Source
-    var isChosen = false { didSet { stateDidChange(animated: true) } }
-    var isLocked = false
-    var awaitsRetry = false { didSet { if awaitsRetry { fixButton.title = "Try Again" ; fixKind = .retry; needsLayout = true } } }
-    var onToggle: (() -> Void)?
+    var isChosen = false { didSet { refresh() } }
+    var isLocked = false { didSet { refresh() } }
+    var onChange: (() -> Void)?
     var onFix: ((ImportProblem.Fix) -> Void)?
-    var state = State.idle { didSet { refreshState() } }
+    var state = State.idle { didSet { refresh() } }
+    /// macOS keeps this browser's files private until Zigzag has Full Disk Access.
+    private var needsAccess = false
 
+    var isFinished: Bool { if case .done(let s) = state { s.problems.isEmpty } else { false } }
+    var hasProblem: Bool { if case .done(let s) = state { !s.problems.isEmpty } else { needsAccess } }
+
+    private let box = ColorView(color: .clear)
+    private let tick = NSImageView()
     private let icon = NSImageView()
     private let name: Label
-    private let detail = NSTextField(wrappingLabelWithString: "")
-    private let check = NSImageView()
+    private let detail = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.62))
+    private let status = Label("", font: Tokens.Font.small(.medium), color: Onboard.ink)
     private let spinner = RibbonView()
-    private let fixButton = TextButton(title: "", font: Tokens.Font.small(.semibold))
-    private var fixKind: ImportProblem.Fix = .none
+    private let fixButton = Onboard.primary("")
+    private let problem = NSTextField(wrappingLabelWithString: "")
+    private var fixKind = ImportProblem.Fix.none
 
     init(source: ImportCoordinator.Source) {
         self.source = source
         name = Label(source.name, font: Tokens.Font.body(.semibold), color: Onboard.ink)
         super.init(frame: .zero)
-        layer?.cornerRadius = 14
-        layer?.cornerCurve = .continuous
+        box.wantsLayer = true
+        box.layer?.cornerRadius = 6
+        box.layer?.borderWidth = 1.5
+        tick.image = Tokens.Symbol.image("checkmark", size: 10)
+        tick.contentTintColor = Brand.navy
+        box.addSubview(tick)
         icon.image = source.icon
         icon.imageScaling = .scaleProportionallyUpOrDown
-        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 16)
-        check.contentTintColor = Onboard.ink
+        detail.lineBreakMode = .byTruncatingTail
+        status.alignment = .right
         spinner.color = Onboard.ink
-        spinner.isHidden = true
-        fixButton.textColor = Onboard.ink
-        fixButton.showsFillAtRest = true
-        fixButton.isHidden = true
         fixButton.onClick = { [weak self] _ in
             guard let self else { return }
             self.onFix?(self.fixKind)
         }
-        detail.font = Tokens.Font.small()
-        detail.textColor = Onboard.dim(0.66)
-        detail.isSelectable = false
-        detail.maximumNumberOfLines = 2
-        [icon, name, detail, check, spinner, fixButton].forEach { addSubview($0) }
+        problem.font = Tokens.Font.small()
+        problem.textColor = NSColor(srgbRed: 1, green: 0.82, blue: 0.55, alpha: 1)
+        problem.isSelectable = false
+        [box, icon, name, detail, status, spinner, fixButton, problem].forEach { addSubview($0) }
         onClick = { [weak self] _ in
-            guard let self, !self.isLocked else { return }
+            guard let self, !self.isLocked, !self.needsAccess, !self.isFinished else { return }
             self.isChosen.toggle()
-            self.onToggle?()
+            self.onChange?()
         }
         setAccessibilityRole(.checkBox)
         setAccessibilityLabel(source.name)
         Task { @MainActor [weak self] in
             let text = await ImportCoordinator.preview(source)
             guard let self, case .idle = self.state else { return }
-            self.detail.stringValue = Self.short(text)
-            self.needsLayout = true
+            if text.contains("permission") {
+                // Found before starting, so it's fixed first instead of failing midway.
+                self.needsAccess = true
+                self.isChosen = false
+                self.detail.stringValue = "macOS keeps its data private for now"
+                self.fixKind = .fullDiskAccess
+                self.onChange?()
+            } else {
+                self.detail.stringValue = text.replacingOccurrences(of: " · passwords from the Passwords app", with: "")
+                    .replacingOccurrences(of: "spaces and pinned tabs", with: "spaces and pinned tabs")
+            }
+            self.refresh()
         }
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private func refreshState() {
+    private static func isSafari(_ source: ImportCoordinator.Source) -> Bool { if case .safari = source.kind { true } else { false } }
+
+    /// A line under the row, for a step to take (like what to do in System Settings).
+    func note(_ text: String) {
+        problem.stringValue = text
+        problem.textColor = Onboard.dim(0.8)
+        needsLayout = true
+        superview?.superview?.needsLayout = true
+    }
+
+    private static let rowHeight: CGFloat = 60
+
+    func height(for width: CGFloat) -> CGFloat {
+        guard !problem.stringValue.isEmpty else { return Self.rowHeight }
+        let h = ceil(problem.sizeThatFits(NSSize(width: width - 62 - Tokens.Space.x4, height: 200)).height)
+        return Self.rowHeight + h + Tokens.Space.x2
+    }
+
+    private func refresh() {
         spinner.stopLooping()
         spinner.isHidden = true
+        status.isHidden = true
         fixButton.isHidden = true
         switch state {
-        case .idle: break
+        case .idle:
+            if needsAccess {
+                fixButton.title = "Allow Access"
+                fixButton.isHidden = false
+            }
         case .waiting:
-            detail.stringValue = isChosen ? "Waiting…" : detail.stringValue
+            status.stringValue = "Waiting"
+            status.textColor = Onboard.dim(0.6)
+            status.isHidden = !isChosen
         case .working:
-            detail.stringValue = "Bringing it over…"
             spinner.isHidden = false
             spinner.startLooping()
         case .done(let summary):
-            if let problem = summary.problems.first {
-                detail.stringValue = problem.message
-                detail.textColor = Tokens.Color.caution.blended(withFraction: 0.35, of: .white) ?? Tokens.Color.caution
-                toolTip = summary.problems.map(\.message).joined(separator: "\n")
-                fixKind = problem.fix
-                switch problem.fix {
+            if let first = summary.problems.first {
+                problem.stringValue = summary.problems.map(\.message).joined(separator: " ")
+                problem.textColor = NSColor(srgbRed: 1, green: 0.82, blue: 0.55, alpha: 1)
+                fixKind = first.fix
+                switch first.fix {
                 case .retry: fixButton.title = "Try Again"
-                case .fullDiskAccess: fixButton.title = "Allow"
+                case .fullDiskAccess: fixButton.title = "Allow Access"
                 case .primaryPassword: fixButton.title = "Unlock"
-                case .exportFromApplePasswords: fixButton.title = "Show Me"
+                case .exportFromApplePasswords: fixButton.title = "Show Me How"
                 case .none: break
                 }
-                fixButton.isHidden = problem.fix == .none
+                fixButton.isHidden = first.fix == .none
             } else {
-                detail.textColor = Onboard.dim(0.66)
+                problem.stringValue = ""
+                status.stringValue = "Imported"
+                status.textColor = Onboard.ink
+                status.isHidden = false
                 detail.stringValue = Self.sentence(summary)
             }
         }
-        stateDidChange(animated: true)
+        let on = isChosen || isFinished
+        box.layer?.backgroundColor = on ? Brand.ribbon.cgColor : nil
+        box.layer?.borderColor = Brand.ribbon.withAlphaComponent(on ? 1 : 0.45).cgColor
+        tick.isHidden = !on
+        box.alphaValue = needsAccess || (isLocked && !isChosen) ? 0.35 : 1
+        stateDidChange(animated: false)
         needsLayout = true
     }
 
-    /// The tile has room for a few words: the long previews say the same thing shorter here.
-    private static func short(_ text: String) -> String {
-        text.replacingOccurrences(of: "macOS will need your permission to read it", with: "Needs your permission")
-            .replacingOccurrences(of: "Bookmarks and history need your permission", with: "Needs your permission")
-            .replacingOccurrences(of: " · passwords from the Passwords app", with: "")
-            .replacingOccurrences(of: "spaces and pinned tabs", with: "spaces")
-    }
-
-    /// "214 passwords · 3 spaces", or that nothing new was needed.
+    /// "6 passwords, 3 spaces and 58 bookmarks".
     private static func sentence(_ s: ImportCoordinator.Summary) -> String {
         func n(_ v: Int, _ one: String, _ many: String) -> String? { v > 0 ? "\(v.formatted()) \(v == 1 ? one : many)" : nil }
         let parts = [n(s.passwords + s.updatedPasswords, "password", "passwords"), n(s.spaces, "space", "spaces"),
                      n(s.bookmarks, "bookmark", "bookmarks"), n(s.history, "page of history", "pages of history")].compactMap { $0 }
-        return parts.isEmpty ? "Nothing new to bring" : parts.joined(separator: " · ")
+        return parts.isEmpty ? "Nothing new: it was already here" : ListFormatter.localizedString(byJoining: parts)
     }
 
     override func stateDidChange(animated: Bool) {
-        let on = isChosen
-        let fill = Brand.ribbon.withAlphaComponent(on ? (isPressed ? 0.22 : 0.16) : (isHovered && !isLocked ? 0.1 : 0.06))
-        layer?.set(backgroundColor: fill.cgColor, animated: animated)
-        layer?.borderWidth = on ? 1.5 : 0
-        layer?.borderColor = Brand.ribbon.withAlphaComponent(0.55).cgColor
-        let showsCheck: Bool = { if case .done(let s) = state { return s.problems.isEmpty } else { return on && !isLocked } }()
-        check.isHidden = !showsCheck
-        alphaValue = isLocked && !on ? 0.45 : 1
+        let interactive = !isLocked && !needsAccess && !isFinished
+        layer?.backgroundColor = interactive && isHovered ? Brand.ribbon.withAlphaComponent(isPressed ? 0.1 : 0.05).cgColor : nil
     }
 
     override func layout() {
         super.layout()
         let pad = Tokens.Space.x4
-        let s: CGFloat = 32
-        icon.frame = NSRect(x: pad, y: (bounds.height - s) / 2, width: s, height: s)
+        let top = Self.rowHeight
+        box.frame = NSRect(x: pad, y: (top - 18) / 2, width: 18, height: 18)
+        tick.frame = box.bounds.insetBy(dx: 3, dy: 3)
+        icon.frame = NSRect(x: box.frame.maxX + Tokens.Space.x3, y: (top - 30) / 2, width: 30, height: 30)
         let x = icon.frame.maxX + Tokens.Space.x3
         var right = bounds.width - pad
         if !fixButton.isHidden {
             let w = fixButton.fittingWidth
             right -= w
-            fixButton.frame = NSRect(x: right, y: (bounds.height - Tokens.Space.x7Height) / 2, width: w, height: Tokens.Space.x7Height)
-            right -= Tokens.Space.x2
+            fixButton.frame = NSRect(x: right, y: (top - Tokens.Space.x7Height) / 2, width: w, height: Tokens.Space.x7Height)
+            right -= Tokens.Space.x3
         }
-        check.frame = NSRect(x: bounds.width - pad - 16, y: Tokens.Space.x3, width: 16, height: 16)
-        spinner.frame = NSRect(x: bounds.width - pad - 16, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        let textRight = check.isHidden && spinner.isHidden ? right : min(right, check.frame.minX - Tokens.Space.x2)
-        let dh = min(ceil(detail.sizeThatFits(NSSize(width: right - x, height: 100)).height), 32)
-        let block = name.lineHeight + 2 + dh
-        name.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: textRight - x, height: name.lineHeight)
-        detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: right - x, height: dh)
+        if !spinner.isHidden {
+            right -= 18
+            spinner.frame = NSRect(x: right, y: (top - 18) / 2, width: 18, height: 18)
+            right -= Tokens.Space.x3
+        }
+        if !status.isHidden {
+            let w = status.textWidth + 2
+            right -= w
+            status.frame = NSRect(x: right, y: (top - status.lineHeight) / 2, width: w, height: status.lineHeight)
+            right -= Tokens.Space.x3
+        }
+        let block = name.lineHeight + 1 + detail.lineHeight
+        name.frame = NSRect(x: x, y: (top - block) / 2, width: right - x, height: name.lineHeight)
+        detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: right - x, height: detail.lineHeight)
+        problem.isHidden = problem.stringValue.isEmpty
+        let ph = ceil(problem.sizeThatFits(NSSize(width: bounds.width - x - pad, height: 200)).height)
+        problem.frame = NSRect(x: x, y: top - Tokens.Space.x2, width: bounds.width - x - pad, height: ph)
     }
 }
 
