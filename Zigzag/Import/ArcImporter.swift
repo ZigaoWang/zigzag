@@ -1,4 +1,5 @@
 import AppKit
+import os
 import SQLite3
 
 /// One-click import from Arc: spaces (with names and colors), pinned tabs and Favorites as bookmarks, and history.
@@ -8,6 +9,22 @@ enum ArcImporter {
         var spaces = 0
         var bookmarks = 0
         var historyEntries = 0
+        /// What stopped part of the import, said plainly; nothing is ever dropped silently.
+        var problems: [ImportProblem] = []
+    }
+
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Zigzag", category: "import")
+
+    /// Turns a file error into something to show: macOS refusing access gets the Full Disk Access fix.
+    private static func problem(reading what: String, _ error: Error) -> ImportProblem {
+        let ns = error as NSError
+        log.error("Arc import: couldn't read \(what, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
+        let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
+            || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
+        if denied {
+            return ImportProblem(message: "macOS didn’t let Zigzag read Arc’s \(what). Allow Zigzag in Full Disk Access, then try again.", fix: .fullDiskAccess)
+        }
+        return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what) (\(ns.localizedDescription)). Try again.", fix: .retry)
     }
 
     static var arcSupport: URL {
@@ -21,7 +38,13 @@ enum ArcImporter {
     @discardableResult
     static func importAll() -> (result: Result, firstSpace: UUID?) {
         var result = Result()
-        let (spaces, favorites) = readSidebar()
+        let (spaces, favorites): ([SpaceInfo], [Bookmark])
+        do {
+            (spaces, favorites) = try readSidebar()
+        } catch {
+            result.problems.append(problem(reading: "spaces and pinned tabs", error))
+            (spaces, favorites) = ([], [])
+        }
         var newSpaces = spaces
         // Arc's Favorites are global, like ours.
         Library.shared.appendFavorites(favorites)
@@ -51,19 +74,24 @@ enum ArcImporter {
             for space in pristine where Library.shared.spaces.count > 1 { Library.shared.removeSpace(space.id) }
             for bookmark in newSpaces.flatMap(\.bookmarks) { FaviconStore.shared.prefetch(for: bookmark.url) }
         }
-        result.historyEntries = importHistory()
+        do { result.historyEntries = try importHistory() } catch { result.problems.append(problem(reading: "history", error)) }
+        log.notice("Arc import: \(result.spaces) spaces, \(result.bookmarks) bookmarks, \(result.historyEntries) history, \(result.problems.count) problems")
         return (result, newSpaces.first?.id)
     }
 
     // MARK: Sidebar
 
-    private static func readSidebar() -> (spaces: [SpaceInfo], favorites: [Bookmark]) {
+    struct FormatError: LocalizedError {
+        var errorDescription: String? { "its sidebar file is in a format Zigzag doesn’t know yet" }
+    }
+
+    private static func readSidebar() throws -> (spaces: [SpaceInfo], favorites: [Bookmark]) {
         let file = arcSupport.appendingPathComponent("StorableSidebar.json")
-        guard let data = try? Data(contentsOf: file),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let data = try Data(contentsOf: file)
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let sidebar = root["sidebar"] as? [String: Any],
               let containers = sidebar["containers"] as? [[String: Any]],
-              let main = containers.first(where: { $0["spaces"] != nil }) else { return ([], []) }
+              let main = containers.first(where: { $0["spaces"] != nil }) else { throw FormatError() }
 
         // Arc stores lists as [key, value, key, value…] or as plain arrays; collect the dictionaries.
         let itemList = (main["items"] as? [Any] ?? []).compactMap { $0 as? [String: Any] }
@@ -130,12 +158,12 @@ enum ArcImporter {
     // MARK: History
 
     /// Reads Arc's Chromium history. The file is copied first because Arc keeps it locked while running.
-    private static func importHistory() -> Int {
+    private static func importHistory() throws -> Int {
         let source = arcSupport.appendingPathComponent("User Data/Default/History")
         guard FileManager.default.fileExists(atPath: source.path) else { return 0 }
         let copy = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-arc-history-\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: copy) }
-        guard (try? FileManager.default.copyItem(at: source, to: copy)) != nil else { return 0 }
+        try FileManager.default.copyItem(at: source, to: copy)
         var db: OpaquePointer?
         guard sqlite3_open_v2(copy.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return 0 }
         defer { sqlite3_close(db) }

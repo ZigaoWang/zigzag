@@ -138,6 +138,7 @@ enum ImportCoordinator {
             summary.spaces = result.spaces
             summary.bookmarks = result.bookmarks
             summary.history = result.historyEntries
+            summary.problems += result.problems
             arcReading = reading.intersection(.passwords)
         }
 
@@ -156,7 +157,7 @@ enum ImportCoordinator {
             }
         }.value
 
-        summary.problems = batch.problems
+        summary.problems += batch.problems
         if choice.contains(.passwords) { await savePasswords(batch.logins, into: &summary) }
         if choice.contains(.bookmarks), !batch.bookmarks.isEmpty { summary.bookmarks += addBookmarks(batch.bookmarks, from: source.name) }
         if choice.contains(.history), !batch.history.isEmpty {
