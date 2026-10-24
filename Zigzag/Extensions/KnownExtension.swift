@@ -1,49 +1,91 @@
 import AppKit
 
-/// The one extension Zigzag knows how to set up: 1Password. It comes from the Chrome Web Store,
-/// the same package Chrome users get, and stays updated weekly.
+/// Extensions come from the Chrome Web Store, the same packages Chrome users get. 1Password is set up on its
+/// own when its app is on this Mac; anything else you add from the store. All of them refresh weekly.
 enum KnownExtension {
     static let onePasswordID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
     private static let lastUpdateKey = "OnePasswordExtensionUpdated"
+    private static let disabledKey = "DisabledExtensions"
+    private static let removedKey = "RemovedExtensions"
 
     static var directory: URL { Paths.directory("Extensions") }
-    static var onePasswordDirectory: URL { directory.appendingPathComponent(onePasswordID, isDirectory: true) }
+    static var onePasswordDirectory: URL { directory(for: onePasswordID) }
+    static func directory(for id: String) -> URL { directory.appendingPathComponent(id, isDirectory: true) }
 
     static var isOnePasswordAppInstalled: Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") != nil
             || FileManager.default.fileExists(atPath: "/Applications/1Password.app")
     }
 
-    static var isOnePasswordInstalled: Bool {
-        FileManager.default.fileExists(atPath: onePasswordDirectory.appendingPathComponent("manifest.json").path)
+    static var isOnePasswordInstalled: Bool { isInstalled(onePasswordID) }
+
+    static func isInstalled(_ id: String) -> Bool {
+        FileManager.default.fileExists(atPath: directory(for: id).appendingPathComponent("manifest.json").path)
     }
 
     static func installedDirectories() -> [URL] {
         let items = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         return items.filter { FileManager.default.fileExists(atPath: $0.appendingPathComponent("manifest.json").path) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Sets up 1Password automatically when the 1Password app is on this Mac, and refreshes it weekly.
+    // MARK: On and off
+
+    static var disabledIDs: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: disabledKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: disabledKey) }
+    }
+
+    static func isEnabled(_ id: String) -> Bool { !disabledIDs.contains(id) }
+
+    /// Removing 1Password is remembered, so it isn't set up again behind your back.
+    private static var removedIDs: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: removedKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: removedKey) }
+    }
+
+    // MARK: The Chrome Web Store
+
+    static let webStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
+
+    /// The extension id in a Chrome Web Store page address, e.g. chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh.
+    static func webStoreID(from url: URL?) -> String? {
+        guard let url, let host = url.host(), host == "chromewebstore.google.com" || host == "chrome.google.com" else { return nil }
+        let parts = url.pathComponents
+        guard let detail = parts.firstIndex(of: "detail") else { return nil }
+        return parts[(detail + 1)...].first { $0.count == 32 && $0.allSatisfy { ("a"..."p").contains($0) } }
+    }
+
+    /// Sets up 1Password automatically when the 1Password app is on this Mac, and refreshes everything weekly.
     static func setUpIfNeeded() {
-        guard #available(macOS 15.4, *), isOnePasswordAppInstalled else { return }
+        guard #available(macOS 15.4, *) else { return }
         let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
-        if !isOnePasswordInstalled || Date().timeIntervalSince(last) > 7 * 24 * 3600 {
-            Task { await installOnePassword(reload: isOnePasswordInstalled) }
+        let stale = Date().timeIntervalSince(last) > 7 * 24 * 3600
+        Task {
+            if isOnePasswordAppInstalled, !isOnePasswordInstalled, !removedIDs.contains(onePasswordID) {
+                await install(onePasswordID)
+            }
+            guard stale else { return }
+            for dir in installedDirectories() { await install(dir.lastPathComponent, update: true) }
+            UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
         }
     }
 
+    /// Downloads an extension from the Chrome Web Store and loads it. An update replaces the files and takes
+    /// effect on the next launch. Returns the extension's name, or nil if it couldn't be installed.
     @discardableResult
-    static func installOnePassword(reload: Bool = false) async -> Bool {
-        guard #available(macOS 15.4, *) else { return false }
+    static func install(_ id: String, update: Bool = false) async -> String? {
+        guard #available(macOS 15.4, *) else { return nil }
         var components = URLComponents(string: "https://clients2.google.com/service/update2/crx")!
         components.queryItems = [
             .init(name: "response", value: "redirect"),
             .init(name: "prodversion", value: "140.0"),
             .init(name: "acceptformat", value: "crx2,crx3"),
-            .init(name: "x", value: "id=\(onePasswordID)&uc"),
+            .init(name: "x", value: "id=\(id)&uc"),
         ]
         guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200, let zip = zipPayload(ofCRX: data) else { return false }
+              (response as? HTTPURLResponse)?.statusCode == 200, let zip = zipPayload(ofCRX: data) else { return nil }
+        let target = directory(for: id)
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-ext-\(UUID().uuidString)")
         let zipFile = staging.appendingPathExtension("zip")
         do {
@@ -54,22 +96,43 @@ enum KnownExtension {
             unzip.arguments = ["-x", "-k", zipFile.path, staging.path]
             try unzip.run()
             unzip.waitUntilExit()
-            guard unzip.terminationStatus == 0,
-                  FileManager.default.fileExists(atPath: staging.appendingPathComponent("manifest.json").path) else { return false }
-            if FileManager.default.fileExists(atPath: onePasswordDirectory.path) {
-                _ = try FileManager.default.replaceItemAt(onePasswordDirectory, withItemAt: staging)
-            } else {
-                try FileManager.default.moveItem(at: staging, to: onePasswordDirectory)
-            }
             try? FileManager.default.removeItem(at: zipFile)
+            guard unzip.terminationStatus == 0,
+                  FileManager.default.fileExists(atPath: staging.appendingPathComponent("manifest.json").path) else { return nil }
+            if FileManager.default.fileExists(atPath: target.path) {
+                _ = try FileManager.default.replaceItemAt(target, withItemAt: staging)
+            } else {
+                try FileManager.default.moveItem(at: staging, to: target)
+            }
         } catch {
-            return false
+            return nil
         }
-        patch(onePasswordDirectory)
-        UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
-        // A fresh install loads right away; an update takes effect on next launch.
-        if !reload { await ExtensionHost.shared.load(from: onePasswordDirectory) }
-        return true
+        patch(target)
+        removedIDs.remove(id)
+        if update { return id }
+        let context = await ExtensionHost.shared.load(from: target)
+        return context?.webExtension.displayName ?? id
+    }
+
+    /// Takes the extension out of Zigzag and deletes its files.
+    static func uninstall(_ id: String) {
+        guard #available(macOS 15.4, *) else { return }
+        ExtensionHost.shared.unload(id)
+        try? FileManager.default.removeItem(at: directory(for: id))
+        disabledIDs.remove(id)
+        removedIDs.insert(id)
+        ExtensionHost.shared.forget(id)
+    }
+
+    static func setEnabled(_ id: String, _ enabled: Bool) {
+        guard #available(macOS 15.4, *), isEnabled(id) != enabled else { return }
+        if enabled {
+            disabledIDs.remove(id)
+            Task { await ExtensionHost.shared.load(from: directory(for: id)) }
+        } else {
+            disabledIDs.insert(id)
+            ExtensionHost.shared.unload(id)
+        }
     }
 
     /// Chrome-only APIs that WebKit's extension engine doesn't provide get small stand-ins, loaded before the
@@ -111,7 +174,7 @@ enum KnownExtension {
     const shims = {};
     function ensure(name, value) { if (!api[name]) { shims[name] = value; missing.push(name); } }
     ensure('management', {
-      getSelf: async () => ({ id: api.runtime.id, name: '1Password', version: api.runtime.getManifest().version, installType: 'normal', enabled: true, type: 'extension' }),
+      getSelf: async () => ({ id: api.runtime.id, name: api.runtime.getManifest().name, version: api.runtime.getManifest().version, installType: 'normal', enabled: true, type: 'extension' }),
       getAll: async () => [], onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event(),
     });
     ensure('privacy', { services: { passwordSavingEnabled: { get: async () => ({ value: false, levelOfControl: 'not_controllable' }), set: async () => {}, clear: async () => {} },

@@ -1,8 +1,8 @@
 import AppKit
 import WebKit
 
-/// Runs browser extensions with WebKit's extension engine. We use it for exactly one thing:
-/// the official 1Password extension, so the password manager works the way it does in other browsers.
+/// Runs browser extensions with WebKit's extension engine: Chrome Web Store extensions, and 1Password
+/// set up for you, so they work the way they do in other browsers.
 @available(macOS 15.4, *)
 final class ExtensionHost: NSObject {
     static let shared = ExtensionHost()
@@ -22,20 +22,51 @@ final class ExtensionHost: NSObject {
 
     // MARK: Loading
 
-    /// Loads every installed extension. Called once at launch.
+    /// Every installed extension, on or off, for Settings. Filled in as they are read at launch.
+    private(set) var installed: [String: WKWebExtension] = [:]
+
+    /// Loads every installed extension that's turned on, and reads the rest for Settings. Called once at launch.
     func loadInstalled() {
         for dir in KnownExtension.installedDirectories() {
             KnownExtension.patch(dir)
-            Task { await load(from: dir) }
+            let id = dir.lastPathComponent
+            Task {
+                if KnownExtension.isEnabled(id) {
+                    await load(from: dir)
+                } else if let ext = try? await WKWebExtension(resourceBaseURL: dir) {
+                    installed[id] = ext
+                    changed.send()
+                }
+            }
         }
+    }
+
+    func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
+
+    /// Stops an extension: its buttons, scripts and background page go away.
+    func unload(_ id: String) {
+        guard let context = context(for: id) else { return }
+        try? controller.unload(context)
+        contexts.removeAll { $0 === context }
+        changed.send()
+    }
+
+    /// Drops a removed extension from the list.
+    func forget(_ id: String) {
+        unload(id)
+        installed[id] = nil
+        changed.send()
     }
 
     @discardableResult
     func load(from directory: URL) async -> WKWebExtensionContext? {
+        let id = directory.lastPathComponent
+        if let existing = context(for: id) { return existing }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
+            installed[id] = ext
             let context = WKWebExtensionContext(for: ext)
-            context.uniqueIdentifier = directory.lastPathComponent
+            context.uniqueIdentifier = id
             context.isInspectable = true
             // Installing an extension here is a deliberate choice; grant what it asks for up front.
             for permission in ext.requestedPermissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
