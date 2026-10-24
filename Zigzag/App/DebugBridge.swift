@@ -189,6 +189,7 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
+        case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
         case "rmext": ExtensionStore.uninstall(arg)
         case "extoff": ExtensionStore.setEnabled(arg, false)
