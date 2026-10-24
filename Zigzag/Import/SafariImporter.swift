@@ -18,7 +18,7 @@ nonisolated enum SafariImporter {
         }
         guard choice.contains(.bookmarks) || choice.contains(.history) else { return batch }
         guard hasAccess else {
-            batch.problems.append(ImportProblem(message: "To bring over Safari's bookmarks and history, give Zigzag Full Disk Access in System Settings, then try again. Or export them from Safari (File › Export Browsing Data) and choose the file here.", fix: .fullDiskAccess))
+            batch.problems.append(ImportProblem(message: "To bring over Safari’s bookmarks and history, export them from Safari (File › Export Browsing Data to File) and choose that file here. Nothing else needs your permission.", fix: .exportFromApplePasswords))
             return batch
         }
         if choice.contains(.bookmarks) { batch.bookmarks = bookmarks() }
