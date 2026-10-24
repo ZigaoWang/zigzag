@@ -115,7 +115,7 @@ enum DebugBridge {
             default: break
             }
         case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
-        case "action": controller.sidebar.address.actionButtons.first?.onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
+        case "action": controller.sidebar.address.actionButtons[min(Int(arg) ?? 0, controller.sidebar.address.actionButtons.count - 1)].onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
         case "popupjs":
             if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
                 webView.evaluateJavaScript(arg) { result, error in
