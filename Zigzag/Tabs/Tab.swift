@@ -103,13 +103,17 @@ final class Tab: NSObject {
     @discardableResult
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
-        let configuration = pendingConfiguration ?? WebKitSetup.makeConfiguration()
         let fromWebKit = pendingConfiguration != nil
+        let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url)
+        let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration()
         pendingConfiguration = nil
-        if !fromWebKit {
+        if extensionConfiguration != nil {
+            configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
+        } else if !fromWebKit {
             WebKitSetup.configure(configuration)
             if let privateStore { configuration.websiteDataStore = privateStore }
         }
+        showsExtensionPage = extensionConfiguration != nil
 
         let webView = BrowserWebView(frame: NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize), configuration: configuration)
         webView.owner = self
@@ -185,8 +189,25 @@ final class Tab: NSObject {
     func load(_ url: URL) {
         self.url = url
         changed.send(.url)
+        // Extension pages and websites need differently set up web views; crossing over swaps it.
+        if let webView, Self.isExtensionPage(url) != showsExtensionPage {
+            tearDown(webView)
+            ensureWebView()
+            return
+        }
         let webView = ensureWebView()
         Self.load(url, in: webView)
+    }
+
+    /// True while the web view was built for an extension's own pages (settings, dashboards).
+    private var showsExtensionPage = false
+
+    static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
+
+    /// WebKit shows an extension's pages only in a web view set up by that extension.
+    private static func extensionConfiguration(for url: URL?) -> WKWebViewConfiguration? {
+        guard #available(macOS 15.4, *), isExtensionPage(url), let host = url?.host() else { return nil }
+        return ExtensionHost.shared.contexts.first { $0.baseURL.host() == host }?.webViewConfiguration
     }
 
     /// Starts this tab with another tab's back/forward list, then navigates: used for search folding.
@@ -388,6 +409,13 @@ extension Tab: WKNavigationDelegate {
         // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
         if let scheme = url.scheme?.lowercased(), !["http", "https", "about", "data", "blob", "file", "javascript", "webkit-extension"].contains(scheme) {
             NSWorkspace.shared.open(url)
+            return (.cancel, preferences)
+        }
+
+        // Going between an extension's pages and the web takes a different web view.
+        if navigationAction.targetFrame?.isMainFrame ?? true, Self.isExtensionPage(url) != showsExtensionPage,
+           ["http", "https", "webkit-extension"].contains(url.scheme?.lowercased() ?? "") {
+            DispatchQueue.main.async { [weak self] in self?.load(url) }
             return (.cancel, preferences)
         }
 
