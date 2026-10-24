@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.build()
+        Shortcuts.apply()
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleGetURL(_:withReply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
     }

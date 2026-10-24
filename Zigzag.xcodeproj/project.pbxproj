@@ -22,6 +22,7 @@
 		1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */; };
 		242E316E28B214F1B75E2B6F /* blocklist.info.json in Resources */ = {isa = PBXBuildFile; fileRef = F3B051247D50C308EF2FDA69 /* blocklist.info.json */; };
 		247132AF897197093E229872 /* CRXPackageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */; };
+		2519AB56C923531EC8C11096 /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */; };
 		2BA694E79AD875D1E25094E5 /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */; };
 		2BAC5D63A9B904BE86762FE6 /* blocklist.json.lzfse in Resources */ = {isa = PBXBuildFile; fileRef = BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */; };
 		2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F9F8B1C1119171EFC0072B /* DebugBridge.swift */; };
@@ -211,6 +212,7 @@
 		F3B051247D50C308EF2FDA69 /* blocklist.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = blocklist.info.json; sourceTree = "<group>"; };
 		F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariImporter.swift; sourceTree = "<group>"; };
 		F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealthTests.swift; sourceTree = "<group>"; };
+		FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shortcuts.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -363,6 +365,7 @@
 			isa = PBXGroup;
 			children = (
 				49E59809F43972950AA5B568 /* SettingsWindowController.swift */,
+				FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -692,6 +695,7 @@
 				995DC7DEF8E08A8C2ADFFE2D /* SavePasswordPrompt.swift in Sources */,
 				0E626C05ABE9E50F2CB2A884 /* SecretString.swift in Sources */,
 				BAE0DD62477D753E854410F6 /* SettingsWindowController.swift in Sources */,
+				2519AB56C923531EC8C11096 /* Shortcuts.swift in Sources */,
 				793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */,
 				A6B3999818FDB11071ED1832 /* SidebarMenus.swift in Sources */,
 				D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */,

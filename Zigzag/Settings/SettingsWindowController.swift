@@ -260,7 +260,7 @@ enum SettingsPane: Int, CaseIterable {
         case .privacy: "What sites keep on this Mac, and the choices you’ve made for them."
         case .translation: "Pages in other languages, translated on this Mac by Apple."
         case .extensions: "Extensions from the Chrome Web Store, running in Zigzag."
-        case .shortcuts: "Every keyboard shortcut in Zigzag."
+        case .shortcuts: "Every keyboard shortcut in Zigzag, and yours to change."
         }
     }
 }
@@ -645,11 +645,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             func walk(_ menu: NSMenu, prefix: String) {
                 for item in menu.items where !item.isSeparatorItem {
                     if let sub = item.submenu { walk(sub, prefix: item.title + " › "); continue }
-                    guard !item.keyEquivalent.isEmpty, !item.isHidden || item.title.hasPrefix("Close Tabs") else { continue }
+                    // Items with keys, and ones whose keys you took away (so you can give them back).
+                    guard !item.isAlternate, !item.keyEquivalent.isEmpty || Shortcuts.isCustom(item),
+                          !item.isHidden || item.title.hasPrefix("Close Tabs") else { continue }
                     // A list of what each key does doesn't need the menu's "…".
                     let title = prefix + (item.title.hasSuffix("…") ? String(item.title.dropLast()) : item.title)
                     guard query.isEmpty || title.lowercased().contains(query) else { continue }
-                    group.add(ShortcutRow(title: title, keys: Self.keys(item)))
+                    let row = ShortcutRow(title: title, item: item)
+                    row.onChange = { [weak self] in
+                        self?.reloadShortcuts()
+                        self?.layoutDocument()
+                    }
+                    row.showTakenNoteIfNeeded()
+                    group.add(row)
                 }
             }
             walk(menu, prefix: "")
@@ -661,22 +669,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             if !group.rows.isEmpty { groups.append((top.title == "Zigzag" ? "Zigzag" : top.title, group)) }
         }
         shortcutGroups = groups
-    }
-
-    private static func keys(_ item: NSMenuItem) -> [String] {
-        var keys: [String] = []
-        let m = item.keyEquivalentModifierMask
-        if m.contains(.control) { keys.append("⌃") }
-        if m.contains(.option) { keys.append("⌥") }
-        if m.contains(.shift) || item.keyEquivalent.uppercased() == item.keyEquivalent && item.keyEquivalent.lowercased() != item.keyEquivalent { keys.append("⇧") }
-        if m.contains(.command) { keys.append("⌘") }
-        let special: [Int: String] = [NSUpArrowFunctionKey: "↑", NSDownArrowFunctionKey: "↓", NSLeftArrowFunctionKey: "←", NSRightArrowFunctionKey: "→"]
-        if let scalar = item.keyEquivalent.unicodeScalars.first, let name = special[Int(scalar.value)] {
-            keys.append(name)
-        } else {
-            keys.append(item.keyEquivalent == " " ? "Space" : item.keyEquivalent.uppercased())
-        }
-        return keys
     }
 
     func controlTextDidChange(_ obj: Notification) {
@@ -739,6 +731,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section("Installed", extensionsGroup, accessory: buttons)
             section(nil, developerGroup)
         case .shortcuts:
+            let resetAll = TextButton.form("Reset All")
+            resetAll.isEnabled = Shortcuts.hasChanges
+            resetAll.onClick = { [weak self] _ in
+                Shortcuts.resetAll()
+                ShortcutRow.lastTaken = nil
+                self?.reloadShortcuts()
+                self?.layoutDocument()
+            }
+            let rw = resetAll.fittingWidth
+            resetAll.frame = NSRect(x: width - pad - rw, y: y, width: rw, height: Tokens.Space.x8)
+            documentView.addSubview(resetAll)
+            let hint = Label("Click a shortcut to change it.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+            hint.frame = NSRect(x: pad + Tokens.Space.x1, y: y + (Tokens.Space.x8 - hint.lineHeight) / 2, width: contentWidth - rw - Tokens.Space.x4, height: hint.lineHeight)
+            documentView.addSubview(hint)
+            y += Tokens.Space.x8 + Tokens.Space.x3
             shortcutSearch.frame = NSRect(x: pad, y: y, width: contentWidth, height: Tokens.Space.x8)
             shortcutSearch.tint = Brand.Theme.brand.accent
             documentView.addSubview(shortcutSearch)
@@ -929,15 +936,52 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 }
 
-/// One shortcut: what it does, and its keys drawn as small keycaps.
-final class ShortcutRow: NSView {
+/// One shortcut: what it does, and its keys drawn as small keycaps. Click it to give it new keys.
+final class ShortcutRow: InteractiveView {
+    private let item: NSMenuItem?
     private let title: Label
+    private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
+    private let field = ColorView(color: .clear)
+    private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+    private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small - 1, toolTip: "Back to Zigzag’s Shortcut")
+    private var monitor: Any?
+    private var isRecording = false { didSet { refresh() } }
+    /// Called after the keys change, so the list can redraw rows that lost theirs.
+    var onChange: (() -> Void)?
+    private static weak var recording: ShortcutRow?
 
-    init(title text: String, keys: [String]) {
+    /// A row for a menu item, which you can change.
+    init(title text: String, item: NSMenuItem) {
+        self.item = item
         title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 40))
+        setup(keys: Shortcuts.caps(item))
+        toolTip = "Click to change"
+        onClick = { [weak self] _ in self?.startRecording() }
+        resetButton.onClick = { [weak self] _ in
+            guard let self, let item = self.item else { return }
+            Shortcuts.reset(item)
+            self.onChange?()
+        }
+    }
+
+    /// A fixed row, like ⌘1–9, which can't be changed.
+    init(title text: String, keys: [String]) {
+        item = nil
+        title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 40))
+        setup(keys: keys)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    private func setup(keys: [String]) {
+        layer?.cornerRadius = Tokens.Radius.row
         addSubview(title)
+        addSubview(note)
+        note.isHidden = true
         for key in keys {
             let cap = ColorView(color: Tokens.Color.fieldFill)
             cap.wantsLayer = true
@@ -949,27 +993,164 @@ final class ShortcutRow: NSView {
             addSubview(cap)
             caps.append((cap, label))
         }
-        setAccessibilityElement(true)
-        setAccessibilityRole(.staticText)
-        setAccessibilityLabel("\(text): \(keys.joined(separator: " "))")
+        field.wantsLayer = true
+        field.layer?.cornerRadius = 6
+        field.layer?.cornerCurve = .continuous
+        field.layer?.borderWidth = 1.5
+        fieldLabel.alignment = .center
+        field.addSubview(fieldLabel)
+        field.isHidden = true
+        addSubview(field)
+        resetButton.isHidden = !(item.map(Shortcuts.isCustom) ?? false)
+        addSubview(resetButton)
+        setAccessibilityRole(item == nil ? .staticText : .button)
+        setAccessibilityLabel("\(title.stringValue): \(keys.isEmpty ? "no shortcut" : keys.joined(separator: " "))")
+        refresh()
     }
 
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
+    /// Shown under the title after a change: which command the keys came from.
+    func say(_ text: String) {
+        note.stringValue = text
+        note.textColor = Tokens.Color.caution
+        note.isHidden = false
+        needsLayout = true
+    }
 
     override func layout() {
         super.layout()
         let pad = Tokens.Space.x3
         let capHeight: CGFloat = 22
         var x = bounds.width - pad
-        for (cap, label) in caps.reversed() {
-            let w = max(capHeight, label.inkWidth + Tokens.Space.x3)
+        if isRecording {
+            let w: CGFloat = 168
             x -= w
-            cap.frame = NSRect(x: x, y: (bounds.height - capHeight) / 2, width: w, height: capHeight)
-            label.frame = NSRect(x: 0, y: (capHeight - label.lineHeight) / 2, width: w, height: label.lineHeight)
-            x -= 4
+            field.frame = NSRect(x: x, y: (bounds.height - 26) / 2, width: w, height: 26)
+            fieldLabel.frame = NSRect(x: Tokens.Space.x2, y: (26 - fieldLabel.lineHeight) / 2, width: w - Tokens.Space.x4, height: fieldLabel.lineHeight)
+        } else if caps.isEmpty && item != nil {
+            fieldLabel.stringValue = "None"
+        } else {
+            for (cap, label) in caps.reversed() {
+                let w = max(capHeight, label.inkWidth + Tokens.Space.x3)
+                x -= w
+                cap.frame = NSRect(x: x, y: (bounds.height - capHeight) / 2, width: w, height: capHeight)
+                label.frame = NSRect(x: 0, y: (capHeight - label.lineHeight) / 2, width: w, height: label.lineHeight)
+                x -= 4
+            }
         }
-        title.frame = NSRect(x: pad, y: (bounds.height - title.lineHeight) / 2, width: max(0, x - pad - Tokens.Space.x3), height: title.lineHeight)
+        if caps.isEmpty && item != nil && !isRecording {
+            // No keys: a quiet "None" where the caps would be.
+            let w = fieldLabel.inkWidth + Tokens.Space.x2
+            x -= w
+            field.frame = NSRect(x: x, y: (bounds.height - 26) / 2, width: w, height: 26)
+            fieldLabel.frame = NSRect(x: 0, y: (26 - fieldLabel.lineHeight) / 2, width: w, height: fieldLabel.lineHeight)
+        }
+        if !resetButton.isHidden {
+            let b = resetButton.frame.width
+            x -= b + Tokens.Space.x2
+            resetButton.frame.origin = NSPoint(x: x, y: (bounds.height - b) / 2)
+        }
+        let width = max(0, x - pad - Tokens.Space.x3)
+        if note.isHidden {
+            title.frame = NSRect(x: pad, y: (bounds.height - title.lineHeight) / 2, width: width, height: title.lineHeight)
+        } else {
+            let block = title.lineHeight + note.lineHeight
+            title.frame = NSRect(x: pad, y: (bounds.height - block) / 2, width: width, height: title.lineHeight)
+            note.frame = NSRect(x: pad, y: title.frame.maxY, width: width, height: note.lineHeight)
+        }
+    }
+
+    override func stateDidChange(animated: Bool) { refresh() }
+
+    private func refresh() {
+        let editable = item != nil
+        let fill: NSColor? = isRecording ? nil : editable && isPressed ? Tokens.Color.pressedFill : editable && isHovered ? Tokens.Color.hoverFill : nil
+        layer?.backgroundColor = fill.map { cgColor($0) }
+        caps.forEach { $0.0.isHidden = isRecording }
+        let none = caps.isEmpty && editable
+        field.isHidden = !(isRecording || none)
+        let accent = Brand.Theme.brand.accent
+        field.layer?.borderColor = isRecording ? cgColor(accent) : nil
+        field.layer?.borderWidth = isRecording ? 1.5 : 0
+        field.layer?.backgroundColor = isRecording ? cgColor(accent.withAlphaComponent(0.08)) : nil
+        if !isRecording && none { fieldLabel.stringValue = "None"; fieldLabel.textColor = Tokens.Color.textTertiary }
+        needsLayout = true
+    }
+
+    // MARK: Recording
+
+    private func startRecording() {
+        guard let item, !isRecording else { return }
+        ShortcutRow.recording?.stopRecording()
+        ShortcutRow.recording = self
+        isRecording = true
+        showHeld([])
+        window?.makeFirstResponder(nil)
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged, .leftMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            switch event.type {
+            case .leftMouseDown:
+                // A click anywhere else ends it, unchanged.
+                if event.window !== self.window || !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.stopRecording() }
+                return event
+            case .flagsChanged:
+                self.showHeld(event.modifierFlags)
+                return nil
+            default:
+                let plain = event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty
+                if plain && event.keyCode == 53 { self.stopRecording(); return nil }
+                if plain && (event.keyCode == 51 || event.keyCode == 117) {
+                    Shortcuts.set(Shortcuts.Combo.none, for: item)
+                    self.finish(taken: nil)
+                    return nil
+                }
+                guard let combo = Shortcuts.combo(from: event) else {
+                    self.fieldLabel.stringValue = "Add ⌘, ⌥ or ⌃"
+                    self.fieldLabel.textColor = Tokens.Color.caution
+                    return nil
+                }
+                let taken = Shortcuts.set(combo, for: item)
+                self.finish(taken: taken)
+                return nil
+            }
+        }
+    }
+
+    /// While recording: the modifiers you're holding, so you can see the shortcut forming.
+    private func showHeld(_ flags: NSEvent.ModifierFlags) {
+        var held = ""
+        if flags.contains(.control) { held += "⌃" }
+        if flags.contains(.option) { held += "⌥" }
+        if flags.contains(.shift) { held += "⇧" }
+        if flags.contains(.command) { held += "⌘" }
+        fieldLabel.stringValue = held.isEmpty ? "Type a shortcut" : held + " …"
+        fieldLabel.textColor = held.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
+    }
+
+    private func finish(taken: NSMenuItem?) {
+        stopRecording()
+        let name = taken.map { $0.title.hasSuffix("…") ? String($0.title.dropLast()) : $0.title }
+        onChange?()
+        if let name { ShortcutRow.lastTaken = (item, name) }
+    }
+
+    /// The last change that took keys from another command, said on the row once the list redraws.
+    static var lastTaken: (item: NSMenuItem?, from: String)?
+
+    func showTakenNoteIfNeeded() {
+        guard let taken = ShortcutRow.lastTaken, taken.item === item else { return }
+        say("Taken from “\(taken.from)”, which has no shortcut now")
+    }
+
+    private func stopRecording() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        if ShortcutRow.recording === self { ShortcutRow.recording = nil }
+        isRecording = false
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stopRecording() }
     }
 }
 
