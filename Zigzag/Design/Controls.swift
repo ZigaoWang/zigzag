@@ -329,6 +329,9 @@ final class PrimaryButton: InteractiveView {
     var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
     /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
     var isDestructive = false { didSet { stateDidChange(animated: false) } }
+    /// Set both to draw the button in other colors, like a light button on the brand's blue.
+    var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
+    var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
     /// Moves the title off center, to leave room for something beside it (a keycap).
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
@@ -364,8 +367,8 @@ final class PrimaryButton: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // The space's accent: the one primary action on a screen.
         let theme = fixedTheme ?? Brand.Theme.for(self)
-        let base = isDestructive ? Tokens.Color.destructive : theme.accent
-        label.textColor = isDestructive ? .white : theme.onAccent
+        let base = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
+        label.textColor = customInk ?? (isDestructive ? .white : theme.onAccent)
         let color = !isEnabled ? base.withAlphaComponent(Tokens.Opacity.disabled) : isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
         layer?.set(backgroundColor: cgColor(color), animated: false)
     }
