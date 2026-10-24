@@ -125,9 +125,23 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         didSet {
             guard oldValue != isAway else { return }
             closeButton.symbol = isAway ? "arrow.uturn.backward" : "xmark"
+            awayMark.isHidden = !isAway
             refreshAccessories()
+            needsLayout = true
         }
     }
+
+    /// Always there while a pinned tab is away from its page: a short slanted stroke, the ribbon's own slant,
+    /// between the icon and the title, so you can tell at a glance it isn't on its pinned page.
+    private lazy var awayMark: CAShapeLayer = {
+        let mark = CAShapeLayer()
+        mark.lineWidth = 1.6
+        mark.lineCap = .round
+        mark.fillColor = nil
+        mark.isHidden = true
+        layer?.addSublayer(mark)
+        return mark
+    }()
     var isUnloaded = false { didSet { refreshTitleColor() } }
     /// The other half of a split: shown in the same row, to the right.
     private(set) var partner: Tab?
@@ -274,6 +288,21 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func layout() {
         super.layout()
+        if isAway {
+            // Make room for the mark: the title moves over by its width.
+            let x = icon.frame.maxX + Tokens.Space.x2
+            let h: CGFloat = 12
+            Tokens.Motion.withoutAnimation {
+                awayMark.frame = CGRect(x: x, y: (bounds.height - h) / 2, width: 6, height: h)
+                let path = CGMutablePath()
+                path.move(to: CGPoint(x: 5, y: isFlipped ? 1 : h - 1))
+                path.addLine(to: CGPoint(x: 1, y: isFlipped ? h - 1 : 1))
+                awayMark.path = path
+                awayMark.strokeColor = cgColor(Tokens.Color.textTertiary)
+            }
+            title.frame.origin.x += 6 + Tokens.Space.x1
+            title.frame.size.width = max(0, title.frame.width - 6 - Tokens.Space.x1)
+        }
         let size = closeButton.frame.size
         let y = (bounds.height - size.height) / 2
         var x = bounds.width - Tokens.Space.x1 - size.width
