@@ -738,6 +738,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .backgroundTab:
             tabManager.newTab(url: url, select: false, opener: opener)
         case .peek:
+            Tutorial.complete("peek")
             showPeek(url: url, configuration: nil)
         case .newWindow:
             WindowManager.shared.newWindow(url: url)
@@ -893,6 +894,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// Turns a tab into a bookmark, undoably.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
+        Tutorial.complete("pin")
         let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
         tabManager.bookmarkTab(tab, at: index, in: spaceID)
         guard let bookmarkID = tab.bookmarkID else { return }

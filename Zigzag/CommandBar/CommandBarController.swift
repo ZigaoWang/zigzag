@@ -390,6 +390,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let inCurrent = mode == .editCurrent && manager.selectedTab != nil
         dismiss(restoringFocus: false)
         func open(_ url: URL, search: Bool = false) {
+            if !inCurrent { Tutorial.complete("newTab") }
             if inCurrent {
                 manager.selectedTab?.load(url)
                 manager.selectedTab?.isSearchTab = search

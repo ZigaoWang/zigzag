@@ -289,6 +289,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         var created: SpaceInfo?
         libraryChange("New Space") { created = Library.shared.addSpace() }
         guard let space = created else { return }
+        Tutorial.complete("space")
         tabManager.switchToSpace(space.id)
         renameSpace(nil)
     }

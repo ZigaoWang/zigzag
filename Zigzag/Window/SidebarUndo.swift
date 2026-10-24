@@ -41,6 +41,7 @@ extension BrowserWindowController {
     // MARK: Split view
 
     func splitWithUndo(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
+        Tutorial.complete("split")
         let previous = [tabManager.split(for: tab), tabManager.split(for: other)].compactMap { $0 }
         let selected = tabManager.selectedTab
         tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight)
