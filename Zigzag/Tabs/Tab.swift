@@ -92,6 +92,10 @@ final class Tab: NSObject {
 
     var isSuspended: Bool { webView == nil }
     /// A name you gave the tab (double-click to rename); it stays whatever the page calls itself.
+    /// While a pinned page is first loading, where it ends up on its own (a site that redirects, like
+    /// calendar.google.com) counts as the pinned page, so it's never "moved on" before you've done anything.
+    var landingUntil: Date?
+    var pinnedLanding: URL?
     var customTitle: String? { didSet { if oldValue != customTitle { changed.send(.title) } } }
 
     var displayTitle: String {
@@ -137,8 +141,9 @@ final class Tab: NSObject {
         self.webView = webView
         observe(webView)
 
-        if Self.isExtensionPage(url), !showsExtensionPage, let url {
-            // A restored tab from an extension that's gone: explain, rather than restore a page that can't load.
+        if Self.isExtensionPage(url), let url {
+            // Extension pages always load fresh: their saved history state can come back as a blank page, and one
+            // from an extension that's gone gets explained rather than restored.
             pendingInteractionState = nil
             Self.load(url, in: webView)
         } else if let state = pendingInteractionState {
@@ -479,6 +484,8 @@ extension Tab: WKNavigationDelegate {
         }
 
         let isLinkClick = navigationAction.navigationType == .linkActivated
+        // Anything you do yourself ends the pinned page's settling-in.
+        if isLinkClick || navigationAction.navigationType == .formSubmitted { landingUntil = nil }
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         if isLinkClick && isMainFrame {
             let flags = navigationAction.modifierFlags
@@ -552,6 +559,7 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
         refreshFavicon()
         Task { [weak self] in
             let article = await Reader.isArticle(webView)

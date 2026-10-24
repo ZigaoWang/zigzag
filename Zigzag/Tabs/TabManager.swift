@@ -309,6 +309,7 @@ final class TabManager {
         tab.host = host
         watch(tab)
         tab.bookmarkID = bookmark.id
+        tab.landingUntil = Date().addingTimeInterval(8)
         bookmarkTabs[bookmark.id] = tab
         changed.send(.structure)
         select(tab)
@@ -350,7 +351,8 @@ final class TabManager {
     /// True when a pinned tab has moved on from its pinned page.
     func isAway(_ bookmarkID: UUID) -> Bool {
         guard let tab = bookmarkTabs[bookmarkID], let url = tab.url, let bookmark = Library.shared.bookmark(bookmarkID) else { return false }
-        return TabManager.normalize(url) != TabManager.normalize(bookmark.url)
+        let here = TabManager.normalize(url)
+        return here != TabManager.normalize(bookmark.url) && here != tab.pinnedLanding.map(TabManager.normalize)
     }
 
     /// Turns the page a pinned tab moved on to into a tab of its own; the pinned item stays as it was, unloaded.
@@ -368,6 +370,9 @@ final class TabManager {
     /// Sends a bookmark's page back to the bookmarked address.
     func resetBookmarkTab(_ bookmarkID: UUID) {
         guard let tab = bookmarkTabs[bookmarkID], let bookmark = Library.shared.bookmark(bookmarkID) else { return }
+        // Already where it lands on its own: nothing to go back to.
+        if let landing = tab.pinnedLanding, let url = tab.url, TabManager.normalize(url) == TabManager.normalize(landing) { return }
+        tab.landingUntil = Date().addingTimeInterval(8)
         tab.load(bookmark.url)
     }
 
