@@ -312,6 +312,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         } else {
             menu.addItem(SidebarMenus.Item("Ad Blocking Is Off…", symbol: "hand.raised.slash") { SettingsWindowController.shared.show() })
         }
+        if tab.isTranslated {
+            menu.addItem(SidebarMenus.Item("Show Original", symbol: "translate") { [weak self] in self?.translatePage() })
+        } else if tab.foreignLanguage != nil {
+            menu.addItem(SidebarMenus.Item("Translate to \(PageTranslator.name(of: PageTranslator.readerLanguage))", symbol: "translate") { [weak self] in self?.translatePage() })
+        }
         if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
             let off = ExtensionStore.extensionsOffSites.contains(site)
             let item = SidebarMenus.Item("Turn Off Extensions on This Site", symbol: "puzzlepiece.extension") {
@@ -562,11 +567,65 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
         case .reader:
             updateReaderButton()
+        case .language:
+            offerTranslation()
         default:
             break
         }
         // Reader belongs to the page it was opened on.
         if change == .url, readerTab === tab, tab.url != readerURL { closeReader() }
+    }
+
+    // MARK: Translation
+
+    private lazy var translator: TranslationHost = {
+        let host = TranslationHost()
+        root.overlay.addSubview(host.view)
+        return host
+    }()
+    /// Sites already offered this session, so browsing a site in another language doesn't ask on every page.
+    private var translationOffered: Set<String> = []
+    /// Sites the person translated this session: their other pages translate as they open.
+    private var translatedSites: Set<String> = []
+
+    private func offerTranslation() {
+        guard let tab = tabManager.selectedTab, let language = tab.foreignLanguage, !tab.isTranslated,
+              let site = ContentBlocker.site(of: tab.url) else { return }
+        if translatedSites.contains(site) { translatePage(); return }
+        guard !translationOffered.contains(site) else { return }
+        translationOffered.insert(site)
+        Toast.show("This page is in \(PageTranslator.name(of: language))", symbol: "translate",
+                   action: (title: "Translate", run: { [weak self] in self?.translatePage() }), duration: 6, in: self)
+    }
+
+    func translatePage() {
+        guard let tab = tabManager.selectedTab, let webView = tab.webView else { return }
+        let site = ContentBlocker.site(of: tab.url)
+        if tab.isTranslated {
+            PageTranslator.restore(in: webView)
+            tab.isTranslated = false
+            if let site { translatedSites.remove(site) }
+            Toast.hide(in: self)
+            return
+        }
+        guard let language = tab.foreignLanguage else {
+            Toast.show("This page is already in \(PageTranslator.name(of: PageTranslator.readerLanguage))", symbol: "translate", duration: 2, in: self)
+            return
+        }
+        let name = PageTranslator.name(of: language)
+        Toast.show("Translating from \(name)…", symbol: "translate", duration: 3600, in: self)
+        translator.translate(webView, from: language, progress: { _ in }, completion: { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                tab.isTranslated = true
+                if let site { self.translatedSites.insert(site) }
+                Toast.show("Translated from \(name)", symbol: "translate",
+                           action: (title: "Show Original", run: { [weak self] in self?.translatePage() }), duration: 4, in: self)
+            case .failure:
+                Toast.show("Couldn’t translate this page. Try again in a moment.", symbol: "exclamationmark.triangle", duration: 3, in: self)
+            }
+        })
     }
 
     // MARK: Reader

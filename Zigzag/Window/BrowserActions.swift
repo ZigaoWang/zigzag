@@ -162,6 +162,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
+    @objc func translatePage(_ sender: Any?) { translatePage() }
 
     /// Floats the playing video. When WebKit can't tell which video that is, says how to do it from the page.
     @objc func togglePictureInPicture(_ sender: Any?) {

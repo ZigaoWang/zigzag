@@ -23,7 +23,7 @@ enum OpenDisposition {
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
-        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader
+        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language
     }
 
     let id: UUID
@@ -205,6 +205,10 @@ final class Tab: NSObject {
 
     /// The page looks like an article, so Reader is offered.
     private(set) var isArticle = false
+    /// The page's language, when it isn't the reader's and can be translated.
+    private(set) var foreignLanguage: Locale.Language?
+    /// The page's text is shown translated.
+    var isTranslated = false
 
     /// Set when switching away floated this tab's video, so switching back can put it back.
     var floatedOnSwitch = false
@@ -332,6 +336,11 @@ final class Tab: NSObject {
                     guard let self, let url = wv.url else { return }
                     let hostChanged = url.host() != self.url?.host()
                     if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
+                    if url != self.url, self.foreignLanguage != nil || self.isTranslated {
+                        self.foreignLanguage = nil
+                        self.isTranslated = false
+                        self.changed.send(.language)
+                    }
                     self.url = url
                     if hostChanged { self.favicon = FaviconStore.shared.cachedIcon(for: url) ?? self.favicon; self.changed.send(.favicon) }
                     self.changed.send(.url)
@@ -509,6 +518,12 @@ extension Tab: WKNavigationDelegate {
             guard let self, self.webView === webView, article != self.isArticle else { return }
             self.isArticle = article
             self.changed.send(.reader)
+        }
+        Task { [weak self] in
+            let language = await PageTranslator.foreignLanguage(of: webView)
+            guard let self, self.webView === webView else { return }
+            self.foreignLanguage = language
+            self.changed.send(.language)
         }
     }
 
