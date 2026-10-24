@@ -149,6 +149,11 @@ enum PasswordManagers {
     /// The installed, turned-on password manager's name.
     static var active: String? {
         guard #available(macOS 15.4, *) else { return nil }
-        return ExtensionHost.shared.contexts.first { extensionIDs.contains($0.uniqueIdentifier) }?.webExtension.displayName
+        // "1Password – Password Manager" reads as "1Password".
+        let name = ExtensionHost.shared.contexts.first { extensionIDs.contains($0.uniqueIdentifier) }?.webExtension.displayName
+        return name.map { full in
+            let cut = [" –", " -", ":"].compactMap { full.range(of: $0)?.lowerBound }.min() ?? full.endIndex
+            return String(full[..<cut]).trimmingCharacters(in: .whitespaces)
+        }
     }
 }
