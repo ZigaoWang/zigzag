@@ -374,6 +374,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
     private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
+    /// The name sits on a soft field, so it reads as something you can type into.
+    private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let canvas = ColorCanvas()
     private let appearanceOptions = AppearanceOption.Mode.allCases.map { AppearanceOption(mode: $0) }
     private var swatches: [TintSwatch] = []
@@ -391,7 +393,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         canvas.hue = space?.hue ?? space?.color.hue ?? 0.6
         canvas.intensity = space?.intensity ?? SpaceColor.defaultIntensity
         swatches = SpaceColor.allCases.map { TintSwatch(kind: .tint($0)) }
-        [nameField, canvas].forEach { addSubview($0) }
+        nameBackground.wantsLayer = true
+        nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
+        nameBackground.layer?.cornerCurve = .continuous
+        [nameBackground, nameField, canvas].forEach { addSubview($0) }
         appearanceOptions.forEach { addSubview($0) }
         for option in appearanceOptions {
             option.onClick = { [weak self, weak option] _ in
@@ -470,7 +475,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let width = bounds.width - pad * 2
         var y = pad
         let fh = ceil(nameField.intrinsicContentSize.height)
-        nameField.frame = NSRect(x: pad, y: y + (Tokens.Space.x8 - fh) / 2, width: width, height: fh)
+        nameBackground.frame = NSRect(x: pad, y: y, width: width, height: Tokens.Space.x8 + 2)
+        nameField.frame = NSRect(x: pad + Tokens.Space.x2, y: y + (Tokens.Space.x8 + 2 - fh) / 2, width: width - Tokens.Space.x4, height: fh)
         y += Tokens.Space.x8 + Tokens.Space.x3
         canvas.frame = NSRect(x: pad, y: y, width: width, height: canvasHeight)
         y = canvas.frame.maxY + Tokens.Space.x3
@@ -492,13 +498,18 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let overlay = controller.root.overlay
         let sidebar = controller.root.sidebarContainer.frame
         let height = contentHeight
-        let top = controller.root.cardFrame.minY + Tokens.Space.x2
-        frame = NSRect(x: sidebar.maxX + Tokens.Space.x2, y: min(top, overlay.bounds.height - height - Tokens.Space.x4),
-                       width: Self.width, height: height)
+        // Beside the space it edits: level with its header in the sidebar, kept inside the window.
+        var top = controller.root.cardFrame.minY + Tokens.Space.x2
+        if let header = controller.sidebar.list.headerView, header.window != nil {
+            top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
+        }
+        top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))
+        frame = NSRect(x: sidebar.maxX + Tokens.Space.x2, y: top, width: Self.width, height: height)
         overlay.addSubview(self)
         present()
         controller.window?.makeFirstResponder(nameField)
-        nameField.currentEditor()?.selectAll(nil)
+        // The cursor at the end, not the whole name selected: you came to change the color as often as the name.
+        if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }
         controller.root.holdReveal = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
