@@ -265,7 +265,9 @@ final class SidebarView: NSView {
             x -= button
         }
         // The sidebar toggle sits right after the traffic lights, where Arc and Safari put it.
-        sidebarButton.frame = NSRect(x: pad + Tokens.Space.x2 + trafficLightsWidth + Tokens.Space.x2, y: rowCenter - button / 2, width: button, height: button)
+        // Without traffic lights (full screen) the sidebar button starts the row.
+        let lead = trafficLightsWidth > 0 ? pad + Tokens.Space.x2 + trafficLightsWidth + Tokens.Space.x2 : pad
+        sidebarButton.frame = NSRect(x: lead, y: rowCenter - button / 2, width: button, height: button)
         let topRowBottom = Tokens.Metric.topRowHeight + Tokens.Space.x2
         address.frame = NSRect(x: pad, y: topRowBottom, width: width - pad * 2, height: Tokens.Metric.addressHeight)
 

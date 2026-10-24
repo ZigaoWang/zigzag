@@ -692,7 +692,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let y = (docked ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
-        sidebar.trafficLightsWidth = window.trafficLightsWidth
+        sidebar.trafficLightsWidth = window.styleMask.contains(.fullScreen) ? 0 : window.trafficLightsWidth
         sidebar.sidebarButton.toolTip = docked ? "Hide Sidebar (⌃⌘S)" : "Show Sidebar (⌃⌘S)"
         sidebar.sidebarButton.isSelected = false
     }
@@ -701,7 +701,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
-    func windowDidEnterFullScreen(_ notification: Notification) { root.needsLayout = true }
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        // Hidden before the zoom starts, so they never flash in AppKit's spot.
+        browserWindow.trafficLightsHidden = true
+    }
+
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        layoutTrafficLights()
+        root.needsLayout = true
+    }
 
     func windowDidExitFullScreen(_ notification: Notification) {
         layoutTrafficLights()
