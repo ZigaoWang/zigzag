@@ -286,9 +286,14 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1]); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsbottom":
-            if let scroll = SettingsWindowController.shared.window?.contentView as? NSScrollView, let document = scroll.documentView {
+            if let root = SettingsWindowController.shared.window?.contentView,
+               let scroll = root.subviews.compactMap({ $0 as? NSScrollView }).first, let document = scroll.documentView {
                 document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
             }
+        case "settingspane":
+            // settingspane <general|spaces|passwords|privacy|translation|extensions|shortcuts>
+            SettingsWindowController.shared.show()
+            if let pane = SettingsPane.allCases.first(where: { "\($0)" == arg }) { SettingsWindowController.shared.show(pane) }
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
         case "addextnow": Task { _ = await ExtensionStore.install(arg) }
