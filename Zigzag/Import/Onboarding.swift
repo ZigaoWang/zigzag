@@ -492,6 +492,8 @@ private final class BrowserRow: InteractiveView {
     private var isSafari: Bool { if case .safari = source.kind { true } else { false } }
     /// Allowing through the folder panel comes first; if macOS still says no, the switch in System Settings.
     var triedPicker = false
+    /// Access was just allowed: the list may now split this browser into its profiles.
+    var onGranted: (() -> Void)?
     private var waitingForSettings = false
 
     func awaitSettings() {
@@ -522,6 +524,7 @@ private final class BrowserRow: InteractiveView {
             } else {
                 needsAccess = false
                 waitingForSettings = false
+                onGranted?()
                 problem.stringValue = ""
                 detail.stringValue = text
                 isChosen = true
@@ -721,6 +724,10 @@ private final class BringPicker: StepContent {
             guard let self, let row else { return }
             self.fix(fix, row)
         }
+        row.onGranted = { [weak self, weak row] in
+            guard let self, let row else { return }
+            self.splitIntoProfiles(row)
+        }
         list.addSubview(row)
         rows.append(row)
         if rows.count > 1 {
@@ -729,6 +736,29 @@ private final class BringPicker: StepContent {
             separators.append(line)
         }
         return row
+    }
+
+    /// Once a browser can be read, several profiles become several rows ("Chrome · Work"), each its own choice.
+    private func splitIntoProfiles(_ row: BrowserRow) {
+        guard case .chromium(let browser) = row.source.kind, browser.profile == nil, browser.name != "Arc",
+              let index = rows.firstIndex(where: { $0 === row }) else { return }
+        let profiles = ChromiumImporter.profileNames(of: browser)
+        guard profiles.count > 1 else { return }
+        row.removeFromSuperview()
+        rows.remove(at: index)
+        separators.forEach { $0.removeFromSuperview() }
+        separators = []
+        let all = rows
+        rows = []
+        for (k, old) in all.enumerated() {
+            if k == index { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) · \(name)", bundleID: browser.bundleID), chosen: true) } }
+            old.removeFromSuperview()
+            rows.append(old)
+            list.addSubview(old)
+            if rows.count > 1 { let line = ColorView(color: Onboard.tint.withAlphaComponent(0.09)); list.addSubview(line); separators.append(line) }
+        }
+        if index >= all.count { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) · \(name)", bundleID: browser.bundleID), chosen: true) } }
+        refresh()
     }
 
     private var waiting: [BrowserRow] { rows.filter { $0.isChosen && !$0.isFinished } }
