@@ -317,7 +317,7 @@ final class BrowserRootView: ColorView {
         let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
         let sidebar = sidebarContainer.frame
         // Anywhere left of the sidebar counts as on it: that's where the pointer goes to summon it.
-        let keep = sidebar.insetBy(dx: -Tokens.Space.x3, dy: -Tokens.Space.x3).contains(point)
+        let keep = sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
             || (point.x < sidebar.minX && point.y >= bounds.minY && point.y <= bounds.maxY)
         if keep || holdReveal || NSEvent.pressedMouseButtons != 0 {
             pointerLeftAt = nil
