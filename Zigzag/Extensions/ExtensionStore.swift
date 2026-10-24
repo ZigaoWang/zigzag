@@ -496,15 +496,46 @@ enum ExtensionProfile {
         var unsupportedAPIs: Set<String> = []
         /// Script run in the background before the extension's own, for APIs it calls without checking.
         var backgroundPrelude: String?
+        /// The same, for the extension's own pages (popup, options), run before any of their scripts.
+        var pagePrelude: String?
         /// Permissions the prelude stands in for well enough that the person won't miss them.
         var coveredPermissions: Set<String> = []
     }
 
     static func profile(for id: String) -> Profile? { profiles[id] }
 
+    /// Every page prelude, by extension ID.
+    static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
+
     private static let profiles: [String: Profile] = [
         ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, coveredPermissions: ["management", "privacy", "idle"]),
+        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
     ]
+
+    /// Bitwarden's background reads the `scripting.ExecutionWorld` constants (WebKit supports the worlds but not
+    /// the names) and asks for contexts and offscreen documents before falling back to its popup for clipboard work.
+    private static let bitwardenPrelude = """
+    const api = globalThis.browser || globalThis.chrome;
+    const noop = () => {};
+    const event = () => ({ addListener: noop, removeListener: noop, hasListener: () => false });
+    const held = {};
+    const namespace = (name) => (held[name] = held[name] || api[name]);
+    const add = (name, value) => { if (!api[name]) { try { api[name] = value; held[name] = value; } catch (e) {} } };
+    const addTo = (name, values) => {
+      const target = namespace(name);
+      if (!target) return;
+      for (const [key, value] of Object.entries(values)) { if (target[key] === undefined) { try { target[key] = value; } catch (e) {} } }
+    };
+    addTo('scripting', { ExecutionWorld: { ISOLATED: 'ISOLATED', MAIN: 'MAIN' } });
+    addTo('runtime', { getContexts: async () => [], ContextType: { BACKGROUND: 'BACKGROUND', OFFSCREEN_DOCUMENT: 'OFFSCREEN_DOCUMENT', POPUP: 'POPUP', SIDE_PANEL: 'SIDE_PANEL', TAB: 'TAB' } });
+    add('offscreen', { createDocument: async () => { throw new Error("Offscreen documents aren't available in Zigzag"); }, closeDocument: async () => {}, hasDocument: async () => false, Reason: { CLIPBOARD: 'CLIPBOARD', LOCAL_STORAGE: 'LOCAL_STORAGE' } });
+    add('idle', { queryState: async () => 'active', setDetectionInterval: noop, onStateChanged: event() });
+    addTo('storage', { managed: { get: async () => ({}), getBytesInUse: async () => 0, onChanged: event() } });
+    // Without a notifications API it swaps in a service that throws at startup and takes the rest of the
+    // background down with it. With this one, its notification requests are refused one at a time instead.
+    add('notifications', { create: async () => { throw new Error("Notifications aren't available in Zigzag"); }, update: async () => false, clear: async () => false, getAll: async () => ({}), onClicked: event(), onClosed: event(), onButtonClicked: event() });
+
+    """
 
     /// 1Password's background calls these at startup without checking they exist, and stops at the first
     /// one WebKit lacks. Each stand-in answers the way a browser without the feature would; anything that
