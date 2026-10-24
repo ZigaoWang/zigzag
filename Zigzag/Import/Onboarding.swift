@@ -192,20 +192,41 @@ private enum Onboard {
 
 // MARK: - 1. Hello
 
-/// "Welcome to", then the wordmark writing itself in, then one button.
+/// "Welcome to", then the wordmark writing itself in over a soft rising glow; once it's written, one highlight
+/// runs across the letters, and the button arrives. Nothing bounces; only the glow keeps breathing, slowly.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let welcome = Label("Welcome to", font: .systemFont(ofSize: 17, weight: .medium), color: Onboard.dim(0.78))
+    private let welcome = Label("Welcome to", font: .systemFont(ofSize: 18, weight: .medium), color: Onboard.dim(0.78))
     private let wordmark = WordmarkView()
+    /// A copy of the wordmark shapes the highlight, so the light only touches the letters.
+    private let sheenMask = WordmarkView()
+    private let sheen = CAGradientLayer()
+    private let glow = CAGradientLayer()
     private let start = Onboard.primary("Get Started")
     private var drewIn = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        wantsLayer = true
+        glow.type = .radial
+        glow.colors = [Brand.ribbon.withAlphaComponent(0.22).cgColor, Brand.ribbon.withAlphaComponent(0).cgColor]
+        glow.startPoint = CGPoint(x: 0.5, y: 0.5)
+        glow.endPoint = CGPoint(x: 1, y: 1)
+        glow.opacity = 0
+        layer?.addSublayer(glow)
         welcome.alignment = .center
         wordmark.color = Onboard.ink
         start.onClick = { [weak self] _ in self?.onStart?() }
         [welcome, wordmark, start].forEach { addSubview($0) }
+        // The highlight: a white copy of the wordmark over the real one, seen only through a moving band.
+        sheenMask.color = .white
+        sheenMask.wantsLayer = true
+        addSubview(sheenMask)
+        sheen.colors = [NSColor.black.withAlphaComponent(0).cgColor, NSColor.black.withAlphaComponent(0.85).cgColor, NSColor.black.withAlphaComponent(0).cgColor]
+        sheen.locations = [0, 0.5, 1]
+        sheen.startPoint = CGPoint(x: 0, y: 0.5)
+        sheen.endPoint = CGPoint(x: 1, y: 0.5)
+        sheenMask.layer?.mask = sheen
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -216,26 +237,78 @@ private final class HelloPage: NSView {
         guard window != nil, !drewIn else { return }
         drewIn = true
         layoutSubtreeIfNeeded()
-        wordmark.drawIn(delay: 0.35)
-        Brand.enter([welcome], delay: 0.1)
-        Brand.enter([start], delay: 1.3)
+        welcome.alphaValue = 0
+        start.alphaValue = 0
+        let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
+        func fadeIn(_ view: NSView, after delay: TimeInterval, duration: TimeInterval = 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = duration
+                    ctx.timingFunction = ease
+                    view.animator().alphaValue = 1
+                }
+            }
+        }
+        fadeIn(welcome, after: 0.15)
+        // The glow rises with the writing, then breathes, so the screen feels lit, not static.
+        let rise = CABasicAnimation(keyPath: "opacity")
+        rise.fromValue = 0
+        rise.toValue = 1
+        rise.beginTime = CACurrentMediaTime() + 0.3
+        rise.duration = 1.4
+        rise.timingFunction = ease
+        rise.fillMode = .backwards
+        glow.opacity = 1
+        glow.add(rise, forKey: "rise")
+        let breathe = CABasicAnimation(keyPath: "transform.scale")
+        breathe.fromValue = 1
+        breathe.toValue = 1.08
+        breathe.duration = 5
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        breathe.beginTime = CACurrentMediaTime() + 1.7
+        glow.add(breathe, forKey: "breathe")
+        wordmark.drawIn(delay: 0.45, total: 1.2)
+        // Once written, one highlight crosses the letters, left to right.
+        let sweep = CABasicAnimation(keyPath: "position.x")
+        let w = wordmark.bounds.width
+        sweep.fromValue = -w * 0.25
+        sweep.toValue = w * 1.25
+        sweep.duration = 0.9
+        sweep.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        sweep.beginTime = CACurrentMediaTime() + 1.75
+        sweep.fillMode = .backwards
+        sheen.add(sweep, forKey: "sweep")
+        fadeIn(start, after: 2.2, duration: 0.45)
     }
 
     override func layout() {
         super.layout()
-        let markHeight: CGFloat = 64
+        let markHeight: CGFloat = 80
         let markWidth = markHeight * WordmarkView.aspect
         let h = Tokens.Space.x10
-        let total = welcome.lineHeight + Tokens.Space.x4 + markHeight + Tokens.Space.x16 + h
+        let total = welcome.lineHeight + Tokens.Space.x5 + markHeight + Tokens.Space.x16 + h
         var y = round((bounds.height - total) / 2) - Tokens.Space.x4
         welcome.frame = NSRect(x: 0, y: y, width: bounds.width, height: welcome.lineHeight)
-        y = welcome.frame.maxY + Tokens.Space.x4
+        y = welcome.frame.maxY + Tokens.Space.x5
         wordmark.frame = NSRect(x: round((bounds.width - markWidth) / 2), y: y, width: markWidth, height: markHeight)
         y = wordmark.frame.maxY + Tokens.Space.x16
         let w: CGFloat = 176
         start.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: h)
+        Tokens.Motion.withoutAnimation {
+            let size: CGFloat = 620
+            glow.bounds = CGRect(x: 0, y: 0, width: size, height: size * 0.62)
+            glow.position = CGPoint(x: wordmark.frame.midX, y: wordmark.frame.midY)
+            sheenMask.frame = wordmark.frame
+            let w = wordmark.bounds.width
+            sheen.frame = CGRect(x: 0, y: 0, width: w * 0.35, height: wordmark.bounds.height)
+            // Parked off the left edge until it runs.
+            sheen.position = CGPoint(x: w * 1.5, y: wordmark.bounds.midY)
+        }
     }
 }
+
 
 // MARK: - 2. Bring your stuff
 
