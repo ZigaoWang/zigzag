@@ -1,6 +1,7 @@
 import AppKit
-// Zigzag's icon: one paper ribbon on an ink tile, folding back on itself four times. It reads as a Z,
-// and it is a zigzag. Flat, two colors, no gradients or shadows; macOS adds its own depth.
+// Zigzag's icon: one pale sky ribbon on a night-blue tile, folding back on itself four times. It reads as
+// a Z, and it is a zigzag. The colors are the Sky space, deepened. Flat, two colors, no gradients or
+// shadows; macOS adds its own depth.
 let size: CGFloat = 1024
 
 func color(_ hex: UInt32) -> NSColor {
@@ -25,10 +26,11 @@ func squircle(_ rect: NSRect, exponent n: CGFloat = 5) -> NSBezierPath {
 let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
     // The standard macOS icon grid: an 824pt tile centered on the 1024pt canvas.
     let tile = NSRect(x: 100, y: 100, width: 824, height: 824)
-    color(0x1D1D21).setFill()   // ink
+    color(0x1E3A5F).setFill()   // night blue
     squircle(tile).fill()
 
-    let left: CGFloat = 322, right: CGFloat = 702, top: CGFloat = 694, bottom: CGFloat = 330
+    // Fat, with clear space between the runs and plenty of tile around it.
+    let left: CGFloat = 328, right: CGFloat = 696, top: CGFloat = 684, bottom: CGFloat = 340
     let middle = (top + bottom) / 2, fold: CGFloat = 150
     let ribbon = NSBezierPath()
     ribbon.move(to: NSPoint(x: left, y: top))
@@ -37,10 +39,10 @@ let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _
     ribbon.line(to: NSPoint(x: 512 + fold, y: middle))
     ribbon.line(to: NSPoint(x: left, y: bottom))
     ribbon.line(to: NSPoint(x: right, y: bottom))
-    ribbon.lineWidth = 96
+    ribbon.lineWidth = 100
     ribbon.lineCapStyle = .round
     ribbon.lineJoinStyle = .round
-    color(0xF3F0EA).setStroke()   // paper
+    color(0xDAE5F2).setStroke()   // sky
     ribbon.stroke()
     return true
 }
