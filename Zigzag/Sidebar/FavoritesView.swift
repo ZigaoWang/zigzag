@@ -146,15 +146,25 @@ final class FavoriteTile: InteractiveView {
     private let icon = FaviconView()
     var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     var onClose: (() -> Void)?
-    /// Shown on an open favorite under the pointer, in the corner, like a tab's close button.
-    private lazy var closeButton: IconButton = {
+    /// Shown on an open favorite under the pointer, in the corner, like a tab's close button. The disc behind it is
+    /// its own view, so the button's hover fill sits on it and never replaces it.
+    private lazy var closeDisc: ColorView = {
+        let disc = ColorView(color: Tokens.Color.panelBackground)
+        disc.wantsLayer = true
+        disc.layer?.cornerRadius = 9
+        disc.layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
+        disc.layer?.shadowOpacity = 1
+        disc.layer?.shadowRadius = 2
+        disc.layer?.shadowOffset = CGSize(width: 0, height: -1)
+        disc.isHidden = true
         let button = IconButton(symbol: "xmark", size: 18, symbolSize: 8, toolTip: "Unload Page")
         button.wantsLayer = true
         button.layer?.cornerRadius = 9
-        button.isHidden = true
         button.onClick = { [weak self] _ in self?.onClose?() }
-        addSubview(button)
-        return button
+        button.frame = NSRect(x: 0, y: 0, width: 18, height: 18)
+        disc.addSubview(button)
+        addSubview(disc)
+        return disc
     }()
     private weak var tab: Tab?
     private var tabToken: SignalToken?
@@ -202,7 +212,7 @@ final class FavoriteTile: InteractiveView {
         super.layout()
         let size = Tokens.Metric.favicon + 4
         icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
-        closeButton.frame = NSRect(x: bounds.width - 18 - Tokens.Space.x1, y: Tokens.Space.x1, width: 18, height: 18)
+        closeDisc.frame = NSRect(x: bounds.width - 18 - Tokens.Space.x1, y: Tokens.Space.x1, width: 18, height: 18)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -212,8 +222,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = 1.5
             return
         }
-        closeButton.isHidden = !(isOpen && isHovered)
-        closeButton.layer?.backgroundColor = cgColor(Tokens.Color.panelBackground.withAlphaComponent(0.9))
+        closeDisc.isHidden = !(isOpen && isHovered)
         let fill: NSColor
         if isSelected {
             // The favorite you're on stands clearly apart from the resting tiles beside it.
