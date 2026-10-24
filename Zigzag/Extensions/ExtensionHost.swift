@@ -246,8 +246,8 @@ final class ExtensionHost: NSObject {
         let inner = (dict?["content"] as? [String: Any])?["content"] as? [String: Any]
         guard let type = inner?["type"] as? String else { return }
         setAttention(type == "BrowserVerificationFailed" ? Attention(
-            title: "Let 1Password fill in Zigzag",
-            message: "1Password only connects to browsers it trusts. In 1Password, open Settings › Browser and add Zigzag. You only do this once.",
+            title: "Connect 1Password to Zigzag",
+            message: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.",
             buttonTitle: "Open 1Password", appBundleID: "com.1password.1password") : nil, for: id)
     }
 
