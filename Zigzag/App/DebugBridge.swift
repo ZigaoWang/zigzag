@@ -48,6 +48,7 @@ enum DebugBridge {
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
         case "tour": WindowTour.start(in: controller) {}
+        case "coach": Tutorial.isHidden = false; TutorialCoach.show(in: controller)
         case "tournext": controller.root.overlay.subviews.compactMap { $0 as? WindowTour }.first?.advance()
         case "fullscreen": controller.window?.toggleFullScreen(nil)
         case "settingsspaceedit":
