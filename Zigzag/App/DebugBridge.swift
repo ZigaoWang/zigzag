@@ -242,6 +242,10 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
+        case "settingsbottom":
+            if let scroll = SettingsWindowController.shared.window?.contentView as? NSScrollView, let document = scroll.documentView {
+                document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
+            }
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
         case "addextnow": Task { _ = await ExtensionStore.install(arg) }
