@@ -39,6 +39,7 @@
 		4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EE88C88464115895D3647DF /* PopupWindowController.swift */; };
 		52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */ = {isa = PBXBuildFile; fileRef = 3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */; };
 		55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979ECE3AE8285E787E972E3E /* PageCardView.swift */; };
+		5825C6C1A2BFB78C050115ED /* PasswordHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6B64529E363AA584C30979 /* PasswordHealth.swift */; };
 		6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0657DD4DA14F56BD051BC34 /* Signal.swift */; };
 		654BFD1BB2CE1CC41CDFD065 /* Readability.js in Resources */ = {isa = PBXBuildFile; fileRef = 25F6D89709F01D7AD083FC85 /* Readability.js */; };
 		65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3073C0E2D268EC8C3B767 /* DockProgress.swift */; };
@@ -54,6 +55,7 @@
 		82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */; };
 		8CB207822183B9D650B3F443 /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0560887D19F137BADD3B098 /* Tab.swift */; };
 		8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253D16FCBE561D267ED6957C /* BrowserRootView.swift */; };
+		92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */; };
 		9704C8BCFA0009792B8AC0FF /* PasswordGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */; };
 		995DC7DEF8E08A8C2ADFFE2D /* SavePasswordPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7620A6879D1A5DEB651B0A66 /* SavePasswordPrompt.swift */; };
 		99F15C29E28C9FA9B038B3A8 /* FindBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */; };
@@ -73,12 +75,14 @@
 		C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765C1F36BCEE463F8B5316BE /* Paths.swift */; };
 		C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */; };
 		C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175D363890A811683DC2D9E7 /* TabSwitcher.swift */; };
+		C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */; };
 		CE83F1D6BC2CD7361C5F4599 /* logins.json in Resources */ = {isa = PBXBuildFile; fileRef = 818D2FEE410E6D64CD17AADD /* logins.json */; };
 		CF63705B985B423D3B9EC482 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77478845778FB285ADD29C14 /* Library.swift */; };
 		CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192303361A76A758A8F9346F /* FaviconView.swift */; };
 		D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */; };
 		D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D47467F8351F9270BAE20A /* SidebarRows.swift */; };
 		D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */; };
+		D3829EDACB516F9EE13AA497 /* PasswordsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */; };
 		D4333F0C5C4389BE81F84324 /* CRXPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */; };
 		DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9088949B9C029636E9E355 /* Updater.swift */; };
 		E12D59946BA4DF7046EFE6F7 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DD59DED7B66593D3CED57A /* ImportCoordinator.swift */; };
@@ -106,6 +110,7 @@
 /* Begin PBXFileReference section */
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
 		06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindow.swift; sourceTree = "<group>"; };
+		0C6B64529E363AA584C30979 /* PasswordHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealth.swift; sourceTree = "<group>"; };
 		0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportBatch.swift; sourceTree = "<group>"; };
 		106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserActions.swift; sourceTree = "<group>"; };
 		118460E2A057D11B6C1946F1 /* ExtensionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStore.swift; sourceTree = "<group>"; };
@@ -170,6 +175,7 @@
 		A9C34787271E39E26E0156FC /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
 		AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionHost.swift; sourceTree = "<group>"; };
 		B0560887D19F137BADD3B098 /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
+		BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmSheet.swift; sourceTree = "<group>"; };
 		BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */ = {isa = PBXFileReference; path = blocklist.json.lzfse; sourceTree = "<group>"; };
 		C31DB0355627F311823B01A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordGeneratorTests.swift; sourceTree = "<group>"; };
@@ -181,6 +187,7 @@
 		CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarModel.swift; sourceTree = "<group>"; };
 		CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
 		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
+		D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordsWindow.swift; sourceTree = "<group>"; };
 		D3EF002AF6A129FB4291D7A1 /* Zigzag.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zigzag.entitlements; sourceTree = "<group>"; };
 		D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconStore.swift; sourceTree = "<group>"; };
 		DEB39442D06F521CAE1203D0 /* Autofill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Autofill.swift; sourceTree = "<group>"; };
@@ -191,6 +198,7 @@
 		EDF5DDEF3F10D52662345203 /* ArcImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArcImporter.swift; sourceTree = "<group>"; };
 		F3B051247D50C308EF2FDA69 /* blocklist.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = blocklist.info.json; sourceTree = "<group>"; };
 		F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariImporter.swift; sourceTree = "<group>"; };
+		F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealthTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -211,7 +219,9 @@
 				DEB39442D06F521CAE1203D0 /* Autofill.swift */,
 				9875E3DF61E5A98363065101 /* PasswordCapture.swift */,
 				959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */,
+				0C6B64529E363AA584C30979 /* PasswordHealth.swift */,
 				4A8DEA66B0550FB3754D7255 /* PasswordStore.swift */,
+				D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */,
 				7620A6879D1A5DEB651B0A66 /* SavePasswordPrompt.swift */,
 				84C767A263C67C27EF0F4BFB /* SecretString.swift */,
 			);
@@ -271,6 +281,7 @@
 		55A9BB4FB8BDAE5C935BC08C /* Design */ = {
 			isa = PBXGroup;
 			children = (
+				BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */,
 				32289A47E7257A31AC82FCB0 /* Controls.swift */,
 				1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */,
 				256245226DA14768B001589E /* Tokens.swift */,
@@ -440,6 +451,7 @@
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */,
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
+				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
 				C4B669E7DCAC024FCA58F074 /* Fixtures */,
 			);
@@ -618,6 +630,7 @@
 				D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */,
 				407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */,
 				C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */,
+				92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */,
 				A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */,
 				10324776656E836D07CD1B27 /* Controls.swift in Sources */,
 				2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */,
@@ -648,7 +661,9 @@
 				0D86B53D6483D5ACF7C2E10B /* PaneHeader.swift in Sources */,
 				666CC5A457A95E2BD07EA5FF /* PasswordCapture.swift in Sources */,
 				9704C8BCFA0009792B8AC0FF /* PasswordGenerator.swift in Sources */,
+				5825C6C1A2BFB78C050115ED /* PasswordHealth.swift in Sources */,
 				4AD56EAFBF0AFF722B1CBEC0 /* PasswordStore.swift in Sources */,
+				D3829EDACB516F9EE13AA497 /* PasswordsWindow.swift in Sources */,
 				C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */,
 				E38366D663CE427B640F71A5 /* PeekController.swift in Sources */,
 				4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */,
@@ -685,6 +700,7 @@
 				247132AF897197093E229872 /* CRXPackageTests.swift in Sources */,
 				3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */,
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
+				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
