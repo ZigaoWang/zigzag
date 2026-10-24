@@ -30,14 +30,26 @@ final class BrowserWindow: NSWindow {
     }
 
     private var relayoutScheduled = false
+    private var isPlacingTrafficLights = false
 
+    /// Puts the buttons back the moment AppKit moves them, so the wrong spot never reaches the screen,
+    /// then once more after AppKit finishes its own pass.
     @objc private func buttonFrameChanged() {
+        if !isPlacingTrafficLights {
+            isPlacingTrafficLights = true
+            layoutTrafficLights()
+            isPlacingTrafficLights = false
+        }
         guard !relayoutScheduled else { return }
         relayoutScheduled = true
         DispatchQueue.main.async { [weak self] in
             self?.relayoutScheduled = false
             self?.layoutTrafficLights()
         }
+    }
+
+    override var title: String {
+        didSet { if title != oldValue { layoutTrafficLights() } }
     }
 
     override var canBecomeKey: Bool { true }
