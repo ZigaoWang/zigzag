@@ -102,7 +102,7 @@ enum MainMenu {
             item("Back", #selector(C.goBack(_:)), "["),
             item("Forward", #selector(C.goForward(_:)), "]"),
             item("Reload Page", #selector(C.reloadPage(_:)), "r"),
-            item("Reload Ignoring Cache", #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .shift]),
+            item("Reload Ignoring Cache", #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .option]),
             item("Stop", #selector(C.stopLoading(_:)), "."),
             .separator(),
             item("Next Tab", #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
