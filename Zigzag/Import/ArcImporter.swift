@@ -18,34 +18,6 @@ enum ArcImporter {
         FileManager.default.fileExists(atPath: arcSupport.appendingPathComponent("StorableSidebar.json").path)
     }
 
-    /// Menu command: import, then say what came over.
-    static func runInteractive() {
-        guard isAvailable else {
-            let alert = NSAlert()
-            alert.messageText = "Arc isn’t on this Mac"
-            alert.informativeText = "Zigzag looks for Arc’s data in your Library folder and couldn’t find it."
-            alert.runModal()
-            return
-        }
-        let result = importAll()
-        Library.shared.importedFromArc = true
-        if let first = result.firstSpace, let controller = WindowManager.shared.keyController {
-            controller.tabManager.switchToSpace(first)
-        }
-        let alert = NSAlert()
-        alert.messageText = "Imported from Arc"
-        var parts: [String] = []
-        if result.result.spaces > 0 { parts.append("\(result.result.spaces) space\(result.result.spaces == 1 ? "" : "s")") }
-        if result.result.bookmarks > 0 { parts.append("\(result.result.bookmarks) bookmark\(result.result.bookmarks == 1 ? "" : "s")") }
-        if result.result.historyEntries > 0 { parts.append("\(result.result.historyEntries) history entries") }
-        alert.informativeText = parts.isEmpty ? "There was nothing to bring over." : "Brought over " + parts.joined(separator: ", ") + ". Your pinned tabs are now bookmarks at the top of each space."
-        if let window = WindowManager.shared.keyController?.window {
-            alert.beginSheetModal(for: window)
-        } else {
-            alert.runModal()
-        }
-    }
-
     @discardableResult
     static func importAll() -> (result: Result, firstSpace: UUID?) {
         var result = Result()

@@ -102,5 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func makeDefaultBrowser(_ sender: Any?) { DefaultBrowser.make() }
 
-    @objc func importFromArc(_ sender: Any?) { ArcImporter.runInteractive() }
+    @objc func importFromBrowser(_ sender: Any?) { ImportWindowController.show() }
+
+    @objc func showPasswords(_ sender: Any?) { PasswordsWindowController.show() }
 }
