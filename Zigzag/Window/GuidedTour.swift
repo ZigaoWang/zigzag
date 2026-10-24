@@ -18,8 +18,9 @@ final class GuidedTour: NSView {
     private let finish = PrimaryButton(title: "Start Browsing")
     // The last card: a note from the person who made Zigzag.
     private let wordmark = WordmarkView()
+    private let header = BrandSurface()
     private let letter = NSTextField(wrappingLabelWithString: "")
-    private let signature = Label("Zigao, who makes Zigzag", font: .systemFont(ofSize: 13, weight: .medium), color: Tokens.Color.textSecondary)
+    private let signature = Label("— Zigao, who makes Zigzag", font: .systemFont(ofSize: 13, weight: .medium), color: Tokens.Color.textSecondary)
     private var tokens: [SignalToken] = []
     private var watch: Timer?
     private var ending = false
@@ -64,12 +65,17 @@ final class GuidedTour: NSView {
         check.contentTintColor = Brand.Theme.brand.accent
         skip.textColor = Tokens.Color.textTertiary
         card.radius = Tokens.Radius.panel + 2
-        [step, check, title, note, skip, finish, wordmark, letter, signature].forEach { card.addSubview($0) }
-        wordmark.color = Brand.Theme.brand.accent
+        header.cornerRadius = 0
+        header.layer?.borderWidth = 0
+        header.showsWatermark = false
+        header.fixedTheme = Brand.Theme.brand
+        [header, step, check, title, note, skip, finish, wordmark, letter, signature].forEach { card.addSubview($0) }
+        wordmark.color = Brand.ribbon
+        finish.fixedTheme = Brand.Theme.brand
         letter.isSelectable = false
         letter.font = .systemFont(ofSize: 14)
         letter.textColor = Tokens.Color.textPrimary
-        letter.stringValue = "Thanks for giving Zigzag a try. I made it to be a calm place for everything you do on the web, and I hope it feels that way.\n\nIf anything feels off, I’d love to hear it. Help › Getting Started walks you through this again anytime."
+        letter.stringValue = "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way."
         
         addSubview(card)
         skip.onClick = { _ in Tutorial.skip() }
@@ -155,7 +161,7 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if SpaceEditorPanel.current != nil, Tutorial.current == nil || Tutorial.current?.id == "space" {
-            return Display(keys: [], title: "Name it and pick a color", note: "", count: "", isDone: false, isFinal: false, target: "editor")
+            return Display(keys: ["↩"], title: "Name it, pick a color, then press Return", note: "", count: "", isDone: false, isFinal: false, target: "editor")
         }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: "", count: "", isDone: true, isFinal: false, target: "done." + done.id)
@@ -224,7 +230,7 @@ final class GuidedTour: NSView {
         step.isHidden = d.isDone || d.isFinal
         finish.isHidden = !d.isFinal
         note.isHidden = true
-        [wordmark, letter, signature].forEach { $0.isHidden = !d.isFinal }
+        [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
         title.font = d.isFinal ? Brand.displayFont(24) : .systemFont(ofSize: 15, weight: .semibold)
         if animated {
             let fade = CATransition()
@@ -241,9 +247,9 @@ final class GuidedTour: NSView {
 
     private func pillSize(_ d: Display) -> NSSize {
         if d.isFinal {
-            let inner: CGFloat = 400 - 64
+            let inner: CGFloat = 380 - 64
             let lh = ceil(letter.sizeThatFits(NSSize(width: inner, height: 400)).height)
-            return NSSize(width: 400, height: 32 + 26 + 22 + 34 + 12 + lh + 14 + signature.lineHeight + 26 + Tokens.Space.x10 + 32)
+            return NSSize(width: 380, height: 120 + 26 + 34 + 10 + lh + 12 + signature.lineHeight + 24 + Tokens.Space.x10 + 28)
         }
         let keys = caps.map { max(34, $0.1.inkWidth + Tokens.Space.x4) }.reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * 4
         var width = Tokens.Space.x4 + (d.isDone ? 20 : keys) + Tokens.Space.x3 + title.textWidth + Tokens.Space.x5
@@ -312,12 +318,15 @@ final class GuidedTour: NSView {
         let width = size.width, height = size.height
         if d.isFinal {
             let pad: CGFloat = 32, inner = width - pad * 2
-            wordmark.frame = NSRect(x: pad, y: pad, width: 26 * WordmarkView.aspect, height: 26)
-            title.frame = NSRect(x: pad, y: wordmark.frame.maxY + 22, width: inner, height: 34)
+            // The brand across the top, the note beneath it.
+            header.frame = NSRect(x: 0, y: 0, width: width, height: 120)
+            let wh: CGFloat = 34
+            wordmark.frame = NSRect(x: (width - wh * WordmarkView.aspect) / 2, y: (120 - wh) / 2, width: wh * WordmarkView.aspect, height: wh)
+            title.frame = NSRect(x: pad, y: header.frame.maxY + 26, width: inner, height: 34)
             let lh = ceil(letter.sizeThatFits(NSSize(width: inner, height: 400)).height)
-            letter.frame = NSRect(x: pad, y: title.frame.maxY + 12, width: inner, height: lh)
-            signature.frame = NSRect(x: pad, y: letter.frame.maxY + 14, width: inner, height: signature.lineHeight)
-            finish.frame = NSRect(x: pad, y: signature.frame.maxY + 26, width: inner, height: Tokens.Space.x10)
+            letter.frame = NSRect(x: pad, y: title.frame.maxY + 10, width: inner, height: lh)
+            signature.frame = NSRect(x: pad, y: letter.frame.maxY + 12, width: inner, height: signature.lineHeight)
+            finish.frame = NSRect(x: pad, y: signature.frame.maxY + 24, width: inner, height: Tokens.Space.x10)
             return
         }
         var x = Tokens.Space.x4
