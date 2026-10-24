@@ -385,8 +385,8 @@ extension Tab: WKNavigationDelegate {
 
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
 
-        // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links).
-        if let scheme = url.scheme?.lowercased(), !["http", "https", "about", "data", "blob", "file", "javascript"].contains(scheme) {
+        // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
+        if let scheme = url.scheme?.lowercased(), !["http", "https", "about", "data", "blob", "file", "javascript", "webkit-extension"].contains(scheme) {
             NSWorkspace.shared.open(url)
             return (.cancel, preferences)
         }
