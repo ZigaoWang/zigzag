@@ -32,7 +32,7 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Co
 
 echo "Verifying signature…"
 codesign --verify --deep --strict --verbose=2 "$APP"
-codesign -dv "$APP" 2>&1 | grep -E "Authority=Developer ID|TeamIdentifier"
+codesign -dvv "$APP" 2>&1 | grep -E "Authority=Developer ID|TeamIdentifier"
 
 if [[ "${1:-}" == "--local" ]]; then
   echo "Done (not notarized): $APP"
