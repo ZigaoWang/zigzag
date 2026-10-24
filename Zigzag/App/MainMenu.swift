@@ -34,7 +34,6 @@ enum MainMenu {
             .separator(),
             item("Settings…", #selector(AppDelegate.showSettings(_:)), ","),
             item("Set as Default Browser", #selector(AppDelegate.makeDefaultBrowser(_:)), ""),
-            item("Import from Arc…", #selector(AppDelegate.importFromArc(_:)), ""),
             .separator(),
             servicesItem(),
             .separator(),
@@ -52,7 +51,8 @@ enum MainMenu {
             item("Open Location…", #selector(C.openLocation(_:)), "l"),
             item("Open File…", #selector(C.openDocument(_:)), "o"),
             .separator(),
-            item("Reopen Closed Tab", #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
+            item("Import from Another Browser…", #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
+            .separator(),
             item("Duplicate Tab", #selector(C.duplicateTab(_:)), "d", [.command, .option]),
             item("Bookmark This Page", #selector(C.toggleBookmark(_:)), "d"),
             .separator(),
@@ -109,10 +109,8 @@ enum MainMenu {
             item("Previous Tab", #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
             item("Next Space", #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
             item("Previous Space", #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
-            item("New Space", #selector(C.newSpace(_:)), ""),
+            item("New Space", #selector(C.newSpace(_:)), "n", [.command, .option]),
             item("Edit Space…", #selector(C.renameSpace(_:)), ""),
-            .separator(),
-            item("Search History…", #selector(C.searchHistory(_:)), "y"),
             .separator(),
             item("Actual Size", #selector(C.actualSize(_:)), "0"),
             item("Zoom In", #selector(C.zoomIn(_:)), "+"),
@@ -120,7 +118,7 @@ enum MainMenu {
             item("Mute Tab", #selector(C.toggleMute(_:)), "m", [.command, .shift]),
             item("Picture in Picture", #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
             item("Show Reader", #selector(C.toggleReader(_:)), "r", [.command, .shift]),
-            item("Translate Page", #selector(C.translatePage(_:)), ""),
+            item("Translate Page", #selector(C.translatePage(_:)), "t", [.command, .option]),
             .separator(),
             submenu("Developer", [
                 item("Web Inspector", #selector(C.showWebInspector(_:)), "i", [.command, .option]),
@@ -144,9 +142,21 @@ enum MainMenu {
         }
         main.addItem(submenu("View", viewItems))
 
+        main.addItem(submenu("History", [
+            item("Search History…", #selector(C.searchHistory(_:)), "y"),
+            item("Reopen Closed Tab", #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
+            .separator(),
+            item("Clear History…", #selector(C.clearHistory(_:)), ""),
+            item("Clear Cache", #selector(C.clearCache(_:)), ""),
+            item("Clear Cookies…", #selector(C.clearCookies(_:)), ""),
+        ]))
+
         let window = submenu("Window", [
             item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"),
             item("Zoom", #selector(NSWindow.performZoom(_:)), ""),
+            .separator(),
+            item("Downloads", #selector(C.showDownloads(_:)), "l", [.command, .option]),
+            item("Passwords", #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
             .separator(),
             item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:)), ""),
         ])
