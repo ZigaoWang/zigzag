@@ -199,7 +199,7 @@ enum DebugBridge {
             // onboardstep <0-3>: hello, bring, personalize, ready
             WelcomeWindowController.show {}
             if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
-               let step = Int(arg).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: false) }
+               let step = Int(arg.prefix(1)).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: arg.hasSuffix("a")) }
         case "importwindow": ImportWindowController.show()
         case "closewindow":
             // closewindow <title>: closes Zigzag's window with that title (Import, Passwords, Settings).
