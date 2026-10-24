@@ -217,6 +217,8 @@ final class TextButton: InteractiveView {
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
     /// Overrides the label color (destructive actions).
     var textColor: NSColor? { didSet { stateDidChange(animated: false) } }
+    /// Moves the title off center, to leave room for something beside it (a keycap).
+    var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
         label = Label(title, font: font, color: Tokens.Color.textSecondary)
@@ -263,7 +265,7 @@ final class TextButton: InteractiveView {
         super.layout()
         let h = label.lineHeight
         label.alignment = .center
-        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
+        label.frame = NSRect(x: labelOffset, y: (bounds.height - h) / 2, width: bounds.width, height: h)
     }
 
     override func stateDidChange(animated: Bool) {

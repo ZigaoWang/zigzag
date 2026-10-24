@@ -329,6 +329,8 @@ final class PrimaryButton: InteractiveView {
     var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
     /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
     var isDestructive = false { didSet { stateDidChange(animated: false) } }
+    /// Moves the title off center, to leave room for something beside it (a keycap).
+    var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.current.onAccent)
@@ -355,7 +357,7 @@ final class PrimaryButton: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x8, height: h)
+        label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x8, height: h)
         label.alignment = .center
     }
 
