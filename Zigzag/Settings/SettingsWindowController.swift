@@ -291,6 +291,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let addSpaceButton = NSButton(title: "Add Space", target: nil, action: nil)
     private var token: SignalToken?
     private let width: CGFloat = 540
+    private let banner = BrandBanner()
     private var spaceRows: [SpaceSettingsRow] = []
 
     private init() {
@@ -298,6 +299,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "Settings"
         window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.backgroundColor = Tokens.Color.formBackground
@@ -513,7 +515,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         documentView.subviews.forEach { $0.removeFromSuperview() }
         let pad = Tokens.Space.x6
         let contentWidth = width - pad * 2
-        var y: CGFloat = Tokens.Space.x12
+        // The header: a wash of the space's color under the title, fading into the form.
+        banner.title = "Settings"
+        banner.titleSize = 30
+        banner.contentInset = pad + Tokens.Space.x1
+        banner.frame = NSRect(x: 0, y: 0, width: width, height: 104)
+        documentView.addSubview(banner, positioned: .below, relativeTo: nil)
+        var y: CGFloat = banner.frame.maxY + Tokens.Space.x2
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if let title {
