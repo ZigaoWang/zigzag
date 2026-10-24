@@ -46,6 +46,7 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
+        case "fullscreen": controller.window?.toggleFullScreen(nil)
         case "settingsspaceedit":
             func rows(_ v: NSView) -> [SpaceSettingsRow] { (v as? SpaceSettingsRow).map { [$0] } ?? v.subviews.flatMap(rows) }
             if let root = SettingsWindowController.shared.window?.contentView { rows(root).first?.openEditor() }
