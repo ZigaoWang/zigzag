@@ -18,6 +18,8 @@ enum Tokens {
         static let x10: CGFloat = 40
         static let x12: CGFloat = 48
         static let x16: CGFloat = 64
+        /// The height of a compact button in forms and panels.
+        static let x7Height: CGFloat = 28
 
         /// Rounds a value onto the 4pt grid.
         static func snap(_ value: CGFloat) -> CGFloat { (value / grid).rounded() * grid }

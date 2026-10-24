@@ -229,10 +229,31 @@ final class TextButton: InteractiveView {
 
     var title: String {
         get { label.stringValue }
-        set { label.stringValue = newValue; needsLayout = true }
+        set { label.stringValue = newValue; invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true }
+    }
+
+    /// Says what just happened in place of the title for a moment ("Cleared"), then goes back.
+    func flash(_ text: String, for seconds: TimeInterval = 1.6) {
+        let original = title
+        title = text
+        isEnabled = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            self?.title = original
+            self?.isEnabled = true
+        }
+    }
+
+    /// The button used in forms and windows: body text on a quiet fill.
+    static func form(_ title: String) -> TextButton {
+        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
+        button.showsFillAtRest = true
+        return button
     }
 
     var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x4 }
+
+    /// So stacks and form rows can size it like any control.
+    override var intrinsicContentSize: NSSize { NSSize(width: ceil(fittingWidth), height: Tokens.Space.x7Height) }
 
     override func layout() {
         super.layout()

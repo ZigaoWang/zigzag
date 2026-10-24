@@ -344,6 +344,8 @@ final class PrimaryButton: InteractiveView {
 
     var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
 
+    override var intrinsicContentSize: NSSize { NSSize(width: ceil(max(fittingWidth, 72)), height: Tokens.Space.x8) }
+
     override func layout() {
         super.layout()
         let h = label.lineHeight
