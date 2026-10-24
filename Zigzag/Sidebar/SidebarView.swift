@@ -26,12 +26,13 @@ final class AddressView: InteractiveView {
     /// Extension buttons (1Password) at the trailing end, like Safari's address bar.
     private(set) var actionButtons: [IconButton] = []
 
-    func setActions(_ items: [(image: NSImage?, label: String, action: (NSView) -> Void)]) {
+    func setActions(_ items: [(image: NSImage?, label: String, action: (NSView) -> Void, menu: () -> NSMenu?)]) {
         actionButtons.forEach { $0.removeFromSuperview() }
         actionButtons = items.map { item in
             let button = IconButton(symbol: "puzzlepiece.extension", size: Tokens.Space.x6, toolTip: item.label)
-            button.image = item.image
+            if let image = item.image { button.image = image }
             button.onClick = { [weak button] _ in if let button { item.action(button) } }
+            button.onRightClick = { _ in item.menu() }
             addSubview(button)
             return button
         }

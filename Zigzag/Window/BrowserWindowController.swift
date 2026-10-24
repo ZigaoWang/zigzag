@@ -336,12 +336,64 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func refreshExtensionActions() {
         guard #available(macOS 15.4, *) else { return }
         let tab = tabManager.selectedTab
-        let items = ExtensionHost.shared.actions(for: tab).map { item in
+        let all = ExtensionHost.shared.actions(for: tab)
+        // The address bar fits a few buttons; past that, the rest wait behind one.
+        let shown = all.count > 3 ? Array(all.prefix(2)) : all
+        var items = shown.map { item in
             (image: item.icon, label: item.label, action: { (anchor: NSView) in
                 ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor)
-            })
+            }, menu: { [weak self] () -> NSMenu? in self?.extensionMenu(for: item.context) })
+        }
+        if all.count > shown.count {
+            items.append((image: nil, label: "Extensions", action: { [weak self] (anchor: NSView) in
+                self?.showExtensionsMenu(all, tab: tab, anchor: anchor)
+            }, menu: { [weak self] () -> NSMenu? in self?.extensionsFooterMenu() }))
         }
         sidebar.address.setActions(items)
+    }
+
+    @available(macOS 15.4, *)
+    private func showExtensionsMenu(_ all: [ExtensionHost.ActionItem], tab: Tab?, anchor: NSView) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for item in all {
+            let entry = SidebarMenus.Item(item.label) { ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor) }
+            entry.image = item.icon
+            menu.addItem(entry)
+        }
+        menu.addItem(.separator())
+        extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.maxY + Tokens.Space.x1), in: anchor)
+    }
+
+    private func extensionsFooterMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") { SettingsWindowController.shared.show() })
+        menu.addItem(SidebarMenus.Item("Get Extensions…", symbol: "bag") { [weak self] in
+            self?.tabManager.newTab(url: KnownExtension.webStoreURL)
+        })
+        return menu
+    }
+
+    @available(macOS 15.4, *)
+    private func extensionMenu(for context: WKWebExtensionContext) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let id = context.uniqueIdentifier
+        let title = NSMenuItem(title: context.webExtension.displayName ?? "Extension", action: nil, keyEquivalent: "")
+        title.isEnabled = false
+        menu.addItem(title)
+        if let options = context.optionsPageURL {
+            menu.addItem(SidebarMenus.Item("Settings", symbol: "gearshape") { [weak self] in
+                self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
+            })
+        }
+        menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { KnownExtension.setEnabled(id, false) })
+        menu.addItem(SidebarMenus.Item("Remove from Zigzag", symbol: "trash") { KnownExtension.uninstall(id) })
+        menu.addItem(.separator())
+        extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
+        return menu
     }
 
     private func selectedTabChanged(_ change: Tab.Change) {
