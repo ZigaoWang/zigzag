@@ -67,6 +67,8 @@ final class ExtensionHost: NSObject {
             installed[id] = ext
             let context = WKWebExtensionContext(for: ext)
             context.uniqueIdentifier = id
+            // A fixed address, so its pages (settings, dashboards) still open after a relaunch.
+            if let base = URL(string: "webkit-extension://\(id.lowercased())/") { context.baseURL = base }
             context.isInspectable = true
             // Installing an extension here is a deliberate choice; grant what it asks for up front.
             for permission in ext.requestedPermissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
@@ -75,7 +77,7 @@ final class ExtensionHost: NSObject {
             contexts.append(context)
             announceExistingWindows(to: context)
             changed.send()
-            debugLog("Zigzag: loaded \(ext.displayName ?? "?") errors=\(ext.errors)")
+            debugLog("Zigzag: loaded \(ext.displayName ?? "?") at \(context.baseURL) errors=\(ext.errors)")
             context.loadBackgroundContent { error in
                 debugLog("Zigzag: background loaded error=\(String(describing: error))")
             }
