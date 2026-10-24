@@ -1,0 +1,174 @@
+import AppKit
+
+/// "Bring your stuff from another browser": finds the browsers on this Mac, imports what the person picks,
+/// merges with what's already here, and says plainly what came over and what couldn't.
+@MainActor
+enum ImportCoordinator {
+    enum Kind: Hashable, Sendable {
+        case chromium(ChromiumImporter.Browser)
+        case firefox(FirefoxImporter.Browser)
+        case safari
+        /// A CSV or Safari export zip the person chose.
+        case file(URL)
+    }
+
+    struct Source: Identifiable, Hashable {
+        let kind: Kind
+        let name: String
+        let bundleID: String?
+        var id: String { name }
+
+        /// The browser's real icon, from the app on this Mac.
+        var icon: NSImage {
+            if let bundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                return NSWorkspace.shared.icon(forFile: app.path)
+            }
+            return NSWorkspace.shared.icon(for: .commaSeparatedText)
+        }
+
+        /// What can come over from it.
+        var offers: Choice {
+            switch kind {
+            case .chromium(let browser): browser.name == "Arc" ? [.passwords, .bookmarks, .history, .tabs] : [.passwords, .bookmarks, .history]
+            case .firefox: [.passwords, .bookmarks, .history]
+            case .safari: [.passwords, .bookmarks, .history]
+            case .file: [.passwords, .bookmarks, .history]
+            }
+        }
+    }
+
+    struct Choice: OptionSet, Hashable {
+        let rawValue: Int
+        static let passwords = Choice(rawValue: 1)
+        static let bookmarks = Choice(rawValue: 2)
+        static let history = Choice(rawValue: 4)
+        /// Arc's spaces, pinned tabs and favorites.
+        static let tabs = Choice(rawValue: 8)
+
+        var reading: ChromiumImporter.Choice {
+            var choice: ChromiumImporter.Choice = []
+            if contains(.passwords) { choice.insert(.passwords) }
+            if contains(.bookmarks) { choice.insert(.bookmarks) }
+            if contains(.history) { choice.insert(.history) }
+            return choice
+        }
+    }
+
+    /// Browsers on this Mac with something to bring, Arc first, then by how commonly they're switched from.
+    static func detectedSources() -> [Source] {
+        var sources: [Source] = []
+        for browser in ChromiumImporter.browsers where ChromiumImporter.isInstalled(browser) {
+            sources.append(Source(kind: .chromium(browser), name: browser.name, bundleID: browser.bundleID))
+        }
+        if NSWorkspace.shared.urlForApplication(withBundleIdentifier: SafariImporter.bundleID) != nil {
+            sources.append(Source(kind: .safari, name: "Safari", bundleID: SafariImporter.bundleID))
+        }
+        for browser in FirefoxImporter.browsers where FirefoxImporter.isInstalled(browser) {
+            sources.append(Source(kind: .firefox(browser), name: browser.name, bundleID: browser.bundleID))
+        }
+        return sources
+    }
+
+    static func fileSource(_ url: URL) -> Source {
+        Source(kind: .file(url), name: url.lastPathComponent, bundleID: nil)
+    }
+
+    struct Summary {
+        let source: String
+        var passwords = 0
+        var updatedPasswords = 0
+        var bookmarks = 0
+        var history = 0
+        var spaces = 0
+        var problems: [ImportProblem] = []
+
+        /// "Imported 214 passwords and 86 bookmarks from Arc."
+        var sentence: String {
+            var parts: [String] = []
+            func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
+            if passwords > 0 { parts.append(count(passwords, "password", "passwords")) }
+            if bookmarks > 0 { parts.append(count(bookmarks, "bookmark", "bookmarks")) }
+            if spaces > 0 { parts.append(count(spaces, "space", "spaces")) }
+            if history > 0 { parts.append(count(history, "page of history", "pages of history")) }
+            guard !parts.isEmpty else { return updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source)." }
+            let list = ListFormatter.localizedString(byJoining: parts)
+            return "Imported \(list) from \(source)."
+        }
+    }
+
+    /// Imports from one source. Reading happens off the main thread; macOS may show its own prompts on the way
+    /// (allowing access to a browser's passwords).
+    static func run(_ source: Source, _ choice: Choice, primaryPassword: String = "") async -> Summary {
+        var summary = Summary(source: source.name)
+        let reading = choice.reading
+        let isArc: Bool = { if case .chromium(let b) = source.kind { return b.name == "Arc" } else { return false } }()
+
+        // Arc's spaces, pinned tabs, favorites and history come through its own importer, which knows its sidebar.
+        var arcReading = reading
+        if isArc, choice.contains(.tabs) || choice.contains(.bookmarks) || choice.contains(.history) {
+            let result = ArcImporter.importAll().result
+            summary.spaces = result.spaces
+            summary.bookmarks = result.bookmarks
+            summary.history = result.historyEntries
+            arcReading = reading.intersection(.passwords)
+        }
+
+        let kind = source.kind
+        let batch: ImportBatch = await Task.detached(priority: .userInitiated) {
+            switch kind {
+            case .chromium(let browser): return ChromiumImporter.read(browser, isArc ? arcReading : reading)
+            case .firefox(let browser): return FirefoxImporter.read(browser, reading, primaryPassword: primaryPassword)
+            case .safari: return SafariImporter.read(reading)
+            case .file(let url):
+                if url.pathExtension.lowercased() == "zip" { return SafariImporter.readExport(url) }
+                switch CSVImporter.read(url) {
+                case .success(let (_, batch)): return batch
+                case .failure: return ImportBatch(problems: [ImportProblem(message: "\(url.lastPathComponent) isn't a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it.", fix: .none)])
+                }
+            }
+        }.value
+
+        summary.problems = batch.problems
+        if choice.contains(.passwords) { await savePasswords(batch.logins, into: &summary) }
+        if choice.contains(.bookmarks), !batch.bookmarks.isEmpty { summary.bookmarks += addBookmarks(batch.bookmarks, from: source.name) }
+        if choice.contains(.history), !batch.history.isEmpty {
+            HistoryStore.shared.importVisits(batch.history)
+            summary.history += batch.history.count
+        }
+        return summary
+    }
+
+    /// New logins are saved; a login already here is replaced only when the imported one is newer.
+    private static func savePasswords(_ logins: [ImportBatch.Login], into summary: inout Summary) async {
+        let store = PasswordStore.shared
+        let existing = (try? await store.all()) ?? []
+        for login in logins {
+            guard let origin = Origin(login.url) else { continue }
+            if let current = existing.first(where: { $0.origin == origin && $0.username == login.username }) {
+                if let created = login.created, created <= current.modified { continue }
+                if let saved = try? await store.password(for: current.id), saved.matches(login.password) { continue }
+                if (try? await store.save(origin: origin, username: login.username, password: login.password,
+                                          notes: login.notes, otpAuth: login.otpAuth)) != nil { summary.updatedPasswords += 1 }
+            } else if (try? await store.save(origin: origin, username: login.username, password: login.password, notes: login.notes,
+                                             otpAuth: login.otpAuth, created: login.created ?? Date())) != nil {
+                summary.passwords += 1
+            }
+        }
+    }
+
+    /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded.
+    private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String) -> Int {
+        let spaceName = "From \(name)"
+        let space = Library.shared.spaces.first { $0.name == spaceName } ?? Library.shared.addSpace(name: spaceName)
+        var known = Set((Library.shared.spaces.first { $0.id == space.id }?.bookmarks ?? []).map { TabManager.normalize($0.url) })
+        var added = 0
+        for bookmark in bookmarks where !known.contains(TabManager.normalize(bookmark.url)) {
+            if Library.shared.addBookmark(url: bookmark.url, title: bookmark.title, to: space.id) != nil {
+                known.insert(TabManager.normalize(bookmark.url))
+                added += 1
+                FaviconStore.shared.prefetch(for: bookmark.url)
+            }
+        }
+        return added
+    }
+}
