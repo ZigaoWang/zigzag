@@ -3,7 +3,9 @@ import Foundation
 nonisolated enum Paths {
     static let support: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = base.appendingPathComponent("Zigzag", isDirectory: true)
+        // The dev build keeps its data apart from the Zigzag you use.
+        let isDev = Bundle.main.bundleIdentifier?.hasSuffix(".dev") ?? false
+        let dir = base.appendingPathComponent(isDev ? "Zigzag Dev" : "Zigzag", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()

@@ -1,6 +1,6 @@
 name: Zigzag
 options:
-  bundleIdPrefix: app.zigzag
+  bundleIdPrefix: wang.zigao
   deploymentTarget:
     macOS: "15.4"
   createIntermediateGroups: true
@@ -24,6 +24,10 @@ settings:
     DEVELOPMENT_TEAM: 432GL3WKY2
   configs:
     Debug:
+      # The dev build is its own app, "Zigzag Dev", with its own settings, data and website logins, so it never
+      # touches the Zigzag you use day to day.
+      PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.dev
+      APP_DISPLAY_NAME: Zigzag Dev
       # A real identity, so the signature stays the same across builds and apps that check who they're
       # talking to (1Password's browser integration) keep trusting it.
       CODE_SIGN_IDENTITY: "Apple Development"
@@ -32,6 +36,8 @@ settings:
       SWIFT_OPTIMIZATION_LEVEL: "-O"
       ENABLE_HARDENED_RUNTIME: NO
     Release:
+      PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag
+      APP_DISPLAY_NAME: Zigzag
       # Archived with development signing; scripts/release.sh exports it signed with Developer ID, and Xcode makes
       # the Developer ID profile the Keychain access group needs.
       CODE_SIGN_IDENTITY: "Apple Development"
@@ -50,9 +56,9 @@ targets:
     info:
       path: Zigzag/Info.plist
       properties:
-        CFBundleDisplayName: Zigzag
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
         CFBundleIconName: AppIcon
-        CFBundleName: Zigzag
+        CFBundleName: $(APP_DISPLAY_NAME)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
@@ -96,6 +102,7 @@ targets:
         com.apple.security.device.camera: true
         com.apple.security.device.audio-input: true
         # Saved passwords live in this group of the data protection keychain, which also syncs through iCloud Keychain.
+        # It keeps its first name: renaming it would hide every password already saved.
         keychain-access-groups:
           - $(AppIdentifierPrefix)app.zigzag.passwords
         com.apple.security.personal-information.location: true
@@ -109,6 +116,7 @@ targets:
       - target: Zigzag
     settings:
       base:
+        PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.tests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Zigzag.app/Contents/MacOS/Zigzag
         BUNDLE_LOADER: $(TEST_HOST)
