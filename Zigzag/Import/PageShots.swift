@@ -13,7 +13,8 @@ import WebKit
     private var views: [Shot: WKWebView] = [:]
     private var started = false
 
-    private static let size = NSSize(width: 1100, height: 760)
+    /// A laptop-ish column: wide enough for a real layout, narrow enough to read once shrunk into the preview.
+    private static let size = NSSize(width: 720, height: 620)
     private static let urls: [Shot: URL] = [
         .wikipedia: URL(string: "https://en.wikipedia.org/wiki/Main_Page")!,
 

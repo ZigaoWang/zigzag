@@ -240,8 +240,8 @@ private final class StepPage: NSView {
         if let picture = content.picture {
             picture.frame = right.bounds
         } else {
-            let pw: CGFloat = 620, ph = min(440, bounds.height - 120)
-            content.preview.frame = NSRect(x: 48, y: (bounds.height - ph) / 2, width: pw, height: ph)
+            let pw = right.bounds.width - 72, ph = min(round(pw * 0.72), bounds.height - 120)
+            content.preview.frame = NSRect(x: 36, y: (bounds.height - ph) / 2, width: pw, height: ph)
         }
     }
 }
@@ -427,6 +427,7 @@ private final class BrowserRow: InteractiveView {
     private let name: Label
     private let detail = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.62))
     private let status = Label("", font: Tokens.Font.small(.medium), color: Onboard.ink)
+    private let doneMark = NSImageView(image: Tokens.Symbol.image("checkmark.circle.fill", size: 18))
     private let spinner = RibbonView()
     private let fixButton = Onboard.primary("")
     private let problem = NSTextField(wrappingLabelWithString: "")
@@ -455,7 +456,9 @@ private final class BrowserRow: InteractiveView {
         problem.font = Tokens.Font.small()
         problem.textColor = Tokens.Color.caution
         problem.isSelectable = false
-        [box, icon, name, detail, status, spinner, fixButton, problem].forEach { addSubview($0) }
+        doneMark.contentTintColor = Tokens.Color.success
+        doneMark.isHidden = true
+        [box, icon, name, detail, status, spinner, fixButton, problem, doneMark].forEach { addSubview($0) }
         onClick = { [weak self] _ in
             guard let self, !self.isLocked, !self.needsAccess, !self.isFinished else { return }
             self.isChosen.toggle()
@@ -586,10 +589,9 @@ private final class BrowserRow: InteractiveView {
                 fixButton.isHidden = first.fix == .none
             } else {
                 problem.stringValue = ""
-                status.stringValue = "✓"
-                status.font = .systemFont(ofSize: 15, weight: .bold)
-                status.textColor = Tokens.Color.success
-                status.isHidden = false
+                status.stringValue = ""
+                status.isHidden = true
+                doneMark.isHidden = false
                 detail.stringValue = Self.sentence(summary)
             }
         }
@@ -633,6 +635,11 @@ private final class BrowserRow: InteractiveView {
         if !spinner.isHidden {
             right -= 18
             spinner.frame = NSRect(x: right, y: (top - 18) / 2, width: 18, height: 18)
+            right -= Tokens.Space.x3
+        }
+        if !doneMark.isHidden {
+            right -= 18
+            doneMark.frame = NSRect(x: right, y: (top - 18) / 2, width: 18, height: 18)
             right -= Tokens.Space.x3
         }
         if !status.isHidden {
@@ -729,7 +736,7 @@ private final class BringPicker: StepContent {
 
     private func refresh() {
         pills.forEach { $0.1.isHidden = true }
-        arrow.show(rows.filter(\.isChosen).prefix(3).map(\.source.icon))
+        arrow.show(rows.filter(\.isChosen).map(\.source.icon))
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
         hint.stringValue = isImporting ? "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
@@ -885,7 +892,7 @@ private final class IntoZigzag: NSView {
         super.init(frame: frame)
         wantsLayer = true
         zigzag.image = NSApp.applicationIconImage
-        badge.image = Tokens.Symbol.image("checkmark.circle.fill", size: 34)
+        badge.image = Tokens.Symbol.image("checkmark.circle.fill", size: 38)
         badge.contentTintColor = Tokens.Color.success
         badge.wantsLayer = true
         badge.isHidden = true
@@ -948,7 +955,10 @@ private final class IntoZigzag: NSView {
     override func layout() {
         super.layout()
         // Every icon the same size: the browsers in a little fanned stack, then the way across, then Zigzag.
-        let size: CGFloat = 104, step: CGFloat = 30, way: CGFloat = 96
+        let size: CGFloat = 104, way: CGFloat = 96
+        // Every browser you picked, however many: the stack tightens to keep the row inside the panel.
+        let room = bounds.width - 64 - way - size - size
+        let step = sources.count > 1 ? min(30, max(10, room / CGFloat(sources.count - 1))) : 0
         let stack = sources.isEmpty ? 0 : size + CGFloat(sources.count - 1) * step
         let row = sources.isEmpty ? size : stack + way + size
         var x = round((bounds.width - row) / 2)
@@ -964,15 +974,15 @@ private final class IntoZigzag: NSView {
         let mid = top + size / 2
         Tokens.Motion.withoutAnimation {
             for (i, dot) in dots.enumerated() {
-                dot.isHidden = sources.isEmpty
+                dot.isHidden = sources.isEmpty || state == .done
                 dot.frame = CGRect(x: x + (way - 8 * 3 - 12 * 2) / 2 + CGFloat(i) * 20, y: mid - 4, width: 8, height: 8)
                 dot.opacity = state == .importing ? 0.2 : 0.6
             }
         }
         if !sources.isEmpty { x += way }
         zigzag.frame = NSRect(x: x, y: top, width: size, height: size)
-        // The check sits on Zigzag's bottom-right corner, over the icon.
-        badge.frame = NSRect(x: zigzag.frame.maxX - 34, y: zigzag.frame.maxY - 34, width: 32, height: 32)
+        // Done: the dots give way to one check, halfway across.
+        badge.frame = NSRect(x: x - way / 2 - 20, y: mid - 20, width: 40, height: 40)
         caption.frame = NSRect(x: 0, y: top + size + 28, width: bounds.width, height: caption.lineHeight)
     }
 }
@@ -1670,7 +1680,7 @@ final class LiveBrowser: NSView {
             needsDisplay = true
         }
     }
-    private let side: CGFloat = 210
+    private let side: CGFloat = 170
     private var shotsToken: SignalToken?
     var page: Page = .wikipedia { didSet { needsDisplay = true } }
     var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
@@ -1791,8 +1801,8 @@ final class LiveBrowser: NSView {
         let shot: PageShots.Shot? = { switch page { case .wikipedia: .wikipedia; case .news(let ads): ads ? .adsShown : .adsBlocked; case .blank: nil } }()
         if let shot, let image = PageShots.shared.images[shot] {
             // The real page, scaled to the window's width, from the top.
-            let scale = pageRect.width / image.size.width
-            image.draw(in: NSRect(x: pageRect.minX, y: pageRect.minY, width: pageRect.width, height: image.size.height * scale),
+            let scale = max(pageRect.width / image.size.width, pageRect.height / image.size.height)
+            image.draw(in: NSRect(x: pageRect.minX, y: pageRect.minY, width: image.size.width * scale, height: image.size.height * scale),
                        from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
             if case .news(false) = page {
                 let badge = NSRect(x: pageRect.minX + 16, y: pageRect.maxY - 42, width: 180, height: 26)
