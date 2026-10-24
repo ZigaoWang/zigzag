@@ -15,6 +15,14 @@ final class TutorialCoach: FloatingPanelView {
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
     private let done = PrimaryButton(title: "Done")
     private var token: SignalToken?
+    private var tabToken: SignalToken?
+
+    private func followSelection() {
+        let onPage = Tutorial.isWelcome(controller?.tabManager.selectedTab?.url)
+        guard isHidden != onPage else { return }
+        isHidden = onPage
+        if !onPage { present(arrival: .fade) }
+    }
     private var celebrating = false
 
     static let width: CGFloat = 320
@@ -27,7 +35,8 @@ final class TutorialCoach: FloatingPanelView {
         current = coach
         controller.root.overlay.addSubview(coach)
         coach.refresh(animated: false)
-        coach.present(arrival: .drop)
+        coach.isHidden = Tutorial.isWelcome(controller.tabManager.selectedTab?.url)
+        if !coach.isHidden { coach.present(arrival: .drop) }
     }
 
     private init(controller: BrowserWindowController) {
@@ -50,6 +59,10 @@ final class TutorialCoach: FloatingPanelView {
         done.onClick = { [weak self] _ in self?.dismiss() }
         done.isHidden = true
         token = Tutorial.changed.observe { [weak self] in self?.stepDone() }
+        // On the Getting started page itself the step is already big in the middle; the card steps aside.
+        tabToken = controller.tabManager.changed.observe { [weak self] change in
+            if change == .selection || change == .structure { self?.followSelection() }
+        }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -74,7 +87,8 @@ final class TutorialCoach: FloatingPanelView {
         caps.forEach { $0.0.removeFromSuperview() }
         caps = []
         if let task = Tutorial.current, let index = Tutorial.tasks.firstIndex(where: { $0.id == task.id }) {
-            count.stringValue = "\(index + 1) of \(Tutorial.tasks.count)"
+            eyebrow.stringValue = "Step \(index + 1) of \(Tutorial.tasks.count)"
+            count.stringValue = ""
             title.stringValue = task.title
             how.stringValue = task.how
             for key in task.keys {
@@ -92,7 +106,8 @@ final class TutorialCoach: FloatingPanelView {
             done.isHidden = true
         } else {
             count.stringValue = ""
-            title.stringValue = "That’s the basics"
+            eyebrow.stringValue = "Getting started"
+            title.stringValue = "You’re all set"
             how.stringValue = "You’ve opened, pinned, peeked, split and made a space. Help › Getting Started brings this back anytime."
             skip.isHidden = true
             done.isHidden = false
