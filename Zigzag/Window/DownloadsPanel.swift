@@ -101,19 +101,25 @@ final class DownloadsPanelView: FloatingPanelView {
     private weak var controller: BrowserWindowController?
     private var rows: [DownloadRowView] = []
     private let title = Label("Downloads", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let clearButton = TextButton(title: "Clear")
+    private let clearButton = TextButton(title: "Clear", font: Tokens.Font.body(.medium))
+    private let folderButton = TextButton(title: "Downloads Folder", font: Tokens.Font.body(.medium))
+    private let emptyNote = Label("No downloads yet. Files you download show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
+    private let footer = Tokens.Space.x10
     private let width: CGFloat = 320
 
     init(controller: BrowserWindowController) {
         self.controller = controller
         super.init(frame: .zero)
-        addSubview(title)
-        addSubview(clearButton)
+        [title, clearButton, folderButton, emptyNote].forEach { addSubview($0) }
         clearButton.onClick = { _ in DownloadManager.shared.clearFinished() }
+        folderButton.onClick = { [weak self] _ in
+            NSWorkspace.shared.open(FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
+            self?.close()
+        }
         token = DownloadManager.shared.changed.observe { [weak self] _ in self?.reload() }
         onLayout = { [weak self] in self?.layoutContent() }
     }
@@ -146,7 +152,7 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     private func reload() {
-        let items = Array(DownloadManager.shared.items.prefix(6))
+        let items = Array(DownloadManager.shared.items.prefix(8))
         while rows.count < items.count {
             let row = DownloadRowView()
             row.onClick = { [weak row] _ in if let item = row?.item { DownloadManager.shared.open(item) } }
@@ -164,14 +170,17 @@ final class DownloadsPanelView: FloatingPanelView {
         while rows.count > items.count { rows.removeLast().removeFromSuperview() }
         for (row, item) in zip(rows, items) { row.configure(item) }
         clearButton.isEnabled = DownloadManager.shared.items.contains { $0.state != .downloading }
-        if items.isEmpty { close(); return }
+        clearButton.isHidden = items.isEmpty
+        emptyNote.isHidden = !items.isEmpty
         reposition()
+        needsLayout = true
     }
 
     private func reposition() {
         guard let controller, let anchor else { return }
         let header = Tokens.Space.x10
-        let height = header + CGFloat(rows.count) * rowHeight + Tokens.Space.x2
+        let body = rows.isEmpty ? Tokens.Space.x10 : CGFloat(rows.count) * rowHeight
+        let height = header + body + footer
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         let x = max(Tokens.Metric.cardInset, anchorFrame.minX)
         frame = NSRect(x: x, y: anchorFrame.minY - Tokens.Space.x2 - height, width: width, height: height)
@@ -181,14 +190,20 @@ final class DownloadsPanelView: FloatingPanelView {
         let pad = Tokens.Space.x2
         let header = Tokens.Space.x10
         let h = title.lineHeight
-        title.frame = NSRect(x: pad + Tokens.Space.x2, y: (header - h) / 2, width: 160, height: h)
         let cw = clearButton.fittingWidth
         clearButton.frame = NSRect(x: bounds.width - pad - cw, y: (header - Tokens.Space.x6) / 2, width: cw, height: Tokens.Space.x6)
+        title.frame = NSRect(x: pad + Tokens.Space.x2, y: (header - h) / 2, width: clearButton.frame.minX - pad * 2 - Tokens.Space.x2, height: h)
         var y = header
+        if rows.isEmpty {
+            emptyNote.frame = NSRect(x: pad + Tokens.Space.x2, y: y + (Tokens.Space.x10 - emptyNote.lineHeight) / 2 - Tokens.Space.x1, width: bounds.width - pad * 2 - Tokens.Space.x4, height: emptyNote.lineHeight)
+            y += Tokens.Space.x10
+        }
         for row in rows {
             row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: rowHeight)
             y += rowHeight
         }
+        let fw = folderButton.fittingWidth
+        folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x6) / 2 - 2, width: fw, height: Tokens.Space.x6)
     }
 }
 
