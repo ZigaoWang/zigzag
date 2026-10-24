@@ -47,6 +47,8 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
+        case "tour": WindowTour.start(in: controller) {}
+        case "tournext": controller.root.overlay.subviews.compactMap { $0 as? WindowTour }.first?.advance()
         case "fullscreen": controller.window?.toggleFullScreen(nil)
         case "settingsspaceedit":
             func rows(_ v: NSView) -> [SpaceSettingsRow] { (v as? SpaceSettingsRow).map { [$0] } ?? v.subviews.flatMap(rows) }
