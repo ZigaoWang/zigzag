@@ -103,7 +103,9 @@ final class GuidedTour: NSView {
         }
         // Other panels (site controls, downloads) come first: the guide steps aside.
         let bar = controller.commandBar.isVisible, peek = controller.peek.isVisible
-        let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek")
+        let editing = SpaceEditorPanel.current != nil
+        let spaceStep = Tutorial.current?.id == "space" || confirming?.id == "space" || Tutorial.current == nil
+        let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep)
         let aside = !relevant && (controller.hasFloatingPanel || peek)
         let alpha: CGFloat = aside ? 0 : 1
         if alphaValue != alpha {
@@ -141,6 +143,10 @@ final class GuidedTour: NSView {
 
     private var display: Display {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
+        // The + opened the new space's editor: say what it's for, and finish once it's closed.
+        if SpaceEditorPanel.current != nil, Tutorial.current == nil || Tutorial.current?.id == "space" {
+            return Display(keys: [], title: "Name it and pick a color", note: "", count: "", isDone: false, isFinal: false, target: "editor")
+        }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: "", count: "", isDone: true, isFinal: false, target: "done." + done.id)
         }
@@ -169,6 +175,7 @@ final class GuidedTour: NSView {
         case "peek": return controller.peek.panelView
         case "done.peek": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
+        case "editor": return SpaceEditorPanel.current
         case "done.space": return controller.sidebar.dotsAnchor
         default: return nil
         }
@@ -260,11 +267,12 @@ final class GuidedTour: NSView {
         var frame: NSRect
         if hole == .zero {
             frame = NSRect(x: page.midX - size.width / 2, y: page.midY - size.height / 2, width: size.width, height: size.height)
-        } else if d.target == "bar" || d.target == "peek" {
-            // Right under the bar, or right above the peek: next to what you're looking at.
-            let x = hole.midX - size.width / 2
-            let y = d.target == "bar" ? hole.maxY + Tokens.Space.x3 : hole.minY - size.height - Tokens.Space.x2
-            frame = NSRect(x: x, y: y, width: size.width, height: size.height)
+        } else if d.target == "bar" || d.target == "editor" {
+            // Right under the bar or the editor: next to what you're looking at.
+            frame = NSRect(x: d.target == "bar" ? hole.midX - size.width / 2 : hole.minX, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
+        } else if d.target == "peek", let sidebar = controller?.root.sidebarContainer.frame, sidebar.width > size.width * 0.8 {
+            // The peek fills the page, so the pill waits in the sidebar, clear of it.
+            frame = NSRect(x: sidebar.midX - size.width / 2, y: bounds.midY - size.height / 2, width: size.width, height: size.height)
         } else if hole.width > page.width * 0.6 {
             // The page itself: the pill sits inside it, bottom right, clear of links.
             frame = NSRect(x: page.maxX - size.width - Tokens.Space.x6, y: page.maxY - size.height - Tokens.Space.x6, width: size.width, height: size.height)
