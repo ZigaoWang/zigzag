@@ -196,7 +196,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let width = min(Tokens.Metric.commandBarWidth, card.width - Tokens.Space.x16)
         let height = Tokens.Metric.commandBarFieldHeight + listHeight
         let top = card.minY + max(Tokens.Space.x12, floor(card.height * 0.18))
-        return NSRect(x: floor(card.midX - width / 2), y: top, width: width, height: height)
+        // Centered on the whole window, not just the page beside the sidebar.
+        let x = min(max(Tokens.Space.x4, floor(controller.root.bounds.midX - width / 2)), controller.root.bounds.width - width - Tokens.Space.x4)
+        return NSRect(x: x, y: top, width: width, height: height)
     }
 
     /// Anchored to the address it's a little smaller, close to the address bar's own size.
