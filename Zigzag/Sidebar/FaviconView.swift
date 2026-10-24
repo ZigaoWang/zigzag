@@ -1,9 +1,9 @@
 import AppKit
 
-/// A site icon that can turn into a loading spinner. Falls back to a globe for sites without icons.
+/// A site icon that turns into the folding ribbon while its page loads. Falls back to a globe for sites without icons.
 final class FaviconView: NSView {
     private let imageLayer = CALayer()
-    private let spinner = CAShapeLayer()
+    private let spinner = RibbonView()
     private let fallback = NSImageView()
     /// Dark one-color icons (GitHub, X, Notion) vanish on a dark frame; they get a light tile behind them.
     private let backing = CALayer()
@@ -25,13 +25,9 @@ final class FaviconView: NSView {
         layer?.addSublayer(backing)
         layer?.addSublayer(imageLayer)
 
-        spinner.fillColor = nil
-        spinner.lineWidth = 1.5
-        spinner.lineCap = .round
-        spinner.strokeStart = 0
-        spinner.strokeEnd = 0.72
-        spinner.opacity = 0
-        layer?.addSublayer(spinner)
+        spinner.weight = 0.3
+        spinner.alphaValue = 0
+        addSubview(spinner)
 
         fallback.image = Tokens.Symbol.image("globe", size: Tokens.TypeSize.body)
         fallback.contentTintColor = Tokens.Color.textTertiary
@@ -47,9 +43,8 @@ final class FaviconView: NSView {
         Tokens.Motion.withoutAnimation {
             backing.frame = bounds
             imageLayer.frame = needsBacking && effectiveAppearance.isDark ? bounds.insetBy(dx: 2, dy: 2) : bounds
-            let inset = bounds.insetBy(dx: 1.5, dy: 1.5)
             spinner.frame = bounds
-            spinner.path = CGPath(ellipseIn: inset.offsetBy(dx: -bounds.minX, dy: -bounds.minY), transform: nil)
+            spinner.ribbonWidth = bounds.width * 0.62
             fallback.frame = bounds
         }
         refreshColors()
@@ -68,7 +63,7 @@ final class FaviconView: NSView {
 
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
-            spinner.strokeColor = cgColor(Tokens.Color.icon)
+            spinner.color = Tokens.Color.icon
             backing.backgroundColor = cgColor(Tokens.Color.hex(0xFFFFFF, alpha: 0.92))
             backing.isHidden = !(needsBacking && effectiveAppearance.isDark) || imageLayer.opacity == 0
             imageLayer.frame = needsBacking && effectiveAppearance.isDark ? bounds.insetBy(dx: 2, dy: 2) : bounds
@@ -92,7 +87,7 @@ final class FaviconView: NSView {
         fallback.isHidden = image != nil || isLoading
         let toSpinner: Float = showSpinner ? 1 : 0
         let toImage: Float = showSpinner ? 0 : 1
-        for (layer, target) in [(spinner as CALayer, toSpinner), (imageLayer, toImage)] {
+        for (layer, target) in [(spinner.layer!, toSpinner), (imageLayer, toImage)] {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
             fade.toValue = target
@@ -100,7 +95,7 @@ final class FaviconView: NSView {
             layer.add(fade, forKey: "fade")
             Tokens.Motion.withoutAnimation { layer.opacity = target }
         }
-        if showSpinner { startSpinning() } else { spinner.removeAnimation(forKey: "spin") }
+        if showSpinner { startSpinning() } else { spinner.stopLooping() }
         Tokens.Motion.withoutAnimation { backing.isHidden = !(needsBacking && effectiveAppearance.isDark) || showSpinner }
     }
 
@@ -134,14 +129,5 @@ final class FaviconView: NSView {
         return result
     }
 
-    private func startSpinning() {
-        guard spinner.animation(forKey: "spin") == nil else { return }
-        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
-        spin.fromValue = 0
-        spin.toValue = -CGFloat.pi * 2
-        spin.duration = 0.9
-        spin.repeatCount = .infinity
-        spin.isRemovedOnCompletion = false
-        spinner.add(spin, forKey: "spin")
-    }
+    private func startSpinning() { spinner.startLooping() }
 }
