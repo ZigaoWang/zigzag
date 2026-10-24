@@ -319,7 +319,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private func build() {
         engine.addItems(withTitles: SearchEngine.allCases.map(\.name))
         for (item, engine) in zip(engine.itemArray, SearchEngine.allCases) {
-            if let icon = FaviconStore.shared.cachedIcon(for: engine.homeURL) { item.image = icon } else { FaviconStore.shared.prefetch(for: engine.homeURL) }
+            if let icon = FaviconStore.shared.cachedIcon(for: engine.homeURL) { item.image = Self.menuIcon(icon) } else { FaviconStore.shared.prefetch(for: engine.homeURL) }
         }
         engine.target = self
         engine.action = #selector(engineChanged)
@@ -445,7 +445,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func refresh() {
         for (item, engine) in zip(engine.itemArray, SearchEngine.allCases) where item.image == nil {
-            item.image = FaviconStore.shared.cachedIcon(for: engine.homeURL)
+            item.image = FaviconStore.shared.cachedIcon(for: engine.homeURL).map(Self.menuIcon)
         }
         engine.selectItem(withTitle: Library.shared.searchEngine.name)
         let isDefault = Self.isDefaultBrowser
@@ -530,6 +530,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
         controller.tabManager.newTab(url: KnownExtension.webStoreURL)
         controller.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Favicons come in at any size; a menu wants 16 points.
+    private static func menuIcon(_ icon: NSImage) -> NSImage {
+        let copy = icon.copy() as! NSImage
+        copy.size = NSSize(width: 16, height: 16)
+        return copy
     }
 
     static var isDefaultBrowser: Bool {
