@@ -265,12 +265,16 @@ actor PasswordStore {
 
 /// Touch ID (or the Mac's password) before a password is shown, copied or exported. Filling never asks.
 enum PasswordAuthentication {
-    /// The last successful check, so one unlock covers the Passwords window while it stays open and in front.
+    /// The last successful check, so one unlock covers the Passwords window for a while, even after it's closed.
+    /// It ends when the Mac sleeps or locks (see `PasswordsView`).
     @MainActor private static var unlockedUntil: Date?
 
     @MainActor static var isUnlocked: Bool { (unlockedUntil ?? .distantPast) > Date() }
 
     @MainActor static func lock() { unlockedUntil = nil }
+
+    /// How long an unlock lasts after its last use.
+    static let unlockDuration: TimeInterval = 15 * 60
 
     #if DEBUG
     /// For the debug bridge only: stands in for Touch ID so the Passwords window can be checked by script.
@@ -279,7 +283,11 @@ enum PasswordAuthentication {
 
     /// Asks for Touch ID with a reason in plain words ("show your password for github.com").
     @MainActor static func authenticate(_ reason: String, keepUnlockedFor seconds: TimeInterval = 0) async -> Bool {
-        if seconds > 0, isUnlocked { return true }
+        if seconds > 0, isUnlocked {
+            // Using it keeps it open: the time counts from the last use, not from when it was unlocked.
+            unlockedUntil = max(unlockedUntil ?? .distantPast, Date().addingTimeInterval(seconds))
+            return true
+        }
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
         var error: NSError?

@@ -32,7 +32,7 @@ final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        PasswordAuthentication.lock()
+        // Closing doesn't lock: reopening soon after shouldn't ask again. Sleep, screen lock or time does.
         Self.shared = nil
     }
 }
@@ -125,7 +125,8 @@ final class PasswordsView: NSView {
                 MainActor.assumeIsolated { self?.lock() }
             })
         }
-        setLocked(true)
+        // Still unlocked from a moment ago: straight to the passwords, no locked screen in between.
+        setLocked(!PasswordAuthentication.isUnlocked)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -136,7 +137,7 @@ final class PasswordsView: NSView {
     func unlock() {
         Task { @MainActor in
             locked.isBusy = true
-            let ok = await PasswordAuthentication.authenticate("see your saved passwords", keepUnlockedFor: 300)
+            let ok = await PasswordAuthentication.authenticate("see your saved passwords", keepUnlockedFor: PasswordAuthentication.unlockDuration)
             locked.isBusy = false
             guard ok else { locked.showFailure(); return }
             setLocked(false)
@@ -762,7 +763,7 @@ private final class DetailView: NSView {
     // MARK: Actions
 
     private func password() async -> SecretString? {
-        guard let credential, await PasswordAuthentication.authenticate("show your password for \(credential.origin.displayName)", keepUnlockedFor: 300) else { return nil }
+        guard let credential, await PasswordAuthentication.authenticate("show your password for \(credential.origin.displayName)", keepUnlockedFor: PasswordAuthentication.unlockDuration) else { return nil }
         return try? await PasswordStore.shared.password(for: credential.id)
     }
 
