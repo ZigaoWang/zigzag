@@ -38,7 +38,11 @@ final class FormGroup: NSView {
         lines = []
     }
 
-    var fittingHeight: CGFloat { rows.map { $0.frame.height }.reduce(0, +) }
+    var fittingHeight: CGFloat { fittingHeight(for: frame.width > 0 ? frame.width : 492) }
+
+    func fittingHeight(for width: CGFloat) -> CGFloat { rows.map { rowHeight($0, width) }.reduce(0, +) }
+
+    private func rowHeight(_ row: NSView, _ width: CGFloat) -> CGFloat { (row as? FormRow)?.height(for: width) ?? row.frame.height }
 
     override func layout() {
         super.layout()
@@ -46,7 +50,7 @@ final class FormGroup: NSView {
         background.layer?.borderColor = background.cgColor(Tokens.Color.formGroupEdge)
         var y: CGFloat = 0
         for (i, row) in rows.enumerated() {
-            let h = row.frame.height
+            let h = rowHeight(row, bounds.width)
             row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
             y += h
             if i < lines.count {
@@ -61,10 +65,11 @@ final class FormGroup: NSView {
     }
 }
 
-/// A form row: a title (and optional explanation) on the left, a control on the right.
+/// A form row: a title (and optional explanation, which wraps) on the left, a control on the right. Rows grow to
+/// fit their explanation, so nothing is ever cut off.
 final class FormRow: NSView {
-    private let title = NSTextField(labelWithString: "")
-    private let detail = NSTextField(labelWithString: "")
+    private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    private let detail = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
     let control: NSView
 
@@ -73,43 +78,57 @@ final class FormRow: NSView {
         self.icon.image = icon
         self.icon.imageScaling = .scaleProportionallyUpOrDown
         self.icon.isHidden = icon == nil
-        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: detail == nil ? Tokens.Space.x10 + Tokens.Space.x1 : Tokens.Space.x12 + Tokens.Space.x2))
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 44))
         self.title.stringValue = title
-        self.title.font = .systemFont(ofSize: NSFont.systemFontSize)
         self.detail.stringValue = detail ?? ""
-        self.detail.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        self.detail.textColor = .secondaryLabelColor
+        self.detail.font = Tokens.Font.small()
+        self.detail.textColor = Tokens.Color.textSecondary
+        self.detail.isSelectable = false
         self.detail.isHidden = detail == nil
-        addSubview(self.icon)
-        addSubview(self.title)
-        addSubview(self.detail)
-        addSubview(control)
+        [self.icon, self.title, self.detail, control].forEach { addSubview($0) }
+        frame.size.height = height(for: frame.width)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
 
+    private let pad = Tokens.Space.x3
+
+    private var controlSize: NSSize {
+        let size = control.fittingSize
+        return size.width > 0 ? size : control.intrinsicContentSize
+    }
+
+    private func textX() -> CGFloat { icon.isHidden ? pad : pad + Tokens.Space.x6 + Tokens.Space.x3 }
+
+    private func textWidth(for width: CGFloat) -> CGFloat { max(120, width - pad - controlSize.width - Tokens.Space.x4 - textX()) }
+
+    /// The height this row needs at `width`.
+    func height(for width: CGFloat) -> CGFloat {
+        let titleHeight = title.lineHeight
+        guard !detail.isHidden else { return max(44, titleHeight + Tokens.Space.x6) }
+        let detailHeight = ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width), height: 400)).height)
+        return max(52, Tokens.Space.x3 + titleHeight + 2 + detailHeight + Tokens.Space.x3)
+    }
+
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x3
-        let size = control.fittingSize
+        let size = controlSize
         control.frame = NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
-        let titleHeight = title.fittingSize.height
-        var x = pad
+        let x = textX()
         if !icon.isHidden {
             let side = Tokens.Space.x6
-            icon.frame = NSRect(x: x, y: round((bounds.height - side) / 2), width: side, height: side)
-            x = icon.frame.maxX + Tokens.Space.x3
+            icon.frame = NSRect(x: pad, y: round((bounds.height - side) / 2), width: side, height: side)
         }
-        let textWidth = control.frame.minX - x - Tokens.Space.x3
+        let width = textWidth(for: bounds.width)
         if detail.isHidden {
-            title.frame = NSRect(x: x, y: round((bounds.height - titleHeight) / 2), width: textWidth, height: titleHeight)
+            title.frame = NSRect(x: x, y: round((bounds.height - title.lineHeight) / 2), width: width, height: title.lineHeight)
         } else {
-            let detailHeight = detail.fittingSize.height
-            let top = round((bounds.height - titleHeight - detailHeight - 1) / 2)
-            title.frame = NSRect(x: x, y: top, width: textWidth, height: titleHeight)
-            detail.frame = NSRect(x: x, y: title.frame.maxY + 1, width: textWidth, height: detailHeight)
+            let detailHeight = ceil(detail.sizeThatFits(NSSize(width: width, height: 400)).height)
+            let top = round((bounds.height - title.lineHeight - 2 - detailHeight) / 2)
+            title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
+            detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: width, height: detailHeight)
         }
     }
 }
@@ -193,14 +212,12 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
 
     static func confirmDelete(_ id: UUID, window: NSWindow) {
         guard let space = Library.shared.space(id), Library.shared.spaces.count > 1 else { return }
-        let alert = NSAlert()
-        alert.messageText = "Delete “\(space.name)”?"
-        alert.informativeText = "Its bookmarks and tabs will be closed."
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons.first?.hasDestructiveAction = true
-        alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
+        // Its tabs can come back with Undo in the browser, but it's still a big step, so it asks first.
+        guard let host = window.contentView else { return }
+        ConfirmSheet.show(in: host, title: "Delete “\(space.name)”?",
+                          message: "Its bookmarks and tabs close. You can bring it back with Undo in the browser window.",
+                          confirmTitle: "Delete Space", destructive: true) { confirmed in
+            if confirmed { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
         }
     }
 }
@@ -276,19 +293,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let spacesGroup = FormGroup()
     private let importGroup = FormGroup()
     private let passwordsGroup = FormGroup()
+    private let privacyGroup = FormGroup()
     private let saveSwitch = NSSwitch()
     private let fillSwitch = NSSwitch()
-    private let openPasswordsButton = NSButton(title: "Open Passwords…", target: nil, action: nil)
+    private let openPasswordsButton = TextButton.form("Open Passwords…")
     private let blockingSwitch = NSSwitch()
     private let pipSwitch = NSSwitch()
     private let extensionsGroup = FormGroup()
-    private let getExtensionsButton = NSButton(title: "Get Extensions…", target: nil, action: nil)
-    private let loadUnpackedButton = NSButton(title: "Load Unpacked…", target: nil, action: nil)
+    private let getExtensionsButton = TextButton.form("Get Extensions…")
+    private let loadUnpackedButton = TextButton.form("Load Unpacked…")
     private var extensionsToken: SignalToken?
     private let engine = NSPopUpButton()
-    private let defaultButton = NSButton(title: "Make Default", target: nil, action: nil)
+    private let defaultButton = TextButton.form("Make Default")
     private let defaultStatus = NSTextField(labelWithString: "")
-    private let addSpaceButton = NSButton(title: "Add Space", target: nil, action: nil)
+    private let addSpaceButton = TextButton.form("Add Space")
     private var token: SignalToken?
     private let width: CGFloat = 540
     private let banner = BrandBanner()
@@ -320,10 +338,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func header(_ text: String) -> NSTextField {
-        let field = NSTextField(labelWithString: text)
-        field.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
-        return field
+    private func header(_ text: String) -> Label {
+        Label(text, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     }
 
     private func build() {
@@ -333,9 +349,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
         engine.target = self
         engine.action = #selector(engineChanged)
-        defaultButton.target = self
-        defaultButton.action = #selector(makeDefault)
-        defaultButton.bezelStyle = .push
+        defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
         defaultStatus.textColor = .secondaryLabelColor
 
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
@@ -352,19 +366,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         pipSwitch.action = #selector(pipChanged)
         generalGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipSwitch))
 
-        addSpaceButton.target = self
-        addSpaceButton.action = #selector(addSpace)
-        addSpaceButton.bezelStyle = .push
-        addSpaceButton.controlSize = .small
+        addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
 
-        getExtensionsButton.target = self
-        getExtensionsButton.action = #selector(getExtensions)
-        getExtensionsButton.bezelStyle = .push
-        getExtensionsButton.controlSize = .small
-        loadUnpackedButton.target = self
-        loadUnpackedButton.action = #selector(loadUnpacked)
-        loadUnpackedButton.bezelStyle = .push
-        loadUnpackedButton.controlSize = .small
+        getExtensionsButton.onClick = { [weak self] _ in self?.getExtensions() }
+        loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
 
         for toggle in [saveSwitch, fillSwitch] {
             toggle.controlSize = .small
@@ -372,14 +377,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
         saveSwitch.action = #selector(saveChanged)
         fillSwitch.action = #selector(fillChanged)
-        openPasswordsButton.target = self
-        openPasswordsButton.action = #selector(openPasswords)
-        openPasswordsButton.bezelStyle = .push
-        openPasswordsButton.controlSize = .small
+        openPasswordsButton.onClick = { [weak self] _ in self?.openPasswords() }
         reloadPasswords()
+        reloadPrivacy()
 
-        let importButton = NSButton(title: "Import…", target: self, action: #selector(importBrowser))
-        importButton.bezelStyle = .push
+        let importButton = TextButton.form("Import…")
+        importButton.onClick = { [weak self] _ in self?.importBrowser() }
         importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
 
         scroll.drawsBackground = false
@@ -424,18 +427,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         var controls: [NSView] = []
         var targets: [AnyObject] = []
         if ExtensionStore.needsApproval(id) {
-            let review = NSButton(title: "Review Update…", target: nil, action: nil)
-            review.controlSize = .small
-            review.bezelStyle = .push
-            let target = SidebarMenus.Handler {
+            let review = TextButton.form("Review Update…")
+            review.onClick = { _ in
                 guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
                 controller.window?.makeKeyAndOrderFront(nil)
                 controller.reviewExtensionUpdate(id)
             }
-            review.target = target
-            review.action = #selector(SidebarMenus.Handler.runAction(_:))
             controls.append(review)
-            targets.append(target)
         }
         if ExtensionStore.isUnpacked(id) {
             let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Reload from Its Folder")
@@ -443,7 +441,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             controls.append(reload)
         }
         let remove = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
-        remove.onClick = { _ in ExtensionStore.uninstall(id) }
+        remove.onClick = { [weak self] _ in self?.confirmRemove(id: id, name: ext.displayName ?? "this extension") }
         controls.append(remove)
         let toggle = NSSwitch()
         toggle.controlSize = .small
@@ -488,10 +486,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor in
                 if await ExtensionStore.loadUnpacked(url) == nil {
-                    let alert = NSAlert()
-                    alert.messageText = "Couldn’t load this extension"
-                    alert.informativeText = "That folder needs a manifest.json that Zigzag can read."
-                    alert.beginSheetModal(for: window, completionHandler: nil)
+                    if let host = window.contentView {
+                        ConfirmSheet.notice(in: host, title: "Couldn’t load this extension", message: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.")
+                    }
                 }
             }
         }
@@ -526,7 +523,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if let title {
                 let label = header(title)
-                label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: 300, height: label.fittingSize.height)
+                label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth - (accessory?.fittingSize.width ?? 0) - Tokens.Space.x4, height: label.lineHeight)
                 documentView.addSubview(label)
                 if let accessory {
                     let size = accessory.fittingSize
@@ -535,7 +532,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 }
                 y = label.frame.maxY + Tokens.Space.x2
             }
-            group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight)
+            group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))
             group.needsLayout = true
             documentView.addSubview(group)
             y = group.frame.maxY + Tokens.Space.x6
@@ -549,6 +546,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             section("Extensions", extensionsGroup, accessory: buttons)
         }
         section("Passwords", passwordsGroup, accessory: openPasswordsButton)
+        section("Privacy", privacyGroup)
         if !importGroup.rows.isEmpty { section(nil, importGroup) }
 
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
@@ -678,6 +676,81 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func openPasswords() { PasswordsWindowController.show() }
+
+    // MARK: Privacy
+
+    /// History, website data, and every per-site decision you've made, in one place. Each button says what it
+    /// did, right where you clicked.
+    private func reloadPrivacy() {
+        privacyGroup.removeAllRows()
+        let history = TextButton.form("Clear History…")
+        history.onClick = { [weak self, weak history] _ in
+            self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, bookmarks and passwords stay.",
+                          action: "Clear History") {
+                HistoryStore.shared.clearAll()
+                history?.flash("Cleared")
+            }
+        }
+        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: history))
+
+        let cache = TextButton.form("Clear Cache")
+        cache.onClick = { [weak cache] _ in
+            Task { @MainActor in
+                await WebsiteData.clear(.cache)
+                cache?.flash("Cleared")
+            }
+        }
+        let cookies = TextButton.form("Clear Cookies…")
+        cookies.onClick = { [weak self, weak cookies] _ in
+            self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, bookmarks and history stay.", action: "Clear Cookies") {
+                Task { @MainActor in
+                    await WebsiteData.clear(.cookies)
+                    cookies?.flash("Cleared")
+                }
+            }
+        }
+        let data = NSStackView(views: [cache, cookies])
+        data.spacing = Tokens.Space.x2
+        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", control: data))
+
+        // The choices made one site at a time, which otherwise have nowhere to be seen.
+        let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
+        let media = SitePermissions.sites.count, zoom = ZoomLevels.count
+        func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
+        let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "camera and microphone choices"), phrase(zoom, "zoom set")].compactMap { $0 }
+        let reset = TextButton.form("Reset All…")
+        reset.isEnabled = !parts.isEmpty
+        reset.onClick = { [weak self] _ in
+            self?.confirm(title: "Reset every site’s exceptions?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera and microphone, and zoom goes back to 100%.",
+                          action: "Reset All") {
+                ContentBlocker.allowedSites = []
+                ExtensionStore.extensionsOffSites = []
+                SitePermissions.forgetAll()
+                ZoomLevels.resetAll()
+                self?.reloadPrivacy()
+                self?.layoutDocument()
+            }
+        }
+        let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads or a camera, show up here."
+            : parts.joined(separator: " · ").prefix(1).uppercased() + parts.joined(separator: " · ").dropFirst() + "."
+        privacyGroup.add(FormRow(title: "Site exceptions", detail: summary, control: reset))
+    }
+
+    private func confirm(title: String, message: String, action: String, then run: @escaping () -> Void) {
+        guard let host = window?.contentView else { return }
+        ConfirmSheet.show(in: host, title: title, message: message, confirmTitle: action, destructive: true) { confirmed in
+            if confirmed { run() }
+        }
+    }
+
+    /// Removing an extension deletes its data too, and can't be undone, so it asks first.
+    private func confirmRemove(id: String, name: String) {
+        guard let host = window?.contentView else { return }
+        ConfirmSheet.show(in: host, title: "Remove \(name)?", message: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.",
+                          confirmTitle: "Remove", destructive: true) { confirmed in
+            if confirmed { ExtensionStore.uninstall(id) }
+        }
+    }
 
     @objc private func getExtensions() {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
