@@ -43,6 +43,7 @@ final class TabManager {
         let spaceID: UUID
         let index: Int
         let interactionState: Data?
+        var customTitle: String? = nil
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -413,7 +414,7 @@ final class TabManager {
         }
         guard var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { return }
         closedTabs.append(ClosedTab(url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                                    interactionState: tab.interactionStateForSaving))
+                                    interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle))
         if closedTabs.count > 50 { closedTabs.removeFirst() }
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
@@ -429,7 +430,7 @@ final class TabManager {
             bookmarkTabs[bookmarkID] = nil
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
             closedTabs.append(ClosedTab(url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                                        interactionState: tab.interactionStateForSaving))
+                                        interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle))
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
         }
@@ -466,6 +467,7 @@ final class TabManager {
         guard let closed = closedTabs.popLast() else { return nil }
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState)
+        tab.customTitle = closed.customTitle
         tab.host = host
         watch(tab)
         var list = tabsBySpace[space] ?? []
