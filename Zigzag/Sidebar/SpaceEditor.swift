@@ -493,20 +493,30 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    func show() {
+    func show(from anchor: NSView? = nil) {
         guard let controller else { return }
         let overlay = controller.root.overlay
         let sidebar = controller.root.sidebarContainer.frame
         let height = contentHeight
-        // Beside the space it edits: level with its header in the sidebar, kept inside the window.
-        var top = controller.root.cardFrame.minY + Tokens.Space.x2
-        if let header = controller.sidebar.list.headerView, header.window != nil {
-            top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
+        let x: CGFloat
+        var top: CGFloat
+        if let anchor, anchor.window != nil, anchor is SpaceDotView {
+            // From a space dot: just above the dot you clicked, its left edge near it, like a menu from that dot.
+            let dot = anchor.convert(anchor.bounds, to: overlay)
+            top = dot.minY - Tokens.Space.x2 - height
+            x = min(max(Tokens.Space.x2, dot.midX - Tokens.Space.x8), overlay.bounds.width - Self.width - Tokens.Space.x2)
+        } else {
+            // From the space's name: beside the sidebar, level with that header.
+            top = controller.root.cardFrame.minY + Tokens.Space.x2
+            if let header = controller.sidebar.list.headerView, header.window != nil {
+                top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
+            }
+            x = sidebar.maxX + Tokens.Space.x2
         }
         top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))
-        frame = NSRect(x: sidebar.maxX + Tokens.Space.x2, y: top, width: Self.width, height: height)
+        frame = NSRect(x: x, y: top, width: Self.width, height: height)
         overlay.addSubview(self)
-        present()
+        present(arrival: .fade)
         controller.window?.makeFirstResponder(nameField)
         // The cursor at the end, not the whole name selected: you came to change the color as often as the name.
         if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }
@@ -557,7 +567,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     static weak var current: SpaceEditorPanel?
 
-    static func toggle(spaceID: UUID, in controller: BrowserWindowController) {
+    static func toggle(spaceID: UUID, anchor: NSView? = nil, in controller: BrowserWindowController) {
         if let current {
             let same = current.spaceID == spaceID
             current.close()
@@ -566,6 +576,6 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         controller.closeFloatingPanels()
         let panel = SpaceEditorPanel(spaceID: spaceID, controller: controller)
         current = panel
-        panel.show()
+        panel.show(from: anchor)
     }
 }

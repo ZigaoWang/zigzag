@@ -320,7 +320,7 @@ enum DebugBridge {
         case "exton": ExtensionStore.setEnabled(arg, true)
         case "settingsid":
             if let w = SettingsWindowController.shared.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
-        case "editspace": controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
+        case "editspace": controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: arg == "dot" ? controller.sidebar.dot(for: controller.tabManager.currentSpaceID) : controller.sidebar.list.headerView)
         case "pagemove":
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2, let window = controller.window, let webView = controller.selectedWebView,
