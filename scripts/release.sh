@@ -7,22 +7,25 @@
 #
 # Usage: scripts/release.sh            build, sign, notarize, staple, appcast
 #        scripts/release.sh --publish  also create the GitHub release with gh
+#        scripts/release.sh --local    build and sign with Developer ID only, to use on this Mac
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PROFILE=${NOTARY_PROFILE:-zigzag-notary}
 REPO=${GITHUB_REPO:-ZigaoWang/zigzag}
 OUT=build/release
+# Tidier build output when xcbeautify is installed; otherwise just the lines that matter.
+pretty() { if command -v xcbeautify >/dev/null; then xcbeautify; else grep -E "error:|ARCHIVE|EXPORT|BUILD" || true; fi; }
 rm -rf "$OUT" && mkdir -p "$OUT/updates"
 
 xcodegen generate -q
 xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release -allowProvisioningUpdates \
-  -derivedDataPath build/rd -archivePath "$OUT/Zigzag.xcarchive" archive | xcbeautify 2>/dev/null || true
+  -derivedDataPath build/rd -archivePath "$OUT/Zigzag.xcarchive" archive | pretty
 [[ -d "$OUT/Zigzag.xcarchive" ]] || { echo "Archive failed"; exit 1; }
 
 # Exporting signs with Developer ID and its provisioning profile (which carries the Keychain access group).
 xcodebuild -exportArchive -archivePath "$OUT/Zigzag.xcarchive" -exportPath "$OUT/export" \
-  -exportOptionsPlist scripts/ExportOptions.plist -allowProvisioningUpdates | xcbeautify 2>/dev/null || true
+  -exportOptionsPlist scripts/ExportOptions.plist -allowProvisioningUpdates | pretty
 APP="$OUT/export/Zigzag.app"
 [[ -d "$APP" ]] || { echo "Export failed"; exit 1; }
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
@@ -30,6 +33,11 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Co
 echo "Verifying signature…"
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign -dv "$APP" 2>&1 | grep -E "Authority=Developer ID|TeamIdentifier"
+
+if [[ "${1:-}" == "--local" ]]; then
+  echo "Done (not notarized): $APP"
+  exit 0
+fi
 
 ZIP="$OUT/updates/Zigzag-$VERSION.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
