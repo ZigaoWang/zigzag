@@ -410,6 +410,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             for card in [root.card, root.secondCard] {
                 card.header.setVertical(pair.vertical)
                 card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: left) }
+                card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: left) }
             }
             root.card.show(left.ensureWebView())
             root.secondCard.show(right.ensureWebView())

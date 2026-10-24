@@ -598,6 +598,16 @@ final class TabManager {
         changed.send(.selection)
     }
 
+    /// The two pages trade places; each keeps the size it had.
+    func swapSplit(for tab: Tab) {
+        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
+        let pair = splits[index]
+        splits[index].left = pair.right
+        splits[index].right = pair.left
+        splits[index].ratio = 1 - pair.ratio
+        changed.send(.structure)
+    }
+
     func setSplitRatio(_ ratio: Double, for tab: Tab) {
         guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }) else { return }
         splits[index].ratio = min(max(ratio, 0.2), 0.8)
