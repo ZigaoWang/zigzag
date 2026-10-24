@@ -59,6 +59,13 @@ final class WindowManager {
 
     // MARK: Creating
 
+    /// Onboarding hasn't been finished or closed yet. Until it is, every launch starts with it, even if a hidden
+    /// browser window was saved behind it.
+    static var needsOnboarding: Bool {
+        !Library.shared.importedFromArc && !UserDefaults.standard.bool(forKey: "ImportOfferDismissed")
+            && !UserDefaults.standard.bool(forKey: "ArcOfferDismissed")
+    }
+
     @discardableResult
     func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false) -> BrowserWindowController {
         let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate)
@@ -69,8 +76,7 @@ final class WindowManager {
         }
         let controller = makeController(manager: manager, frame: frame, sidebarVisible: keyController?.root.sidebarVisible ?? true,
                                         sidebarWidth: keyController?.root.sidebarWidth ?? Tokens.Metric.sidebarWidth)
-        let firstLaunch = url == nil && !isPrivate && !Library.shared.importedFromArc && !UserDefaults.standard.bool(forKey: "ImportOfferDismissed")
-            && !UserDefaults.standard.bool(forKey: "ArcOfferDismissed")
+        let firstLaunch = url == nil && !isPrivate && Self.needsOnboarding
         if firstLaunch {
             // First launch is its own moment: the welcome window, then the browser.
             WelcomeWindowController.show { [weak controller] in

@@ -36,7 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if #available(macOS 15.4, *) {
             ExtensionStore.setUpIfNeeded()
         }
-        let restored = WindowManager.shared.restoreSession()
+        // Onboarding not finished: it comes first, instead of the window that was waiting behind it.
+        let restored = WindowManager.needsOnboarding ? false : WindowManager.shared.restoreSession()
         launched = true
         if !pendingURLs.isEmpty {
             if !restored { WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false) }
