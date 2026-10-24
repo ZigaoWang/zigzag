@@ -478,3 +478,83 @@ final class ChoicePill: InteractiveView {
         check.contentTintColor = isOn ? tint : Tokens.Color.textTertiary
     }
 }
+
+/// A row of filters where one is chosen (All · Weak · Reused…), each with an optional count. The chosen one takes
+/// a soft fill of the space's accent; the rest are plain until hovered.
+final class SegmentedPills: NSView {
+    private final class Segment: InteractiveView {
+        let title: Label
+        let count = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textTertiary)
+        var tint: NSColor = Tokens.Color.accent { didSet { stateDidChange(animated: false) } }
+
+        init(_ text: String) {
+            title = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+            super.init(frame: .zero)
+            layer?.cornerRadius = Tokens.Radius.control + 2
+            layer?.cornerCurve = .continuous
+            [title, count].forEach { addSubview($0) }
+            setAccessibilityRole(.radioButton)
+            setAccessibilityLabel(text)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        var fittingWidth: CGFloat { Tokens.Space.x3 + title.textWidth + (count.stringValue.isEmpty ? 0 : count.textWidth) + Tokens.Space.x2 }
+
+        override func layout() {
+            super.layout()
+            let x = Tokens.Space.x3 - 2
+            title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2, width: title.textWidth, height: title.lineHeight)
+            count.frame = NSRect(x: title.frame.maxX - 4, y: (bounds.height - count.lineHeight) / 2, width: count.textWidth, height: count.lineHeight)
+        }
+
+        override func stateDidChange(animated: Bool) {
+            let fill: NSColor? = isSelected ? tint.withAlphaComponent(isPressed ? 0.24 : 0.16) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+            layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+            title.font = Tokens.Font.body(isSelected ? .semibold : .medium)
+            title.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            count.textColor = isSelected ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+        }
+    }
+
+    private var segments: [Segment] = []
+    var onChange: ((Int) -> Void)?
+    var selectedIndex = 0 { didSet { segments.enumerated().forEach { $0.element.isSelected = $0.offset == selectedIndex } } }
+    var tint: NSColor = Tokens.Color.accent { didSet { segments.forEach { $0.tint = tint } } }
+
+    init(_ titles: [String]) {
+        super.init(frame: .zero)
+        segments = titles.enumerated().map { index, text in
+            let segment = Segment(text)
+            segment.onClick = { [weak self] _ in
+                guard let self, self.selectedIndex != index else { return }
+                self.selectedIndex = index
+                self.onChange?(index)
+            }
+            addSubview(segment)
+            return segment
+        }
+        setAccessibilityRole(.radioGroup)
+        selectedIndex = 0
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func setCount(_ value: Int?, at index: Int) {
+        guard segments.indices.contains(index) else { return }
+        segments[index].count.stringValue = value.map { $0 > 0 ? "\($0)" : "" } ?? ""
+        needsLayout = true
+    }
+
+    var fittingWidth: CGFloat { segments.map(\.fittingWidth).reduce(0, +) + CGFloat(max(0, segments.count - 1)) * 2 }
+
+    override func layout() {
+        super.layout()
+        var x: CGFloat = 0
+        for segment in segments {
+            let w = ceil(segment.fittingWidth)
+            segment.frame = NSRect(x: x, y: 0, width: w, height: bounds.height)
+            x += w + 2
+        }
+    }
+}
