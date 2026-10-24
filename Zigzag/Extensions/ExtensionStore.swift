@@ -158,9 +158,6 @@ enum ExtensionStore {
         Task {
             await migrateLegacyInstalls()
             await ExtensionHost.shared.loadInstalled()
-            if isOnePasswordAppInstalled, !isInstalled(onePasswordID), !removedIDs.contains(onePasswordID) {
-                _ = await install(onePasswordID)
-            }
             await checkForUpdatesIfDue()
         }
     }
@@ -231,7 +228,7 @@ enum ExtensionStore {
         try? FileManager.default.removeItem(at: prepared.folder)
     }
 
-    /// Downloads, verifies and loads an extension without asking: used for 1Password, set up because its app is here.
+    /// Downloads, verifies and loads an extension you picked (in onboarding).
     static func install(_ id: String) async -> Result<String, InstallError> {
         guard #available(macOS 15.4, *) else { return .failure(.download) }
         switch await prepareInstall(id) {
