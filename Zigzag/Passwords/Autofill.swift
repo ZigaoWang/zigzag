@@ -40,11 +40,16 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let field = NSRect(x: x, y: y, width: w, height: h)
             let frame = message.frameInfo
             let current = generation
+            if body["isNew"] as? Bool == true {
+                guard !(webView.owner?.isPrivate ?? false) else { hide(); return }
+                show([.generate], under: field, in: webView, frame: frame, origin: origin)
+                return
+            }
             Task {
                 let logins = ((try? await PasswordStore.shared.credentials(for: origin)) ?? [])
                     .sorted { ($0.lastUsed ?? $0.modified) > ($1.lastUsed ?? $1.modified) }
                 guard current == self.generation, !logins.isEmpty else { if current == self.generation { self.hide() }; return }
-                self.show(logins, under: field, in: webView, frame: frame, origin: origin)
+                self.show(logins.map { .login($0) }, under: field, in: webView, frame: frame, origin: origin)
             }
         case "blur":
             generation += 1
@@ -58,7 +63,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             switch key {
             case "ArrowDown": menu.move(1)
             case "ArrowUp": menu.move(-1)
-            case "Enter": if let login = menu.selected { fill(login) }
+            case "Enter": if let item = menu.selected { pick(item) }
             case "Escape": hide()
             default: break
             }
@@ -66,11 +71,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func show(_ logins: [Credential], under field: NSRect, in webView: BrowserWebView, frame: WKFrameInfo, origin: Origin) {
+    private func show(_ items: [AutofillMenu.Item], under field: NSRect, in webView: BrowserWebView, frame: WKFrameInfo, origin: Origin) {
         guard let overlay = WindowManager.shared.controllers.first(where: { $0.window === webView.window })?.root.overlay else { return }
         menu?.removeFromSuperview()
-        let menu = AutofillMenu(logins: Array(logins.prefix(5)), origin: origin)
-        menu.onPick = { [weak self] login in self?.fill(login) }
+        let menu = AutofillMenu(items: Array(items.prefix(5)), origin: origin)
+        menu.onPick = { [weak self] item in self?.pick(item) }
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         let width = min(max(fieldInOverlay.width, 260), 360)
         let height = menu.contentHeight
@@ -97,6 +102,34 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private func setSuggesting(_ on: Bool) {
         guard let target else { return }
         target.webView.evaluateJavaScript("window.__zigzagSuggesting = \(on)", in: target.frame, in: .defaultClient)
+    }
+
+    private func pick(_ item: AutofillMenu.Item) {
+        switch item {
+        case .login(let login): fill(login)
+        case .generate: fillGenerated()
+        }
+    }
+
+    /// Fills a new strong password into the form's new-password fields, and saves it right away, so it's never
+    /// lost if the sign-up's submit goes unnoticed. The username is added when the form is sent.
+    private func fillGenerated() {
+        guard let target else { return }
+        let origin = target.origin
+        let webView = target.webView
+        hide()
+        let password = PasswordGenerator.generate()
+        Task {
+            let arguments: [String: Any] = ["password": password.withUnsafeString { String($0) }]
+            let username = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? String
+            let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
+            do {
+                try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password)
+                if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key.fill", duration: 2, in: controller) }
+            } catch {
+                if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+            }
+        }
     }
 
     private func fill(_ login: Credential) {
@@ -134,14 +167,27 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const scope = el.form || document;
         return !!scope.querySelector('input[type=password]') && /user|login|email|account|id|name/i.test((el.name || '') + (el.id || '') + (el.placeholder || '') + (el.getAttribute('aria-label') || ''));
       };
+      // A field for a new password: marked new-password, or on a form with several password fields (sign-up and
+      // confirm, or current, new and confirm) where it isn't the current one.
+      const isNew = (el) => {
+        if (!el || el.tagName !== 'INPUT' || el.type !== 'password' || el.disabled || el.readOnly) return false;
+        if (/new-password/.test(el.autocomplete || '')) return true;
+        if (/current-password/.test(el.autocomplete || '')) return false;
+        const all = [...(el.form || document).querySelectorAll('input[type=password]')].filter((f) => f.getBoundingClientRect().width > 1);
+        if (all.length < 2) return false;
+        if (all.some((f) => /current-password/.test(f.autocomplete || ''))) return true;  // and this isn't it
+        if (all.length === 2) return true;  // a password and its confirmation
+        return all.indexOf(el) > 0;         // current, new, confirm
+      };
       const report = (el) => {
         const r = el.getBoundingClientRect();
-        post({ kind: 'focus', rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
+        post({ kind: 'focus', isNew: isNew(el) && !el.value, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
       };
-      document.addEventListener('focusin', (e) => { if (signIn(e.target)) report(e.target); }, true);
-      document.addEventListener('mousedown', (e) => { if (e.target === document.activeElement && signIn(e.target)) report(e.target); }, true);
-      document.addEventListener('focusout', (e) => { if (signIn(e.target)) post({ kind: 'blur' }); }, true);
-      document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && signIn(e.target)) post({ kind: 'blur' }); }, true);
+      const wanted = (el) => signIn(el) || isNew(el);
+      document.addEventListener('focusin', (e) => { if (wanted(e.target)) report(e.target); }, true);
+      document.addEventListener('mousedown', (e) => { if (e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
+      document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
+      document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && wanted(e.target)) post({ kind: 'blur' }); }, true);
       window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
       document.addEventListener('keydown', (e) => {
         if (!window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
@@ -149,6 +195,29 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         post({ kind: 'key', key: e.key });
       }, true);
     })();
+    """
+
+    /// Puts a new password in every new-password field of the focused form (the password and its confirmation),
+    /// and returns the username typed so far, if any.
+    private static let generatedFiller = """
+    const active = document.activeElement;
+    const scope = (active && active.form) || document;
+    const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && !el.disabled && !el.readOnly; };
+    const inputs = [...scope.querySelectorAll('input')].filter(visible);
+    const passwords = inputs.filter((el) => el.type === 'password');
+    const current = passwords.find((el) => /current-password/.test(el.autocomplete || ''));
+    const fresh = passwords.filter((el) => el !== current && (/new-password/.test(el.autocomplete || '') || !/current-password/.test(el.autocomplete || '')));
+    const targets = current || passwords.length < 3 ? fresh : fresh.slice(1);
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    for (const el of targets) {
+      setter.call(el, password);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const first = passwords[0];
+    const users = inputs.filter((el) => ['text', 'email', 'tel', ''].includes(el.type) && el.value && inputs.indexOf(el) < inputs.indexOf(first));
+    const marked = users.find((el) => /username|email/.test(el.autocomplete || '') || el.type === 'email');
+    return (marked || users[users.length - 1] || {}).value || '';
     """
 
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
@@ -174,26 +243,31 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     """
 }
 
-/// The list under a sign-in field: one row per saved login, newest used first.
+/// The list under a sign-in field: one row per saved login, newest used first, or a strong new password.
 final class AutofillMenu: FloatingPanelView {
+    enum Item {
+        case login(Credential)
+        case generate
+    }
+
     private var rows: [AutofillRow] = []
     private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }
-    var onPick: ((Credential) -> Void)?
+    var onPick: ((Item) -> Void)?
 
     private let pad = Tokens.Space.x1 + 2
     private let rowHeight = Tokens.Space.x10 + Tokens.Space.x1
 
-    init(logins: [Credential], origin: Origin) {
+    init(items: [Item], origin: Origin) {
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
-        rows = logins.map { login in
-            let row = AutofillRow(login: login, icon: origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) })
-            row.onClick = { [weak self] _ in self?.onPick?(login) }
+        rows = items.map { item in
+            let row = AutofillRow(item: item, origin: origin)
+            row.onClick = { [weak self] _ in self?.onPick?(item) }
             addSubview(row)
             return row
         }
         setAccessibilityRole(.menu)
-        setAccessibilityLabel("Saved passwords")
+        setAccessibilityLabel("Passwords")
         onLayout = { [weak self] in self?.layoutRows() }
     }
 
@@ -201,7 +275,7 @@ final class AutofillMenu: FloatingPanelView {
 
     var contentHeight: CGFloat { pad * 2 + CGFloat(rows.count) * rowHeight }
 
-    var selected: Credential? { rows.indices.contains(selection) ? rows[selection].login : (rows.count == 1 ? rows[0].login : nil) }
+    var selected: Item? { rows.indices.contains(selection) ? rows[selection].item : (rows.count == 1 ? rows[0].item : nil) }
 
     var isPointerInside: Bool {
         guard let window else { return false }
@@ -221,24 +295,33 @@ final class AutofillMenu: FloatingPanelView {
 }
 
 private final class AutofillRow: InteractiveView {
-    let login: Credential
+    let item: AutofillMenu.Item
     private let icon = NSImageView()
     private let name: Label
     private let detail: Label
-    init(login: Credential, icon image: NSImage?) {
-        self.login = login
-        name = Label(login.username.isEmpty ? "No username" : login.username, font: Tokens.Font.body(.medium),
-                     color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
-        detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+
+    init(item: AutofillMenu.Item, origin: Origin) {
+        self.item = item
+        switch item {
+        case .login(let login):
+            name = Label(login.username.isEmpty ? "No username" : login.username, font: Tokens.Font.body(.medium),
+                         color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
+            detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill")
+            icon.contentTintColor = Tokens.Color.textSecondary
+        case .generate:
+            name = Label("Use Strong Password", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label("Saved to your Keychain for \(origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("key.viewfinder")
+            icon.contentTintColor = Tokens.Color.accent
+        }
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.control + 2
         layer?.cornerCurve = .continuous
-        icon.image = image ?? Tokens.Symbol.image("key.fill")
-        icon.contentTintColor = Tokens.Color.textSecondary
         icon.imageScaling = .scaleProportionallyUpOrDown
         [icon, name, detail].forEach { addSubview($0) }
         setAccessibilityRole(.menuItem)
-        setAccessibilityLabel("Fill \(name.stringValue)")
+        setAccessibilityLabel(name.stringValue)
     }
 
     required init?(coder: NSCoder) { fatalError() }
