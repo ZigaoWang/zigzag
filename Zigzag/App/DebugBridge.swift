@@ -24,6 +24,7 @@ enum DebugBridge {
         #endif
     }
 
+    #if DEBUG
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
@@ -426,4 +427,5 @@ enum DebugBridge {
         default: break
         }
     }
+    #endif
 }
