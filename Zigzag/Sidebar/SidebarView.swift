@@ -399,8 +399,8 @@ final class SidebarView: NSView {
         ghostEnd.origin.x -= direction * width
         Tokens.Motion.withoutAnimation { ghost.frame = ghostEnd }
         let curve = Tokens.Motion.spaceSwitch
-        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve)
-        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve)
+        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true)
+        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true)
         // The outgoing list fades as it leaves, so the two never compete.
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 1

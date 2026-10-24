@@ -183,8 +183,8 @@ enum Tokens {
         }
 
         @discardableResult
-        static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy) -> TimeInterval {
-            guard let layer = view.layer, offset != 0, !isKeyboardDriven, !reduceMotion else { return 0 }
+        static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy, fromKeyboard: Bool = false) -> TimeInterval {
+            guard let layer = view.layer, offset != 0, fromKeyboard || !isKeyboardDriven, !reduceMotion else { return 0 }
             let animation: CABasicAnimation
             if let bounce = curve.bounce {
                 let spring = CASpringAnimation(perceptualDuration: curve.duration, bounce: bounce)
