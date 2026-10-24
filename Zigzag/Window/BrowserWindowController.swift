@@ -294,6 +294,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// What you can change for the site you're on: right-click the address.
+    /// Signing out of every site is a big step, so it asks first.
+    func confirmClearCookies() {
+        ConfirmSheet.show(in: root.overlay, title: "Clear cookies for every site?",
+                          message: "You’ll be signed out of every website. Your passwords, bookmarks and history stay.",
+                          confirmTitle: "Clear Cookies") { [weak self] confirmed in
+            guard confirmed else { return }
+            Task { @MainActor in
+                await WebsiteData.clear(.cookies)
+                self?.tabManager.selectedTab?.reload()
+                if let self { Toast.show("Cleared cookies. You’re signed out everywhere.", symbol: "trash", duration: 2.4, in: self) }
+            }
+        }
+    }
+
     private func siteMenu() -> NSMenu? {
         guard let tab = tabManager.selectedTab, let url = tab.url, let site = ContentBlocker.site(of: url),
               url.scheme == "http" || url.scheme == "https" else { return nil }
@@ -329,6 +343,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
+        if !tab.isPrivate {
+            menu.addItem(SidebarMenus.Item("Clear Cache for This Site", symbol: "arrow.clockwise") { [weak self] in
+                Task { @MainActor in
+                    await WebsiteData.clear(.cache, site: site)
+                    tab.reload()
+                    if let self { Toast.show("Cleared \(site)’s cache", symbol: "arrow.clockwise", duration: 1.6, in: self) }
+                }
+            })
+            menu.addItem(SidebarMenus.Item("Clear Cookies for This Site", symbol: "trash") { [weak self] in
+                Task { @MainActor in
+                    await WebsiteData.clear(.cookies, site: site)
+                    tab.reload()
+                    if let self { Toast.show("Cleared \(site)’s cookies. You’re signed out there.", symbol: "trash", duration: 2.4, in: self) }
+                }
+            })
+            menu.addItem(.separator())
+        }
         menu.addItem(SidebarMenus.Item("Copy Link", symbol: "link") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
@@ -477,20 +508,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard #available(macOS 15.4, *) else { return }
         let tab = tabManager.selectedTab
         let all = ExtensionHost.shared.actions(for: tab)
-        let pinned = all.filter { ExtensionStore.isPinned($0.id) }
-        let shown = Array(pinned.prefix(2))
-        var items = shown.map { item in
-            AddressView.ActionButton(image: item.icon, label: item.label, badge: item.badge, needsAttention: item.attention != nil,
-                action: { anchor in ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor) },
-                menu: { [weak self] in self?.extensionMenu(for: item.context) })
-        }
-        if all.count > shown.count {
-            let waiting = all.filter { item in !shown.contains { $0.id == item.id } }
-            items.append(AddressView.ActionButton(label: "Extensions", needsAttention: waiting.contains { $0.attention != nil },
-                action: { [weak self] anchor in self?.showExtensionsMenu(all, tab: tab, anchor: anchor) },
-                menu: { [weak self] in self?.extensionsFooterMenu() }))
-        }
-        sidebar.address.setActions(items)
+        // Like Arc: extensions live behind one button, so the address area stays calm. It shows a dot when one
+        // of them needs attention.
+        guard !all.isEmpty else { sidebar.address.setActions([]); return }
+        sidebar.address.setActions([AddressView.ActionButton(label: "Extensions", needsAttention: all.contains { $0.attention != nil },
+            action: { [weak self] anchor in self?.showExtensionsMenu(all, tab: tab, anchor: anchor) },
+            menu: { [weak self] in self?.extensionsFooterMenu() })])
     }
 
     @available(macOS 15.4, *)
@@ -504,17 +527,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             menu.addItem(entry)
         }
         menu.addItem(.separator())
-        let pins = NSMenuItem(title: "Show by the Address", action: nil, keyEquivalent: "")
-        let pinsMenu = NSMenu()
-        pinsMenu.autoenablesItems = false
+        // Each extension's own options, one level in, so a click above always just opens the extension.
+        let manage = NSMenuItem(title: "Manage", action: nil, keyEquivalent: "")
+        manage.image = Tokens.Symbol.image("slider.horizontal.3")
+        let manageMenu = NSMenu()
+        manageMenu.autoenablesItems = false
         for item in all {
-            let pinned = ExtensionStore.isPinned(item.id)
-            let entry = SidebarMenus.Item(item.label) { ExtensionStore.setPinned(item.id, !pinned) }
-            entry.state = pinned ? .on : .off
-            pinsMenu.addItem(entry)
+            let entry = NSMenuItem(title: item.label, action: nil, keyEquivalent: "")
+            entry.image = item.icon
+            entry.submenu = extensionMenu(for: item.context, footer: false)
+            manageMenu.addItem(entry)
         }
-        pins.submenu = pinsMenu
-        menu.addItem(pins)
+        manage.submenu = manageMenu
+        menu.addItem(manage)
         extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.maxY + Tokens.Space.x1), in: anchor)
     }
@@ -530,7 +555,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @available(macOS 15.4, *)
-    private func extensionMenu(for context: WKWebExtensionContext) -> NSMenu {
+    private func extensionMenu(for context: WKWebExtensionContext, footer: Bool = true) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let id = context.uniqueIdentifier
@@ -543,10 +568,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             })
         }
         menu.addItem(siteAccessItem(for: id))
-        let pinned = ExtensionStore.isPinned(id)
-        menu.addItem(SidebarMenus.Item(pinned ? "Hide from the Address" : "Show by the Address", symbol: pinned ? "pin.slash" : "pin") { ExtensionStore.setPinned(id, !pinned) })
         menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
         menu.addItem(SidebarMenus.Item("Remove from Zigzag", symbol: "trash") { ExtensionStore.uninstall(id) })
+        guard footer else { return menu }
         menu.addItem(.separator())
         extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
         return menu

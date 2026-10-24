@@ -374,9 +374,16 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
 extension CommandBarController {
     func runAction(_ id: String) {
+        guard let controller else { return }
         switch id {
         case "import": ImportWindowController.show()
         case "passwords": PasswordsWindowController.show()
+        case "clear-cache":
+            Task { @MainActor in
+                await WebsiteData.clear(.cache)
+                Toast.show("Cleared the cache. Pages load fresh.", symbol: "arrow.clockwise", duration: 2, in: controller)
+            }
+        case "clear-cookies": controller.confirmClearCookies()
         default: break
         }
     }
