@@ -65,6 +65,7 @@ enum DebugBridge {
         case "desk": controller.toggleDeskView(nil)
         case "find": controller.findBar.show(query: arg)
         case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
+        case "peekclose": controller.peek.close()
         case "switcher": controller.debugSwitcher()
         case "appearance":
             NSApp.appearance = arg == "dark" ? NSAppearance(named: .darkAqua) : arg == "light" ? NSAppearance(named: .aqua) : nil
