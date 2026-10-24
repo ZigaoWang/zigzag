@@ -28,7 +28,9 @@
 		37872776DAE6F6D005D98E10 /* SidebarUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */; };
 		3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A868C3F6FC798AA3459ACF /* DownloadsPanel.swift */; };
 		3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D49789A1E612924BE5AD995 /* DeskController.swift */; };
+		3CC1FECBB9087F53BF03AD3F /* key4.db in Resources */ = {isa = PBXBuildFile; fileRef = 17A229EAFF40049CACFF0C03 /* key4.db */; };
 		3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */; };
+		3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */; };
 		407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */; };
 		44E2F9F75871B2E41AE8FD6C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4F4B9A84C7CFFC3CEB0D2D /* WelcomeView.swift */; };
 		4AD56EAFBF0AFF722B1CBEC0 /* PasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8DEA66B0550FB3754D7255 /* PasswordStore.swift */; };
@@ -65,6 +67,7 @@
 		C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765C1F36BCEE463F8B5316BE /* Paths.swift */; };
 		C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */; };
 		C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175D363890A811683DC2D9E7 /* TabSwitcher.swift */; };
+		CE83F1D6BC2CD7361C5F4599 /* logins.json in Resources */ = {isa = PBXBuildFile; fileRef = 818D2FEE410E6D64CD17AADD /* logins.json */; };
 		CF63705B985B423D3B9EC482 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77478845778FB285ADD29C14 /* Library.swift */; };
 		CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192303361A76A758A8F9346F /* FaviconView.swift */; };
 		D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */; };
@@ -102,11 +105,13 @@
 		15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarListView.swift; sourceTree = "<group>"; };
 		16FC91D0E7086B1EC211FD6F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		175D363890A811683DC2D9E7 /* TabSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcher.swift; sourceTree = "<group>"; };
+		17A229EAFF40049CACFF0C03 /* key4.db */ = {isa = PBXFileReference; path = key4.db; sourceTree = "<group>"; };
 		18FC50557675B6C303B2E0AE /* Reader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reader.swift; sourceTree = "<group>"; };
 		192303361A76A758A8F9346F /* FaviconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconView.swift; sourceTree = "<group>"; };
 		1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceColor.swift; sourceTree = "<group>"; };
 		1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebKitSetup.swift; sourceTree = "<group>"; };
 		1EE88C88464115895D3647DF /* PopupWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupWindowController.swift; sourceTree = "<group>"; };
+		1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxImporter.swift; sourceTree = "<group>"; };
 		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
 		253D16FCBE561D267ED6957C /* BrowserRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRootView.swift; sourceTree = "<group>"; };
 		256245226DA14768B001589E /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
@@ -139,6 +144,7 @@
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
 		804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStoreTests.swift; sourceTree = "<group>"; };
+		818D2FEE410E6D64CD17AADD /* logins.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = logins.json; sourceTree = "<group>"; };
 		84C767A263C67C27EF0F4BFB /* SecretString.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretString.swift; sourceTree = "<group>"; };
 		88F9F8B1C1119171EFC0072B /* DebugBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBridge.swift; sourceTree = "<group>"; };
 		8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTranslator.swift; sourceTree = "<group>"; };
@@ -302,6 +308,15 @@
 			path = Peek;
 			sourceTree = "<group>";
 		};
+		9DF2A2D01D8BD422F0F2323B /* firefox-profile */ = {
+			isa = PBXGroup;
+			children = (
+				17A229EAFF40049CACFF0C03 /* key4.db */,
+				818D2FEE410E6D64CD17AADD /* logins.json */,
+			);
+			path = "firefox-profile";
+			sourceTree = "<group>";
+		};
 		AD198676FC355DA00F18BD4B /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -334,6 +349,7 @@
 				EDF5DDEF3F10D52662345203 /* ArcImporter.swift */,
 				59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */,
 				E314E1B3C6242087C5B2B7E3 /* CSVImporter.swift */,
+				1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */,
 				0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */,
 				FB4F4B9A84C7CFFC3CEB0D2D /* WelcomeView.swift */,
 			);
@@ -393,6 +409,7 @@
 			isa = PBXGroup;
 			children = (
 				3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */,
+				9DF2A2D01D8BD422F0F2323B /* firefox-profile */,
 			);
 			path = Fixtures;
 			sourceTree = "<group>";
@@ -542,6 +559,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */,
+				3CC1FECBB9087F53BF03AD3F /* key4.db in Resources */,
+				CE83F1D6BC2CD7361C5F4599 /* logins.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -592,6 +611,7 @@
 				CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */,
 				2BA694E79AD875D1E25094E5 /* FavoritesView.swift in Sources */,
 				99F15C29E28C9FA9B038B3A8 /* FindBar.swift in Sources */,
+				3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */,
 				01AF8CAE8DC01BC74B382DCA /* HistoryStore.swift in Sources */,
 				F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */,
 				CF63705B985B423D3B9EC482 /* Library.swift in Sources */,
