@@ -100,12 +100,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard renameField == nil, let window else { return }
         let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: "Name")
         field.stringValue = title.stringValue
-        field.frame = title.frame.insetBy(dx: 0, dy: -2)
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         title.isHidden = true
         addSubview(field)
         renameField = field
+        // The whole row is the name while you edit it: no close or audio button in the way.
+        refreshAccessories()
+        layoutRenameField()
         window.makeFirstResponder(field)
         field.currentEditor()?.selectAll(nil)
     }
@@ -116,6 +118,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         field.removeFromSuperview()
         title.isHidden = false
+        refreshAccessories()
         if commit { onRename?(name) }
         window?.makeFirstResponder(window?.contentView)
     }
@@ -265,11 +268,18 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func refreshAccessories() {
-        let showClose = (isHovered || isSelected) && !isLifted && (!isBookmark || !isUnloaded)
+        let showClose = (isHovered || isSelected) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil
         closeButton.isHidden = !showClose
         closeButton.toolTip = isAway ? "Back to Pinned Page" : isBookmark ? "Unload Page" : "Close Tab"
-        audioButton.isHidden = !showsAudio
+        audioButton.isHidden = !showsAudio || renameField != nil
         needsLayout = true
+    }
+
+    private func layoutRenameField() {
+        guard let field = renameField else { return }
+        let x = title.frame.minX
+        let height = ceil(field.intrinsicContentSize.height)
+        field.frame = NSRect(x: x, y: (bounds.height - height) / 2, width: max(0, bounds.width - x - Tokens.Space.x2), height: height)
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
@@ -303,6 +313,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame.origin.x += 6 + Tokens.Space.x1
             title.frame.size.width = max(0, title.frame.width - 6 - Tokens.Space.x1)
         }
+        layoutRenameField()
         let size = closeButton.frame.size
         let y = (bounds.height - size.height) / 2
         var x = bounds.width - Tokens.Space.x1 - size.width
