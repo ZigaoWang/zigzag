@@ -272,6 +272,11 @@ enum PasswordAuthentication {
 
     @MainActor static func lock() { unlockedUntil = nil }
 
+    #if DEBUG
+    /// For the debug bridge only: stands in for Touch ID so the Passwords window can be checked by script.
+    @MainActor static func unlockForTesting() { unlockedUntil = Date().addingTimeInterval(120) }
+    #endif
+
     /// Asks for Touch ID with a reason in plain words ("show your password for github.com").
     @MainActor static func authenticate(_ reason: String, keepUnlockedFor seconds: TimeInterval = 0) async -> Bool {
         if seconds > 0, isUnlocked { return true }

@@ -189,6 +189,13 @@ enum DebugBridge {
             if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
         case "welcome": controller.showWelcome()
         case "importwindow": ImportWindowController.show()
+        case "passwordsshow":
+            (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow(arg)
+        case "passwordswindow":
+            // Unlocks without Touch ID and lets the window be captured, for checking it by script with test data.
+            PasswordAuthentication.unlockForTesting()
+            PasswordsWindowController.show()
+            PasswordsWindowController.shared?.window?.sharingType = .readOnly
         case "key":
             // key <char> [cmd|shift|ctrl|opt...] — goes through the real event path, menus included.
             let f = arg.split(separator: " ").map(String.init)
