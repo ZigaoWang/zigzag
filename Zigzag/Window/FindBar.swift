@@ -298,6 +298,14 @@ enum Toast {
     private static weak var current: ToastView?
     private static var hideWork: DispatchWorkItem?
 
+    /// Takes down the toast showing in this window, if any.
+    static func hide(in controller: BrowserWindowController) {
+        guard let toast = current, toast.superview === controller.root.overlay else { return }
+        hideWork?.cancel()
+        toast.dismiss(always: true)
+        current = nil
+    }
+
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, in controller: BrowserWindowController) {
         let toast: ToastView

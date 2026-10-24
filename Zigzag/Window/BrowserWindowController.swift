@@ -247,6 +247,36 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         updateWindowTitle()
         refreshExtensionActions()
         updateNowPlaying()
+        offerWebStoreExtension()
+    }
+
+    private var offeredExtensionID: String?
+
+    /// On an extension's Chrome Web Store page, offers to add it to Zigzag (the store's own button only works in Chrome).
+    private func offerWebStoreExtension() {
+        guard #available(macOS 15.4, *) else { return }
+        let id = KnownExtension.webStoreID(from: tabManager.selectedTab?.url)
+        guard id != offeredExtensionID else { return }
+        if offeredExtensionID != nil { Toast.hide(in: self) }
+        offeredExtensionID = id
+        guard let id, !KnownExtension.isInstalled(id) else { return }
+        Toast.show("Use this extension in Zigzag", symbol: "puzzlepiece.extension", action: (title: "Add to Zigzag", run: { [weak self] in
+            self?.installExtension(id)
+        }), duration: 3600, in: self)
+    }
+
+    func installExtension(_ id: String) {
+        guard #available(macOS 15.4, *) else { return }
+        Toast.show("Adding extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
+        Task { [weak self] in
+            let name = await KnownExtension.install(id)
+            guard let self else { return }
+            if let name {
+                Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
+            } else {
+                Toast.show("Couldn’t add this extension", symbol: "exclamationmark.triangle", duration: 2.5, in: self)
+            }
+        }
     }
 
     private weak var nowPlayingTab: Tab?
@@ -320,6 +350,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .url, .navigation, .loading:
             sidebar.update(tab: tab)
             updateWindowTitle()
+            offerWebStoreExtension()
         case .title:
             updateWindowTitle()
         case .webView:
