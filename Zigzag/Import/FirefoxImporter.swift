@@ -56,6 +56,26 @@ nonisolated enum FirefoxImporter {
         return batch
     }
 
+    /// How much a browser holds, without reading any password.
+    static func counts(_ browser: Browser) -> (passwords: Int, bookmarks: Int, history: Int) {
+        var passwords = 0, bookmarks = 0, history = 0
+        for profile in profiles(of: browser) {
+            if let data = try? Data(contentsOf: profile.appendingPathComponent("logins.json")),
+               let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                passwords += (file["logins"] as? [Any])?.count ?? 0
+            } else if FileManager.default.fileExists(atPath: profile.appendingPathComponent("logins.db").path),
+                      let db = SQLiteReader(profile.appendingPathComponent("logins.db")) {
+                db.rows("SELECT (SELECT count(*) FROM loginsL WHERE is_deleted = 0) + (SELECT count(*) FROM loginsM WHERE is_deleted = 0)") { passwords += Int($0.int(0)) }
+            }
+            let places = profile.appendingPathComponent("places.sqlite")
+            if let db = SQLiteReader(places) {
+                db.rows("SELECT count(*) FROM moz_bookmarks WHERE type = 1") { bookmarks += Int($0.int(0)) }
+                db.rows("SELECT count(*) FROM moz_places WHERE last_visit_date IS NOT NULL") { history += Int($0.int(0)) }
+            }
+        }
+        return (passwords, bookmarks, history)
+    }
+
     // MARK: Passwords
 
     private static func readLogins(_ browser: Browser, _ profile: URL, _ primaryPassword: String, into batch: inout ImportBatch) {

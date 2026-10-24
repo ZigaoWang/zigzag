@@ -89,6 +89,22 @@ nonisolated enum ChromiumImporter {
         return batch
     }
 
+    /// How much a browser holds, without reading any password.
+    static func counts(_ browser: Browser) -> (passwords: Int, bookmarks: Int, history: Int) {
+        var passwords = 0, history = 0
+        for profile in profiles(of: browser) {
+            for file in ["Login Data", "Login Data For Account"] {
+                guard FileManager.default.fileExists(atPath: profile.appendingPathComponent(file).path), let db = SQLiteReader(profile.appendingPathComponent(file)) else { continue }
+                db.rows("SELECT count(*) FROM logins WHERE blacklisted_by_user = 0") { passwords += Int($0.int(0)) }
+            }
+            if FileManager.default.fileExists(atPath: profile.appendingPathComponent("History").path), let db = SQLiteReader(profile.appendingPathComponent("History")) {
+                db.rows("SELECT count(*) FROM urls WHERE hidden = 0") { history += Int($0.int(0)) }
+            }
+        }
+        let bookmarks = profiles(of: browser).map { self.bookmarks(at: $0.appendingPathComponent("Bookmarks")).count }.reduce(0, +)
+        return (passwords, bookmarks, history)
+    }
+
     enum KeyError: Error { case denied, missing }
 
     /// The browser's "Safe Storage" secret, turned into its AES key. Asks macOS, which asks the person.

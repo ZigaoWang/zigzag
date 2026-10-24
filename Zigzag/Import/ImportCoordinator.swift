@@ -73,6 +73,34 @@ enum ImportCoordinator {
         Source(kind: .file(url), name: url.lastPathComponent, bundleID: nil)
     }
 
+    /// What a source holds, counted without decrypting anything: "6 passwords · 57 bookmarks · history".
+    static func preview(_ source: Source) async -> String {
+        let kind = source.kind
+        return await Task.detached(priority: .utility) { () -> String in
+            func phrase(_ n: Int, _ one: String, _ many: String) -> String? { n > 0 ? "\(n) \(n == 1 ? one : many)" : nil }
+            switch kind {
+            case .chromium(let browser):
+                let profiles = ChromiumImporter.profiles(of: browser)
+                let files = profiles.flatMap { p in ["Login Data", "Bookmarks", "History"].map { p.appendingPathComponent($0) } }
+                if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) }) {
+                    return "macOS will need your permission to read it"
+                }
+                let counts = ChromiumImporter.counts(browser)
+                let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"),
+                             counts.history > 0 ? "history" : nil, browser.name == "Arc" ? "spaces and pinned tabs" : nil].compactMap { $0 }
+                return parts.isEmpty ? "Nothing to bring over" : parts.joined(separator: " · ")
+            case .firefox(let browser):
+                let counts = FirefoxImporter.counts(browser)
+                let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
+                return parts.isEmpty ? "Nothing to bring over" : parts.joined(separator: " · ")
+            case .safari:
+                return SafariImporter.hasAccess ? "Bookmarks and history · passwords from the Passwords app" : "Bookmarks and history need your permission · passwords from the Passwords app"
+            case .file(let url):
+                return url.lastPathComponent
+            }
+        }.value
+    }
+
     struct Summary {
         let source: String
         var passwords = 0

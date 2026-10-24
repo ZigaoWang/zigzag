@@ -314,3 +314,46 @@ extension NSScrollView {
         autohidesScrollers = true
     }
 }
+
+/// The one filled button style: the main action on a screen.
+final class PrimaryButton: InteractiveView {
+    private let label: Label
+
+    init(title: String) {
+        label = Label(title, font: Tokens.Font.body(.semibold), color: .white)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        addSubview(label)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(title)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    var title: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue; setAccessibilityLabel(newValue); needsLayout = true }
+    }
+
+    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
+
+    override func layout() {
+        super.layout()
+        let h = label.lineHeight
+        label.frame = NSRect(x: Tokens.Space.x4, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x8, height: h)
+        label.alignment = .center
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let base = Tokens.Color.accent
+        let color = !isEnabled ? base.withAlphaComponent(Tokens.Opacity.disabled) : isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
+        layer?.set(backgroundColor: cgColor(color), animated: false)
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled, let event = NSApp.currentEvent else { return false }
+        onClick?(event)
+        return true
+    }
+}
