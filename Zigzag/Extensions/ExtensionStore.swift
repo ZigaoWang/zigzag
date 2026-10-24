@@ -1,0 +1,370 @@
+import AppKit
+
+/// Where extensions live and what the person decided about them. Packages come from the Chrome Web Store,
+/// the same files Chrome users get, and are never edited: each version sits in its own folder exactly as
+/// it was downloaded. What's ours (on or off, granted permissions, which version is current) is kept beside it.
+///
+///     Extensions/<id>/state.json
+///     Extensions/<id>/versions/<version>/   ← the package, untouched
+enum ExtensionStore {
+    static let onePasswordID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+    private static let lastUpdateKey = "ExtensionsLastUpdateCheck"
+    private static let removedKey = "RemovedExtensions"
+
+    static var root: URL { Paths.directory("Extensions") }
+    static func folder(for id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
+    private static func versionsFolder(for id: String) -> URL { folder(for: id).appendingPathComponent("versions", isDirectory: true) }
+    private static func stateFile(for id: String) -> URL { folder(for: id).appendingPathComponent("state.json") }
+
+    // MARK: State
+
+    /// What we remember about one installed extension.
+    struct State: Codable {
+        var version: String
+        var enabled = true
+        /// Permissions and site patterns the person approved. Nil until the first load records them.
+        var grantedPermissions: [String]?
+        var grantedMatchPatterns: [String]?
+    }
+
+    static func state(_ id: String) -> State? {
+        guard let data = try? Data(contentsOf: stateFile(for: id)) else { return nil }
+        return try? JSONDecoder().decode(State.self, from: data)
+    }
+
+    static func save(_ state: State, for id: String) {
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        try? data.write(to: stateFile(for: id), options: .atomic)
+    }
+
+    static func update(_ id: String, _ change: (inout State) -> Void) {
+        guard var current = state(id) else { return }
+        change(&current)
+        save(current, for: id)
+    }
+
+    /// The folder WebKit loads: the current version's untouched package.
+    static func packageDirectory(for id: String) -> URL? {
+        guard let state = state(id) else { return nil }
+        let dir = versionsFolder(for: id).appendingPathComponent(state.version, isDirectory: true)
+        return FileManager.default.fileExists(atPath: dir.appendingPathComponent("manifest.json").path) ? dir : nil
+    }
+
+    static var installedIDs: [String] {
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        return items.filter { packageDirectory(for: $0) != nil }.sorted()
+    }
+
+    static func isInstalled(_ id: String) -> Bool { packageDirectory(for: id) != nil }
+    static func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
+
+    /// Removing an extension is remembered, so 1Password's automatic setup doesn't bring it back.
+    private static var removedIDs: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: removedKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: removedKey) }
+    }
+
+    // MARK: The Chrome Web Store
+
+    static let webStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
+
+    /// The extension id in a Chrome Web Store page address, e.g. chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh.
+    static func webStoreID(from url: URL?) -> String? {
+        guard let url, let host = url.host(), host == "chromewebstore.google.com" || host == "chrome.google.com" else { return nil }
+        let parts = url.pathComponents
+        guard let detail = parts.firstIndex(of: "detail") else { return nil }
+        return parts[(detail + 1)...].first(where: isExtensionID)
+    }
+
+    static func isExtensionID(_ string: String) -> Bool {
+        string.count == 32 && string.allSatisfy { ("a"..."p").contains($0) }
+    }
+
+    static var isOnePasswordAppInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") != nil
+            || FileManager.default.fileExists(atPath: "/Applications/1Password.app")
+    }
+
+    /// At launch: moves extensions installed by older builds to the untouched layout, loads what's installed, sets up 1Password
+    /// when its app is on this Mac, and refreshes everything weekly.
+    static func setUpIfNeeded() {
+        guard #available(macOS 15.4, *) else { return }
+        let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
+        let stale = Date().timeIntervalSince(last) > 7 * 24 * 3600
+        Task {
+            await migrateLegacyInstalls()
+            await ExtensionHost.shared.loadInstalled()
+            if isOnePasswordAppInstalled, !isInstalled(onePasswordID), !removedIDs.contains(onePasswordID) {
+                await install(onePasswordID)
+            }
+            guard stale else { return }
+            for id in installedIDs { await install(id, update: true) }
+            UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
+        }
+    }
+
+    // MARK: Installing
+
+    /// Downloads an extension from the Chrome Web Store and loads it. An update keeps the person's choices and
+    /// takes effect on the next launch. Returns the extension's name, or nil if it couldn't be installed.
+    @discardableResult
+    static func install(_ id: String, update: Bool = false) async -> String? {
+        guard #available(macOS 15.4, *), isExtensionID(id) else { return nil }
+        guard let package = await download(id) else { return nil }
+        let version = package.version
+        let target = versionsFolder(for: id).appendingPathComponent(version, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: target.path) {
+                try FileManager.default.removeItem(at: package.folder)
+            } else {
+                try FileManager.default.moveItem(at: package.folder, to: target)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: package.folder)
+            return nil
+        }
+        let previous = state(id)
+        var next = previous ?? State(version: version)
+        next.version = version
+        save(next, for: id)
+        removeVersions(of: id, keeping: [version, previous?.version].compactMap { $0 })
+        removedIDs.remove(id)
+        if update { return id }
+        let context = await ExtensionHost.shared.load(id)
+        return context?.webExtension.displayName ?? id
+    }
+
+    /// Fetches and unpacks a package into a fresh temporary folder.
+    private static func download(_ id: String) async -> (folder: URL, version: String)? {
+        var components = URLComponents(string: "https://clients2.google.com/service/update2/crx")!
+        components.queryItems = [
+            .init(name: "response", value: "redirect"),
+            .init(name: "prodversion", value: "140.0"),
+            .init(name: "acceptformat", value: "crx2,crx3"),
+            .init(name: "x", value: "id=\(id)&uc"),
+        ]
+        guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200, let zip = zipPayload(ofCRX: data) else { return nil }
+        let staging = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-ext-\(UUID().uuidString)")
+        let zipFile = staging.appendingPathExtension("zip")
+        defer { try? FileManager.default.removeItem(at: zipFile) }
+        do {
+            try zip.write(to: zipFile)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            let unzip = Process()
+            unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            unzip.arguments = ["-x", "-k", zipFile.path, staging.path]
+            try unzip.run()
+            unzip.waitUntilExit()
+            guard unzip.terminationStatus == 0, let version = manifestVersion(in: staging) else {
+                try? FileManager.default.removeItem(at: staging)
+                return nil
+            }
+            return (staging, version)
+        } catch {
+            try? FileManager.default.removeItem(at: staging)
+            return nil
+        }
+    }
+
+    private static func manifestVersion(in folder: URL) -> String? {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")),
+              let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let version = manifest["version"] as? String, !version.isEmpty, !version.contains("/") else { return nil }
+        return version
+    }
+
+    private static func removeVersions(of id: String, keeping keep: [String]) {
+        let folder = versionsFolder(for: id)
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] where !keep.contains(name) {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
+        }
+    }
+
+    /// Takes the extension out of Zigzag and deletes its files.
+    static func uninstall(_ id: String) {
+        guard #available(macOS 15.4, *) else { return }
+        ExtensionHost.shared.unload(id)
+        try? FileManager.default.removeItem(at: folder(for: id))
+        removedIDs.insert(id)
+        ExtensionHost.shared.forget(id)
+    }
+
+    static func setEnabled(_ id: String, _ enabled: Bool) {
+        guard #available(macOS 15.4, *), isEnabled(id) != enabled else { return }
+        update(id) { $0.enabled = enabled }
+        if enabled {
+            Task { await ExtensionHost.shared.load(id) }
+        } else {
+            ExtensionHost.shared.unload(id)
+        }
+    }
+
+    // MARK: Older installs
+
+    /// Builds before this one unpacked straight into Extensions/<id>/ and edited the package to load a shim.
+    /// Those get a fresh, untouched copy from the store. Offline, the edit is undone in place instead.
+    private static func migrateLegacyInstalls() async {
+        let disabled = Set(UserDefaults.standard.stringArray(forKey: "DisabledExtensions") ?? [])
+        for id in (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [] where isExtensionID(id) {
+            let legacy = folder(for: id)
+            guard state(id) == nil, FileManager.default.fileExists(atPath: legacy.appendingPathComponent("manifest.json").path) else { continue }
+            let moved = root.appendingPathComponent(".legacy-\(id)-\(UUID().uuidString)")
+            guard (try? FileManager.default.moveItem(at: legacy, to: moved)) != nil else { continue }
+            if let package = await download(id) {
+                try? FileManager.default.removeItem(at: moved)
+                try? FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
+                try? FileManager.default.moveItem(at: package.folder, to: versionsFolder(for: id).appendingPathComponent(package.version))
+                save(State(version: package.version, enabled: !disabled.contains(id)), for: id)
+            } else if let version = manifestVersion(in: moved) {
+                undoLegacyPatch(in: moved)
+                try? FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
+                try? FileManager.default.moveItem(at: moved, to: versionsFolder(for: id).appendingPathComponent(version))
+                save(State(version: version, enabled: !disabled.contains(id)), for: id)
+            } else {
+                try? FileManager.default.moveItem(at: moved, to: legacy)
+            }
+        }
+        UserDefaults.standard.removeObject(forKey: "DisabledExtensions")
+        UserDefaults.standard.removeObject(forKey: "OnePasswordExtensionUpdated")
+    }
+
+    private static func undoLegacyPatch(in folder: URL) {
+        let manifestURL = folder.appendingPathComponent("manifest.json")
+        guard let data = try? Data(contentsOf: manifestURL),
+              var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              var background = manifest["background"] as? [String: Any],
+              let original = background["zigzag_original_worker"] as? String else { return }
+        background["service_worker"] = original
+        background["zigzag_original_worker"] = nil
+        manifest["background"] = background
+        if let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) { try? out.write(to: manifestURL) }
+        for name in ["zigzag-background.js", "zigzag-shim.js"] { try? FileManager.default.removeItem(at: folder.appendingPathComponent(name)) }
+    }
+
+    /// A CRX file is a small signed header followed by a plain zip.
+    static func zipPayload(ofCRX data: Data) -> Data? {
+        guard data.count > 16, data.prefix(4) == Data("Cr24".utf8) else { return nil }
+        let version = data.subdata(in: 4..<8).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian }
+        if version == 3 {
+            let headerSize = Int(data.subdata(in: 8..<12).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
+            return data.subdata(in: (12 + headerSize)..<data.count)
+        }
+        if version == 2 {
+            let keyLength = Int(data.subdata(in: 8..<12).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
+            let sigLength = Int(data.subdata(in: 12..<16).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
+            return data.subdata(in: (16 + keyLength + sigLength)..<data.count)
+        }
+        return nil
+    }
+}
+
+/// Per-extension adjustments the host applies, never by editing the package (see EXTENSIONS.md).
+enum ExtensionProfile {
+    struct Profile {
+        /// `browser.*` paths hidden from the extension, so it takes its own fallback instead of calling into nothing.
+        var unsupportedAPIs: Set<String> = []
+        /// Script run in the background before the extension's own, for APIs it calls without checking.
+        var backgroundPrelude: String?
+    }
+
+    static func profile(for id: String) -> Profile? { profiles[id] }
+
+    private static let profiles: [String: Profile] = [
+        ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude),
+    ]
+
+    /// 1Password's background calls these at startup without checking they exist, and stops at the first
+    /// one WebKit lacks. Each stand-in answers the way a browser without the feature would; anything that
+    /// would need to actually do something says it can't. Only added to the API objects, never wrapping them:
+    /// WebKit delivers messages through the original objects.
+    private static let onePasswordPrelude = """
+    const api = globalThis.browser || globalThis.chrome;
+    const noop = () => {};
+    const event = () => ({ addListener: noop, removeListener: noop, hasListener: () => false });
+    const unavailable = (what) => async () => { throw new Error(what + " isn't available in Zigzag"); };
+    // API objects are cached weakly; holding each one here keeps what we add to it.
+    const held = {};
+    const namespace = (name) => (held[name] = held[name] || api[name]);
+    const add = (name, value) => { if (!api[name]) { try { api[name] = value; held[name] = value; } catch (e) {} } };
+    const addTo = (name, values) => {
+      const target = namespace(name);
+      if (!target) return;
+      for (const [key, value] of Object.entries(values)) { if (target[key] === undefined) { try { target[key] = value; } catch (e) {} } }
+    };
+    const manifest = api.runtime.getManifest();
+    add('management', {
+      getSelf: async () => ({ id: api.runtime.id, name: manifest.name, version: manifest.version, installType: 'normal', enabled: true, type: 'extension' }),
+      getAll: async () => [],
+      setEnabled: unavailable('Turning other extensions off'),
+      onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event(),
+    });
+    const setting = (value) => ({ get: async () => ({ value, levelOfControl: 'not_controllable' }), set: async () => {}, clear: async () => {}, onChange: event() });
+    add('privacy', { services: { passwordSavingEnabled: setting(false), autofillEnabled: setting(false), autofillAddressEnabled: setting(false), autofillCreditCardEnabled: setting(false) } });
+    add('idle', { queryState: async () => 'active', setDetectionInterval: noop, onStateChanged: event() });
+    add('notifications', { create: unavailable('Notifications'), update: async () => false, clear: async () => false, getAll: async () => ({}), onClicked: event(), onClosed: event(), onButtonClicked: event() });
+    add('downloads', { download: unavailable('Downloads from extensions'), onChanged: event() });
+    addTo('webNavigation', { onCreatedNavigationTarget: event() });
+    addTo('runtime', { onSuspend: event(), requestUpdateCheck: async () => ({ status: 'no_update' }) });
+    addTo('commands', { update: unavailable('Changing shortcuts') });
+    addTo('permissions', { addHostAccessRequest: async () => {}, removeHostAccessRequest: async () => {} });
+    addTo('storage', { managed: { get: async () => ({}), getBytesInUse: async () => 0, onChanged: event() } });
+    """
+}
+
+extension ExtensionStore {
+    /// The folder WebKit loads. Usually the untouched package itself. An extension whose profile needs a
+    /// background prelude gets a sibling folder of hard links to the same files, plus a manifest that runs
+    /// the prelude first. The package keeps its exact bytes either way.
+    static func loadDirectory(for id: String) -> URL? {
+        guard let package = packageDirectory(for: id), let state = state(id) else { return nil }
+        guard let prelude = ExtensionProfile.profile(for: id)?.backgroundPrelude else { return package }
+        let overlay = folder(for: id).appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(state.version, isDirectory: true)
+        let marker = overlay.appendingPathComponent("zigzag-prelude.js")
+        if (try? String(contentsOf: marker, encoding: .utf8)) == prelude { return overlay }
+        try? FileManager.default.removeItem(at: overlay.deletingLastPathComponent())
+        guard linkTree(from: package, to: overlay), writeOverlayManifest(in: overlay, from: package, prelude: prelude) else { return package }
+        return overlay
+    }
+
+    private static func linkTree(from source: URL, to target: URL) -> Bool {
+        let fm = FileManager.default
+        guard (try? fm.createDirectory(at: target, withIntermediateDirectories: true)) != nil,
+              let enumerator = fm.enumerator(at: source, includingPropertiesForKeys: [.isDirectoryKey]) else { return false }
+        for case let item as URL in enumerator {
+            let relative = String(item.path.dropFirst(source.path.count + 1))
+            guard relative != "manifest.json" else { continue }
+            let destination = target.appendingPathComponent(relative)
+            if (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                try? fm.createDirectory(at: destination, withIntermediateDirectories: true)
+            } else if (try? fm.linkItem(at: item, to: destination)) == nil {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
+        guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
+              var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              var background = manifest["background"] as? [String: Any],
+              let worker = background["service_worker"] as? String else { return false }
+        // Manifests write the worker as "js/background.js" or "/js/background.js"; both mean the extension's root.
+        let path = worker.hasPrefix("/") ? String(worker.dropFirst()) : worker
+        let entry = (background["type"] as? String) == "module"
+            ? "import './zigzag-prelude.js';\nimport './\(path)';\n"
+            : "importScripts('zigzag-prelude.js', '\(path)');\n"
+        background["service_worker"] = "zigzag-entry.js"
+        manifest["background"] = background
+        guard let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) else { return false }
+        do {
+            try out.write(to: overlay.appendingPathComponent("manifest.json"))
+            try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8)
+            try prelude.write(to: overlay.appendingPathComponent("zigzag-prelude.js"), atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
+    }
+}

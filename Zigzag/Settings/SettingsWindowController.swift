@@ -374,12 +374,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         for (id, ext) in installed {
             let toggle = NSSwitch()
             toggle.controlSize = .small
-            toggle.state = KnownExtension.isEnabled(id) ? .on : .off
-            let toggleTarget = SidebarMenus.Handler { [weak toggle] in KnownExtension.setEnabled(id, toggle?.state == .on) }
+            toggle.state = ExtensionStore.isEnabled(id) ? .on : .off
+            let toggleTarget = SidebarMenus.Handler { [weak toggle] in ExtensionStore.setEnabled(id, toggle?.state == .on) }
             toggle.target = toggleTarget
             toggle.action = #selector(SidebarMenus.Handler.runAction(_:))
             let remove = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
-            remove.onClick = { _ in KnownExtension.uninstall(id) }
+            remove.onClick = { _ in ExtensionStore.uninstall(id) }
             let controls = NSStackView(views: [remove, toggle])
             controls.spacing = Tokens.Space.x2
             let detail = ext.version.map { "Version \($0)" } ?? ""
@@ -528,7 +528,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func getExtensions() {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
-        controller.tabManager.newTab(url: KnownExtension.webStoreURL)
+        controller.tabManager.newTab(url: ExtensionStore.webStoreURL)
         controller.window?.makeKeyAndOrderFront(nil)
     }
 

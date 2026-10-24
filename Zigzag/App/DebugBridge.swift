@@ -190,9 +190,9 @@ enum DebugBridge {
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
         case "addext": controller.installExtension(arg)
-        case "rmext": KnownExtension.uninstall(arg)
-        case "extoff": KnownExtension.setEnabled(arg, false)
-        case "exton": KnownExtension.setEnabled(arg, true)
+        case "rmext": ExtensionStore.uninstall(arg)
+        case "extoff": ExtensionStore.setEnabled(arg, false)
+        case "exton": ExtensionStore.setEnabled(arg, true)
         case "settingsid":
             if let w = SettingsWindowController.shared.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
         case "editspace": controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)

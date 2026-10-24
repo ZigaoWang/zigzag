@@ -25,18 +25,16 @@ final class ExtensionHost: NSObject {
     /// Every installed extension, on or off, for Settings. Filled in as they are read at launch.
     private(set) var installed: [String: WKWebExtension] = [:]
 
-    /// Loads every installed extension that's turned on, and reads the rest for Settings. Called once at launch.
-    func loadInstalled() {
-        for dir in KnownExtension.installedDirectories() {
-            KnownExtension.patch(dir)
-            let id = dir.lastPathComponent
-            Task {
-                if KnownExtension.isEnabled(id) {
-                    await load(from: dir)
-                } else if let ext = try? await WKWebExtension(resourceBaseURL: dir) {
-                    installed[id] = ext
-                    changed.send()
-                }
+    /// Loads every installed extension that's turned on, and reads the rest for Settings. Safe to call again:
+    /// what's already loaded stays as it is.
+    func loadInstalled() async {
+        for id in ExtensionStore.installedIDs {
+            if ExtensionStore.isEnabled(id) {
+                await load(id)
+            } else if installed[id] == nil, let dir = ExtensionStore.packageDirectory(for: id),
+                      let ext = try? await WKWebExtension(resourceBaseURL: dir) {
+                installed[id] = ext
+                changed.send()
             }
         }
     }
@@ -59,32 +57,53 @@ final class ExtensionHost: NSObject {
     }
 
     @discardableResult
-    func load(from directory: URL) async -> WKWebExtensionContext? {
-        let id = directory.lastPathComponent
+    func load(_ id: String) async -> WKWebExtensionContext? {
         if let existing = context(for: id) { return existing }
+        guard let directory = ExtensionStore.loadDirectory(for: id) else { return nil }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
             installed[id] = ext
             let context = WKWebExtensionContext(for: ext)
+            // The store ID, so runtime.id matches Chrome's and storage persists across launches.
             context.uniqueIdentifier = id
             // A fixed address, so its pages (settings, dashboards) still open after a relaunch.
-            if let base = URL(string: "webkit-extension://\(id.lowercased())/") { context.baseURL = base }
+            if let base = URL(string: "webkit-extension://\(id)/") { context.baseURL = base }
+            context.unsupportedAPIs = ExtensionProfile.profile(for: id)?.unsupportedAPIs ?? []
+            #if DEBUG
             context.isInspectable = true
-            // Installing an extension here is a deliberate choice; grant what it asks for up front.
-            for permission in ext.requestedPermissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
-            for pattern in ext.allRequestedMatchPatterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+            #endif
+            restoreGrants(for: context, extension: ext)
             try controller.load(context)
             contexts.append(context)
             announceExistingWindows(to: context)
             changed.send()
-            debugLog("Zigzag: loaded \(ext.displayName ?? "?") at \(context.baseURL) errors=\(ext.errors)")
-            context.loadBackgroundContent { error in
-                debugLog("Zigzag: background loaded error=\(String(describing: error))")
-            }
+            context.loadBackgroundContent { _ in }
             return context
         } catch {
-            debugLog("Zigzag: extension at \(directory.path) failed to load: \(error)")
+            debugLog("Extension \(id) failed to load: \(error.localizedDescription)")
             return nil
+        }
+    }
+
+    // MARK: Permissions
+
+    /// Grants what the person approved. Until the install sheet exists, installing approves what the
+    /// extension asks for; that approval is recorded once and restored from then on.
+    private func restoreGrants(for context: WKWebExtensionContext, extension ext: WKWebExtension) {
+        let state = ExtensionStore.state(context.uniqueIdentifier)
+        let permissions = state?.grantedPermissions.map { Set($0.map(WKWebExtension.Permission.init(rawValue:))) } ?? ext.requestedPermissions
+        let patterns = state?.grantedMatchPatterns.map { Set($0.compactMap { try? WKWebExtension.MatchPattern(string: $0) }) } ?? ext.allRequestedMatchPatterns
+        for permission in permissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
+        for pattern in patterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+        if state?.grantedPermissions == nil { saveGrants(of: context) }
+    }
+
+    fileprivate func saveGrants(of context: WKWebExtensionContext) {
+        let permissions = context.grantedPermissions.keys.map(\.rawValue).sorted()
+        let patterns = context.grantedPermissionMatchPatterns.keys.map(\.string).sorted()
+        ExtensionStore.update(context.uniqueIdentifier) {
+            $0.grantedPermissions = permissions
+            $0.grantedMatchPatterns = patterns
         }
     }
 
@@ -116,7 +135,7 @@ final class ExtensionHost: NSObject {
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
         actionAnchor = anchor
-        if item.context.uniqueIdentifier == KnownExtension.onePasswordID, onePasswordNeedsApproval,
+        if item.context.uniqueIdentifier == ExtensionStore.onePasswordID, onePasswordNeedsApproval,
            let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
             OnePasswordHint.show(below: anchor, in: controller)
             return
@@ -199,6 +218,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.Permission>, Date?) -> Void) {
         completionHandler(permissions, nil)
+        DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionToAccess urls: Set<URL>,
@@ -211,6 +231,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
         completionHandler(matchPatterns, nil)
+        DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action, forExtensionContext context: WKWebExtensionContext) {
@@ -220,7 +241,6 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action,
                                 for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         lastAction = action
-        debugLog("Zigzag: present popup popover=\(action.popupPopover != nil) webView=\(action.popupWebView != nil)")
         guard let popover = action.popupPopover else { completionHandler(nil); return }
         let anchor = actionAnchor ?? WindowManager.shared.keyController?.sidebar.address
         guard let anchor, anchor.window != nil else { completionHandler(nil); return }
@@ -233,12 +253,6 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
-        if applicationIdentifier == "app.zigzag.log" {
-            debugLog("Extension: \(((message as? [String: Any])?["message"] as? String) ?? String(describing: message))")
-            replyHandler(nil, nil)
-            return
-        }
-        debugLog("Zigzag: sendNativeMessage to \(applicationIdentifier ?? "nil"): \(String(describing: message).prefix(200))")
         guard let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext) else {
             replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
@@ -248,7 +262,6 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, connectUsing port: WKWebExtension.MessagePort,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        debugLog("Zigzag: connectNative \(port.applicationIdentifier ?? "nil")")
         guard let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext) else {
             completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
@@ -441,13 +454,10 @@ final class NativeMessagingHost {
     }
 
     func connect(_ port: WKWebExtension.MessagePort, onClose: @escaping () -> Void) {
-        debugLog("Zigzag: native host connect \(executable.lastPathComponent) origin=\(origin)")
         let started = start(onMessage: { message in
             ExtensionHost.shared.nativeHostReplied(message)
-            debugLog("Zigzag: native host -> extension \(String(describing: message).prefix(1500))")
             port.sendMessage(message, completionHandler: nil)
         }, onExit: {
-            debugLog("Zigzag: native host exited")
             port.disconnect()
             onClose()
         })

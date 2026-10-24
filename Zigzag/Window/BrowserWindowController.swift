@@ -255,11 +255,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// On an extension's Chrome Web Store page, offers to add it to Zigzag (the store's own button only works in Chrome).
     private func offerWebStoreExtension() {
         guard #available(macOS 15.4, *) else { return }
-        let id = KnownExtension.webStoreID(from: tabManager.selectedTab?.url)
+        let id = ExtensionStore.webStoreID(from: tabManager.selectedTab?.url)
         guard id != offeredExtensionID else { return }
         if offeredExtensionID != nil { Toast.hide(in: self) }
         offeredExtensionID = id
-        guard let id, !KnownExtension.isInstalled(id) else { return }
+        guard let id, !ExtensionStore.isInstalled(id) else { return }
         Toast.show("Use this extension in Zigzag", symbol: "puzzlepiece.extension", action: (title: "Add to Zigzag", run: { [weak self] in
             self?.installExtension(id)
         }), duration: 3600, in: self)
@@ -269,7 +269,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard #available(macOS 15.4, *) else { return }
         Toast.show("Adding extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
         Task { [weak self] in
-            let name = await KnownExtension.install(id)
+            let name = await ExtensionStore.install(id)
             guard let self else { return }
             if let name {
                 Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
@@ -371,7 +371,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         menu.autoenablesItems = false
         menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") { SettingsWindowController.shared.show() })
         menu.addItem(SidebarMenus.Item("Get Extensions…", symbol: "bag") { [weak self] in
-            self?.tabManager.newTab(url: KnownExtension.webStoreURL)
+            self?.tabManager.newTab(url: ExtensionStore.webStoreURL)
         })
         return menu
     }
@@ -389,8 +389,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
             })
         }
-        menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { KnownExtension.setEnabled(id, false) })
-        menu.addItem(SidebarMenus.Item("Remove from Zigzag", symbol: "trash") { KnownExtension.uninstall(id) })
+        menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
+        menu.addItem(SidebarMenus.Item("Remove from Zigzag", symbol: "trash") { ExtensionStore.uninstall(id) })
         menu.addItem(.separator())
         extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
         return menu

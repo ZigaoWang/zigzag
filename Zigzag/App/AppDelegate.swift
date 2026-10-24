@@ -16,8 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = HistoryStore.shared
         ContentBlocker.prepare()
         if #available(macOS 15.4, *) {
-            ExtensionHost.shared.loadInstalled()
-            KnownExtension.setUpIfNeeded()
+            ExtensionStore.setUpIfNeeded()
         }
         let restored = WindowManager.shared.restoreSession()
         launched = true
