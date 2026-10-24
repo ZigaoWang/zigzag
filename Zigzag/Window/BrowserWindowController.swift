@@ -542,8 +542,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func offerTranslation() {
         guard let tab = tabManager.selectedTab, let language = tab.foreignLanguage, !tab.isTranslated,
               let site = ContentBlocker.site(of: tab.url) else { return }
-        if translatedSites.contains(site) { translatePage(); return }
-        guard !translationOffered.contains(site) else { return }
+        // Languages you always translate, and sites you translated a moment ago, translate on their own.
+        if translatedSites.contains(site) || PageTranslator.translatesAlways(language) { translatePage(); return }
+        guard PageTranslator.offers, !translationOffered.contains(site) else { return }
         translationOffered.insert(site)
         Toast.show("This page is in \(PageTranslator.name(of: language))", symbol: "translate",
                    action: (title: "Translate", run: { [weak self] in self?.translatePage() }), duration: 6, in: self)

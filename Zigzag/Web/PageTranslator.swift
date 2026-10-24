@@ -8,9 +8,50 @@ import WebKit
 /// The page's text is read and written back in Zigzag's own script world, so the page's scripts can't see
 /// or interfere; the original words are kept so "Show Original" puts them back exactly.
 enum PageTranslator {
-    /// The language a person reads, from their system settings.
+    /// The language pages are translated into: chosen in Settings, or the system's first language.
     static var readerLanguage: Locale.Language {
-        Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
+        if let chosen = UserDefaults.standard.string(forKey: "TranslateInto") { return Locale.Language(identifier: chosen) }
+        return Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
+    }
+
+    /// nil follows the system.
+    static var chosenLanguage: String? {
+        get { UserDefaults.standard.string(forKey: "TranslateInto") }
+        set { UserDefaults.standard.set(newValue, forKey: "TranslateInto") }
+    }
+
+    /// Offer to translate pages in other languages. On by default.
+    static var offers: Bool {
+        get { UserDefaults.standard.object(forKey: "TranslateOffers") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "TranslateOffers") }
+    }
+
+    /// Languages translated without asking, by language code ("zh", "ja").
+    static var alwaysLanguages: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "TranslateAlways") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "TranslateAlways") }
+    }
+
+    static func code(of language: Locale.Language) -> String { language.languageCode?.identifier ?? language.minimalIdentifier }
+
+    static func translatesAlways(_ language: Locale.Language) -> Bool { alwaysLanguages.contains(code(of: language)) }
+
+    static func setTranslatesAlways(_ always: Bool, _ language: Locale.Language) {
+        var set = alwaysLanguages
+        if always { set.insert(code(of: language)) } else { set.remove(code(of: language)) }
+        alwaysLanguages = set
+    }
+
+    /// Languages Apple can translate into on this Mac, by name, for the Settings menu.
+    @concurrent nonisolated static func targetLanguages() async -> [(id: String, name: String)] {
+        let supported = await LanguageAvailability().supportedLanguages
+        var seen = Set<String>()
+        return supported.compactMap { language -> (String, String)? in
+            let id = language.minimalIdentifier
+            guard seen.insert(id).inserted else { return nil }
+            let name = Locale.current.localizedString(forIdentifier: id) ?? id
+            return (id, name)
+        }.sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
     }
 
     static func name(of language: Locale.Language) -> String {
