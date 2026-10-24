@@ -192,41 +192,20 @@ private enum Onboard {
 
 // MARK: - 1. Hello
 
-/// "Welcome to", then the wordmark writing itself in over a soft rising glow; once it's written, one highlight
-/// runs across the letters, and the button arrives. Nothing bounces; only the glow keeps breathing, slowly.
+/// "Welcome to", then the wordmark writing itself in, then one button. Nothing else on the screen moves.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
     private let welcome = Label("Welcome to", font: .systemFont(ofSize: 18, weight: .medium), color: Onboard.dim(0.78))
     private let wordmark = WordmarkView()
-    /// A copy of the wordmark shapes the highlight, so the light only touches the letters.
-    private let sheenMask = WordmarkView()
-    private let sheen = CAGradientLayer()
-    private let glow = CAGradientLayer()
     private let start = Onboard.primary("Get Started")
     private var drewIn = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        wantsLayer = true
-        glow.type = .radial
-        glow.colors = [Brand.ribbon.withAlphaComponent(0.22).cgColor, Brand.ribbon.withAlphaComponent(0).cgColor]
-        glow.startPoint = CGPoint(x: 0.5, y: 0.5)
-        glow.endPoint = CGPoint(x: 1, y: 1)
-        glow.opacity = 0
-        layer?.addSublayer(glow)
         welcome.alignment = .center
         wordmark.color = Onboard.ink
         start.onClick = { [weak self] _ in self?.onStart?() }
         [welcome, wordmark, start].forEach { addSubview($0) }
-        // The highlight: a white copy of the wordmark over the real one, seen only through a moving band.
-        sheenMask.color = .white
-        sheenMask.wantsLayer = true
-        addSubview(sheenMask)
-        sheen.colors = [NSColor.black.withAlphaComponent(0).cgColor, NSColor.black.withAlphaComponent(0.85).cgColor, NSColor.black.withAlphaComponent(0).cgColor]
-        sheen.locations = [0, 0.5, 1]
-        sheen.startPoint = CGPoint(x: 0, y: 0.5)
-        sheen.endPoint = CGPoint(x: 1, y: 0.5)
-        sheenMask.layer?.mask = sheen
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -240,52 +219,23 @@ private final class HelloPage: NSView {
         welcome.alphaValue = 0
         start.alphaValue = 0
         let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
-        func fadeIn(_ view: NSView, after delay: TimeInterval, duration: TimeInterval = 0.5) {
+        func fadeIn(_ view: NSView, after delay: TimeInterval) {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = duration
+                    ctx.duration = 0.45
                     ctx.timingFunction = ease
                     view.animator().alphaValue = 1
                 }
             }
         }
         fadeIn(welcome, after: 0.15)
-        // The glow rises with the writing, then breathes, so the screen feels lit, not static.
-        let rise = CABasicAnimation(keyPath: "opacity")
-        rise.fromValue = 0
-        rise.toValue = 1
-        rise.beginTime = CACurrentMediaTime() + 0.3
-        rise.duration = 1.4
-        rise.timingFunction = ease
-        rise.fillMode = .backwards
-        glow.opacity = 1
-        glow.add(rise, forKey: "rise")
-        let breathe = CABasicAnimation(keyPath: "transform.scale")
-        breathe.fromValue = 1
-        breathe.toValue = 1.08
-        breathe.duration = 5
-        breathe.autoreverses = true
-        breathe.repeatCount = .infinity
-        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        breathe.beginTime = CACurrentMediaTime() + 1.7
-        glow.add(breathe, forKey: "breathe")
-        wordmark.drawIn(delay: 0.45, total: 1.2)
-        // Once written, one highlight crosses the letters, left to right.
-        let sweep = CABasicAnimation(keyPath: "position.x")
-        let w = wordmark.bounds.width
-        sweep.fromValue = -w * 0.25
-        sweep.toValue = w * 1.25
-        sweep.duration = 0.9
-        sweep.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        sweep.beginTime = CACurrentMediaTime() + 1.75
-        sweep.fillMode = .backwards
-        sheen.add(sweep, forKey: "sweep")
-        fadeIn(start, after: 2.2, duration: 0.45)
+        wordmark.drawIn(delay: 0.4, total: 1.1)
+        fadeIn(start, after: 1.6)
     }
 
     override func layout() {
         super.layout()
-        let markHeight: CGFloat = 80
+        let markHeight: CGFloat = 72
         let markWidth = markHeight * WordmarkView.aspect
         let h = Tokens.Space.x10
         let total = welcome.lineHeight + Tokens.Space.x5 + markHeight + Tokens.Space.x16 + h
@@ -296,19 +246,8 @@ private final class HelloPage: NSView {
         y = wordmark.frame.maxY + Tokens.Space.x16
         let w: CGFloat = 176
         start.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: h)
-        Tokens.Motion.withoutAnimation {
-            let size: CGFloat = 620
-            glow.bounds = CGRect(x: 0, y: 0, width: size, height: size * 0.62)
-            glow.position = CGPoint(x: wordmark.frame.midX, y: wordmark.frame.midY)
-            sheenMask.frame = wordmark.frame
-            let w = wordmark.bounds.width
-            sheen.frame = CGRect(x: 0, y: 0, width: w * 0.35, height: wordmark.bounds.height)
-            // Parked off the left edge until it runs.
-            sheen.position = CGPoint(x: w * 1.5, y: wordmark.bounds.midY)
-        }
     }
 }
-
 
 // MARK: - 2. Bring your stuff
 
@@ -416,8 +355,15 @@ private final class BringPage: NSView {
         Task { @MainActor in
             for row in rows {
                 row.state = .working
-                let summary = await ImportCoordinator.run(row.source, choice.intersection(row.source.offers))
+                var wanted = choice.intersection(row.source.offers)
+                let isSafari: Bool = { if case .safari = row.source.kind { true } else { false } }()
+                // Safari's passwords live in the Passwords app, which only it can read; the row says how to bring them.
+                if isSafari { wanted.remove(.passwords) }
+                let summary = await ImportCoordinator.run(row.source, wanted)
                 row.state = .done(summary)
+                if isSafari, choice.contains(.passwords), summary.problems.isEmpty {
+                    row.note("Safari’s passwords are in the Passwords app. Export them there (File › Export All Passwords), then use Import a password file.")
+                }
                 self.needsLayout = true
             }
             self.isImporting = false
@@ -470,14 +416,18 @@ private final class BringPage: NSView {
             // Pre-select the browser's own folder, so Allow is the only thing to do.
             DispatchQueue.main.async { panel.directoryURL = folder }
         case .safari:
+            // The same one click as Chrome: macOS opens Safari's folder to Zigzag once you allow it here.
+            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari", isDirectory: true)
             let panel = NSOpenPanel()
-            panel.allowedContentTypes = [.zip]
-            panel.prompt = "Import"
-            panel.message = "In Safari, choose File › Export Browsing Data to File, then choose that file here."
-            panel.beginSheetModal(for: window) { [weak self, weak row] response in
-                guard let self, let row, response == .OK, let url = panel.url else { return }
-                row.useFile(url)
-                self.run([row])
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.directoryURL = folder
+            panel.prompt = "Allow"
+            panel.message = "Click Allow to let Zigzag read Safari’s bookmarks and history. Nothing in Safari changes."
+            panel.beginSheetModal(for: window) { [weak self, weak row] _ in
+                guard let self, let row else { return }
+                row.recheckAccess()
+                self.refresh()
             }
         default:
             break
@@ -654,7 +604,7 @@ private final class BrowserRow: InteractiveView {
                 // Found before starting, so it's fixed first instead of failing midway.
                 self.needsAccess = true
                 self.isChosen = false
-                self.detail.stringValue = Self.isSafari(source) ? "Bring it over with a file Safari exports" : "macOS asks you to allow this once"
+                self.detail.stringValue = "macOS asks you to allow this once"
                 self.fixKind = .fullDiskAccess
                 self.onChange?()
             } else {
@@ -745,7 +695,7 @@ private final class BrowserRow: InteractiveView {
         switch state {
         case .idle:
             if needsAccess {
-                fixButton.title = isSafari ? "Use Safari’s Export" : waitingForSettings ? "Check Again" : triedPicker ? "Open Settings" : "Allow Access"
+                fixButton.title = waitingForSettings ? "Check Again" : triedPicker && !isSafari ? "Open Settings" : "Allow Access"
                 fixButton.isHidden = false
             }
         case .waiting:
