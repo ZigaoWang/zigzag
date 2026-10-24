@@ -25,6 +25,7 @@ final class OnboardingView: NSView {
         surface.showsWatermark = false
         addSubview(surface)
         SitesPicker.preload()
+        PageShots.shared.start()
         show(Self.resumeOnBring ? .bring : .hello, animated: false)
         Self.resumeOnBring = false
     }
@@ -585,8 +586,9 @@ private final class BrowserRow: InteractiveView {
                 fixButton.isHidden = first.fix == .none
             } else {
                 problem.stringValue = ""
-                status.stringValue = "Imported"
-                status.textColor = Onboard.ink
+                status.stringValue = "✓"
+                status.font = .systemFont(ofSize: 15, weight: .bold)
+                status.textColor = Tokens.Color.success
                 status.isHidden = false
                 detail.stringValue = Self.sentence(summary)
             }
@@ -945,27 +947,32 @@ private final class IntoZigzag: NSView {
 
     override func layout() {
         super.layout()
-        let size: CGFloat = 104, gap: CGFloat = 14, way: CGFloat = 90
-        let shown = sources.prefix(3)
-        let row = shown.isEmpty ? size : CGFloat(shown.count) * size + CGFloat(shown.count - 1) * gap + way + size
+        // Every icon the same size: the browsers in a little fanned stack, then the way across, then Zigzag.
+        let size: CGFloat = 104, step: CGFloat = 30, way: CGFloat = 96
+        let stack = sources.isEmpty ? 0 : size + CGFloat(sources.count - 1) * step
+        let row = sources.isEmpty ? size : stack + way + size
         var x = round((bounds.width - row) / 2)
         let top = round(bounds.height / 2 - size / 2) - 16
         for (k, view) in sources.enumerated() {
-            view.isHidden = k >= 3
-            view.frame = NSRect(x: x, y: top, width: size, height: size)
-            if k < 3 { x += size + gap }
+            view.frame = NSRect(x: x + CGFloat(k) * step, y: top, width: size, height: size)
+            view.wantsLayer = true
+            // A slight fan: each one turned a touch, the newest flat on top.
+            let turn = CGFloat(sources.count - 1 - k) * -0.06
+            view.frameCenterRotation = turn * 180 / .pi
         }
+        x += stack
         let mid = top + size / 2
         Tokens.Motion.withoutAnimation {
             for (i, dot) in dots.enumerated() {
-                dot.isHidden = shown.isEmpty
-                dot.frame = CGRect(x: x - gap + (way - 8 * 3 - 12 * 2) / 2 + CGFloat(i) * 20, y: mid - 4, width: 8, height: 8)
+                dot.isHidden = sources.isEmpty
+                dot.frame = CGRect(x: x + (way - 8 * 3 - 12 * 2) / 2 + CGFloat(i) * 20, y: mid - 4, width: 8, height: 8)
                 dot.opacity = state == .importing ? 0.2 : 0.6
             }
         }
-        if !shown.isEmpty { x += way - gap }
+        if !sources.isEmpty { x += way }
         zigzag.frame = NSRect(x: x, y: top, width: size, height: size)
-        badge.frame = NSRect(x: zigzag.frame.maxX - 30, y: zigzag.frame.minY - 6, width: 36, height: 36)
+        // The check sits on Zigzag's bottom-right corner, over the icon.
+        badge.frame = NSRect(x: zigzag.frame.maxX - 34, y: zigzag.frame.maxY - 34, width: 32, height: 32)
         caption.frame = NSRect(x: 0, y: top + size + 28, width: bounds.width, height: caption.lineHeight)
     }
 }
@@ -992,7 +999,10 @@ private final class PickTile: InteractiveView {
         layer?.cornerCurve = .continuous
         icon.imageScaling = .scaleProportionallyUpOrDown
         name.alignment = horizontal ? .left : .center
-        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 16)
+        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 18)
+        check.wantsLayer = true
+        check.layer?.backgroundColor = NSColor.white.cgColor
+        check.layer?.cornerRadius = 9
         check.contentTintColor = Onboard.ink
         spinner.color = Onboard.ink
         spinner.isHidden = true
@@ -1029,8 +1039,7 @@ private final class PickTile: InteractiveView {
 
     override func layout() {
         super.layout()
-        check.frame = NSRect(x: bounds.width - 16 - 8, y: 8, width: 16, height: 16)
-        spinner.frame = check.frame
+        spinner.frame = NSRect(x: bounds.width - 16 - 8, y: 8, width: 16, height: 16)
         if horizontal {
             let s: CGFloat = 30
             icon.frame = NSRect(x: 14, y: (bounds.height - s) / 2, width: s, height: s)
@@ -1041,6 +1050,8 @@ private final class PickTile: InteractiveView {
         } else {
             let s: CGFloat = 40
             icon.frame = NSRect(x: (bounds.width - s) / 2, y: bounds.height / 2 - s + 4, width: s, height: s)
+            // Picked: a small check on the icon's bottom-right corner, like a selected photo.
+            check.frame = NSRect(x: icon.frame.maxX - 13, y: icon.frame.maxY - 13, width: 18, height: 18)
             name.frame = NSRect(x: 4, y: icon.frame.maxY + 8, width: bounds.width - 8, height: name.lineHeight)
         }
     }
@@ -1471,7 +1482,7 @@ private final class AdsPicker: StepContent {
         block.isChosen = on
         allow.isChosen = !on
         preview.page = .news(ads: !on)
-        preview.tabs = ["Today’s news", "Recipes", "Trip ideas"]
+        preview.tabs = ["The Daily Field", "Recipes", "Trip ideas"]
     }
 
     override func commit(_ done: @escaping () -> Void) {
@@ -1660,6 +1671,7 @@ final class LiveBrowser: NSView {
         }
     }
     private let side: CGFloat = 210
+    private var shotsToken: SignalToken?
     var page: Page = .wikipedia { didSet { needsDisplay = true } }
     var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
     private var background: NSColor = SpaceColor.sky.background
@@ -1675,6 +1687,7 @@ final class LiveBrowser: NSView {
         layer?.shadowOffset = CGSize(width: 0, height: -16)
         favoritesView.isHidden = true
         addSubview(favoritesView)
+        shotsToken = PageShots.shared.changed.observe { [weak self] in self?.needsDisplay = true }
         refreshColors()
     }
 
@@ -1729,7 +1742,7 @@ final class LiveBrowser: NSView {
         // Address field, with extension icons at its end once you've added some.
         let address = NSRect(x: pad, y: 32, width: side - pad * 2, height: 24)
         box(address, ink.withAlphaComponent(0.07), 7)
-        let label: String = { switch page { case .news: "news.example.com"; case .wikipedia: "wikipedia.org"; case .blank: "Search or enter address" } }()
+        let label: String = { switch page { case .news: "thedailyfield.com"; case .wikipedia: "wikipedia.org"; case .blank: "Search or enter address" } }()
         text(label, NSPoint(x: address.minX + 8, y: address.minY + 5), size: 10.5, color: ink.withAlphaComponent(0.5), width: address.width - 16)
         // Favorites: the sites you picked, with their own icons.
         let favs = liveFavorites != nil ? [] : favorites ?? Library.shared.favorites.prefix(8).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) }
@@ -1766,7 +1779,7 @@ final class LiveBrowser: NSView {
             // Where the app keeps them: site controls, from the button at the end of the address.
             let button = NSRect(x: address.maxX - 22, y: address.minY + 4, width: 16, height: 16)
             box(button, accent.withAlphaComponent(0.2), 4)
-            extensionPanel = NSRect(x: address.minX + 20, y: address.maxY + 8, width: 210, height: 86)
+            extensionPanel = NSRect(x: address.minX, y: address.maxY + 8, width: 236, height: 150)
         }
         // The page.
         let pageRect = NSRect(x: side, y: 10, width: bounds.width - side - 10, height: bounds.height - 20)
@@ -1775,6 +1788,18 @@ final class LiveBrowser: NSView {
         NSGraphicsContext.current?.saveGraphicsState()
         NSBezierPath(roundedRect: pageRect, xRadius: 9, yRadius: 9).addClip()
         let px = pageRect.minX + 22
+        let shot: PageShots.Shot? = { switch page { case .wikipedia: .wikipedia; case .news(let ads): ads ? .adsShown : .adsBlocked; case .blank: nil } }()
+        if let shot, let image = PageShots.shared.images[shot] {
+            // The real page, scaled to the window's width, from the top.
+            let scale = pageRect.width / image.size.width
+            image.draw(in: NSRect(x: pageRect.minX, y: pageRect.minY, width: pageRect.width, height: image.size.height * scale),
+                       from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            if case .news(false) = page {
+                let badge = NSRect(x: pageRect.minX + 16, y: pageRect.maxY - 42, width: 180, height: 26)
+                box(badge, accent, 8)
+                text("Ads and trackers blocked", NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: .white, width: 170)
+            }
+        } else {
         switch page {
         case .blank:
             break
@@ -1813,6 +1838,7 @@ final class LiveBrowser: NSView {
                 text("Ads and trackers blocked", NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: accent, width: 170)
             }
         }
+        }
         NSGraphicsContext.current?.restoreGraphicsState()
         if let panel = extensionPanel {
             NSGraphicsContext.current?.saveGraphicsState()
@@ -1823,13 +1849,25 @@ final class LiveBrowser: NSView {
             shadow.set()
             box(panel, isDark ? NSColor(white: 0.17, alpha: 1) : .white, 10)
             NSGraphicsContext.current?.restoreGraphicsState()
-            text("wikipedia.org", NSPoint(x: panel.minX + 12, y: panel.minY + 10), size: 11, weight: .semibold, color: pageInk.withAlphaComponent(0.85))
-            text("Extensions", NSPoint(x: panel.minX + 12, y: panel.minY + 30), size: 9.5, weight: .semibold, color: pageInk.withAlphaComponent(0.45))
-            for (k, icon) in extensions.prefix(6).enumerated() {
-                let r = NSRect(x: panel.minX + 12 + CGFloat(k) * 30, y: panel.minY + 48, width: 26, height: 26)
-                box(r, pageInk.withAlphaComponent(0.06), 7)
-                icon.draw(in: r.insetBy(dx: 4, dy: 4))
+            // As the app's site controls draw it: the site, its extensions, then its switches.
+            let inset = panel.minX + 14
+            if let favicon = FaviconStore.shared.cachedIcon(for: URL(string: "https://www.wikipedia.org")!) {
+                favicon.draw(in: NSRect(x: inset, y: panel.minY + 12, width: 16, height: 16))
             }
+            text("wikipedia.org", NSPoint(x: inset + 24, y: panel.minY + 11), size: 11.5, weight: .semibold, color: pageInk.withAlphaComponent(0.85))
+            text("Secure connection", NSPoint(x: inset + 24, y: panel.minY + 26), size: 9.5, color: pageInk.withAlphaComponent(0.45))
+            box(NSRect(x: inset, y: panel.minY + 46, width: panel.width - 28, height: 1), pageInk.withAlphaComponent(0.08), 0)
+            text("Extensions", NSPoint(x: inset, y: panel.minY + 54), size: 9.5, weight: .semibold, color: pageInk.withAlphaComponent(0.45))
+            for (k, icon) in extensions.prefix(6).enumerated() {
+                let r = NSRect(x: inset + CGFloat(k) * 32, y: panel.minY + 70, width: 28, height: 28)
+                box(r, pageInk.withAlphaComponent(0.06), 8)
+                icon.draw(in: r.insetBy(dx: 5, dy: 5))
+            }
+            text("Block ads and trackers", NSPoint(x: inset, y: panel.minY + 112), size: 10.5, color: pageInk.withAlphaComponent(0.75))
+            let toggle = NSRect(x: panel.maxX - 14 - 26, y: panel.minY + 110, width: 26, height: 16)
+            box(toggle, accent, 8)
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: NSRect(x: toggle.maxX - 14, y: toggle.minY + 2, width: 12, height: 12)).fill()
         }
     }
 }
