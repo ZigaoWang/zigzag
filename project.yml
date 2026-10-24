@@ -2,7 +2,7 @@ name: Zigzag
 options:
   bundleIdPrefix: app.zigzag
   deploymentTarget:
-    macOS: "15.0"
+    macOS: "15.4"
   createIntermediateGroups: true
 packages:
   Sparkle:
@@ -13,7 +13,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
-    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.4"
     MARKETING_VERSION: "0.1.0"
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     SPARKLE_PUBLIC_KEY: ""
