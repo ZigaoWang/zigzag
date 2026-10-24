@@ -165,18 +165,22 @@ private enum Onboard {
 
 // MARK: - 1. Hello
 
+/// The ribbon writes itself in, then the name, the line and the one button: a first moment with nothing to read.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let wordmark = WordmarkView()
-    private let line = Onboard.line("A calm browser for the Mac.")
+    private let ribbon = RibbonView()
+    private let title = Onboard.title("Welcome to Zigzag")
+    private let line = Onboard.line("Everything in its place.")
     private let start = Onboard.primary("Get Started")
+    private var drewIn = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        wordmark.color = Onboard.ink
-        line.font = .systemFont(ofSize: 15)
+        ribbon.color = Onboard.ink
+        title.attributedStringValue = Brand.display("Welcome to Zigzag", size: 34, color: Onboard.ink, alignment: .center)
+        line.font = .systemFont(ofSize: 16)
         start.onClick = { [weak self] _ in self?.onStart?() }
-        [wordmark, line, start].forEach { addSubview($0) }
+        [ribbon, title, line, start].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -184,24 +188,28 @@ private final class HelloPage: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        // The one time the wordmark writes itself in.
-        guard window != nil, !Brand.hasDrawnIn else { return }
-        Brand.hasDrawnIn = true
-        wordmark.drawIn(delay: 0.3)
+        guard window != nil, !drewIn else { return }
+        drewIn = true
+        layoutSubtreeIfNeeded()
+        // The ribbon writes itself, then the words arrive a beat apart.
+        ribbon.drawIn(delay: 0.25)
+        Brand.enter([title, line, start], delay: 0.9)
     }
 
     override func layout() {
         super.layout()
-        let markHeight: CGFloat = 40
-        let markWidth = markHeight * WordmarkView.aspect
+        let mark: CGFloat = 76
         let h = Tokens.Space.x10
-        let total = markHeight + Tokens.Space.x5 + 20 + Tokens.Space.x12 + h
+        let th = ceil(title.sizeThatFits(NSSize(width: bounds.width, height: 100)).height)
+        let total = mark + Tokens.Space.x8 + th + Tokens.Space.x2 + 22 + Tokens.Space.x12 + h
         var y = round((bounds.height - total) / 2) - Tokens.Space.x4
-        wordmark.frame = NSRect(x: round((bounds.width - markWidth) / 2), y: y, width: markWidth, height: markHeight)
-        y = wordmark.frame.maxY + Tokens.Space.x5
-        line.frame = NSRect(x: 0, y: y, width: bounds.width, height: 20)
+        ribbon.frame = NSRect(x: round((bounds.width - mark / Brand.aspect) / 2), y: y, width: round(mark / Brand.aspect), height: mark)
+        y = ribbon.frame.maxY + Tokens.Space.x8
+        title.frame = NSRect(x: 0, y: y, width: bounds.width, height: th)
+        y = title.frame.maxY + Tokens.Space.x2
+        line.frame = NSRect(x: 0, y: y, width: bounds.width, height: 22)
         y = line.frame.maxY + Tokens.Space.x12
-        let w: CGFloat = 168
+        let w: CGFloat = 176
         start.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: h)
     }
 }
