@@ -206,9 +206,18 @@ final class ExtensionHost: NSObject {
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
         actionAnchor = anchor
+        // Its own popup always opens; if it still needs a step only you can do (1Password trusting Zigzag), a
+        // short note says so, with the way there.
         if let attention = item.attention, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
-            AttentionHint.show(attention, icon: item.icon, below: anchor, in: controller)
-            return
+            let open: (title: String, run: () -> Void)? = attention.appBundleID.map { id in
+                (attention.buttonTitle, {
+                    if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+                        NSWorkspace.shared.openApplication(at: app, configuration: .init())
+                    }
+                })
+            }
+            Toast.show("\(attention.title): in its settings, choose Browser, then Add Browser.", symbol: "exclamationmark.circle",
+                       action: open, duration: 6, in: controller)
         }
         // "When you click it": clicking gives it this site from now on.
         if ExtensionStore.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
