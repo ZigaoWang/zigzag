@@ -131,7 +131,7 @@ final class BrowserWindow: NSWindow {
 
     /// Hidden while the sidebar is collapsed or sliding; shown in full screen only when AppKit wants them.
     var trafficLightsHidden = false {
-        didSet { buttons.forEach { $0.isHidden = trafficLightsHidden || styleMask.contains(.fullScreen) } }
+        didSet { buttons.forEach { $0.isHidden = trafficLightsHidden && !styleMask.contains(.fullScreen) } }
     }
 
 
@@ -141,11 +141,10 @@ final class BrowserWindow: NSWindow {
               let titlebar = close.superview else { return }
         // In full screen AppKit shows them in the title bar that slides down with the menu bar, flashing them in
         // the wrong place; they stay hidden there, and the sidebar's buttons move into their space.
-        // The empty title bar that slides down with the menu bar draws nothing either, instead of a white strip.
-        let fullScreen = styleMask.contains(.fullScreen)
-        if titlebar.alphaValue != (fullScreen ? 0 : 1) { titlebar.alphaValue = fullScreen ? 0 : 1 }
-        guard !fullScreen else {
-            buttons.forEach { if !$0.isHidden { $0.isHidden = true } }
+        // In full screen they belong to the title bar that slides down with the menu bar, where AppKit puts them,
+        // so you can always leave full screen; the sidebar keeps no space for them.
+        guard !styleMask.contains(.fullScreen) else {
+            buttons.forEach { if $0.isHidden { $0.isHidden = false } }
             return
         }
         let height = close.frame.height

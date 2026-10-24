@@ -701,11 +701,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
-    func windowWillEnterFullScreen(_ notification: Notification) {
-        // Hidden before the zoom starts, so they never flash in AppKit's spot.
-        browserWindow.trafficLightsHidden = true
-    }
-
     func windowDidEnterFullScreen(_ notification: Notification) {
         layoutTrafficLights()
         root.needsLayout = true
