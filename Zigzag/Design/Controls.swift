@@ -315,13 +315,17 @@ extension NSScrollView {
     }
 }
 
-/// The one filled button style: the main action on a screen.
+/// The one filled button style: the main action on a screen, in the space's accent. Use one per screen.
 final class PrimaryButton: InteractiveView {
     private let label: Label
+    private var themeToken: SignalToken?
+    /// The space's accent unless set.
+    var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
 
     init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.semibold), color: .white)
+        label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.current.onAccent)
         super.init(frame: .zero)
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         addSubview(label)
@@ -346,7 +350,10 @@ final class PrimaryButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let base = Tokens.Color.accent
+        // The space's accent: the one primary action on a screen.
+        let theme = fixedTheme ?? Brand.Theme.current
+        let base = theme.accent
+        label.textColor = theme.onAccent
         let color = !isEnabled ? base.withAlphaComponent(Tokens.Opacity.disabled) : isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
         layer?.set(backgroundColor: cgColor(color), animated: false)
     }
@@ -365,6 +372,8 @@ final class FilledField: NSView {
         get { field.stringValue }
         set { field.stringValue = newValue }
     }
+    /// The focus ring's color: the system accent, or the space's color in brand moments.
+    var tint: NSColor = Tokens.Color.accent { didSet { updateColors() } }
 
     init(placeholder: String, secure: Bool = false, font: NSFont = Tokens.Font.body()) {
         if secure {
@@ -402,7 +411,7 @@ final class FilledField: NSView {
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
-            layer?.borderColor = (isEditing ? Tokens.Color.accent.withAlphaComponent(0.6) : .clear).cgColor
+            layer?.borderColor = (isEditing ? tint.withAlphaComponent(0.6) : .clear).cgColor
         }
     }
 
@@ -426,6 +435,8 @@ final class ChoicePill: InteractiveView {
     private let check = NSImageView()
     var onChange: ((Bool) -> Void)?
     var isOn = true { didSet { stateDidChange(animated: true) } }
+    /// The system accent, or the space's color in brand moments.
+    var tint: NSColor = Tokens.Color.accent { didSet { stateDidChange(animated: false) } }
 
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
@@ -459,11 +470,11 @@ final class ChoicePill: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill = isOn ? Tokens.Color.accent.withAlphaComponent(isPressed ? 0.26 : isHovered ? 0.2 : 0.14)
+        let fill = isOn ? tint.withAlphaComponent(isPressed ? 0.26 : isHovered ? 0.2 : 0.14)
             : (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.fieldFill)
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         label.textColor = isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.TypeSize.small)
-        check.contentTintColor = isOn ? Tokens.Color.accent : Tokens.Color.textTertiary
+        check.contentTintColor = isOn ? tint : Tokens.Color.textTertiary
     }
 }
