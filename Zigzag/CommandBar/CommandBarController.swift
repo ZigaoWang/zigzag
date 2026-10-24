@@ -102,6 +102,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var suppressCompletion = false
     private(set) var isVisible = false
     private var mouseAtOpen = NSPoint.zero
+    /// Searching one site: its chip sits in front of the field, and Return searches there.
+    private var scope: SiteSearch?
+    private let chip = ColorView(color: .clear)
+    private let chipLabel = Label("", font: Tokens.Font.body(.semibold), color: .white)
+    /// "Search YouTube  Tab", at the right of the field, when what you've typed names a site.
+    private let hint = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    private let hintKey = KeyHint("Tab")
+    private var hinted: SiteSearch?
 
     init(window: BrowserWindowController) {
         controller = window
@@ -113,6 +121,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         panel.addSubview(fieldIcon)
         panel.addSubview(field)
         panel.addSubview(divider)
+        chip.wantsLayer = true
+        chip.layer?.cornerRadius = 7
+        chip.layer?.cornerCurve = .continuous
+        chip.addSubview(chipLabel)
+        chip.isHidden = true
+        hint.alignment = .right
+        hint.isHidden = true
+        hintKey.isHidden = true
+        [chip, hint, hintKey].forEach { panel.addSubview($0) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         scrim.onClick = { [weak self] in self?.dismiss() }
     }
@@ -137,6 +154,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     func show(mode: Mode) {
         guard let controller else { return }
+        if !isVisible { setScope(nil) }
         self.mode = mode
         mouseAtOpen = NSEvent.mouseLocation
         let card = controller.root.cardFrame
@@ -232,8 +250,24 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let iconSize = isAnchored ? Tokens.Space.x5 : Tokens.Space.x6
         fieldIcon.frame = NSRect(x: Tokens.Space.x4, y: (fieldHeight - iconSize) / 2, width: iconSize, height: iconSize)
         let textHeight = ceil(field.intrinsicContentSize.height)
-        let fieldX = fieldIcon.frame.maxX + Tokens.Space.x2
-        field.frame = NSRect(x: fieldX, y: (fieldHeight - textHeight) / 2, width: b.width - fieldX - Tokens.Space.x4, height: textHeight)
+        var fieldX = fieldIcon.frame.maxX + Tokens.Space.x2
+        if !chip.isHidden {
+            let cw = chipLabel.textWidth + Tokens.Space.x5
+            let ch: CGFloat = 26
+            chip.frame = NSRect(x: fieldX, y: (fieldHeight - ch) / 2, width: cw, height: ch)
+            chipLabel.frame = NSRect(x: 0, y: (ch - chipLabel.lineHeight) / 2, width: cw, height: chipLabel.lineHeight)
+            chipLabel.alignment = .center
+            fieldX = chip.frame.maxX + Tokens.Space.x2
+        }
+        var fieldRight = b.width - Tokens.Space.x4
+        if !hint.isHidden {
+            let kw = hintKey.width
+            hintKey.frame = NSRect(x: fieldRight - kw, y: (fieldHeight - KeyHint.height) / 2, width: kw, height: KeyHint.height)
+            let hw = hint.textWidth + 4
+            hint.frame = NSRect(x: hintKey.frame.minX - Tokens.Space.x2 - hw, y: (fieldHeight - hint.lineHeight) / 2, width: hw, height: hint.lineHeight)
+            fieldRight = hint.frame.minX - Tokens.Space.x3
+        }
+        field.frame = NSRect(x: fieldX, y: (fieldHeight - textHeight) / 2, width: max(40, fieldRight - fieldX), height: textHeight)
         divider.frame = NSRect(x: 0, y: fieldHeight - Tokens.Metric.hairline, width: b.width, height: Tokens.Metric.hairline)
         divider.isHidden = results.isEmpty
         var y = fieldHeight + Tokens.Space.x2
@@ -251,6 +285,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         results = CommandRanker.results(for: editing ? "" : typed, manager: controller.tabManager, suggestions: suggestions,
                                         editingCurrent: mode == .editCurrent, historyOnly: mode == .history)
         if editing { results = [] }
+        if let scope {
+            // Searching one site: the query there first, then suggestions, all searching that site.
+            let q = typed.trimmingCharacters(in: .whitespaces)
+            let queries = (q.isEmpty ? [] : [q]) + suggestions.filter { $0.lowercased() != q.lowercased() }.prefix(5)
+            results = queries.compactMap { query in
+                scope.url(for: query).map { CommandResult(kind: .searchOn($0), title: query, detail: "Search \(scope.name)",
+                                                         icon: FaviconStore.shared.cachedIcon(for: scope.home), symbol: "magnifyingglass") }
+            }
+        }
         // An inline completion becomes the first result.
         if let completionURL, !typed.isEmpty {
             var top = CommandResult(kind: .open(completionURL), title: CommandRanker.displayURL(completionURL), detail: "",
@@ -304,6 +347,39 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         for (i, row) in rows.enumerated() { row.isSelected = i == selectedIndex }
     }
 
+    // MARK: Searching one site
+
+    private func refreshHint() {
+        hinted = scope == nil && mode != .history ? SiteSearch.match(typed) : nil
+        hint.stringValue = hinted.map { "Search \($0.name)" } ?? ""
+        hint.isHidden = hinted == nil
+        hintKey.isHidden = hinted == nil
+        panel.needsLayout = true
+    }
+
+    #if DEBUG
+    func debugTab() { if scope == nil, let site = hinted { setScope(site) } }
+    #endif
+
+    private func setScope(_ site: SiteSearch?) {
+        scope = site
+        chip.isHidden = site == nil
+        chip.color = site?.color ?? .clear
+        chipLabel.stringValue = site?.name ?? ""
+        completionURL = nil
+        if site != nil {
+            field.stringValue = ""
+            typed = ""
+            suggestions = []
+        }
+        let font = field.font ?? Tokens.Font.large()
+        field.placeholderAttributedString = NSAttributedString(string: site.map { "Search \($0.name)" } ?? (mode == .history ? "Search history" : "Search or enter address"),
+                                                               attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
+        if let site { FaviconStore.shared.prefetch(for: site.home) }
+        refreshHint()
+        refreshResults(animated: true)
+    }
+
     // MARK: Typing
 
     func controlTextDidChange(_ obj: Notification) {
@@ -312,7 +388,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         typed = text
         completionURL = nil
         // Inline completion: only when typing forward at the end, never after deleting.
-        if !suppressCompletion, editor.selectedRange.location == (text as NSString).length,
+        if scope == nil, !suppressCompletion, editor.selectedRange.location == (text as NSString).length,
            let controller, mode != .history,
            let (completion, url) = CommandRanker.inlineCompletion(for: text, manager: controller.tabManager),
            completion.lowercased().hasPrefix(text.lowercased()), completion.count > text.count {
@@ -320,12 +396,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             field.stringValue = text + suffix
             editor.selectedRange = NSRange(location: (text as NSString).length, length: (suffix as NSString).length)
             completionURL = url
-        } else if !suppressCompletion, let controller, mode != .history,
+        } else if scope == nil, !suppressCompletion, let controller, mode != .history,
                   let (completion, url) = CommandRanker.inlineCompletion(for: text, manager: controller.tabManager),
                   completion.lowercased() == text.lowercased() {
             completionURL = url
         }
         suppressCompletion = false
+        refreshHint()
         refreshResults(animated: true)
         fetcher.fetch(text) { [weak self] list in
             guard let self, self.isVisible, self.typed == text else { return }
@@ -344,6 +421,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             select(max(selectedIndex - 1, 0)); return true
         case #selector(NSResponder.insertNewline(_:)):
             commit(modifiers: NSApp.currentEvent?.modifierFlags ?? []); return true
+        case #selector(NSResponder.cancelOperation(_:)) where scope != nil:
+            setScope(nil)
+            return true
         case #selector(NSResponder.cancelOperation(_:)):
             if completionURL != nil, field.stringValue != typed {
                 field.stringValue = typed
@@ -354,13 +434,18 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
             return true
         case #selector(NSResponder.insertTab(_:)):
-            // Tab accepts the inline completion.
-            if completionURL != nil {
+            // Tab on a site's name searches that site; otherwise it accepts the inline completion.
+            if scope == nil, let site = hinted {
+                setScope(site)
+            } else if completionURL != nil {
                 textView.selectedRange = NSRange(location: (field.stringValue as NSString).length, length: 0)
                 typed = field.stringValue
             } else {
                 select(min(selectedIndex + 1, results.count - 1))
             }
+            return true
+        case #selector(NSResponder.deleteBackward(_:)) where scope != nil && field.stringValue.isEmpty:
+            setScope(nil)
             return true
         case #selector(NSResponder.deleteBackward(_:)):
             // Deleting removes the completion first, without re-completing.
@@ -408,6 +493,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             open(url)
         case .search(let query), .suggestion(let query):
             open(Library.shared.searchEngine.searchURL(query), search: true)
+        case .searchOn(let url):
+            open(url, search: true)
         case .switchTo(let id):
             if let tab = manager.tab(with: id) { manager.select(tab) }
         case .bookmark(let id):

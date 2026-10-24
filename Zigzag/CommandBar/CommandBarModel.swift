@@ -5,6 +5,8 @@ struct CommandResult: Equatable {
     enum Kind: Equatable {
         case open(URL)
         case search(String)
+        /// A search on one site, from the address bar's site search.
+        case searchOn(URL)
         case switchTo(UUID)
         case bookmark(UUID)
         case history(URL)
@@ -22,7 +24,7 @@ struct CommandResult: Equatable {
     var actionLabel: String {
         switch kind {
         case .open, .history: "Open"
-        case .search, .suggestion: "Search"
+        case .search, .suggestion, .searchOn: "Search"
         case .switchTo: "Switch to Tab"
         case .bookmark: "Open Bookmark"
         case .action: "Run"
