@@ -276,6 +276,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let spacesGroup = FormGroup()
     private let importGroup = FormGroup()
     private let blockingSwitch = NSSwitch()
+    private let pipSwitch = NSSwitch()
     private let extensionsGroup = FormGroup()
     private let getExtensionsButton = NSButton(title: "Get Extensions…", target: nil, action: nil)
     private let loadUnpackedButton = NSButton(title: "Load Unpacked…", target: nil, action: nil)
@@ -340,6 +341,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         blockingSwitch.action = #selector(blockingChanged)
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
         generalGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingSwitch))
+        pipSwitch.controlSize = .small
+        pipSwitch.target = self
+        pipSwitch.action = #selector(pipChanged)
+        generalGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipSwitch))
 
         addSpaceButton.target = self
         addSpaceButton.action = #selector(addSpace)
@@ -542,6 +547,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         defaultStatus.stringValue = "Zigzag opens your links"
         defaultStatus.isHidden = !isDefault
         blockingSwitch.state = ContentBlocker.isEnabled ? .on : .off
+        pipSwitch.state = PictureInPicture.followsTabs ? .on : .off
         defaultButton.isHidden = isDefault
         generalGroup.rows.forEach { $0.needsLayout = true }
     }
@@ -618,6 +624,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func importArc() { ArcImporter.runInteractive() }
 
     @objc private func blockingChanged() { ContentBlocker.isEnabled = blockingSwitch.state == .on }
+
+    @objc private func pipChanged() { PictureInPicture.followsTabs = pipSwitch.state == .on }
 
     @objc private func getExtensions() {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
