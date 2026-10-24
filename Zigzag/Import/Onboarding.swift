@@ -24,6 +24,7 @@ final class OnboardingView: NSView {
         surface.layer?.borderWidth = 0
         surface.showsWatermark = false
         addSubview(surface)
+        SitesPicker.preload()
         show(Self.resumeOnBring ? .bring : .hello, animated: false)
         Self.resumeOnBring = false
     }
@@ -925,6 +926,29 @@ private struct Suggestion {
 
 /// Icons, sharp at tile size: the Mac app's own icon if it's installed, else the site's large icon, fetched by
 /// domain from one icon service (nothing about you is sent). A globe shows until each arrives.
+@MainActor private var iconCache: [URL: NSImage] = [:]
+@MainActor private var iconWaiters: [URL: [(NSImage) -> Void]] = [:]
+
+/// Fetches an icon once, sharing it with everyone who asked; started early so it's there when the step opens.
+@MainActor private func fetchIcon(_ source: URL, then: ((NSImage) -> Void)? = nil) {
+    if let image = iconCache[source] { then?(image); return }
+    let first = iconWaiters[source] == nil
+    iconWaiters[source, default: []].append(then ?? { _ in })
+    guard first else { return }
+    Task { @MainActor in
+        guard let (data, _) = try? await URLSession.shared.data(from: source), let image = NSImage(data: data), image.isValid else {
+            iconWaiters[source] = nil
+            return
+        }
+        iconCache[source] = image
+        iconWaiters.removeValue(forKey: source)?.forEach { $0(image) }
+    }
+}
+
+private func iconSource(site: URL, explicit: URL?) -> URL? {
+    explicit ?? site.host().flatMap { URL(string: "https://www.google.com/s2/favicons?domain=\($0)&sz=128") }
+}
+
 private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: URL? = nil) {
     if let app {
         tile.icon.image = NSWorkspace.shared.icon(forFile: app.path)
@@ -933,13 +957,10 @@ private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: UR
     }
     tile.icon.image = Tokens.Symbol.image("globe", size: 22)
     tile.icon.contentTintColor = Onboard.dim(0.7)
-    guard let host = site.host(),
-          let source = explicit ?? URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=128") else { return }
-    Task { @MainActor [weak tile] in
-        guard let (data, _) = try? await URLSession.shared.data(from: source), let image = NSImage(data: data), image.isValid,
-              let tile else { return }
-        tile.icon.image = image
-        tile.icon.contentTintColor = nil
+    guard let source = iconSource(site: site, explicit: explicit) else { return }
+    fetchIcon(source) { [weak tile] image in
+        tile?.icon.image = image
+        tile?.icon.contentTintColor = nil
     }
 }
 
@@ -948,13 +969,15 @@ private func loadIcons(_ pairs: [(PickTile, URL)]) { for (tile, url) in pairs { 
 // MARK: - Everyday sites
 
 /// The sites people open every day, as tiles: the ones you pick become favorites at the top of the sidebar.
-private final class SitesPicker: StepContent {
+final class SitesPicker: StepContent {
     private static let all: [Suggestion] = [
-        Suggestion(name: "Gmail", url: URL(string: "https://mail.google.com")!, app: nil),
+        Suggestion(name: "Gmail", url: URL(string: "https://mail.google.com")!, app: nil,
+                   icon: URL(string: "https://www.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png")),
         Suggestion(name: "Calendar", url: URL(string: "https://calendar.google.com")!, app: nil,
                    icon: URL(string: "https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png")),
         Suggestion(name: "YouTube", url: URL(string: "https://www.youtube.com")!, app: nil),
-        Suggestion(name: "Drive", url: URL(string: "https://drive.google.com")!, app: "com.google.drivefs"),
+        Suggestion(name: "Drive", url: URL(string: "https://drive.google.com")!, app: "com.google.drivefs",
+                   icon: URL(string: "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png")),
         Suggestion(name: "Notion", url: URL(string: "https://www.notion.so")!, app: "notion.id"),
         Suggestion(name: "ChatGPT", url: URL(string: "https://chatgpt.com")!, app: "com.openai.chat"),
         Suggestion(name: "Spotify", url: URL(string: "https://open.spotify.com")!, app: "com.spotify.client"),
@@ -964,6 +987,11 @@ private final class SitesPicker: StepContent {
         Suggestion(name: "WhatsApp", url: URL(string: "https://web.whatsapp.com")!, app: "net.whatsapp.WhatsApp"),
         Suggestion(name: "Discord", url: URL(string: "https://discord.com/app")!, app: "com.hnc.Discord"),
     ]
+    /// Starts the icons while you're still on the first screens.
+    static func preload() {
+        for site in sites where site.appURL == nil { if let source = iconSource(site: site.url, explicit: site.icon) { fetchIcon(source) } }
+    }
+
     /// Nine: the ones whose apps are on this Mac first, since those are the ones you use.
     private static var sites: [Suggestion] {
         let (have, rest) = (all.filter { $0.appURL != nil }, all.filter { $0.appURL == nil })
