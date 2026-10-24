@@ -376,6 +376,7 @@ extension CommandBarController {
     func runAction(_ id: String) {
         switch id {
         case "import": ImportWindowController.show()
+        case "passwords": PasswordsWindowController.show()
         default: break
         }
     }
