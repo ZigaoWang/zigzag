@@ -241,6 +241,7 @@ final class SidebarView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     @objc private func listScrolled() {
+        list.pinHeader()
         let scrolled = scrollView.contentView.bounds.minY > 1
         if (topSeparator.alphaValue > 0) != scrolled {
             Tokens.Motion.animate(Tokens.Motion.feedback) { self.topSeparator.animator().alphaValue = scrolled ? 1 : 0 }

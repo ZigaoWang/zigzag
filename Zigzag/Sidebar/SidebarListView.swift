@@ -186,6 +186,7 @@ final class SidebarListView: NSView {
             Tokens.Motion.animate { changes.forEach { $0() } }
         }
         updateDocumentHeight()
+        pinHeader()
     }
 
     private func updateDocumentHeight() {
@@ -318,6 +319,20 @@ final class SidebarListView: NSView {
     }
 
     var headerView: NSView? { rows[.header] }
+
+    /// The space's name stays at the top while the list scrolls, so you can always fold its bookmarks. It gets the
+    /// sidebar's own color behind it once rows pass under it.
+    func pinHeader() {
+        guard let header = rows[.header] as? SpaceHeaderView, header !== drag?.view else { return }
+        let top = max(0, visibleRect.minY)
+        let stuck = top > 0.5
+        Tokens.Motion.withoutAnimation {
+            header.frame.origin.y = top
+            header.layer?.zPosition = 10
+            let tint = (window?.windowController as? BrowserWindowController)?.root.sidebarContainer.tint
+            header.layer?.backgroundColor = stuck ? tint.map { cgColor($0) } : nil
+        }
+    }
 
     // MARK: Folding bookmarks
 
