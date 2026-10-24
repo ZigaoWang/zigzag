@@ -78,10 +78,13 @@ final class WindowManager {
                 controller.showWindow(nil)
                 // Straight after onboarding: Getting started open in a pinned tab, then a short tour of the window.
                 FirstRun.prepare(controller)
-                guard !WindowTour.hasRun else { return }
+                guard !WindowTour.hasRun else { TutorialCoach.show(in: controller); return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak controller] in
                     guard let controller else { return }
-                    WindowTour.start(in: controller) {}
+                    // The tour shows where things are; then the guide walks through using them.
+                    WindowTour.start(in: controller) { [weak controller] in
+                        if let controller { TutorialCoach.show(in: controller) }
+                    }
                 }
             }
             return controller

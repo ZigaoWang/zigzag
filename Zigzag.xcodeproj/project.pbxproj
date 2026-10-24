@@ -10,6 +10,7 @@
 		0100CD43A4B713911A1FC04E /* BrowserWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6A928496FC897893B22DF7 /* BrowserWebView.swift */; };
 		0104054FA97C0D01FC9A422C /* ExtensionHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */; };
 		01AF8CAE8DC01BC74B382DCA /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */; };
+		04D96CAC6093EE2D4955EC94 /* TutorialCoach.swift in Sources */ = {isa = PBXBuildFile; fileRef = 984EFE4D2017B1D4B750E6E5 /* TutorialCoach.swift */; };
 		07B8E8D78400474F39A969F4 /* Readability-readerable.js in Resources */ = {isa = PBXBuildFile; fileRef = 5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */; };
 		087468A86D6129B66892F5D9 /* Autofill.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB39442D06F521CAE1203D0 /* Autofill.swift */; };
 		089B04904C4690F9A9C519AC /* WelcomeWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12B055E9A9D600A2CAA8EAA /* WelcomeWindow.swift */; };
@@ -181,6 +182,7 @@
 		959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordGenerator.swift; sourceTree = "<group>"; };
 		95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUndo.swift; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
+		984EFE4D2017B1D4B750E6E5 /* TutorialCoach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialCoach.swift; sourceTree = "<group>"; };
 		9875E3DF61E5A98363065101 /* PasswordCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordCapture.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackage.swift; sourceTree = "<group>"; };
@@ -509,6 +511,7 @@
 				0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */,
 				95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */,
 				9B14798B8A091AAE19C57100 /* SitePanel.swift */,
+				984EFE4D2017B1D4B750E6E5 /* TutorialCoach.swift */,
 				47C2AEB8C330E43554D56661 /* WindowTour.swift */,
 			);
 			path = Window;
@@ -721,6 +724,7 @@
 				36BC4DAF8C508734F781BA47 /* TabPreview.swift in Sources */,
 				C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */,
 				66E5020894B420AEB3943EAC /* Tokens.swift in Sources */,
+				04D96CAC6093EE2D4955EC94 /* TutorialCoach.swift in Sources */,
 				DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */,
 				82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */,
 				F972A38781338935BAF22135 /* WebsiteData.swift in Sources */,

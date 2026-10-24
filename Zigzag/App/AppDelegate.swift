@@ -18,6 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
+        // Getting started picks up where you left off, if you'd begun and haven't hidden it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            guard WindowTour.hasRun, !Tutorial.done.isEmpty,
+                  let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            TutorialCoach.show(in: controller)
+        }
         _ = Library.shared
         _ = HistoryStore.shared
         ContentBlocker.prepare()
