@@ -285,19 +285,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard spaces.indices.contains(index) else { return }
         tabManager.switchToSpace(spaces[index].id)
     }
-    /// Help › Getting Started: the page, and the guide in the corner, from wherever you left off.
+    /// Help › Getting Started: the guide, from the first step.
     @objc func showGettingStarted(_ sender: Any?) {
-        Tutorial.isHidden = false
-        if let pinned = Library.shared.spaces.first(where: { $0.id == tabManager.currentSpaceID })?.bookmarks.first(where: { Tutorial.isWelcome($0.url) }) {
-            tabManager.openBookmark(pinned)
-        } else if let open = tabManager.allTabs.first(where: { Tutorial.isWelcome($0.url) }) {
-            tabManager.select(open)
-        } else {
-            tabManager.newTab(url: Tutorial.url)
-        }
-        // Finished already: start over, so there's something to show.
-        if Tutorial.current == nil { Tutorial.done = [] }
-        TutorialCoach.show(in: self)
+        Tutorial.restart()
+        GuidedTour.start(in: self)
     }
 
     @objc func newSpace(_ sender: Any?) {
