@@ -64,7 +64,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
-        sidebar.address.onRightClick = { [weak self] _ in self?.siteMenu() }
+        sidebar.address.onRightClick = { [weak self] _ in
+            if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
+            return nil
+        }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
@@ -309,62 +312,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func siteMenu() -> NSMenu? {
-        guard let tab = tabManager.selectedTab, let url = tab.url, let site = ContentBlocker.site(of: url),
-              url.scheme == "http" || url.scheme == "https" else { return nil }
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        let heading = NSMenuItem(title: site, action: nil, keyEquivalent: "")
-        heading.isEnabled = false
-        menu.addItem(heading)
-        if ContentBlocker.isEnabled {
-            let allowed = ContentBlocker.isAllowed(on: url)
-            let item = SidebarMenus.Item(allowed ? "Block Ads on This Site" : "Allow Ads on This Site", symbol: allowed ? "hand.raised" : "hand.raised.slash") {
-                ContentBlocker.setAllowed(!allowed, on: url)
-                tab.reload()
-            }
-            menu.addItem(item)
-        } else {
-            menu.addItem(SidebarMenus.Item("Ad Blocking Is Off…", symbol: "hand.raised.slash") { SettingsWindowController.shared.show() })
-        }
-        if tab.isTranslated {
-            menu.addItem(SidebarMenus.Item("Show Original", symbol: "translate") { [weak self] in self?.translatePage() })
-        } else if tab.foreignLanguage != nil {
-            menu.addItem(SidebarMenus.Item("Translate to \(PageTranslator.name(of: PageTranslator.readerLanguage))", symbol: "translate") { [weak self] in self?.translatePage() })
-        }
-        if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
-            let off = ExtensionStore.extensionsOffSites.contains(site)
-            let item = SidebarMenus.Item("Turn Off Extensions on This Site", symbol: "puzzlepiece.extension") {
-                var sites = ExtensionStore.extensionsOffSites
-                if off { sites.remove(site) } else { sites.insert(site) }
-                ExtensionStore.extensionsOffSites = sites
-                tab.reload()
-            }
-            item.state = off ? .on : .off
-            menu.addItem(item)
-        }
-        menu.addItem(.separator())
-        if !tab.isPrivate {
-            menu.addItem(SidebarMenus.Item("Clear Cache for This Site", symbol: "arrow.clockwise") { [weak self] in
-                Task { @MainActor in
-                    await WebsiteData.clear(.cache, site: site)
-                    tab.reload()
-                    if let self { Toast.show("Cache cleared for \(site)", symbol: "arrow.clockwise", duration: 1.6, in: self) }
-                }
-            })
-            menu.addItem(SidebarMenus.Item("Clear Cookies for This Site", symbol: "trash") { [weak self] in
-                Task { @MainActor in
-                    await WebsiteData.clear(.cookies, site: site)
-                    tab.reload()
-                    if let self { Toast.show("Cookies cleared for \(site). You’re signed out there.", symbol: "trash", duration: 2.4, in: self) }
-                }
-            })
-            menu.addItem(.separator())
-        }
-        menu.addItem(SidebarMenus.Item("Copy Link", symbol: "link") { [weak self] in self?.copyLink(url) })
-        return menu
-    }
-
     private var offeredExtensionID: String?
 
     /// On an extension's Chrome Web Store page, offers to add it to Zigzag (the store's own button only works in Chrome).
@@ -500,47 +447,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.setNowPlaying(tab, paused: tab?.isPlaybackPaused ?? false)
     }
 
-    /// Pinned extensions show as buttons by the address (two at most, so the address stays readable);
-    /// the rest wait behind one button.
+    /// One button by the address, for everything about this page: quick actions, extensions, the site's own
+    /// settings, and clearing its data. It shows a dot when an extension needs attention.
     func refreshExtensionActions() {
-        guard #available(macOS 15.4, *) else { return }
         let tab = tabManager.selectedTab
-        let all = ExtensionHost.shared.actions(for: tab)
-        // Like Arc: extensions live behind one button, so the address area stays calm. It shows a dot when one
-        // of them needs attention.
-        guard !all.isEmpty else { sidebar.address.setActions([]); return }
-        sidebar.address.setActions([AddressView.ActionButton(label: "Extensions", needsAttention: all.contains { $0.attention != nil },
-            action: { [weak self] anchor in self?.showExtensionsMenu(all, tab: tab, anchor: anchor) },
-            menu: { [weak self] in self?.extensionsFooterMenu() })])
+        guard let url = tab?.url, ["http", "https"].contains(url.scheme ?? "") || url.scheme == "webkit-extension" else {
+            sidebar.address.setActions([])
+            return
+        }
+        var attention = false
+        if #available(macOS 15.4, *) { attention = ExtensionHost.shared.actions(for: tab).contains { $0.attention != nil } }
+        sidebar.address.setActions([AddressView.ActionButton(symbol: "slider.horizontal.3", label: "Site Controls", needsAttention: attention,
+            action: { [weak self] anchor in if let self { SitePanel.toggle(in: self, from: self.sidebar.address) } },
+            menu: { [weak self] in
+                if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
+                return nil
+            })])
     }
 
-    @available(macOS 15.4, *)
-    private func showExtensionsMenu(_ all: [ExtensionHost.ActionItem], tab: Tab?, anchor: NSView) {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        for item in all {
-            let title = item.attention != nil ? "\(item.label)  ·  needs attention" : item.badge.isEmpty ? item.label : "\(item.label)  ·  \(item.badge)"
-            let entry = SidebarMenus.Item(title) { ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor) }
-            entry.image = item.icon
-            menu.addItem(entry)
-        }
-        menu.addItem(.separator())
-        // Each extension's own options, one level in, so a click above always just opens the extension.
-        let manage = NSMenuItem(title: "Manage", action: nil, keyEquivalent: "")
-        manage.image = Tokens.Symbol.image("slider.horizontal.3")
-        let manageMenu = NSMenu()
-        manageMenu.autoenablesItems = false
-        for item in all {
-            let entry = NSMenuItem(title: item.label, action: nil, keyEquivalent: "")
-            entry.image = item.icon
-            entry.submenu = extensionMenu(for: item.context, footer: false)
-            manageMenu.addItem(entry)
-        }
-        manage.submenu = manageMenu
-        menu.addItem(manage)
-        extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.maxY + Tokens.Space.x1), in: anchor)
-    }
+    var isShowingReader: Bool { reader != nil }
 
     private func extensionsFooterMenu() -> NSMenu {
         let menu = NSMenu()
@@ -553,7 +478,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @available(macOS 15.4, *)
-    private func extensionMenu(for context: WKWebExtensionContext, footer: Bool = true) -> NSMenu {
+    func extensionMenu(for context: WKWebExtensionContext, footer: Bool = true) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let id = context.uniqueIdentifier
@@ -581,6 +506,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.card.setLoading(tab.isLoading, progress: tab.progress)
         case .url, .navigation, .loading:
             root.card.setLoading(tab.isLoading, progress: tab.progress)
+            if change == .url { refreshExtensionActions() }
             sidebar.update(tab: tab)
             updateWindowTitle()
             offerWebStoreExtension()
