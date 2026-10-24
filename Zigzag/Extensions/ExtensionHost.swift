@@ -130,13 +130,24 @@ final class ExtensionHost: NSObject {
         let context: WKWebExtensionContext
         let icon: NSImage?
         let label: String
+        /// Short text the extension shows on its button (a count, "ON").
+        let badge: String
+        /// Set when the extension can't work until the person does something.
+        let attention: Attention?
+        var id: String { context.uniqueIdentifier }
     }
 
     func actions(for tab: Tab?) -> [ActionItem] {
         contexts.compactMap { context in
             guard let action = context.action(for: tab) else { return nil }
-            return ActionItem(context: context, icon: action.icon(for: NSSize(width: 16, height: 16)), label: action.label)
+            return ActionItem(context: context, icon: action.icon(for: NSSize(width: 16, height: 16)), label: action.label,
+                              badge: action.badgeText, attention: attention[context.uniqueIdentifier])
         }
+    }
+
+    /// Extension items for a page's right-click menu.
+    func menuItems(for tab: Tab) -> [NSMenuItem] {
+        contexts.flatMap { $0.menuItems(for: tab) }
     }
 
     private weak var actionAnchor: NSView?
@@ -144,24 +155,52 @@ final class ExtensionHost: NSObject {
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
         actionAnchor = anchor
-        if item.context.uniqueIdentifier == ExtensionStore.onePasswordID, onePasswordNeedsApproval,
-           let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
-            OnePasswordHint.show(below: anchor, in: controller)
+        if let attention = item.attention, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
+            AttentionHint.show(attention, below: anchor, in: controller)
             return
         }
         item.context.performAction(for: tab)
     }
 
-    /// Set when the 1Password app has not (yet) been told to trust Zigzag.
-    private(set) var onePasswordNeedsApproval = false
+    // MARK: Needing attention
 
-    fileprivate func nativeHostReplied(_ message: Any) {
-        guard let dict = message as? [String: Any], let content = dict["content"] as? [String: Any],
-              let inner = content["content"] as? [String: Any], let type = inner["type"] as? String else {
-            onePasswordNeedsApproval = false
-            return
-        }
-        onePasswordNeedsApproval = type == "BrowserVerificationFailed"
+    /// Something only the person can fix, shown as a "!" on the extension's button.
+    struct Attention: Equatable {
+        let title: String
+        let message: String
+        let buttonTitle: String
+        /// The app to open to fix it.
+        let appBundleID: String?
+    }
+
+    private(set) var attention: [String: Attention] = [:]
+
+    fileprivate func setAttention(_ value: Attention?, for id: String) {
+        guard attention[id] != value else { return }
+        attention[id] = value
+        changed.send()
+    }
+
+    /// Native-messaging replies are read for one thing: an app saying it doesn't trust this browser yet.
+    /// 1Password says so in its first message; other apps would need their own reading here.
+    fileprivate func nativeHostReplied(_ message: Any, for id: String) {
+        guard id == ExtensionStore.onePasswordID else { return }
+        let dict = message as? [String: Any]
+        let inner = (dict?["content"] as? [String: Any])?["content"] as? [String: Any]
+        guard let type = inner?["type"] as? String else { return }
+        setAttention(type == "BrowserVerificationFailed" ? Attention(
+            title: "Let 1Password fill in Zigzag",
+            message: "1Password only connects to browsers it trusts. In 1Password, open Settings › Browser and add Zigzag. You only do this once.",
+            buttonTitle: "Open 1Password", appBundleID: "com.1password.1password") : nil, for: id)
+    }
+
+    /// An extension asked for its companion app, and that app isn't on this Mac.
+    fileprivate func companionAppMissing(for context: WKWebExtensionContext) {
+        let name = context.webExtension.displayName ?? "This extension"
+        setAttention(Attention(
+            title: "\(name) needs its app",
+            message: "\(name) works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag.",
+            buttonTitle: "OK", appBundleID: nil), for: context.uniqueIdentifier)
     }
 
     // MARK: Event fan-out from our model
@@ -263,6 +302,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
         guard let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext) else {
+            companionAppMissing(for: extensionContext)
             replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
         }
@@ -272,6 +312,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, connectUsing port: WKWebExtension.MessagePort,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         guard let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext) else {
+            companionAppMissing(for: extensionContext)
             completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
         }
@@ -371,6 +412,7 @@ extension BrowserWindowController: WKWebExtensionWindow {
 final class NativeMessagingHost {
     private let executable: URL
     private let origin: String
+    private let extensionID: String
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
@@ -382,6 +424,7 @@ final class NativeMessagingHost {
         // Hosts only talk to the extension IDs they list; we present the extension's Chrome ID.
         let allowed = (manifest["allowed_origins"] as? [String]) ?? []
         let id = context.uniqueIdentifier
+        extensionID = id
         origin = allowed.first { $0.contains(id) } ?? "chrome-extension://\(id)/"
     }
 
@@ -463,8 +506,9 @@ final class NativeMessagingHost {
     }
 
     func connect(_ port: WKWebExtension.MessagePort, onClose: @escaping () -> Void) {
+        let id = extensionID
         let started = start(onMessage: { message in
-            ExtensionHost.shared.nativeHostReplied(message)
+            ExtensionHost.shared.nativeHostReplied(message, for: id)
             port.sendMessage(message, completionHandler: nil)
         }, onExit: {
             port.disconnect()
@@ -494,22 +538,22 @@ func debugLog(_ message: String) {
     #endif
 }
 
-/// Explains the one step only the person can do: telling 1Password to trust Zigzag.
+/// Explains the one step only the person can do, like telling 1Password to trust Zigzag.
 @available(macOS 15.4, *)
-enum OnePasswordHint {
+enum AttentionHint {
     private static weak var current: FloatingPanelView?
 
-    static func show(below anchor: NSView, in controller: BrowserWindowController) {
+    static func show(_ attention: ExtensionHost.Attention, below anchor: NSView, in controller: BrowserWindowController) {
         current?.dismiss()
         let panel = FloatingPanelView()
-        let title = Label("Let 1Password fill in Zigzag", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-        let body = NSTextField(wrappingLabelWithString: "1Password only connects to browsers it trusts. In 1Password, open Settings › Browser and add Zigzag. You only do this once.")
+        let title = Label(attention.title, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+        let body = NSTextField(wrappingLabelWithString: attention.message)
         body.font = Tokens.Font.body()
         body.textColor = Tokens.Color.textSecondary
         body.isSelectable = false
-        let open = TextButton(title: "Open 1Password", font: Tokens.Font.body(.medium))
+        let open = TextButton(title: attention.buttonTitle, font: Tokens.Font.body(.medium))
         open.onClick = { _ in
-            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
+            if let bundleID = attention.appBundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 NSWorkspace.shared.openApplication(at: app, configuration: .init())
             }
             panel.dismiss()
