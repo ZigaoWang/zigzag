@@ -233,7 +233,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func showSelectedTab() {
         previews.hide()
         let tab = tabManager.selectedTab
-        if tab != nil { dismissWelcome() }
         if tab !== shownTab {
             closeReader()
             floatVideoOnSwitch(from: shownTab, to: tab)
@@ -805,28 +804,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func showPeek(url: URL?, configuration: WKWebViewConfiguration?) -> WKWebView? {
         commandBar.dismiss(restoringFocus: false)
         return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab)
-    }
-
-    private var welcome: ImportView?
-
-    /// First launch: offer to bring everything over from the browsers on this Mac, inside the empty page.
-    func showWelcome() {
-        let view = ImportView(presentation: .welcome)
-        view.frame = root.card.bounds
-        view.autoresizingMask = [.width, .height]
-        root.card.addSubview(view)
-        welcome = view
-        view.onClose = { [weak self] in
-            UserDefaults.standard.set(true, forKey: "ImportOfferDismissed")
-            self?.dismissWelcome()
-            self?.commandBar.show(mode: .newTab)
-        }
-    }
-
-    private func dismissWelcome() {
-        guard let welcome else { return }
-        self.welcome = nil
-        Tokens.Motion.animate(Tokens.Motion.feedback, { welcome.animator().alphaValue = 0 }, completion: { welcome.removeFromSuperview() })
     }
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
