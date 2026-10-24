@@ -4,6 +4,7 @@ protocol SidebarListDelegate: AnyObject {
     var tabManager: TabManager { get }
     func listSelect(_ tab: Tab)
     func listOpenBookmark(_ bookmark: Bookmark)
+    func listRenameBookmark(_ id: UUID, to name: String)
     func listClose(_ tab: Tab)
     func listNewTab()
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
@@ -111,9 +112,11 @@ final class SidebarListView: NSView {
         let spaceID = spaceOverride ?? manager.currentSpaceID
         let bookmarks = Library.shared.bookmarks(in: spaceID)
         let collapsed = Self.isCollapsed(spaceID) && !includeEmptyBookmarkSection
-        if !collapsed { result += bookmarks.map { .bookmark($0.id) } }
+        // Collapsed, the section still shows the pinned page you're on, so where you are never disappears.
+        let shown = collapsed ? bookmarks.filter { $0.id == manager.selectedTab?.bookmarkID } : bookmarks
+        result += shown.map { .bookmark($0.id) }
         if bookmarks.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
-        if (!bookmarks.isEmpty && !collapsed) || includeEmptyBookmarkSection { result.append(.separator) }
+        if !shown.isEmpty || includeEmptyBookmarkSection { result.append(.separator) }
         result.append(.newTab)
         // The right half of a split rides in its left half's row.
         let rightHalves = Set(manager.splits.map(\.right))
@@ -234,6 +237,8 @@ final class SidebarListView: NSView {
             row.onMiddleClick = { [weak self, weak row] in
                 if let tab = row?.tab { self?.delegate?.listClose(tab) }
             }
+            row.onDoubleClick = { [weak row] in row?.beginRename() }
+            row.onRename = { [weak row] name in row?.tab?.customTitle = name.isEmpty ? nil : name }
             row.onClose = { [weak self, weak row] in
                 if let tab = row?.tab { self?.delegate?.listClose(tab) }
             }
@@ -247,6 +252,11 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             let row = TabRowView()
             row.isBookmark = true
+            row.onDoubleClick = { [weak row] in row?.beginRename() }
+            row.onRename = { [weak self] name in
+                guard !name.isEmpty else { return }
+                self?.delegate?.listRenameBookmark(id, to: name)
+            }
             row.onClick = { [weak self] _ in
                 guard let self, let bookmark = Library.shared.bookmark(id) else { return }
                 self.delegate?.listOpenBookmark(bookmark)
@@ -290,7 +300,10 @@ final class SidebarListView: NSView {
             let tab = manager.bookmarkTab(for: id)
             row.bookmarkIcon = FaviconStore.shared.cachedIcon(for: bookmark.url)
             if row.bookmarkIcon == nil { FaviconStore.shared.prefetch(for: bookmark.url) }
-            row.fixedTitle = bookmark.title
+            // Moved on from its pinned page: the row shows where it is now, and its button goes back.
+            let away = manager.isAway(id)
+            row.isAway = away
+            row.fixedTitle = away ? nil : bookmark.title
             row.isUnloaded = tab == nil
             row.configure(tab: tab)
             row.isSelected = tab != nil && tab === selected

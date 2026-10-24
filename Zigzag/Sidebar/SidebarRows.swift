@@ -82,7 +82,7 @@ class SidebarRowView: InteractiveView {
 }
 
 /// A tab (or a bookmark's live page).
-final class TabRowView: SidebarRowView {
+final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
     let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x5, symbolSize: Tokens.TypeSize.small, toolTip: "Close Tab")
@@ -91,6 +91,43 @@ final class TabRowView: SidebarRowView {
     /// Bookmarks keep their own title; only the icon and state follow the page.
     var fixedTitle: String? { didSet { refresh() } }
     var isBookmark = false
+    /// Called with the new name when a rename is committed (empty: go back to the page's own title).
+    var onRename: ((String) -> Void)?
+    private var renameField: PlainTextField?
+
+    /// Double-click: the title becomes a field, the whole name selected. Return keeps it, Escape doesn't.
+    func beginRename() {
+        guard renameField == nil, let window else { return }
+        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: "Name")
+        field.stringValue = title.stringValue
+        field.frame = title.frame.insetBy(dx: 0, dy: -2)
+        field.delegate = self
+        field.onCancel = { [weak self] in self?.endRename(commit: false) }
+        title.isHidden = true
+        addSubview(field)
+        renameField = field
+        window.makeFirstResponder(field)
+        field.currentEditor()?.selectAll(nil)
+    }
+
+    private func endRename(commit: Bool) {
+        guard let field = renameField else { return }
+        renameField = nil
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        field.removeFromSuperview()
+        title.isHidden = false
+        if commit { onRename?(name) }
+        window?.makeFirstResponder(window?.contentView)
+    }
+
+    /// A pinned tab showing a different page from its pinned one: the close button takes it back instead.
+    var isAway = false {
+        didSet {
+            guard oldValue != isAway else { return }
+            closeButton.symbol = isAway ? "arrow.uturn.backward" : "xmark"
+            refreshAccessories()
+        }
+    }
     var isUnloaded = false { didSet { refreshTitleColor() } }
     /// The other half of a split: shown in the same row, to the right.
     private(set) var partner: Tab?
@@ -216,9 +253,16 @@ final class TabRowView: SidebarRowView {
     private func refreshAccessories() {
         let showClose = (isHovered || isSelected) && !isLifted && (!isBookmark || !isUnloaded)
         closeButton.isHidden = !showClose
-        closeButton.toolTip = isBookmark ? "Unload Page" : "Close Tab"
+        closeButton.toolTip = isAway ? "Back to Pinned Page" : isBookmark ? "Unload Page" : "Close Tab"
         audioButton.isHidden = !showsAudio
         needsLayout = true
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.cancelOperation(_:)) { endRename(commit: false); return true }
+        return false
     }
 
     override func stateDidChange(animated: Bool) {

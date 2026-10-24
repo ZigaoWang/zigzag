@@ -249,7 +249,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         showPages()
         sidebar.update(tab: tab)
-        sidebar.list.refreshRows()
+        // A collapsed pinned section shows the pinned page you're on, so it changes with the selection.
+        if SidebarListView.isCollapsed(tabManager.currentSpaceID) { sidebar.list.reload(animated: true) } else { sidebar.list.refreshRows() }
         reloadFavorites()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
@@ -506,7 +507,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.card.setLoading(tab.isLoading, progress: tab.progress)
         case .url, .navigation, .loading:
             root.card.setLoading(tab.isLoading, progress: tab.progress)
-            if change == .url { refreshExtensionActions() }
+            if change == .url {
+                refreshExtensionActions()
+                // A pinned tab that moved on shows it right away.
+                if tab.bookmarkID != nil { sidebar.list.refreshRows() }
+            }
             sidebar.update(tab: tab)
             updateWindowTitle()
             offerWebStoreExtension()
@@ -832,6 +837,10 @@ extension BrowserWindowController: SidebarDelegate {
     func listSelect(_ tab: Tab) { tabManager.select(tab) }
     func listOpenBookmark(_ bookmark: Bookmark) { tabManager.openBookmark(bookmark) }
     func listClose(_ tab: Tab) { closeWithUndo(tab) }
+
+    func listRenameBookmark(_ id: UUID, to name: String) {
+        libraryChange("Rename") { Library.shared.updateBookmark(id, title: name) }
+    }
 
     // MARK: Undo (⌘Z) for sidebar actions
 
