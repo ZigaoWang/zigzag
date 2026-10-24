@@ -194,6 +194,16 @@ enum DebugBridge {
         case "rmext": ExtensionStore.uninstall(arg)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }
         case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true)) }
+        case "extaccess":
+            // extaccess <id> <all|click|sites> [site,site]
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count >= 2, let access = ExtensionStore.SiteAccess(rawValue: f[1]) {
+                ExtensionStore.setSiteAccess(f[0], access, sites: f.count > 2 ? f[2].split(separator: ",").map(String.init) : nil)
+            }
+        case "extoffsite":
+            // extoffsite <site> on|off
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 2 { var sites = ExtensionStore.extensionsOffSites; if f[1] == "on" { sites.insert(f[0]) } else { sites.remove(f[0]) }; ExtensionStore.extensionsOffSites = sites }
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
         case "extoff": ExtensionStore.setEnabled(arg, false)
         case "exton": ExtensionStore.setEnabled(arg, true)
