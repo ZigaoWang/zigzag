@@ -252,6 +252,13 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
+        case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
+        case "cancelsheet":
+            // Cancels any open confirmation, in every window, without confirming it.
+            for window in NSApp.windows {
+                func walk(_ view: NSView?) { for sub in view?.subviews ?? [] { (sub as? ConfirmSheet)?.debugCancel(); walk(sub) } }
+                walk(window.contentView)
+            }
         case "pwseed":
             // Five obviously fake logins for checking the Passwords window; remove them with pwclear.
             Task {

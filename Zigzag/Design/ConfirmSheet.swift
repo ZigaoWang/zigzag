@@ -58,6 +58,10 @@ final class ConfirmSheet: NSView {
         (host.subviews.last as? ConfirmSheet)?.cancel.isHidden = true
     }
 
+    #if DEBUG
+    func debugCancel() { finish(false) }
+    #endif
+
     private func finish(_ confirmed: Bool) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
