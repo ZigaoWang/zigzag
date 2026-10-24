@@ -308,9 +308,15 @@ enum Toast {
 
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, in controller: BrowserWindowController) {
+        show(text, symbol: symbol, action: action, duration: duration, over: controller.root.overlay, area: controller.root.cardFrame)
+    }
+
+    /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
+    static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
+                     duration: TimeInterval = 1.3, over host: NSView, area: NSRect) {
         let toast: ToastView
         let isNew: Bool
-        if let existing = current, existing.superview === controller.root.overlay {
+        if let existing = current, existing.superview === host {
             toast = existing
             isNew = false
         } else {
@@ -329,12 +335,11 @@ enum Toast {
             }
         }
         let width = ceil(toast.fittingWidth)
-        let card = controller.root.cardFrame
         // Top center of the page: where your eyes already are, clear of the content you're reading.
-        toast.frame = NSRect(x: round(card.midX - width / 2), y: card.minY + Tokens.Space.x3, width: width, height: ToastView.height)
+        toast.frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: ToastView.height)
         toast.needsLayout = true
         if isNew {
-            controller.root.overlay.addSubview(toast)
+            host.addSubview(toast)
             toast.present(always: true)
             Tokens.Motion.slideVertically(toast, fromOffsetY: -Tokens.Space.x2)
         } else {
