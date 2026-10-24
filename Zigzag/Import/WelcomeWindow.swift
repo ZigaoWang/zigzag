@@ -96,7 +96,7 @@ private final class WelcomeView: NSView {
         case .done:
             copy = ("You’re all set", "Your spaces and pinned tabs are in the sidebar, and your passwords are in Zigzag’s Passwords window.", 2)
         }
-        heading.attributedStringValue = Brand.display(copy.0, size: 30, color: theme.tint)
+        heading.attributedStringValue = Brand.display(copy.0, size: 30, color: theme.tint, wraps: true)
         body.stringValue = copy.1
         body.textColor = theme.tint.withAlphaComponent(0.74)
         wordmark.color = theme.tint

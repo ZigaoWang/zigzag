@@ -438,7 +438,7 @@ private final class LockedView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         badge.color = Brand.Theme.current.accent
-        title.attributedStringValue = Brand.display("Your passwords are locked", size: 22, color: Tokens.Color.textPrimary, alignment: .center)
+        title.attributedStringValue = Brand.display("Your passwords are locked", size: 22, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
         title.alignment = .center
         body.alignment = .center
         [badge, title, body, button].forEach { addSubview($0) }
@@ -570,6 +570,9 @@ private final class EmptyStateView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         icon.contentTintColor = Tokens.Color.textTertiary
+        title.usesSingleLineMode = false
+        title.maximumNumberOfLines = 2
+        title.cell?.wraps = true
         title.alignment = .center
         body.font = Tokens.Font.body()
         body.textColor = Tokens.Color.textSecondary
@@ -602,7 +605,7 @@ private final class EmptyStateView: NSView {
         icon.isHidden = usesRibbon
         ribbon.isHidden = !usesRibbon
         ribbon.color = Brand.Theme.current.accent.withAlphaComponent(0.85)
-        self.title.attributedStringValue = Brand.display(title, size: 20, color: Tokens.Color.textPrimary, alignment: .center)
+        self.title.attributedStringValue = Brand.display(title, size: 20, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
         self.title.alignment = .center
         self.body.stringValue = body
         importButton.isHidden = !showsImport
@@ -618,13 +621,14 @@ private final class EmptyStateView: NSView {
         let width = min(bounds.width - Tokens.Space.x8 * 2, 340)
         let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width, height: 200)).height)
         let side: CGFloat = 36
-        let total = side + Tokens.Space.x4 + title.lineHeight + Tokens.Space.x2 + bodyHeight + (importButton.isHidden ? 0 : Tokens.Space.x6 + Tokens.Space.x8)
+        let titleHeight = ceil(title.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 200)).height ?? title.lineHeight)
+        let total = side + Tokens.Space.x4 + titleHeight + Tokens.Space.x2 + bodyHeight + (importButton.isHidden ? 0 : Tokens.Space.x6 + Tokens.Space.x8)
         var y = round((bounds.height - total) / 2)
         let x = round((bounds.width - width) / 2)
         icon.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
         ribbon.frame = icon.frame.insetBy(dx: -4, dy: -4)
         y = icon.frame.maxY + Tokens.Space.x4
-        title.frame = NSRect(x: x, y: y, width: width, height: ceil(title.intrinsicContentSize.height))
+        title.frame = NSRect(x: x, y: y, width: width, height: titleHeight)
         y = title.frame.maxY + Tokens.Space.x2
         body.frame = NSRect(x: x, y: y, width: width, height: bodyHeight)
         y = body.frame.maxY + Tokens.Space.x6
