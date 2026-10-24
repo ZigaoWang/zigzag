@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// Debug builds only: lets scripts drive the UI (for screenshots and testing) via distributed notifications.
 /// `xcrun swift -e` or the bundled `zz` script posts "app.zigzag.debug" with a command string.
@@ -116,6 +117,13 @@ enum DebugBridge {
             }
         case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
         case "action": controller.sidebar.address.actionButtons[min(Int(arg) ?? 0, controller.sidebar.address.actionButtons.count - 1)].onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
+        case "popupcatch":
+            // Records the popup's errors from its first line on, then reloads it; read them with popupjs "__errors".
+            if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
+                let source = "window.__errors = []; addEventListener('error', e => __errors.push(e.message + ' @' + (e.filename||'').split('/').pop() + ':' + e.lineno)); addEventListener('unhandledrejection', e => __errors.push('rejection: ' + (e.reason && (e.reason.message || e.reason))));"
+                webView.configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+                webView.reload()
+            }
         case "popupjs":
             if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
                 webView.evaluateJavaScript(arg) { result, error in
@@ -191,6 +199,7 @@ enum DebugBridge {
         case "settings": SettingsWindowController.shared.show()
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
+        case "addextnow": Task { _ = await ExtensionStore.install(arg) }
         case "rmext": ExtensionStore.uninstall(arg)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }
         case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true)) }
@@ -204,6 +213,10 @@ enum DebugBridge {
             // extoffsite <site> on|off
             let f = arg.split(separator: " ").map(String.init)
             if f.count == 2 { var sites = ExtensionStore.extensionsOffSites; if f[1] == "on" { sites.insert(f[0]) } else { sites.remove(f[0]) }; ExtensionStore.extensionsOffSites = sites }
+        case "extpopup":
+            if let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
+                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, anchor: controller.sidebar.address)
+            }
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
         case "extoff": ExtensionStore.setEnabled(arg, false)
         case "exton": ExtensionStore.setEnabled(arg, true)
