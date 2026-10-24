@@ -275,6 +275,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let generalGroup = FormGroup()
     private let spacesGroup = FormGroup()
     private let importGroup = FormGroup()
+    private let passwordsGroup = FormGroup()
+    private let saveSwitch = NSSwitch()
+    private let fillSwitch = NSSwitch()
+    private let openPasswordsButton = NSButton(title: "Open Passwords…", target: nil, action: nil)
     private let blockingSwitch = NSSwitch()
     private let pipSwitch = NSSwitch()
     private let extensionsGroup = FormGroup()
@@ -359,6 +363,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loadUnpackedButton.action = #selector(loadUnpacked)
         loadUnpackedButton.bezelStyle = .push
         loadUnpackedButton.controlSize = .small
+
+        for toggle in [saveSwitch, fillSwitch] {
+            toggle.controlSize = .small
+            toggle.target = self
+        }
+        saveSwitch.action = #selector(saveChanged)
+        fillSwitch.action = #selector(fillChanged)
+        openPasswordsButton.target = self
+        openPasswordsButton.action = #selector(openPasswords)
+        openPasswordsButton.bezelStyle = .push
+        openPasswordsButton.controlSize = .small
+        reloadPasswords()
 
         let importButton = NSButton(title: "Import…", target: self, action: #selector(importBrowser))
         importButton.bezelStyle = .push
@@ -524,6 +540,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             buttons.spacing = Tokens.Space.x2
             section("Extensions", extensionsGroup, accessory: buttons)
         }
+        section("Passwords", passwordsGroup, accessory: openPasswordsButton)
         if !importGroup.rows.isEmpty { section(nil, importGroup) }
 
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
@@ -546,6 +563,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         defaultStatus.isHidden = !isDefault
         blockingSwitch.state = ContentBlocker.isEnabled ? .on : .off
         pipSwitch.state = PictureInPicture.followsTabs ? .on : .off
+        saveSwitch.state = PasswordCapture.offersToSave ? .on : .off
+        fillSwitch.state = Autofill.isOn ? .on : .off
         defaultButton.isHidden = isDefault
         generalGroup.rows.forEach { $0.needsLayout = true }
     }
@@ -624,6 +643,33 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func blockingChanged() { ContentBlocker.isEnabled = blockingSwitch.state == .on }
 
     @objc private func pipChanged() { PictureInPicture.followsTabs = pipSwitch.state == .on }
+
+    /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
+    private func reloadPasswords() {
+        passwordsGroup.removeAllRows()
+        saveSwitch.state = PasswordCapture.offersToSave ? .on : .off
+        fillSwitch.state = Autofill.isOn ? .on : .off
+        let manager = PasswordManagers.active
+        let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
+        let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
+        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveSwitch))
+        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillSwitch))
+    }
+
+    @objc private func saveChanged() {
+        PasswordCapture.offersToSave = saveSwitch.state == .on
+        reloadPasswords()
+        layoutDocument()
+    }
+
+    @objc private func fillChanged() {
+        Autofill.isOn = fillSwitch.state == .on
+        if !Autofill.isOn { Autofill.shared.hide() }
+        reloadPasswords()
+        layoutDocument()
+    }
+
+    @objc private func openPasswords() { PasswordsWindowController.show() }
 
     @objc private func getExtensions() {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
