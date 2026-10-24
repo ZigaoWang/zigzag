@@ -362,8 +362,9 @@ private final class PaneTab: InteractiveView {
     override func layout() {
         super.layout()
         let side: CGFloat = 22
-        icon.frame = NSRect(x: (bounds.width - side) / 2, y: bounds.height - 6 - side, width: side, height: side)
-        label.frame = NSRect(x: 0, y: 6, width: bounds.width, height: label.lineHeight)
+        // Flipped: the symbol on top, its name under it.
+        icon.frame = NSRect(x: (bounds.width - side) / 2, y: 7, width: side, height: side)
+        label.frame = NSRect(x: 0, y: bounds.height - 6 - label.lineHeight, width: bounds.width, height: label.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -716,7 +717,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 for item in menu.items where !item.isSeparatorItem {
                     if let sub = item.submenu { walk(sub, prefix: item.title + " › "); continue }
                     guard !item.keyEquivalent.isEmpty, !item.isHidden || item.title.hasPrefix("Close Tabs") else { continue }
-                    let title = prefix + item.title
+                    // A list of what each key does doesn't need the menu's "…".
+                    let title = prefix + (item.title.hasSuffix("…") ? String(item.title.dropLast()) : item.title)
                     guard query.isEmpty || title.lowercased().contains(query) else { continue }
                     group.add(ShortcutRow(title: title, keys: Self.keys(item)))
                 }
