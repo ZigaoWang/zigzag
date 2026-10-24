@@ -189,6 +189,12 @@ enum DebugBridge {
             if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
         case "welcome": controller.showWelcome()
         case "importwindow": ImportWindowController.show()
+        case "closewindow":
+            // closewindow <title>: closes Zigzag's window with that title (Import, Passwords, Settings).
+            NSApp.windows.first { $0.title == arg }?.close()
+        case "importsuccess":
+            ImportWindowController.show()
+            (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugShowSuccess()
         case "passwordsshow":
             (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow(arg)
         case "passwordswindow":
@@ -242,6 +248,7 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
+        case "about": AboutWindowController.show()
         case "clearsite":
             // clearsite <cache|cookies> <site>
             let f = arg.split(separator: " ").map(String.init)
