@@ -20,7 +20,7 @@ final class ImportView: NSView {
 
     private let hero = ImportHero()
     private let banner = BrandBanner()
-    private var summaries: [ImportCoordinator.Summary] = []
+    private(set) var summaries: [ImportCoordinator.Summary] = []
 
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let subtitle = NSTextField(wrappingLabelWithString: "")
@@ -156,7 +156,12 @@ final class ImportView: NSView {
         subtitle.stringValue = presentation == .welcome ? "" : passwords > 0
             ? "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Window › Passwords."
             : "Everything that came over is in your sidebar. You can bring more over anytime from Settings."
-        if presentation == .welcome { rows.forEach { $0.isHidden = true } }
+        // Rows that hit a problem stay, with their fix; the ones that went fine give way to the summary.
+        if presentation == .welcome {
+            for row in rows {
+                if case .done(let summary) = row.state, !summary.problems.isEmpty { row.isHidden = false } else { row.isHidden = true }
+            }
+        }
         showPasswords.isHidden = passwords == 0
         // The finished moment: the lit surface, the count, and the ribbon writing itself across it.
         if hero.superview == nil { addSubview(hero) }
@@ -594,6 +599,11 @@ private final class ImportHero: NSView {
             caption.stringValue = lead.1
             detail.stringValue = rest.isEmpty ? "All in. Nothing left behind." : "Plus " + ListFormatter.localizedString(byJoining: rest) + "."
             count.attributedStringValue = Brand.display(lead.0.formatted(), size: 60, color: theme.tint)
+        } else if summaries.contains(where: { !$0.problems.isEmpty }) {
+            // Never a cheerful "all set" over a failure: say nothing came, and the rows below say why.
+            count.attributedStringValue = Brand.display("Not yet", size: 44, color: theme.tint)
+            caption.stringValue = "Nothing came over"
+            detail.stringValue = "What stopped it is below, with a way to fix it."
         } else {
             count.attributedStringValue = Brand.display("All set", size: 44, color: theme.tint)
             caption.stringValue = "Nothing new to bring over"
@@ -612,7 +622,8 @@ private final class ImportHero: NSView {
         let pad = Tokens.Space.x8
         let wordmarkHeight: CGFloat = 44
         wordmark.frame = NSRect(x: pad, y: (bounds.height - wordmarkHeight) / 2, width: wordmarkHeight * WordmarkView.aspect, height: wordmarkHeight)
-        let countHeight = ceil(count.intrinsicContentSize.height)
+        // Measured from the text itself: the label's own size can lag a change of text.
+        let countHeight = ceil(count.attributedStringValue.size().height)
         let textWidth = bounds.width * 0.62
         let total = countHeight + caption.lineHeight + 4 + detail.lineHeight
         var y = (bounds.height - total) / 2
