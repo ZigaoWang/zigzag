@@ -7,11 +7,19 @@ import UniformTypeIdentifiers
 final class ImportView: NSView {
     var onClose: (() -> Void)?
 
+    /// First launch shows it in the empty page, under the wordmark; elsewhere it's its own window, under a banner.
+    enum Presentation { case welcome, window }
+    let presentation: Presentation
+
     private enum Stage { case choose, importing, done }
     private var stage = Stage.choose
 
-    private let title = Label("Bring your stuff from another browser", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-    private let subtitle = NSTextField(wrappingLabelWithString: "Passwords, bookmarks and history come over in one go. Your other browser stays exactly as it is.")
+    private let hero = ImportHero()
+    private let banner = BrandBanner()
+    private var summaries: [ImportCoordinator.Summary] = []
+
+    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let subtitle = NSTextField(wrappingLabelWithString: "")
     private var sources: [ImportCoordinator.Source] = []
     private var rows: [SourceRow] = []
     private let choiceLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
@@ -21,8 +29,24 @@ final class ImportView: NSView {
     private let secondary = TextButton(title: "Not Now", font: Tokens.Font.body(.medium))
     private let emptyNote = NSTextField(wrappingLabelWithString: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.")
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
+    init(presentation: Presentation) {
+        self.presentation = presentation
+        super.init(frame: .zero)
+        wantsLayer = true
+        switch presentation {
+        case .welcome:
+            // It sits in the page; whatever page is there stays out of sight behind it.
+            layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+            title.stringValue = "Welcome to Zigzag"
+            subtitle.stringValue = "Bring your passwords, bookmarks and Arc spaces over in one go. Your other browser stays exactly as it is."
+            addSubview(hero)
+        case .window:
+            title.stringValue = ""
+            subtitle.stringValue = ""
+            banner.title = "Bring your stuff over"
+            banner.subtitle = "Passwords, bookmarks and history, from any browser on this Mac."
+            addSubview(banner)
+        }
         subtitle.font = Tokens.Font.body()
         subtitle.textColor = Tokens.Color.textSecondary
         subtitle.isSelectable = false
@@ -32,6 +56,7 @@ final class ImportView: NSView {
         [title, subtitle, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
         for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
             let box = ChoicePill(title: name)
+            box.tint = Brand.Theme.current.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }
             addSubview(box)
             choiceButtons.append((choice, box))
@@ -44,6 +69,18 @@ final class ImportView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        if presentation == .welcome { layer?.backgroundColor = cgColor(Tokens.Color.cardBackground) }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, presentation == .welcome else { return }
+        hero.showWordmark(drawIn: !Brand.hasDrawnIn)
+        Brand.hasDrawnIn = true
+    }
 
     private func reloadSources() {
         rows.forEach { $0.removeFromSuperview() }
@@ -84,8 +121,8 @@ final class ImportView: NSView {
     private func startImport(_ chosen: [SourceRow]) {
         guard !chosen.isEmpty else { return }
         stage = .importing
-        title.stringValue = "Bringing your stuff over…"
-        subtitle.stringValue = "macOS may ask to let Zigzag open a browser's saved passwords. Choose Allow."
+        title.stringValue = "Bringing it over…"
+        subtitle.stringValue = "macOS may ask to let Zigzag open a browser’s saved passwords. Choose Allow, and it carries on."
         primary.title = "Importing…"
         primary.isEnabled = false
         secondary.isHidden = true
@@ -106,6 +143,8 @@ final class ImportView: NSView {
         row.state = .working
         let choice = data.intersection(row.source.offers)
         let summary = await ImportCoordinator.run(row.source, choice, primaryPassword: primaryPassword)
+        summaries.removeAll { $0.source == summary.source }
+        summaries.append(summary)
         row.state = .done(summary)
         row.onFix = { [weak self, weak row] fix, password in
             guard let self, let row else { return }
@@ -116,12 +155,46 @@ final class ImportView: NSView {
 
     private func finish() {
         stage = .done
-        title.stringValue = "You're all set"
-        subtitle.stringValue = "Your passwords are in the Keychain and sync with iCloud Keychain. Open them anytime from Settings › Passwords."
+        title.stringValue = "You’re all set"
+        subtitle.stringValue = "Passwords are in your Keychain and sync with iCloud Keychain. They’re in Passwords whenever you need them."
+        // The finished moment: the lit surface, the count, and the ribbon writing itself across it.
+        if hero.superview == nil { addSubview(hero) }
+        banner.isHidden = true
+        hero.showSuccess(summaries)
         primary.title = "Done"
+        fitWindow()
         primary.isEnabled = true
         needsLayout = true
     }
+
+    /// In its own window, the window follows the content: shorter once only the summary is left.
+    func fitWindow() {
+        guard presentation == .window, let window else { return }
+        layoutSubtreeIfNeeded()
+        let bottom = subviews.filter { !$0.isHidden && $0.superview === self }.map(\.frame.maxY).max() ?? bounds.height
+        let height = min(bottom + Tokens.Space.x6, 780)
+        var frame = window.frame
+        let delta = height - window.contentLayoutRect.height
+        guard abs(delta) > 1 else { return }
+        frame.size.height += delta
+        frame.origin.y -= delta
+        window.setFrame(frame, display: true, animate: true)
+    }
+
+    #if DEBUG
+    /// For the debug bridge: the finished screen with sample numbers, without importing anything.
+    func debugShowSuccess() {
+        var arc = ImportCoordinator.Summary(source: "Arc")
+        arc.passwords = 214
+        arc.bookmarks = 86
+        arc.spaces = 3
+        summaries = [arc]
+        rows.filter { !$0.isChosen }.forEach { $0.isHidden = true }
+        [secondary, chooseFile, choiceLabel].forEach { $0.isHidden = true }
+        choiceButtons.forEach { $0.1.isHidden = true }
+        finish()
+    }
+    #endif
 
     private func fix(_ fix: ImportProblem.Fix, for row: SourceRow, data: ImportCoordinator.Choice, primaryPassword: String) {
         switch fix {
@@ -179,12 +252,28 @@ final class ImportView: NSView {
         let showsChoices = stage == .choose && !sources.isEmpty
         let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + Tokens.Space.x8 : 0
         let emptyHeight: CGFloat = sources.isEmpty && stage == .choose ? ceil(emptyNote.sizeThatFits(NSSize(width: width, height: 200)).height) + Tokens.Space.x4 : 0
-        let total = title.lineHeight + Tokens.Space.x2 + subtitleHeight + Tokens.Space.x6 + rowsHeight + emptyHeight
+        let showsHero = hero.superview != nil
+        let heroHeight: CGFloat = showsHero ? ImportHero.height + Tokens.Space.x8 : 0
+        let titleHeight = ceil(title.intrinsicContentSize.height)
+        let total = heroHeight + titleHeight + Tokens.Space.x2 + subtitleHeight + Tokens.Space.x6 + rowsHeight + emptyHeight
             + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + Tokens.Space.x8 + Tokens.Space.x8
-        y = max(Tokens.Space.x8, round((bounds.height - total) / 2))
+        if presentation == .window {
+            banner.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 128)
+            banner.contentInset = x
+            y = (banner.isHidden ? Tokens.Space.x12 : banner.frame.maxY + Tokens.Space.x6)
+        } else {
+            y = max(Tokens.Space.x8, round((bounds.height - total) / 2))
+        }
+        if showsHero {
+            hero.frame = NSRect(x: x, y: y, width: width, height: ImportHero.height)
+            y = hero.frame.maxY + Tokens.Space.x6
+        }
         title.alignment = .left
-        place(title, height: title.lineHeight, gap: Tokens.Space.x2)
-        place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6)
+        title.attributedStringValue = Brand.display(title.stringValue, size: 22, color: Tokens.Color.textPrimary)
+        if !title.stringValue.isEmpty {
+            place(title, height: titleHeight, gap: Tokens.Space.x2)
+            place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6)
+        }
         if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
         for row in visibleRows { place(row, height: row.preferredHeight, gap: Tokens.Space.x2) }
         if showsChoices {
@@ -231,7 +320,7 @@ private final class SourceRow: InteractiveView {
     private let name: Label
     private let detail = NSTextField(wrappingLabelWithString: "")
     private let check = NSImageView()
-    private let spinner = NSProgressIndicator()
+    private let spinner = RibbonView()
     private var fixViews: [NSView] = []
     private var passwordField: FilledField?
     /// What the browser holds, filled in once counted.
@@ -248,8 +337,7 @@ private final class SourceRow: InteractiveView {
         detail.font = Tokens.Font.small()
         detail.textColor = Tokens.Color.textSecondary
         detail.isSelectable = false
-        spinner.style = .spinning
-        spinner.controlSize = .small
+        spinner.color = Brand.Theme.current.accent
         spinner.isHidden = true
         check.isHidden = true
         [icon, name, detail, check, spinner].forEach { addSubview($0) }
@@ -281,7 +369,7 @@ private final class SourceRow: InteractiveView {
         fixViews.forEach { $0.removeFromSuperview() }
         fixViews = []
         passwordField = nil
-        spinner.stopAnimation(nil)
+        spinner.stopLooping()
         spinner.isHidden = true
         check.isHidden = true
         switch state {
@@ -289,13 +377,13 @@ private final class SourceRow: InteractiveView {
             detail.stringValue = preview
             check.isHidden = !isChosen
             check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.large)
-            check.contentTintColor = Tokens.Color.accent
+            check.contentTintColor = Brand.Theme.current.accent
         case .waiting:
             detail.stringValue = "Waiting…"
         case .working:
             detail.stringValue = "Bringing it over…"
             spinner.isHidden = false
-            spinner.startAnimation(nil)
+            spinner.startLooping()
         case .done(let summary):
             detail.stringValue = ([summary.sentence] + summary.problems.map(\.message)).joined(separator: "\n")
             check.isHidden = false
@@ -378,7 +466,7 @@ private final class SourceRow: InteractiveView {
         let fill: NSColor? = isChosen ? Tokens.Color.fieldFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated)
         layer?.borderWidth = isChosen ? 1 : 0
-        layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.5))
+        layer?.borderColor = cgColor(Brand.Theme.current.accent.withAlphaComponent(0.55))
     }
 }
 
@@ -395,7 +483,8 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.backgroundColor = Tokens.Color.formBackground
-        let view = ImportView(frame: window.contentLayoutRect)
+        let view = ImportView(presentation: .window)
+        view.frame = window.contentLayoutRect
         view.autoresizingMask = [.width, .height]
         window.contentView = view
         let controller = ImportWindowController(window: window)
@@ -406,12 +495,104 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         // Laid out once tall, so the content's real height can be measured, then fitted.
         view.frame.size.height = 2000
         view.layoutSubtreeIfNeeded()
-        let height = view.subviews.map(\.frame.maxY).max().map { $0 + Tokens.Space.x8 } ?? 560
-        window.setContentSize(NSSize(width: 560, height: min(height - (view.subviews.map(\.frame.minY).min() ?? 0) + Tokens.Space.x10, 760)))
+        let height = view.subviews.filter { !$0.isHidden }.map(\.frame.maxY).max().map { $0 + Tokens.Space.x6 } ?? 560
+        window.setContentSize(NSSize(width: 560, height: min(height, 780)))
         window.center()
         shared = controller
         controller.showWindow(nil)
     }
 
     func windowWillClose(_ notification: Notification) { Self.shared = nil }
+}
+
+/// The brand moment above the import: the wordmark on the lit surface on first launch, and the count of what
+/// came over when it's done.
+private final class ImportHero: NSView {
+    static let height: CGFloat = 168
+    private let surface = BrandSurface()
+    private let wordmark = WordmarkView()
+    private let count = Label("", font: .systemFont(ofSize: 60, weight: .heavy), color: Brand.ribbon)
+    private let caption = Label("", font: .systemFont(ofSize: 17, weight: .semibold), color: Brand.ribbon)
+    private let detail = Label("", font: Tokens.Font.body(), color: Brand.ribbon.withAlphaComponent(0.7))
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        [surface, wordmark, count, caption, detail].forEach { addSubview($0) }
+        [count, caption, detail].forEach { $0.isHidden = true }
+        applyTheme()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    private var theme: Brand.Theme { Brand.Theme.current }
+
+    private func applyTheme() {
+        wordmark.color = theme.tint
+        caption.textColor = theme.tint
+        detail.textColor = theme.tint.withAlphaComponent(0.7)
+    }
+
+    func showWordmark(drawIn: Bool) {
+        applyTheme()
+        layoutSubtreeIfNeeded()
+        // The one time the wordmark writes itself in: the very first time Zigzag opens.
+        Brand.enter([surface])
+        if drawIn {
+            wordmark.drawIn(delay: 0.25)
+            surface.watermark.drawIn(delay: 1.25)
+        } else {
+            Brand.enter([wordmark], delay: 0.04)
+            surface.watermark.drawIn(delay: 0.2)
+        }
+    }
+
+    func showSuccess(_ summaries: [ImportCoordinator.Summary]) {
+        applyTheme()
+        let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
+        let bookmarks = summaries.map(\.bookmarks).reduce(0, +)
+        let spaces = summaries.map(\.spaces).reduce(0, +)
+        let history = summaries.map(\.history).reduce(0, +)
+        let from = summaries.count == 1 ? " from \(summaries[0].source)" : ""
+        func plural(_ n: Int, _ one: String, _ many: String) -> String { "\(n.formatted()) \(n == 1 ? one : many)" }
+        // The biggest thing that came over leads; the rest follow in a line.
+        var lead: (Int, String)?
+        var rest: [String] = []
+        for (n, one, many) in [(passwords, "password", "passwords"), (bookmarks, "bookmark", "bookmarks"), (spaces, "space", "spaces"), (history, "page of history", "pages of history")] where n > 0 {
+            if lead == nil { lead = (n, (n == 1 ? one : many) + from) } else { rest.append(plural(n, one, many)) }
+        }
+        wordmark.isHidden = true
+        [count, caption, detail].forEach { $0.isHidden = false }
+        if let lead {
+            caption.stringValue = lead.1
+            detail.stringValue = rest.isEmpty ? "All in. Nothing left behind." : "Plus " + ListFormatter.localizedString(byJoining: rest) + "."
+            count.attributedStringValue = Brand.display(lead.0.formatted(), size: 60, color: theme.tint)
+        } else {
+            count.attributedStringValue = Brand.display("All set", size: 44, color: theme.tint)
+            caption.stringValue = "Nothing new to bring over"
+            detail.stringValue = "Everything was already here."
+        }
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        // The panel arrives, its lines a beat apart, then the ribbon writes itself across it.
+        Brand.enter([surface, count, caption, detail])
+        surface.watermark.drawIn(delay: 0.2)
+    }
+
+    override func layout() {
+        super.layout()
+        surface.frame = bounds
+        let pad = Tokens.Space.x8
+        let wordmarkHeight: CGFloat = 44
+        wordmark.frame = NSRect(x: pad, y: (bounds.height - wordmarkHeight) / 2, width: wordmarkHeight * WordmarkView.aspect, height: wordmarkHeight)
+        let countHeight = ceil(count.intrinsicContentSize.height)
+        let textWidth = bounds.width * 0.62
+        let total = countHeight + caption.lineHeight + 4 + detail.lineHeight
+        var y = (bounds.height - total) / 2
+        count.frame = NSRect(x: pad - 3, y: y, width: textWidth, height: countHeight)
+        y = count.frame.maxY
+        caption.frame = NSRect(x: pad, y: y, width: textWidth, height: caption.lineHeight)
+        y = caption.frame.maxY + 4
+        detail.frame = NSRect(x: pad, y: y, width: textWidth, height: detail.lineHeight)
+    }
 }
