@@ -21,10 +21,10 @@ final class Updater {
         if let controller {
             controller.checkForUpdates(nil)
         } else {
-            let alert = NSAlert()
-            alert.messageText = "Updates aren’t available in this build"
-            alert.informativeText = "Release builds of Zigzag update themselves automatically."
-            alert.runModal()
+            // A development build: say so where you're looking, not in a system alert.
+            if let window = WindowManager.shared.keyController {
+                Toast.show("This build doesn’t update itself. Release builds of Zigzag update automatically.", symbol: "arrow.down.circle", duration: 3, in: window)
+            }
         }
     }
 }
