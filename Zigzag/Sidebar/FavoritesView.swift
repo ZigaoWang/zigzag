@@ -44,7 +44,7 @@ final class FavoritesView: NSView {
         return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Space.x2
     }
 
-    func reload(favorites: [Bookmark], openIDs: Set<UUID>, selectedID: UUID?) {
+    func reload(favorites: [Bookmark], openIDs: Set<UUID>, selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
         if tiles.map(\.bookmark?.id) != favorites.map(\.id) {
             tiles.forEach { $0.removeFromSuperview() }
             tiles = favorites.map { favorite in
@@ -65,6 +65,7 @@ final class FavoritesView: NSView {
             guard let id = tile.bookmark?.id else { continue }
             tile.isSelected = id == selectedID
             tile.isOpen = openIDs.contains(id)
+            tile.track(tabs[id])
             tile.refreshIcon()
         }
     }
@@ -141,6 +142,8 @@ final class FavoriteTile: InteractiveView {
     let bookmark: Bookmark?
     private let icon = FaviconView()
     var isOpen = false
+    private weak var tab: Tab?
+    private var tabToken: SignalToken?
     var isPlaceholder = false { didSet { icon.isHidden = isPlaceholder; stateDidChange(animated: false) } }
 
     init(bookmark: Bookmark?) {
@@ -156,6 +159,21 @@ final class FavoriteTile: InteractiveView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Follows the favorite's page, so the tile shows the loading ribbon while it loads, like a tab does.
+    func track(_ tab: Tab?) {
+        guard tab !== self.tab else { return }
+        self.tab = tab
+        tabToken = tab?.changed.observe { [weak self] change in
+            if change == .loading || change == .favicon { self?.refreshLoading() }
+        }
+        refreshLoading()
+    }
+
+    private func refreshLoading() {
+        icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
+        if let favicon = tab?.favicon, !(tab?.isLoading ?? false) { icon.image = favicon }
+    }
 
     func refreshIcon() {
         guard let bookmark else { return }

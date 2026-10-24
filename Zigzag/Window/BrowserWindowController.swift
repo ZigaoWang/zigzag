@@ -192,7 +192,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func reloadFavorites() {
         let favorites = Library.shared.favorites
         let open = Set(favorites.map(\.id).filter { tabManager.bookmarkTab(for: $0) != nil })
-        sidebar.favorites.reload(favorites: favorites, openIDs: open, selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil)
+        let tabs = Dictionary(uniqueKeysWithValues: favorites.compactMap { favorite in tabManager.bookmarkTab(for: favorite.id).map { (favorite.id, $0) } })
+        sidebar.favorites.reload(favorites: favorites, openIDs: open, selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
         sidebar.needsLayout = true
     }
 
