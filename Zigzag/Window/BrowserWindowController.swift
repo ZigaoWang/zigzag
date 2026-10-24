@@ -251,6 +251,44 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         offerWebStoreExtension()
     }
 
+    /// Where an extension may read and change pages, Chrome's three choices.
+    private func siteAccessItem(for id: String) -> NSMenuItem {
+        let item = NSMenuItem(title: "Site Access", action: nil, keyEquivalent: "")
+        item.image = Tokens.Symbol.image("globe")
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let access = ExtensionStore.siteAccess(id)
+        let tab = tabManager.selectedTab
+        let site = ContentBlocker.site(of: tab?.url)
+        let all = SidebarMenus.Item("On All Sites") { ExtensionStore.setSiteAccess(id, .all); tab?.reload() }
+        all.state = access == .all ? .on : .off
+        let click = SidebarMenus.Item("When You Click It") { ExtensionStore.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        click.state = access == .click ? .on : .off
+        menu.addItem(all)
+        menu.addItem(click)
+        if let site {
+            let sites = access == .sites ? ExtensionStore.accessSites(id) : []
+            let listed = sites.contains(site)
+            let only = SidebarMenus.Item(access == .sites ? "On \(site)" : "Only on \(site)") {
+                let next = listed ? sites.filter { $0 != site } : sites + [site]
+                ExtensionStore.setSiteAccess(id, .sites, sites: next)
+                tab?.reload()
+            }
+            only.state = listed ? .on : .off
+            menu.addItem(.separator())
+            menu.addItem(only)
+            if access == .sites {
+                for other in sites where other != site {
+                    let entry = SidebarMenus.Item("On \(other)") { ExtensionStore.setSiteAccess(id, .sites, sites: sites.filter { $0 != other }) }
+                    entry.state = .on
+                    menu.addItem(entry)
+                }
+            }
+        }
+        item.submenu = menu
+        return item
+    }
+
     /// What you can change for the site you're on: right-click the address.
     private func siteMenu() -> NSMenu? {
         guard let tab = tabManager.selectedTab, let url = tab.url, let site = ContentBlocker.site(of: url),
@@ -269,6 +307,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             menu.addItem(item)
         } else {
             menu.addItem(SidebarMenus.Item("Ad Blocking Is Off…", symbol: "hand.raised.slash") { SettingsWindowController.shared.show() })
+        }
+        if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
+            let off = ExtensionStore.extensionsOffSites.contains(site)
+            let item = SidebarMenus.Item("Turn Off Extensions on This Site", symbol: "puzzlepiece.extension") {
+                var sites = ExtensionStore.extensionsOffSites
+                if off { sites.remove(site) } else { sites.insert(site) }
+                ExtensionStore.extensionsOffSites = sites
+                tab.reload()
+            }
+            item.state = off ? .on : .off
+            menu.addItem(item)
         }
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item("Copy Link", symbol: "link") {
@@ -471,6 +520,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
             })
         }
+        menu.addItem(siteAccessItem(for: id))
         let pinned = ExtensionStore.isPinned(id)
         menu.addItem(SidebarMenus.Item(pinned ? "Hide from the Address" : "Show by the Address", symbol: pinned ? "pin.slash" : "pin") { ExtensionStore.setPinned(id, !pinned) })
         menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
