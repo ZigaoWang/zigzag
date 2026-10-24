@@ -64,10 +64,14 @@ final class FormGroup: NSView {
 final class FormRow: NSView {
     private let title = NSTextField(labelWithString: "")
     private let detail = NSTextField(labelWithString: "")
+    private let icon = NSImageView()
     let control: NSView
 
-    init(title: String, detail: String? = nil, control: NSView) {
+    init(title: String, detail: String? = nil, icon: NSImage? = nil, control: NSView) {
         self.control = control
+        self.icon.image = icon
+        self.icon.imageScaling = .scaleProportionallyUpOrDown
+        self.icon.isHidden = icon == nil
         super.init(frame: NSRect(x: 0, y: 0, width: 400, height: detail == nil ? Tokens.Space.x10 + Tokens.Space.x1 : Tokens.Space.x12 + Tokens.Space.x2))
         self.title.stringValue = title
         self.title.font = .systemFont(ofSize: NSFont.systemFontSize)
@@ -75,6 +79,7 @@ final class FormRow: NSView {
         self.detail.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         self.detail.textColor = .secondaryLabelColor
         self.detail.isHidden = detail == nil
+        addSubview(self.icon)
         addSubview(self.title)
         addSubview(self.detail)
         addSubview(control)
@@ -90,14 +95,20 @@ final class FormRow: NSView {
         let size = control.fittingSize
         control.frame = NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
         let titleHeight = title.fittingSize.height
-        let textWidth = control.frame.minX - pad - Tokens.Space.x3
+        var x = pad
+        if !icon.isHidden {
+            let side = Tokens.Space.x6
+            icon.frame = NSRect(x: x, y: round((bounds.height - side) / 2), width: side, height: side)
+            x = icon.frame.maxX + Tokens.Space.x3
+        }
+        let textWidth = control.frame.minX - x - Tokens.Space.x3
         if detail.isHidden {
-            title.frame = NSRect(x: pad, y: round((bounds.height - titleHeight) / 2), width: textWidth, height: titleHeight)
+            title.frame = NSRect(x: x, y: round((bounds.height - titleHeight) / 2), width: textWidth, height: titleHeight)
         } else {
             let detailHeight = detail.fittingSize.height
             let top = round((bounds.height - titleHeight - detailHeight - 1) / 2)
-            title.frame = NSRect(x: pad, y: top, width: textWidth, height: titleHeight)
-            detail.frame = NSRect(x: pad, y: title.frame.maxY + 1, width: textWidth, height: detailHeight)
+            title.frame = NSRect(x: x, y: top, width: textWidth, height: titleHeight)
+            detail.frame = NSRect(x: x, y: title.frame.maxY + 1, width: textWidth, height: detailHeight)
         }
     }
 }
@@ -255,7 +266,7 @@ final class TintPickerController: NSViewController {
 // MARK: - Window
 
 /// Settings in the System Settings style: grouped rows and native controls. What lives here:
-/// the search engine, default browser, spaces, and importing from Arc. Nothing else, on purpose.
+/// the search engine, default browser, spaces, extensions, and importing from Arc. Nothing else, on purpose.
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     static let shared = SettingsWindowController()
     private let scroll = NSScrollView()
@@ -263,6 +274,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let generalGroup = FormGroup()
     private let spacesGroup = FormGroup()
     private let importGroup = FormGroup()
+    private let extensionsGroup = FormGroup()
+    private let getExtensionsButton = NSButton(title: "Get Extensions…", target: nil, action: nil)
+    private var extensionsToken: SignalToken?
     private let engine = NSPopUpButton()
     private let defaultButton = NSButton(title: "Make Default", target: nil, action: nil)
     private let defaultStatus = NSTextField(labelWithString: "")
@@ -285,6 +299,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         token = Library.shared.changed.observe { [weak self] in
             guard let self, self.window?.isVisible == true else { return }
             self.reloadSpaces()
+        }
+        if #available(macOS 15.4, *) {
+            extensionsToken = ExtensionHost.shared.changed.observe { [weak self] in
+                guard let self, self.window?.isVisible == true else { return }
+                self.reloadExtensions()
+            }
         }
     }
 
@@ -318,6 +338,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         addSpaceButton.bezelStyle = .push
         addSpaceButton.controlSize = .small
 
+        getExtensionsButton.target = self
+        getExtensionsButton.action = #selector(getExtensions)
+        getExtensionsButton.bezelStyle = .push
+        getExtensionsButton.controlSize = .small
+
         if ArcImporter.isAvailable {
             let button = NSButton(title: "Import…", target: self, action: #selector(importArc))
             button.bezelStyle = .push
@@ -332,6 +357,37 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         scroll.useSlimScroller()
         window?.contentView = scroll
         reloadSpaces()
+        reloadExtensions()
+    }
+
+    private func reloadExtensions() {
+        extensionsGroup.removeAllRows()
+        defer { layoutDocument() }
+        guard #available(macOS 15.4, *) else { return }
+        let installed = ExtensionHost.shared.installed.sorted {
+            ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
+        }
+        guard !installed.isEmpty else {
+            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Open one in the Chrome Web Store and choose Add to Zigzag.", control: NSView()))
+            return
+        }
+        for (id, ext) in installed {
+            let toggle = NSSwitch()
+            toggle.controlSize = .small
+            toggle.state = KnownExtension.isEnabled(id) ? .on : .off
+            let toggleTarget = SidebarMenus.Handler { [weak toggle] in KnownExtension.setEnabled(id, toggle?.state == .on) }
+            toggle.target = toggleTarget
+            toggle.action = #selector(SidebarMenus.Handler.runAction(_:))
+            let remove = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
+            remove.onClick = { _ in KnownExtension.uninstall(id) }
+            let controls = NSStackView(views: [remove, toggle])
+            controls.spacing = Tokens.Space.x2
+            let detail = ext.version.map { "Version \($0)" } ?? ""
+            let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? nil : detail,
+                              icon: ext.icon(for: NSSize(width: 24, height: 24)), control: controls)
+            objc_setAssociatedObject(row, "toggleTarget", toggleTarget, .OBJC_ASSOCIATION_RETAIN)
+            extensionsGroup.add(row)
+        }
     }
 
     private func reloadSpaces() {
@@ -374,6 +430,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         section(nil, generalGroup)
         section("Spaces", spacesGroup, accessory: addSpaceButton)
+        if #available(macOS 15.4, *) { section("Extensions", extensionsGroup, accessory: getExtensionsButton) }
         if !importGroup.rows.isEmpty { section(nil, importGroup) }
 
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
@@ -401,6 +458,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func show() {
         refresh()
         reloadSpaces()
+        reloadExtensions()
         if window?.isVisible != true { window?.center() }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
@@ -467,6 +525,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
 
     @objc private func importArc() { ArcImporter.runInteractive() }
+
+    @objc private func getExtensions() {
+        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        controller.tabManager.newTab(url: KnownExtension.webStoreURL)
+        controller.window?.makeKeyAndOrderFront(nil)
+    }
 
     static var isDefaultBrowser: Bool {
         guard let url = URL(string: "https://example.com"),
