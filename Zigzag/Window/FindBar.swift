@@ -307,6 +307,7 @@ final class ToastView: FloatingPanelView {
         addSubview(label)
         addSubview(actionButton)
         actionButton.textColor = Tokens.Color.accent
+        actionButton.showsFillAtRest = true
         actionButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
     }
@@ -317,7 +318,7 @@ final class ToastView: FloatingPanelView {
 
     var fittingWidth: CGFloat {
         Tokens.Space.x3 + (icon.image == nil ? 0 : Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth
-            + (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1 + actionButton.fittingWidth + Tokens.Space.x1)
+            + (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x3 + actionButton.fittingWidth + Tokens.Space.x2)
     }
 
     /// The space around the text: the icon on the left, the action (or padding) on the right.
@@ -346,7 +347,9 @@ final class ToastView: FloatingPanelView {
         }
         let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
         if !actionButton.isHidden {
-            actionButton.frame = NSRect(x: bounds.width - Tokens.Space.x1 - actionWidth, y: (bounds.height - Tokens.Space.x6) / 2, width: actionWidth, height: Tokens.Space.x6)
+            // Inset evenly from the toast's edge, top, bottom and right alike.
+            let h = Tokens.Space.x7Height
+            actionButton.frame = NSRect(x: bounds.width - (bounds.height - h) / 2 - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
         }
         let textWidth = bounds.width - chromeWidth
         let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
