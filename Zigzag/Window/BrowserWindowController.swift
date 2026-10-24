@@ -239,6 +239,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             floatVideoOnSwitch(from: shownTab, to: tab)
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
+            root.card.setLoading(false, progress: 1)
+            if let tab, tab.isLoading { root.card.setLoading(true, progress: tab.progress) }
             if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
                 DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(webView) }
             }
@@ -579,7 +581,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func selectedTabChanged(_ change: Tab.Change) {
         guard let tab = shownTab else { return }
         switch change {
+        case .progress:
+            root.card.setLoading(tab.isLoading, progress: tab.progress)
         case .url, .navigation, .loading:
+            root.card.setLoading(tab.isLoading, progress: tab.progress)
             sidebar.update(tab: tab)
             updateWindowTitle()
             offerWebStoreExtension()
@@ -763,6 +768,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
     func windowDidExitFullScreen(_ notification: Notification) { layoutTrafficLights() }
     func windowDidBecomeKey(_ notification: Notification) {
+        // Brand moments in other windows (Settings, Passwords) follow the space in front.
+        Brand.themeChanged.send(())
         layoutTrafficLights()
         WindowManager.shared.windowBecameKey(self)
     }
@@ -804,7 +811,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// First launch: offer to bring everything over from the browsers on this Mac, inside the empty page.
     func showWelcome() {
-        let view = ImportView()
+        let view = ImportView(presentation: .welcome)
         view.frame = root.card.bounds
         view.autoresizingMask = [.width, .height]
         root.card.addSubview(view)

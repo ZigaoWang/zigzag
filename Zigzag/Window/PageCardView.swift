@@ -14,6 +14,49 @@ final class PageCardView: NSView {
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
 
+    /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades when done.
+    private let progressLine = CALayer()
+    private var progress: CGFloat = 0
+    private var isShowingProgress = false
+
+    func setLoading(_ loading: Bool, progress value: Double) {
+        if progressLine.superlayer == nil {
+            progressLine.opacity = 0
+            progressLine.anchorPoint = CGPoint(x: 0, y: 1)
+            // Above the page's own layer.
+            progressLine.zPosition = 100
+            clip.layer?.addSublayer(progressLine)
+        }
+        Tokens.Motion.withoutAnimation { progressLine.backgroundColor = cgColor(Brand.Theme.current.accent) }
+        let target = loading ? max(0.08, CGFloat(value)) : 1
+        guard loading || isShowingProgress else { return }
+        if loading && !isShowingProgress {
+            // A fresh load starts from the left edge.
+            isShowingProgress = true
+            progress = 0
+            Tokens.Motion.withoutAnimation { progressLine.opacity = 1; layoutProgress() }
+        }
+        guard target >= progress || !loading else { return }
+        progress = target
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(loading ? 0.3 : 0.18)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        layoutProgress()
+        CATransaction.commit()
+        guard !loading else { return }
+        isShowingProgress = false
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.35)
+        progressLine.opacity = 0
+        CATransaction.commit()
+    }
+
+    private func layoutProgress() {
+        let top = showsHeader ? PaneHeaderView.height : 0
+        progressLine.bounds = CGRect(x: 0, y: 0, width: clip.bounds.width * progress, height: 2)
+        progressLine.position = CGPoint(x: 0, y: clip.bounds.height - top)
+    }
+
     func setOverlay(_ view: NSView?) {
         overlay?.removeFromSuperview()
         overlay = view
@@ -74,6 +117,7 @@ final class PageCardView: NSView {
             placeholder.frame = content
             overlay?.frame = content
             edge.frame = clip.bounds
+            if progressLine.superlayer != nil { layoutProgress() }
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Tokens.Radius.card, cornerHeight: Tokens.Radius.card, transform: nil)
         }
     }
@@ -86,6 +130,7 @@ final class PageCardView: NSView {
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
             clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+            progressLine.backgroundColor = cgColor(Brand.Theme.current.accent)
             edge.borderColor = cgColor(isFocusedPane ? Tokens.Color.accent.withAlphaComponent(0.55) : Tokens.Color.cardEdge)
             edge.borderWidth = isFocusedPane ? 2 : Tokens.Metric.hairline
             layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
