@@ -28,12 +28,19 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
         controller.showWindow(nil)
     }
 
+    /// Onboarding counts as done only when you finish it or close it yourself; quitting midway brings it back
+    /// next time, where you left the start.
     private func finish() {
+        UserDefaults.standard.set(true, forKey: "ImportOfferDismissed")
         window?.close()
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
         UserDefaults.standard.set(true, forKey: "ImportOfferDismissed")
+        return true
+    }
+
+    func windowWillClose(_ notification: Notification) {
         Self.shared = nil
         let done = onFinish
         onFinish = nil
