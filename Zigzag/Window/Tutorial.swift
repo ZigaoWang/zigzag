@@ -56,15 +56,3 @@ enum Tutorial {
         isHidden = false
     }
 }
-
-/// Straight after onboarding, on a Mac with nothing brought over: a few sample favorites, so the sidebar shows
-/// what favorites are before you make your own.
-enum FirstRun {
-    @MainActor static func prepare(_ controller: BrowserWindowController) {
-        let library = Library.shared
-        guard library.favorites.isEmpty, library.spaces.allSatisfy({ $0.bookmarks.isEmpty }) else { return }
-        let samples: [(String, String)] = [("https://www.google.com", "Google"), ("https://www.youtube.com", "YouTube"), ("https://www.wikipedia.org", "Wikipedia")]
-        library.appendFavorites(samples.compactMap { url, title in URL(string: url).map { Bookmark(url: $0, title: title) } })
-        for (url, _) in samples { if let url = URL(string: url) { FaviconStore.shared.prefetch(for: url) } }
-    }
-}

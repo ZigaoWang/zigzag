@@ -77,7 +77,6 @@ final class WindowManager {
                 guard let controller else { return }
                 controller.showWindow(nil)
                 // Straight after onboarding: the Getting started guide, in the window itself.
-                FirstRun.prepare(controller)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak controller] in
                     if let controller { GuidedTour.start(in: controller) }
                 }
