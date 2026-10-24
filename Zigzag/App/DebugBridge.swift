@@ -117,6 +117,22 @@ enum DebugBridge {
             }
         case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
         case "action": controller.sidebar.address.actionButtons[min(Int(arg) ?? 0, controller.sidebar.address.actionButtons.count - 1)].onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
+        case "importprobe":
+            // Lists the browsers found and how many bookmarks and history pages each has; imports nothing.
+            Task {
+                for source in ImportCoordinator.detectedSources() {
+                    let kind = source.kind
+                    let batch: ImportBatch = await Task.detached {
+                        switch kind {
+                        case .chromium(let b): return ChromiumImporter.read(b, [.bookmarks, .history])
+                        case .firefox(let b): return FirefoxImporter.read(b, [.bookmarks, .history])
+                        case .safari: return SafariImporter.read([.bookmarks, .history])
+                        case .file: return ImportBatch()
+                        }
+                    }.value
+                    debugLog("importprobe \(source.name): \(batch.bookmarks.count) bookmarks, \(batch.history.count) history, problems=\(batch.problems.map(\.message))")
+                }
+            }
         case "keychainprobe":
             // Adds, reads and deletes a dummy item in Zigzag's data protection keychain group; logs only status codes.
             let group = (Bundle.main.object(forInfoDictionaryKey: "AppIdentifierPrefix") as? String ?? "432GL3WKY2.") + "app.zigzag.passwords"
