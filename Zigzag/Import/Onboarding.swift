@@ -23,6 +23,7 @@ final class OnboardingView: NSView {
         for _ in Step.allCases {
             let dot = CALayer()
             dot.cornerRadius = 3
+            dot.zPosition = 10
             layer?.addSublayer(dot)
             dots.append(dot)
         }
@@ -139,7 +140,7 @@ private enum Onboard {
     }
 
     /// Lays a title and line out centered from `y`, returning where the content below should start.
-    static func header(_ title: NSTextField, _ line: NSTextField, in bounds: NSRect, top y: CGFloat, width: CGFloat = 460) -> CGFloat {
+    static func header(_ title: NSTextField, _ line: NSTextField, in bounds: NSRect, top y: CGFloat, width: CGFloat = 540) -> CGFloat {
         let x = (bounds.width - width) / 2
         let th = ceil(title.sizeThatFits(NSSize(width: width, height: 200)).height)
         title.frame = NSRect(x: x, y: y, width: width, height: th)
@@ -210,7 +211,7 @@ private final class HelloPage: NSView {
 private final class BringPage: NSView {
     var onContinue: (() -> Void)?
     private let title = Onboard.title("Bring your stuff over")
-    private let line = Onboard.line("Passwords, bookmarks and history. Your other browser stays exactly as it is.")
+    private let line = Onboard.line("Passwords, bookmarks and history. Your other browser stays as it is.")
     private var tiles: [BrowserTile] = []
     private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
     private let primary = Onboard.primary("Import")
@@ -333,10 +334,10 @@ private final class BringPage: NSView {
 
     override func layout() {
         super.layout()
-        var y = Onboard.header(title, line, in: bounds, top: 84) + Tokens.Space.x8
+        var y = Onboard.header(title, line, in: bounds, top: 72) + Tokens.Space.x8
         let width: CGFloat = 460, gap = Tokens.Space.x3
         let x = (bounds.width - width) / 2
-        let tileWidth = (width - gap) / 2, tileHeight: CGFloat = 72
+        let tileWidth = (width - gap) / 2, tileHeight: CGFloat = 68
         for (i, tile) in tiles.enumerated() {
             let col = CGFloat(i % 2), row = CGFloat(i / 2)
             tile.frame = NSRect(x: x + col * (tileWidth + gap), y: y + row * (tileHeight + gap), width: tileWidth, height: tileHeight)
@@ -375,7 +376,7 @@ private final class BrowserTile: InteractiveView {
 
     private let icon = NSImageView()
     private let name: Label
-    private let detail = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.66))
+    private let detail = NSTextField(wrappingLabelWithString: "")
     private let check = NSImageView()
     private let spinner = RibbonView()
     private let fixButton = TextButton(title: "", font: Tokens.Font.small(.semibold))
@@ -400,7 +401,10 @@ private final class BrowserTile: InteractiveView {
             guard let self else { return }
             self.onFix?(self.fixKind)
         }
-        detail.lineBreakMode = .byTruncatingTail
+        detail.font = Tokens.Font.small()
+        detail.textColor = Onboard.dim(0.66)
+        detail.isSelectable = false
+        detail.maximumNumberOfLines = 2
         [icon, name, detail, check, spinner, fixButton].forEach { addSubview($0) }
         onClick = { [weak self] _ in
             guard let self, !self.isLocked else { return }
@@ -412,7 +416,8 @@ private final class BrowserTile: InteractiveView {
         Task { @MainActor [weak self] in
             let text = await ImportCoordinator.preview(source)
             guard let self, case .idle = self.state else { return }
-            self.detail.stringValue = text
+            self.detail.stringValue = Self.short(text)
+            self.needsLayout = true
         }
     }
 
@@ -454,6 +459,14 @@ private final class BrowserTile: InteractiveView {
         needsLayout = true
     }
 
+    /// The tile has room for a few words: the long previews say the same thing shorter here.
+    private static func short(_ text: String) -> String {
+        text.replacingOccurrences(of: "macOS will need your permission to read it", with: "Needs your permission")
+            .replacingOccurrences(of: "Bookmarks and history need your permission", with: "Needs your permission")
+            .replacingOccurrences(of: " · passwords from the Passwords app", with: "")
+            .replacingOccurrences(of: "spaces and pinned tabs", with: "spaces")
+    }
+
     /// "214 passwords · 3 spaces", or that nothing new was needed.
     private static func sentence(_ s: ImportCoordinator.Summary) -> String {
         func n(_ v: Int, _ one: String, _ many: String) -> String? { v > 0 ? "\(v.formatted()) \(v == 1 ? one : many)" : nil }
@@ -489,9 +502,10 @@ private final class BrowserTile: InteractiveView {
         check.frame = NSRect(x: bounds.width - pad - 16, y: Tokens.Space.x3, width: 16, height: 16)
         spinner.frame = NSRect(x: bounds.width - pad - 16, y: (bounds.height - 16) / 2, width: 16, height: 16)
         let textRight = check.isHidden && spinner.isHidden ? right : min(right, check.frame.minX - Tokens.Space.x2)
-        let block = name.lineHeight + 2 + detail.lineHeight
+        let dh = min(ceil(detail.sizeThatFits(NSSize(width: right - x, height: 100)).height), 32)
+        let block = name.lineHeight + 2 + dh
         name.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: textRight - x, height: name.lineHeight)
-        detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: right - x, height: detail.lineHeight)
+        detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: right - x, height: dh)
     }
 }
 
