@@ -11,11 +11,12 @@ enum Tutorial {
         let keys: [String]
     }
 
+    /// Each step is the keys and three words: nothing to read.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Open a website", how: "Press ⌘T, type wikipedia.org, and press Return.", keys: ["⌘", "T"]),
-        Task(id: "pin", title: "Pin it", how: "Press ⌘D. Pinned pages stay at the top of your sidebar, even after you close them.", keys: ["⌘", "D"]),
-        Task(id: "peek", title: "Peek at a link", how: "Hold Shift and click any link on the page. Press Esc to close it.", keys: ["⇧", "Click"]),
-        Task(id: "space", title: "Make a space", how: "Click + to make a space for another part of your life, like work. Each space has its own tabs.", keys: ["+"]),
+        Task(id: "newTab", title: "Open a website", how: "", keys: ["⌘", "T"]),
+        Task(id: "pin", title: "Pin this page", how: "", keys: ["⌘", "D"]),
+        Task(id: "peek", title: "Peek at a link", how: "", keys: ["⇧", "Click"]),
+        Task(id: "space", title: "Make a space", how: "", keys: ["+"]),
     ]
 
     private static let key = "TutorialDone"

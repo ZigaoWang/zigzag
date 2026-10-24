@@ -8,16 +8,17 @@ final class GuidedTour: NSView {
     private let dim = CAShapeLayer()
     private let ring = CAShapeLayer()
     private let card = FloatingPanelView()
-    private let step = Label("", font: Tokens.Font.small(.semibold), color: Brand.Theme.brand.accent)
+    private let step = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
     private let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: 9, toolTip: "End Getting Started")
     private let check = NSImageView()
-    private let title = Label("", font: .systemFont(ofSize: 16, weight: .semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: .systemFont(ofSize: 15, weight: .semibold), color: Tokens.Color.textPrimary)
     private let how = NSTextField(wrappingLabelWithString: "")
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
     private let finish = PrimaryButton(title: "Start Browsing")
     private var tokens: [SignalToken] = []
     private var celebrating = false
+    private var watch: Timer?
 
     /// Starts, or picks up at the step you're on. Nothing happens once every step is done or it was ended.
     static func start(in controller: BrowserWindowController) {
@@ -68,6 +69,10 @@ final class GuidedTour: NSView {
         tokens.append(controller.tabManager.changed.observe { [weak self] _ in
             DispatchQueue.main.async { self?.layoutTour(animated: true) }
         })
+        // Peek and the address bar come first: the guide steps aside while either is open.
+        watch = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stepAsideIfNeeded() }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -79,7 +84,24 @@ final class GuidedTour: NSView {
         return inCard ? super.hitTest(point) : nil
     }
 
+    private func stepAsideIfNeeded() {
+        guard let controller else { return }
+        let busy = controller.peek.isVisible || controller.hasFloatingPanel
+        let target: CGFloat = busy ? 0 : 1
+        guard alphaValue != target, !isAnimatingOut else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.15
+            self.animator().alphaValue = target
+        }
+        if !busy { layoutTour(animated: false) }
+    }
+
+    private var isAnimatingOut = false
+
     private func end() {
+        isAnimatingOut = true
+        watch?.invalidate()
+        watch = nil
         tokens = []
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.2
@@ -119,15 +141,14 @@ final class GuidedTour: NSView {
         caps.forEach { $0.0.removeFromSuperview() }
         caps = []
         if let task = Tutorial.current, let index = Tutorial.tasks.firstIndex(where: { $0.id == task.id }) {
-            step.stringValue = "Step \(index + 1) of \(Tutorial.tasks.count)"
+            step.stringValue = "\(index + 1)/\(Tutorial.tasks.count)"
             title.stringValue = task.title
-            how.stringValue = task.how
             for key in task.keys {
                 let cap = ColorView(color: Tokens.Color.fieldFill)
                 cap.wantsLayer = true
                 cap.layer?.cornerRadius = 6
                 cap.layer?.cornerCurve = .continuous
-                let label = Label(key, font: .systemFont(ofSize: 13, weight: .semibold), color: Tokens.Color.textPrimary)
+                let label = Label(key, font: .systemFont(ofSize: 15, weight: .semibold), color: Tokens.Color.textPrimary)
                 label.alignment = .center
                 cap.addSubview(label)
                 card.addSubview(cap)
@@ -139,7 +160,7 @@ final class GuidedTour: NSView {
         } else {
             step.stringValue = "Getting started"
             title.stringValue = "You’re all set"
-            how.stringValue = "That’s the basics. You can see this again anytime from Help › Getting Started."
+            how.stringValue = "Help › Getting Started shows this again."
             skip.isHidden = true
             finish.isHidden = false
             close.isHidden = true
@@ -158,11 +179,18 @@ final class GuidedTour: NSView {
         layoutTour(animated: false)
     }
 
+    private var isFinal: Bool { Tutorial.current == nil }
+
+    /// A pill while there's a step: keys, three words, the count. The last card is a little card in the middle.
     private var cardSize: NSSize {
-        let width: CGFloat = 320, pad = Tokens.Space.x5
-        let howHeight = ceil(how.sizeThatFits(NSSize(width: width - pad * 2, height: 200)).height)
-        return NSSize(width: width, height: pad + step.lineHeight + Tokens.Space.x2 + title.lineHeight + Tokens.Space.x1 + howHeight
-                      + Tokens.Space.x4 + Tokens.Space.x8 + pad)
+        if isFinal {
+            let pad = Tokens.Space.x5, width: CGFloat = 300
+            let howHeight = ceil(how.sizeThatFits(NSSize(width: width - pad * 2, height: 200)).height)
+            return NSSize(width: width, height: pad + title.lineHeight + Tokens.Space.x1 + howHeight + Tokens.Space.x4 + Tokens.Space.x8 + pad)
+        }
+        let keys = caps.map { max(34, $0.1.inkWidth + Tokens.Space.x4) }.reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * 4
+        let width = Tokens.Space.x4 + keys + Tokens.Space.x3 + title.textWidth + Tokens.Space.x5 + step.textWidth + Tokens.Space.x3 + skip.fittingWidth + Tokens.Space.x2
+        return NSSize(width: ceil(width), height: 56)
     }
 
     private func layoutTour(animated: Bool) {
@@ -218,29 +246,37 @@ final class GuidedTour: NSView {
     }
 
     private func layoutCard() {
-        let width = card.frame.width, pad = Tokens.Space.x5
-        let inner = width - pad * 2
-        var y = pad
-        step.frame = NSRect(x: pad, y: y, width: inner - 30, height: step.lineHeight)
-        close.frame.origin = NSPoint(x: width - pad - close.frame.width + Tokens.Space.x1, y: y - 5)
-        y = step.frame.maxY + Tokens.Space.x2
-        check.frame = NSRect(x: pad, y: y, width: 18, height: 18)
-        let tx = check.isHidden ? pad : check.frame.maxX + Tokens.Space.x2
-        title.frame = NSRect(x: tx, y: y, width: width - tx - pad, height: title.lineHeight)
-        y = title.frame.maxY + Tokens.Space.x1
-        let howHeight = ceil(how.sizeThatFits(NSSize(width: inner, height: 200)).height)
-        how.frame = NSRect(x: pad, y: y, width: inner, height: howHeight)
-        y = how.frame.maxY + Tokens.Space.x4
-        var x = pad
+        let width = card.frame.width, height = card.frame.height
+        if isFinal {
+            let pad = Tokens.Space.x5, inner = width - pad * 2
+            [step, close, check, skip].forEach { $0.isHidden = true }
+            how.isHidden = false
+            title.frame = NSRect(x: pad, y: pad, width: inner, height: title.lineHeight)
+            let howHeight = ceil(how.sizeThatFits(NSSize(width: inner, height: 200)).height)
+            how.frame = NSRect(x: pad, y: title.frame.maxY + Tokens.Space.x1, width: inner, height: howHeight)
+            let fw = max(finish.fittingWidth, 140)
+            finish.frame = NSRect(x: width - pad - fw, y: how.frame.maxY + Tokens.Space.x4, width: fw, height: Tokens.Space.x8)
+            return
+        }
+        how.isHidden = true
+        step.isHidden = false
+        close.isHidden = true
+        var x = Tokens.Space.x4
         for (cap, label) in caps {
-            let w = max(28, label.inkWidth + Tokens.Space.x4)
-            cap.frame = NSRect(x: x, y: y + 2, width: w, height: 28)
-            label.frame = NSRect(x: 0, y: (28 - label.lineHeight) / 2, width: w, height: label.lineHeight)
+            let w = max(34, label.inkWidth + Tokens.Space.x4)
+            cap.frame = NSRect(x: x, y: (height - 34) / 2, width: w, height: 34)
+            label.frame = NSRect(x: 0, y: (34 - label.lineHeight) / 2, width: w, height: label.lineHeight)
             x += w + 4
         }
+        x += Tokens.Space.x3 - 4
+        if !check.isHidden {
+            check.frame = NSRect(x: x, y: (height - 18) / 2, width: 18, height: 18)
+            x = check.frame.maxX + Tokens.Space.x2
+        }
+        title.frame = NSRect(x: x, y: (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
         let sw = skip.fittingWidth
-        skip.frame = NSRect(x: width - pad - sw + Tokens.Space.x2, y: y, width: sw, height: Tokens.Space.x8)
-        let fw = max(finish.fittingWidth, 140)
-        finish.frame = NSRect(x: width - pad - fw, y: y, width: fw, height: Tokens.Space.x8)
+        skip.frame = NSRect(x: width - Tokens.Space.x2 - sw, y: (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        let cw = step.textWidth + 2
+        step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
     }
 }
