@@ -195,10 +195,11 @@ enum DebugBridge {
             debugLog("arc import: spaces=\(r.result.spaces) bookmarks=\(r.result.bookmarks) history=\(r.result.historyEntries)")
             if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
         case "welcome": WelcomeWindowController.show {}
-        case "welcomesuccess":
+        case "onboardstep":
+            // onboardstep <0-3>: hello, bring, personalize, ready
             WelcomeWindowController.show {}
-            func find(_ view: NSView?) -> ImportView? { view as? ImportView ?? view?.subviews.lazy.compactMap { find($0) }.first }
-            find(WelcomeWindowController.shared?.window?.contentView)?.debugShowSuccess()
+            if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
+               let step = Int(arg).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: false) }
         case "importwindow": ImportWindowController.show()
         case "closewindow":
             // closewindow <title>: closes Zigzag's window with that title (Import, Passwords, Settings).
