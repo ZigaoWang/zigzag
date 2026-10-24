@@ -90,3 +90,23 @@ targets:
         com.apple.security.device.audio-input: true
         com.apple.security.personal-information.location: true
         com.apple.security.cs.allow-unsigned-executable-memory: false
+  ZigzagTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ZigzagTests
+    dependencies:
+      - target: Zigzag
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Zigzag.app/Contents/MacOS/Zigzag
+        BUNDLE_LOADER: $(TEST_HOST)
+schemes:
+  Zigzag:
+    build:
+      targets:
+        Zigzag: all
+        ZigzagTests: [test]
+    test:
+      targets: [ZigzagTests]

@@ -12,7 +12,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                      forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
     }
 
+    /// Unit tests run inside the app; they must never touch the person's windows, session or extensions.
+    static let isHostingTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !Self.isHostingTests else { return }
         _ = Library.shared
         _ = HistoryStore.shared
         ContentBlocker.prepare()
@@ -48,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationWillTerminate(_ notification: Notification) {
+        guard !Self.isHostingTests else { return }
         WindowManager.shared.prepareForTermination()
     }
 

@@ -15,6 +15,7 @@
 		10324776656E836D07CD1B27 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32289A47E7257A31AC82FCB0 /* Controls.swift */; };
 		1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */; };
 		242E316E28B214F1B75E2B6F /* blocklist.info.json in Resources */ = {isa = PBXBuildFile; fileRef = F3B051247D50C308EF2FDA69 /* blocklist.info.json */; };
+		247132AF897197093E229872 /* CRXPackageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */; };
 		2BA694E79AD875D1E25094E5 /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */; };
 		2BAC5D63A9B904BE86762FE6 /* blocklist.json.lzfse in Resources */ = {isa = PBXBuildFile; fileRef = BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */; };
 		2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F9F8B1C1119171EFC0072B /* DebugBridge.swift */; };
@@ -27,6 +28,7 @@
 		407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */; };
 		44E2F9F75871B2E41AE8FD6C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4F4B9A84C7CFFC3CEB0D2D /* WelcomeView.swift */; };
 		4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EE88C88464115895D3647DF /* PopupWindowController.swift */; };
+		52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */ = {isa = PBXBuildFile; fileRef = 3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */; };
 		55E2EE95BF56E2D3A4B618EF /* PageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979ECE3AE8285E787E972E3E /* PageCardView.swift */; };
 		6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0657DD4DA14F56BD051BC34 /* Signal.swift */; };
 		65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F3073C0E2D268EC8C3B767 /* DockProgress.swift */; };
@@ -57,6 +59,7 @@
 		CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192303361A76A758A8F9346F /* FaviconView.swift */; };
 		D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D47467F8351F9270BAE20A /* SidebarRows.swift */; };
 		D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */; };
+		D4333F0C5C4389BE81F84324 /* CRXPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */; };
 		DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9088949B9C029636E9E355 /* Updater.swift */; };
 		E38366D663CE427B640F71A5 /* PeekController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB43BE39C48B06C807284C2 /* PeekController.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
@@ -65,6 +68,16 @@
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B8E4D03FC689942845411A0B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAFC8E8057351FE56D640C13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 19FD92FF5E7C2232EBC622F1;
+			remoteInfo = Zigzag;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
@@ -87,6 +100,7 @@
 		32289A47E7257A31AC82FCB0 /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controls.swift; sourceTree = "<group>"; };
 		32D47467F8351F9270BAE20A /* SidebarRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRows.swift; sourceTree = "<group>"; };
 		34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarController.swift; sourceTree = "<group>"; };
+		3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */ = {isa = PBXFileReference; path = "custom-progress-bar.crx"; sourceTree = "<group>"; };
 		3D49789A1E612924BE5AD995 /* DeskController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskController.swift; sourceTree = "<group>"; };
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		49E59809F43972950AA5B568 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
@@ -95,15 +109,18 @@
 		66958B9657E4B52FE56AA408 /* TabPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPreview.swift; sourceTree = "<group>"; };
 		672B7AF38828D9E9738B29FD /* LinkStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkStatus.swift; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
+		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		765C1F36BCEE463F8B5316BE /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paths.swift; sourceTree = "<group>"; };
 		77478845778FB285ADD29C14 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
 		88F9F8B1C1119171EFC0072B /* DebugBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBridge.swift; sourceTree = "<group>"; };
+		8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackageTests.swift; sourceTree = "<group>"; };
 		91506D36CD561CBD7E11897D /* ContentBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentBlocker.swift; sourceTree = "<group>"; };
 		95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUndo.swift; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackage.swift; sourceTree = "<group>"; };
 		9F78ECBEF8A16738C2C9DF0C /* SidebarMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMenus.swift; sourceTree = "<group>"; };
 		A9C34787271E39E26E0156FC /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
 		AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionHost.swift; sourceTree = "<group>"; };
@@ -211,6 +228,7 @@
 		85A5F772A833404217E58966 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
+				9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */,
 				AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */,
 				118460E2A057D11B6C1946F1 /* ExtensionStore.swift */,
 			);
@@ -315,10 +333,28 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		C4B669E7DCAC024FCA58F074 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		DF27ED16EF9BB28D19F995E5 /* ZigzagTests */ = {
+			isa = PBXGroup;
+			children = (
+				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
+				C4B669E7DCAC024FCA58F074 /* Fixtures */,
+			);
+			path = ZigzagTests;
+			sourceTree = "<group>";
+		};
 		ED8E9F75EF5FAD808ACCF7EE = {
 			isa = PBXGroup;
 			children = (
 				B228F7478163465F1BC541F3 /* Zigzag */,
+				DF27ED16EF9BB28D19F995E5 /* ZigzagTests */,
 				F72FDC008AFDE2EA8248DCDF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -344,6 +380,7 @@
 			isa = PBXGroup;
 			children = (
 				98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */,
+				6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -380,6 +417,25 @@
 			productReference = 98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1C41F196FFE2F1238082669C /* ZigzagTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F507F488034B25E065E61AE1 /* Build configuration list for PBXNativeTarget "ZigzagTests" */;
+			buildPhases = (
+				46B1825D6D07DC8A18B51DB8 /* Sources */,
+				29FBD707D2BB6BEF651AF7AD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				507BDFC89DBB3B30F84441C2 /* PBXTargetDependency */,
+			);
+			name = ZigzagTests;
+			packageProductDependencies = (
+			);
+			productName = ZigzagTests;
+			productReference = 6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -390,6 +446,10 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					19FD92FF5E7C2232EBC622F1 = {
+						DevelopmentTeam = 432GL3WKY2;
+						ProvisioningStyle = Manual;
+					};
+					1C41F196FFE2F1238082669C = {
 						DevelopmentTeam = 432GL3WKY2;
 						ProvisioningStyle = Manual;
 					};
@@ -413,11 +473,20 @@
 			projectRoot = "";
 			targets = (
 				19FD92FF5E7C2232EBC622F1 /* Zigzag */,
+				1C41F196FFE2F1238082669C /* ZigzagTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		29FBD707D2BB6BEF651AF7AD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52954A58F54060FB7FCEF032 /* custom-progress-bar.crx in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1441208B36A4091641A7B3F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -442,6 +511,7 @@
 				0100CD43A4B713911A1FC04E /* BrowserWebView.swift in Sources */,
 				1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */,
 				F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */,
+				D4333F0C5C4389BE81F84324 /* CRXPackage.swift in Sources */,
 				407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */,
 				C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */,
 				A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */,
@@ -491,7 +561,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		46B1825D6D07DC8A18B51DB8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				247132AF897197093E229872 /* CRXPackageTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		507BDFC89DBB3B30F84441C2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 19FD92FF5E7C2232EBC622F1 /* Zigzag */;
+			targetProxy = B8E4D03FC689942845411A0B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		44D455F0F452D4167279BC39 /* Release */ = {
@@ -579,6 +665,23 @@
 			};
 			name = Debug;
 		};
+		90056DB7E3B374FF4961BA13 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.zigzag.ZigzagTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Zigzag.app/Contents/MacOS/Zigzag";
+			};
+			name = Debug;
+		};
 		A4FBD7A0B8903197EE752ECD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -653,6 +756,23 @@
 			};
 			name = Debug;
 		};
+		B62804BF895FE0DB288D2A00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.zigzag.ZigzagTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Zigzag.app/Contents/MacOS/Zigzag";
+			};
+			name = Release;
+		};
 		F32D7B184B938CBF5E1F074F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -686,6 +806,15 @@
 			buildConfigurations = (
 				670D908C0FD1012DB4E9E674 /* Debug */,
 				F32D7B184B938CBF5E1F074F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F507F488034B25E065E61AE1 /* Build configuration list for PBXNativeTarget "ZigzagTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90056DB7E3B374FF4961BA13 /* Debug */,
+				B62804BF895FE0DB288D2A00 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
