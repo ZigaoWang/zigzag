@@ -246,7 +246,8 @@ final class ImportView: NSView {
         }
         let subtitleHeight = ceil(subtitle.sizeThatFits(NSSize(width: width, height: 200)).height)
         let visibleRows = rows.filter { !$0.isHidden }
-        let rowsHeight = visibleRows.map(\.preferredHeight).reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
+        let rowHeights: [CGFloat] = visibleRows.map { $0.preferredHeight(for: width) }
+        let rowsHeight: CGFloat = rowHeights.reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
         let showsChoices = stage == .choose && !sources.isEmpty
         let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + Tokens.Space.x8 : 0
         let emptyHeight: CGFloat = sources.isEmpty && stage == .choose ? ceil(emptyNote.sizeThatFits(NSSize(width: width, height: 200)).height) + Tokens.Space.x4 : 0
@@ -271,7 +272,7 @@ final class ImportView: NSView {
         if !title.stringValue.isEmpty { place(title, height: titleHeight, gap: Tokens.Space.x2) }
         if !subtitle.stringValue.isEmpty { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
         if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
-        for row in visibleRows { place(row, height: row.preferredHeight, gap: Tokens.Space.x2) }
+        for row in visibleRows { place(row, height: row.preferredHeight(for: width), gap: Tokens.Space.x2) }
         if showsChoices {
             y += Tokens.Space.x4
             choiceLabel.isHidden = false
@@ -358,11 +359,31 @@ private final class SourceRow: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    var preferredHeight: CGFloat {
+    /// Measured at the width the row will really have, so nothing is cut off.
+    func preferredHeight(for width: CGFloat) -> CGFloat {
         let base = Tokens.Space.x12 + Tokens.Space.x2
-        let detailHeight = detail.stringValue.isEmpty ? 0 : ceil(detail.sizeThatFits(NSSize(width: 440 - 96, height: 400)).height)
-        let fixes = fixViews.isEmpty ? 0 : Tokens.Space.x8 + Tokens.Space.x2
+        let textWidth = width - textX - Tokens.Space.x3 - Tokens.Space.x8
+        let detailHeight = detail.stringValue.isEmpty ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth, height: 400)).height)
+        let lines = fixLines(for: width - textX - Tokens.Space.x3).count
+        let fixes = lines == 0 ? 0 : CGFloat(lines) * (Tokens.Space.x8 + Tokens.Space.x2)
         return max(base, Tokens.Space.x3 + name.lineHeight + 2 + detailHeight + Tokens.Space.x3 + fixes)
+    }
+
+    private var textX: CGFloat { Tokens.Space.x3 + Tokens.Space.x8 + Tokens.Space.x3 }
+
+    private func fixWidth(_ view: NSView) -> CGFloat { view is FilledField ? 180 : ((view as? TextButton)?.fittingWidth ?? 80) }
+
+    /// The fix buttons, wrapped onto as many lines as the row's width needs.
+    private func fixLines(for width: CGFloat) -> [[NSView]] {
+        var lines: [[NSView]] = [], line: [NSView] = [], used: CGFloat = 0
+        for view in fixViews {
+            let w = fixWidth(view)
+            if !line.isEmpty, used + w > width { lines.append(line); line = []; used = 0 }
+            line.append(view)
+            used += w + Tokens.Space.x2
+        }
+        if !line.isEmpty { lines.append(line) }
+        return lines
     }
 
     private func refresh() {
@@ -453,12 +474,15 @@ private final class SourceRow: InteractiveView {
         let indicator = NSRect(x: bounds.width - pad - Tokens.Space.x5, y: pad + (side - Tokens.Space.x5) / 2, width: Tokens.Space.x5, height: Tokens.Space.x5)
         check.frame = indicator
         spinner.frame = indicator.insetBy(dx: 2, dy: 2)
-        var fx = textX
-        let fy = detail.frame.maxY + Tokens.Space.x2
-        for view in fixViews {
-            let w: CGFloat = view is FilledField ? 180 : ((view as? TextButton)?.fittingWidth ?? 80)
-            view.frame = NSRect(x: fx, y: fy, width: w, height: Tokens.Space.x8)
-            fx += w + Tokens.Space.x2
+        var fy = detail.frame.maxY + Tokens.Space.x2
+        for line in fixLines(for: bounds.width - textX - Tokens.Space.x3) {
+            var fx = textX
+            for view in line {
+                let w = fixWidth(view)
+                view.frame = NSRect(x: fx, y: fy, width: w, height: Tokens.Space.x8)
+                fx += w + Tokens.Space.x2
+            }
+            fy += Tokens.Space.x8 + Tokens.Space.x2
         }
     }
 
