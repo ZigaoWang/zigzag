@@ -94,13 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func newWindow(_ sender: Any?) { WindowManager.shared.newWindow() }
     @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
 
-    @objc func showAbout(_ sender: Any?) {
-        NSApp.orderFrontStandardAboutPanel(options: [
-            .credits: NSAttributedString(string: "A calm browser for the Mac.", attributes: [
-                .font: Tokens.Font.small(), .foregroundColor: NSColor.secondaryLabelColor,
-            ]),
-        ])
-    }
+    @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
 
     @objc func showSettings(_ sender: Any?) { SettingsWindowController.shared.show() }
 
