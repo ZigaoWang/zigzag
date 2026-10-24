@@ -117,8 +117,10 @@ final class WebStoreOffer: FloatingPanelView {
 
     /// The extension's own icon, from the store page.
     private func loadIcon() {
+        // Only from this extension's own page, so a previous page's icon never shows.
+        guard let tab = controller?.tabManager.selectedTab, ExtensionStore.webStoreID(from: tab.url) == id, !tab.isLoading else { return }
         let script = "(document.querySelector('meta[property=\"og:image\"]')||{}).content || ''"
-        controller?.tabManager.selectedTab?.webView?.evaluateJavaScript(script) { [weak self] result, _ in
+        tab.webView?.evaluateJavaScript(script) { [weak self] result, _ in
             MainActor.assumeIsolated {
                 guard let string = result as? String, let url = URL(string: string) else { return }
                 Task { @MainActor [weak self] in
@@ -133,7 +135,7 @@ final class WebStoreOffer: FloatingPanelView {
 
     private func place() {
         guard let card = controller?.root.cardFrame else { return }
-        frame.origin = NSPoint(x: card.midX - Self.size.width / 2, y: card.maxY - Self.size.height - Tokens.Space.x5)
+        frame.origin = NSPoint(x: card.midX - Self.size.width / 2, y: card.minY + Tokens.Space.x4)
     }
 
     private func layoutContent() {
