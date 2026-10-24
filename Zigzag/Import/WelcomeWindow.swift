@@ -62,6 +62,7 @@ private final class WelcomeView: NSView {
         heading.maximumNumberOfLines = 2
         panel.cornerRadius = 0
         panel.layer?.borderWidth = 0
+        panel.showsWatermark = false
         body.font = .systemFont(ofSize: 14)
         body.isSelectable = false
         body.maximumNumberOfLines = 0
@@ -124,12 +125,10 @@ private final class WelcomeView: NSView {
         if !Brand.hasDrawnIn {
             wordmark.drawIn(delay: 0.3)
             Brand.enter([heading, body] + steps, delay: 1.2)
-            panel.watermark.drawIn(delay: 1.35)
             Brand.enter([importView], delay: 1.3)
             Brand.hasDrawnIn = true
         } else {
             Brand.enter([wordmark, heading, body] + steps, delay: 0.05)
-            panel.watermark.drawIn(delay: 0.2)
             Brand.enter([importView], delay: 0.1)
         }
     }

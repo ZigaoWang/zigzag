@@ -16,7 +16,7 @@ final class ImportView: NSView {
     private(set) var stage = Stage.choose { didSet { if oldValue != stage { onStageChange?(stage) } } }
     /// The welcome window follows along, retitling its brand panel at each step.
     var onStageChange: ((Stage) -> Void)?
-    private let showPasswords = TextButton(title: "Open Zigzag Passwords", font: Tokens.Font.body(.medium))
+    private let showPasswords = TextButton(title: "Show Passwords", font: Tokens.Font.body(.medium))
 
     private let hero = ImportHero()
     private let banner = BrandBanner()
@@ -151,9 +151,12 @@ final class ImportView: NSView {
         stage = .done
         title.stringValue = presentation == .window ? "You’re all set" : ""
         let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
-        subtitle.stringValue = passwords > 0
-            ? "Your passwords are saved in Zigzag: in your Mac’s Keychain, synced with iCloud Keychain. Find them in Zigzag’s Passwords window, from Settings or the command bar."
+        // In the welcome window the brand panel already says where everything went; here only the count and the
+        // next step remain.
+        subtitle.stringValue = presentation == .welcome ? "" : passwords > 0
+            ? "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Window › Passwords."
             : "Everything that came over is in your sidebar. You can bring more over anytime from Settings."
+        if presentation == .welcome { rows.forEach { $0.isHidden = true } }
         showPasswords.isHidden = passwords == 0
         // The finished moment: the lit surface, the count, and the ribbon writing itself across it.
         if hero.superview == nil { addSubview(hero) }

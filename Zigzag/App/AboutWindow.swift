@@ -39,6 +39,7 @@ private final class AboutView: NSView {
         surface.fixedTheme = .navy
         surface.cornerRadius = 0
         surface.layer?.borderWidth = 0
+        surface.showsWatermark = false
         wordmark.color = Brand.ribbon
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -64,7 +65,6 @@ private final class AboutView: NSView {
         guard window != nil else { return }
         layoutSubtreeIfNeeded()
         Brand.enter([wordmark], delay: 0.05)
-        surface.watermark.drawIn(delay: 0.15)
         Brand.enter([version, line, updates, copyright], delay: 0.12)
     }
 

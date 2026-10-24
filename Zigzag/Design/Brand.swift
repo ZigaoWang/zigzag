@@ -275,16 +275,23 @@ final class RibbonView: NSView {
         isLooping = true
         layoutSubtreeIfNeeded()
         resetStroke()
-        let cycle: CFTimeInterval = 1.5
-        let end = CAKeyframeAnimation(keyPath: "strokeEnd")
-        end.values = [0, 1, 1]
-        end.keyTimes = [0, 0.5, 1]
-        let start = CAKeyframeAnimation(keyPath: "strokeStart")
-        start.values = [0, 0, 1]
-        start.keyTimes = [0, 0.5, 1]
-        let ease = CAMediaTimingFunction(controlPoints: 0.45, 0, 0.25, 1)
-        end.timingFunctions = [ease, ease]
-        start.timingFunctions = [ease, ease]
+        // One continuous motion: the head runs the length of the ribbon, the tail follows a beat behind, so the
+        // stroke grows, travels and shrinks away with no pause at either end.
+        let cycle: CFTimeInterval = 1.6
+        let ease = CAMediaTimingFunction(name: .easeInEaseOut)
+        let end = CABasicAnimation(keyPath: "strokeEnd")
+        end.fromValue = 0
+        end.toValue = 1
+        end.duration = cycle * 0.66
+        end.timingFunction = ease
+        end.fillMode = .both
+        let start = CABasicAnimation(keyPath: "strokeStart")
+        start.fromValue = 0
+        start.toValue = 1
+        start.beginTime = cycle * 0.34
+        start.duration = cycle * 0.66
+        start.timingFunction = ease
+        start.fillMode = .both
         let group = CAAnimationGroup()
         group.animations = [end, start]
         group.duration = cycle
@@ -325,6 +332,8 @@ final class BrandSurface: NSView {
     var fixedTheme: Brand.Theme? { didSet { applyTheme() } }
     private(set) var theme = Brand.Theme.navy
     var cornerRadius: CGFloat = 18 { didSet { layer?.cornerRadius = cornerRadius } }
+    /// One Z per screen: off where the wordmark is already the logo.
+    var showsWatermark = true { didSet { watermark.isHidden = !showsWatermark } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
