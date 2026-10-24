@@ -176,6 +176,13 @@ private enum Onboard {
         return line.frame.maxY
     }
 
+    /// A screen with one action: the button centered above the step dots.
+    static func centeredFooter(_ primary: PrimaryButton, in bounds: NSRect) {
+        let h = Tokens.Space.x10
+        let w = max(primary.fittingWidth, 176)
+        primary.frame = NSRect(x: round((bounds.width - w) / 2), y: bounds.height - 76 - h, width: w, height: h)
+    }
+
     /// The bottom row: the main button on the right, a quiet choice on the left, above the step dots.
     static func footer(primary: NSView, quiet: NSView?, in bounds: NSRect, width: CGFloat = 460) {
         let h = Tokens.Space.x10
@@ -877,7 +884,7 @@ private final class PersonalizePage: NSView {
         makeDefault.frame = NSRect(x: card.frame.maxX - pad - bw, y: y + (72 - Tokens.Space.x8) / 2, width: bw, height: Tokens.Space.x8)
         let lw = isDefaultLabel.textWidth + 4
         isDefaultLabel.frame = NSRect(x: card.frame.maxX - pad - lw, y: y + (72 - isDefaultLabel.lineHeight) / 2, width: lw, height: isDefaultLabel.lineHeight)
-        Onboard.footer(primary: next, quiet: nil, in: bounds)
+        Onboard.centeredFooter(next, in: bounds)
     }
 }
 
@@ -926,22 +933,27 @@ private final class ReadyPage: NSView {
     override func layout() {
         super.layout()
         var y = Onboard.header(title, line, in: bounds, top: 96) + Tokens.Space.x10
-        let width: CGFloat = 400
-        let x = (bounds.width - width) / 2
-        let capSize: CGFloat = 30
+        let capSize: CGFloat = 30, capGap: CGFloat = 5
+        func capWidth(_ cap: ColorView) -> CGFloat { max(capSize, ((cap.subviews.first as? Label)?.inkWidth ?? 0) + Tokens.Space.x4) }
+        // Keys right-aligned in one column, what they do left-aligned in the next, the pair centered as a block.
+        let keysWidth = rows.map { $0.caps.map(capWidth).reduce(0, +) + CGFloat(max($0.caps.count - 1, 0)) * capGap }.max() ?? 0
+        let textWidth = rows.map { $0.label.textWidth }.max() ?? 0
+        let gap = Tokens.Space.x5
+        let x = round((bounds.width - (keysWidth + gap + textWidth)) / 2)
         for (caps, label) in rows {
-            var cx = x
+            let rowKeys = caps.map(capWidth).reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * capGap
+            var cx = x + keysWidth - rowKeys
             for cap in caps {
                 let text = cap.subviews.first as? Label
-                let w = max(capSize, (text?.inkWidth ?? 0) + Tokens.Space.x4)
+                let w = capWidth(cap)
                 cap.frame = NSRect(x: cx, y: y, width: w, height: capSize)
                 text?.frame = NSRect(x: 0, y: (capSize - (text?.lineHeight ?? 0)) / 2, width: w, height: text?.lineHeight ?? 0)
-                cx += w + 5
+                cx += w + capGap
             }
-            let lx = x + 116
-            label.frame = NSRect(x: lx, y: y + (capSize - label.lineHeight) / 2, width: x + width - lx, height: label.lineHeight)
+            let lx = x + keysWidth + gap
+            label.frame = NSRect(x: lx, y: y + (capSize - label.lineHeight) / 2, width: textWidth + 4, height: label.lineHeight)
             y += capSize + Tokens.Space.x4
         }
-        Onboard.footer(primary: start, quiet: nil, in: bounds)
+        Onboard.centeredFooter(start, in: bounds)
     }
 }
