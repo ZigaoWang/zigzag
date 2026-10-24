@@ -110,6 +110,12 @@ final class FaviconStore {
         }
     }
 
+    /// Keeps an icon we already have (onboarding's site logos), so the sidebar never starts with a globe.
+    func remember(_ image: NSImage, for url: URL) {
+        guard let key = key(for: url), memory[key] == nil else { return }
+        store(image, key: key)
+    }
+
     private func store(_ image: NSImage, key: String) {
         let normalized = Self.normalize(image)
         memory[key] = normalized
