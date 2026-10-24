@@ -140,7 +140,7 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
     let spaceID: UUID
     private let swatchButton = InteractiveView()
     private let swatchFill = NSView()
-    private let name = NSTextField()
+    private let name = PlainTextField(font: Tokens.Font.body(), placeholder: "Name")
     private let grip = NSImageView()
     private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
 
@@ -148,14 +148,9 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
         spaceID = space.id
         super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Space.x10 + Tokens.Space.x1))
         name.stringValue = space.name
-        name.isBordered = false
-        name.drawsBackground = false
-        name.focusRingType = .none
-        name.font = .systemFont(ofSize: NSFont.systemFontSize)
         name.delegate = self
-        name.placeholderString = "Name"
         grip.image = Tokens.Symbol.image("line.3.horizontal", size: Tokens.TypeSize.small)
-        grip.contentTintColor = .tertiaryLabelColor
+        grip.contentTintColor = Tokens.Color.textTertiary
         grip.imageScaling = .scaleNone
         grip.toolTip = "Drag to reorder"
         deleteButton.isHidden = true
@@ -204,10 +199,8 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
     }
 
     private func openColorPicker() {
-        let popover = NSPopover()
-        popover.contentViewController = TintPickerController(spaceID: spaceID)
-        popover.behavior = .transient
-        popover.show(relativeTo: swatchButton.bounds, of: swatchButton, preferredEdge: .maxY)
+        guard let host = window?.contentView else { return }
+        TintPickerPanel.show(spaceID: spaceID, from: swatchButton, in: host)
     }
 
     static func confirmDelete(_ id: UUID, window: NSWindow) {
@@ -222,29 +215,24 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
     }
 }
 
-/// The tint row and custom hue slider in a popover, for Settings.
-final class TintPickerController: NSViewController {
+/// A space's color, in a Zigzag panel under its swatch: the tints, and a slider for any hue.
+final class TintPickerPanel: FloatingPanelView {
+    private static weak var current: TintPickerPanel?
     private let spaceID: UUID
     private var swatches: [TintSwatch] = []
     private let slider = HueSlider()
+    private var monitor: Any?
 
-    init(spaceID: UUID) {
+    private init(spaceID: UUID) {
         self.spaceID = spaceID
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func loadView() {
-        let size = Tokens.Space.x6
-        let gap = Tokens.Space.x2
-        let pad = Tokens.Space.x4
+        super.init(frame: .zero)
+        let size = Tokens.Space.x6, gap = Tokens.Space.x2, pad = Tokens.Space.x4
         swatches = SpaceColor.allCases.map { TintSwatch(kind: .tint($0)) } + [TintSwatch(kind: .custom)]
         let width = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap + pad * 2
-        let view = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: pad * 2 + size + Tokens.Space.x3 + size))
+        frame.size = NSSize(width: width, height: pad * 2 + size + Tokens.Space.x3 + size)
         for (i, swatch) in swatches.enumerated() {
             swatch.frame = NSRect(x: pad + CGFloat(i) * (size + gap), y: pad, width: size, height: size)
-            view.addSubview(swatch)
+            addSubview(swatch)
             swatch.onClick = { [weak self, weak swatch] _ in
                 guard let self, let swatch else { return }
                 switch swatch.kind {
@@ -265,9 +253,33 @@ final class TintPickerController: NSViewController {
             Library.shared.setHue(hue, for: self.spaceID)
             self.refresh()
         }
-        view.addSubview(slider)
-        self.view = view
+        addSubview(slider)
         refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    static func show(spaceID: UUID, from anchor: NSView, in host: NSView) {
+        current?.close()
+        let panel = TintPickerPanel(spaceID: spaceID)
+        let a = anchor.convert(anchor.bounds, to: host)
+        panel.frame.origin = NSPoint(x: max(Tokens.Space.x3, a.minX - Tokens.Space.x2), y: host.isFlipped ? a.maxY + Tokens.Space.x1 : a.minY - Tokens.Space.x1 - panel.frame.height)
+        host.addSubview(panel)
+        panel.present()
+        current = panel
+        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak panel] event in
+            guard let panel else { return event }
+            if event.type == .keyDown { if event.keyCode == 53 { panel.close(); return nil }; return event }
+            if event.window === panel.window, !panel.bounds.contains(panel.convert(event.locationInWindow, from: nil)) { panel.close() }
+            return event
+        }
+    }
+
+    func close() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        dismiss()
     }
 
     private func refresh() {
@@ -283,44 +295,142 @@ final class TintPickerController: NSViewController {
 
 // MARK: - Window
 
-/// Settings in the System Settings style: grouped rows and native controls. What lives here:
-/// the search engine, default browser, spaces, extensions, and importing from Arc. Nothing else, on purpose.
-final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+/// The parts of Settings, each a pane of its own, picked from the toolbar at the top.
+enum SettingsPane: Int, CaseIterable {
+    case general, spaces, passwords, privacy, translation, extensions, shortcuts
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .spaces: "Spaces"
+        case .passwords: "Passwords"
+        case .privacy: "Privacy"
+        case .translation: "Translation"
+        case .extensions: "Extensions"
+        case .shortcuts: "Shortcuts"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .spaces: "square.stack"
+        case .passwords: "key"
+        case .privacy: "hand.raised"
+        case .translation: "translate"
+        case .extensions: "puzzlepiece.extension"
+        case .shortcuts: "command"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .general: "Search, your default browser, and how pages behave."
+        case .spaces: "Each space keeps its own tabs, pins and color. Drag to reorder."
+        case .passwords: "Saved in your Keychain and synced with iCloud Keychain."
+        case .privacy: "What sites keep on this Mac, and the choices you’ve made for them."
+        case .translation: "Pages in other languages, translated on this Mac by Apple."
+        case .extensions: "Extensions from the Chrome Web Store, running in Zigzag."
+        case .shortcuts: "Every keyboard shortcut in Zigzag."
+        }
+    }
+}
+
+/// One pane button in the toolbar: its symbol over its name, a soft fill of the space's accent when chosen.
+private final class PaneTab: InteractiveView {
+    let pane: SettingsPane
+    private let icon = NSImageView()
+    private let label: Label
+
+    init(_ pane: SettingsPane) {
+        self.pane = pane
+        label = Label(pane.title, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.panel - 2
+        layer?.cornerCurve = .continuous
+        icon.image = Tokens.Symbol.image(pane.symbol, size: 18)
+        label.alignment = .center
+        [icon, label].forEach { addSubview($0) }
+        setAccessibilityRole(.radioButton)
+        setAccessibilityLabel(pane.title)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    static let size = NSSize(width: 76, height: 54)
+
+    override func layout() {
+        super.layout()
+        let side: CGFloat = 22
+        icon.frame = NSRect(x: (bounds.width - side) / 2, y: bounds.height - 6 - side, width: side, height: side)
+        label.frame = NSRect(x: 0, y: 6, width: bounds.width, height: label.lineHeight)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let accent = Tokens.Color.accent
+        let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : 0.14) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
+        label.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+    }
+}
+
+/// Settings: a pane toolbar, then each pane's header and its groups, built from Zigzag's own controls.
+final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate {
     static let shared = SettingsWindowController()
+    private let root = FlippedView()
+    private var tabs: [PaneTab] = []
+    private let toolbarEdge = ColorView(color: Tokens.Color.separator)
     private let scroll = NSScrollView()
     private let documentView = FlippedView()
+    private let banner = BrandBanner()
+    private(set) var pane = SettingsPane.general
+
     private let generalGroup = FormGroup()
-    private let spacesGroup = FormGroup()
+    private let behaviorGroup = FormGroup()
     private let importGroup = FormGroup()
+    private let spacesGroup = FormGroup()
     private let passwordsGroup = FormGroup()
+    private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
-    private let saveSwitch = NSSwitch()
-    private let fillSwitch = NSSwitch()
-    private let openPasswordsButton = TextButton.form("Open Passwords")
-    private let blockingSwitch = NSSwitch()
-    private let pipSwitch = NSSwitch()
+    private let translationGroup = FormGroup()
+    private let alwaysGroup = FormGroup()
     private let extensionsGroup = FormGroup()
+    private let developerGroup = FormGroup()
+    private var shortcutGroups: [(String, FormGroup)] = []
+    private let shortcutSearch = FilledField(placeholder: "Search shortcuts")
+
+    private let engine = MenuButton()
+    private let defaultButton = TextButton.form("Make Default")
+    private let defaultStatus = StatusLabel("Zigzag is your default browser")
+    private let blockingToggle = Toggle()
+    private let pipToggle = Toggle()
+    private let saveToggle = Toggle()
+    private let fillToggle = Toggle()
+    private let translateOffer = Toggle()
+    private let translateInto = MenuButton()
+    private var languages: [(id: String, name: String)] = []
+    private let addSpaceButton = TextButton.form("Add Space")
     private let getExtensionsButton = TextButton.form("Get Extensions")
     private let loadUnpackedButton = TextButton.form("Load Unpacked")
-    private var extensionsToken: SignalToken?
-    private let engine = NSPopUpButton()
-    private let defaultButton = TextButton.form("Make Default")
-    private let defaultStatus = NSTextField(labelWithString: "")
-    private let addSpaceButton = TextButton.form("Add Space")
-    private var token: SignalToken?
-    private let width: CGFloat = 540
-    private let banner = BrandBanner()
     private var spaceRows: [SpaceSettingsRow] = []
+    private var token: SignalToken?
+    private var extensionsToken: SignalToken?
+
+    private let width: CGFloat = 720
+    private let toolbarHeight: CGFloat = 96
 
     private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 520),
-                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 640),
+                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "Settings"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.backgroundColor = Tokens.Color.formBackground
+        window.contentMinSize = NSSize(width: 720, height: 460)
+        window.contentMaxSize = NSSize(width: 720, height: 2000)
         super.init(window: window)
         window.delegate = self
         build()
@@ -342,48 +452,73 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         Label(text, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     }
 
-    private func build() {
-        engine.addItems(withTitles: SearchEngine.allCases.map(\.name))
-        for (item, engine) in zip(engine.itemArray, SearchEngine.allCases) {
-            if let icon = FaviconStore.shared.cachedIcon(for: engine.homeURL) { item.image = Self.menuIcon(icon) } else { FaviconStore.shared.prefetch(for: engine.homeURL) }
-        }
-        engine.target = self
-        engine.action = #selector(engineChanged)
-        defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
-        defaultStatus.textColor = .secondaryLabelColor
+    // MARK: Building
 
-        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
+    private func build() {
+        // The toolbar of panes.
+        tabs = SettingsPane.allCases.map { pane in
+            let tab = PaneTab(pane)
+            tab.onClick = { [weak self] _ in self?.show(pane) }
+            root.addSubview(tab)
+            return tab
+        }
+        root.addSubview(toolbarEdge)
+
+        // General
+        engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        SearchEngine.allCases.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
+        engine.onSelect = { index in Library.shared.searchEngine = SearchEngine.allCases[index] }
+        defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
+        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
-        blockingSwitch.controlSize = .small
-        blockingSwitch.target = self
-        blockingSwitch.action = #selector(blockingChanged)
+        blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
+        pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        generalGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingSwitch))
-        pipSwitch.controlSize = .small
-        pipSwitch.target = self
-        pipSwitch.action = #selector(pipChanged)
-        generalGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipSwitch))
+        behaviorGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
+        behaviorGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
+        let importButton = TextButton.form("Import")
+        importButton.onClick = { _ in ImportWindowController.show() }
+        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
 
+        // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
 
+        // Passwords
+        saveToggle.onChange = { [weak self] on in
+            PasswordCapture.offersToSave = on
+            self?.reloadPasswords()
+            self?.layoutDocument()
+        }
+        fillToggle.onChange = { [weak self] on in
+            Autofill.isOn = on
+            if !on { Autofill.shared.hide() }
+            self?.reloadPasswords()
+            self?.layoutDocument()
+        }
+        reloadPasswords()
+
+        // Translation
+        translateOffer.onChange = { on in PageTranslator.offers = on }
+        translateInto.onSelect = { [weak self] index in
+            guard let self else { return }
+            PageTranslator.chosenLanguage = index == 0 ? nil : self.languages[index - 1].id
+        }
+        reloadTranslation()
+        Task { @MainActor in
+            languages = await PageTranslator.targetLanguages()
+            reloadTranslation()
+        }
+
+        // Extensions
         getExtensionsButton.onClick = { [weak self] _ in self?.getExtensions() }
         loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
 
-        for toggle in [saveSwitch, fillSwitch] {
-            toggle.controlSize = .small
-            toggle.target = self
-        }
-        saveSwitch.action = #selector(saveChanged)
-        fillSwitch.action = #selector(fillChanged)
-        openPasswordsButton.onClick = { [weak self] _ in self?.openPasswords() }
-        reloadPasswords()
-        reloadPrivacy()
+        // Shortcuts
+        shortcutSearch.field.delegate = self
 
-        let importButton = TextButton.form("Import")
-        importButton.onClick = { [weak self] _ in self?.importBrowser() }
-        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
+        reloadPrivacy()
 
         scroll.drawsBackground = false
         scroll.automaticallyAdjustsContentInsets = false
@@ -391,41 +526,70 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         scroll.autohidesScrollers = true
         scroll.documentView = documentView
         scroll.useSlimScroller()
-        window?.contentView = scroll
+        root.addSubview(scroll)
+        window?.contentView = root
+        root.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(rootResized), name: NSView.frameDidChangeNotification, object: root)
         reloadSpaces()
         reloadExtensions()
+        show(.general)
     }
+
+    @objc private func rootResized() { layoutRoot() }
+
+    private func layoutRoot() {
+        let size = PaneTab.size
+        let gap: CGFloat = 2
+        let total = CGFloat(tabs.count) * size.width + CGFloat(tabs.count - 1) * gap
+        var x = round((root.bounds.width - total) / 2)
+        for tab in tabs {
+            tab.frame = NSRect(x: x, y: toolbarHeight - size.height - Tokens.Space.x2, width: size.width, height: size.height)
+            x += size.width + gap
+        }
+        toolbarEdge.frame = NSRect(x: 0, y: toolbarHeight, width: root.bounds.width, height: Tokens.Metric.hairline)
+        scroll.frame = NSRect(x: 0, y: toolbarHeight + Tokens.Metric.hairline, width: root.bounds.width, height: max(0, root.bounds.height - toolbarHeight - Tokens.Metric.hairline))
+        layoutDocument()
+    }
+
+    /// Opens a pane.
+    func show(_ pane: SettingsPane) {
+        self.pane = pane
+        tabs.forEach { $0.isSelected = $0.pane == pane }
+        if pane == .privacy { reloadPrivacy() }
+        if pane == .shortcuts { reloadShortcuts() }
+        layoutRoot()
+        documentView.scroll(.zero)
+        Brand.enter(Array(documentView.subviews.prefix(4)))
+    }
+
+    // MARK: Groups
 
     private func reloadExtensions() {
         extensionsGroup.removeAllRows()
-        defer { layoutDocument() }
+        developerGroup.removeAllRows()
+        defer { if pane == .extensions { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
         loadUnpackedButton.isHidden = !ExtensionStore.developerMode
         let installed = ExtensionHost.shared.installed.sorted {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
         if installed.isEmpty {
-            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Open one in the Chrome Web Store and choose Add to Zigzag.", control: NSView()))
+            let get = TextButton.form("Get Extensions")
+            get.onClick = { [weak self] _ in self?.getExtensions() }
+            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", control: get))
         }
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
-        let developer = NSSwitch()
-        developer.controlSize = .small
-        developer.state = ExtensionStore.developerMode ? .on : .off
-        let developerTarget = SidebarMenus.Handler { [weak self, weak developer] in
-            ExtensionStore.developerMode = developer?.state == .on
+        let developer = Toggle(isOn: ExtensionStore.developerMode)
+        developer.onChange = { [weak self] on in
+            ExtensionStore.developerMode = on
             self?.reloadExtensions()
         }
-        developer.target = developerTarget
-        developer.action = #selector(SidebarMenus.Handler.runAction(_:))
-        let developerRow = FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", control: developer)
-        objc_setAssociatedObject(developerRow, "target", developerTarget, .OBJC_ASSOCIATION_RETAIN)
-        extensionsGroup.add(developerRow)
+        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", control: developer))
     }
 
     @available(macOS 15.4, *)
     private func extensionRow(id: String, ext: WKWebExtension) -> FormRow {
         var controls: [NSView] = []
-        var targets: [AnyObject] = []
         if ExtensionStore.needsApproval(id) {
             let review = TextButton.form("Review Update")
             review.onClick = { _ in
@@ -436,25 +600,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             controls.append(review)
         }
         if ExtensionStore.isUnpacked(id) {
-            let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Reload from Its Folder")
+            let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Reload from Its Folder")
             reload.onClick = { _ in Task { await ExtensionStore.reloadUnpacked(id) } }
             controls.append(reload)
         }
-        let remove = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
+        let remove = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
         remove.onClick = { [weak self] _ in self?.confirmRemove(id: id, name: ext.displayName ?? "this extension") }
         controls.append(remove)
-        let toggle = NSSwitch()
-        toggle.controlSize = .small
-        toggle.state = ExtensionStore.isEnabled(id) ? .on : .off
-        let toggleTarget = SidebarMenus.Handler { [weak toggle] in ExtensionStore.setEnabled(id, toggle?.state == .on) }
-        toggle.target = toggleTarget
-        toggle.action = #selector(SidebarMenus.Handler.runAction(_:))
+        let toggle = Toggle(isOn: ExtensionStore.isEnabled(id))
+        toggle.onChange = { on in ExtensionStore.setEnabled(id, on) }
         controls.append(toggle)
-        targets.append(toggleTarget)
         let stack = NSStackView(views: controls)
         stack.spacing = Tokens.Space.x2
 
-        // "Version 1.2 · Unpacked · Won't work here: side panel" — what matters about it at a glance.
+        // "Version 1.2 · Unpacked · 1 feature won't work here": what matters about it at a glance.
         var detail: [String] = [ext.version.map { "Version \($0)" } ?? ""].filter { !$0.isEmpty }
         if ExtensionStore.isUnpacked(id) { detail.append("Unpacked") }
         if ExtensionStore.needsApproval(id) { detail.append("Update wants more access") }
@@ -462,20 +621,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if let manifest = ExtensionStore.manifest(for: id) {
             let limits = ExtensionReport(extension: ext, manifest: manifest, id: id).limits
             if !limits.isEmpty {
-                // The count fits the row; the names are a hover away.
                 detail.append(limits.count == 1 ? "1 feature won’t work here" : "\(limits.count) features won’t work here")
                 let names = limits.map { $0.prefix(1).lowercased() + $0.dropFirst() }
                 limitsNote = "Won’t work in Zigzag: " + ListFormatter.localizedString(byJoining: names) + "."
             }
         }
-        let row = FormRow(title: ext.displayName ?? id, detail: detail.joined(separator: " · "),
-                          icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        let row = FormRow(title: ext.displayName ?? id, detail: detail.joined(separator: " · "), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
         row.toolTip = limitsNote
-        objc_setAssociatedObject(row, "targets", targets, .OBJC_ASSOCIATION_RETAIN)
         return row
     }
 
-    @objc private func loadUnpacked() {
+    private func loadUnpacked() {
         guard #available(macOS 15.4, *), let window else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -485,10 +641,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor in
-                if await ExtensionStore.loadUnpacked(url) == nil {
-                    if let host = window.contentView {
-                        ConfirmSheet.notice(in: host, title: "Couldn’t load this extension", message: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.")
-                    }
+                if await ExtensionStore.loadUnpacked(url) == nil, let host = window.contentView {
+                    ConfirmSheet.notice(in: host, title: "Couldn’t load this extension", message: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.")
                 }
             }
         }
@@ -505,25 +659,120 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             spacesGroup.add(row)
             return row
         }
+        if pane == .spaces { layoutDocument() }
+    }
+
+    /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
+    private func reloadPasswords() {
+        passwordsGroup.removeAllRows()
+        passwordsWindowGroup.removeAllRows()
+        saveToggle.isOn = PasswordCapture.offersToSave
+        fillToggle.isOn = Autofill.isOn
+        let manager = PasswordManagers.active
+        let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
+        let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
+        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveToggle))
+        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillToggle))
+        let open = TextButton.form("Open Passwords")
+        open.onClick = { _ in PasswordsWindowController.show() }
+        passwordsWindowGroup.add(FormRow(title: "Your passwords", detail: "See, edit and export them. Also in Window › Passwords (⌥⌘K).", control: open))
+        let bring = TextButton.form("Import")
+        bring.onClick = { _ in ImportWindowController.show() }
+        passwordsWindowGroup.add(FormRow(title: "Bring passwords over", detail: "From another browser, or a password export.", control: bring))
+    }
+
+    private func reloadTranslation() {
+        translationGroup.removeAllRows()
+        alwaysGroup.removeAllRows()
+        let system = Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
+        translateInto.options = [MenuButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { MenuButton.Option(title: $0.name, image: nil) }
+        translateInto.selectedIndex = PageTranslator.chosenLanguage.flatMap { chosen in languages.firstIndex { $0.id == chosen }.map { $0 + 1 } } ?? 0
+        translateOffer.isOn = PageTranslator.offers
+        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
+        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", control: translateOffer))
+        let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
+        let reset = TextButton.form("Reset")
+        reset.isEnabled = !always.isEmpty
+        reset.onClick = { [weak self] _ in
+            PageTranslator.alwaysLanguages = []
+            self?.reloadTranslation()
+            self?.layoutDocument()
+        }
+        alwaysGroup.add(FormRow(title: "Always translate",
+                                detail: always.isEmpty ? "None yet. Turn on Always Translate from a page’s site controls." : ListFormatter.localizedString(byJoining: always) + ".",
+                                control: reset))
+    }
+
+    // MARK: Shortcuts
+
+    /// Every shortcut, read from the menu bar itself so the list is always right.
+    private func reloadShortcuts() {
+        let query = shortcutSearch.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
+        var groups: [(String, FormGroup)] = []
+        for top in NSApp.mainMenu?.items ?? [] {
+            guard let menu = top.submenu else { continue }
+            let group = FormGroup()
+            func walk(_ menu: NSMenu, prefix: String) {
+                for item in menu.items where !item.isSeparatorItem {
+                    if let sub = item.submenu { walk(sub, prefix: item.title + " › "); continue }
+                    guard !item.keyEquivalent.isEmpty, !item.isHidden || item.title.hasPrefix("Close Tabs") else { continue }
+                    let title = prefix + item.title
+                    guard query.isEmpty || title.lowercased().contains(query) else { continue }
+                    group.add(ShortcutRow(title: title, keys: Self.keys(item)))
+                }
+            }
+            walk(menu, prefix: "")
+            if top.title == "View" {
+                for (title, keys) in [("Go to tab 1 to 8, or the last tab", ["⌘", "1–9"]), ("Go to space 1 to 9", ["⌃", "1–9"])] where query.isEmpty || title.lowercased().contains(query) {
+                    group.add(ShortcutRow(title: title, keys: keys))
+                }
+            }
+            if !group.rows.isEmpty { groups.append((top.title == "Zigzag" ? "Zigzag" : top.title, group)) }
+        }
+        shortcutGroups = groups
+    }
+
+    private static func keys(_ item: NSMenuItem) -> [String] {
+        var keys: [String] = []
+        let m = item.keyEquivalentModifierMask
+        if m.contains(.control) { keys.append("⌃") }
+        if m.contains(.option) { keys.append("⌥") }
+        if m.contains(.shift) || item.keyEquivalent.uppercased() == item.keyEquivalent && item.keyEquivalent.lowercased() != item.keyEquivalent { keys.append("⇧") }
+        if m.contains(.command) { keys.append("⌘") }
+        let special: [Int: String] = [NSUpArrowFunctionKey: "↑", NSDownArrowFunctionKey: "↓", NSLeftArrowFunctionKey: "←", NSRightArrowFunctionKey: "→"]
+        if let scalar = item.keyEquivalent.unicodeScalars.first, let name = special[Int(scalar.value)] {
+            keys.append(name)
+        } else {
+            keys.append(item.keyEquivalent == " " ? "Space" : item.keyEquivalent.uppercased())
+        }
+        return keys
+    }
+
+    func controlTextDidChange(_ obj: Notification) {
+        reloadShortcuts()
         layoutDocument()
     }
 
+    // MARK: Layout
+
     private func layoutDocument() {
         documentView.subviews.forEach { $0.removeFromSuperview() }
-        let pad = Tokens.Space.x6
+        let pad = Tokens.Space.x8
         let contentWidth = width - pad * 2
-        // The header: a wash of the space's color under the title, fading into the form.
-        banner.title = "Settings"
-        banner.titleSize = 30
+        banner.title = pane.title
+        banner.subtitle = pane.subtitle
+        banner.titleSize = 26
         banner.contentInset = pad + Tokens.Space.x1
-        banner.frame = NSRect(x: 0, y: 0, width: width, height: 104)
+        banner.washOverhang = 0
+        banner.frame = NSRect(x: 0, y: 0, width: width, height: 92)
         documentView.addSubview(banner, positioned: .below, relativeTo: nil)
         var y: CGFloat = banner.frame.maxY + Tokens.Space.x2
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
-            if let title {
-                let label = header(title)
-                label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth - (accessory?.fittingSize.width ?? 0) - Tokens.Space.x4, height: label.lineHeight)
+            if title != nil || accessory != nil {
+                let label = header(title ?? "")
+                let accessoryWidth = accessory?.fittingSize.width ?? 0
+                label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth - accessoryWidth - Tokens.Space.x4, height: label.lineHeight)
                 documentView.addSubview(label)
                 if let accessory {
                     let size = accessory.fittingSize
@@ -538,40 +787,55 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             y = group.frame.maxY + Tokens.Space.x6
         }
 
-        section(nil, generalGroup)
-        section("Spaces", spacesGroup, accessory: addSpaceButton)
-        if #available(macOS 15.4, *) {
+        switch pane {
+        case .general:
+            section(nil, generalGroup)
+            section(nil, behaviorGroup)
+            section(nil, importGroup)
+        case .spaces:
+            section("Your spaces", spacesGroup, accessory: addSpaceButton)
+        case .passwords:
+            section(nil, passwordsGroup)
+            section(nil, passwordsWindowGroup)
+        case .privacy:
+            section(nil, privacyGroup)
+        case .translation:
+            section(nil, translationGroup)
+            section(nil, alwaysGroup)
+        case .extensions:
             let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
             buttons.spacing = Tokens.Space.x2
-            section("Extensions", extensionsGroup, accessory: buttons)
+            section("Installed", extensionsGroup, accessory: buttons)
+            section(nil, developerGroup)
+        case .shortcuts:
+            shortcutSearch.frame = NSRect(x: pad, y: y, width: contentWidth, height: Tokens.Space.x8)
+            shortcutSearch.tint = Tokens.Color.accent
+            documentView.addSubview(shortcutSearch)
+            y = shortcutSearch.frame.maxY + Tokens.Space.x5
+            if shortcutGroups.isEmpty {
+                let none = Label("No shortcuts match “\(shortcutSearch.stringValue)”.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+                none.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth, height: none.lineHeight)
+                documentView.addSubview(none)
+                y = none.frame.maxY + Tokens.Space.x6
+            }
+            for (title, group) in shortcutGroups { section(title, group) }
         }
-        section("Passwords", passwordsGroup, accessory: openPasswordsButton)
-        section("Privacy", privacyGroup)
-        if !importGroup.rows.isEmpty { section(nil, importGroup) }
 
-        documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
-        guard let window else { return }
-        let maxHeight = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
-        let height = min(y, maxHeight * 0.85)
-        let top = window.frame.maxY
-        window.setContentSize(NSSize(width: width, height: height))
-        if window.isVisible { window.setFrameTopLeftPoint(NSPoint(x: window.frame.minX, y: top)) }
-        scroll.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        let height = max(y, scroll.contentSize.height)
+        documentView.frame = NSRect(x: 0, y: 0, width: width, height: height)
     }
 
     private func refresh() {
-        for (item, engine) in zip(engine.itemArray, SearchEngine.allCases) where item.image == nil {
-            item.image = FaviconStore.shared.cachedIcon(for: engine.homeURL).map(Self.menuIcon)
-        }
-        engine.selectItem(withTitle: Library.shared.searchEngine.name)
+        engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        engine.selectedIndex = SearchEngine.allCases.firstIndex(of: Library.shared.searchEngine) ?? 0
         let isDefault = Self.isDefaultBrowser
-        defaultStatus.stringValue = "Zigzag opens your links"
         defaultStatus.isHidden = !isDefault
-        blockingSwitch.state = ContentBlocker.isEnabled ? .on : .off
-        pipSwitch.state = PictureInPicture.followsTabs ? .on : .off
-        saveSwitch.state = PasswordCapture.offersToSave ? .on : .off
-        fillSwitch.state = Autofill.isOn ? .on : .off
         defaultButton.isHidden = isDefault
+        blockingToggle.isOn = ContentBlocker.isEnabled
+        pipToggle.isOn = PictureInPicture.followsTabs
+        saveToggle.isOn = PasswordCapture.offersToSave
+        fillToggle.isOn = Autofill.isOn
+        translateOffer.isOn = PageTranslator.offers
         generalGroup.rows.forEach { $0.needsLayout = true }
     }
 
@@ -579,9 +843,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         refresh()
         reloadSpaces()
         reloadExtensions()
+        reloadPasswords()
+        reloadTranslation()
         if window?.isVisible != true { window?.center() }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+        layoutRoot()
         // Nothing is focused until you click it; a settings window shouldn't start in edit mode.
         window?.makeFirstResponder(nil)
     }
@@ -631,51 +898,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Actions
 
-    @objc private func engineChanged() {
-        if let engine = SearchEngine.allCases.first(where: { $0.name == engine.titleOfSelectedItem }) {
-            Library.shared.searchEngine = engine
-        }
-    }
-
-    @objc private func makeDefault() {
+    private func makeDefault() {
         DefaultBrowser.make()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(); self?.layoutDocument() }
     }
 
-    @objc private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
-
-    @objc private func importBrowser() { ImportWindowController.show() }
-
-    @objc private func blockingChanged() { ContentBlocker.isEnabled = blockingSwitch.state == .on }
-
-    @objc private func pipChanged() { PictureInPicture.followsTabs = pipSwitch.state == .on }
-
-    /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
-    private func reloadPasswords() {
-        passwordsGroup.removeAllRows()
-        saveSwitch.state = PasswordCapture.offersToSave ? .on : .off
-        fillSwitch.state = Autofill.isOn ? .on : .off
-        let manager = PasswordManagers.active
-        let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
-        let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
-        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveSwitch))
-        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillSwitch))
-    }
-
-    @objc private func saveChanged() {
-        PasswordCapture.offersToSave = saveSwitch.state == .on
-        reloadPasswords()
-        layoutDocument()
-    }
-
-    @objc private func fillChanged() {
-        Autofill.isOn = fillSwitch.state == .on
-        if !Autofill.isOn { Autofill.shared.hide() }
-        reloadPasswords()
-        layoutDocument()
-    }
-
-    @objc private func openPasswords() { PasswordsWindowController.show() }
+    private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
 
     // MARK: Privacy
 
@@ -752,7 +980,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    @objc private func getExtensions() {
+    private func getExtensions() {
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
         controller.tabManager.newTab(url: ExtensionStore.webStoreURL)
         controller.window?.makeKeyAndOrderFront(nil)
@@ -770,6 +998,50 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
               let app = NSWorkspace.shared.urlForApplication(toOpen: url) else { return false }
         return app.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL
             || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
+    }
+}
+
+/// One shortcut: what it does, and its keys drawn as small keycaps.
+final class ShortcutRow: NSView {
+    private let title: Label
+    private var caps: [(ColorView, Label)] = []
+
+    init(title text: String, keys: [String]) {
+        title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 40))
+        addSubview(title)
+        for key in keys {
+            let cap = ColorView(color: Tokens.Color.fieldFill)
+            cap.wantsLayer = true
+            cap.layer?.cornerRadius = 5
+            cap.layer?.cornerCurve = .continuous
+            let label = Label(key, font: .systemFont(ofSize: Tokens.TypeSize.small, weight: .semibold), color: Tokens.Color.textSecondary)
+            label.alignment = .center
+            cap.addSubview(label)
+            addSubview(cap)
+            caps.append((cap, label))
+        }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel("\(text): \(keys.joined(separator: " "))")
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        let pad = Tokens.Space.x3
+        let capHeight: CGFloat = 22
+        var x = bounds.width - pad
+        for (cap, label) in caps.reversed() {
+            let w = max(capHeight, label.inkWidth + Tokens.Space.x3)
+            x -= w
+            cap.frame = NSRect(x: x, y: (bounds.height - capHeight) / 2, width: w, height: capHeight)
+            label.frame = NSRect(x: 0, y: (capHeight - label.lineHeight) / 2, width: w, height: label.lineHeight)
+            x -= 4
+        }
+        title.frame = NSRect(x: pad, y: (bounds.height - title.lineHeight) / 2, width: max(0, x - pad - Tokens.Space.x3), height: title.lineHeight)
     }
 }
 
