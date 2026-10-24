@@ -205,6 +205,10 @@ enum DebugBridge {
                 webView.mouseMoved(with: e)
             }
         case "closetab": controller.closeTab(nil)
+        case "closematching":
+            // closematching <text>: closes this space's tabs whose title or address contains the text.
+            let doomed = controller.tabManager.currentTabs.filter { $0.displayTitle.contains(arg) || ($0.url?.absoluteString.contains(arg) ?? false) }
+            controller.tabManager.close(doomed)
         case "pip":
             controller.selectedWebView?.callAsyncJavaScript("const v = [...document.querySelectorAll('video')].find(v => !v.paused); if (!v) return 'no video'; v.webkitSetPresentationMode('picture-in-picture'); await new Promise(r => setTimeout(r, 800)); return v.webkitPresentationMode;", arguments: [:], in: nil, in: .page) { result in
                 debugLog("pip => \(result)")
