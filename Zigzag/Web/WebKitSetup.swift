@@ -31,6 +31,10 @@ enum WebKitSetup {
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
+        // Zigzag's own pages, like Getting started.
+        if configuration.urlSchemeHandler(forURLScheme: InternalPages.scheme) == nil {
+            configuration.setURLSchemeHandler(InternalPages.shared, forURLScheme: InternalPages.scheme)
+        }
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         if #available(macOS 15.4, *), configuration.webExtensionController == nil {
             configuration.webExtensionController = ExtensionHost.shared.controller

@@ -53,6 +53,7 @@
 		66E5020894B420AEB3943EAC /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 256245226DA14768B001589E /* Tokens.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
+		6DE77407293C13A7B5C871FB /* WelcomePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 926E5B1ED5A65F10B041B64D /* WelcomePage.swift */; };
 		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
 		72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30417C99681AAC2507555F94 /* ExtensionReport.swift */; };
 		75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C34787271E39E26E0156FC /* MainMenu.swift */; };
@@ -176,6 +177,7 @@
 		8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTranslator.swift; sourceTree = "<group>"; };
 		8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackageTests.swift; sourceTree = "<group>"; };
 		91506D36CD561CBD7E11897D /* ContentBlocker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentBlocker.swift; sourceTree = "<group>"; };
+		926E5B1ED5A65F10B041B64D /* WelcomePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomePage.swift; sourceTree = "<group>"; };
 		959ACDC16ECDF0A6CED7B431 /* PasswordGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordGenerator.swift; sourceTree = "<group>"; };
 		95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUndo.swift; sourceTree = "<group>"; };
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
@@ -389,6 +391,7 @@
 				CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */,
 				1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */,
 				C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */,
+				926E5B1ED5A65F10B041B64D /* WelcomePage.swift */,
 			);
 			path = Web;
 			sourceTree = "<group>";
@@ -721,6 +724,7 @@
 				DDFF8EFE3CB4DBF463105561 /* Updater.swift in Sources */,
 				82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */,
 				F972A38781338935BAF22135 /* WebsiteData.swift in Sources */,
+				6DE77407293C13A7B5C871FB /* WelcomePage.swift in Sources */,
 				089B04904C4690F9A9C519AC /* WelcomeWindow.swift in Sources */,
 				2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */,
 				17296DB4782870C9CD64FC6F /* WindowTour.swift in Sources */,
