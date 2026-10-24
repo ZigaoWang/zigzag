@@ -234,6 +234,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let tab = tabManager.selectedTab
         if tab != nil { dismissWelcome() }
         if tab !== shownTab {
+            floatVideoOnSwitch(from: shownTab, to: tab)
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
             if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
@@ -396,6 +397,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private weak var nowPlayingTab: Tab?
+
+    /// Leaving a tab while its video plays keeps the video with you, floating; coming back puts it in the page.
+    private func floatVideoOnSwitch(from old: Tab?, to new: Tab?) {
+        guard PictureInPicture.followsTabs else { return }
+        if let webView = new?.webView, webView.isPictureInPictureActive, new?.floatedOnSwitch == true {
+            webView.togglePictureInPicture()
+            new?.floatedOnSwitch = false
+        }
+        if let old, old.isPlayingAudio, let webView = old.webView, webView.canTogglePictureInPicture, !webView.isPictureInPictureActive {
+            webView.togglePictureInPicture()
+            old.floatedOnSwitch = true
+        }
+    }
 
     /// Puts the selected tab in the page card, or both halves of its split side by side.
     private func showPages() {

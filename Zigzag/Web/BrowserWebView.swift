@@ -60,3 +60,37 @@ final class BrowserWebView: WKWebView {
         DispatchQueue.main.async { BrowserWebView.pendingDisposition = nil }
     }
 }
+
+// MARK: - Picture in picture
+
+/// WebKit floats a page's main playing video through a method it doesn't publish; Safari's own button uses it.
+/// Every use checks it's there first, so if it goes away the page's own button (PageScripts) still works.
+extension WKWebView {
+    private static let canToggle = NSSelectorFromString("_canTogglePictureInPicture")
+    private static let isActive = NSSelectorFromString("_isPictureInPictureActive")
+    private static let toggle = NSSelectorFromString("_togglePictureInPicture")
+
+    private func flag(_ selector: Selector) -> Bool {
+        guard responds(to: selector) else { return false }
+        typealias Getter = @convention(c) (AnyObject, Selector) -> Bool
+        return unsafeBitCast(method(for: selector), to: Getter.self)(self, selector)
+    }
+
+    /// True when the page has a playing video that can float.
+    var canTogglePictureInPicture: Bool { responds(to: Self.toggle) && flag(Self.canToggle) }
+    var isPictureInPictureActive: Bool { flag(Self.isActive) }
+
+    func togglePictureInPicture() {
+        guard canTogglePictureInPicture || isPictureInPictureActive else { return }
+        perform(Self.toggle)
+    }
+}
+
+enum PictureInPicture {
+    private static let key = "PictureInPictureFollowsTabs"
+    /// Float a playing video when you switch to another tab. On unless turned off in Settings.
+    static var followsTabs: Bool {
+        get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+}

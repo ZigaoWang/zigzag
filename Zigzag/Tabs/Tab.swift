@@ -203,6 +203,9 @@ final class Tab: NSObject {
         Self.load(url, in: webView)
     }
 
+    /// Set when switching away floated this tab's video, so switching back can put it back.
+    var floatedOnSwitch = false
+
     /// True while the web view was built for an extension's own pages (settings, dashboards).
     private var showsExtensionPage = false
 

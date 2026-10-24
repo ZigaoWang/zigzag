@@ -118,6 +118,7 @@ enum MainMenu {
             item("Zoom In", #selector(C.zoomIn(_:)), "+"),
             item("Zoom Out", #selector(C.zoomOut(_:)), "-"),
             item("Mute Tab", #selector(C.toggleMute(_:)), "m", [.command, .shift]),
+            item("Picture in Picture", #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
             .separator(),
             submenu("Developer", [
                 item("Web Inspector", #selector(C.showWebInspector(_:)), "i", [.command, .option]),
