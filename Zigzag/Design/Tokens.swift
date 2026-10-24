@@ -287,7 +287,9 @@ enum Tokens {
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.18), dark: hex(0x000000, alpha: 0.5))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
-        static let accent = NSColor.controlAccentColor
+        /// Zigzag's one accent: the space's own, so progress, focus, selection and actions agree everywhere.
+        /// Native controls (switches, pop-ups) keep the system's.
+        @MainActor static var accent: NSColor { Brand.Theme.current.accent }
         /// Counts on extension buttons: quiet, never competing with the page.
         static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
 
