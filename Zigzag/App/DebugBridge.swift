@@ -130,6 +130,14 @@ enum DebugBridge {
                     debugLog("popupjs => \(String(describing: result).prefix(2000)) \(String(describing: error))")
                 }
             } else { debugLog("popupjs: no popup") }
+        case "jsclient":
+            // Like js, in Zigzag's own script world rather than the page's.
+            controller.selectedWebView?.evaluateJavaScript(arg, in: nil, in: .defaultClient) { result in
+                switch result {
+                case .success(let value): debugLog("jsclient => \(String(describing: value).prefix(1500))")
+                case .failure(let error): debugLog("jsclient error \(error)")
+                }
+            }
         case "js":
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
@@ -160,7 +168,7 @@ enum DebugBridge {
                 switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
             }
             let chars = ch == "esc" ? "\u{1b}" : ch == "tab" ? "\t" : ch
-            let codes: [String: UInt16] = ["s": 1, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3]
+            let codes: [String: UInt16] = ["s": 1, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35]
             if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                         windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
                                         isARepeat: false, keyCode: codes[ch] ?? 0) {
