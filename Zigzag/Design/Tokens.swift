@@ -297,6 +297,12 @@ enum Tokens {
         static let formGroupEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06))
         static let progress = dynamic(light: hex(0x000000, alpha: 0.28), dark: hex(0xFFFFFF, alpha: 0.32))
         static let destructive = NSColor.systemRed
+        /// Status: something to fix (a weak password, an import problem).
+        static let warning = NSColor.systemOrange
+        /// Status: worth knowing (a reused password).
+        static let caution = NSColor.systemYellow
+        /// Status: done and fine.
+        static let success = NSColor.systemGreen
     }
 
     // MARK: - Shadows (purposeful only)
