@@ -357,6 +357,8 @@ final class SidebarView: NSView {
 
     /// The row of space dots.
     var dotsAnchor: NSView { bottomBar }
+    /// The + that makes a space.
+    var newSpaceAnchor: NSView { newSpaceButton }
     var onEditSpace: ((UUID) -> Void)?
 
     /// The bottom stack: the now-playing control sits above the dots.

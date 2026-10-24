@@ -26,8 +26,6 @@ final class FaviconStore {
     }
 
     func cachedIcon(for url: URL) -> NSImage? {
-        // Zigzag's own pages wear its icon.
-        if url.scheme == InternalPages.scheme { return NSApp.applicationIconImage }
         // An extension's own pages wear the extension's icon.
         if #available(macOS 15.4, *), url.scheme == "webkit-extension",
            let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {

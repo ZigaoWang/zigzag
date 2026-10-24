@@ -320,6 +320,9 @@ final class SidebarListView: NSView {
 
     var headerView: NSView? { rows[.header] }
 
+    /// The row showing a tab, for pointing at it (the Getting started guide).
+    func rowView(for tab: Tab) -> NSView? { rows[.tab(tab.id)] }
+
     /// The space's name stays at the top while the list scrolls, so you can always fold its bookmarks. It gets the
     /// sidebar's own color behind it once rows pass under it.
     func pinHeader() {
