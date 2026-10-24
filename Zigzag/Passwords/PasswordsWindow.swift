@@ -522,21 +522,14 @@ private final class ListRow: InteractiveView {
         let top = (bounds.height - title.lineHeight - subtitle.lineHeight) / 2
         title.frame = NSRect(x: x, y: top, width: bounds.width - x - Tokens.Space.x2, height: title.lineHeight)
         subtitle.frame = NSRect(x: x, y: title.frame.maxY, width: bounds.width - x - Tokens.Space.x2, height: subtitle.lineHeight)
-        Tokens.Motion.withoutAnimation { marker.frame = CGRect(x: 2, y: (bounds.height - 16) / 2, width: 3, height: 16) }
     }
 
-    /// Selected the way tabs are in the sidebar: a soft fill of the space's accent and the slim bar at the leading edge.
-    private let marker = CALayer()
+    /// Selected with a soft fill of the space's accent.
 
     override func stateDidChange(animated: Bool) {
         let accent = Brand.Theme.current.accent
         let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.2 : 0.13) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        if marker.superlayer == nil { marker.cornerRadius = 1.5; layer?.addSublayer(marker) }
-        Tokens.Motion.withoutAnimation {
-            marker.backgroundColor = cgColor(accent)
-            marker.opacity = isSelected ? 1 : 0
-        }
     }
 
 }

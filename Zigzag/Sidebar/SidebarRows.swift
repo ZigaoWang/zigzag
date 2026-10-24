@@ -225,56 +225,11 @@ final class TabRowView: SidebarRowView {
         super.stateDidChange(animated: animated)
         refreshTitleColor()
         refreshAccessories()
-        refreshActiveMark(animated: window != nil)
     }
 
-    /// The space's accent, at the leading edge of the selected tab: the one place the sidebar says "you are here".
-    /// It grows from its middle on a soft spring when the tab is chosen, and shrinks away when it isn't.
-    private let activeMark = CALayer()
-    private var showsActiveMark = false
-
-    private func refreshActiveMark(animated: Bool) {
-        let show = isSelected && !isLifted
-        guard show != showsActiveMark else { return }
-        showsActiveMark = show
-        if activeMark.superlayer == nil {
-            activeMark.backgroundColor = cgColor(Brand.Theme.current.accent)
-            activeMark.cornerRadius = 1.5
-            activeMark.opacity = 0
-            layer?.addSublayer(activeMark)
-            layer?.masksToBounds = false
-        }
-        let scale = CASpringAnimation(keyPath: "transform.scale.y")
-        scale.damping = 18
-        scale.stiffness = 260
-        scale.fromValue = activeMark.presentation()?.value(forKeyPath: "transform.scale.y") ?? (show ? 0.1 : 1)
-        scale.toValue = show ? 1 : 0.1
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = activeMark.presentation()?.opacity ?? activeMark.opacity
-        fade.toValue = show ? 1 : 0
-        let group = CAAnimationGroup()
-        group.animations = [scale, fade]
-        group.duration = animated ? (show ? scale.settlingDuration : 0.16) : 0
-        fade.duration = show ? 0.12 : 0.16
-        activeMark.add(group, forKey: "unfold")
-        Tokens.Motion.withoutAnimation {
-            activeMark.opacity = show ? 1 : 0
-            activeMark.transform = CATransform3DMakeScale(1, show ? 1 : 0.1, 1)
-        }
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        Tokens.Motion.withoutAnimation { activeMark.backgroundColor = cgColor(Brand.Theme.current.accent) }
-    }
 
     override func layout() {
         super.layout()
-        Tokens.Motion.withoutAnimation {
-            // Inside the row's leading padding, before the favicon: the list clips anything outside the row.
-            activeMark.bounds = CGRect(x: 0, y: 0, width: 3, height: 14)
-            activeMark.position = CGPoint(x: 3.5, y: bounds.midY)
-        }
         let size = closeButton.frame.size
         let y = (bounds.height - size.height) / 2
         var x = bounds.width - Tokens.Space.x1 - size.width
