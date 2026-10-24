@@ -47,31 +47,35 @@ final class OnboardingView: NSView {
             case .bring:
                 content = BringPicker()
                 title = "Bring your stuff over"
-                body = "Pick the browsers to bring from. They stay exactly as they are."
+                body = "Passwords, bookmarks and history. Nothing changes in your old browser."
             case .sites:
                 content = SitesPicker()
-                title = "Your everyday sites"
-                body = "Pick the ones you open every day. They sit at the top of your sidebar."
+                title = "Pin your favorites"
+                body = "One click away, at the top of your sidebar."
             case .extensions:
                 content = ExtensionsPicker()
-                title = "Your extensions"
-                body = "Chrome extensions work in Zigzag. Pick the ones you use."
+                title = "Add extensions"
+                body = "Chrome extensions work here too."
             case .ads:
                 content = AdsPicker()
                 title = "Block ads?"
-                body = "Zigzag can stop ads and trackers on every site. You can change this per site later."
+                body = "Faster pages, fewer trackers. Change it for any site later."
             case .color:
                 content = ColorPicker()
                 (content as? ColorPicker)?.onColor = { [weak self] in self?.applySpaceColor() }
-                title = "Make it yours"
-                body = "Pick a color for your first space, and how it looks."
+                title = "Pick a color"
+                body = "Your space wears it. Every space can have its own."
             default:
                 content = ReadyPicker()
-                title = "You’re ready"
-                body = "One last thing: open links from other apps in Zigzag."
+                title = "You’re all set"
+                body = "Last thing: open links from other apps in Zigzag."
             }
-            let stepPage = StepPage(title: title, body: body, content: content, showsBack: true,
-                                    showsSkip: next != .ready)
+            let stepPage = StepPage(title: title, body: body, content: content, index: next.rawValue - 1,
+                                    count: Step.allCases.count - 1, showsSkip: next != .ready)
+            (content as? ColorPicker)?.onColor = { [weak stepPage, weak self] in
+                stepPage?.retint()
+                self?.applySpaceColor()
+            }
             stepPage.onBack = { [weak self] in
                 guard let self, let back = Step(rawValue: next.rawValue - 1) else { return }
                 self.show(back, animated: true)
@@ -131,36 +135,53 @@ final class OnboardingView: NSView {
 
 // MARK: - The step layout
 
-/// What a step's right side is: the thing to do, and what its main button says.
+/// One step's choice (left), and the picture of what it does (right).
 class StepContent: NSView {
     var onChange: (() -> Void)?
-    var primaryTitle: String { "Next" }
+    var primaryTitle: String { "Continue" }
     var primaryEnabled: Bool { true }
     var isBusy: Bool { false }
+    /// What the step shows on the right: a Zigzag window that changes as you choose.
+    let preview = LiveBrowser()
     /// The main button: do what the step needs, then call `done` to move on (now, or once it's finished).
     func commit(_ done: @escaping () -> Void) { done() }
     override var isFlipped: Bool { true }
 }
 
-/// One step on the blue: title and line at the top, the step in the middle, and Back, Skip and Next at the bottom.
+/// Every step the same way: on the left, progress, a title and one line, the choice, and Back · Skip · Continue;
+/// on the right, on the brand's blue, a Zigzag window showing what your choice does, so it explains itself.
 private final class StepPage: NSView {
     var onBack: (() -> Void)?
     var onNext: (() -> Void)?
+    private let left = ColorView(color: Onboard.paper)
+    private let right = BrandSurface()
+    private var bars: [ColorView] = []
     private let title: NSTextField
     private let body: NSTextField
     private let back = Onboard.quiet("Back")
-    private let next = Onboard.primary("Next")
+    private let next = Onboard.primary("Continue")
     private let skip = Onboard.quiet("Skip")
     private let content: StepContent
 
-    init(title text: String, body bodyText: String, content: StepContent, showsBack: Bool, showsSkip: Bool) {
+    init(title text: String, body bodyText: String, content: StepContent, index: Int, count: Int, showsSkip: Bool) {
         self.content = content
         title = Onboard.title(text)
         body = Onboard.line(bodyText)
         super.init(frame: .zero)
-        back.isHidden = !showsBack
+        right.cornerRadius = 0
+        right.layer?.borderWidth = 0
+        right.showsWatermark = false
+        right.fixedTheme = Brand.Theme.of(Library.shared.spaces.first)
         skip.isHidden = !showsSkip
-        [title, body, content, back, skip, next].forEach { addSubview($0) }
+        for i in 0..<count {
+            let bar = ColorView(color: i <= index ? Onboard.accent : Onboard.tint.withAlphaComponent(0.12))
+            bar.wantsLayer = true
+            bar.layer?.cornerRadius = 2
+            bars.append(bar)
+        }
+        [left, right].forEach { addSubview($0) }
+        (bars + [title, body, content, back, skip, next] as [NSView]).forEach { addSubview($0) }
+        right.addSubview(content.preview)
         back.onClick = { [weak self] _ in self?.onBack?() }
         skip.onClick = { [weak self] _ in self?.onNext?() }
         next.onClick = { [weak self] _ in
@@ -175,6 +196,9 @@ private final class StepPage: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    /// The right side follows your space's color as soon as you pick one.
+    func retint() { right.fixedTheme = Brand.Theme.of(Library.shared.spaces.first) }
+
     private func refresh() {
         next.title = content.primaryTitle
         next.isEnabled = content.primaryEnabled && !content.isBusy
@@ -183,32 +207,51 @@ private final class StepPage: NSView {
         needsLayout = true
     }
 
+    static let leftWidth: CGFloat = 420
+
     override func layout() {
         super.layout()
-        let width: CGFloat = 520
-        let x = (bounds.width - width) / 2
-        let top = Onboard.header(title, body, in: bounds, top: 56, width: 560) + Tokens.Space.x6
-        // Bottom row: Back on the left; Skip beside Next on the right.
+        let lw = Self.leftWidth, pad: CGFloat = 44
+        left.frame = NSRect(x: 0, y: 0, width: lw, height: bounds.height)
+        right.frame = NSRect(x: lw, y: 0, width: bounds.width - lw, height: bounds.height)
+        let inner = lw - pad * 2
+        var y: CGFloat = 64
+        for (i, bar) in bars.enumerated() {
+            bar.frame = NSRect(x: pad + CGFloat(i) * 28, y: y, width: 22, height: 4)
+        }
+        y += 28
+        let th = ceil(title.sizeThatFits(NSSize(width: inner, height: 200)).height)
+        title.frame = NSRect(x: pad, y: y, width: inner, height: th)
+        let bh = ceil(body.sizeThatFits(NSSize(width: inner, height: 200)).height)
+        body.frame = NSRect(x: pad, y: title.frame.maxY + 8, width: inner, height: bh)
+        let top = body.frame.maxY + 24
         let h = Tokens.Space.x10
-        let y = bounds.height - 48 - h
-        let nw = max(next.fittingWidth, 140)
-        next.frame = NSRect(x: x + width - nw, y: y, width: nw, height: h)
+        let fy = bounds.height - 36 - h
+        let nw = max(next.fittingWidth, 128)
+        next.frame = NSRect(x: lw - pad - nw, y: fy, width: nw, height: h)
         let sw = skip.fittingWidth
-        skip.frame = NSRect(x: next.frame.minX - Tokens.Space.x3 - sw, y: y + (h - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
-        back.frame = NSRect(x: x - Tokens.Space.x2, y: y + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
-        content.frame = NSRect(x: x - 20, y: top, width: width + 40, height: max(0, y - Tokens.Space.x6 - top))
+        skip.frame = NSRect(x: next.frame.minX - Tokens.Space.x2 - sw, y: fy + (h - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        back.frame = NSRect(x: pad - Tokens.Space.x2, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
+        content.frame = NSRect(x: pad, y: top, width: inner, height: max(0, fy - 20 - top))
+        // The window sits low and to the right, running off the edge, like a real one behind this.
+        let pw: CGFloat = 620, ph = min(440, bounds.height - 120)
+        content.preview.frame = NSRect(x: 48, y: (bounds.height - ph) / 2, width: pw, height: ph)
     }
 }
 
-/// Text and buttons that read on the blue.
+/// Colors and controls for the steps (dark on the light left side) and the welcome (light on blue).
 private enum Onboard {
-    static let ink = Brand.ribbon
-    static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Brand.ribbon.withAlphaComponent(alpha) }
+    static let paper = Tokens.Color.dynamic(light: .white, dark: Tokens.Color.hex(0x1C1F25))
+    static let ink = Tokens.Color.textPrimary
+    static let accent = Brand.Theme.brand.accent
+    /// Fills and outlines on the light side, used with alpha.
+    static let tint = Tokens.Color.dynamic(light: Tokens.Color.hex(0x1E3A5F), dark: Tokens.Color.hex(0xDAE5F2))
+    static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Tokens.Color.textPrimary.withAlphaComponent(alpha * 0.85) }
 
     static func title(_ text: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: "")
         field.isSelectable = false
-        field.attributedStringValue = Brand.display(text, size: 28, color: ink, alignment: .center, wraps: true)
+        field.attributedStringValue = Brand.display(text, size: 28, color: ink, wraps: true)
         return field
     }
 
@@ -216,13 +259,19 @@ private enum Onboard {
         let field = NSTextField(wrappingLabelWithString: text)
         field.isSelectable = false
         field.font = .systemFont(ofSize: 14)
-        field.textColor = dim()
-        field.alignment = .center
+        field.textColor = Tokens.Color.textSecondary
         return field
     }
 
-    /// The one main action on a screen: light on the blue.
+    /// The main action on a step: the brand's blue.
     static func primary(_ title: String) -> PrimaryButton {
+        let button = PrimaryButton(title: title)
+        button.fixedTheme = Brand.Theme.brand
+        return button
+    }
+
+    /// The welcome's one button: light on the blue.
+    static func light(_ title: String) -> PrimaryButton {
         let button = PrimaryButton(title: title)
         button.customFill = Brand.ribbon
         button.customInk = Brand.navy
@@ -231,38 +280,8 @@ private enum Onboard {
 
     static func quiet(_ title: String) -> TextButton {
         let button = TextButton(title: title, font: Tokens.Font.body(.medium))
-        button.textColor = dim(0.8)
+        button.textColor = Tokens.Color.textSecondary
         return button
-    }
-
-    /// Lays a title and line out centered from `y`, returning where the content below should start.
-    static func header(_ title: NSTextField, _ line: NSTextField, in bounds: NSRect, top y: CGFloat, width: CGFloat = 540) -> CGFloat {
-        let x = (bounds.width - width) / 2
-        let th = ceil(title.sizeThatFits(NSSize(width: width, height: 200)).height)
-        title.frame = NSRect(x: x, y: y, width: width, height: th)
-        let lh = ceil(line.sizeThatFits(NSSize(width: width, height: 200)).height)
-        line.frame = NSRect(x: x, y: title.frame.maxY + Tokens.Space.x2, width: width, height: lh)
-        return line.frame.maxY
-    }
-
-    /// A screen with one action: the button centered above the step dots.
-    static func centeredFooter(_ primary: PrimaryButton, in bounds: NSRect) {
-        let h = Tokens.Space.x10
-        let w = max(primary.fittingWidth, 176)
-        primary.frame = NSRect(x: round((bounds.width - w) / 2), y: bounds.height - 76 - h, width: w, height: h)
-    }
-
-    /// The bottom row: the main button on the right, a quiet choice on the left, above the step dots.
-    static func footer(primary: NSView, quiet: NSView?, in bounds: NSRect, width: CGFloat = 460) {
-        let h = Tokens.Space.x10
-        let y = bounds.height - 76 - h
-        let x = (bounds.width - width) / 2
-        let w = max((primary as? PrimaryButton)?.fittingWidth ?? 120, 140)
-        primary.frame = NSRect(x: x + width - w, y: y, width: w, height: h)
-        if let quiet {
-            let qw = (quiet as? TextButton)?.fittingWidth ?? 100
-            quiet.frame = NSRect(x: x - Tokens.Space.x2, y: y + (h - Tokens.Space.x8) / 2, width: qw, height: Tokens.Space.x8)
-        }
     }
 }
 
@@ -271,15 +290,15 @@ private enum Onboard {
 /// "Welcome to", then the wordmark writing itself in, then one button. Nothing else on the screen moves.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let welcome = Label("Welcome to", font: .systemFont(ofSize: 18, weight: .medium), color: Onboard.dim(0.78))
+    private let welcome = Label("Welcome to", font: .systemFont(ofSize: 18, weight: .medium), color: Brand.ribbon.withAlphaComponent(0.78))
     private let wordmark = WordmarkView()
-    private let start = Onboard.primary("Get Started")
+    private let start = Onboard.light("Get Started")
     private var drewIn = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         welcome.alignment = .center
-        wordmark.color = Onboard.ink
+        wordmark.color = Brand.ribbon
         start.onClick = { [weak self] _ in self?.onStart?() }
         [welcome, wordmark, start].forEach { addSubview($0) }
     }
@@ -356,9 +375,9 @@ private final class DataToggle: InteractiveView {
     var fittingWidth: CGFloat { ceil(Tokens.Space.x3 + 10 + Tokens.Space.x1 + label.inkWidth + Tokens.Space.x3) }
 
     private func refresh() {
-        layer?.backgroundColor = Brand.ribbon.withAlphaComponent(isOn ? 0.16 : 0).cgColor
+        layer?.backgroundColor = Onboard.tint.withAlphaComponent(isOn ? 0.16 : 0).cgColor
         layer?.borderWidth = 1
-        layer?.borderColor = Brand.ribbon.withAlphaComponent(isOn ? 0 : 0.25).cgColor
+        layer?.borderColor = Onboard.tint.withAlphaComponent(isOn ? 0 : 0.25).cgColor
         label.textColor = isOn ? Onboard.ink : Onboard.dim(0.55)
         check.contentTintColor = Onboard.ink
         check.isHidden = !isOn
@@ -368,7 +387,7 @@ private final class DataToggle: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         guard !isLocked else { return }
-        if isHovered && !isOn { layer?.backgroundColor = Brand.ribbon.withAlphaComponent(0.07).cgColor } else { refresh() }
+        if isHovered && !isOn { layer?.backgroundColor = Onboard.tint.withAlphaComponent(0.07).cgColor } else { refresh() }
     }
 
     override func layout() {
@@ -414,7 +433,7 @@ private final class BrowserRow: InteractiveView {
         box.layer?.cornerRadius = 6
         box.layer?.borderWidth = 1.5
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
-        tick.contentTintColor = Brand.navy
+        tick.contentTintColor = NSColor.white
         box.addSubview(tick)
         icon.image = source.icon
         icon.imageScaling = .scaleProportionallyUpOrDown
@@ -427,7 +446,7 @@ private final class BrowserRow: InteractiveView {
             self.onFix?(self.fixKind)
         }
         problem.font = Tokens.Font.small()
-        problem.textColor = NSColor(srgbRed: 1, green: 0.82, blue: 0.55, alpha: 1)
+        problem.textColor = Tokens.Color.caution
         problem.isSelectable = false
         [box, icon, name, detail, status, spinner, fixButton, problem].forEach { addSubview($0) }
         onClick = { [weak self] _ in
@@ -519,7 +538,7 @@ private final class BrowserRow: InteractiveView {
         superview?.superview?.needsLayout = true
     }
 
-    private static let rowHeight: CGFloat = 60
+    private static let rowHeight: CGFloat = 50
 
     func height(for width: CGFloat) -> CGFloat {
         guard !problem.stringValue.isEmpty else { return Self.rowHeight }
@@ -535,7 +554,7 @@ private final class BrowserRow: InteractiveView {
         switch state {
         case .idle:
             if needsAccess {
-                fixButton.title = waitingForSettings ? "Check Again" : triedPicker && !isSafari ? "Open Settings" : "Allow Access"
+                fixButton.title = waitingForSettings ? "Check Again" : triedPicker && !isSafari ? "Settings" : "Allow"
                 fixButton.isHidden = false
             }
         case .waiting:
@@ -548,7 +567,7 @@ private final class BrowserRow: InteractiveView {
         case .done(let summary):
             if let first = summary.problems.first {
                 problem.stringValue = summary.problems.map(\.message).joined(separator: " ")
-                problem.textColor = NSColor(srgbRed: 1, green: 0.82, blue: 0.55, alpha: 1)
+                problem.textColor = Tokens.Color.caution
                 fixKind = first.fix
                 switch first.fix {
                 case .retry: fixButton.title = "Try Again"
@@ -567,8 +586,8 @@ private final class BrowserRow: InteractiveView {
             }
         }
         let on = isChosen || isFinished
-        box.layer?.backgroundColor = on ? Brand.ribbon.cgColor : nil
-        box.layer?.borderColor = Brand.ribbon.withAlphaComponent(on ? 1 : 0.45).cgColor
+        box.layer?.backgroundColor = on ? Onboard.accent.cgColor : nil
+        box.layer?.borderColor = Onboard.tint.withAlphaComponent(on ? 1 : 0.45).cgColor
         tick.isHidden = !on
         box.alphaValue = needsAccess || (isLocked && !isChosen) ? 0.35 : 1
         stateDidChange(animated: false)
@@ -585,7 +604,7 @@ private final class BrowserRow: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let interactive = !isLocked && !needsAccess && !isFinished
-        layer?.backgroundColor = interactive && isHovered ? Brand.ribbon.withAlphaComponent(isPressed ? 0.1 : 0.05).cgColor : nil
+        layer?.backgroundColor = interactive && isHovered ? Onboard.tint.withAlphaComponent(isPressed ? 0.1 : 0.05).cgColor : nil
     }
 
     override func layout() {
@@ -628,7 +647,7 @@ private final class BrowserRow: InteractiveView {
 /// The browsers on this Mac, each with a checkbox, what it holds, and how its import went. Anything macOS keeps
 /// private says so before you start, with the fix beside it.
 private final class BringPicker: StepContent {
-    private let list = ColorView(color: Brand.ribbon.withAlphaComponent(0.07))
+    private let list = ColorView(color: Onboard.tint.withAlphaComponent(0.07))
     private var rows: [BrowserRow] = []
     private var separators: [ColorView] = []
     private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
@@ -644,7 +663,7 @@ private final class BringPicker: StepContent {
         list.layer?.cornerRadius = 12
         list.layer?.cornerCurve = .continuous
         list.layer?.borderWidth = 1
-        list.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.1).cgColor
+        list.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
         hint.alignment = .center
         [list, bringLabel, fileLink, hint].forEach { addSubview($0) }
         for (i, source) in ImportCoordinator.detectedSources().enumerated() { add(source, chosen: i == 0) }
@@ -684,7 +703,7 @@ private final class BringPicker: StepContent {
         list.addSubview(row)
         rows.append(row)
         if rows.count > 1 {
-            let line = ColorView(color: Brand.ribbon.withAlphaComponent(0.09))
+            let line = ColorView(color: Onboard.tint.withAlphaComponent(0.09))
             list.addSubview(line)
             separators.append(line)
         }
@@ -807,8 +826,8 @@ private final class BringPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let pad: CGFloat = 24
-        let width = bounds.width - pad * 2
+        let pad: CGFloat = 0
+        let width = bounds.width
         var ry: CGFloat = 0
         for (i, row) in rows.enumerated() {
             let h = row.height(for: width)
@@ -818,7 +837,8 @@ private final class BringPicker: StepContent {
         }
         // The list, the choice of what to bring, and the file link, as one block in the middle.
         let block = ry + Tokens.Space.x5 + Tokens.Space.x8 + Tokens.Space.x3 + Tokens.Space.x8
-        var y = max(pad, (bounds.height - block) / 2)
+        var y: CGFloat = 0
+        _ = block
         list.isHidden = rows.isEmpty
         list.frame = NSRect(x: pad, y: y, width: width, height: ry)
         if rows.isEmpty {
@@ -826,17 +846,20 @@ private final class BringPicker: StepContent {
             ry = 40
         }
         y += ry + Tokens.Space.x5
-        bringLabel.frame = NSRect(x: pad + 2, y: y + (Tokens.Space.x8 - bringLabel.lineHeight) / 2, width: 40, height: bringLabel.lineHeight)
-        var px = bringLabel.frame.maxX + Tokens.Space.x1
+        // What to bring: pills that wrap to a second line when the column is narrow.
+        bringLabel.isHidden = true
+        var px: CGFloat = 0
         for (_, pill) in pills where !pill.isHidden {
             let w = pill.fittingWidth
-            pill.frame = NSRect(x: px, y: y + 2, width: w, height: 28)
-            px += w + Tokens.Space.x1
+            if px + w > width { px = 0; y += 34 }
+            pill.frame = NSRect(x: px, y: y, width: w, height: 28)
+            px += w + 6
         }
-        y += Tokens.Space.x8 + Tokens.Space.x3
+        y += 28 + Tokens.Space.x2
         let fw = fileLink.fittingWidth
         fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: fw, height: Tokens.Space.x8)
-        hint.frame = NSRect(x: pad, y: bounds.height - pad - hint.lineHeight, width: width, height: hint.lineHeight)
+        hint.alignment = .left
+        hint.frame = NSRect(x: 0, y: bounds.height - hint.lineHeight, width: width, height: hint.lineHeight)
     }
 }
 
@@ -887,10 +910,10 @@ private final class PickTile: InteractiveView {
     }
 
     private func refresh() {
-        let fill = Brand.ribbon.withAlphaComponent(isPicked ? 0.2 : (isHovered && !isLocked ? 0.1 : 0.06))
+        let fill = Onboard.tint.withAlphaComponent(isPicked ? 0.2 : (isHovered && !isLocked ? 0.1 : 0.06))
         layer?.backgroundColor = fill.cgColor
         layer?.borderWidth = isPicked ? 1.5 : 0
-        layer?.borderColor = Brand.ribbon.withAlphaComponent(0.7).cgColor
+        layer?.borderColor = Onboard.tint.withAlphaComponent(0.7).cgColor
         check.isHidden = !isPicked || !spinner.isHidden
     }
 
@@ -1050,17 +1073,29 @@ final class SitesPicker: StepContent {
         for site in Self.sites {
             let tile = PickTile(name: site.name)
             tile.isPicked = have.contains(TabManager.normalize(site.url))
-            tile.onToggle = { [weak self] in self?.onChange?() }
+            tile.onToggle = { [weak self] in self?.showPicked() }
             addSubview(tile)
             tiles.append((tile, site.url, site.name))
             loadIcon(tile, site: site.url, app: site.appURL, explicit: site.icon, bundled: site.bundled)
         }
+        preview.page = .blank
+        preview.tabs = ["New Tab"]
+        preview.favorites = []
+        // Icons can still be arriving; the window catches up.
+        for delay in [0.4, 1.2, 2.5] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.showPicked() } }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var picked: [(URL, String)] { tiles.filter { $0.0.isPicked }.map { ($0.1, $0.2) } }
-    override var primaryTitle: String { picked.isEmpty ? "Next" : "Add \(picked.count)" }
+
+    /// The window on the right gains each site you pick as a favorite, as you pick it.
+    private func showPicked() {
+        preview.favorites = tiles.filter { $0.0.isPicked }.compactMap { $0.0.icon.image }
+        preview.highlightsFavorites = true
+        onChange?()
+    }
+    override var primaryTitle: String { picked.isEmpty ? "Continue" : "Pin \(picked.count)" }
 
     override func commit(_ done: @escaping () -> Void) {
         let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
@@ -1070,11 +1105,9 @@ final class SitesPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let size: CGFloat = 100, gap: CGFloat = 12, columns = 4
-        let rows = (tiles.count + columns - 1) / columns
-        let width = CGFloat(columns) * size + CGFloat(columns - 1) * gap
-        let height = CGFloat(rows) * size + CGFloat(rows - 1) * gap
-        let x0 = (bounds.width - width) / 2, y0 = max(0, (bounds.height - height) / 2)
+        let columns = 4, gap: CGFloat = 8
+        let size = floor((bounds.width - CGFloat(columns - 1) * gap) / CGFloat(columns))
+        let x0: CGFloat = 0, y0: CGFloat = 0
         for (i, (tile, _, _)) in tiles.enumerated() {
             tile.frame = NSRect(x: x0 + CGFloat(i % columns) * (size + gap), y: y0 + CGFloat(i / columns) * (size + gap), width: size, height: size)
         }
@@ -1094,12 +1127,12 @@ private final class ExtensionsPicker: StepContent {
         ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Saves pages to Notion", "https://www.notion.so", nil),
         ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", "Translates what you select", "https://translate.google.com", nil),
     ]
-    private let list = ColorView(color: Brand.ribbon.withAlphaComponent(0.07))
+    private let list = ColorView(color: Onboard.tint.withAlphaComponent(0.07))
     private var rows: [(ExtensionRow, String)] = []
     private var separators: [ColorView] = []
     private var installing = false
     private var finished = false
-    private let note = Label("Find more in the Chrome Web Store, then choose Add to Zigzag.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
+    private let note = Label("More in the Chrome Web Store: choose Add to Zigzag.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1107,18 +1140,18 @@ private final class ExtensionsPicker: StepContent {
         list.layer?.cornerRadius = 12
         list.layer?.cornerCurve = .continuous
         list.layer?.borderWidth = 1
-        list.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.1).cgColor
+        list.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
         addSubview(list)
         var installed: Set<String> = []
         if #available(macOS 15.4, *) { installed = Set(ExtensionHost.shared.installed.keys) }
         for (i, s) in Self.suggestions.enumerated() {
             let row = ExtensionRow(name: s.name, kind: s.kind)
             if installed.contains(s.id) { row.state = .added }
-            row.onChange = { [weak self] in self?.onChange?() }
+            row.onChange = { [weak self] in self?.showChosen() }
             list.addSubview(row)
             rows.append((row, s.id))
             if i > 0 {
-                let line = ColorView(color: Brand.ribbon.withAlphaComponent(0.09))
+                let line = ColorView(color: Onboard.tint.withAlphaComponent(0.09))
                 list.addSubview(line)
                 separators.append(line)
             }
@@ -1127,14 +1160,21 @@ private final class ExtensionsPicker: StepContent {
                 loadIcon(tile, site: site, app: s.app.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
             }
         }
-        note.alignment = .center
+        note.alignment = .left
         addSubview(note)
+        for delay in [0.4, 1.2, 2.5] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.showChosen() } }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var toAdd: [(ExtensionRow, String)] { rows.filter { $0.0.isChosen && $0.0.state == .idle } }
-    override var primaryTitle: String { installing ? "Adding…" : toAdd.isEmpty ? "Next" : toAdd.count == 1 ? "Add 1 Extension" : "Add \(toAdd.count) Extensions" }
+
+    /// The window on the right shows each extension you pick, as you pick it.
+    private func showChosen() {
+        preview.extensions = rows.filter { $0.0.isChosen || $0.0.state == .added }.compactMap { $0.0.iconTile.icon.image }
+        onChange?()
+    }
+    override var primaryTitle: String { installing ? "Adding…" : toAdd.isEmpty ? "Continue" : "Add \(toAdd.count)" }
     override var isBusy: Bool { installing }
 
     override func commit(_ done: @escaping () -> Void) {
@@ -1170,17 +1210,15 @@ private final class ExtensionsPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let width: CGFloat = 480, rowH: CGFloat = 58
-        let height = CGFloat(rows.count) * rowH
-        let x = (bounds.width - width) / 2
-        let y = max(0, (bounds.height - height - 40) / 2)
-        list.frame = NSRect(x: x, y: y, width: width, height: height)
+        let width = bounds.width, rowH: CGFloat = 54
+        list.frame = NSRect(x: 0, y: 0, width: width, height: CGFloat(rows.count) * rowH)
         for (i, (row, _)) in rows.enumerated() {
             row.frame = NSRect(x: 0, y: CGFloat(i) * rowH, width: width, height: rowH)
             if i > 0 { separators[i - 1].frame = NSRect(x: 62, y: CGFloat(i) * rowH, width: width - 62, height: Tokens.Metric.hairline) }
         }
-        note.frame = NSRect(x: 0, y: list.frame.maxY + 18, width: bounds.width, height: note.lineHeight)
+        note.frame = NSRect(x: 2, y: list.frame.maxY + 14, width: width, height: note.lineHeight)
     }
+
 }
 
 /// One suggested extension: checkbox, icon, name and what it does; on the right, how adding it went.
@@ -1208,12 +1246,11 @@ private final class ExtensionRow: InteractiveView {
         box.layer?.cornerRadius = 6
         box.layer?.borderWidth = 1.5
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
-        tick.contentTintColor = Brand.navy
+        tick.contentTintColor = NSColor.white
         box.addSubview(tick)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
-        spinner.appearance = NSAppearance(named: .darkAqua)
         status.alignment = .right
         [box, iconTile.icon, name, kind, status, statusIcon, spinner].forEach { addSubview($0) }
         onClick = { [weak self] _ in
@@ -1234,11 +1271,11 @@ private final class ExtensionRow: InteractiveView {
     private func refresh() {
         let added = state == .added
         let on = isChosen || added
-        box.layer?.backgroundColor = on ? Brand.ribbon.cgColor : nil
-        box.layer?.borderColor = Brand.ribbon.withAlphaComponent(on ? 1 : 0.45).cgColor
+        box.layer?.backgroundColor = on ? Onboard.accent.cgColor : nil
+        box.layer?.borderColor = Onboard.tint.withAlphaComponent(on ? 1 : 0.45).cgColor
         tick.isHidden = !on
         box.alphaValue = added ? 0.5 : 1
-        layer?.backgroundColor = isHovered && state == .idle && !isLocked ? Brand.ribbon.withAlphaComponent(0.05).cgColor : nil
+        layer?.backgroundColor = isHovered && state == .idle && !isLocked ? Onboard.tint.withAlphaComponent(0.05).cgColor : nil
         statusIcon.isHidden = true
         status.textColor = Onboard.ink
         switch state {
@@ -1248,11 +1285,11 @@ private final class ExtensionRow: InteractiveView {
         case .added:
             status.stringValue = "Added"
             statusIcon.image = Tokens.Symbol.image("checkmark.circle.fill", size: 15)
-            statusIcon.contentTintColor = NSColor(srgbRed: 0.45, green: 0.85, blue: 0.6, alpha: 1)
+            statusIcon.contentTintColor = Tokens.Color.success
             statusIcon.isHidden = false
         case .failed(let message):
             status.stringValue = "Couldn’t add"
-            status.textColor = NSColor(srgbRed: 1, green: 0.82, blue: 0.55, alpha: 1)
+            status.textColor = Tokens.Color.caution
             toolTip = message
         }
         state == .working ? spinner.startAnimation(nil) : spinner.stopAnimation(nil)
@@ -1288,24 +1325,25 @@ private final class ExtensionRow: InteractiveView {
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let preview = AdsPreview()
-    private let block = ChoiceCard(title: "Block ads", detail: "Faster pages, less tracking.", recommended: true)
-    private let allow = ChoiceCard(title: "Show ads", detail: "Sites as they come.", recommended: false)
+    private let block = ChoiceCard(title: "Block ads", detail: "Faster pages, less tracking", recommended: true)
+    private let allow = ChoiceCard(title: "Show ads", detail: "Sites exactly as they come", recommended: false)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [preview, block, allow].forEach { addSubview($0) }
-        pick(ContentBlocker.isEnabled, animated: false)
-        block.onClick = { [weak self] _ in self?.pick(true, animated: true) }
-        allow.onClick = { [weak self] _ in self?.pick(false, animated: true) }
+        [block, allow].forEach { addSubview($0) }
+        pick(ContentBlocker.isEnabled)
+        block.onClick = { [weak self] _ in self?.pick(true) }
+        allow.onClick = { [weak self] _ in self?.pick(false) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func pick(_ on: Bool, animated: Bool) {
+    /// The page on the right shows the choice: banners and a pop-up, or just the article.
+    private func pick(_ on: Bool) {
         block.isChosen = on
         allow.isChosen = !on
-        preview.setBlocked(on, animated: animated)
+        preview.page = .news(ads: !on)
+        preview.tabs = ["Today’s news", "Recipes", "Trip ideas"]
     }
 
     override func commit(_ done: @escaping () -> Void) {
@@ -1315,86 +1353,8 @@ private final class AdsPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let w: CGFloat = 460, ph: CGFloat = 230, ch: CGFloat = 70, gap: CGFloat = 12
-        let total = ph + 20 + ch
-        let x = (bounds.width - w) / 2, y = max(0, (bounds.height - total) / 2)
-        preview.frame = NSRect(x: x, y: y, width: w, height: ph)
-        let cw = (w - gap) / 2
-        block.frame = NSRect(x: x, y: preview.frame.maxY + 20, width: cw, height: ch)
-        allow.frame = NSRect(x: x + cw + gap, y: preview.frame.maxY + 20, width: cw, height: ch)
-    }
-}
-
-/// A small article page; the ad layer fades in or out over it.
-private final class AdsPreview: NSView {
-    private let ads = NSView()
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = 14
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-        ads.wantsLayer = true
-        addSubview(PageDrawing())
-        addSubview(ads)
-        ads.addSubview(AdsDrawing())
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    func setBlocked(_ blocked: Bool, animated: Bool) {
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = animated ? 0.3 : 0
-            ads.animator().alphaValue = blocked ? 0 : 1
-        }
-    }
-
-    override func layout() {
-        super.layout()
-        subviews.forEach { $0.frame = bounds }
-        ads.subviews.forEach { $0.frame = bounds }
-    }
-
-    private final class PageDrawing: NSView {
-        override var isFlipped: Bool { true }
-        override func draw(_ dirtyRect: NSRect) {
-            NSColor.white.setFill()
-            bounds.fill()
-            func bar(_ r: NSRect, _ c: NSColor, _ radius: CGFloat = 3) { c.setFill(); NSBezierPath(roundedRect: r, xRadius: radius, yRadius: radius).fill() }
-            bar(NSRect(x: 0, y: 0, width: bounds.width, height: 26), NSColor(white: 0.95, alpha: 1), 0)
-            bar(NSRect(x: 14, y: 9, width: 60, height: 8), NSColor(white: 0.75, alpha: 1))
-            bar(NSRect(x: 40, y: 46, width: bounds.width * 0.55, height: 12), NSColor(white: 0.2, alpha: 1))
-            for (k, f) in [0.82, 0.78, 0.8, 0.7, 0.76, 0.6, 0.8, 0.74].enumerated() {
-                bar(NSRect(x: 40, y: 72 + CGFloat(k) * 16, width: (bounds.width - 80) * f, height: 6), NSColor(white: 0.82, alpha: 1))
-            }
-        }
-    }
-
-    private final class AdsDrawing: NSView {
-        override var isFlipped: Bool { true }
-        override func draw(_ dirtyRect: NSRect) {
-            func ad(_ r: NSRect, _ c: NSColor, label: Bool = true) {
-                c.setFill()
-                NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6).fill()
-                guard label else { return }
-                let text = NSAttributedString(string: "AD", attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .heavy), .foregroundColor: NSColor.white.withAlphaComponent(0.9)])
-                text.draw(at: NSPoint(x: r.minX + 8, y: r.minY + 6))
-            }
-            // A banner across the top, a box in the text, a sticky bar, and a pop-up in the middle.
-            ad(NSRect(x: 40, y: 34, width: bounds.width - 80, height: 34), NSColor.systemOrange.withAlphaComponent(0.85))
-            ad(NSRect(x: bounds.width - 150, y: 82, width: 110, height: 90), NSColor.systemPink.withAlphaComponent(0.8))
-            ad(NSRect(x: 0, y: bounds.height - 30, width: bounds.width, height: 30), NSColor.systemPurple.withAlphaComponent(0.8))
-            NSColor.black.withAlphaComponent(0.25).setFill()
-            NSBezierPath(rect: bounds).fill()
-            let popup = NSRect(x: bounds.midX - 90, y: bounds.midY - 46, width: 180, height: 84)
-            NSColor.white.setFill()
-            NSBezierPath(roundedRect: popup, xRadius: 10, yRadius: 10).fill()
-            ad(NSRect(x: popup.minX + 12, y: popup.minY + 12, width: popup.width - 24, height: 34), NSColor.systemBlue.withAlphaComponent(0.85))
-            NSColor(white: 0.8, alpha: 1).setFill()
-            NSBezierPath(roundedRect: NSRect(x: popup.minX + 12, y: popup.minY + 56, width: 90, height: 8), xRadius: 3, yRadius: 3).fill()
-        }
+        block.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 64)
+        allow.frame = NSRect(x: 0, y: block.frame.maxY + 10, width: bounds.width, height: 64)
     }
 }
 
@@ -1402,11 +1362,11 @@ private final class AdsPreview: NSView {
 private final class ChoiceCard: InteractiveView {
     var isChosen = false { didSet { refresh() } }
     private let ring = ColorView(color: .clear)
-    private let dot = ColorView(color: Onboard.ink)
+    private let dot = ColorView(color: Onboard.accent)
     private let title: Label
     private let detail: Label
-    private let badge = Label("Recommended", font: .systemFont(ofSize: 11, weight: .semibold), color: Brand.navy)
-    private let badgeFill = ColorView(color: Brand.ribbon)
+    private let badge = Label("Recommended", font: .systemFont(ofSize: 11, weight: .semibold), color: NSColor.white)
+    private let badgeFill = ColorView(color: Onboard.accent)
 
     init(title text: String, detail line: String, recommended: Bool) {
         title = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
@@ -1436,10 +1396,10 @@ private final class ChoiceCard: InteractiveView {
     override func stateDidChange(animated: Bool) { refresh() }
 
     private func refresh() {
-        layer?.backgroundColor = Brand.ribbon.withAlphaComponent(isChosen ? 0.16 : (isHovered ? 0.09 : 0.05)).cgColor
+        layer?.backgroundColor = Onboard.tint.withAlphaComponent(isChosen ? 0.16 : (isHovered ? 0.09 : 0.05)).cgColor
         layer?.borderWidth = isChosen ? 1.5 : 0
-        layer?.borderColor = Brand.ribbon.withAlphaComponent(0.7).cgColor
-        ring.layer?.borderColor = Brand.ribbon.withAlphaComponent(isChosen ? 1 : 0.45).cgColor
+        layer?.borderColor = Onboard.tint.withAlphaComponent(0.7).cgColor
+        ring.layer?.borderColor = Onboard.tint.withAlphaComponent(isChosen ? 1 : 0.45).cgColor
         dot.isHidden = !isChosen
     }
 
@@ -1464,26 +1424,24 @@ private final class ChoiceCard: InteractiveView {
 /// Automatic underneath.
 private final class ColorPicker: StepContent {
     var onColor: (() -> Void)?
-    private let preview = MiniBrowser()
     private var swatches: [(SpaceColor, ColorView)] = []
-    private var looks: [(String?, DataToggle)] = []
+    private let lookLabel = Label("Look", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
+    private let look = SegmentedPills(["Automatic", "Light", "Dark"])
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        addSubview(preview)
         for color in SpaceColor.allCases {
             let dot = ColorView(color: color.swatch)
             dot.wantsLayer = true
+            dot.toolTip = color.name
             dot.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(picked(_:))))
             addSubview(dot)
             swatches.append((color, dot))
         }
-        for (value, name) in [(nil, "Automatic"), ("light", "Light"), ("dark", "Dark")] as [(String?, String)] {
-            let toggle = DataToggle(name)
-            toggle.onChange = { [weak self] in self?.look(value) }
-            addSubview(toggle)
-            looks.append((value, toggle))
-        }
+        look.tint = Onboard.accent
+        look.onChange = { [weak self] index in self?.setLook([nil, "light", "dark"][index]) }
+        [lookLabel, look].forEach { addSubview($0) }
+        preview.page = .wikipedia
         refresh()
     }
 
@@ -1498,7 +1456,7 @@ private final class ColorPicker: StepContent {
         onColor?()
     }
 
-    private func look(_ value: String?) {
+    private func setLook(_ value: String?) {
         guard let id = space?.id else { return }
         Library.shared.setAppearance(value, for: id)
         refresh()
@@ -1509,42 +1467,41 @@ private final class ColorPicker: StepContent {
         for (color, dot) in swatches {
             let on = current?.hue == nil && current?.color == color
             dot.layer?.borderWidth = on ? 3 : 0
-            dot.layer?.borderColor = Brand.ribbon.cgColor
+            dot.layer?.borderColor = Onboard.paper.cgColor
+            dot.layer?.shadowColor = Onboard.accent.cgColor
+            dot.layer?.shadowOpacity = on ? 1 : 0
+            dot.layer?.shadowRadius = 0
+            dot.layer?.shadowOffset = .zero
+            dot.layer?.shadowPath = on ? CGPath(ellipseIn: CGRect(x: -2, y: -2, width: 38, height: 38), transform: nil) : nil
         }
-        for (value, toggle) in looks { toggle.isOn = current?.appearance == value }
-        preview.show(background: current?.background ?? SpaceColor.sky.background, appearance: current?.appearance)
+        look.selectedIndex = current?.appearance == "light" ? 1 : current?.appearance == "dark" ? 2 : 0
+        preview.refreshColors()
         needsLayout = true
     }
 
     override func layout() {
         super.layout()
-        let ww: CGFloat = 480, wh: CGFloat = 270
-        let size: CGFloat = 30, gap: CGFloat = 12
-        let swW = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap
-        let lookW = looks.map { $0.1.fittingWidth }.reduce(0, +) + CGFloat(looks.count - 1) * 8
-        let block = wh + 24 + size + 18 + 28
-        var y = max(0, (bounds.height - block) / 2)
-        preview.frame = NSRect(x: (bounds.width - ww) / 2, y: y, width: ww, height: wh)
-        y = preview.frame.maxY + 24
-        var x = (bounds.width - swW) / 2
-        for (_, dot) in swatches {
-            dot.frame = NSRect(x: x, y: y, width: size, height: size)
+        let size: CGFloat = 34, gap = (bounds.width - size * 4) / 3
+        for (i, (_, dot)) in swatches.enumerated() {
+            dot.frame = NSRect(x: CGFloat(i % 4) * (size + gap), y: CGFloat(i / 4) * (size + 16), width: size, height: size)
             dot.layer?.cornerRadius = size / 2
-            x += size + gap
         }
-        y += size + 18
-        x = (bounds.width - lookW) / 2
-        for (_, toggle) in looks {
-            let w = toggle.fittingWidth
-            toggle.frame = NSRect(x: x, y: y, width: w, height: 28)
-            x += w + 8
-        }
+        let y = CGFloat((swatches.count + 3) / 4) * (size + 16) + 14
+        lookLabel.frame = NSRect(x: 0, y: y, width: 100, height: lookLabel.lineHeight)
+        look.frame = NSRect(x: 0, y: lookLabel.frame.maxY + 8, width: bounds.width, height: 32)
     }
 }
 
-/// A drawing of a Zigzag window in your space's color: traffic lights, the address field, three favorites, a
-/// few tabs with one selected, the space dots, and a page. Drawn rather than captured, so it changes as you pick.
-private final class MiniBrowser: NSView {
+/// The window on the right of every step: a drawing of Zigzag in your space's color that shows what each choice
+/// does: the favorites you pick, the extensions you add, a page with or without ads.
+final class LiveBrowser: NSView {
+    enum Page: Equatable { case blank, wikipedia, news(ads: Bool) }
+    var favorites: [NSImage]? { didSet { needsDisplay = true } }
+    /// Favorites drawn with a ring: the ones you just picked.
+    var highlightsFavorites = false { didSet { needsDisplay = true } }
+    var extensions: [NSImage] = [] { didSet { needsDisplay = true } }
+    var page: Page = .wikipedia { didSet { needsDisplay = true } }
+    var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
     private var background: NSColor = SpaceColor.sky.background
     private var accent: NSColor = Brand.Theme.brand.accent
     private var isDark = false
@@ -1552,27 +1509,38 @@ private final class MiniBrowser: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer?.cornerRadius = 14
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.35
+        layer?.shadowRadius = 30
+        layer?.shadowOffset = CGSize(width: 0, height: -16)
+        refreshColors()
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    func show(background: NSColor, appearance: String?) {
-        self.appearance = appearance == "dark" ? NSAppearance(named: .darkAqua) : appearance == "light" ? NSAppearance(named: .aqua) : nil
+    /// Takes on the first space's color and look.
+    func refreshColors() {
+        let space = Library.shared.spaces.first
+        let look = space?.appearance
+        appearance = look == "dark" ? NSAppearance(named: .darkAqua) : look == "light" ? NSAppearance(named: .aqua) : nil
         effectiveAppearance.performAsCurrentDrawingAppearance {
             self.isDark = self.effectiveAppearance.isDark
-            self.background = background.usingColorSpace(.sRGB) ?? background
-            self.accent = Brand.Theme.of(Library.shared.spaces.first).accent.usingColorSpace(.sRGB) ?? Brand.Theme.brand.accent
+            let bg = space?.background ?? SpaceColor.sky.background
+            self.background = bg.usingColorSpace(.sRGB) ?? bg
+            self.accent = Brand.Theme.of(space).accent.usingColorSpace(.sRGB) ?? Brand.Theme.brand.accent
         }
         needsDisplay = true
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColors()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
+        let shape = NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12)
+        shape.addClip()
         let ink = isDark ? NSColor.white : NSColor.black
         background.setFill()
         bounds.fill()
@@ -1586,54 +1554,101 @@ private final class MiniBrowser: NSView {
             NSAttributedString(string: string, attributes: [.font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color, .paragraphStyle: style])
                 .draw(with: NSRect(x: point.x, y: point.y, width: width, height: size * 1.4), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
         }
-        let side: CGFloat = 150, pad: CGFloat = 12
-        // Traffic lights.
+        let side: CGFloat = 160, pad: CGFloat = 12
         for (i, c) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
             c.setFill()
-            NSBezierPath(ovalIn: NSRect(x: pad + CGFloat(i) * 13, y: 12, width: 8, height: 8)).fill()
+            NSBezierPath(ovalIn: NSRect(x: pad + CGFloat(i) * 14, y: 13, width: 9, height: 9)).fill()
         }
-        // Address field.
-        box(NSRect(x: pad, y: 30, width: side - pad * 2, height: 20), ink.withAlphaComponent(0.07), 6)
-        text("wikipedia.org", NSPoint(x: pad + 8, y: 33), size: 10, color: ink.withAlphaComponent(0.55), width: side - pad * 2 - 12)
+        // Address field, with extension icons at its end once you've added some.
+        let address = NSRect(x: pad, y: 32, width: side - pad * 2, height: 24)
+        box(address, ink.withAlphaComponent(0.07), 7)
+        let label: String = { switch page { case .news: "news.example.com"; case .wikipedia: "wikipedia.org"; case .blank: "Search or enter address" } }()
+        text(label, NSPoint(x: address.minX + 8, y: address.minY + 5), size: 10.5, color: ink.withAlphaComponent(0.5), width: address.width - 16)
         // Favorites: the sites you picked, with their own icons.
-        let picks = Library.shared.favorites.prefix(3)
-        let favW = (side - pad * 2 - 8) / 3
-        for i in 0..<3 {
-            let r = NSRect(x: pad + CGFloat(i) * (favW + 4), y: 58, width: favW, height: 28)
-            box(r, ink.withAlphaComponent(0.06), 7)
-            if i < picks.count, let icon = FaviconStore.shared.cachedIcon(for: picks[picks.startIndex + i].url) {
-                icon.draw(in: NSRect(x: r.midX - 7, y: r.midY - 7, width: 14, height: 14))
-            } else {
-                box(NSRect(x: r.midX - 5, y: r.midY - 5, width: 10, height: 10), ink.withAlphaComponent(0.15), 3)
+        let favs = favorites ?? Library.shared.favorites.prefix(8).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) }
+        let slots = max(3, min(favs.count, 6))
+        let cols = min(slots, 3)
+        let favW = (side - pad * 2 - CGFloat(cols - 1) * 5) / CGFloat(cols)
+        var y: CGFloat = 64
+        for i in 0..<slots {
+            let r = NSRect(x: pad + CGFloat(i % cols) * (favW + 5), y: y + CGFloat(i / cols) * 37, width: favW, height: 32)
+            box(r, ink.withAlphaComponent(0.06), 8)
+            if i < favs.count {
+                if highlightsFavorites {
+                    accent.setStroke()
+                    let ring = NSBezierPath(roundedRect: r.insetBy(dx: 0.75, dy: 0.75), xRadius: 8, yRadius: 8)
+                    ring.lineWidth = 1.5
+                    ring.stroke()
+                }
+                favs[i].draw(in: NSRect(x: r.midX - 8, y: r.midY - 8, width: 16, height: 16))
             }
         }
-        // The space's name and its tabs, one selected.
-        text(Library.shared.spaces.first?.name ?? "Personal", NSPoint(x: pad + 2, y: 96), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
-        for (i, title) in ["Wikipedia", "Getting started", "Recipes", "Trip ideas"].enumerated() {
-            let r = NSRect(x: pad - 3, y: 114 + CGFloat(i) * 24, width: side - pad * 2 + 6, height: 21)
-            if i == 0 { box(r, isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.85), 6) }
-            box(NSRect(x: r.minX + 6, y: r.midY - 4, width: 8, height: 8), i == 0 ? accent : ink.withAlphaComponent(0.25), 2)
-            text(title, NSPoint(x: r.minX + 20, y: r.minY + 4), size: 10.5, weight: i == 0 ? .medium : .regular,
-                 color: ink.withAlphaComponent(i == 0 ? 0.85 : 0.6), width: r.width - 26)
+        y += CGFloat((slots + cols - 1) / cols) * 37 + 8
+        text(Library.shared.spaces.first?.name ?? "Personal", NSPoint(x: pad + 2, y: y), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
+        y += 18
+        for (i, title) in tabs.enumerated() {
+            let r = NSRect(x: pad - 3, y: y + CGFloat(i) * 26, width: side - pad * 2 + 6, height: 23)
+            if i == 0 { box(r, isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.85), 7) }
+            box(NSRect(x: r.minX + 7, y: r.midY - 4, width: 8, height: 8), i == 0 ? accent : ink.withAlphaComponent(0.25), 2)
+            text(title, NSPoint(x: r.minX + 22, y: r.minY + 5), size: 11, weight: i == 0 ? .medium : .regular,
+                 color: ink.withAlphaComponent(i == 0 ? 0.85 : 0.6), width: r.width - 28)
         }
-        // Space dots, the current one in the accent.
-        for i in 0..<3 {
-            (i == 0 ? accent : ink.withAlphaComponent(0.2)).setFill()
-            NSBezierPath(ovalIn: NSRect(x: side / 2 - 18 + CGFloat(i) * 14, y: bounds.height - 18, width: 7, height: 7)).fill()
+        // Extensions you've added, under the sidebar's tabs, as their icons.
+        if !extensions.isEmpty {
+            let ey = bounds.height - 58
+            text("Extensions", NSPoint(x: pad + 2, y: ey), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
+            for (k, icon) in extensions.prefix(5).enumerated() {
+                let r = NSRect(x: pad + CGFloat(k) * 26, y: ey + 16, width: 22, height: 22)
+                box(r, isDark ? NSColor.white.withAlphaComponent(0.1) : NSColor.white.withAlphaComponent(0.8), 6)
+                icon.draw(in: r.insetBy(dx: 3, dy: 3))
+            }
         }
         // The page.
-        let page = NSRect(x: side, y: 10, width: bounds.width - side - 10, height: bounds.height - 20)
+        let pageRect = NSRect(x: side, y: 10, width: bounds.width - side - 10, height: bounds.height - 20)
         let pageInk = isDark ? NSColor.white : NSColor.black
-        box(page, isDark ? NSColor(white: 0.12, alpha: 1) : .white, 9)
-        text("Wikipedia", NSPoint(x: page.minX + 18, y: page.minY + 16), size: 16, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: page.width - 36)
-        text("The free encyclopedia", NSPoint(x: page.minX + 18, y: page.minY + 38), size: 10, color: pageInk.withAlphaComponent(0.5), width: page.width - 36)
-        for (k, w) in [0.9, 0.82, 0.86, 0.64].enumerated() {
-            box(NSRect(x: page.minX + 18, y: page.minY + 64 + CGFloat(k) * 12, width: (page.width - 36) * w, height: 5), pageInk.withAlphaComponent(0.12), 2)
+        box(pageRect, isDark ? NSColor(white: 0.12, alpha: 1) : .white, 9)
+        NSGraphicsContext.current?.saveGraphicsState()
+        NSBezierPath(roundedRect: pageRect, xRadius: 9, yRadius: 9).addClip()
+        let px = pageRect.minX + 22
+        switch page {
+        case .blank:
+            break
+        case .wikipedia:
+            text("Wikipedia", NSPoint(x: px, y: pageRect.minY + 20), size: 18, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: pageRect.width - 44)
+            text("The free encyclopedia", NSPoint(x: px, y: pageRect.minY + 46), size: 11, color: pageInk.withAlphaComponent(0.5), width: pageRect.width - 44)
+            for (k, w) in [0.9, 0.82, 0.86, 0.64].enumerated() {
+                box(NSRect(x: px, y: pageRect.minY + 76 + CGFloat(k) * 13, width: (pageRect.width - 44) * w, height: 6), pageInk.withAlphaComponent(0.12), 3)
+            }
+            let card = NSRect(x: px, y: pageRect.minY + 142, width: pageRect.width - 44, height: pageRect.height - 162)
+            box(card, accent.withAlphaComponent(0.16), 9)
+            box(NSRect(x: card.minX + 14, y: card.minY + 14, width: 78, height: 22), accent, 6)
+            text("Read more", NSPoint(x: card.minX + 23, y: card.minY + 18), size: 10, weight: .semibold, color: .white, width: 70)
+        case .news(let ads):
+            text("Today’s news", NSPoint(x: px, y: pageRect.minY + 20), size: 18, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: pageRect.width - 44)
+            for (k, w) in [0.92, 0.84, 0.88, 0.7, 0.9, 0.8, 0.86, 0.6, 0.88, 0.75].enumerated() {
+                box(NSRect(x: px, y: pageRect.minY + 58 + CGFloat(k) * 15 + (k > 4 ? 12 : 0), width: (pageRect.width - 44) * w, height: 6), pageInk.withAlphaComponent(0.12), 3)
+            }
+            if ads {
+                func ad(_ r: NSRect, _ c: NSColor) {
+                    box(r, c, 6)
+                    text("AD", NSPoint(x: r.minX + 8, y: r.minY + 6), size: 10, weight: .heavy, color: .white.withAlphaComponent(0.9))
+                }
+                ad(NSRect(x: px, y: pageRect.minY + 50, width: pageRect.width - 44, height: 40), NSColor.systemOrange)
+                ad(NSRect(x: pageRect.maxX - 140, y: pageRect.minY + 110, width: 118, height: 110), NSColor.systemPink)
+                ad(NSRect(x: pageRect.minX, y: pageRect.maxY - 34, width: pageRect.width, height: 34), NSColor.systemPurple)
+                NSColor.black.withAlphaComponent(0.25).setFill()
+                pageRect.fill()
+                let popup = NSRect(x: pageRect.midX - 100, y: pageRect.midY - 50, width: 200, height: 96)
+                box(popup, .white, 12)
+                ad(NSRect(x: popup.minX + 14, y: popup.minY + 14, width: popup.width - 28, height: 40), NSColor.systemBlue)
+                box(NSRect(x: popup.minX + 14, y: popup.minY + 66, width: 100, height: 8), NSColor(white: 0.85, alpha: 1), 3)
+            } else {
+                let badge = NSRect(x: pageRect.maxX - 196, y: pageRect.maxY - 40, width: 180, height: 26)
+                box(badge, accent.withAlphaComponent(0.14), 8)
+                text("Ads and trackers blocked", NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: accent, width: 170)
+            }
         }
-        let card = NSRect(x: page.minX + 18, y: page.minY + 122, width: page.width - 36, height: page.height - 140)
-        box(card, accent.withAlphaComponent(0.16), 8)
-        box(NSRect(x: card.minX + 12, y: card.minY + 12, width: 70, height: 20), accent, 6)
-        text("Read more", NSPoint(x: card.minX + 20, y: card.minY + 15), size: 9.5, weight: .semibold, color: .white, width: 60)
+        NSGraphicsContext.current?.restoreGraphicsState()
     }
 }
 
@@ -1641,7 +1656,7 @@ private final class MiniBrowser: NSView {
 
 /// The last step: make Zigzag the browser links open in, then start.
 private final class ReadyPicker: StepContent {
-    private let card = ColorView(color: Brand.ribbon.withAlphaComponent(0.08))
+    private let card = ColorView(color: Onboard.tint.withAlphaComponent(0.08))
     private let title = Label("Make Zigzag your default browser", font: Tokens.Font.body(.semibold), color: Onboard.ink)
     private let line = Label("Links from other apps open here.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
     private let button = Onboard.primary("Make Default")
@@ -1676,17 +1691,16 @@ private final class ReadyPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let w: CGFloat = 460, h: CGFloat = 80
-        let r = NSRect(x: (bounds.width - w) / 2, y: max(0, (bounds.height - h) / 2), width: w, height: h)
+        let w = bounds.width, h: CGFloat = 132
+        let r = NSRect(x: 0, y: 0, width: w, height: h)
         card.frame = r
-        let block = title.lineHeight + 2 + line.lineHeight
-        let bw = max(button.fittingWidth, 124)
-        let tw = w - 40 - bw - 16
-        title.frame = NSRect(x: r.minX + 20, y: r.minY + (h - block) / 2, width: tw, height: title.lineHeight)
-        line.frame = NSRect(x: r.minX + 20, y: title.frame.maxY + 2, width: tw, height: line.lineHeight)
-        button.frame = NSRect(x: r.maxX - 20 - bw, y: r.minY + (h - Tokens.Space.x8) / 2, width: bw, height: Tokens.Space.x8)
-        done.frame = NSRect(x: r.minX, y: r.minY + (h - done.lineHeight) / 2, width: w, height: done.lineHeight)
-        done.alignment = .center
+        title.frame = NSRect(x: 18, y: 18, width: w - 36, height: title.lineHeight)
+        line.frame = NSRect(x: 18, y: title.frame.maxY + 3, width: w - 36, height: line.lineHeight)
+        let bw = max(button.fittingWidth, 140)
+        button.frame = NSRect(x: 18, y: line.frame.maxY + 16, width: bw, height: Tokens.Space.x8)
+        done.frame = NSRect(x: 18, y: (h - done.lineHeight) / 2, width: w - 36, height: done.lineHeight)
+        done.alignment = .left
     }
+
 }
 
