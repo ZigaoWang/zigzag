@@ -416,7 +416,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateWindowTitle() {
         let tab = tabManager.selectedTab
-        window?.title = tab?.displayTitle ?? "Zigzag"
+        // Each title change makes AppKit relay out the title bar; skip the ones that change nothing.
+        let title = tab?.displayTitle ?? "Zigzag"
+        if window?.title != title { window?.title = title }
         // Lets accessibility clients (1Password, Raycast, Shortcuts) know which page is showing.
         window?.representedURL = nil
         window?.setAccessibilityDocument(tab?.url?.absoluteString)
