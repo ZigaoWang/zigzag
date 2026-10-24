@@ -161,6 +161,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let tab = selectedTab { tabManager.toggleSplitOrientation(for: tab) }
     }
 
+    @objc func toggleReader(_ sender: Any?) { toggleReader() }
+
     /// Floats the playing video. When WebKit can't tell which video that is, says how to do it from the page.
     @objc func togglePictureInPicture(_ sender: Any?) {
         guard let webView = selectedWebView else { return }

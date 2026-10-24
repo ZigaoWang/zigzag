@@ -14,6 +14,8 @@ final class AddressView: InteractiveView {
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
     let captureButton = IconButton(symbol: "video.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Using your camera")
+    /// Shown on articles: opens Reader.
+    let readerButton = IconButton(symbol: "doc.plaintext", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Show Reader (⇧⌘R)")
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
@@ -62,11 +64,20 @@ final class AddressView: InteractiveView {
         addSubview(label)
         captureButton.isHidden = true
         addSubview(captureButton)
+        readerButton.isHidden = true
+        addSubview(readerButton)
         setAccessibilityRole(.button)
         setAccessibilityHelp("Opens the command bar")
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    func setReader(available: Bool, active: Bool) {
+        readerButton.isHidden = !available && !active
+        readerButton.isSelected = active
+        readerButton.toolTip = active ? "Hide Reader (⇧⌘R)" : "Show Reader (⇧⌘R)"
+        needsLayout = true
+    }
 
     func show(url: URL?, isSecure: Bool) {
         if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
@@ -98,12 +109,13 @@ final class AddressView: InteractiveView {
             x = lock.frame.maxX + Tokens.Space.x1
         }
         var right = bounds.width - Tokens.Space.x1
-        for button in (actionButtons + (captureButton.isHidden ? [] : [captureButton])).reversed() {
+        let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
+        for button in trailingButtons.reversed() {
             let side = Tokens.Space.x6
             button.frame = NSRect(x: right - side, y: (bounds.height - side) / 2, width: side, height: side)
             right = button.frame.minX
         }
-        let trailing = actionButtons.isEmpty && captureButton.isHidden ? bounds.width - pad : right - Tokens.Space.x1
+        let trailing = trailingButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
         let h = ceil(label.intrinsicContentSize.height)
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: trailing - x, height: h)
     }

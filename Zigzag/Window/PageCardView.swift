@@ -11,6 +11,21 @@ final class PageCardView: NSView {
     /// In split view each pane gets its own small toolbar.
     let header = PaneHeaderView()
     var showsHeader = false { didSet { header.isHidden = !showsHeader; needsLayout = true } }
+    /// Reader, over the page, which stays loaded underneath.
+    private(set) var overlay: NSView?
+
+    func setOverlay(_ view: NSView?) {
+        overlay?.removeFromSuperview()
+        overlay = view
+        if let view {
+            // Placed at once and kept in step with the card, so nothing of the page shows around it.
+            let top = showsHeader ? PaneHeaderView.height : 0
+            view.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
+            view.autoresizingMask = [.width, .height]
+            clip.addSubview(view, positioned: .below, relativeTo: header)
+        }
+    }
+
     /// Shown while a suspended tab wakes up so the card never flashes blank.
     private let placeholder = NSImageView()
 
@@ -57,6 +72,7 @@ final class PageCardView: NSView {
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             webView?.frame = content
             placeholder.frame = content
+            overlay?.frame = content
             edge.frame = clip.bounds
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Tokens.Radius.card, cornerHeight: Tokens.Radius.card, transform: nil)
         }

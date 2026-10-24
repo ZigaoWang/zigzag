@@ -36,7 +36,7 @@ enum WebKitSetup {
             configuration.webExtensionController = ExtensionHost.shared.controller
         }
         if configuration.userContentController.userScripts.isEmpty {
-            for script in PageScripts.all { configuration.userContentController.addUserScript(script) }
+            for script in PageScripts.all + Reader.scripts { configuration.userContentController.addUserScript(script) }
             // Runs in its own world, invisible to the page.
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
             ContentBlocker.attach(to: configuration)

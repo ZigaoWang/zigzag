@@ -65,6 +65,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
         sidebar.address.onRightClick = { [weak self] _ in self?.siteMenu() }
+        sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
             let menu = NSMenu()
@@ -234,6 +235,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let tab = tabManager.selectedTab
         if tab != nil { dismissWelcome() }
         if tab !== shownTab {
+            closeReader()
             floatVideoOnSwitch(from: shownTab, to: tab)
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
@@ -250,6 +252,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         refreshExtensionActions()
         updateNowPlaying()
         offerWebStoreExtension()
+        updateReaderButton()
     }
 
     /// Where an extension may read and change pages, Chrome's three choices.
@@ -557,9 +560,68 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             showPages()
         case .capture:
             sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
+        case .reader:
+            updateReaderButton()
         default:
             break
         }
+        // Reader belongs to the page it was opened on.
+        if change == .url, readerTab === tab, tab.url != readerURL { closeReader() }
+    }
+
+    // MARK: Reader
+
+    private var reader: ReaderView?
+    private weak var readerTab: Tab?
+    private var readerURL: URL?
+    private var readerKeyMonitor: Any?
+
+    func toggleReader() {
+        if reader != nil { closeReader(); return }
+        guard let tab = tabManager.selectedTab, let webView = tab.webView, let url = tab.url else { return }
+        Task { [weak self] in
+            guard let article = await Reader.article(in: webView), let self else {
+                if let self { Toast.show("This page doesn’t have an article to read", symbol: "doc.plaintext", duration: 2, in: self) }
+                return
+            }
+            guard self.tabManager.selectedTab === tab else { return }
+            let view = ReaderView()
+            view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link) }
+            view.show(article, from: url)
+            self.reader = view
+            self.readerTab = tab
+            self.readerURL = url
+            self.root.card.setOverlay(view)
+            view.alphaValue = 0
+            Tokens.Motion.animate(Tokens.Motion.feedback) { view.animator().alphaValue = 1 }
+            self.window?.makeFirstResponder(view.webView)
+            self.readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 53, event.window === self?.window, self?.reader != nil else { return event }
+                self?.closeReader()
+                return nil
+            }
+            self.updateReaderButton()
+        }
+    }
+
+    private func closeReader() {
+        guard let view = reader else { return }
+        reader = nil
+        readerTab = nil
+        readerURL = nil
+        if let monitor = readerKeyMonitor { NSEvent.removeMonitor(monitor) }
+        readerKeyMonitor = nil
+        Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { [weak self] in
+            guard let self, self.reader == nil, self.root.card.overlay === view else { view.removeFromSuperview(); return }
+            self.root.card.setOverlay(nil)
+        })
+        if let webView = tabManager.selectedTab?.webView { window?.makeFirstResponder(webView) }
+        updateReaderButton()
+    }
+
+    private func updateReaderButton() {
+        let tab = tabManager.selectedTab
+        sidebar.address.setReader(available: tab?.isArticle ?? false, active: reader != nil && readerTab === tab)
     }
 
     private func updateWindowTitle() {

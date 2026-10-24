@@ -23,7 +23,7 @@ enum OpenDisposition {
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
-        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture
+        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader
     }
 
     let id: UUID
@@ -203,6 +203,9 @@ final class Tab: NSObject {
         Self.load(url, in: webView)
     }
 
+    /// The page looks like an article, so Reader is offered.
+    private(set) var isArticle = false
+
     /// Set when switching away floated this tab's video, so switching back can put it back.
     var floatedOnSwitch = false
 
@@ -328,6 +331,7 @@ final class Tab: NSObject {
                 MainActor.assumeIsolated {
                     guard let self, let url = wv.url else { return }
                     let hostChanged = url.host() != self.url?.host()
+                    if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
                     self.url = url
                     if hostChanged { self.favicon = FaviconStore.shared.cachedIcon(for: url) ?? self.favicon; self.changed.send(.favicon) }
                     self.changed.send(.url)
@@ -500,6 +504,12 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refreshFavicon()
+        Task { [weak self] in
+            let article = await Reader.isArticle(webView)
+            guard let self, self.webView === webView, article != self.isArticle else { return }
+            self.isArticle = article
+            self.changed.send(.reader)
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
