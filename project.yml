@@ -24,7 +24,9 @@ settings:
     DEVELOPMENT_TEAM: 432GL3WKY2
   configs:
     Debug:
-      CODE_SIGN_IDENTITY: "-"
+      # A real identity, so the signature stays the same across builds and apps that check who they're
+      # talking to (1Password's browser integration) keep trusting it.
+      CODE_SIGN_IDENTITY: "Apple Development"
       SWIFT_OPTIMIZATION_LEVEL: "-O"
       ENABLE_HARDENED_RUNTIME: NO
     Release:
