@@ -180,8 +180,12 @@ final class BrowserRootView: ColorView {
 
     // MARK: Layout
 
+    /// Full screen with the sidebar hidden: the page is the whole screen, no frame around it (like Arc).
+    var isEdgeToEdge: Bool { window?.styleMask.contains(.fullScreen) == true && !sidebarVisible }
+
     var cardFrame: NSRect {
         let inset = Tokens.Metric.cardInset
+        if isEdgeToEdge { return bounds }
         if sidebarVisible {
             return NSRect(x: sidebarWidth, y: inset, width: max(0, bounds.width - sidebarWidth - inset), height: max(0, bounds.height - inset * 2))
         }
@@ -206,6 +210,7 @@ final class BrowserRootView: ColorView {
 
     private func layoutCards() {
         let panes = paneFrames
+        card.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
         if let right = panes.right {
             secondCard.isHidden = false

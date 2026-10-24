@@ -689,7 +689,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidResize(_ notification: Notification) { layoutTrafficLights(); onStateChange?() }
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
-    func windowDidExitFullScreen(_ notification: Notification) { layoutTrafficLights() }
+
+    func windowDidEnterFullScreen(_ notification: Notification) { root.needsLayout = true }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        layoutTrafficLights()
+        root.needsLayout = true
+    }
     func windowDidBecomeKey(_ notification: Notification) {
         // Brand moments in other windows (Settings, Passwords) follow the space in front.
         Brand.themeChanged.send(())

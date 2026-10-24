@@ -14,6 +14,21 @@ final class PageCardView: NSView {
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
 
+    /// No corners, edge or shadow: the page fills the screen.
+    var isEdgeToEdge = false {
+        didSet {
+            guard oldValue != isEdgeToEdge else { return }
+            Tokens.Motion.withoutAnimation {
+                let radius = isEdgeToEdge ? 0 : Tokens.Radius.card
+                clip.layer?.cornerRadius = radius
+                edge.cornerRadius = radius
+                edge.isHidden = isEdgeToEdge
+                layer?.shadowOpacity = isEdgeToEdge ? 0 : 1
+            }
+            needsLayout = true
+        }
+    }
+
     /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades when done.
     private let progressLine = CALayer()
     private var progress: CGFloat = 0
@@ -118,7 +133,8 @@ final class PageCardView: NSView {
             overlay?.frame = content
             edge.frame = clip.bounds
             if progressLine.superlayer != nil { layoutProgress() }
-            layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Tokens.Radius.card, cornerHeight: Tokens.Radius.card, transform: nil)
+            let radius = isEdgeToEdge ? 0 : Tokens.Radius.card
+            layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         }
     }
 
