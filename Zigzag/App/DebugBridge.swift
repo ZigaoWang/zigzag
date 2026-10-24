@@ -311,6 +311,12 @@ enum DebugBridge {
         case "addextnow": Task { _ = await ExtensionStore.install(arg) }
         case "rmext": ExtensionStore.uninstall(arg)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }
+        case "extclick":
+            // extclick <extension id>: clicks its button, as from the site panel.
+            if #available(macOS 15.4, *), let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
+                debugLog("extclick \(item.label) attention=\(item.attention != nil)")
+                ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, anchor: controller.sidebar.address)
+            } else { debugLog("extclick: no action for \(arg)") }
         case "loadunpacked": Task { _ = await ExtensionStore.loadUnpacked(URL(fileURLWithPath: arg, isDirectory: true)) }
         case "extaccess":
             // extaccess <id> <all|click|sites> [site,site]
