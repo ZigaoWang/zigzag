@@ -53,7 +53,10 @@ final class TabManager {
         privateStore = isPrivate ? .nonPersistent() : nil
         let requested = spaceID.flatMap { Library.shared.space($0)?.id }
         currentSpaceID = requested ?? Library.shared.spaces[0].id
-        libraryToken = Library.shared.changed.observe { [weak self] in self?.libraryDidChange() }
+        libraryToken = Library.shared.changed.observe { [weak self] in
+            self?.libraryDidChange()
+            Brand.themeChanged.send(())
+        }
         suspendTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.suspendIdleTabs() }
         }
@@ -235,6 +238,7 @@ final class TabManager {
         selectedTab?.captureSnapshot()
         currentSpaceID = id
         changed.send(.space)
+        Brand.themeChanged.send(())
         if let tab = selectedTab {
             tab.markActivated()
             promote(tab)
