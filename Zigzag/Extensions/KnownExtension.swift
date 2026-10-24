@@ -169,15 +169,18 @@ enum KnownExtension {
     private static let shim = """
     const api = globalThis.chrome || globalThis.browser;
     globalThis.__zigzagReport = (message) => {
-      try { api.runtime.sendNativeMessage('app.zigzag.log', { message: String(message).slice(0, 4000) }); } catch (e) {}
+      // Only extensions allowed native messaging can report; a failed report must not raise another error.
+      if (!(api.runtime.getManifest().permissions || []).includes('nativeMessaging')) return;
+      try { Promise.resolve(api.runtime.sendNativeMessage('app.zigzag.log', { message: String(message).slice(0, 4000) })).catch(() => {}); } catch (e) {}
     };
     self.addEventListener('error', (e) => __zigzagReport('error: ' + (e.error && e.error.stack || e.message)));
     self.addEventListener('unhandledrejection', (e) => __zigzagReport('rejection: ' + (e.reason && ((e.reason.message || '') + ' @ ' + (e.reason.stack || '').split('\\n')[0]) || e.reason)));
     const noop = () => {};
     const event = () => ({ addListener: noop, removeListener: noop, hasListener: () => false });
     const missing = [];
-    const shims = {};
-    function ensure(name, value) { if (!api[name]) { shims[name] = value; missing.push(name); } }
+    // Stand-ins go straight onto the real objects. Replacing `chrome` itself with a wrapper stops WebKit
+    // delivering messages to the background, so it is only ever added to, never swapped out.
+    function ensure(name, value) { if (!api[name]) { try { api[name] = value; missing.push(name); } catch (e) {} } }
     ensure('management', {
       getSelf: async () => ({ id: api.runtime.id, name: api.runtime.getManifest().name, version: api.runtime.getManifest().version, installType: 'normal', enabled: true, type: 'extension' }),
       getAll: async () => [], onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event(),
@@ -202,48 +205,38 @@ enum KnownExtension {
       alarms: ['onAlarm'],
       commands: ['onCommand'],
     };
-    const additions = {};
+    // Some namespaces hand back a fresh object on every read, so a patched one is pinned in place.
+    const pinned = {};
+    function namespace(name) {
+      if (pinned[name]) return pinned[name];
+      const value = api[name];
+      if (!value) return undefined;
+      try { Object.defineProperty(api, name, { value, configurable: true, enumerable: true, writable: true }); } catch (e) {}
+      return (pinned[name] = value);
+    }
     for (const [name, list] of Object.entries(events)) {
+      const target = namespace(name);
+      if (!target) continue;
       for (const prop of list) {
-        if (api[name] && api[name][prop]) continue;
-        (additions[name] = additions[name] || {})[prop] = event();
-        missing.push(name + '.' + prop);
+        if (target[prop]) continue;
+        try { target[prop] = event(); missing.push(name + '.' + prop); } catch (e) {}
       }
     }
-    const managed = { get: async () => ({}), getBytesInUse: async () => 0, onChanged: event() };
     const constants = {
       windows: { WINDOW_ID_NONE: -1, WINDOW_ID_CURRENT: -2 },
       tabs: { TAB_ID_NONE: -1 },
-      storage: { managed: managed },
+      storage: { managed: { get: async () => ({}), getBytesInUse: async () => 0, onChanged: event() } },
     };
-    const extras = { ...shims };
-    const wrappedCache = {};
-    function wrap(name, target) {
-      if (!target && !extras[name] && !additions[name]) return target;
-      if (wrappedCache[name]) return wrappedCache[name];
-      const base = target || extras[name] || {};
-      const added = { ...(additions[name] || {}), ...(constants[name] || {}) };
-      return (wrappedCache[name] = new Proxy(base, {
-        get(t, prop) {
-          const value = Reflect.get(t, prop);
-          if (value !== undefined) return typeof value === 'function' ? value.bind(t) : value;
-          return added[prop];
-        },
-        has(t, prop) { return prop in t || prop in added; }
-      }));
-    }
-    const realChrome = api;
-    const proxy = new Proxy(realChrome, {
-      get(t, prop) {
-        const value = Reflect.get(t, prop);
-        if (typeof prop !== 'string') return value;
-        if (value === undefined && extras[prop]) return extras[prop];
-        if (events[prop] || constants[prop]) return wrap(prop, value);
-        return value;
+    for (const [name, values] of Object.entries(constants)) {
+      const target = namespace(name);
+      if (!target) continue;
+      for (const [key, value] of Object.entries(values)) {
+        if (target[key] === undefined) { try { target[key] = value; } catch (e) {} }
       }
-    });
-    try { Object.defineProperty(globalThis, 'chrome', { value: proxy, configurable: true, writable: true }); } catch (e) { missing.push('!chrome-not-replaced'); }
-    try { Object.defineProperty(globalThis, 'browser', { value: proxy, configurable: true, writable: true }); } catch (e) {}
+    }
+    if (globalThis.browser && globalThis.browser !== api) {
+      for (const name of Object.keys(pinned)) { try { Object.defineProperty(globalThis.browser, name, { value: pinned[name], configurable: true, writable: true }); } catch (e) {} }
+    }
     setTimeout(() => { if (missing.length) __zigzagReport('shimmed: ' + missing.join(', ')); }, 3000);
     """
 
