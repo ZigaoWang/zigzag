@@ -64,6 +64,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
+        sidebar.address.onRightClick = { [weak self] _ in self?.siteMenu() }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
             let menu = NSMenu()
@@ -248,6 +249,33 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         refreshExtensionActions()
         updateNowPlaying()
         offerWebStoreExtension()
+    }
+
+    /// What you can change for the site you're on: right-click the address.
+    private func siteMenu() -> NSMenu? {
+        guard let tab = tabManager.selectedTab, let url = tab.url, let site = ContentBlocker.site(of: url),
+              url.scheme == "http" || url.scheme == "https" else { return nil }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let heading = NSMenuItem(title: site, action: nil, keyEquivalent: "")
+        heading.isEnabled = false
+        menu.addItem(heading)
+        if ContentBlocker.isEnabled {
+            let allowed = ContentBlocker.isAllowed(on: url)
+            let item = SidebarMenus.Item(allowed ? "Block Ads on This Site" : "Allow Ads on This Site", symbol: allowed ? "hand.raised" : "hand.raised.slash") {
+                ContentBlocker.setAllowed(!allowed, on: url)
+                tab.reload()
+            }
+            menu.addItem(item)
+        } else {
+            menu.addItem(SidebarMenus.Item("Ad Blocking Is Off…", symbol: "hand.raised.slash") { SettingsWindowController.shared.show() })
+        }
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item("Copy Link", symbol: "link") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        })
+        return menu
     }
 
     private var offeredExtensionID: String?
