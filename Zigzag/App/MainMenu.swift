@@ -163,7 +163,9 @@ enum MainMenu {
         main.addItem(window)
         NSApp.windowsMenu = window.submenu
 
-        let help = submenu("Help", [])
+        let help = submenu("Help", [
+            item("Getting Started", #selector(C.showGettingStarted(_:)), ""),
+        ])
         main.addItem(help)
         NSApp.helpMenu = help.submenu
         return main
