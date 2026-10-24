@@ -224,7 +224,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         let color = tabManager.isPrivate ? SpaceColor.graphite.background : tabManager.currentSpace.background
-        root.setColor(color, animated: animated && !Tokens.Motion.isKeyboardDriven)
+        root.setColor(color, animated: animated)
         root.sidebarContainer.tint = color
     }
 

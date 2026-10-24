@@ -381,7 +381,8 @@ final class SidebarView: NSView {
         let fromSwipe = scrollView.frame.minX - Tokens.Metric.sidebarPadding
         var finalFrame = scrollView.frame
         finalFrame.origin.x = Tokens.Metric.sidebarPadding
-        let animate = snapshot != nil && direction != 0 && !Tokens.Motion.reduceMotion && (!Tokens.Motion.isKeyboardDriven || fromSwipe != 0)
+        // Space switches slide even from the keyboard (⌃1, ⌃2…): the motion tells you which way you went.
+        let animate = snapshot != nil && direction != 0 && !Tokens.Motion.reduceMotion
         Tokens.Motion.withoutAnimation { scrollView.frame = finalFrame }
         // Mid-drag the list keeps its gap and hidden row; otherwise it simply reloads.
         if list.isDragging { list.refreshDuringDrag() } else { list.reload(animated: false) }
