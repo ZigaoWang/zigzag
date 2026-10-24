@@ -10,5 +10,9 @@
 	<true/>
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.zigzag.passwords</string>
+	</array>
 </dict>
 </plist>

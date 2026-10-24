@@ -16,11 +16,15 @@ OUT=build/release
 rm -rf "$OUT" && mkdir -p "$OUT/updates"
 
 xcodegen generate -q
-xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release \
+xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release -allowProvisioningUpdates \
   -derivedDataPath build/rd -archivePath "$OUT/Zigzag.xcarchive" archive | xcbeautify 2>/dev/null || true
+[[ -d "$OUT/Zigzag.xcarchive" ]] || { echo "Archive failed"; exit 1; }
 
-APP="$OUT/Zigzag.xcarchive/Products/Applications/Zigzag.app"
-[[ -d "$APP" ]] || { echo "Archive failed"; exit 1; }
+# Exporting signs with Developer ID and its provisioning profile (which carries the Keychain access group).
+xcodebuild -exportArchive -archivePath "$OUT/Zigzag.xcarchive" -exportPath "$OUT/export" \
+  -exportOptionsPlist scripts/ExportOptions.plist -allowProvisioningUpdates | xcbeautify 2>/dev/null || true
+APP="$OUT/export/Zigzag.app"
+[[ -d "$APP" ]] || { echo "Export failed"; exit 1; }
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
 
 echo "Verifying signature…"

@@ -27,10 +27,15 @@ settings:
       # A real identity, so the signature stays the same across builds and apps that check who they're
       # talking to (1Password's browser integration) keep trusting it.
       CODE_SIGN_IDENTITY: "Apple Development"
+      # Xcode registers the App ID and makes the development profile the Keychain access group needs.
+      CODE_SIGN_STYLE: Automatic
       SWIFT_OPTIMIZATION_LEVEL: "-O"
       ENABLE_HARDENED_RUNTIME: NO
     Release:
-      CODE_SIGN_IDENTITY: "Developer ID Application"
+      # Archived with development signing; scripts/release.sh exports it signed with Developer ID, and Xcode makes
+      # the Developer ID profile the Keychain access group needs.
+      CODE_SIGN_IDENTITY: "Apple Development"
+      CODE_SIGN_STYLE: Automatic
       SPARKLE_PUBLIC_KEY: fcLCAtuyhCGTC62F2cDfj/vAMXgFvrpQSyF3540+hq0=
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
       OTHER_CODE_SIGN_FLAGS: "--timestamp"
@@ -90,6 +95,9 @@ targets:
       properties:
         com.apple.security.device.camera: true
         com.apple.security.device.audio-input: true
+        # Saved passwords live in this group of the data protection keychain, which also syncs through iCloud Keychain.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)app.zigzag.passwords
         com.apple.security.personal-information.location: true
         com.apple.security.cs.allow-unsigned-executable-memory: false
   ZigzagTests:
