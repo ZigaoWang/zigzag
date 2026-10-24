@@ -738,6 +738,7 @@ private final class BringPicker: StepContent {
 
     private func run(_ rows: [BrowserRow]) {
         isImporting = true
+        arrow.set(.importing)
         rows.forEach { $0.state = .waiting }
         refresh()
         let choice = self.choice
@@ -756,6 +757,8 @@ private final class BringPicker: StepContent {
                 self.needsLayout = true
             }
             self.isImporting = false
+            let failed = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
+            self.arrow.set(failed ? .idle : .done)
             self.refresh()
         }
     }
@@ -865,18 +868,34 @@ private final class BringPicker: StepContent {
     }
 }
 
-/// The import step's picture: the browsers you've picked, an arrow, and Zigzag.
+/// The import step's picture: the browsers you've picked, the way across, and Zigzag. While importing, dots
+/// run along the way across; when it's done, Zigzag gets a check.
 private final class IntoZigzag: NSView {
+    enum State { case idle, importing, done }
     private var sources: [NSImageView] = []
-    private let arrow = NSImageView()
     private let zigzag = NSImageView()
+    private var dots: [CALayer] = []
+    private let badge = NSImageView()
+    private let caption = Label("", font: .systemFont(ofSize: 15, weight: .semibold), color: Brand.ribbon)
+    private var state = State.idle
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        arrow.image = Tokens.Symbol.image("arrow.right", size: 30)
-        arrow.contentTintColor = Brand.ribbon.withAlphaComponent(0.7)
+        wantsLayer = true
         zigzag.image = NSApp.applicationIconImage
-        [arrow, zigzag].forEach { addSubview($0) }
+        badge.image = Tokens.Symbol.image("checkmark.circle.fill", size: 34)
+        badge.contentTintColor = Tokens.Color.success
+        badge.wantsLayer = true
+        badge.isHidden = true
+        caption.alignment = .center
+        [zigzag, badge, caption].forEach { addSubview($0) }
+        for _ in 0..<3 {
+            let dot = CALayer()
+            dot.backgroundColor = Brand.ribbon.withAlphaComponent(0.6).cgColor
+            dot.cornerRadius = 4
+            layer?.addSublayer(dot)
+            dots.append(dot)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -890,25 +909,64 @@ private final class IntoZigzag: NSView {
             addSubview(view)
             return view
         }
-        arrow.isHidden = icons.isEmpty
+        needsLayout = true
+    }
+
+    func set(_ new: State) {
+        guard new != state else { return }
+        state = new
+        // The dots run toward Zigzag, one after another, while it works.
+        for (i, dot) in dots.enumerated() {
+            dot.removeAllAnimations()
+            guard new == .importing else { continue }
+            let pulse = CAKeyframeAnimation(keyPath: "opacity")
+            pulse.values = [0.2, 1, 0.2]
+            pulse.keyTimes = [0, 0.3, 1]
+            pulse.duration = 0.9
+            pulse.repeatCount = .infinity
+            pulse.beginTime = CACurrentMediaTime() + Double(i) * 0.18
+            dot.add(pulse, forKey: "run")
+        }
+        caption.stringValue = new == .importing ? "Bringing it over…" : new == .done ? "All in Zigzag" : ""
+        badge.isHidden = new != .done
+        if new == .done, let layer = badge.layer {
+            // The check lands with a little give, once.
+            layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            let pop = CASpringAnimation(keyPath: "transform.scale")
+            pop.fromValue = 0.3
+            pop.toValue = 1
+            pop.damping = 11
+            pop.initialVelocity = 6
+            pop.duration = pop.settlingDuration
+            layer.add(pop, forKey: "pop")
+        }
         needsLayout = true
     }
 
     override func layout() {
         super.layout()
-        let big: CGFloat = 128, small: CGFloat = 96
-        // The browsers stacked a little, the arrow, then Zigzag, centered as one row.
-        let stack = sources.isEmpty ? 0 : small + CGFloat(sources.count - 1) * 36
-        let total = sources.isEmpty ? big : stack + 40 + 44 + 40 + big
-        var x = (bounds.width - total) / 2
-        let mid = bounds.height / 2
-        for (i, view) in sources.enumerated() {
-            view.frame = NSRect(x: x + CGFloat(i) * 36, y: mid - small / 2, width: small, height: small)
+        let size: CGFloat = 104, gap: CGFloat = 14, way: CGFloat = 90
+        let shown = sources.prefix(3)
+        let row = shown.isEmpty ? size : CGFloat(shown.count) * size + CGFloat(shown.count - 1) * gap + way + size
+        var x = round((bounds.width - row) / 2)
+        let top = round(bounds.height / 2 - size / 2) - 16
+        for (k, view) in sources.enumerated() {
+            view.isHidden = k >= 3
+            view.frame = NSRect(x: x, y: top, width: size, height: size)
+            if k < 3 { x += size + gap }
         }
-        x += stack + 40
-        arrow.frame = NSRect(x: x, y: mid - 22, width: 44, height: 44)
-        if !sources.isEmpty { x += 44 + 40 }
-        zigzag.frame = NSRect(x: x, y: mid - big / 2, width: big, height: big)
+        let mid = top + size / 2
+        Tokens.Motion.withoutAnimation {
+            for (i, dot) in dots.enumerated() {
+                dot.isHidden = shown.isEmpty
+                dot.frame = CGRect(x: x - gap + (way - 8 * 3 - 12 * 2) / 2 + CGFloat(i) * 20, y: mid - 4, width: 8, height: 8)
+                dot.opacity = state == .importing ? 0.2 : 0.6
+            }
+        }
+        if !shown.isEmpty { x += way - gap }
+        zigzag.frame = NSRect(x: x, y: top, width: size, height: size)
+        badge.frame = NSRect(x: zigzag.frame.maxX - 30, y: zigzag.frame.minY - 6, width: 36, height: 36)
+        caption.frame = NSRect(x: 0, y: top + size + 28, width: bounds.width, height: caption.lineHeight)
     }
 }
 
@@ -959,10 +1017,11 @@ private final class PickTile: InteractiveView {
     }
 
     private func refresh() {
-        let fill = Onboard.tint.withAlphaComponent(isPicked ? 0.2 : (isHovered && !isLocked ? 0.1 : 0.06))
+        // Quiet at rest, a soft accent wash and a check when picked: the icon does the talking.
+        let fill = isPicked ? Onboard.accent.withAlphaComponent(0.12) : Onboard.tint.withAlphaComponent(isHovered && !isLocked ? 0.06 : 0)
         layer?.backgroundColor = fill.cgColor
-        layer?.borderWidth = isPicked ? 1.5 : 0
-        layer?.borderColor = Onboard.tint.withAlphaComponent(0.7).cgColor
+        layer?.borderWidth = 0
+        check.contentTintColor = Onboard.accent
         check.isHidden = !isPicked || !spinner.isHidden
     }
 
@@ -1048,6 +1107,7 @@ private func appTile(_ logo: NSImage) -> NSImage {
 
 private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: URL? = nil, bundled: String? = nil) {
     if let bundled, let url = Bundle.main.url(forResource: bundled, withExtension: "png"), let image = NSImage(contentsOf: url) {
+        FaviconStore.shared.remember(image, for: site)
         tile.icon.image = image.size.width >= 128 && bundled == "avoidxray" ? appTileFull(image) : appTile(image)
         tile.icon.contentTintColor = nil
         return
@@ -1055,11 +1115,14 @@ private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: UR
     if let app {
         tile.icon.image = NSWorkspace.shared.icon(forFile: app.path)
         tile.icon.contentTintColor = nil
+        // The sidebar still wants the site's own icon, for the favorite.
+        if let source = iconSource(site: site, explicit: explicit) { fetchIcon(source) { image in FaviconStore.shared.remember(image, for: site) } }
         return
     }
     tile.icon.image = Tokens.Symbol.image("globe", size: 22)
     tile.icon.contentTintColor = Onboard.dim(0.7)
     guard let source = iconSource(site: site, explicit: explicit) else { return }
+    fetchIcon(source) { image in FaviconStore.shared.remember(image, for: site) }
     fetchIcon(source) { [weak tile] image in
         tile?.icon.image = appTile(image)
         tile?.icon.contentTintColor = nil
@@ -1129,7 +1192,12 @@ final class SitesPicker: StepContent {
         }
         preview.page = .blank
         preview.tabs = ["New Tab"]
-        preview.favorites = []
+        preview.favoritesView.onReorder = { [weak self] bookmark, index in
+            guard let self, let from = self.order.firstIndex(where: { $0.id == bookmark.id }) else { return }
+            self.order.remove(at: from)
+            self.order.insert(bookmark, at: min(index, self.order.count))
+            self.preview.liveFavorites = self.order
+        }
         // Icons can still be arriving; the window catches up.
         for delay in [0.4, 1.2, 2.5] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.showPicked() } }
     }
@@ -1138,17 +1206,28 @@ final class SitesPicker: StepContent {
 
     private var picked: [(URL, String)] { tiles.filter { $0.0.isPicked }.map { ($0.1, $0.2) } }
 
+    /// Picked sites in the order you've arranged them (drag them in the window on the right).
+    private var order: [Bookmark] = []
+    private var ids: [URL: UUID] = [:]
+
     /// The window on the right gains each site you pick as a favorite, as you pick it.
     private func showPicked() {
-        preview.favorites = tiles.filter { $0.0.isPicked }.compactMap { $0.0.icon.image }
-        preview.highlightsFavorites = true
+        let picked = tiles.filter { $0.0.isPicked }
+        let urls = Set(picked.map(\.1))
+        order.removeAll { !urls.contains($0.url) }
+        for (_, url, name) in picked where !order.contains(where: { $0.url == url }) {
+            let id = ids[url] ?? UUID()
+            ids[url] = id
+            order.append(Bookmark(id: id, url: url, title: name))
+        }
+        preview.liveFavorites = order
         onChange?()
     }
     override var primaryTitle: String { picked.isEmpty ? "Continue" : "Pin \(picked.count)" }
 
     override func commit(_ done: @escaping () -> Void) {
         let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
-        for (url, name) in picked where !have.contains(TabManager.normalize(url)) { _ = Library.shared.addFavorite(url: url, title: name) }
+        for bookmark in order where !have.contains(TabManager.normalize(bookmark.url)) { _ = Library.shared.addFavorite(url: bookmark.url, title: bookmark.title) }
         done()
     }
 
@@ -1473,12 +1552,35 @@ private final class ChoiceCard: InteractiveView {
 /// Automatic underneath.
 private final class ColorPicker: StepContent {
     var onColor: (() -> Void)?
+    /// The same color field as the space editor: drag anywhere for any hue and strength.
+    private let canvas = ColorCanvas()
+    private let looks = AppearanceOption.Mode.allCases.map { AppearanceOption(mode: $0) }
     private var swatches: [(SpaceColor, ColorView)] = []
-    private let lookLabel = Label("Look", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
-    private let look = SegmentedPills(["Automatic", "Light", "Dark"])
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        let space = self.space
+        canvas.hue = space?.hue ?? space?.color.hue ?? 0.6
+        canvas.intensity = space?.intensity ?? SpaceColor.defaultIntensity
+        canvas.wantsLayer = true
+        canvas.layer?.cornerRadius = 12
+        canvas.layer?.masksToBounds = true
+        addSubview(canvas)
+        canvas.onChange = { [weak self] hue, intensity, _ in
+            guard let self, let id = self.space?.id else { return }
+            // Live as you drag: the window and the whole right side follow your finger.
+            Library.shared.setHue(hue, intensity: intensity, for: id)
+            self.refresh()
+            self.onColor?()
+        }
+        for option in looks {
+            option.onClick = { [weak self, weak option] _ in
+                guard let self, let option, let id = self.space?.id else { return }
+                Library.shared.setAppearance(option.mode == .light ? "light" : option.mode == .dark ? "dark" : nil, for: id)
+                self.refresh()
+            }
+            addSubview(option)
+        }
         for color in SpaceColor.allCases {
             let dot = ColorView(color: color.swatch)
             dot.wantsLayer = true
@@ -1487,9 +1589,6 @@ private final class ColorPicker: StepContent {
             addSubview(dot)
             swatches.append((color, dot))
         }
-        look.tint = Onboard.accent
-        look.onChange = { [weak self] index in self?.setLook([nil, "light", "dark"][index]) }
-        [lookLabel, look].forEach { addSubview($0) }
         preview.page = .wikipedia
         refresh()
     }
@@ -1501,43 +1600,44 @@ private final class ColorPicker: StepContent {
     @objc private func picked(_ gesture: NSClickGestureRecognizer) {
         guard let view = gesture.view, let color = swatches.first(where: { $0.1 === view })?.0, let id = space?.id else { return }
         Library.shared.setColor(color, for: id)
+        canvas.hue = color.hue
+        canvas.intensity = SpaceColor.defaultIntensity
         refresh()
         onColor?()
-    }
-
-    private func setLook(_ value: String?) {
-        guard let id = space?.id else { return }
-        Library.shared.setAppearance(value, for: id)
-        refresh()
     }
 
     private func refresh() {
         let current = space
         for (color, dot) in swatches {
             let on = current?.hue == nil && current?.color == color
-            dot.layer?.borderWidth = on ? 3 : 0
+            dot.layer?.borderWidth = on ? 2.5 : 0
             dot.layer?.borderColor = Onboard.paper.cgColor
-            dot.layer?.shadowColor = Onboard.accent.cgColor
-            dot.layer?.shadowOpacity = on ? 1 : 0
-            dot.layer?.shadowRadius = 0
-            dot.layer?.shadowOffset = .zero
-            dot.layer?.shadowPath = on ? CGPath(ellipseIn: CGRect(x: -2, y: -2, width: 38, height: 38), transform: nil) : nil
         }
-        look.selectedIndex = current?.appearance == "light" ? 1 : current?.appearance == "dark" ? 2 : 0
+        for option in looks {
+            switch option.mode {
+            case .auto: option.isSelected = current?.appearance == nil
+            case .light: option.isSelected = current?.appearance == "light"
+            case .dark: option.isSelected = current?.appearance == "dark"
+            }
+            option.show(current?.background ?? SpaceColor.sky.background)
+        }
         preview.refreshColors()
-        needsLayout = true
     }
 
     override func layout() {
         super.layout()
-        let size: CGFloat = 34, gap = (bounds.width - size * 4) / 3
+        let w = bounds.width
+        canvas.frame = NSRect(x: 0, y: 0, width: w, height: 150)
+        let size: CGFloat = 24, gap = (w - size * CGFloat(swatches.count)) / CGFloat(max(swatches.count - 1, 1))
         for (i, (_, dot)) in swatches.enumerated() {
-            dot.frame = NSRect(x: CGFloat(i % 4) * (size + gap), y: CGFloat(i / 4) * (size + 16), width: size, height: size)
+            dot.frame = NSRect(x: CGFloat(i) * (size + gap), y: canvas.frame.maxY + 14, width: size, height: size)
             dot.layer?.cornerRadius = size / 2
         }
-        let y = CGFloat((swatches.count + 3) / 4) * (size + 16) + 14
-        lookLabel.frame = NSRect(x: 0, y: y, width: 100, height: lookLabel.lineHeight)
-        look.frame = NSRect(x: 0, y: lookLabel.frame.maxY + 8, width: bounds.width, height: 32)
+        let y = canvas.frame.maxY + 14 + size + 18
+        let ow = (w - 16) / 3
+        for (i, option) in looks.enumerated() {
+            option.frame = NSRect(x: CGFloat(i) * (ow + 8), y: y, width: ow, height: 70)
+        }
     }
 }
 
@@ -1549,6 +1649,17 @@ final class LiveBrowser: NSView {
     /// Favorites drawn with a ring: the ones you just picked.
     var highlightsFavorites = false { didSet { needsDisplay = true } }
     var extensions: [NSImage] = [] { didSet { needsDisplay = true } }
+    /// Zigzag's own favorites grid, for the step where you pick them: it looks and drags exactly like the app's.
+    let favoritesView = FavoritesView()
+    var liveFavorites: [Bookmark]? {
+        didSet {
+            favoritesView.isHidden = liveFavorites == nil
+            favoritesView.reload(favorites: liveFavorites ?? [], openIDs: [], selectedID: nil)
+            needsLayout = true
+            needsDisplay = true
+        }
+    }
+    private let side: CGFloat = 210
     var page: Page = .wikipedia { didSet { needsDisplay = true } }
     var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
     private var background: NSColor = SpaceColor.sky.background
@@ -1562,7 +1673,14 @@ final class LiveBrowser: NSView {
         layer?.shadowOpacity = 0.35
         layer?.shadowRadius = 30
         layer?.shadowOffset = CGSize(width: 0, height: -16)
+        favoritesView.isHidden = true
+        addSubview(favoritesView)
         refreshColors()
+    }
+
+    override func layout() {
+        super.layout()
+        favoritesView.frame = NSRect(x: 12, y: 64, width: side - 24, height: max(favoritesView.preferredHeight, 1))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1603,7 +1721,7 @@ final class LiveBrowser: NSView {
             NSAttributedString(string: string, attributes: [.font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color, .paragraphStyle: style])
                 .draw(with: NSRect(x: point.x, y: point.y, width: width, height: size * 1.4), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
         }
-        let side: CGFloat = 160, pad: CGFloat = 12
+        let pad: CGFloat = 12
         for (i, c) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
             c.setFill()
             NSBezierPath(ovalIn: NSRect(x: pad + CGFloat(i) * 14, y: 13, width: 9, height: 9)).fill()
@@ -1614,11 +1732,12 @@ final class LiveBrowser: NSView {
         let label: String = { switch page { case .news: "news.example.com"; case .wikipedia: "wikipedia.org"; case .blank: "Search or enter address" } }()
         text(label, NSPoint(x: address.minX + 8, y: address.minY + 5), size: 10.5, color: ink.withAlphaComponent(0.5), width: address.width - 16)
         // Favorites: the sites you picked, with their own icons.
-        let favs = favorites ?? Library.shared.favorites.prefix(8).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) }
-        let slots = max(3, min(favs.count, 6))
-        let cols = min(slots, 3)
+        let favs = liveFavorites != nil ? [] : favorites ?? Library.shared.favorites.prefix(8).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) }
+        let slots = liveFavorites != nil ? 0 : max(4, min(favs.count, 8))
+        let cols = 4
         let favW = (side - pad * 2 - CGFloat(cols - 1) * 5) / CGFloat(cols)
         var y: CGFloat = 64
+        if liveFavorites != nil { y += favoritesView.preferredHeight + 8 - 37 }
         for i in 0..<slots {
             let r = NSRect(x: pad + CGFloat(i % cols) * (favW + 5), y: y + CGFloat(i / cols) * 37, width: favW, height: 32)
             box(r, ink.withAlphaComponent(0.06), 8)
@@ -1632,7 +1751,7 @@ final class LiveBrowser: NSView {
                 favs[i].draw(in: NSRect(x: r.midX - 8, y: r.midY - 8, width: 16, height: 16))
             }
         }
-        y += CGFloat((slots + cols - 1) / cols) * 37 + 8
+        y += CGFloat(max(1, (slots + cols - 1) / cols)) * 37 + 8
         text(Library.shared.spaces.first?.name ?? "Personal", NSPoint(x: pad + 2, y: y), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
         y += 18
         for (i, title) in tabs.enumerated() {
@@ -1642,15 +1761,12 @@ final class LiveBrowser: NSView {
             text(title, NSPoint(x: r.minX + 22, y: r.minY + 5), size: 11, weight: i == 0 ? .medium : .regular,
                  color: ink.withAlphaComponent(i == 0 ? 0.85 : 0.6), width: r.width - 28)
         }
-        // Extensions you've added, under the sidebar's tabs, as their icons.
+        var extensionPanel: NSRect?
         if !extensions.isEmpty {
-            let ey = bounds.height - 58
-            text("Extensions", NSPoint(x: pad + 2, y: ey), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
-            for (k, icon) in extensions.prefix(5).enumerated() {
-                let r = NSRect(x: pad + CGFloat(k) * 26, y: ey + 16, width: 22, height: 22)
-                box(r, isDark ? NSColor.white.withAlphaComponent(0.1) : NSColor.white.withAlphaComponent(0.8), 6)
-                icon.draw(in: r.insetBy(dx: 3, dy: 3))
-            }
+            // Where the app keeps them: site controls, from the button at the end of the address.
+            let button = NSRect(x: address.maxX - 22, y: address.minY + 4, width: 16, height: 16)
+            box(button, accent.withAlphaComponent(0.2), 4)
+            extensionPanel = NSRect(x: address.minX + 20, y: address.maxY + 8, width: 210, height: 86)
         }
         // The page.
         let pageRect = NSRect(x: side, y: 10, width: bounds.width - side - 10, height: bounds.height - 20)
@@ -1698,6 +1814,23 @@ final class LiveBrowser: NSView {
             }
         }
         NSGraphicsContext.current?.restoreGraphicsState()
+        if let panel = extensionPanel {
+            NSGraphicsContext.current?.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.2)
+            shadow.shadowBlurRadius = 12
+            shadow.shadowOffset = NSSize(width: 0, height: -4)
+            shadow.set()
+            box(panel, isDark ? NSColor(white: 0.17, alpha: 1) : .white, 10)
+            NSGraphicsContext.current?.restoreGraphicsState()
+            text("wikipedia.org", NSPoint(x: panel.minX + 12, y: panel.minY + 10), size: 11, weight: .semibold, color: pageInk.withAlphaComponent(0.85))
+            text("Extensions", NSPoint(x: panel.minX + 12, y: panel.minY + 30), size: 9.5, weight: .semibold, color: pageInk.withAlphaComponent(0.45))
+            for (k, icon) in extensions.prefix(6).enumerated() {
+                let r = NSRect(x: panel.minX + 12 + CGFloat(k) * 30, y: panel.minY + 48, width: 26, height: 26)
+                box(r, pageInk.withAlphaComponent(0.06), 7)
+                icon.draw(in: r.insetBy(dx: 4, dy: 4))
+            }
+        }
     }
 }
 
