@@ -133,7 +133,11 @@ final class Tab: NSObject {
         self.webView = webView
         observe(webView)
 
-        if let state = pendingInteractionState {
+        if Self.isExtensionPage(url), !showsExtensionPage, let url {
+            // A restored tab from an extension that's gone: explain, rather than restore a page that can't load.
+            pendingInteractionState = nil
+            Self.load(url, in: webView)
+        } else if let state = pendingInteractionState {
             webView.interactionState = state as NSData
             pendingInteractionState = nil
             // Interaction state restores history but may not start a load on its own.
@@ -225,6 +229,11 @@ final class Tab: NSObject {
 
     /// Local files need read access granted to their folder; everything else is a plain request.
     static func load(_ url: URL, in webView: WKWebView) {
+        // WebKit quietly ignores a page from an extension it doesn't have; say what happened instead.
+        if isExtensionPage(url), extensionConfiguration(for: url) == nil {
+            ErrorPage.show(error: NSError(domain: NSURLErrorDomain, code: NSURLErrorResourceUnavailable), url: url, in: webView)
+            return
+        }
         if url.isFileURL {
             webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         } else {

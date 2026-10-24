@@ -131,14 +131,23 @@ enum ErrorPage {
         button:active { background: color-mix(in srgb, CanvasText 14%, transparent); }
         </style></head><body><main>
         <h1>\(escape(title))</h1><p>\(escape(message))</p>
-        <button onclick="location.reload()">Try Again</button>
+        \(url.scheme == "webkit-extension" ? "" : #"<button onclick="location.reload()">Try Again</button>"#)
         </main></body></html>
         """
-        webView.loadSimulatedRequest(URLRequest(url: url), responseHTML: html)
+        // WebKit won't show anything at an address of an extension it doesn't have, so that page has none.
+        if url.scheme == "webkit-extension" {
+            webView.loadHTMLString(html, baseURL: nil)
+        } else {
+            webView.loadSimulatedRequest(URLRequest(url: url), responseHTML: html)
+        }
     }
 
     private static func describe(_ error: NSError, url: URL) -> (String, String) {
         let host = url.host() ?? url.absoluteString
+        // An extension's own page, from an extension that's been removed or turned off.
+        if url.scheme == "webkit-extension" {
+            return ("This extension isn’t here", "The page belongs to an extension that has been removed or turned off. Turn it back on in Settings › Extensions, or close this tab.")
+        }
         switch error.code {
         case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
             return ("You’re offline", "Check your internet connection, then try again.")
