@@ -241,6 +241,7 @@ final class KeyHint: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     var width: CGFloat { max(Self.height + 4, label.inkWidth + Tokens.Space.x3) }
+    override var intrinsicContentSize: NSSize { NSSize(width: width, height: Self.height) }
 
     override func layout() {
         super.layout()

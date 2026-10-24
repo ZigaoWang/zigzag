@@ -402,6 +402,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
+        let sites = SiteSearch.all.map(\.name)
+        generalGroup.add(FormRow(title: "Search a site", detail: "In the address bar, type a site’s name and press Tab to search it: "
+            + ListFormatter.localizedString(byJoining: sites) + ".", control: KeyHint("Tab")))
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
