@@ -15,7 +15,7 @@ final class ImportView: NSView {
     private var sources: [ImportCoordinator.Source] = []
     private var rows: [SourceRow] = []
     private let choiceLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
-    private var choiceButtons: [(ImportCoordinator.Choice, NSButton)] = []
+    private var choiceButtons: [(ImportCoordinator.Choice, ChoicePill)] = []
     private let chooseFile = TextButton(title: "Choose a File…", font: Tokens.Font.body(.medium))
     private let primary = PrimaryButton(title: "Import")
     private let secondary = TextButton(title: "Not Now", font: Tokens.Font.body(.medium))
@@ -30,10 +30,9 @@ final class ImportView: NSView {
         emptyNote.textColor = Tokens.Color.textSecondary
         emptyNote.isSelectable = false
         [title, subtitle, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & pinned tabs")] {
-            let box = NSButton(checkboxWithTitle: name, target: self, action: #selector(choicesChanged))
-            box.state = .on
-            box.font = Tokens.Font.body()
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
+            let box = ChoicePill(title: name)
+            box.onChange = { [weak self] _ in self?.choicesChanged() }
             addSubview(box)
             choiceButtons.append((choice, box))
         }
@@ -69,7 +68,7 @@ final class ImportView: NSView {
     }
 
     private var chosenData: ImportCoordinator.Choice {
-        choiceButtons.reduce(into: []) { result, pair in if pair.1.state == .on, !pair.1.isHidden { result.insert(pair.0) } }
+        choiceButtons.reduce(into: []) { result, pair in if pair.1.isOn, !pair.1.isHidden { result.insert(pair.0) } }
     }
 
     private func primaryAction() {
@@ -158,22 +157,9 @@ final class ImportView: NSView {
             self.addSubview(row)
             self.rows.append(row)
             self.startImport([row])
-            row.onFinishedFile = { [weak self] in self?.offerToTrash(url) }
+            row.exportFile = url
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: handle) } else { handle(panel.runModal()) }
-    }
-
-    /// An export holds passwords in plain text; leaving it in Downloads is the risk.
-    private func offerToTrash(_ file: URL) {
-        guard let window else { return }
-        let alert = NSAlert()
-        alert.messageText = "Move \(file.lastPathComponent) to the Trash?"
-        alert.informativeText = "The export holds your passwords unprotected. Now that they're in Zigzag, it's safer not to keep it."
-        alert.addButton(withTitle: "Move to Trash")
-        alert.addButton(withTitle: "Keep It")
-        alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn { NSWorkspace.shared.recycle([file]) }
-        }
     }
 
     // MARK: Layout
@@ -191,7 +177,7 @@ final class ImportView: NSView {
         let visibleRows = rows.filter { !$0.isHidden }
         let rowsHeight = visibleRows.map(\.preferredHeight).reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
         let showsChoices = stage == .choose && !sources.isEmpty
-        let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + Tokens.Space.x6 : 0
+        let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + Tokens.Space.x8 : 0
         let emptyHeight: CGFloat = sources.isEmpty && stage == .choose ? ceil(emptyNote.sizeThatFits(NSSize(width: width, height: 200)).height) + Tokens.Space.x4 : 0
         let total = title.lineHeight + Tokens.Space.x2 + subtitleHeight + Tokens.Space.x6 + rowsHeight + emptyHeight
             + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + Tokens.Space.x8 + Tokens.Space.x8
@@ -207,11 +193,12 @@ final class ImportView: NSView {
             place(choiceLabel, height: choiceLabel.lineHeight, gap: Tokens.Space.x2)
             var cx = x
             for (_, box) in choiceButtons where !box.isHidden {
-                let w = ceil(box.fittingSize.width)
-                box.frame = NSRect(x: cx, y: y, width: w, height: Tokens.Space.x6)
-                cx += w + Tokens.Space.x4
+                let w = box.fittingWidth
+                if cx + w > x + width { cx = x; y += Tokens.Space.x8 + Tokens.Space.x2 }
+                box.frame = NSRect(x: cx, y: y, width: w, height: Tokens.Space.x8)
+                cx += w + Tokens.Space.x2
             }
-            y += Tokens.Space.x6
+            y += Tokens.Space.x8
         }
         y += Tokens.Space.x8
         let buttonHeight = Tokens.Space.x8
@@ -234,7 +221,8 @@ private final class SourceRow: InteractiveView {
     let source: ImportCoordinator.Source
     var onToggle: (() -> Void)?
     var onFix: ((ImportProblem.Fix, String) -> Void)?
-    var onFinishedFile: (() -> Void)?
+    /// A chosen export: once its passwords are in, offer to move it to the Trash, since it holds them unprotected.
+    var exportFile: URL?
 
     var isChosen = false { didSet { stateDidChange(animated: true); refresh() } }
     var state = State.idle { didSet { refresh() } }
@@ -245,7 +233,7 @@ private final class SourceRow: InteractiveView {
     private let check = NSImageView()
     private let spinner = NSProgressIndicator()
     private var fixViews: [NSView] = []
-    private var passwordField: NSSecureTextField?
+    private var passwordField: FilledField?
     /// What the browser holds, filled in once counted.
     private var preview = "Looking…" { didSet { refresh() } }
 
@@ -315,7 +303,22 @@ private final class SourceRow: InteractiveView {
             check.image = Tokens.Symbol.image(clean ? "checkmark.circle.fill" : "exclamationmark.circle.fill", size: Tokens.TypeSize.large)
             check.contentTintColor = clean ? .systemGreen : .systemOrange
             for problem in summary.problems { addFix(problem.fix) }
-            if case .file = source.kind, summary.passwords + summary.updatedPasswords > 0 { onFinishedFile?() }
+            if let exportFile, summary.passwords + summary.updatedPasswords > 0, FileManager.default.fileExists(atPath: exportFile.path) {
+                detail.stringValue += "\nThe file still holds your passwords unprotected. It's safer to move it to the Trash."
+                let button = TextButton(title: "Move to Trash", font: Tokens.Font.body(.medium))
+                button.showsFillAtRest = true
+                button.onClick = { [weak self, weak button] _ in
+                    NSWorkspace.shared.recycle([exportFile]) { _, error in
+                        DispatchQueue.main.async {
+                            button?.title = error == nil ? "Moved to Trash" : "Couldn't Move It"
+                            button?.isEnabled = false
+                            self?.needsLayout = true
+                        }
+                    }
+                }
+                addSubview(button)
+                fixViews.append(button)
+            }
         }
         superview?.needsLayout = true
         needsLayout = true
@@ -332,9 +335,7 @@ private final class SourceRow: InteractiveView {
         }
         guard !fixViews.contains(where: { ($0 as? TextButton)?.title == title }) else { return }
         if fix == .primaryPassword {
-            let field = NSSecureTextField()
-            field.placeholderString = "Primary password"
-            field.controlSize = .regular
+            let field = FilledField(placeholder: "Primary password", secure: true)
             addSubview(field)
             fixViews.append(field)
             passwordField = field
@@ -367,7 +368,7 @@ private final class SourceRow: InteractiveView {
         var fx = textX
         let fy = detail.frame.maxY + Tokens.Space.x2
         for view in fixViews {
-            let w: CGFloat = view is NSSecureTextField ? 180 : ((view as? TextButton)?.fittingWidth ?? 80)
+            let w: CGFloat = view is FilledField ? 180 : ((view as? TextButton)?.fittingWidth ?? 80)
             view.frame = NSRect(x: fx, y: fy, width: w, height: Tokens.Space.x8)
             fx += w + Tokens.Space.x2
         }
