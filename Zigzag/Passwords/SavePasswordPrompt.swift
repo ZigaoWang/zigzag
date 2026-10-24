@@ -12,7 +12,9 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     private let icon = NSImageView()
     private let titleLabel: Label
-    private let usernameField = NSTextField()
+    private let usernameField = FilledField(placeholder: "Username")
+    private let usernameText = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let isUpdate: Bool
     private let saveButton: PrimaryButton
     private let notNowButton = TextButton(title: "Not Now", font: Tokens.Font.body(.medium))
     private let neverButton = TextButton(title: "Never for This Site", font: Tokens.Font.body(.medium))
@@ -22,31 +24,27 @@ final class SavePasswordPrompt: FloatingPanelView {
     static let width: CGFloat = 340
 
     /// The username is a field to correct when saving, and plain text when updating.
-    private var fieldHeight: CGFloat { usernameField.isEditable ? Tokens.Space.x8 : Tokens.Space.x5 }
+    private var fieldHeight: CGFloat { isUpdate ? Tokens.Space.x5 : Tokens.Space.x8 }
 
     private init(kind: Kind, origin: Origin) {
         switch kind {
         case .save: titleLabel = Label("Save password for \(origin.displayName)?", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
         case .update: titleLabel = Label("Update password for \(origin.displayName)?", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
         }
+        isUpdate = { if case .update = kind { true } else { false } }()
         saveButton = PrimaryButton(title: { if case .update = kind { "Update" } else { "Save" } }())
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: 0))
         icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill")
         icon.imageScaling = .scaleProportionallyUpOrDown
-        usernameField.placeholderString = "Username"
-        usernameField.font = Tokens.Font.body()
-        usernameField.bezelStyle = .roundedBezel
-        usernameField.focusRingType = .default
         switch kind {
-        case .save(let username): usernameField.stringValue = username
+        case .save(let username):
+            usernameField.stringValue = username
+            addSubview(usernameField)
         case .update(let credential):
-            usernameField.stringValue = credential.username
-            usernameField.isEditable = false
-            usernameField.isBordered = false
-            usernameField.drawsBackground = false
-            usernameField.textColor = Tokens.Color.textSecondary
+            usernameText.stringValue = credential.username.isEmpty ? "No username" : credential.username
+            addSubview(usernameText)
         }
-        [icon, titleLabel, usernameField, neverButton, notNowButton, saveButton].forEach { addSubview($0) }
+        [icon, titleLabel, neverButton, notNowButton, saveButton].forEach { addSubview($0) }
         neverButton.isHidden = { if case .update = kind { true } else { false } }()
         frame.size.height = Tokens.Space.x4 * 2 + Tokens.Space.x6 + Tokens.Space.x3 + fieldHeight + Tokens.Space.x3 + Tokens.Space.x8
         onLayout = { [weak self] in self?.layoutContent() }
@@ -97,7 +95,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.superview != nil else { return }
-                if let window = self.window, self.bounds.contains(self.convert(window.mouseLocationOutsideOfEventStream, from: nil)) || window.firstResponder === self.usernameField.currentEditor() {
+                if let window = self.window, self.bounds.contains(self.convert(window.mouseLocationOutsideOfEventStream, from: nil)) || window.firstResponder === self.usernameField.field.currentEditor() {
                     self.scheduleHide()
                 } else {
                     self.close(saved: false)
@@ -124,9 +122,12 @@ final class SavePasswordPrompt: FloatingPanelView {
         let textX = icon.frame.maxX + Tokens.Space.x3
         titleLabel.frame = NSRect(x: textX, y: pad + (iconSize - titleLabel.lineHeight) / 2, width: bounds.width - textX - pad, height: titleLabel.lineHeight)
         let fieldY = icon.frame.maxY + Tokens.Space.x3
-        let inset: CGFloat = usernameField.isEditable ? 2 : 0
-        usernameField.frame = NSRect(x: textX - inset, y: usernameField.isEditable ? fieldY : fieldY - Tokens.Space.x1, width: bounds.width - textX - pad + inset, height: fieldHeight)
-        let buttonY = usernameField.frame.maxY + Tokens.Space.x3
+        if isUpdate {
+            usernameText.frame = NSRect(x: textX, y: fieldY - Tokens.Space.x1, width: bounds.width - textX - pad, height: fieldHeight)
+        } else {
+            usernameField.frame = NSRect(x: textX, y: fieldY, width: bounds.width - textX - pad, height: fieldHeight)
+        }
+        let buttonY = fieldY + fieldHeight + Tokens.Space.x3
         let h = Tokens.Space.x8
         let saveWidth = max(saveButton.fittingWidth, 72)
         saveButton.frame = NSRect(x: bounds.width - pad - saveWidth, y: buttonY, width: saveWidth, height: h)
