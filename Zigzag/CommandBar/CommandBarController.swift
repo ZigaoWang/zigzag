@@ -69,7 +69,9 @@ final class CommandRowView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isSelected ? Tokens.Color.highlight : nil
+        // The chosen row in the space's accent, like the rest of the window.
+        let accent = Brand.Theme.for(self).accent
+        let fill: NSColor? = isPressed ? accent.withAlphaComponent(0.24) : isSelected ? accent.withAlphaComponent(0.16) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         needsLayout = true
     }
@@ -115,6 +117,22 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     // MARK: Showing
 
+    /// The bar takes on the space it opens in: its surface carries the space's color, and the search icon,
+    /// cursor and chosen row use its accent.
+    private func applySpaceTheme() {
+        guard let controller else { return }
+        let space = controller.tabManager.currentSpace
+        let accent = Brand.Theme.of(controller.tabManager.isPrivate ? nil : space).accent
+        panel.surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : space.background
+        fieldIcon.contentTintColor = accent
+        divider.color = accent.withAlphaComponent(0.18)
+        if let editor = field.currentEditor() as? NSTextView {
+            editor.insertionPointColor = accent
+            editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(0.25)]
+        }
+        rows.forEach { $0.stateDidChange(animated: false) }
+    }
+
     func show(mode: Mode) {
         guard let controller else { return }
         self.mode = mode
@@ -133,6 +151,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             controller.root.overlay.addSubview(panel)
             scrim.show()
         }
+        applySpaceTheme()
         let font = isAnchored ? NSFont.systemFont(ofSize: 15) : Tokens.Font.large()
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
@@ -150,6 +169,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // Attached to the address, it's simply there; over the page it arrives with the usual drop.
         panel.present(arrival: isAnchored ? .instant : .drop)
         controller.window?.makeFirstResponder(field)
+        applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
     }
 

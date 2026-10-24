@@ -209,8 +209,20 @@ class FloatingPanelView: NSView {
         refreshColors()
     }
 
+    /// A color mixed into the panel's surface, like the space's own, so the panel belongs to it. Nil is plain.
+    var surfaceTint: NSColor? { didSet { refreshColors() } }
+
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
+            if let tint = surfaceTint {
+                effectiveAppearance.performAsCurrentDrawingAppearance {
+                    let base = Tokens.Color.panelBackground.usingColorSpace(.sRGB) ?? Tokens.Color.panelBackground
+                    let mixed = base.blended(withFraction: effectiveAppearance.isDark ? 0.55 : 0.6, of: tint.usingColorSpace(.sRGB) ?? tint) ?? base
+                    surface.color = mixed
+                }
+            } else {
+                surface.color = Tokens.Color.panelBackground
+            }
             surface.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
             layer?.shadowOpacity = 1
