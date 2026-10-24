@@ -124,8 +124,6 @@ final class BrowserRootView: ColorView {
     var onSidebarWidthChange: ((CGFloat) -> Void)?
 
     private var trackingArea: NSTrackingArea?
-    private let revealDebouncer = Debouncer(delay: Tokens.Motion.edgeRevealDelay)
-    private let hideDebouncer = Debouncer(delay: Tokens.Motion.edgeHideDelay)
     /// Keeps the floating sidebar open, e.g. while a menu from it is showing.
     var holdReveal = false
 
@@ -244,8 +242,6 @@ final class BrowserRootView: ColorView {
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
         guard visible != sidebarVisible else { return }
-        hideDebouncer.cancel()
-        revealDebouncer.cancel()
         let oldSidebar = sidebarContainer.frame
         sidebarVisible = visible
         sidebarRevealed = false
@@ -281,50 +277,56 @@ final class BrowserRootView: ColorView {
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        guard !sidebarVisible else { return }
         let point = convert(event.locationInWindow, from: nil)
-        if !sidebarRevealed {
-            if point.x <= Tokens.Metric.edgeRevealWidth {
-                hideDebouncer.cancel()
-                reveal(true)
-            } else {
-                revealDebouncer.cancel()
-            }
-        } else {
-            let keep = sidebarContainer.frame.insetBy(dx: -Tokens.Space.x4, dy: -Tokens.Space.x4).contains(point)
-            if keep || holdReveal { hideDebouncer.cancel() } else { hideDebouncer.call { [weak self] in self?.reveal(false) } }
-        }
+        if point.x <= Tokens.Metric.edgeRevealWidth { reveal(true) }
     }
 
+    /// Crossing the left edge opens the sidebar, however fast: a quick flick out of the window
+    /// may never land a moved event inside the edge strip, but it always leaves through it.
     override func mouseExited(with event: NSEvent) {
-        revealDebouncer.cancel()
+        super.mouseExited(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        if point.x <= Tokens.Metric.edgeRevealWidth, point.y >= bounds.minY, point.y <= bounds.maxY { reveal(true) }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        if point.x <= Tokens.Metric.edgeRevealWidth { reveal(true) }
     }
 
     private var pointerTimer: Timer?
+    private var pointerLeftAt: Date?
 
     /// While the sidebar floats, follow the pointer itself: web views swallow mouse-moved events,
-    /// so tracking areas alone can't tell when you've left.
+    /// and nothing arrives at all once the pointer is outside the window.
     private func watchPointer(_ on: Bool) {
         pointerTimer?.invalidate()
         pointerTimer = nil
+        pointerLeftAt = nil
         guard on else { return }
-        pointerTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, let window = self.window, self.sidebarRevealed else { return }
-                let point = self.convert(window.mouseLocationOutsideOfEventStream, from: nil)
-                let keep = self.sidebarContainer.frame.insetBy(dx: -Tokens.Space.x2, dy: -Tokens.Space.x2).contains(point)
-                if keep || self.holdReveal || NSEvent.pressedMouseButtons != 0 {
-                    self.pointerLeftAt = nil
-                } else if let left = self.pointerLeftAt {
-                    if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { self.pointerLeftAt = nil; self.reveal(false) }
-                } else {
-                    self.pointerLeftAt = Date()
-                }
-            }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followPointer() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        pointerTimer = timer
     }
 
-    private var pointerLeftAt: Date?
+    private func followPointer() {
+        guard let window, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        let sidebar = sidebarContainer.frame
+        // Anywhere left of the sidebar counts as on it: that's where the pointer goes to summon it.
+        let keep = sidebar.insetBy(dx: -Tokens.Space.x3, dy: -Tokens.Space.x3).contains(point)
+            || (point.x < sidebar.minX && point.y >= bounds.minY && point.y <= bounds.maxY)
+        if keep || holdReveal || NSEvent.pressedMouseButtons != 0 {
+            pointerLeftAt = nil
+        } else if let left = pointerLeftAt {
+            if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { reveal(false) }
+        } else {
+            pointerLeftAt = Date()
+        }
+    }
 
     func reveal(_ show: Bool) {
         guard !sidebarVisible, show != sidebarRevealed else { return }
