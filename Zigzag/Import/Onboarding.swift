@@ -1,19 +1,17 @@
 import AppKit
 
-/// First launch: four calm screens on the brand's blue, one idea each, centered, one main button.
-/// Hello → bring your stuff over → make it yours → the few keys worth knowing.
+/// First launch: a hello, then a few short steps on the brand's blue. Each has a title and one line, the thing to
+/// do in the middle, and the same bottom row: Back, Skip, Next.
 final class OnboardingView: NSView {
     var onFinish: (() -> Void)?
 
-    enum Step: Int, CaseIterable { case hello, bring, personalize, ready }
+    enum Step: Int, CaseIterable { case hello, bring, sites, extensions, ads, color, ready }
     private(set) var step = Step.hello
 
     private let surface = BrandSurface()
     private var page: NSView?
-    private var dots: [CALayer] = []
-    private var startedImport = false
 
-    /// Set if Zigzag has to reopen to pick up a permission: onboarding then picks up on the import screen.
+    /// Set if Zigzag has to reopen to pick up a permission: onboarding then picks up on the import step.
     static var resumeOnBring: Bool {
         get { UserDefaults.standard.bool(forKey: "OnboardingResumeOnBring") }
         set { UserDefaults.standard.set(newValue, forKey: "OnboardingResumeOnBring") }
@@ -26,13 +24,6 @@ final class OnboardingView: NSView {
         surface.layer?.borderWidth = 0
         surface.showsWatermark = false
         addSubview(surface)
-        for _ in Step.allCases {
-            let dot = CALayer()
-            dot.cornerRadius = 3
-            dot.zPosition = 10
-            layer?.addSublayer(dot)
-            dots.append(dot)
-        }
         show(Self.resumeOnBring ? .bring : .hello, animated: false)
         Self.resumeOnBring = false
     }
@@ -40,48 +31,72 @@ final class OnboardingView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    /// The space you're setting up: the first one, which a fresh install has.
-    private var spaceID: UUID? { Library.shared.spaces.first?.id }
-
     func show(_ next: Step, animated: Bool) {
+        let forward = next.rawValue >= step.rawValue
         step = next
         let view: NSView
-        switch next {
-        case .hello:
+        if next == .hello {
             let hello = HelloPage()
             hello.onStart = { [weak self] in self?.show(.bring, animated: true) }
             view = hello
-        case .bring:
-            let bring = BringPage()
-            bring.onContinue = { [weak self] in self?.show(.personalize, animated: true) }
-            view = bring
-        case .personalize:
-            let page = PersonalizePage(spaceID: spaceID)
-            page.onColor = { [weak self] in self?.applySpaceColor() }
-            page.onContinue = { [weak self] in self?.show(.ready, animated: true) }
-            view = page
-        case .ready:
-            let ready = ReadyPage()
-            ready.onStart = { [weak self] in self?.onFinish?() }
-            view = ready
+        } else {
+            let content: StepContent
+            let title: String, body: String
+            switch next {
+            case .bring:
+                content = BringPicker()
+                title = "Bring your stuff over"
+                body = "Pick the browsers to bring from. They stay exactly as they are."
+            case .sites:
+                content = SitesPicker()
+                title = "Your everyday sites"
+                body = "Pick the ones you open every day. They sit at the top of your sidebar."
+            case .extensions:
+                content = ExtensionsPicker()
+                title = "Your extensions"
+                body = "Chrome extensions work in Zigzag. Pick the ones you use."
+            case .ads:
+                content = AdsPicker()
+                title = "Block ads?"
+                body = "Zigzag can stop ads and trackers on every site. You can change this per site later."
+            case .color:
+                content = ColorPicker()
+                (content as? ColorPicker)?.onColor = { [weak self] in self?.applySpaceColor() }
+                title = "Make it yours"
+                body = "Pick a color for your first space, and how it looks."
+            default:
+                content = ReadyPicker()
+                title = "You’re ready"
+                body = "One last thing: open links from other apps in Zigzag."
+            }
+            let stepPage = StepPage(title: title, body: body, content: content, showsBack: true,
+                                    showsSkip: next != .ready)
+            stepPage.onBack = { [weak self] in
+                guard let self, let back = Step(rawValue: next.rawValue - 1) else { return }
+                self.show(back, animated: true)
+            }
+            stepPage.onNext = { [weak self] in
+                guard let self else { return }
+                if let after = Step(rawValue: next.rawValue + 1) { self.show(after, animated: true) } else { self.onFinish?() }
+            }
+            view = stepPage
         }
         let old = page
         page = view
         view.frame = bounds
         view.autoresizingMask = [.width, .height]
         addSubview(view)
-        refreshDots()
         guard animated, let old else { old?.removeFromSuperview(); return }
         window?.makeFirstResponder(nil)
-        slide(from: old, to: view)
+        slide(from: old, to: view, forward: forward)
     }
 
-    /// Moving on: the screen you're leaving drifts a little left as it fades, the next arrives from the right.
-    /// One smooth ease-out, short, no bounce, so it reads as going forward and nothing more.
-    private func slide(from old: NSView, to new: NSView) {
+    /// Moving on: the screen you're leaving drifts a little aside as it fades, the next arrives from the other
+    /// side. One smooth ease-out, short, no bounce.
+    private func slide(from old: NSView, to new: NSView, forward: Bool) {
         [old, new].forEach { $0.wantsLayer = true }
         guard let oldLayer = old.layer, let newLayer = new.layer else { old.removeFromSuperview(); return }
-        let distance: CGFloat = 36
+        let distance: CGFloat = forward ? 36 : -36
         let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         func animation(_ key: String, _ from: Any, _ to: Any, _ duration: CFTimeInterval) -> CABasicAnimation {
             let a = CABasicAnimation(keyPath: key)
@@ -106,30 +121,83 @@ final class OnboardingView: NSView {
         surface.fixedTheme = Brand.Theme.of(Library.shared.spaces.first)
     }
 
-    private func refreshDots() {
-        Tokens.Motion.withoutAnimation {
-            for (i, dot) in dots.enumerated() {
-                dot.backgroundColor = Brand.ribbon.withAlphaComponent(i == step.rawValue ? 0.95 : 0.3).cgColor
-            }
+    override func layout() {
+        super.layout()
+        surface.frame = bounds
+        page?.frame = bounds
+    }
+}
+
+// MARK: - The step layout
+
+/// What a step's right side is: the thing to do, and what its main button says.
+class StepContent: NSView {
+    var onChange: (() -> Void)?
+    var primaryTitle: String { "Next" }
+    var primaryEnabled: Bool { true }
+    var isBusy: Bool { false }
+    /// The main button: do what the step needs, then call `done` to move on (now, or once it's finished).
+    func commit(_ done: @escaping () -> Void) { done() }
+    override var isFlipped: Bool { true }
+}
+
+/// One step on the blue: title and line at the top, the step in the middle, and Back, Skip and Next at the bottom.
+private final class StepPage: NSView {
+    var onBack: (() -> Void)?
+    var onNext: (() -> Void)?
+    private let title: NSTextField
+    private let body: NSTextField
+    private let back = Onboard.quiet("Back")
+    private let next = Onboard.primary("Next")
+    private let skip = Onboard.quiet("Skip")
+    private let content: StepContent
+
+    init(title text: String, body bodyText: String, content: StepContent, showsBack: Bool, showsSkip: Bool) {
+        self.content = content
+        title = Onboard.title(text)
+        body = Onboard.line(bodyText)
+        super.init(frame: .zero)
+        back.isHidden = !showsBack
+        skip.isHidden = !showsSkip
+        [title, body, content, back, skip, next].forEach { addSubview($0) }
+        back.onClick = { [weak self] _ in self?.onBack?() }
+        skip.onClick = { [weak self] _ in self?.onNext?() }
+        next.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.content.commit { [weak self] in self?.onNext?() }
+            self.refresh()
         }
+        content.onChange = { [weak self] in self?.refresh() }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    private func refresh() {
+        next.title = content.primaryTitle
+        next.isEnabled = content.primaryEnabled && !content.isBusy
+        skip.isEnabled = !content.isBusy
+        back.isEnabled = !content.isBusy
         needsLayout = true
     }
 
     override func layout() {
         super.layout()
-        surface.frame = bounds
-        page?.frame = bounds
-        let size: CGFloat = 6, gap: CGFloat = 10
-        let total = CGFloat(dots.count) * size + CGFloat(dots.count - 1) * gap
-        Tokens.Motion.withoutAnimation {
-            for (i, dot) in dots.enumerated() {
-                dot.frame = CGRect(x: (bounds.width - total) / 2 + CGFloat(i) * (size + gap), y: bounds.height - Tokens.Space.x8 - size, width: size, height: size)
-            }
-        }
+        let width: CGFloat = 520
+        let x = (bounds.width - width) / 2
+        let top = Onboard.header(title, body, in: bounds, top: 56, width: 560) + Tokens.Space.x6
+        // Bottom row: Back on the left; Skip beside Next on the right.
+        let h = Tokens.Space.x10
+        let y = bounds.height - 48 - h
+        let nw = max(next.fittingWidth, 140)
+        next.frame = NSRect(x: x + width - nw, y: y, width: nw, height: h)
+        let sw = skip.fittingWidth
+        skip.frame = NSRect(x: next.frame.minX - Tokens.Space.x3 - sw, y: y + (h - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        back.frame = NSRect(x: x - Tokens.Space.x2, y: y + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
+        content.frame = NSRect(x: x - 20, y: top, width: width + 40, height: max(0, y - Tokens.Space.x6 - top))
     }
 }
-
-// MARK: - Pieces
 
 /// Text and buttons that read on the blue.
 private enum Onboard {
@@ -253,242 +321,6 @@ private final class HelloPage: NSView {
         y = wordmark.frame.maxY + Tokens.Space.x16
         let w: CGFloat = 176
         start.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: h)
-    }
-}
-
-// MARK: - 2. Bring your stuff
-
-/// The browsers on this Mac in one list, each with a checkbox, what it holds, and how its import went. Anything
-/// macOS keeps private says so before you start, with the fix beside it; problems are written out in full.
-private final class BringPage: NSView {
-    var onContinue: (() -> Void)?
-    private let title = Onboard.title("Bring your stuff over")
-    private let line = Onboard.line("")
-    private let list = ColorView(color: Brand.ribbon.withAlphaComponent(0.07))
-    private var rows: [BrowserRow] = []
-    private var separators: [ColorView] = []
-    private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
-    private let bringLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
-    private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
-    private let fileLink = Onboard.quiet("Import a password file")
-    private let primary = Onboard.primary("Import")
-    private let skip = Onboard.quiet("Not Now")
-    private var isImporting = false
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        list.wantsLayer = true
-        list.layer?.cornerRadius = 14
-        list.layer?.cornerCurve = .continuous
-        list.layer?.borderWidth = 1
-        list.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.1).cgColor
-        [title, line, list, bringLabel, fileLink, primary, skip].forEach { addSubview($0) }
-        for (i, source) in ImportCoordinator.detectedSources().enumerated() { add(source, chosen: i == 0) }
-        if rows.isEmpty { addSubview(empty) }
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
-            let pill = DataToggle(name)
-            pill.onChange = { [weak self] in self?.refresh() }
-            addSubview(pill)
-            pills.append((choice, pill))
-        }
-        fileLink.onClick = { [weak self] _ in self?.pickFile() }
-        primary.onClick = { [weak self] _ in self?.primaryAction() }
-        skip.onClick = { [weak self] _ in self?.onContinue?() }
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    @discardableResult
-    private func add(_ source: ImportCoordinator.Source, chosen: Bool) -> BrowserRow {
-        let row = BrowserRow(source: source)
-        row.isChosen = chosen
-        row.onChange = { [weak self] in self?.refresh() }
-        row.onFix = { [weak self, weak row] fix in
-            guard let self, let row else { return }
-            self.fix(fix, row)
-        }
-        list.addSubview(row)
-        rows.append(row)
-        if rows.count > 1 {
-            let line = ColorView(color: Brand.ribbon.withAlphaComponent(0.09))
-            list.addSubview(line)
-            separators.append(line)
-        }
-        return row
-    }
-
-    private var waiting: [BrowserRow] { rows.filter { $0.isChosen && !$0.isFinished } }
-    private var choice: ImportCoordinator.Choice { pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } } }
-    private var anyImported: Bool { rows.contains(where: \.isFinished) }
-
-    private func refresh() {
-        let arc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
-        pills.first { $0.0 == .tabs }?.1.isHidden = !arc
-        pills.forEach { $0.1.isLocked = isImporting }
-        rows.forEach { $0.isLocked = isImporting }
-        let toDo = waiting.count
-        if isImporting {
-            primary.title = "Importing…"
-            primary.isEnabled = false
-        } else if toDo > 0 {
-            primary.title = "Import"
-            primary.isEnabled = !choice.isEmpty
-        } else {
-            primary.title = "Continue"
-            primary.isEnabled = true
-        }
-        skip.isHidden = anyImported || isImporting || rows.isEmpty
-        let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
-        line.stringValue = isImporting ? "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
-            : problems ? "Some of it didn’t come over yet. The fix is next to it."
-            : anyImported ? "Done. Pick another browser to bring more, or continue."
-            : "Pick the browsers to bring from. They stay exactly as they are."
-        needsLayout = true
-    }
-
-    private func primaryAction() {
-        let toDo = waiting
-        if toDo.isEmpty { onContinue?(); return }
-        run(toDo)
-    }
-
-    private func run(_ rows: [BrowserRow]) {
-        isImporting = true
-        rows.forEach { $0.state = .waiting }
-        refresh()
-        let choice = self.choice
-        Task { @MainActor in
-            for row in rows {
-                row.state = .working
-                var wanted = choice.intersection(row.source.offers)
-                let isSafari: Bool = { if case .safari = row.source.kind { true } else { false } }()
-                // Safari's passwords live in the Passwords app, which only it can read; the row says how to bring them.
-                if isSafari { wanted.remove(.passwords) }
-                let summary = await ImportCoordinator.run(row.source, wanted)
-                row.state = .done(summary)
-                if isSafari, choice.contains(.passwords), summary.problems.isEmpty {
-                    row.note("Safari’s passwords are in the Passwords app. Export them there (File › Export All Passwords), then use Import a password file.")
-                }
-                self.needsLayout = true
-            }
-            self.isImporting = false
-            self.refresh()
-        }
-    }
-
-    private func fix(_ fix: ImportProblem.Fix, _ row: BrowserRow) {
-        switch fix {
-        case .retry:
-            row.isChosen = true
-            run([row])
-        case .fullDiskAccess:
-            allow(row)
-        case .primaryPassword, .exportFromApplePasswords:
-            // These need a password or an export file; the Import window walks through both.
-            ImportWindowController.show()
-        case .none:
-            break
-        }
-        needsLayout = true
-    }
-
-    /// macOS opens a browser's private folder to an app once you pick that folder yourself. The panel opens on
-    /// it already, so it's one click on Allow; Safari instead hands over its own export file.
-    private func allow(_ row: BrowserRow) {
-        guard let window else { return }
-        switch row.source.kind {
-        case .chromium(let browser) where row.triedPicker:
-            // macOS 27 keeps some browsers' folders private unless you switch them on, under Zigzag, in
-            // Privacy & Security › Files & Folders.
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
-            row.note("In Files & Folders, find Zigzag and turn on \(browser.name). Then come back and click Check Again.")
-            row.awaitSettings()
-        case .chromium(let browser):
-            row.triedPicker = true
-            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/\(browser.root)")
-            let panel = NSOpenPanel()
-            panel.canChooseDirectories = true
-            panel.canChooseFiles = false
-            panel.allowsMultipleSelection = false
-            panel.directoryURL = folder.deletingLastPathComponent()
-            panel.prompt = "Allow"
-            panel.message = "Click Allow to let Zigzag read \(browser.name)’s bookmarks and passwords. Nothing in \(browser.name) changes."
-            panel.beginSheetModal(for: window) { [weak self, weak row] response in
-                guard let self, let row else { return }
-                row.recheckAccess()
-                self.refresh()
-            }
-            // Pre-select the browser's own folder, so Allow is the only thing to do.
-            DispatchQueue.main.async { panel.directoryURL = folder }
-        case .safari:
-            // The same one click as Chrome: macOS opens Safari's folder to Zigzag once you allow it here.
-            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari", isDirectory: true)
-            let panel = NSOpenPanel()
-            panel.canChooseDirectories = true
-            panel.canChooseFiles = false
-            panel.directoryURL = folder
-            panel.prompt = "Allow"
-            panel.message = "Click Allow to let Zigzag read Safari’s bookmarks and history. Nothing in Safari changes."
-            panel.beginSheetModal(for: window) { [weak self, weak row] _ in
-                guard let self, let row else { return }
-                row.recheckAccess()
-                self.refresh()
-            }
-        default:
-            break
-        }
-    }
-
-    /// A CSV from a password manager (1Password, Bitwarden…) or Safari's export.
-    private func pickFile() {
-        guard let window else { return }
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)."
-        panel.prompt = "Import"
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url, let self else { return }
-            let row = self.add(ImportCoordinator.fileSource(url), chosen: true)
-            self.run([row])
-        }
-    }
-
-    override func layout() {
-        super.layout()
-        let width: CGFloat = 520
-        let x = (bounds.width - width) / 2
-        var y = Onboard.header(title, line, in: bounds, top: 64, width: 560) + Tokens.Space.x6
-        // The list grows with its rows, and scrolls nothing: past six browsers the rows get shorter.
-        var ry: CGFloat = 0
-        for (i, row) in rows.enumerated() {
-            let h = row.height(for: width)
-            row.frame = NSRect(x: 0, y: ry, width: width, height: h)
-            ry += h
-            if i < separators.count { separators[i].frame = NSRect(x: 62, y: ry, width: width - 62, height: Tokens.Metric.hairline) }
-        }
-        list.isHidden = rows.isEmpty
-        list.frame = NSRect(x: x, y: y, width: width, height: ry)
-        y = rows.isEmpty ? y : list.frame.maxY + Tokens.Space.x5
-        if rows.isEmpty {
-            empty.frame = NSRect(x: x, y: y, width: width, height: 40)
-            y = empty.frame.maxY + Tokens.Space.x4
-        }
-        // What to bring, always in view, in one row.
-        bringLabel.frame = NSRect(x: x + 2, y: y + (Tokens.Space.x8 - bringLabel.lineHeight) / 2, width: 44, height: bringLabel.lineHeight)
-        var px = bringLabel.frame.maxX + Tokens.Space.x2
-        for (_, pill) in pills where !pill.isHidden {
-            let w = pill.fittingWidth
-            pill.frame = NSRect(x: px, y: y + 2, width: w, height: 28)
-            px += w + Tokens.Space.x2
-        }
-        // Bottom row: a password manager's export on the left; Not Now beside Import on the right.
-        Onboard.footer(primary: primary, quiet: nil, in: bounds, width: width)
-        let fw = fileLink.fittingWidth
-        fileLink.frame = NSRect(x: x - Tokens.Space.x2, y: primary.frame.midY - Tokens.Space.x4, width: fw, height: Tokens.Space.x8)
-        let sw = skip.fittingWidth
-        skip.frame = NSRect(x: primary.frame.minX - Tokens.Space.x3 - sw, y: primary.frame.midY - Tokens.Space.x4, width: sw, height: Tokens.Space.x8)
     }
 }
 
@@ -790,170 +622,742 @@ private final class BrowserRow: InteractiveView {
     }
 }
 
-// MARK: - 3. Make it yours
+// MARK: - Bring your stuff
 
-private final class PersonalizePage: NSView {
-    var onColor: (() -> Void)?
-    var onContinue: (() -> Void)?
-    private let spaceID: UUID?
-    private let title = Onboard.title("Make it yours")
-    private let line = Onboard.line("Pick a color for your first space. Each space can have its own, and you can change it anytime.")
-    private var swatches: [(SpaceColor, ColorView)] = []
-    private let card = ColorView(color: Brand.ribbon.withAlphaComponent(0.08))
-    private let cardTitle = Label("Your default browser", font: Tokens.Font.body(.semibold), color: Onboard.ink)
-    private let cardLine = Label("Links from other apps open in Zigzag.", font: Tokens.Font.small(), color: Onboard.dim(0.66))
-    private let makeDefault = Onboard.primary("Make Default")
-    private let isDefaultLabel = Label("", font: Tokens.Font.body(.medium), color: Onboard.ink)
-    private let next = Onboard.primary("Continue")
+/// The browsers on this Mac, each with a checkbox, what it holds, and how its import went. Anything macOS keeps
+/// private says so before you start, with the fix beside it.
+private final class BringPicker: StepContent {
+    private let list = ColorView(color: Brand.ribbon.withAlphaComponent(0.07))
+    private var rows: [BrowserRow] = []
+    private var separators: [ColorView] = []
+    private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
+    private let hint = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.7))
+    private let bringLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
+    private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
+    private let fileLink = Onboard.quiet("Import a password file")
+    private var isImporting = false
 
-    init(spaceID: UUID?) {
-        self.spaceID = spaceID
-        super.init(frame: .zero)
-        [title, line, card, cardTitle, cardLine, makeDefault, isDefaultLabel, next].forEach { addSubview($0) }
-        card.wantsLayer = true
-        card.layer?.cornerRadius = 14
-        card.layer?.cornerCurve = .continuous
-        for color in SpaceColor.allCases {
-            let dot = ColorView(color: color.swatch)
-            dot.wantsLayer = true
-            let click = NSClickGestureRecognizer(target: self, action: #selector(picked(_:)))
-            dot.addGestureRecognizer(click)
-            dot.toolTip = "\(color)".capitalized
-            addSubview(dot)
-            swatches.append((color, dot))
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        list.wantsLayer = true
+        list.layer?.cornerRadius = 12
+        list.layer?.cornerCurve = .continuous
+        list.layer?.borderWidth = 1
+        list.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.1).cgColor
+        hint.alignment = .center
+        [list, bringLabel, fileLink, hint].forEach { addSubview($0) }
+        for (i, source) in ImportCoordinator.detectedSources().enumerated() { add(source, chosen: i == 0) }
+        if rows.isEmpty { addSubview(empty) }
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
+            let pill = DataToggle(name)
+            pill.onChange = { [weak self] in self?.refresh() }
+            addSubview(pill)
+            pills.append((choice, pill))
         }
-        makeDefault.onClick = { [weak self] _ in
-            DefaultBrowser.make()
-            // macOS asks to confirm; the card catches up once it has.
-            for delay in [1.0, 3.0, 6.0] {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self?.refreshDefault() }
+        fileLink.onClick = { [weak self] _ in self?.pickFile() }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var primaryTitle: String { isImporting ? "Importing…" : waiting.isEmpty ? "Next" : "Import" }
+    override var primaryEnabled: Bool { waiting.isEmpty || !choice.isEmpty }
+    override var isBusy: Bool { isImporting }
+
+    override func commit(_ done: @escaping () -> Void) {
+        let toDo = waiting
+        if toDo.isEmpty { done(); return }
+        // Importing stays on this step, so you see what came over; Next then moves on.
+        run(toDo)
+    }
+
+    @discardableResult
+    private func add(_ source: ImportCoordinator.Source, chosen: Bool) -> BrowserRow {
+        let row = BrowserRow(source: source)
+        row.isChosen = chosen
+        row.onChange = { [weak self] in self?.refresh() }
+        row.onFix = { [weak self, weak row] fix in
+            guard let self, let row else { return }
+            self.fix(fix, row)
+        }
+        list.addSubview(row)
+        rows.append(row)
+        if rows.count > 1 {
+            let line = ColorView(color: Brand.ribbon.withAlphaComponent(0.09))
+            list.addSubview(line)
+            separators.append(line)
+        }
+        return row
+    }
+
+    private var waiting: [BrowserRow] { rows.filter { $0.isChosen && !$0.isFinished } }
+    private var choice: ImportCoordinator.Choice { pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } } }
+
+    private func refresh() {
+        let arc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
+        pills.first { $0.0 == .tabs }?.1.isHidden = !arc
+        pills.forEach { $0.1.isLocked = isImporting }
+        rows.forEach { $0.isLocked = isImporting }
+        let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
+        hint.stringValue = isImporting ? "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
+            : problems ? "Some of it didn’t come over yet. The fix is next to it." : ""
+        needsLayout = true
+        onChange?()
+    }
+
+    private func run(_ rows: [BrowserRow]) {
+        isImporting = true
+        rows.forEach { $0.state = .waiting }
+        refresh()
+        let choice = self.choice
+        Task { @MainActor in
+            for row in rows {
+                row.state = .working
+                var wanted = choice.intersection(row.source.offers)
+                let isSafari: Bool = { if case .safari = row.source.kind { true } else { false } }()
+                // Safari's passwords live in the Passwords app, which only it can read; the row says how to bring them.
+                if isSafari { wanted.remove(.passwords) }
+                let summary = await ImportCoordinator.run(row.source, wanted)
+                row.state = .done(summary)
+                if isSafari, choice.contains(.passwords), summary.problems.isEmpty {
+                    row.note("Safari’s passwords are in the Passwords app. Export them there, then use Import a password file.")
+                }
+                self.needsLayout = true
             }
+            self.isImporting = false
+            self.refresh()
         }
-        next.onClick = { [weak self] _ in self?.onContinue?() }
-        refreshDefault()
-        refreshSwatches()
+    }
+
+    private func fix(_ fix: ImportProblem.Fix, _ row: BrowserRow) {
+        switch fix {
+        case .retry:
+            row.isChosen = true
+            run([row])
+        case .fullDiskAccess:
+            allow(row)
+        case .primaryPassword, .exportFromApplePasswords:
+            // These need a password or an export file; the Import window walks through both.
+            ImportWindowController.show()
+        case .none:
+            break
+        }
+        needsLayout = true
+    }
+
+    /// macOS opens a browser's private folder to an app once you pick that folder yourself. The panel opens on
+    /// it already, so it's one click on Allow.
+    private func allow(_ row: BrowserRow) {
+        guard let window else { return }
+        switch row.source.kind {
+        case .chromium(let browser) where row.triedPicker:
+            // macOS 27 keeps some browsers' folders private unless you switch them on, under Zigzag, in
+            // Privacy & Security › Files & Folders.
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
+            row.note("In Files & Folders, find Zigzag and turn on \(browser.name). Then come back and click Check Again.")
+            row.awaitSettings()
+        case .chromium(let browser):
+            row.triedPicker = true
+            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/\(browser.root)")
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false
+            panel.directoryURL = folder.deletingLastPathComponent()
+            panel.prompt = "Allow"
+            panel.message = "Click Allow to let Zigzag read \(browser.name)’s bookmarks and passwords. Nothing in \(browser.name) changes."
+            panel.beginSheetModal(for: window) { [weak self, weak row] _ in
+                guard let self, let row else { return }
+                row.recheckAccess()
+                self.refresh()
+            }
+            DispatchQueue.main.async { panel.directoryURL = folder }
+        case .safari:
+            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari", isDirectory: true)
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.directoryURL = folder
+            panel.prompt = "Allow"
+            panel.message = "Click Allow to let Zigzag read Safari’s bookmarks and history. Nothing in Safari changes."
+            panel.beginSheetModal(for: window) { [weak self, weak row] _ in
+                guard let self, let row else { return }
+                row.recheckAccess()
+                self.refresh()
+            }
+        default:
+            break
+        }
+    }
+
+    /// A CSV from a password manager (1Password, Bitwarden…) or Safari's export.
+    private func pickFile() {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .zip]
+        panel.message = "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)."
+        panel.prompt = "Import"
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url, let self else { return }
+            let row = self.add(ImportCoordinator.fileSource(url), chosen: true)
+            self.run([row])
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        let pad: CGFloat = 24
+        let width = bounds.width - pad * 2
+        var ry: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            let h = row.height(for: width)
+            row.frame = NSRect(x: 0, y: ry, width: width, height: h)
+            ry += h
+            if i < separators.count { separators[i].frame = NSRect(x: 62, y: ry, width: width - 62, height: Tokens.Metric.hairline) }
+        }
+        // The list, the choice of what to bring, and the file link, as one block in the middle.
+        let block = ry + Tokens.Space.x5 + Tokens.Space.x8 + Tokens.Space.x3 + Tokens.Space.x8
+        var y = max(pad, (bounds.height - block) / 2)
+        list.isHidden = rows.isEmpty
+        list.frame = NSRect(x: pad, y: y, width: width, height: ry)
+        if rows.isEmpty {
+            empty.frame = NSRect(x: pad, y: y, width: width, height: 40)
+            ry = 40
+        }
+        y += ry + Tokens.Space.x5
+        bringLabel.frame = NSRect(x: pad + 2, y: y + (Tokens.Space.x8 - bringLabel.lineHeight) / 2, width: 40, height: bringLabel.lineHeight)
+        var px = bringLabel.frame.maxX + Tokens.Space.x1
+        for (_, pill) in pills where !pill.isHidden {
+            let w = pill.fittingWidth
+            pill.frame = NSRect(x: px, y: y + 2, width: w, height: 28)
+            px += w + Tokens.Space.x1
+        }
+        y += Tokens.Space.x8 + Tokens.Space.x3
+        let fw = fileLink.fittingWidth
+        fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: fw, height: Tokens.Space.x8)
+        hint.frame = NSRect(x: pad, y: bounds.height - pad - hint.lineHeight, width: width, height: hint.lineHeight)
+    }
+}
+
+// MARK: - Tiles
+
+/// A square you tap to pick: an icon over a name, and a check when it's picked. Light on the blue.
+private final class PickTile: InteractiveView {
+    var isPicked = false { didSet { refresh() } }
+    var isLocked = false { didSet { refresh() } }
+    var onToggle: (() -> Void)?
+    let icon = NSImageView()
+    private let name: Label
+    let detail = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.6))
+    private let check = NSImageView()
+    private let spinner = RibbonView()
+    private let horizontal: Bool
+
+    init(name text: String, horizontal: Bool = false) {
+        name = Label(text, font: Tokens.Font.body(.medium), color: Onboard.ink)
+        self.horizontal = horizontal
+        super.init(frame: .zero)
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        name.alignment = horizontal ? .left : .center
+        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 16)
+        check.contentTintColor = Onboard.ink
+        spinner.color = Onboard.ink
+        spinner.isHidden = true
+        [icon, name, detail, check, spinner].forEach { addSubview($0) }
+        onClick = { [weak self] _ in
+            guard let self, !self.isLocked else { return }
+            self.isPicked.toggle()
+            self.onToggle?()
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(text)
+        refresh()
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    func setWorking(_ working: Bool) {
+        spinner.isHidden = !working
+        working ? spinner.startLooping() : spinner.stopLooping()
+        needsLayout = true
+    }
+
+    private func refresh() {
+        let fill = Brand.ribbon.withAlphaComponent(isPicked ? 0.2 : (isHovered && !isLocked ? 0.1 : 0.06))
+        layer?.backgroundColor = fill.cgColor
+        layer?.borderWidth = isPicked ? 1.5 : 0
+        layer?.borderColor = Brand.ribbon.withAlphaComponent(0.7).cgColor
+        check.isHidden = !isPicked || !spinner.isHidden
+    }
+
+    override func stateDidChange(animated: Bool) { refresh() }
+
+    override func layout() {
+        super.layout()
+        check.frame = NSRect(x: bounds.width - 16 - 8, y: 8, width: 16, height: 16)
+        spinner.frame = check.frame
+        if horizontal {
+            let s: CGFloat = 30
+            icon.frame = NSRect(x: 14, y: (bounds.height - s) / 2, width: s, height: s)
+            let x = icon.frame.maxX + 12
+            let block = name.lineHeight + 1 + detail.lineHeight
+            name.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: bounds.width - x - 28, height: name.lineHeight)
+            detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: bounds.width - x - 12, height: detail.lineHeight)
+        } else {
+            let s: CGFloat = 34
+            icon.frame = NSRect(x: (bounds.width - s) / 2, y: bounds.height / 2 - s + 2, width: s, height: s)
+            name.frame = NSRect(x: 4, y: icon.frame.maxY + 8, width: bounds.width - 8, height: name.lineHeight)
+        }
+    }
+}
+
+/// Icons for the suggested sites and extensions, sharp at tile size. They come from one icon service by domain
+/// (nothing about you is sent), with a globe until each arrives.
+private func loadIcons(_ pairs: [(PickTile, URL)]) {
+    for (tile, url) in pairs {
+        tile.icon.image = Tokens.Symbol.image("globe", size: 22)
+        tile.icon.contentTintColor = Onboard.dim(0.7)
+        if let cached = FaviconStore.shared.cachedIcon(for: url), cached.size.width >= 32 {
+            tile.icon.image = cached
+            tile.icon.contentTintColor = nil
+            continue
+        }
+        guard let host = url.host(),
+              let source = URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=128") else { continue }
+        Task { @MainActor [weak tile] in
+            guard let (data, _) = try? await URLSession.shared.data(from: source), let image = NSImage(data: data), image.isValid,
+                  let tile else { return }
+            tile.icon.image = image
+            tile.icon.contentTintColor = nil
+        }
+    }
+}
+
+// MARK: - Everyday sites
+
+/// The sites people open every day, as tiles: the ones you pick become favorites at the top of the sidebar.
+private final class SitesPicker: StepContent {
+    private static let sites: [(String, String)] = [
+        ("Gmail", "https://mail.google.com"), ("YouTube", "https://www.youtube.com"), ("Calendar", "https://calendar.google.com"),
+        ("Notion", "https://www.notion.so"), ("ChatGPT", "https://chatgpt.com"), ("Spotify", "https://open.spotify.com"),
+        ("Slack", "https://app.slack.com"), ("Figma", "https://www.figma.com"), ("X", "https://x.com"),
+    ]
+    private var tiles: [(PickTile, URL, String)] = []
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
+        for (name, string) in Self.sites {
+            guard let url = URL(string: string) else { continue }
+            let tile = PickTile(name: name)
+            tile.isPicked = have.contains(TabManager.normalize(url))
+            tile.onToggle = { [weak self] in self?.onChange?() }
+            addSubview(tile)
+            tiles.append((tile, url, name))
+        }
+        loadIcons(tiles.map { ($0.0, $0.1) })
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var picked: [(URL, String)] { tiles.filter { $0.0.isPicked }.map { ($0.1, $0.2) } }
+    override var primaryTitle: String { picked.isEmpty ? "Next" : "Add \(picked.count)" }
+
+    override func commit(_ done: @escaping () -> Void) {
+        let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
+        for (url, name) in picked where !have.contains(TabManager.normalize(url)) { _ = Library.shared.addFavorite(url: url, title: name) }
+        done()
+    }
+
+    override func layout() {
+        super.layout()
+        let size: CGFloat = 104, gap: CGFloat = 12
+        let total = size * 3 + gap * 2
+        let x0 = (bounds.width - total) / 2, y0 = max(0, (bounds.height - total) / 2)
+        for (i, (tile, _, _)) in tiles.enumerated() {
+            tile.frame = NSRect(x: x0 + CGFloat(i % 3) * (size + gap), y: y0 + CGFloat(i / 3) * (size + gap), width: size, height: size)
+        }
+    }
+}
+
+// MARK: - Extensions
+
+/// Popular extensions as tiles; the ones you pick are added from the Chrome Web Store when you press Next, each
+/// showing how it went.
+private final class ExtensionsPicker: StepContent {
+    private static let suggestions: [(id: String, name: String, kind: String, site: String)] = [
+        (ExtensionStore.onePasswordID, "1Password", "Passwords", "https://1password.com"),
+        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", "Passwords", "https://bitwarden.com"),
+        ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", "Writing", "https://www.grammarly.com"),
+        ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", "Dark mode for sites", "https://darkreader.org"),
+        ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Save pages", "https://www.notion.so"),
+        ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", "Translation", "https://translate.google.com"),
+    ]
+    private var tiles: [(PickTile, String)] = []
+    private var installing = false
+    private var finished = false
+    private let note = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.7))
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        var installed: Set<String> = []
+        if #available(macOS 15.4, *) { installed = Set(ExtensionHost.shared.installed.keys) }
+        let hasOnePassword = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") != nil
+        for s in Self.suggestions {
+            let tile = PickTile(name: s.name, horizontal: true)
+            tile.detail.stringValue = installed.contains(s.id) ? "Already added" : s.kind
+            tile.isPicked = installed.contains(s.id) || (s.id == ExtensionStore.onePasswordID && hasOnePassword)
+            tile.isLocked = installed.contains(s.id)
+            tile.onToggle = { [weak self] in self?.onChange?() }
+            addSubview(tile)
+            tiles.append((tile, s.id))
+        }
+        loadIcons(zip(tiles.map(\.0), Self.suggestions.compactMap { URL(string: $0.site) }).map { ($0, $1) })
+        note.alignment = .center
+        note.stringValue = "More anytime from the Chrome Web Store: choose Add to Zigzag."
+        addSubview(note)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var toAdd: [(PickTile, String)] { tiles.filter { $0.0.isPicked && !$0.0.isLocked } }
+    override var primaryTitle: String { installing ? "Adding…" : (toAdd.isEmpty || finished) ? "Next" : "Add \(toAdd.count)" }
+    override var isBusy: Bool { installing }
+
+    override func commit(_ done: @escaping () -> Void) {
+        let work = toAdd
+        guard !work.isEmpty, !finished else { done(); return }
+        installing = true
+        onChange?()
+        Task { @MainActor in
+            var failed = false
+            for (tile, id) in work {
+                tile.isLocked = true
+                tile.setWorking(true)
+                tile.detail.stringValue = "Adding…"
+                let result = await ExtensionStore.install(id)
+                tile.setWorking(false)
+                switch result {
+                case .success: tile.detail.stringValue = "Added"
+                case .failure(let error):
+                    failed = true
+                    tile.isPicked = false
+                    tile.isLocked = false
+                    tile.detail.stringValue = "Couldn’t add it"
+                    tile.toolTip = error.message
+                }
+            }
+            self.installing = false
+            self.finished = true
+            if failed {
+                // Say so, and wait: Next then moves on.
+                self.note.stringValue = "Some couldn’t be added. Check your connection, or add them later from the Chrome Web Store."
+                self.onChange?()
+            } else {
+                done()
+            }
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        let w: CGFloat = 228, h: CGFloat = 64, gap: CGFloat = 12
+        let total = w * 2 + gap
+        let rows = CGFloat((tiles.count + 1) / 2)
+        let blockH = rows * h + (rows - 1) * gap
+        let x0 = (bounds.width - total) / 2, y0 = max(0, (bounds.height - blockH - 40) / 2)
+        for (i, (tile, _)) in tiles.enumerated() {
+            tile.frame = NSRect(x: x0 + CGFloat(i % 2) * (w + gap), y: y0 + CGFloat(i / 2) * (h + gap), width: w, height: h)
+        }
+        note.frame = NSRect(x: 0, y: y0 + blockH + 20, width: bounds.width, height: note.lineHeight)
+    }
+}
+
+// MARK: - Ads
+
+/// Two clear answers, one picked: block ads and trackers, or leave sites as they are.
+private final class AdsPicker: StepContent {
+    private let block = ChoiceCard(title: "Block ads and trackers", detail: "Pages load faster, and fewer sites follow you around.", recommended: true)
+    private let allow = ChoiceCard(title: "Leave them on", detail: "Sites show everything, ads included.", recommended: false)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        [block, allow].forEach { addSubview($0) }
+        pick(ContentBlocker.isEnabled)
+        block.onClick = { [weak self] _ in self?.pick(true) }
+        allow.onClick = { [weak self] _ in self?.pick(false) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func pick(_ on: Bool) {
+        block.isChosen = on
+        allow.isChosen = !on
+    }
+
+    override func commit(_ done: @escaping () -> Void) {
+        ContentBlocker.isEnabled = block.isChosen
+        done()
+    }
+
+    override func layout() {
+        super.layout()
+        let w: CGFloat = 420, h: CGFloat = 76, gap: CGFloat = 14
+        let y0 = max(0, (bounds.height - h * 2 - gap) / 2)
+        block.frame = NSRect(x: (bounds.width - w) / 2, y: y0, width: w, height: h)
+        allow.frame = NSRect(x: (bounds.width - w) / 2, y: y0 + h + gap, width: w, height: h)
+    }
+}
+
+/// A choice you can only pick one of: a ring, a title and a line.
+private final class ChoiceCard: InteractiveView {
+    var isChosen = false { didSet { refresh() } }
+    private let ring = ColorView(color: .clear)
+    private let dot = ColorView(color: Onboard.ink)
+    private let title: Label
+    private let detail: Label
+    private let badge = Label("Recommended", font: .systemFont(ofSize: 11, weight: .semibold), color: Brand.navy)
+    private let badgeFill = ColorView(color: Brand.ribbon)
+
+    init(title text: String, detail line: String, recommended: Bool) {
+        title = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
+        detail = Label(line, font: Tokens.Font.small(), color: Onboard.dim(0.65))
+        super.init(frame: .zero)
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        ring.wantsLayer = true
+        ring.layer?.cornerRadius = 10
+        ring.layer?.borderWidth = 1.5
+        dot.wantsLayer = true
+        dot.layer?.cornerRadius = 5
+        ring.addSubview(dot)
+        badgeFill.wantsLayer = true
+        badgeFill.layer?.cornerRadius = 6
+        badge.alignment = .center
+        badgeFill.addSubview(badge)
+        badgeFill.isHidden = !recommended
+        [ring, title, detail, badgeFill].forEach { addSubview($0) }
+        setAccessibilityRole(.radioButton)
+        setAccessibilityLabel(text)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    override func stateDidChange(animated: Bool) { refresh() }
+
+    private func refresh() {
+        layer?.backgroundColor = Brand.ribbon.withAlphaComponent(isChosen ? 0.16 : (isHovered ? 0.09 : 0.05)).cgColor
+        layer?.borderWidth = isChosen ? 1.5 : 0
+        layer?.borderColor = Brand.ribbon.withAlphaComponent(0.7).cgColor
+        ring.layer?.borderColor = Brand.ribbon.withAlphaComponent(isChosen ? 1 : 0.45).cgColor
+        dot.isHidden = !isChosen
+    }
+
+    override func layout() {
+        super.layout()
+        ring.frame = NSRect(x: 20, y: (bounds.height - 20) / 2, width: 20, height: 20)
+        dot.frame = NSRect(x: 5, y: 5, width: 10, height: 10)
+        let x = ring.frame.maxX + 16
+        let block = title.lineHeight + 2 + detail.lineHeight
+        title.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: title.textWidth + 4, height: title.lineHeight)
+        detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: bounds.width - x - 16, height: detail.lineHeight)
+        let bw = badge.textWidth + 14
+        badgeFill.frame = NSRect(x: title.frame.maxX + 8, y: title.frame.midY - 10, width: bw, height: 20)
+        badge.frame = NSRect(x: 0, y: (20 - badge.lineHeight) / 2, width: bw, height: badge.lineHeight)
+    }
+}
+
+// MARK: - Color
+
+/// A small Zigzag window that takes on your space's color as you pick it, with the colors and Light, Dark or
+/// Automatic underneath.
+private final class ColorPicker: StepContent {
+    var onColor: (() -> Void)?
+    private let preview = MiniBrowser()
+    private var swatches: [(SpaceColor, ColorView)] = []
+    private var looks: [(String?, DataToggle)] = []
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        addSubview(preview)
+        for color in SpaceColor.allCases {
+            let dot = ColorView(color: color.swatch)
+            dot.wantsLayer = true
+            dot.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(picked(_:))))
+            addSubview(dot)
+            swatches.append((color, dot))
+        }
+        for (value, name) in [(nil, "Automatic"), ("light", "Light"), ("dark", "Dark")] as [(String?, String)] {
+            let toggle = DataToggle(name)
+            toggle.onChange = { [weak self] in self?.look(value) }
+            addSubview(toggle)
+            looks.append((value, toggle))
+        }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var space: SpaceInfo? { Library.shared.spaces.first }
+
     @objc private func picked(_ gesture: NSClickGestureRecognizer) {
-        guard let view = gesture.view, let color = swatches.first(where: { $0.1 === view })?.0, let spaceID else { return }
-        Library.shared.setColor(color, for: spaceID)
-        refreshSwatches()
+        guard let view = gesture.view, let color = swatches.first(where: { $0.1 === view })?.0, let id = space?.id else { return }
+        Library.shared.setColor(color, for: id)
+        refresh()
         onColor?()
     }
 
-    private func refreshSwatches() {
-        let current = Library.shared.spaces.first { $0.id == spaceID }
+    private func look(_ value: String?) {
+        guard let id = space?.id else { return }
+        Library.shared.setAppearance(value, for: id)
+        refresh()
+    }
+
+    private func refresh() {
+        let current = space
         for (color, dot) in swatches {
             let on = current?.hue == nil && current?.color == color
             dot.layer?.borderWidth = on ? 3 : 0
             dot.layer?.borderColor = Brand.ribbon.cgColor
         }
-    }
-
-    private func refreshDefault() {
-        let isDefault = SettingsWindowController.isDefaultBrowser
-        makeDefault.isHidden = isDefault
-        isDefaultLabel.isHidden = !isDefault
-        isDefaultLabel.stringValue = "✓  It’s Zigzag"
+        for (value, toggle) in looks { toggle.isOn = current?.appearance == value }
+        preview.show(background: current?.background ?? SpaceColor.sky.background, appearance: current?.appearance)
         needsLayout = true
     }
 
     override func layout() {
         super.layout()
-        var y = Onboard.header(title, line, in: bounds, top: 96) + Tokens.Space.x8
-        let size: CGFloat = 36, gap = Tokens.Space.x4
-        let total = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap
-        var x = (bounds.width - total) / 2
+        let ww: CGFloat = 320, wh: CGFloat = 190
+        let size: CGFloat = 30, gap: CGFloat = 12
+        let swW = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap
+        let lookW = looks.map { $0.1.fittingWidth }.reduce(0, +) + CGFloat(looks.count - 1) * 8
+        let block = wh + 24 + size + 18 + 28
+        var y = max(0, (bounds.height - block) / 2)
+        preview.frame = NSRect(x: (bounds.width - ww) / 2, y: y, width: ww, height: wh)
+        y = preview.frame.maxY + 24
+        var x = (bounds.width - swW) / 2
         for (_, dot) in swatches {
             dot.frame = NSRect(x: x, y: y, width: size, height: size)
             dot.layer?.cornerRadius = size / 2
             x += size + gap
         }
-        y += size + Tokens.Space.x12
-        let width: CGFloat = 460
-        let cx = (bounds.width - width) / 2
-        card.frame = NSRect(x: cx, y: y, width: width, height: 72)
-        let pad = Tokens.Space.x5
-        let block = cardTitle.lineHeight + 2 + cardLine.lineHeight
-        cardTitle.frame = NSRect(x: cx + pad, y: y + (72 - block) / 2, width: 260, height: cardTitle.lineHeight)
-        cardLine.frame = NSRect(x: cx + pad, y: cardTitle.frame.maxY + 2, width: 260, height: cardLine.lineHeight)
-        let bw = max(makeDefault.fittingWidth, 120)
-        makeDefault.frame = NSRect(x: card.frame.maxX - pad - bw, y: y + (72 - Tokens.Space.x8) / 2, width: bw, height: Tokens.Space.x8)
-        let lw = isDefaultLabel.textWidth + 4
-        isDefaultLabel.frame = NSRect(x: card.frame.maxX - pad - lw, y: y + (72 - isDefaultLabel.lineHeight) / 2, width: lw, height: isDefaultLabel.lineHeight)
-        Onboard.centeredFooter(next, in: bounds)
+        y += size + 18
+        x = (bounds.width - lookW) / 2
+        for (_, toggle) in looks {
+            let w = toggle.fittingWidth
+            toggle.frame = NSRect(x: x, y: y, width: w, height: 28)
+            x += w + 8
+        }
     }
 }
 
-// MARK: - 4. Ready
-
-private final class ReadyPage: NSView {
-    var onStart: (() -> Void)?
-    private let title = Onboard.title("You’re ready")
-    private let line = Onboard.line("Three keys worth knowing. Every other one is in Settings › Shortcuts.")
-    private var rows: [(caps: [ColorView], label: Label)] = []
-    private let start = Onboard.primary("Start Browsing")
-
-    /// What each key does, read from the menus themselves, so a shortcut you've changed shows as you set it.
-    private static let tips: [(Selector, String)] = [
-        (#selector(BrowserWindowController.newTab(_:)), "Open a page or search, from anywhere"),
-        (#selector(BrowserWindowController.toggleBookmark(_:)), "Pin the page you’re on to its space"),
-        (#selector(BrowserWindowController.toggleBrowserSidebar(_:)), "Show or hide the sidebar"),
-    ]
+/// A drawing of a Zigzag window: a sidebar in the space's color, a few rows, and a page.
+private final class MiniBrowser: NSView {
+    private let sidebar = ColorView(color: .clear)
+    private let page = ColorView(color: .white)
+    private var rows: [ColorView] = []
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [title, line, start].forEach { addSubview($0) }
-        for (action, text) in Self.tips {
-            let keys = Shortcuts.allItems.first { $0.action == action }.map(Shortcuts.caps) ?? []
-            let caps: [ColorView] = keys.map { key in
-                let cap = ColorView(color: Brand.ribbon.withAlphaComponent(0.14))
-                cap.wantsLayer = true
-                cap.layer?.cornerRadius = 7
-                cap.layer?.cornerCurve = .continuous
-                let label = Label(key, font: .systemFont(ofSize: 14, weight: .semibold), color: Onboard.ink)
-                label.alignment = .center
-                cap.addSubview(label)
-                addSubview(cap)
-                return cap
-            }
-            let label = Label(text, font: Tokens.Font.body(), color: Onboard.ink)
-            addSubview(label)
-            rows.append((caps, label))
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        addSubview(sidebar)
+        addSubview(page)
+        page.wantsLayer = true
+        page.layer?.cornerRadius = 6
+        for i in 0..<5 {
+            let row = ColorView(color: .clear)
+            row.wantsLayer = true
+            row.layer?.cornerRadius = 4
+            addSubview(row)
+            rows.append(row)
+            _ = i
         }
-        start.onClick = { [weak self] _ in self?.onStart?() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    func show(background: NSColor, appearance: String?) {
+        self.appearance = appearance == "dark" ? NSAppearance(named: .darkAqua) : appearance == "light" ? NSAppearance(named: .aqua) : nil
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let bg = background.usingColorSpace(.sRGB) ?? background
+            layer?.backgroundColor = bg.cgColor
+            sidebar.color = .clear
+            let dark = effectiveAppearance.isDark
+            page.color = dark ? NSColor(white: 0.13, alpha: 1) : .white
+            for (i, row) in rows.enumerated() {
+                row.color = (dark ? NSColor.white : NSColor.black).withAlphaComponent(i == 1 ? 0.12 : 0.06)
+            }
+        }
+    }
+
     override func layout() {
         super.layout()
-        var y = Onboard.header(title, line, in: bounds, top: 96) + Tokens.Space.x10
-        let capSize: CGFloat = 30, capGap: CGFloat = 5
-        func capWidth(_ cap: ColorView) -> CGFloat { max(capSize, ((cap.subviews.first as? Label)?.inkWidth ?? 0) + Tokens.Space.x4) }
-        // Keys right-aligned in one column, what they do left-aligned in the next, the pair centered as a block.
-        let keysWidth = rows.map { $0.caps.map(capWidth).reduce(0, +) + CGFloat(max($0.caps.count - 1, 0)) * capGap }.max() ?? 0
-        let textWidth = rows.map { $0.label.textWidth }.max() ?? 0
-        let gap = Tokens.Space.x5
-        let x = round((bounds.width - (keysWidth + gap + textWidth)) / 2)
-        for (caps, label) in rows {
-            let rowKeys = caps.map(capWidth).reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * capGap
-            var cx = x + keysWidth - rowKeys
-            for cap in caps {
-                let text = cap.subviews.first as? Label
-                let w = capWidth(cap)
-                cap.frame = NSRect(x: cx, y: y, width: w, height: capSize)
-                text?.frame = NSRect(x: 0, y: (capSize - (text?.lineHeight ?? 0)) / 2, width: w, height: text?.lineHeight ?? 0)
-                cx += w + capGap
-            }
-            let lx = x + keysWidth + gap
-            label.frame = NSRect(x: lx, y: y + (capSize - label.lineHeight) / 2, width: textWidth + 4, height: label.lineHeight)
-            y += capSize + Tokens.Space.x4
+        let side: CGFloat = 96
+        for (i, row) in rows.enumerated() {
+            row.frame = NSRect(x: 10, y: 34 + CGFloat(i) * 22, width: side - 20, height: 14)
         }
-        Onboard.centeredFooter(start, in: bounds)
+        page.frame = NSRect(x: side, y: 8, width: bounds.width - side - 8, height: bounds.height - 16)
     }
 }
+
+// MARK: - Ready
+
+/// The last step: make Zigzag the browser links open in, then start.
+private final class ReadyPicker: StepContent {
+    private let card = ColorView(color: Brand.ribbon.withAlphaComponent(0.08))
+    private let title = Label("Make Zigzag your default browser", font: Tokens.Font.body(.semibold), color: Onboard.ink)
+    private let line = Label("Links from other apps open here.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
+    private let button = Onboard.primary("Make Default")
+    private let done = Label("✓  Zigzag is your default browser", font: Tokens.Font.body(.medium), color: Onboard.ink)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 14
+        card.layer?.cornerCurve = .continuous
+        [card, title, line, button, done].forEach { addSubview($0) }
+        button.onClick = { [weak self] _ in
+            DefaultBrowser.make()
+            // macOS asks to confirm; the card catches up once it has.
+            for delay in [1.0, 3.0, 6.0] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self?.refresh() } }
+        }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var primaryTitle: String { "Start Browsing" }
+
+    private func refresh() {
+        let isDefault = SettingsWindowController.isDefaultBrowser
+        button.isHidden = isDefault
+        done.isHidden = !isDefault
+        title.isHidden = isDefault
+        line.isHidden = isDefault
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let w: CGFloat = 460, h: CGFloat = 80
+        let r = NSRect(x: (bounds.width - w) / 2, y: max(0, (bounds.height - h) / 2), width: w, height: h)
+        card.frame = r
+        let block = title.lineHeight + 2 + line.lineHeight
+        let bw = max(button.fittingWidth, 124)
+        let tw = w - 40 - bw - 16
+        title.frame = NSRect(x: r.minX + 20, y: r.minY + (h - block) / 2, width: tw, height: title.lineHeight)
+        line.frame = NSRect(x: r.minX + 20, y: title.frame.maxY + 2, width: tw, height: line.lineHeight)
+        button.frame = NSRect(x: r.maxX - 20 - bw, y: r.minY + (h - Tokens.Space.x8) / 2, width: bw, height: Tokens.Space.x8)
+        done.frame = NSRect(x: r.minX, y: r.minY + (h - done.lineHeight) / 2, width: w, height: done.lineHeight)
+        done.alignment = .center
+    }
+}
+

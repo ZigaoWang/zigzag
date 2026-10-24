@@ -7,7 +7,7 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
 
     static func show(onFinish: @escaping () -> Void) {
         if let shared { shared.window?.makeKeyAndOrderFront(nil); return }
-        let size = NSSize(width: 860, height: 640)
+        let size = NSSize(width: 880, height: 720)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
         window.title = "Welcome to Zigzag"
