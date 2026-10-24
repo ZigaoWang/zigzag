@@ -107,7 +107,7 @@ enum ContentBlocker {
     // MARK: Applying
 
     /// The list a page should be blocked with right now, if any.
-    private static var activeList: WKContentRuleList? { ruleList ?? fallbackList }
+    static var activeList: WKContentRuleList? { ruleList ?? fallbackList }
 
     static func attach(to configuration: WKWebViewConfiguration) {
         guard isEnabled, let list = activeList else { return }
