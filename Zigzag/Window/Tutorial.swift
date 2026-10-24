@@ -13,10 +13,10 @@ enum Tutorial {
 
     /// Each step is the keys and three words: nothing to read.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Open a website", keys: ["⌘", "T"], done: "It opened as a tab, here."),
+        Task(id: "newTab", title: "Open a new tab", keys: ["⌘", "T"], done: "It opened as a tab, here."),
         Task(id: "pin", title: "Pin this page", keys: ["⌘", "D"], done: "Pinned. It stays up here."),
-        Task(id: "peek", title: "Shift-click a link", keys: ["⇧", "Click"], done: "That’s Peek: a look without leaving."),
-        Task(id: "space", title: "Make a space", keys: ["+"], done: "A new space. The dots switch spaces."),
+        Task(id: "peek", title: "Shift-click any link", keys: ["⇧", "Click"], done: "That’s Peek: a look without leaving."),
+        Task(id: "space", title: "Click + to make a space", keys: ["+"], done: "A new space. The dots switch spaces."),
     ]
 
     private static let key = "TutorialDone"
