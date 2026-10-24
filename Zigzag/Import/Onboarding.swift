@@ -13,7 +13,7 @@ final class OnboardingView: NSView {
     private var dots: [CALayer] = []
     private var startedImport = false
 
-    /// Set while you go to grant Full Disk Access: Zigzag reopens, and onboarding picks up on the import screen.
+    /// Set if Zigzag has to reopen to pick up a permission: onboarding then picks up on the import screen.
     static var resumeOnBring: Bool {
         get { UserDefaults.standard.bool(forKey: "OnboardingResumeOnBring") }
         set { UserDefaults.standard.set(newValue, forKey: "OnboardingResumeOnBring") }
@@ -431,11 +431,7 @@ private final class BringPage: NSView {
             row.isChosen = true
             run([row])
         case .fullDiskAccess:
-            // Access takes effect once Zigzag reopens; System Settings offers Quit & Reopen, and the
-            // onboarding comes back on this screen.
-            OnboardingView.resumeOnBring = true
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
-            row.note("Turn on Zigzag in Full Disk Access, then choose Quit & Reopen. You’ll be back right here.")
+            allow(row)
         case .primaryPassword, .exportFromApplePasswords:
             // These need a password or an export file; the Import window walks through both.
             ImportWindowController.show()
@@ -443,6 +439,49 @@ private final class BringPage: NSView {
             break
         }
         needsLayout = true
+    }
+
+    /// macOS opens a browser's private folder to an app once you pick that folder yourself. The panel opens on
+    /// it already, so it's one click on Allow; Safari instead hands over its own export file.
+    private func allow(_ row: BrowserRow) {
+        guard let window else { return }
+        switch row.source.kind {
+        case .chromium(let browser) where row.triedPicker:
+            // macOS 27 keeps some browsers' folders private unless you switch them on, under Zigzag, in
+            // Privacy & Security › Files & Folders.
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
+            row.note("In Files & Folders, find Zigzag and turn on \(browser.name). Then come back and click Check Again.")
+            row.awaitSettings()
+        case .chromium(let browser):
+            row.triedPicker = true
+            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/\(browser.root)")
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false
+            panel.directoryURL = folder.deletingLastPathComponent()
+            panel.prompt = "Allow"
+            panel.message = "Click Allow to let Zigzag read \(browser.name)’s bookmarks and passwords. Nothing in \(browser.name) changes."
+            panel.beginSheetModal(for: window) { [weak self, weak row] response in
+                guard let self, let row else { return }
+                row.recheckAccess()
+                self.refresh()
+            }
+            // Pre-select the browser's own folder, so Allow is the only thing to do.
+            DispatchQueue.main.async { panel.directoryURL = folder }
+        case .safari:
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [.zip]
+            panel.prompt = "Import"
+            panel.message = "In Safari, choose File › Export Browsing Data to File, then choose that file here."
+            panel.beginSheetModal(for: window) { [weak self, weak row] response in
+                guard let self, let row, response == .OK, let url = panel.url else { return }
+                row.useFile(url)
+                self.run([row])
+            }
+        default:
+            break
+        }
     }
 
     /// A CSV from a password manager (1Password, Bitwarden…) or Safari's export.
@@ -554,13 +593,13 @@ private final class DataToggle: InteractiveView {
 /// One browser: checkbox, icon, name and what it holds; then progress, what came over, or the problem in full.
 private final class BrowserRow: InteractiveView {
     enum State { case idle, waiting, working, done(ImportCoordinator.Summary) }
-    let source: ImportCoordinator.Source
+    private(set) var source: ImportCoordinator.Source
     var isChosen = false { didSet { refresh() } }
     var isLocked = false { didSet { refresh() } }
     var onChange: (() -> Void)?
     var onFix: ((ImportProblem.Fix) -> Void)?
     var state = State.idle { didSet { refresh() } }
-    /// macOS keeps this browser's files private until Zigzag has Full Disk Access.
+    /// macOS keeps this browser's files private until you allow Zigzag (macOS 27 does this for Chrome and others).
     private var needsAccess = false
 
     var isFinished: Bool { if case .done(let s) = state { s.problems.isEmpty } else { false } }
@@ -594,6 +633,7 @@ private final class BrowserRow: InteractiveView {
         spinner.color = Onboard.ink
         fixButton.onClick = { [weak self] _ in
             guard let self else { return }
+            if self.waitingForSettings { self.recheckAccess(); return }
             self.onFix?(self.fixKind)
         }
         problem.font = Tokens.Font.small()
@@ -614,7 +654,7 @@ private final class BrowserRow: InteractiveView {
                 // Found before starting, so it's fixed first instead of failing midway.
                 self.needsAccess = true
                 self.isChosen = false
-                self.detail.stringValue = "macOS keeps its data private for now"
+                self.detail.stringValue = Self.isSafari(source) ? "Bring it over with a file Safari exports" : "macOS asks you to allow this once"
                 self.fixKind = .fullDiskAccess
                 self.onChange?()
             } else {
@@ -630,7 +670,58 @@ private final class BrowserRow: InteractiveView {
 
     private static func isSafari(_ source: ImportCoordinator.Source) -> Bool { if case .safari = source.kind { true } else { false } }
 
-    /// A line under the row, for a step to take (like what to do in System Settings).
+    private var isSafari: Bool { if case .safari = source.kind { true } else { false } }
+    /// Allowing through the folder panel comes first; if macOS still says no, the switch in System Settings.
+    var triedPicker = false
+    private var waitingForSettings = false
+
+    func awaitSettings() {
+        waitingForSettings = true
+        refresh()
+    }
+
+    /// Opens one of the browser's files for real, so macOS records the attempt (and lists the browser under
+    /// Zigzag in Files & Folders) instead of only being asked whether it would be allowed.
+    private func touchFiles() async {
+        guard case .chromium(let browser) = source.kind else { return }
+        let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/\(browser.root)")
+        await Task.detached {
+            for name in ["Local State", "Default/Bookmarks"] {
+                if let handle = try? FileHandle(forReadingFrom: root.appendingPathComponent(name)) { try? handle.close() }
+            }
+        }.value
+    }
+
+    /// After you've allowed it: read what it holds again, and pick it if it can come over now.
+    func recheckAccess() {
+        Task { @MainActor in
+            await touchFiles()
+            let text = await ImportCoordinator.preview(source)
+            if text.contains("permission") {
+                note(waitingForSettings ? "Not yet. In Files & Folders, under Zigzag, turn on \(source.name), then click Check Again."
+                                        : "macOS still keeps it private. One switch in System Settings fixes it.")
+            } else {
+                needsAccess = false
+                waitingForSettings = false
+                problem.stringValue = ""
+                detail.stringValue = text
+                isChosen = true
+                onChange?()
+            }
+            refresh()
+            superview?.superview?.needsLayout = true
+        }
+    }
+
+    /// Safari's export stands in for Safari itself: it holds passwords, bookmarks and history.
+    func useFile(_ url: URL) {
+        source = ImportCoordinator.fileSource(url)
+        needsAccess = false
+        isChosen = true
+        detail.stringValue = url.lastPathComponent
+    }
+
+    /// A line under the row, for a step to take.
     func note(_ text: String) {
         problem.stringValue = text
         problem.textColor = Onboard.dim(0.8)
@@ -654,7 +745,7 @@ private final class BrowserRow: InteractiveView {
         switch state {
         case .idle:
             if needsAccess {
-                fixButton.title = "Allow Access"
+                fixButton.title = isSafari ? "Use Safari’s Export" : waitingForSettings ? "Check Again" : triedPicker ? "Open Settings" : "Allow Access"
                 fixButton.isHidden = false
             }
         case .waiting:
