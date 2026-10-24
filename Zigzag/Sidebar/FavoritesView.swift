@@ -4,6 +4,8 @@ import AppKit
 final class FavoritesView: NSView {
     var onOpen: ((Bookmark) -> Void)?
     var onMenu: ((Bookmark) -> NSMenu?)?
+    /// The × on an open favorite: unloads its page, the favorite stays.
+    var onClose: ((Bookmark) -> Void)?
     private var tiles: [FavoriteTile] = []
     /// While a tab is dragged over the grid: an empty tile shows where it would go.
     private let dropTile = FavoriteTile(bookmark: nil)
@@ -51,6 +53,7 @@ final class FavoritesView: NSView {
                 let tile = FavoriteTile(bookmark: favorite)
                 tile.onClick = { [weak self] _ in self?.onOpen?(favorite) }
                 tile.onRightClick = { [weak self] _ in self?.onMenu?(favorite) }
+                tile.onClose = { [weak self] in self?.onClose?(favorite) }
                 tile.onDragStart = { [weak self, weak tile] event in
                     guard let self, let tile else { return false }
                     self.drag(tile, favorite: favorite, event: event)
@@ -141,7 +144,18 @@ final class FavoritesView: NSView {
 final class FavoriteTile: InteractiveView {
     let bookmark: Bookmark?
     private let icon = FaviconView()
-    var isOpen = false
+    var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
+    var onClose: (() -> Void)?
+    /// Shown on an open favorite under the pointer, in the corner, like a tab's close button.
+    private lazy var closeButton: IconButton = {
+        let button = IconButton(symbol: "xmark", size: 18, symbolSize: 8, toolTip: "Unload Page")
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 9
+        button.isHidden = true
+        button.onClick = { [weak self] _ in self?.onClose?() }
+        addSubview(button)
+        return button
+    }()
     private weak var tab: Tab?
     private var tabToken: SignalToken?
     var isPlaceholder = false { didSet { icon.isHidden = isPlaceholder; stateDidChange(animated: false) } }
@@ -188,6 +202,7 @@ final class FavoriteTile: InteractiveView {
         super.layout()
         let size = Tokens.Metric.favicon + 4
         icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
+        closeButton.frame = NSRect(x: bounds.width - 18 - Tokens.Space.x1, y: Tokens.Space.x1, width: 18, height: 18)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -197,9 +212,12 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = 1.5
             return
         }
+        closeButton.isHidden = !(isOpen && isHovered)
+        closeButton.layer?.backgroundColor = cgColor(Tokens.Color.panelBackground.withAlphaComponent(0.9))
         let fill: NSColor
         if isSelected {
-            fill = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
+            // The favorite you're on stands clearly apart from the resting tiles beside it.
+            fill = isHovered ? Self.selectedHover : Self.selected
         } else if isPressed {
             fill = Tokens.Color.pressedFill
         } else if isHovered {
@@ -209,8 +227,13 @@ final class FavoriteTile: InteractiveView {
         }
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         layer?.shadowOpacity = isSelected ? 1 : 0
-        layer?.shadowColor = cgColor(Tokens.Color.selectedEdge)
-        layer?.shadowRadius = 0.5
-        layer?.shadowOffset = CGSize(width: 0, height: -0.5)
+        layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
+        layer?.shadowRadius = 2
+        layer?.shadowOffset = CGSize(width: 0, height: -1)
+        layer?.borderWidth = isSelected ? Tokens.Metric.hairline : 0
+        layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
     }
+
+    private static let selected = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.95), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
+    private static let selectedHover = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 1), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.24))
 }

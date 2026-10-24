@@ -53,7 +53,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
 
         sidebar.delegate = self
-        sidebar.onEditSpace = { [weak self] id in self?.openSpaceEditor(id) }
+        sidebar.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }
 
         sidebar.onSwipeSpace = { [weak self] offset in
             guard let self else { return false }
@@ -115,6 +115,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.favorites.onOpen = { [weak self] favorite in self?.tabManager.openBookmark(favorite) }
+        sidebar.favorites.onClose = { [weak self] favorite in
+            guard let self, let live = self.tabManager.bookmarkTab(for: favorite.id) else { return }
+            self.tabManager.close(live)
+        }
         sidebar.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }
             return SidebarMenus.favoriteMenu(for: favorite, controller: self)
@@ -217,7 +221,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
         if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
         previews.hide()
-        SpaceEditorPanel.toggle(spaceID: spaceID, in: self)
+        SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
 
     private func applySpaceColor(animated: Bool) {
