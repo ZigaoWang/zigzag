@@ -15,6 +15,17 @@ nonisolated enum ChromiumImporter {
         let root: String
         let keychainService: String
         let keychainAccount: String
+        /// One profile's folder ("Profile 1"), when importing a single profile; nil means all of them.
+        var profile: String? = nil
+        /// That profile's name as the browser shows it ("Work").
+        var profileName: String? = nil
+
+        func only(_ folder: String, named display: String) -> Browser {
+            var copy = self
+            copy.profile = folder
+            copy.profileName = display
+            return copy
+        }
     }
 
     static let browsers: [Browser] = [
@@ -41,11 +52,35 @@ nonisolated enum ChromiumImporter {
             names = cache.keys.sorted()
         }
         if names.isEmpty { names = ["Default"] }
+        if let only = browser.profile { names = names.filter { $0 == only } }
         return names.map { root.appendingPathComponent($0, isDirectory: true) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
     static func isInstalled(_ browser: Browser) -> Bool { !profiles(of: browser).isEmpty }
+
+    /// Each profile's folder and the name the browser shows for it, in the order the browser lists them.
+    static func profileNames(of browser: Browser) -> [(folder: String, name: String)] {
+        let root = rootURL(of: browser)
+        guard let data = try? Data(contentsOf: root.appendingPathComponent("Local State")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let profile = json["profile"] as? [String: Any],
+              let cache = profile["info_cache"] as? [String: Any] else { return [] }
+        let order = (profile["profiles_order"] as? [String]) ?? cache.keys.sorted()
+        let found: [(String, String, String?)] = order.compactMap { folder in
+            guard let info = cache[folder] as? [String: Any],
+                  FileManager.default.fileExists(atPath: root.appendingPathComponent(folder).path) else { return nil }
+            let name = (info["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? folder
+            let email = (info["user_name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return (folder, name, email)
+        }
+        // Two profiles with the same name ("Wang" and "Wang"): tell them apart by their account, else their folder.
+        let counts = Dictionary(grouping: found, by: \.1).mapValues(\.count)
+        return found.map { folder, name, email in
+            guard counts[name, default: 0] > 1 else { return (folder, name) }
+            return (folder, "\(name) (\(email ?? folder))")
+        }
+    }
 
     // MARK: Reading
 

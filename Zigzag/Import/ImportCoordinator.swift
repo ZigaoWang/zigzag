@@ -58,7 +58,15 @@ enum ImportCoordinator {
     static func detectedSources() -> [Source] {
         var sources: [Source] = []
         for browser in ChromiumImporter.browsers where ChromiumImporter.isInstalled(browser) {
-            sources.append(Source(kind: .chromium(browser), name: browser.name, bundleID: browser.bundleID))
+            // Several profiles: each is its own choice ("Chrome · Work"), as other browsers' importers do.
+            let profiles = browser.name == "Arc" ? [] : ChromiumImporter.profileNames(of: browser)
+            if profiles.count > 1 {
+                for (folder, display) in profiles {
+                    sources.append(Source(kind: .chromium(browser.only(folder, named: display)), name: "\(browser.name) · \(display)", bundleID: browser.bundleID))
+                }
+            } else {
+                sources.append(Source(kind: .chromium(browser), name: browser.name, bundleID: browser.bundleID))
+            }
         }
         if NSWorkspace.shared.urlForApplication(withBundleIdentifier: SafariImporter.bundleID) != nil {
             sources.append(Source(kind: .safari, name: "Safari", bundleID: SafariImporter.bundleID))
