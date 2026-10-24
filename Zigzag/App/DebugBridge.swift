@@ -252,6 +252,26 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsWindowController.shared.show()
+        case "pwseed":
+            // Five obviously fake logins for checking the Passwords window; remove them with pwclear.
+            Task {
+                let samples: [(String, String, String)] = [("https://github.com", "sam@example.com", "correct-horse-battery-staple"),
+                                                           ("https://figma.com", "sam@example.com", "Password1!"),
+                                                           ("https://linear.app", "sam@example.com", "correct-horse-battery-staple"),
+                                                           ("https://notion.so", "design@example.com", "Vq7-mBe2-Kp9xZ4"),
+                                                           ("https://vercel.com", "sam@example.com", "hunter22")]
+                for (site, user, password) in samples {
+                    if let origin = Origin(URL(string: site)) { _ = try? await PasswordStore.shared.save(origin: origin, username: user, password: SecretString(password)) }
+                }
+                debugLog("pwseed done")
+            }
+        case "pwclear":
+            Task {
+                let all = (try? await PasswordStore.shared.all()) ?? []
+                let samples = all.filter { $0.username.hasSuffix("@example.com") }
+                for credential in samples { try? await PasswordStore.shared.delete(credential.id) }
+                debugLog("pwclear removed \(samples.count)")
+            }
         case "about": AboutWindowController.show()
         case "clearsite":
             // clearsite <cache|cookies> <site>
