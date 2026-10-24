@@ -197,8 +197,10 @@ final class ColorCanvas: NSView {
             let base = cgColor(Tokens.Color.panelBackground)
             fade.colors = [base.copy(alpha: 0) ?? base, base.copy(alpha: 0.55) ?? base]
             drawDots()
-            let x = CGFloat(hue) * bounds.width
-            let y = (1 - CGFloat(intensity)) * bounds.height
+            // The knob's center keeps half a knob from each edge, so it's never cut off.
+            let r = knobSize / 2
+            let x = r + CGFloat(hue) * (bounds.width - knobSize)
+            let y = r + (1 - CGFloat(intensity)) * (bounds.height - knobSize)
             knob.frame = NSRect(x: x - knobSize / 2, y: y - knobSize / 2, width: knobSize, height: knobSize)
             knob.cornerRadius = knobSize / 2
             knob.backgroundColor = .white
@@ -236,8 +238,9 @@ final class ColorCanvas: NSView {
 
     private func update(from event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        hue = Double(min(max(p.x / bounds.width, 0), 0.999))
-        intensity = Double(min(max(1 - p.y / bounds.height, 0), 1))
+        let r = knobSize / 2
+        hue = Double(min(max((p.x - r) / (bounds.width - knobSize), 0), 0.999))
+        intensity = Double(min(max(1 - (p.y - r) / (bounds.height - knobSize), 0), 1))
         layoutSubtreeIfNeeded()
     }
 
@@ -317,7 +320,7 @@ final class AppearanceOption: InteractiveView {
     override func stateDidChange(animated: Bool) {
         Tokens.Motion.withoutAnimation {
             ring.frame = clip.frame.insetBy(dx: -3, dy: -3)
-            ring.borderColor = cgColor(isSelected ? Tokens.Color.accent : (isHovered ? Tokens.Color.textTertiary : .clear))
+            ring.borderColor = cgColor(isSelected ? Brand.Theme.for(self).accent : (isHovered ? Tokens.Color.textTertiary : .clear))
         }
         label.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         setAccessibilityValue(isSelected ? "selected" : nil)
@@ -533,7 +536,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let fits = host.isFlipped ? below + height <= host.bounds.height - Tokens.Space.x2 : below >= Tokens.Space.x2
         // Not enough room underneath: it opens upward from the button instead.
         let above = host.isFlipped ? button.minY - Tokens.Space.x1 - height : button.maxY + Tokens.Space.x1
-        let y = fits ? below : above
+        // Never past the window's edges: if neither way fits, it slides to fit and sits left of the button.
+        let y = max(Tokens.Space.x2, min(fits ? below : above, host.bounds.height - height - Tokens.Space.x2))
         let x = max(Tokens.Space.x2, min(button.maxX - Self.width, host.bounds.width - Self.width - Tokens.Space.x2))
         frame = NSRect(x: x, y: y, width: Self.width, height: height)
         host.addSubview(self)
