@@ -36,6 +36,19 @@ enum ExtensionStore {
         var unpackedPath: String?
         /// Shown as a button by the address. Nil means the default: pinned.
         var pinned: Bool?
+        /// Where it may read and change pages. Nil means the default: everywhere it was approved for.
+        var siteAccess: SiteAccess?
+        /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
+        var accessSites: [String]?
+    }
+
+    enum SiteAccess: String, Codable {
+        /// Every site it was approved for.
+        case all
+        /// Only a site where the person clicked its button.
+        case click
+        /// Only the sites the person listed.
+        case sites
     }
 
     static func state(_ id: String) -> State? {
@@ -76,6 +89,28 @@ enum ExtensionStore {
     static func isUnpacked(_ id: String) -> Bool { state(id)?.unpackedPath != nil }
     static func needsApproval(_ id: String) -> Bool { state(id)?.pendingVersion != nil }
     static func isPinned(_ id: String) -> Bool { state(id)?.pinned ?? true }
+    static func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
+    static func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
+
+    static func setSiteAccess(_ id: String, _ access: SiteAccess, sites: [String]? = nil) {
+        guard #available(macOS 15.4, *) else { return }
+        update(id) {
+            $0.siteAccess = access
+            if let sites { $0.accessSites = sites } else if access == .all { $0.accessSites = nil }
+        }
+        ExtensionHost.shared.applySiteAccess(id)
+    }
+
+    /// Sites where every extension is off, whatever its own access says.
+    private static let offSitesKey = "ExtensionsOffSites"
+    static var extensionsOffSites: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: offSitesKey) ?? []) }
+        set {
+            UserDefaults.standard.set(Array(newValue).sorted(), forKey: offSitesKey)
+            guard #available(macOS 15.4, *) else { return }
+            for id in installedIDs { ExtensionHost.shared.applySiteAccess(id) }
+        }
+    }
 
     static func setPinned(_ id: String, _ pinned: Bool) {
         guard #available(macOS 15.4, *) else { return }

@@ -105,10 +105,50 @@ final class ExtensionHost: NSObject {
         for permission in permissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
         for pattern in patterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         if state?.grantedPermissions == nil { saveGrants(of: context) }
+        applySiteAccess(to: context)
+    }
+
+    // MARK: Site access
+
+    func applySiteAccess(_ id: String) {
+        guard let context = context(for: id) else { return }
+        applySiteAccess(to: context)
+        changed.send()
+    }
+
+    /// Turns the approved site patterns into what the person chose: every approved site, only sites they
+    /// clicked the extension on, or only sites they listed. Sites where extensions are off are denied to all.
+    private func applySiteAccess(to context: WKWebExtensionContext) {
+        let id = context.uniqueIdentifier
+        let approved = (ExtensionStore.state(id)?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        let access = ExtensionStore.siteAccess(id)
+        // Forget earlier decisions first (clearing one pattern can clear an overlapping one), then make the current ones.
+        for pattern in context.grantedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
+        for pattern in context.deniedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
+        if access == .all {
+            for pattern in approved { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+        } else {
+            for site in ExtensionStore.accessSites(id) {
+                for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+            }
+        }
+        for site in ExtensionStore.extensionsOffSites {
+            for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        }
+    }
+
+    /// A site and its subdomains, over http and https.
+    static func patterns(for site: String) -> [WKWebExtension.MatchPattern] {
+        ["*://\(site)/*", "*://*.\(site)/*"].compactMap { try? WKWebExtension.MatchPattern(string: $0) }
     }
 
     fileprivate func saveGrants(of context: WKWebExtensionContext) {
         let permissions = context.grantedPermissions.keys.map(\.rawValue).sorted()
+        // Per-site grants come from site access, not approval; only an "all sites" extension's grants are its approvals.
+        guard ExtensionStore.siteAccess(context.uniqueIdentifier) == .all || ExtensionStore.state(context.uniqueIdentifier)?.grantedMatchPatterns == nil else {
+            ExtensionStore.update(context.uniqueIdentifier) { $0.grantedPermissions = permissions }
+            return
+        }
         let patterns = context.grantedPermissionMatchPatterns.keys.map(\.string).sorted()
         ExtensionStore.update(context.uniqueIdentifier) {
             $0.grantedPermissions = permissions
@@ -158,6 +198,12 @@ final class ExtensionHost: NSObject {
         if let attention = item.attention, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
             AttentionHint.show(attention, below: anchor, in: controller)
             return
+        }
+        // "When you click it": clicking gives it this site from now on.
+        if ExtensionStore.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
+           !ExtensionStore.accessSites(item.id).contains(site) {
+            ExtensionStore.setSiteAccess(item.id, .click, sites: ExtensionStore.accessSites(item.id) + [site])
+            tab?.reload()
         }
         item.context.performAction(for: tab)
     }
