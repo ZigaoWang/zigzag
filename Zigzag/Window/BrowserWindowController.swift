@@ -325,26 +325,43 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard #available(macOS 15.4, *) else { return }
         let id = ExtensionStore.webStoreID(from: tabManager.selectedTab?.url)
         guard id != offeredExtensionID else { return }
-        if offeredExtensionID != nil { Toast.hide(in: self) }
+        if offeredExtensionID != nil { WebStoreOffer.hide() }
         offeredExtensionID = id
         guard let id, !ExtensionStore.isInstalled(id) else { return }
-        Toast.show("Use this extension in Zigzag", symbol: "puzzlepiece.extension", action: (title: "Add to Zigzag", run: { [weak self] in
-            self?.installExtension(id)
-        }), duration: 3600, in: self)
+        // Shown once the page has its title, so the bar can name the extension.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self, self.offeredExtensionID == id else { return }
+            WebStoreOffer.show(id, in: self)
+        }
     }
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed.
-    func installExtension(_ id: String) {
+    enum InstallStage { case downloading, reviewing, adding, added(String), failed(String), cancelled }
+
+    /// Adding from the store: verify the package, show what it can do, install only once confirmed. `progress`
+    /// hears each stage (the store bar shows them); without it, toasts do.
+    func installExtension(_ id: String, progress: ((InstallStage) -> Void)? = nil) {
         guard #available(macOS 15.4, *) else { return }
-        Toast.show("Checking extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
+        let report: (InstallStage) -> Void = { [weak self] stage in
+            if let progress { progress(stage); return }
+            guard let self else { return }
+            switch stage {
+            case .downloading: Toast.show("Downloading extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
+            case .reviewing, .cancelled: Toast.hide(in: self)
+            case .adding: Toast.show("Adding…", symbol: "arrow.down.circle", duration: 3600, in: self)
+            case .added(let name): Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
+            case .failed(let message): Toast.show(message, symbol: "exclamationmark.triangle", duration: 4, in: self)
+            }
+        }
+        report(.downloading)
         Task { [weak self] in
             let result = await ExtensionStore.prepareInstall(id)
             guard let self else { return }
             switch result {
             case .failure(let error):
-                Toast.show(error.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
+                report(.failed(error.message))
             case .success(let prepared):
-                Toast.hide(in: self)
+                report(.reviewing)
                 let info = prepared.extensionInfo
                 let content = ExtensionSheet.Content(
                     icon: info.icon(for: NSSize(width: 40, height: 40)),
@@ -353,19 +370,22 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                     heading: "It will be able to",
                     report: prepared.report,
                     confirm: "Add Extension", cancel: "Cancel")
-                ExtensionSheet.present(content, in: self, onConfirm: { [weak self] in
-                    Task { [weak self] in
-                        let installed = await ExtensionStore.finishInstall(prepared)
-                        guard let self else { return }
-                        switch installed {
-                        case .success(let name): Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
-                        case .failure(let error): Toast.show(error.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
+                ExtensionSheet.present(content, in: self, onConfirm: {
+                    report(.adding)
+                    Task {
+                        switch await ExtensionStore.finishInstall(prepared) {
+                        case .success(let name): report(.added(name))
+                        case .failure(let error): report(.failed(error.message))
                         }
                     }
-                }, onCancel: { ExtensionStore.discard(prepared) })
+                }, onCancel: {
+                    ExtensionStore.discard(prepared)
+                    report(.cancelled)
+                })
             }
         }
     }
+
 
     /// An update that wants more access waits for this.
     func reviewExtensionUpdate(_ id: String) {
