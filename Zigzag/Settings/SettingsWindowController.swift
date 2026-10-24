@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 // MARK: - Grouped form, the way System Settings lays things out
 
@@ -277,6 +278,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let blockingSwitch = NSSwitch()
     private let extensionsGroup = FormGroup()
     private let getExtensionsButton = NSButton(title: "Get Extensions…", target: nil, action: nil)
+    private let loadUnpackedButton = NSButton(title: "Load Unpacked…", target: nil, action: nil)
     private var extensionsToken: SignalToken?
     private let engine = NSPopUpButton()
     private let defaultButton = NSButton(title: "Make Default", target: nil, action: nil)
@@ -348,6 +350,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         getExtensionsButton.action = #selector(getExtensions)
         getExtensionsButton.bezelStyle = .push
         getExtensionsButton.controlSize = .small
+        loadUnpackedButton.target = self
+        loadUnpackedButton.action = #selector(loadUnpacked)
+        loadUnpackedButton.bezelStyle = .push
+        loadUnpackedButton.controlSize = .small
 
         if ArcImporter.isAvailable {
             let button = NSButton(title: "Import…", target: self, action: #selector(importArc))
@@ -370,29 +376,103 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         extensionsGroup.removeAllRows()
         defer { layoutDocument() }
         guard #available(macOS 15.4, *) else { return }
+        loadUnpackedButton.isHidden = !ExtensionStore.developerMode
         let installed = ExtensionHost.shared.installed.sorted {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
-        guard !installed.isEmpty else {
+        if installed.isEmpty {
             extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Open one in the Chrome Web Store and choose Add to Zigzag.", control: NSView()))
-            return
         }
-        for (id, ext) in installed {
-            let toggle = NSSwitch()
-            toggle.controlSize = .small
-            toggle.state = ExtensionStore.isEnabled(id) ? .on : .off
-            let toggleTarget = SidebarMenus.Handler { [weak toggle] in ExtensionStore.setEnabled(id, toggle?.state == .on) }
-            toggle.target = toggleTarget
-            toggle.action = #selector(SidebarMenus.Handler.runAction(_:))
-            let remove = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
-            remove.onClick = { _ in ExtensionStore.uninstall(id) }
-            let controls = NSStackView(views: [remove, toggle])
-            controls.spacing = Tokens.Space.x2
-            let detail = ext.version.map { "Version \($0)" } ?? ""
-            let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? nil : detail,
-                              icon: ext.icon(for: NSSize(width: 24, height: 24)), control: controls)
-            objc_setAssociatedObject(row, "toggleTarget", toggleTarget, .OBJC_ASSOCIATION_RETAIN)
-            extensionsGroup.add(row)
+        for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
+        let developer = NSSwitch()
+        developer.controlSize = .small
+        developer.state = ExtensionStore.developerMode ? .on : .off
+        let developerTarget = SidebarMenus.Handler { [weak self, weak developer] in
+            ExtensionStore.developerMode = developer?.state == .on
+            self?.reloadExtensions()
+        }
+        developer.target = developerTarget
+        developer.action = #selector(SidebarMenus.Handler.runAction(_:))
+        let developerRow = FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", control: developer)
+        objc_setAssociatedObject(developerRow, "target", developerTarget, .OBJC_ASSOCIATION_RETAIN)
+        extensionsGroup.add(developerRow)
+    }
+
+    @available(macOS 15.4, *)
+    private func extensionRow(id: String, ext: WKWebExtension) -> FormRow {
+        var controls: [NSView] = []
+        var targets: [AnyObject] = []
+        if ExtensionStore.needsApproval(id) {
+            let review = NSButton(title: "Review Update…", target: nil, action: nil)
+            review.controlSize = .small
+            review.bezelStyle = .push
+            let target = SidebarMenus.Handler {
+                guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+                controller.window?.makeKeyAndOrderFront(nil)
+                controller.reviewExtensionUpdate(id)
+            }
+            review.target = target
+            review.action = #selector(SidebarMenus.Handler.runAction(_:))
+            controls.append(review)
+            targets.append(target)
+        }
+        if ExtensionStore.isUnpacked(id) {
+            let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Reload from Its Folder")
+            reload.onClick = { _ in Task { await ExtensionStore.reloadUnpacked(id) } }
+            controls.append(reload)
+        }
+        let remove = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
+        remove.onClick = { _ in ExtensionStore.uninstall(id) }
+        controls.append(remove)
+        let toggle = NSSwitch()
+        toggle.controlSize = .small
+        toggle.state = ExtensionStore.isEnabled(id) ? .on : .off
+        let toggleTarget = SidebarMenus.Handler { [weak toggle] in ExtensionStore.setEnabled(id, toggle?.state == .on) }
+        toggle.target = toggleTarget
+        toggle.action = #selector(SidebarMenus.Handler.runAction(_:))
+        controls.append(toggle)
+        targets.append(toggleTarget)
+        let stack = NSStackView(views: controls)
+        stack.spacing = Tokens.Space.x2
+
+        // "Version 1.2 · Unpacked · Won't work here: side panel" — what matters about it at a glance.
+        var detail: [String] = [ext.version.map { "Version \($0)" } ?? ""].filter { !$0.isEmpty }
+        if ExtensionStore.isUnpacked(id) { detail.append("Unpacked") }
+        if ExtensionStore.needsApproval(id) { detail.append("Update wants more access") }
+        var limitsNote: String?
+        if let manifest = ExtensionStore.manifest(for: id) {
+            let limits = ExtensionReport(extension: ext, manifest: manifest, id: id).limits
+            if !limits.isEmpty {
+                // The count fits the row; the names are a hover away.
+                detail.append(limits.count == 1 ? "1 feature won’t work here" : "\(limits.count) features won’t work here")
+                let names = limits.map { $0.prefix(1).lowercased() + $0.dropFirst() }
+                limitsNote = "Won’t work in Zigzag: " + ListFormatter.localizedString(byJoining: names) + "."
+            }
+        }
+        let row = FormRow(title: ext.displayName ?? id, detail: detail.joined(separator: " · "),
+                          icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        row.toolTip = limitsNote
+        objc_setAssociatedObject(row, "targets", targets, .OBJC_ASSOCIATION_RETAIN)
+        return row
+    }
+
+    @objc private func loadUnpacked() {
+        guard #available(macOS 15.4, *), let window else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Load"
+        panel.message = "Choose the folder that contains the extension’s manifest.json."
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                if await ExtensionStore.loadUnpacked(url) == nil {
+                    let alert = NSAlert()
+                    alert.messageText = "Couldn’t load this extension"
+                    alert.informativeText = "That folder needs a manifest.json that Zigzag can read."
+                    alert.beginSheetModal(for: window, completionHandler: nil)
+                }
+            }
         }
     }
 
@@ -436,7 +516,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         section(nil, generalGroup)
         section("Spaces", spacesGroup, accessory: addSpaceButton)
-        if #available(macOS 15.4, *) { section("Extensions", extensionsGroup, accessory: getExtensionsButton) }
+        if #available(macOS 15.4, *) {
+            let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
+            buttons.spacing = Tokens.Space.x2
+            section("Extensions", extensionsGroup, accessory: buttons)
+        }
         if !importGroup.rows.isEmpty { section(nil, importGroup) }
 
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: y)
