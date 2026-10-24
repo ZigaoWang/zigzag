@@ -21,3 +21,37 @@ struct PasswordGeneratorTests {
         #expect(seen.count == 2000)
     }
 }
+
+struct PasswordRulesTests {
+    @Test func readsPasswordRules() {
+        let rules = PasswordGenerator.Rules(passwordRules: "minlength: 8; maxlength: 16; required: upper; required: digit; required: [-_]; allowed: lower;")
+        #expect(rules.minLength == 8)
+        #expect(rules.maxLength == 16)
+        #expect(rules.requiresSpecial)
+        #expect(rules.allowedSpecials == ["-", "_"])
+    }
+
+    @Test func honorsMaxLengthAndRequiredSymbol() {
+        let rules = PasswordGenerator.Rules(passwordRules: "required: lower; required: upper; required: digit; required: [!#];", maxLength: 12)
+        for _ in 0..<100 {
+            let password = PasswordGenerator.generate(rules).withUnsafeString { String($0) }
+            #expect(password.count == 12)
+            #expect(password.contains { "!#".contains($0) })
+            #expect(!password.contains("-"))
+        }
+    }
+
+    @Test func noSymbolsWhenOnlyLettersAndDigitsAllowed() {
+        let rules = PasswordGenerator.Rules(passwordRules: "allowed: upper, lower, digit;")
+        for _ in 0..<100 {
+            let password = PasswordGenerator.generate(rules).withUnsafeString { String($0) }
+            #expect(password.allSatisfy { $0.isLetter || $0.isNumber })
+            #expect(password.count == 20)
+        }
+    }
+
+    @Test func longerWhenMinLengthAsks() {
+        let password = PasswordGenerator.generate(PasswordGenerator.Rules(minLength: 32)).withUnsafeString { String($0) }
+        #expect(password.count == 32)
+    }
+}
