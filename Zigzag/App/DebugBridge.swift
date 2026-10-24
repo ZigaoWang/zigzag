@@ -57,6 +57,7 @@ enum DebugBridge {
             if let root = SettingsWindowController.shared.window?.contentView { rows(root).first?.openEditor() }
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
+        case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend()
         case "space": controller.tabManager.switchSpace(by: Int(arg) ?? 1)
         case "newspace":
             let space = Library.shared.addSpace(name: arg.isEmpty ? nil : arg)
