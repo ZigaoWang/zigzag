@@ -39,6 +39,8 @@ enum WebKitSetup {
             for script in PageScripts.all + Reader.scripts { configuration.userContentController.addUserScript(script) }
             // Runs in its own world, invisible to the page.
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
+            configuration.userContentController.addUserScript(PasswordCapture.script)
+            configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             ContentBlocker.attach(to: configuration)
         }
     }
