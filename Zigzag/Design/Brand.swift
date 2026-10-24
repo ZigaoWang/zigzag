@@ -296,7 +296,7 @@ final class RibbonView: NSView {
 }
 
 /// The surface for Zigzag's big moments (first launch, import finished): deep in the space's hue, lit from one
-/// corner by its accent, with fine grain and a hairline edge, and one large ribbon written across it, tone on tone.
+/// corner by its accent, with fine grain and a hairline edge, and one large ribbon written in at its right, tone on tone.
 final class BrandSurface: NSView {
     private let base = CAGradientLayer()
     private let glow = CAGradientLayer()
@@ -383,11 +383,14 @@ final class BrandSurface: NSView {
             let g = max(bounds.width, bounds.height) * 1.1
             glow.frame = CGRect(x: bounds.maxX - g * 0.62, y: bounds.maxY - g * 0.6, width: g, height: g)
         }
-        // One big ribbon, running off the right edge.
-        let h = bounds.height * 1.18
+        // One big ribbon at the right. At most a sliver runs off the edge, so it always reads as the Z. On a tall
+        // surface it's sized by the width and sits in the lower part, clear of the text above.
+        let tall = bounds.height > bounds.width * 1.2
+        let h = tall ? bounds.width * 0.78 * Brand.aspect : bounds.height * 0.86
         let w = h / Brand.aspect
-        watermark.frame = NSRect(x: bounds.maxX - w * 0.78, y: bounds.midY - h / 2 - bounds.height * 0.06, width: w, height: h)
-        watermark.ribbonWidth = w * 0.8
+        let y = tall ? bounds.height * 0.2 : bounds.midY - h / 2
+        watermark.frame = NSRect(x: bounds.maxX - w * 0.92, y: y, width: w, height: h)
+        watermark.ribbonWidth = w / (1 + Brand.weight * 1.05)
     }
 }
 
@@ -488,8 +491,7 @@ final class WordmarkView: NSView {
 }
 
 /// The top of a branded window (Settings, Passwords, Import): a soft wash of the space's accent that fades into the
-/// window, big display type, and a large ribbon at the top right, tone on tone, written in when it appears. No band,
-/// no hard edge. Leaves the top-left free for the traffic lights.
+/// window, big display type, and the ribbon, whole, at the right, written in when it appears. No band, no hard edge. Leaves the top-left free for the traffic lights.
 final class BrandBanner: NSView {
     private let wash = CAGradientLayer()
     let ribbonMark = RibbonView()
@@ -534,7 +536,7 @@ final class BrandBanner: NSView {
                 wash.locations = [0, 0.55, 1]
             }
         }
-        ribbonMark.color = theme.accent.withAlphaComponent(dark ? 0.2 : 0.16)
+        ribbonMark.color = theme.accent.withAlphaComponent(dark ? 0.34 : 0.26)
         titleLabel.attributedStringValue = Brand.display(title, size: titleSize, color: Tokens.Color.textPrimary)
     }
 
@@ -560,10 +562,12 @@ final class BrandBanner: NSView {
             wash.startPoint = CGPoint(x: 0.5, y: 0)
             wash.endPoint = CGPoint(x: 0.5, y: 1)
         }
-        let h = bounds.height * 1.05
-        let w = h / Brand.aspect
-        ribbonMark.frame = NSRect(x: bounds.width - w * 0.86, y: -h * 0.16, width: w, height: h)
-        ribbonMark.ribbonWidth = w * 0.78
+        // The ribbon, whole: a mark at the right, level with the title, never cropped.
+        let markHeight = min(bounds.height * 0.5, 56)
+        let markWidth = markHeight / Brand.aspect
+        ribbonMark.frame = NSRect(x: bounds.width - contentInset - markWidth, y: bounds.height - Tokens.Space.x4 - markHeight - 2,
+                                  width: markWidth, height: markHeight)
+        ribbonMark.ribbonWidth = markWidth / (1 + Brand.weight * 1.05)
         let x = contentInset
         let titleHeight = ceil(titleLabel.intrinsicContentSize.height)
         let subtitleHeight = subtitleLabel.isHidden ? 0 : subtitleLabel.lineHeight
