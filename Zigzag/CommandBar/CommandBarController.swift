@@ -127,8 +127,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             controller.root.overlay.addSubview(panel)
             scrim.show()
         }
+        let font = isAnchored ? NSFont.systemFont(ofSize: 15) : Tokens.Font.large()
+        field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
-                                                               attributes: [.font: Tokens.Font.large(), .foregroundColor: Tokens.Color.textTertiary])
+                                                               attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
         if mode == .editCurrent, let url = controller.tabManager.selectedTab?.url {
             field.stringValue = url.absoluteString
         } else {
@@ -178,9 +180,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if isAnchored {
             let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
             let width = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
-            let height = Tokens.Metric.commandBarFieldHeight + listHeight
+            let height = fieldHeight + listHeight
             // The field sits where the address was, so the text doesn't jump.
-            let y = address.midY - Tokens.Metric.commandBarFieldHeight / 2
+            let y = address.midY - fieldHeight / 2
             return NSRect(x: address.minX - Tokens.Space.x1, y: max(Tokens.Space.x1, y), width: width, height: height)
         }
         let card = controller.root.cardFrame
@@ -190,10 +192,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         return NSRect(x: floor(card.midX - width / 2), y: top, width: width, height: height)
     }
 
+    /// Anchored to the address it's a little smaller, close to the address bar's own size.
+    private var fieldHeight: CGFloat { isAnchored ? Tokens.Space.x10 + Tokens.Space.x1 : Tokens.Metric.commandBarFieldHeight }
+
     private func layoutPanel() {
         let b = panel.bounds
-        let fieldHeight = Tokens.Metric.commandBarFieldHeight
-        let iconSize = Tokens.Space.x6
+        let fieldHeight = self.fieldHeight
+        let iconSize = isAnchored ? Tokens.Space.x5 : Tokens.Space.x6
         fieldIcon.frame = NSRect(x: Tokens.Space.x4, y: (fieldHeight - iconSize) / 2, width: iconSize, height: iconSize)
         let textHeight = ceil(field.intrinsicContentSize.height)
         let fieldX = fieldIcon.frame.maxX + Tokens.Space.x2
