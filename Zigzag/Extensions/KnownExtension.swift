@@ -148,9 +148,14 @@ enum KnownExtension {
             worker = (background["zigzag_original_worker"] as? String) ?? "background/background.js"
         }
         background["zigzag_original_worker"] = worker
-        let entry = """
+        // Manifests write the worker as "js/background.js" or "/js/background.js"; both mean the extension's root.
+        let path = worker.hasPrefix("/") ? String(worker.dropFirst()) : worker
+        // A module worker imports; a classic one (which may itself call importScripts) loads both scripts in order.
+        let entry = (background["type"] as? String) == "module" ? """
         import './zigzag-shim.js';
-        import './\(worker)';
+        import './\(path)';
+        """ : """
+        importScripts('zigzag-shim.js', '\(path)');
         """
         try? entry.write(to: dir.appendingPathComponent("zigzag-background.js"), atomically: true, encoding: .utf8)
         try? shim.write(to: dir.appendingPathComponent("zigzag-shim.js"), atomically: true, encoding: .utf8)
