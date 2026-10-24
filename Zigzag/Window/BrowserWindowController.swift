@@ -293,18 +293,56 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }), duration: 3600, in: self)
     }
 
+    /// Adding from the store: verify the package, show what it can do, install only once confirmed.
     func installExtension(_ id: String) {
         guard #available(macOS 15.4, *) else { return }
-        Toast.show("Adding extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
+        Toast.show("Checking extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
         Task { [weak self] in
-            let result = await ExtensionStore.install(id)
+            let result = await ExtensionStore.prepareInstall(id)
             guard let self else { return }
             switch result {
-            case .success(let name):
-                Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
             case .failure(let error):
                 Toast.show(error.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
+            case .success(let prepared):
+                Toast.hide(in: self)
+                let info = prepared.extensionInfo
+                let content = ExtensionSheet.Content(
+                    icon: info.icon(for: NSSize(width: 40, height: 40)),
+                    title: "Add \(info.displayName ?? "this extension")?",
+                    subtitle: "Chrome Web Store · Version \(prepared.version)",
+                    heading: "It will be able to",
+                    report: prepared.report,
+                    confirm: "Add Extension", cancel: "Cancel")
+                ExtensionSheet.present(content, in: self, onConfirm: { [weak self] in
+                    Task { [weak self] in
+                        let installed = await ExtensionStore.finishInstall(prepared)
+                        guard let self else { return }
+                        switch installed {
+                        case .success(let name): Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
+                        case .failure(let error): Toast.show(error.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
+                        }
+                    }
+                }, onCancel: { ExtensionStore.discard(prepared) })
             }
+        }
+    }
+
+    /// An update that wants more access waits for this.
+    func reviewExtensionUpdate(_ id: String) {
+        guard #available(macOS 15.4, *) else { return }
+        Task { [weak self] in
+            guard let (info, report) = await ExtensionStore.pendingUpdateReport(id), let self else { return }
+            let name = info.displayName ?? "This extension"
+            let content = ExtensionSheet.Content(
+                icon: info.icon(for: NSSize(width: 40, height: 40)),
+                title: "\(name) wants more access",
+                subtitle: "Version \(info.version ?? "") is ready. Until you allow it, the current version keeps running.",
+                heading: "It would also be able to",
+                report: report,
+                confirm: "Allow and Update", cancel: "Not Now")
+            ExtensionSheet.present(content, in: self, onConfirm: {
+                Task { await ExtensionStore.approvePendingUpdate(id) }
+            })
         }
     }
 

@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import WebKit
 
 /// Where extensions live and what the person decided about them. Packages come from the Chrome Web Store,
 /// the same files Chrome users get, verified and never edited: each version sits in its own folder exactly as
@@ -134,24 +135,74 @@ enum ExtensionStore {
         }
     }
 
-    /// Downloads, verifies and loads an extension from the Chrome Web Store. Returns its name.
-    static func install(_ id: String) async -> Result<String, InstallError> {
-        guard #available(macOS 15.4, *), isExtensionID(id) else { return .failure(.download) }
+    /// A verified package, downloaded and unpacked but not installed yet: what the install sheet shows.
+    @available(macOS 15.4, *)
+    struct PreparedInstall {
+        let id: String
+        let version: String
+        fileprivate let folder: URL
+        let extensionInfo: WKWebExtension
+        let report: ExtensionReport
+    }
+
+    /// Downloads and verifies a package and reads what it asks for, without installing it.
+    @available(macOS 15.4, *)
+    static func prepareInstall(_ id: String) async -> Result<PreparedInstall, InstallError> {
+        guard isExtensionID(id) else { return .failure(.download) }
         let package: (folder: URL, version: String)
         switch await download(id) {
         case .success(let value): package = value
         case .failure(let error): return .failure(error)
         }
-        guard store(package, for: id) else { return .failure(.unpack) }
-        var next = state(id) ?? State(version: package.version)
-        next.version = package.version
+        guard let ext = try? await WKWebExtension(resourceBaseURL: package.folder), let manifest = manifest(in: package.folder) else {
+            try? FileManager.default.removeItem(at: package.folder)
+            return .failure(.unpack)
+        }
+        let report = ExtensionReport(extension: ext, manifest: manifest, id: id)
+        return .success(PreparedInstall(id: id, version: package.version, folder: package.folder, extensionInfo: ext, report: report))
+    }
+
+    /// Installs a prepared package and loads it. Returns its name.
+    @available(macOS 15.4, *)
+    static func finishInstall(_ prepared: PreparedInstall) async -> Result<String, InstallError> {
+        let id = prepared.id
+        guard store((prepared.folder, prepared.version), for: id) else { return .failure(.unpack) }
+        var next = state(id) ?? State(version: prepared.version)
+        next.version = prepared.version
         next.pendingVersion = nil
         next.unpackedPath = nil
+        // Approved just now, from what the sheet showed.
+        next.grantedPermissions = nil
+        next.grantedMatchPatterns = nil
         save(next, for: id)
         removedIDs.remove(id)
-        removeVersions(of: id, keeping: [package.version])
+        removeVersions(of: id, keeping: [prepared.version])
+        ExtensionHost.shared.unload(id)
         let context = await ExtensionHost.shared.load(id)
-        return .success(context?.webExtension.displayName ?? id)
+        return .success(context?.webExtension.displayName ?? prepared.extensionInfo.displayName ?? id)
+    }
+
+    @available(macOS 15.4, *)
+    static func discard(_ prepared: PreparedInstall) {
+        try? FileManager.default.removeItem(at: prepared.folder)
+    }
+
+    /// Downloads, verifies and loads an extension without asking: used for 1Password, set up because its app is here.
+    static func install(_ id: String) async -> Result<String, InstallError> {
+        guard #available(macOS 15.4, *) else { return .failure(.download) }
+        switch await prepareInstall(id) {
+        case .success(let prepared): return await finishInstall(prepared)
+        case .failure(let error): return .failure(error)
+        }
+    }
+
+    /// What a held-back update would add, for the approval sheet.
+    @available(macOS 15.4, *)
+    static func pendingUpdateReport(_ id: String) async -> (extension: WKWebExtension, report: ExtensionReport)? {
+        guard let pending = state(id)?.pendingVersion, let new = packageDirectory(for: id, version: pending),
+              let old = packageDirectory(for: id), let newManifest = manifest(in: new), let oldManifest = manifest(in: old),
+              let ext = try? await WKWebExtension(resourceBaseURL: new) else { return nil }
+        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id))
     }
 
     /// Loads an extension from a folder on disk, for testing one you're building. Its ID comes from the
@@ -223,6 +274,9 @@ enum ExtensionStore {
             return false
         }
     }
+
+    /// The current version's manifest.
+    static func manifest(for id: String) -> [String: Any]? { packageDirectory(for: id).flatMap(manifest(in:)) }
 
     private static func manifest(in folder: URL) -> [String: Any]? {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")) else { return nil }
@@ -398,12 +452,14 @@ enum ExtensionProfile {
         var unsupportedAPIs: Set<String> = []
         /// Script run in the background before the extension's own, for APIs it calls without checking.
         var backgroundPrelude: String?
+        /// Permissions the prelude stands in for well enough that the person won't miss them.
+        var coveredPermissions: Set<String> = []
     }
 
     static func profile(for id: String) -> Profile? { profiles[id] }
 
     private static let profiles: [String: Profile] = [
-        ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude),
+        ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, coveredPermissions: ["management", "privacy", "idle"]),
     ]
 
     /// 1Password's background calls these at startup without checking they exist, and stops at the first
