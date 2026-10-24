@@ -79,10 +79,14 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
       if (window.__zigzagPasswordWatcher) return;
       window.__zigzagPasswordWatcher = true;
       const post = (message) => { try { window.webkit.messageHandlers.zigzagPassword.postMessage(message); } catch (e) {} };
+      // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
       const visible = (el) => {
         if (!el || el.type === 'hidden' || el.disabled) return false;
-        const r = el.getBoundingClientRect(), s = getComputedStyle(el);
-        return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+        if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+        const s = getComputedStyle(el);
+        return s.visibility === 'visible' && parseFloat(s.opacity) >= 0.1;
       };
       const fields = (scope) => [...(scope || document).querySelectorAll('input')].filter(visible);
       const isUserField = (el) => /username|email/.test(el.autocomplete || '') || el.type === 'email'
