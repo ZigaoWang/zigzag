@@ -357,3 +357,113 @@ final class PrimaryButton: InteractiveView {
         return true
     }
 }
+
+/// A text field on a soft fill, ringed in the accent while typing: the one look for fields in panels and windows.
+final class FilledField: NSView {
+    let field: NSTextField
+    var stringValue: String {
+        get { field.stringValue }
+        set { field.stringValue = newValue }
+    }
+
+    init(placeholder: String, secure: Bool = false, font: NSFont = Tokens.Font.body()) {
+        if secure {
+            let secureField = NSSecureTextField()
+            secureField.font = font
+            secureField.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
+            field = secureField
+        } else {
+            field = PlainTextField(font: font, placeholder: placeholder)
+        }
+        super.init(frame: .zero)
+        field.isBordered = false
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.textColor = Tokens.Color.textPrimary
+        field.cell?.isScrollable = true
+        field.cell?.wraps = false
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1.5
+        addSubview(field)
+        NotificationCenter.default.addObserver(self, selector: #selector(editingChanged), name: NSControl.textDidBeginEditingNotification, object: field)
+        NotificationCenter.default.addObserver(self, selector: #selector(editingChanged), name: NSControl.textDidEndEditingNotification, object: field)
+        updateColors()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var isEditing: Bool { field.currentEditor() != nil }
+
+    @objc private func editingChanged() { updateColors() }
+
+    private func updateColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
+            layer?.borderColor = (isEditing ? Tokens.Color.accent.withAlphaComponent(0.6) : .clear).cgColor
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColors()
+    }
+
+    override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(field) }
+
+    override func layout() {
+        super.layout()
+        let h = ceil(field.intrinsicContentSize.height)
+        field.frame = NSRect(x: Tokens.Space.x2 + 2, y: round((bounds.height - h) / 2), width: bounds.width - Tokens.Space.x5, height: h)
+    }
+}
+
+/// A choice that's on or off, drawn as a pill with a check: used where several things can be picked at once.
+final class ChoicePill: InteractiveView {
+    private let label: Label
+    private let check = NSImageView()
+    var onChange: ((Bool) -> Void)?
+    var isOn = true { didSet { stateDidChange(animated: true) } }
+
+    init(title: String) {
+        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerCurve = .continuous
+        [check, label].forEach { addSubview($0) }
+        onClick = { [weak self] _ in
+            guard let self else { return }
+            self.isOn.toggle()
+            self.onChange?(self.isOn)
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(title)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// `textWidth` already carries the cell's padding, so only the check and the edges are added.
+    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + Tokens.Space.x3 + label.textWidth + Tokens.Space.x1) }
+
+    override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Space.x3
+        check.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - side) / 2, width: side, height: side)
+        let h = label.lineHeight
+        label.frame = NSRect(x: check.frame.maxX + 2, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let fill = isOn ? Tokens.Color.accent.withAlphaComponent(isPressed ? 0.26 : isHovered ? 0.2 : 0.14)
+            : (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.fieldFill)
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        label.textColor = isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.TypeSize.small)
+        check.contentTintColor = isOn ? Tokens.Color.accent : Tokens.Color.textTertiary
+    }
+}
