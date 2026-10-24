@@ -297,12 +297,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard #available(macOS 15.4, *) else { return }
         Toast.show("Adding extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
         Task { [weak self] in
-            let name = await ExtensionStore.install(id)
+            let result = await ExtensionStore.install(id)
             guard let self else { return }
-            if let name {
+            switch result {
+            case .success(let name):
                 Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
-            } else {
-                Toast.show("Couldn’t add this extension", symbol: "exclamationmark.triangle", duration: 2.5, in: self)
+            case .failure(let error):
+                Toast.show(error.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
             }
         }
     }

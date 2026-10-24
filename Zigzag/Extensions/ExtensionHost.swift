@@ -49,6 +49,15 @@ final class ExtensionHost: NSObject {
         changed.send()
     }
 
+    /// Deletes what an extension stored (its storage, registered scripts, rule cache), for removal.
+    func removeData(for id: String) {
+        controller.fetchDataRecords(ofTypes: WKWebExtensionController.allExtensionDataTypes) { [weak self] records in
+            let mine = records.filter { $0.uniqueIdentifier == id }
+            guard !mine.isEmpty else { return }
+            self?.controller.removeData(ofTypes: WKWebExtensionController.allExtensionDataTypes, from: mine) {}
+        }
+    }
+
     /// Drops a removed extension from the list.
     func forget(_ id: String) {
         unload(id)

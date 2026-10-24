@@ -1,15 +1,19 @@
 import AppKit
+import CryptoKit
 
 /// Where extensions live and what the person decided about them. Packages come from the Chrome Web Store,
-/// the same files Chrome users get, and are never edited: each version sits in its own folder exactly as
+/// the same files Chrome users get, verified and never edited: each version sits in its own folder exactly as
 /// it was downloaded. What's ours (on or off, granted permissions, which version is current) is kept beside it.
 ///
 ///     Extensions/<id>/state.json
 ///     Extensions/<id>/versions/<version>/   ← the package, untouched
+///
+/// Unpacked extensions (for developers) are read in place from the folder the person chose.
 enum ExtensionStore {
     static let onePasswordID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
     private static let lastUpdateKey = "ExtensionsLastUpdateCheck"
     private static let removedKey = "RemovedExtensions"
+    private static let developerModeKey = "ExtensionsDeveloperMode"
 
     static var root: URL { Paths.directory("Extensions") }
     static func folder(for id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
@@ -25,6 +29,10 @@ enum ExtensionStore {
         /// Permissions and site patterns the person approved. Nil until the first load records them.
         var grantedPermissions: [String]?
         var grantedMatchPatterns: [String]?
+        /// A downloaded update that asks for more than the current version, waiting for the person's approval.
+        var pendingVersion: String?
+        /// For an unpacked extension: the folder it's read from.
+        var unpackedPath: String?
     }
 
     static func state(_ id: String) -> State? {
@@ -34,6 +42,7 @@ enum ExtensionStore {
 
     static func save(_ state: State, for id: String) {
         guard let data = try? JSONEncoder().encode(state) else { return }
+        try? FileManager.default.createDirectory(at: folder(for: id), withIntermediateDirectories: true)
         try? data.write(to: stateFile(for: id), options: .atomic)
     }
 
@@ -43,10 +52,14 @@ enum ExtensionStore {
         save(current, for: id)
     }
 
-    /// The folder WebKit loads: the current version's untouched package.
-    static func packageDirectory(for id: String) -> URL? {
+    /// The untouched package for a version (the current one unless named).
+    static func packageDirectory(for id: String, version: String? = nil) -> URL? {
         guard let state = state(id) else { return nil }
-        let dir = versionsFolder(for: id).appendingPathComponent(state.version, isDirectory: true)
+        if let path = state.unpackedPath {
+            let dir = URL(fileURLWithPath: path, isDirectory: true)
+            return FileManager.default.fileExists(atPath: dir.appendingPathComponent("manifest.json").path) ? dir : nil
+        }
+        let dir = versionsFolder(for: id).appendingPathComponent(version ?? state.version, isDirectory: true)
         return FileManager.default.fileExists(atPath: dir.appendingPathComponent("manifest.json").path) ? dir : nil
     }
 
@@ -57,11 +70,19 @@ enum ExtensionStore {
 
     static func isInstalled(_ id: String) -> Bool { packageDirectory(for: id) != nil }
     static func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
+    static func isUnpacked(_ id: String) -> Bool { state(id)?.unpackedPath != nil }
+    static func needsApproval(_ id: String) -> Bool { state(id)?.pendingVersion != nil }
 
     /// Removing an extension is remembered, so 1Password's automatic setup doesn't bring it back.
     private static var removedIDs: Set<String> {
         get { Set(UserDefaults.standard.stringArray(forKey: removedKey) ?? []) }
         set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: removedKey) }
+    }
+
+    /// Shows "Load Unpacked…" in Settings.
+    static var developerMode: Bool {
+        get { UserDefaults.standard.bool(forKey: developerModeKey) }
+        set { UserDefaults.standard.set(newValue, forKey: developerModeKey) }
     }
 
     // MARK: The Chrome Web Store
@@ -85,72 +106,90 @@ enum ExtensionStore {
             || FileManager.default.fileExists(atPath: "/Applications/1Password.app")
     }
 
-    /// At launch: moves extensions installed by older builds to the untouched layout, loads what's installed, sets up 1Password
-    /// when its app is on this Mac, and refreshes everything weekly.
+    /// At launch: moves extensions installed by older builds to the untouched layout, loads what's installed,
+    /// sets up 1Password when its app is on this Mac, and checks for updates once a day.
     static func setUpIfNeeded() {
         guard #available(macOS 15.4, *) else { return }
-        let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
-        let stale = Date().timeIntervalSince(last) > 7 * 24 * 3600
         Task {
             await migrateLegacyInstalls()
             await ExtensionHost.shared.loadInstalled()
             if isOnePasswordAppInstalled, !isInstalled(onePasswordID), !removedIDs.contains(onePasswordID) {
-                await install(onePasswordID)
+                _ = await install(onePasswordID)
             }
-            guard stale else { return }
-            for id in installedIDs { await install(id, update: true) }
-            UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
+            await checkForUpdatesIfDue()
         }
     }
 
     // MARK: Installing
 
-    /// Downloads an extension from the Chrome Web Store and loads it. An update keeps the person's choices and
-    /// takes effect on the next launch. Returns the extension's name, or nil if it couldn't be installed.
-    @discardableResult
-    static func install(_ id: String, update: Bool = false) async -> String? {
-        guard #available(macOS 15.4, *), isExtensionID(id) else { return nil }
-        guard let package = await download(id) else { return nil }
-        let version = package.version
-        let target = versionsFolder(for: id).appendingPathComponent(version, isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: target.path) {
-                try FileManager.default.removeItem(at: package.folder)
-            } else {
-                try FileManager.default.moveItem(at: package.folder, to: target)
+    enum InstallError: Error {
+        case download, verification, unpack
+        /// What to tell the person, in plain words.
+        var message: String {
+            switch self {
+            case .download: "Couldn’t download this extension. Check your connection and try again."
+            case .verification: "This extension’s package couldn’t be verified, so it wasn’t installed."
+            case .unpack: "This extension’s package is damaged, so it wasn’t installed."
             }
-        } catch {
-            try? FileManager.default.removeItem(at: package.folder)
-            return nil
         }
-        let previous = state(id)
-        var next = previous ?? State(version: version)
-        next.version = version
-        save(next, for: id)
-        removeVersions(of: id, keeping: [version, previous?.version].compactMap { $0 })
-        removedIDs.remove(id)
-        if update { return id }
-        let context = await ExtensionHost.shared.load(id)
-        return context?.webExtension.displayName ?? id
     }
 
-    /// Fetches and unpacks a package into a fresh temporary folder.
-    private static func download(_ id: String) async -> (folder: URL, version: String)? {
+    /// Downloads, verifies and loads an extension from the Chrome Web Store. Returns its name.
+    static func install(_ id: String) async -> Result<String, InstallError> {
+        guard #available(macOS 15.4, *), isExtensionID(id) else { return .failure(.download) }
+        let package: (folder: URL, version: String)
+        switch await download(id) {
+        case .success(let value): package = value
+        case .failure(let error): return .failure(error)
+        }
+        guard store(package, for: id) else { return .failure(.unpack) }
+        var next = state(id) ?? State(version: package.version)
+        next.version = package.version
+        next.pendingVersion = nil
+        next.unpackedPath = nil
+        save(next, for: id)
+        removedIDs.remove(id)
+        removeVersions(of: id, keeping: [package.version])
+        let context = await ExtensionHost.shared.load(id)
+        return .success(context?.webExtension.displayName ?? id)
+    }
+
+    /// Loads an extension from a folder on disk, for testing one you're building. Its ID comes from the
+    /// folder's path, the way Chrome does it, so reloading the same folder keeps its data.
+    static func loadUnpacked(_ url: URL) async -> String? {
+        guard #available(macOS 15.4, *),
+              FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else { return nil }
+        let id = CRXPackage.extensionID(Array(SHA256.hash(data: Data(url.standardizedFileURL.path.utf8)).prefix(16)))
+        save(State(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path), for: id)
+        removedIDs.remove(id)
+        let context = await ExtensionHost.shared.load(id)
+        return context?.webExtension.displayName
+    }
+
+    /// Re-reads an unpacked extension's files.
+    static func reloadUnpacked(_ id: String) async {
+        guard #available(macOS 15.4, *), isUnpacked(id) else { return }
+        ExtensionHost.shared.unload(id)
+        await ExtensionHost.shared.load(id)
+    }
+
+    /// Fetches, verifies and unpacks a package into a fresh temporary folder.
+    private static func download(_ id: String) async -> Result<(folder: URL, version: String), InstallError> {
         var components = URLComponents(string: "https://clients2.google.com/service/update2/crx")!
         components.queryItems = [
             .init(name: "response", value: "redirect"),
             .init(name: "prodversion", value: "140.0"),
-            .init(name: "acceptformat", value: "crx2,crx3"),
+            .init(name: "acceptformat", value: "crx3"),
             .init(name: "x", value: "id=\(id)&uc"),
         ]
         guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200, let zip = zipPayload(ofCRX: data) else { return nil }
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return .failure(.download) }
+        guard let package = try? CRXPackage(data, expectedID: id) else { return .failure(.verification) }
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-ext-\(UUID().uuidString)")
         let zipFile = staging.appendingPathExtension("zip")
         defer { try? FileManager.default.removeItem(at: zipFile) }
         do {
-            try zip.write(to: zipFile)
+            try package.zip.write(to: zipFile)
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             let unzip = Process()
             unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
@@ -159,19 +198,39 @@ enum ExtensionStore {
             unzip.waitUntilExit()
             guard unzip.terminationStatus == 0, let version = manifestVersion(in: staging) else {
                 try? FileManager.default.removeItem(at: staging)
-                return nil
+                return .failure(.unpack)
             }
-            return (staging, version)
+            return .success((staging, version))
         } catch {
             try? FileManager.default.removeItem(at: staging)
-            return nil
+            return .failure(.unpack)
         }
     }
 
+    /// Moves a downloaded package into its version folder.
+    private static func store(_ package: (folder: URL, version: String), for id: String) -> Bool {
+        let target = versionsFolder(for: id).appendingPathComponent(package.version, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: target.path) {
+                try FileManager.default.removeItem(at: package.folder)
+            } else {
+                try FileManager.default.moveItem(at: package.folder, to: target)
+            }
+            return true
+        } catch {
+            try? FileManager.default.removeItem(at: package.folder)
+            return false
+        }
+    }
+
+    private static func manifest(in folder: URL) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
     private static func manifestVersion(in folder: URL) -> String? {
-        guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")),
-              let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let version = manifest["version"] as? String, !version.isEmpty, !version.contains("/") else { return nil }
+        guard let version = manifest(in: folder)?["version"] as? String, !version.isEmpty, !version.contains("/") else { return nil }
         return version
     }
 
@@ -182,12 +241,104 @@ enum ExtensionStore {
         }
     }
 
-    /// Takes the extension out of Zigzag and deletes its files.
+    // MARK: Updating
+
+    /// Checks every installed extension for a new version, at most once a day.
+    static func checkForUpdatesIfDue(force: Bool = false) async {
+        let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
+        guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return }
+        UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
+        for id in installedIDs where !isUnpacked(id) { await updateIfNewer(id) }
+    }
+
+    /// Asks the store for the latest version only; downloads it when it's newer. An update that asks for
+    /// nothing new replaces the running version; one that asks for more waits for approval.
+    static func updateIfNewer(_ id: String) async {
+        guard #available(macOS 15.4, *), let current = state(id), let latest = await latestVersion(of: id, current: current.version),
+              isVersion(latest, newerThan: current.version), latest != current.pendingVersion else { return }
+        guard case .success(let package) = await download(id), store(package, for: id),
+              let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
+        if asksForMore(new, than: old) {
+            update(id) { $0.pendingVersion = package.version }
+            ExtensionHost.shared.changed.send()
+            return
+        }
+        await switchVersion(of: id, to: package.version)
+    }
+
+    /// Approves a held-back update: its new permissions are granted and it replaces the running version.
+    static func approvePendingUpdate(_ id: String) async {
+        guard let pending = state(id)?.pendingVersion else { return }
+        update(id) {
+            $0.pendingVersion = nil
+            // Re-recorded from the new version's request on load.
+            $0.grantedPermissions = nil
+            $0.grantedMatchPatterns = nil
+        }
+        await switchVersion(of: id, to: pending)
+    }
+
+    /// Makes a version current and reloads the extension with it, going back to the old one if it won't load.
+    private static func switchVersion(of id: String, to version: String) async {
+        guard #available(macOS 15.4, *), let previous = state(id)?.version else { return }
+        update(id) { $0.version = version; $0.pendingVersion = nil }
+        guard isEnabled(id) else { removeVersions(of: id, keeping: [version]); return }
+        ExtensionHost.shared.unload(id)
+        if await ExtensionHost.shared.load(id) != nil {
+            removeVersions(of: id, keeping: [version])
+        } else {
+            update(id) { $0.version = previous }
+            await ExtensionHost.shared.load(id)
+        }
+    }
+
+    private static func latestVersion(of id: String, current: String) async -> String? {
+        var components = URLComponents(string: "https://clients2.google.com/service/update2/crx")!
+        components.queryItems = [
+            .init(name: "response", value: "updatecheck"),
+            .init(name: "prodversion", value: "140.0"),
+            .init(name: "acceptformat", value: "crx3"),
+            .init(name: "x", value: "id=\(id)&v=\(current)&uc"),
+        ]
+        guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200, let xml = String(data: data, encoding: .utf8),
+              let check = xml.range(of: "<updatecheck[^>]*>", options: .regularExpression) else { return nil }
+        let tag = String(xml[check])
+        guard tag.contains("status=\"ok\""), let version = tag.range(of: "version=\"[^\"]+\"", options: .regularExpression) else { return nil }
+        return String(tag[version].dropFirst("version=\"".count).dropLast())
+    }
+
+    /// Chrome versions are up to four dot-separated numbers.
+    static func isVersion(_ a: String, newerThan b: String) -> Bool {
+        let x = a.split(separator: ".").map { Int($0) ?? 0 }, y = b.split(separator: ".").map { Int($0) ?? 0 }
+        for i in 0..<max(x.count, y.count) {
+            let l = i < x.count ? x[i] : 0, r = i < y.count ? y[i] : 0
+            if l != r { return l > r }
+        }
+        return false
+    }
+
+    /// True when a new version requests permissions or sites the old one didn't.
+    private static func asksForMore(_ new: URL, than old: URL) -> Bool {
+        func requested(_ folder: URL) -> Set<String> {
+            guard let manifest = manifest(in: folder) else { return [] }
+            let keys = ["permissions", "host_permissions", "optional_permissions", "optional_host_permissions"]
+            return Set(keys.flatMap { manifest[$0] as? [String] ?? [] })
+        }
+        return !requested(new).isSubset(of: requested(old))
+    }
+
+    // MARK: Removing
+
+    /// Takes the extension out of Zigzag and deletes its files and everything it stored.
     static func uninstall(_ id: String) {
         guard #available(macOS 15.4, *) else { return }
+        let unpacked = isUnpacked(id)
         ExtensionHost.shared.unload(id)
+        ExtensionHost.shared.removeData(for: id)
+        // An unpacked extension's own folder belongs to its developer; only our record of it goes.
         try? FileManager.default.removeItem(at: folder(for: id))
-        removedIDs.insert(id)
+        if !unpacked { removedIDs.insert(id) }
         ExtensionHost.shared.forget(id)
     }
 
@@ -204,7 +355,7 @@ enum ExtensionStore {
     // MARK: Older installs
 
     /// Builds before this one unpacked straight into Extensions/<id>/ and edited the package to load a shim.
-    /// Those get a fresh, untouched copy from the store. Offline, the edit is undone in place instead.
+    /// Those get a fresh, verified copy from the store. Offline, the edit is undone in place instead.
     private static func migrateLegacyInstalls() async {
         let disabled = Set(UserDefaults.standard.stringArray(forKey: "DisabledExtensions") ?? [])
         for id in (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [] where isExtensionID(id) {
@@ -212,10 +363,8 @@ enum ExtensionStore {
             guard state(id) == nil, FileManager.default.fileExists(atPath: legacy.appendingPathComponent("manifest.json").path) else { continue }
             let moved = root.appendingPathComponent(".legacy-\(id)-\(UUID().uuidString)")
             guard (try? FileManager.default.moveItem(at: legacy, to: moved)) != nil else { continue }
-            if let package = await download(id) {
+            if case .success(let package) = await download(id), store(package, for: id) {
                 try? FileManager.default.removeItem(at: moved)
-                try? FileManager.default.createDirectory(at: versionsFolder(for: id), withIntermediateDirectories: true)
-                try? FileManager.default.moveItem(at: package.folder, to: versionsFolder(for: id).appendingPathComponent(package.version))
                 save(State(version: package.version, enabled: !disabled.contains(id)), for: id)
             } else if let version = manifestVersion(in: moved) {
                 undoLegacyPatch(in: moved)
@@ -232,31 +381,13 @@ enum ExtensionStore {
 
     private static func undoLegacyPatch(in folder: URL) {
         let manifestURL = folder.appendingPathComponent("manifest.json")
-        guard let data = try? Data(contentsOf: manifestURL),
-              var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              var background = manifest["background"] as? [String: Any],
+        guard var manifest = manifest(in: folder), var background = manifest["background"] as? [String: Any],
               let original = background["zigzag_original_worker"] as? String else { return }
         background["service_worker"] = original
         background["zigzag_original_worker"] = nil
         manifest["background"] = background
         if let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) { try? out.write(to: manifestURL) }
         for name in ["zigzag-background.js", "zigzag-shim.js"] { try? FileManager.default.removeItem(at: folder.appendingPathComponent(name)) }
-    }
-
-    /// A CRX file is a small signed header followed by a plain zip.
-    static func zipPayload(ofCRX data: Data) -> Data? {
-        guard data.count > 16, data.prefix(4) == Data("Cr24".utf8) else { return nil }
-        let version = data.subdata(in: 4..<8).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian }
-        if version == 3 {
-            let headerSize = Int(data.subdata(in: 8..<12).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
-            return data.subdata(in: (12 + headerSize)..<data.count)
-        }
-        if version == 2 {
-            let keyLength = Int(data.subdata(in: 8..<12).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
-            let sigLength = Int(data.subdata(in: 12..<16).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian })
-            return data.subdata(in: (16 + keyLength + sigLength)..<data.count)
-        }
-        return nil
     }
 }
 
