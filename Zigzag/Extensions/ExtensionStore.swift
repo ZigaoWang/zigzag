@@ -34,6 +34,8 @@ enum ExtensionStore {
         var pendingVersion: String?
         /// For an unpacked extension: the folder it's read from.
         var unpackedPath: String?
+        /// Shown as a button by the address. Nil means the default: pinned.
+        var pinned: Bool?
     }
 
     static func state(_ id: String) -> State? {
@@ -73,6 +75,13 @@ enum ExtensionStore {
     static func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
     static func isUnpacked(_ id: String) -> Bool { state(id)?.unpackedPath != nil }
     static func needsApproval(_ id: String) -> Bool { state(id)?.pendingVersion != nil }
+    static func isPinned(_ id: String) -> Bool { state(id)?.pinned ?? true }
+
+    static func setPinned(_ id: String, _ pinned: Bool) {
+        guard #available(macOS 15.4, *) else { return }
+        update(id) { $0.pinned = pinned }
+        ExtensionHost.shared.changed.send()
+    }
 
     /// Removing an extension is remembered, so 1Password's automatic setup doesn't bring it back.
     private static var removedIDs: Set<String> {

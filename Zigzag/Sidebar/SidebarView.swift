@@ -23,16 +23,29 @@ final class AddressView: InteractiveView {
         needsLayout = true
     }
 
-    /// Extension buttons (1Password) at the trailing end, like Safari's address bar.
+    /// Extension buttons at the trailing end, like Safari's address bar.
     private(set) var actionButtons: [IconButton] = []
 
-    func setActions(_ items: [(image: NSImage?, label: String, action: (NSView) -> Void, menu: () -> NSMenu?)]) {
+    struct ActionButton {
+        var image: NSImage?
+        var symbol = "puzzlepiece.extension"
+        var label: String
+        /// A short count or word in the corner; "!" when the extension needs the person.
+        var badge = ""
+        var needsAttention = false
+        var action: (NSView) -> Void
+        var menu: () -> NSMenu?
+    }
+
+    func setActions(_ items: [ActionButton]) {
         actionButtons.forEach { $0.removeFromSuperview() }
         actionButtons = items.map { item in
-            let button = IconButton(symbol: "puzzlepiece.extension", size: Tokens.Space.x6, toolTip: item.label)
+            let button = IconButton(symbol: item.symbol, size: Tokens.Space.x6, toolTip: item.label)
             if let image = item.image { button.image = image }
             button.onClick = { [weak button] _ in if let button { item.action(button) } }
             button.onRightClick = { _ in item.menu() }
+            let badge = item.needsAttention ? "!" : item.badge
+            if !badge.isEmpty { button.addSubview(BadgeView(text: badge, attention: item.needsAttention)) }
             addSubview(button)
             return button
         }
@@ -490,4 +503,52 @@ final class SidebarView: NSView {
     /// The space this sidebar shows; set by the window.
     var currentSpaceID: UUID?
 
+}
+
+/// The little capsule on an extension's button: a blocked count, a word, or "!" when it needs you.
+final class BadgeView: NSView {
+    private let label: Label
+    private let attention: Bool
+
+    init(text: String, attention: Bool) {
+        self.attention = attention
+        label = Label(String(text.prefix(4)), font: .systemFont(ofSize: 8, weight: .bold), color: .white)
+        super.init(frame: .zero)
+        wantsLayer = true
+        label.alignment = .center
+        addSubview(label)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        guard let superview else { return }
+        // A ring in the address field's color keeps the badge apart from the icon under it.
+        let ring: CGFloat = 1.5
+        let height: CGFloat = 10 + ring * 2
+        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? NSFont.systemFont(ofSize: 8)]).width
+        let width = max(height, ceil(text) + 6 + ring * 2)
+        // Bottom-right corner of the button, like Safari's.
+        frame = NSRect(x: superview.bounds.width - width, y: superview.bounds.height - height, width: width, height: height)
+        label.frame = NSRect(x: 0, y: (height - label.lineHeight) / 2, width: width, height: label.lineHeight)
+        layer?.cornerRadius = height / 2
+        layer?.borderWidth = ring
+        layer?.borderColor = cgColor(Tokens.Color.fieldFill)
+        layer?.backgroundColor = cgColor(attention ? .systemOrange : Tokens.Color.badge)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
+    }
 }

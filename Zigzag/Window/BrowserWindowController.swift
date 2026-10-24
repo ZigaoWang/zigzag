@@ -400,21 +400,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.setNowPlaying(tab, paused: tab?.isPlaybackPaused ?? false)
     }
 
+    /// Pinned extensions show as buttons by the address (two at most, so the address stays readable);
+    /// the rest wait behind one button.
     func refreshExtensionActions() {
         guard #available(macOS 15.4, *) else { return }
         let tab = tabManager.selectedTab
         let all = ExtensionHost.shared.actions(for: tab)
-        // The address bar fits a few buttons; past that, the rest wait behind one.
-        let shown = all.count > 3 ? Array(all.prefix(2)) : all
+        let pinned = all.filter { ExtensionStore.isPinned($0.id) }
+        let shown = Array(pinned.prefix(2))
         var items = shown.map { item in
-            (image: item.icon, label: item.label, action: { (anchor: NSView) in
-                ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor)
-            }, menu: { [weak self] () -> NSMenu? in self?.extensionMenu(for: item.context) })
+            AddressView.ActionButton(image: item.icon, label: item.label, badge: item.badge, needsAttention: item.attention != nil,
+                action: { anchor in ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor) },
+                menu: { [weak self] in self?.extensionMenu(for: item.context) })
         }
         if all.count > shown.count {
-            items.append((image: nil, label: "Extensions", action: { [weak self] (anchor: NSView) in
-                self?.showExtensionsMenu(all, tab: tab, anchor: anchor)
-            }, menu: { [weak self] () -> NSMenu? in self?.extensionsFooterMenu() }))
+            let waiting = all.filter { item in !shown.contains { $0.id == item.id } }
+            items.append(AddressView.ActionButton(label: "Extensions", needsAttention: waiting.contains { $0.attention != nil },
+                action: { [weak self] anchor in self?.showExtensionsMenu(all, tab: tab, anchor: anchor) },
+                menu: { [weak self] in self?.extensionsFooterMenu() }))
         }
         sidebar.address.setActions(items)
     }
@@ -424,11 +427,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
         for item in all {
-            let entry = SidebarMenus.Item(item.label) { ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor) }
+            let title = item.attention != nil ? "\(item.label)  ·  needs attention" : item.badge.isEmpty ? item.label : "\(item.label)  ·  \(item.badge)"
+            let entry = SidebarMenus.Item(title) { ExtensionHost.shared.performAction(item, tab: tab, anchor: anchor) }
             entry.image = item.icon
             menu.addItem(entry)
         }
         menu.addItem(.separator())
+        let pins = NSMenuItem(title: "Show by the Address", action: nil, keyEquivalent: "")
+        let pinsMenu = NSMenu()
+        pinsMenu.autoenablesItems = false
+        for item in all {
+            let pinned = ExtensionStore.isPinned(item.id)
+            let entry = SidebarMenus.Item(item.label) { ExtensionStore.setPinned(item.id, !pinned) }
+            entry.state = pinned ? .on : .off
+            pinsMenu.addItem(entry)
+        }
+        pins.submenu = pinsMenu
+        menu.addItem(pins)
         extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.maxY + Tokens.Space.x1), in: anchor)
     }
@@ -456,6 +471,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
             })
         }
+        let pinned = ExtensionStore.isPinned(id)
+        menu.addItem(SidebarMenus.Item(pinned ? "Hide from the Address" : "Show by the Address", symbol: pinned ? "pin.slash" : "pin") { ExtensionStore.setPinned(id, !pinned) })
         menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
         menu.addItem(SidebarMenus.Item("Remove from Zigzag", symbol: "trash") { ExtensionStore.uninstall(id) })
         menu.addItem(.separator())

@@ -288,6 +288,8 @@ enum Tokens {
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
         static let accent = NSColor.controlAccentColor
+        /// Counts on extension buttons: quiet, never competing with the page.
+        static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
 
         /// Settings: the window behind grouped rows, and the groups themselves (System Settings proportions).
         static let formBackground = dynamic(light: hex(0xF2F2F4), dark: hex(0x1E1E20))
