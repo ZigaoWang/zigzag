@@ -7,6 +7,36 @@ enum Brand {
     // MARK: Color
 
     static let navy = Tokens.Color.hex(0x1E3A5F)
+    /// Relative luminance targets for the accent: about 5:1 against white text in light mode, and about 6.5:1
+    /// against deep text in dark mode.
+    static let accentLuminance = (light: 0.16, dark: 0.36)
+
+    /// A color of `hue` and `saturation` whose WCAG relative luminance is `luminance`, found by solving brightness.
+    static func color(hue: Double, saturation: Double, luminance target: Double) -> NSColor {
+        var low = 0.0, high = 1.0
+        for _ in 0..<24 {
+            let mid = (low + high) / 2
+            if relativeLuminance(NSColor(hue: hue, saturation: saturation, brightness: mid, alpha: 1)) < target { low = mid } else { high = mid }
+        }
+        // Past full brightness the hue can't get any lighter at this saturation; ease off the saturation instead.
+        if high >= 0.999, relativeLuminance(NSColor(hue: hue, saturation: saturation, brightness: 1, alpha: 1)) < target {
+            return color(hue: hue, saturation: saturation * 0.8, luminance: target)
+        }
+        return NSColor(hue: hue, saturation: saturation, brightness: (low + high) / 2, alpha: 1)
+    }
+
+    /// WCAG 2 relative luminance of an sRGB color.
+    static func relativeLuminance(_ color: NSColor) -> Double {
+        guard let c = color.usingColorSpace(.sRGB) else { return 0 }
+        func linear(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(c.redComponent) + 0.7152 * linear(c.greenComponent) + 0.0722 * linear(c.blueComponent)
+    }
+
+    /// WCAG 2 contrast ratio between two colors.
+    static func contrast(_ a: NSColor, _ b: NSColor) -> Double {
+        let (la, lb) = (relativeLuminance(a), relativeLuminance(b))
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    }
     static let navyHue: Double = 213.0 / 360
     static let ribbon = Tokens.Color.hex(0xDAE5F2)
     /// Banners are navy in both appearances; a touch deeper in dark so they sit in a dark window.
@@ -41,14 +71,19 @@ enum Brand {
         }
 
         /// The one accent, from the space's own hue: the primary action, selection, the active tab, progress.
+        /// The one accent, from the space's own hue: the primary action, selection, the active tab, progress.
+        /// Its lightness is solved per hue so text on it always passes WCAG AA (4.5:1): white on a deep accent in
+        /// light mode, deep text on a light accent in dark mode. Yellow spaces get a deeper gold, blue ones stay vivid.
         var accent: NSColor {
             let h = hue ?? Brand.navyHue
-            return Tokens.Color.dynamic(light: NSColor(hue: h, saturation: 0.62, brightness: 0.74, alpha: 1),
-                                        dark: NSColor(hue: h, saturation: 0.5, brightness: 0.86, alpha: 1))
+            return Tokens.Color.dynamic(light: Brand.color(hue: h, saturation: 0.6, luminance: Brand.accentLuminance.light),
+                                        dark: Brand.color(hue: h, saturation: 0.48, luminance: Brand.accentLuminance.dark))
         }
 
         /// Text on the accent.
-        var onAccent: NSColor { Tokens.Color.dynamic(light: .white, dark: NSColor(hue: hue ?? Brand.navyHue, saturation: 0.7, brightness: 0.16, alpha: 1)) }
+        var onAccent: NSColor {
+            Tokens.Color.dynamic(light: .white, dark: Brand.color(hue: hue ?? Brand.navyHue, saturation: 0.7, luminance: 0.012))
+        }
 
         static let navy = Theme(hue: nil)
 
