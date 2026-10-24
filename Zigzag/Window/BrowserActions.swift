@@ -28,6 +28,13 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func closeWindow(_ sender: Any?) { window?.performClose(sender) }
 
+    /// Copies a link and says so, wherever the copy came from.
+    func copyLink(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        Toast.show("Link copied", symbol: "link", in: self)
+    }
+
     @objc func showDownloads(_ sender: Any?) {
         // From the sidebar's Downloads button when it's there; from the address otherwise.
         let anchor = sidebar.downloadsAnchor.isHidden ? sidebar.address : sidebar.downloadsAnchor
@@ -100,14 +107,14 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let url = selectedTab?.url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show("Link Copied", symbol: "link", in: self)
+        Toast.show("Link copied", symbol: "link", in: self)
     }
 
     @objc func copyPageURLAsMarkdown(_ sender: Any?) {
         guard let tab = selectedTab, let url = tab.url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("[\(tab.displayTitle)](\(url.absoluteString))", forType: .string)
-        Toast.show("Markdown Link Copied", symbol: "link", in: self)
+        Toast.show("Markdown link copied", symbol: "link", in: self)
     }
 
     @objc func showFindBar(_ sender: Any?) { findBar.show() }
@@ -226,7 +233,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let tab = selectedTab else { return }
         if let bookmarkID = tab.bookmarkID {
             unbookmarkWithUndo(bookmarkID, to: 0)
-            Toast.show("Bookmark Removed", symbol: "bookmark.slash", in: self)
+            Toast.show("Bookmark removed", symbol: "bookmark.slash", in: self)
         } else {
             bookmarkWithUndo(tab, at: nil, in: tab.spaceID)
             Toast.show("Bookmarked", symbol: "bookmark.fill", in: self)
@@ -243,6 +250,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func duplicateTab(_ sender: Any?) {
         guard let tab = selectedTab else { return }
+        duplicate(tab)
+    }
+
+    /// A copy of a tab, with its back and forward history, opened next to it.
+    func duplicate(_ tab: Tab) {
         let copy = tabManager.newTab(url: nil, title: tab.displayTitle)
         if let state = tab.interactionStateForSaving {
             copy.ensureWebView().interactionState = state as NSData
@@ -256,11 +268,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func closeOtherTabs(_ sender: Any?) {
         guard let tab = selectedTab else { return }
-        tabManager.close(tabManager.currentTabs.filter { $0 !== tab })
+        closeManyWithUndo(tabManager.currentTabs.filter { $0 !== tab })
     }
     @objc func closeTabsBelow(_ sender: Any?) {
         guard let tab = selectedTab, let index = tabManager.currentTabs.firstIndex(where: { $0 === tab }) else { return }
-        tabManager.close(Array(tabManager.currentTabs.dropFirst(index + 1)))
+        closeManyWithUndo(Array(tabManager.currentTabs.dropFirst(index + 1)))
     }
 
     // MARK: Spaces

@@ -381,7 +381,7 @@ extension CommandBarController {
         case "clear-cache":
             Task { @MainActor in
                 await WebsiteData.clear(.cache)
-                Toast.show("Cleared the cache. Pages load fresh.", symbol: "arrow.clockwise", duration: 2, in: controller)
+                Toast.show("Cache cleared. Pages load fresh.", symbol: "arrow.clockwise", duration: 2, in: controller)
             }
         case "clear-cookies": controller.confirmClearCookies()
         default: break

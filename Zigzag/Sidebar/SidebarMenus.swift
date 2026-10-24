@@ -24,9 +24,7 @@ enum SidebarMenus {
         menu.autoenablesItems = false
         let manager = controller.tabManager
         menu.addItem(Item("Copy Link", enabled: tab.url != nil) {
-            guard let url = tab.url else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            if let url = tab.url { controller.copyLink(url) }
         })
         menu.addItem(Item("Bookmark", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
         menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
@@ -35,13 +33,11 @@ enum SidebarMenus {
         } else if let current = manager.selectedTab, current !== tab {
             menu.addItem(Item("Open in Split View") { controller.splitWithUndo(current, with: tab) })
         }
-        menu.addItem(Item("Duplicate") {
-            if let url = tab.url { manager.newTab(url: url) }
-        })
+        menu.addItem(Item("Duplicate Tab") { controller.duplicate(tab) })
         menu.addItem(.separator())
         menu.addItem(Item("Reload") { tab.reload() })
         if tab.isPlayingAudio || tab.isMuted {
-            menu.addItem(Item(tab.isMuted ? "Unmute" : "Mute") { tab.setMuted(!tab.isMuted) })
+            menu.addItem(Item(tab.isMuted ? "Unmute Tab" : "Mute Tab") { tab.setMuted(!tab.isMuted) })
         }
         if Library.shared.spaces.count > 1 {
             let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
@@ -76,10 +72,7 @@ enum SidebarMenus {
                 controller.libraryChange("Update Bookmark") { Library.shared.updateBookmark(bookmark.id, url: url) }
             })
         }
-        menu.addItem(Item("Copy Link") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(bookmark.url.absoluteString, forType: .string)
-        })
+        menu.addItem(Item("Copy Link") { controller.copyLink(bookmark.url) })
         menu.addItem(Item("Add to Favorites") {
             controller.libraryChange("Add to Favorites") { Library.shared.makeFavorite(bookmark.id) }
             live?.isFavorite = true
@@ -109,10 +102,7 @@ enum SidebarMenus {
         menu.autoenablesItems = false
         let manager = controller.tabManager
         let live = manager.bookmarkTab(for: favorite.id)
-        menu.addItem(Item("Copy Link") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(favorite.url.absoluteString, forType: .string)
-        })
+        menu.addItem(Item("Copy Link") { controller.copyLink(favorite.url) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
             menu.addItem(Item("Go Back to Favorite Page") { manager.resetBookmarkTab(favorite.id) })
         }

@@ -304,7 +304,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             Task { @MainActor in
                 await WebsiteData.clear(.cookies)
                 self?.tabManager.selectedTab?.reload()
-                if let self { Toast.show("Cleared cookies. You’re signed out everywhere.", symbol: "trash", duration: 2.4, in: self) }
+                if let self { Toast.show("Cookies cleared. You’re signed out everywhere.", symbol: "trash", duration: 2.4, in: self) }
             }
         }
     }
@@ -349,22 +349,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 Task { @MainActor in
                     await WebsiteData.clear(.cache, site: site)
                     tab.reload()
-                    if let self { Toast.show("Cleared \(site)’s cache", symbol: "arrow.clockwise", duration: 1.6, in: self) }
+                    if let self { Toast.show("Cache cleared for \(site)", symbol: "arrow.clockwise", duration: 1.6, in: self) }
                 }
             })
             menu.addItem(SidebarMenus.Item("Clear Cookies for This Site", symbol: "trash") { [weak self] in
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies, site: site)
                     tab.reload()
-                    if let self { Toast.show("Cleared \(site)’s cookies. You’re signed out there.", symbol: "trash", duration: 2.4, in: self) }
+                    if let self { Toast.show("Cookies cleared for \(site). You’re signed out there.", symbol: "trash", duration: 2.4, in: self) }
                 }
             })
             menu.addItem(.separator())
         }
-        menu.addItem(SidebarMenus.Item("Copy Link", symbol: "link") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        })
+        menu.addItem(SidebarMenus.Item("Copy Link", symbol: "link") { [weak self] in self?.copyLink(url) })
         return menu
     }
 
