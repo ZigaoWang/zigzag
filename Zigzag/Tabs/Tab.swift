@@ -378,6 +378,11 @@ final class Tab: NSObject {
 
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url, !isPrivate else { return }
+        if Self.isExtensionPage(pageURL) {
+            favicon = FaviconStore.shared.cachedIcon(for: pageURL)
+            changed.send(.favicon)
+            return
+        }
         webView.evaluateJavaScript(PageScripts.iconLinks) { [weak self] result, _ in
             MainActor.assumeIsolated {
                 let links = (result as? [[String: String]]) ?? []
