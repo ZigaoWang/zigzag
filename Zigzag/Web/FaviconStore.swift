@@ -26,6 +26,11 @@ final class FaviconStore {
     }
 
     func cachedIcon(for url: URL) -> NSImage? {
+        // An extension's own pages wear the extension's icon.
+        if #available(macOS 15.4, *), url.scheme == "webkit-extension",
+           let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
+            return context.webExtension.icon(for: NSSize(width: 32, height: 32))
+        }
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }
         if let image = NSImage(contentsOf: file(for: key)) {
