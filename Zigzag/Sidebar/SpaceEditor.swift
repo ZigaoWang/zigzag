@@ -382,7 +382,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private var monitor: Any?
     static let width: CGFloat = 304
 
-    init(spaceID: UUID, controller: BrowserWindowController) {
+    /// `controller` is the browser window it belongs to; Settings passes nil and hosts it in its own window.
+    init(spaceID: UUID, controller: BrowserWindowController?) {
         self.spaceID = spaceID
         self.controller = controller
         super.init(frame: .zero)
@@ -417,7 +418,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
                 self.edited = true
             } else {
                 let background = SpaceColor.background(hue: hue, intensity: intensity)
-                self.controller?.previewSpaceColor(background: background, swatch: SpaceColor.swatch(hue: hue), for: self.spaceID)
+                (self.controller ?? BrowserWindowController.undoTarget)?.previewSpaceColor(background: background, swatch: SpaceColor.swatch(hue: hue), for: self.spaceID)
                 self.showPreviews(background)
             }
             self.refreshSelection()
@@ -521,6 +522,30 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         // The cursor at the end, not the whole name selected: you came to change the color as often as the name.
         if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }
         controller.root.holdReveal = true
+        startMonitoring()
+    }
+
+    /// In Settings: dropping from the Edit button that opened it, its right edge on the button's, inside that window.
+    func show(in host: NSView, below anchor: NSView) {
+        let button = anchor.convert(anchor.bounds, to: host)
+        let height = contentHeight
+        let below = host.isFlipped ? button.maxY + Tokens.Space.x1 : button.minY - Tokens.Space.x1 - height
+        let fits = host.isFlipped ? below + height <= host.bounds.height - Tokens.Space.x2 : below >= Tokens.Space.x2
+        // Not enough room underneath: it opens upward from the button instead.
+        let above = host.isFlipped ? button.minY - Tokens.Space.x1 - height : button.maxY + Tokens.Space.x1
+        let y = fits ? below : above
+        let x = max(Tokens.Space.x2, min(button.maxX - Self.width, host.bounds.width - Self.width - Tokens.Space.x2))
+        frame = NSRect(x: x, y: y, width: Self.width, height: height)
+        host.addSubview(self)
+        present(arrival: .instant)
+        window?.makeFirstResponder(nameField)
+        if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }
+        startMonitoring()
+    }
+
+    var onClose: (() -> Void)?
+
+    private func startMonitoring() {
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
@@ -540,11 +565,17 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         commitName()
-        if edited { controller?.recordLibraryUndo("Edit Space", before: before) }
-        controller?.root.holdReveal = false
-        dismiss()
-        if let webView = controller?.selectedWebView { controller?.window?.makeFirstResponder(webView) }
+        if edited { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo("Edit Space", before: before) }
+        if let controller {
+            controller.root.holdReveal = false
+            dismiss()
+            if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+        } else {
+            window?.makeFirstResponder(nil)
+            dismiss(instantly: true)
+        }
         if SpaceEditorPanel.current === self { SpaceEditorPanel.current = nil }
+        onClose?()
     }
 
     private func commitName() {

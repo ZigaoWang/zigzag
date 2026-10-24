@@ -136,35 +136,34 @@ final class FormRow: NSView {
 // MARK: - Spaces list
 
 /// A space in Settings: its color (click to change), its name (edit in place), delete on hover, drag to reorder.
-final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
+final class SpaceSettingsRow: InteractiveView {
     let spaceID: UUID
-    private let swatchButton = InteractiveView()
-    private let swatchFill = NSView()
-    private let name = PlainTextField(font: Tokens.Font.body(), placeholder: "Name")
-    private let grip = NSImageView()
-    private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
+    private let dot = ColorView(color: .clear)
+    private let name: Label
+    private let editButton = TextButton.form("Edit")
+    private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
+    /// True while the row is being dragged; it draws as lifted.
+    var isLifted = false { didSet { stateDidChange(animated: true) } }
 
     init(space: SpaceInfo) {
         spaceID = space.id
-        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Space.x10 + Tokens.Space.x1))
-        name.stringValue = space.name
-        name.delegate = self
-        grip.image = Tokens.Symbol.image("line.3.horizontal", size: Tokens.TypeSize.small)
-        grip.contentTintColor = Tokens.Color.textTertiary
-        grip.imageScaling = .scaleNone
-        grip.toolTip = "Drag to reorder"
+        name = Label(space.name, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Space.x12))
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        dot.wantsLayer = true
+        dot.color = space.swatch
         deleteButton.isHidden = true
         deleteButton.isEnabled = Library.shared.spaces.count > 1
-        swatchFill.wantsLayer = true
-        swatchButton.addSubview(swatchFill)
-        [swatchButton, name, grip, deleteButton].forEach { addSubview($0) }
-        swatchFill.layer?.backgroundColor = swatchFill.cgColor(space.swatch)
-        swatchButton.toolTip = "Change color"
-        swatchButton.onClick = { [weak self] _ in self?.openColorPicker() }
+        [dot, name, deleteButton, editButton].forEach { addSubview($0) }
+        // The row and its Edit button both open the same editor the sidebar uses.
+        onClick = { [weak self] _ in self?.openEditor() }
+        editButton.onClick = { [weak self] _ in self?.openEditor() }
         deleteButton.onClick = { [weak self] _ in
             guard let self, let window = self.window else { return }
             SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
         }
+        toolTip = "Click to edit, drag to reorder"
         setAccessibilityRole(.row)
         setAccessibilityLabel(space.name)
     }
@@ -174,33 +173,41 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
     override func layout() {
         super.layout()
         let pad = Tokens.Space.x3
-        let swatch = Tokens.Space.x5
-        swatchButton.frame = NSRect(x: pad - 2, y: (bounds.height - swatch - 4) / 2, width: swatch + 4, height: swatch + 4)
-        swatchButton.layer?.cornerRadius = (swatch + 4) / 2
-        swatchFill.frame = swatchButton.bounds.insetBy(dx: 2, dy: 2)
-        swatchFill.layer?.cornerRadius = swatch / 2
-        grip.frame = NSRect(x: bounds.width - pad - Tokens.Space.x4, y: 0, width: Tokens.Space.x4, height: bounds.height)
+        let d = Tokens.Space.x5
+        dot.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
+        dot.layer?.cornerRadius = d / 2
+        let ew = editButton.fittingWidth
+        editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - Tokens.Space.x7Height) / 2, width: ew, height: Tokens.Space.x7Height)
         let b = deleteButton.frame.width
-        deleteButton.frame.origin = NSPoint(x: grip.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
-        let nameHeight = name.fittingSize.height
-        let x = swatchButton.frame.maxX + Tokens.Space.x2
-        name.frame = NSRect(x: x, y: round((bounds.height - nameHeight) / 2), width: deleteButton.frame.minX - x - Tokens.Space.x2, height: nameHeight)
+        deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
+        let x = dot.frame.maxX + Tokens.Space.x3
+        name.frame = NSRect(x: x, y: (bounds.height - name.lineHeight) / 2, width: max(0, deleteButton.frame.minX - x - Tokens.Space.x2), height: name.lineHeight)
     }
+
+    override func resetCursorRects() { addCursorRect(bounds, cursor: isLifted ? .closedHand : .pointingHand) }
 
     override func stateDidChange(animated: Bool) {
-        deleteButton.isHidden = !isHovered
-        grip.alphaValue = isHovered ? 1 : 0.5
+        deleteButton.isHidden = !isHovered || isLifted
+        let fill: NSColor? = isLifted ? Tokens.Color.formGroup : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
+        layer?.shadowOpacity = isLifted ? 1 : 0
+        layer?.shadowRadius = 12
+        layer?.shadowOffset = CGSize(width: 0, height: -4)
+        layer?.borderWidth = isLifted ? 1 : 0
+        layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.5))
     }
 
-    func controlTextDidEndEditing(_ obj: Notification) {
-        let name = name.stringValue
-        guard name != Library.shared.space(spaceID)?.name else { return }
-        BrowserWindowController.undoTarget?.libraryChange("Rename Space") { Library.shared.renameSpace(spaceID, to: name) }
-    }
-
-    private func openColorPicker() {
+    func openEditor() {
         guard let host = window?.contentView else { return }
-        TintPickerPanel.show(spaceID: spaceID, from: swatchButton, in: host)
+        if let open = SpaceEditorPanel.current {
+            let same = open.spaceID == spaceID
+            open.close()
+            if same { return }
+        }
+        let editor = SpaceEditorPanel(spaceID: spaceID, controller: nil)
+        SpaceEditorPanel.current = editor
+        editor.show(in: host, below: editButton)
     }
 
     static func confirmDelete(_ id: UUID, window: NSWindow) {
@@ -211,84 +218,6 @@ final class SpaceSettingsRow: InteractiveView, NSTextFieldDelegate {
                           message: "Its bookmarks and tabs close. You can bring it back with Undo in the browser window.",
                           confirmTitle: "Delete Space", destructive: true) { confirmed in
             if confirmed { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
-        }
-    }
-}
-
-/// A space's color, in a Zigzag panel under its swatch: the tints, and a slider for any hue.
-final class TintPickerPanel: FloatingPanelView {
-    private static weak var current: TintPickerPanel?
-    private let spaceID: UUID
-    private var swatches: [TintSwatch] = []
-    private let slider = HueSlider()
-    private var monitor: Any?
-
-    private init(spaceID: UUID) {
-        self.spaceID = spaceID
-        super.init(frame: .zero)
-        let size = Tokens.Space.x6, gap = Tokens.Space.x2, pad = Tokens.Space.x4
-        swatches = SpaceColor.allCases.map { TintSwatch(kind: .tint($0)) } + [TintSwatch(kind: .custom)]
-        let width = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap + pad * 2
-        frame.size = NSSize(width: width, height: pad * 2 + size + Tokens.Space.x3 + size)
-        for (i, swatch) in swatches.enumerated() {
-            swatch.frame = NSRect(x: pad + CGFloat(i) * (size + gap), y: pad, width: size, height: size)
-            addSubview(swatch)
-            swatch.onClick = { [weak self, weak swatch] _ in
-                guard let self, let swatch else { return }
-                switch swatch.kind {
-                case .tint(let color):
-                    BrowserWindowController.undoTarget?.libraryChange("Space Color") { Library.shared.setColor(color, for: self.spaceID) }
-                    self.slider.hue = color.hue
-                case .custom:
-                    Library.shared.setHue(self.slider.hue, for: self.spaceID)
-                }
-                self.refresh()
-            }
-        }
-        slider.frame = NSRect(x: pad, y: pad + size + Tokens.Space.x3, width: width - pad * 2, height: size)
-        let space = Library.shared.space(spaceID)
-        slider.hue = space?.hue ?? space?.color.hue ?? 0.6
-        slider.onChange = { [weak self] hue, final in
-            guard let self, final else { return }
-            Library.shared.setHue(hue, for: self.spaceID)
-            self.refresh()
-        }
-        addSubview(slider)
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    static func show(spaceID: UUID, from anchor: NSView, in host: NSView) {
-        current?.close()
-        let panel = TintPickerPanel(spaceID: spaceID)
-        let a = anchor.convert(anchor.bounds, to: host)
-        panel.frame.origin = NSPoint(x: max(Tokens.Space.x3, a.minX - Tokens.Space.x2), y: host.isFlipped ? a.maxY + Tokens.Space.x1 : a.minY - Tokens.Space.x1 - panel.frame.height)
-        host.addSubview(panel)
-        panel.present()
-        current = panel
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak panel] event in
-            guard let panel else { return event }
-            if event.type == .keyDown { if event.keyCode == 53 { panel.close(); return nil }; return event }
-            if event.window === panel.window, !panel.bounds.contains(panel.convert(event.locationInWindow, from: nil)) { panel.close() }
-            return event
-        }
-    }
-
-    func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        dismiss()
-    }
-
-    private func refresh() {
-        let space = Library.shared.space(spaceID)
-        for swatch in swatches {
-            switch swatch.kind {
-            case .tint(let color): swatch.isSelected = space?.hue == nil && space?.color == color
-            case .custom: swatch.isSelected = space?.hue != nil
-            }
         }
     }
 }
@@ -326,7 +255,7 @@ enum SettingsPane: Int, CaseIterable {
     var subtitle: String {
         switch self {
         case .general: "Search, your default browser, and how pages behave."
-        case .spaces: "Each space keeps its own tabs, pins and color. Drag to reorder."
+        case .spaces: "Each space keeps its own tabs, pins and color. Drag a space to reorder."
         case .passwords: "Saved in your Keychain and synced with iCloud Keychain."
         case .privacy: "What sites keep on this Mac, and the choices you’ve made for them."
         case .translation: "Pages in other languages, translated on this Mac by Apple."
@@ -560,14 +489,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if pane == .shortcuts { reloadShortcuts() }
         layoutRoot()
         documentView.scroll(.zero)
-        // Panes cross-fade: quick, and nothing moves.
-        documentView.wantsLayer = true
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0.0
-        fade.toValue = 1.0
-        fade.duration = 0.15
-        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        documentView.layer?.add(fade, forKey: "pane")
+
     }
 
     // MARK: Groups
@@ -872,11 +794,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let rowHeight = row.frame.height
         row.removeFromSuperview()
         spacesGroup.addSubview(row)
-        row.layer?.backgroundColor = row.cgColor(Tokens.Color.formGroup)
-        row.layer?.cornerRadius = Tokens.Radius.row
-        row.layer?.shadowOpacity = 1
-        row.layer?.shadowRadius = 8
-        row.layer?.shadowColor = row.cgColor(Tokens.Color.panelShadow)
+        SpaceEditorPanel.current?.close()
+        row.isLifted = true
         let originY = row.frame.minY
         var target = startIndex
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
