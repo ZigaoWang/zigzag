@@ -292,6 +292,9 @@ final class AutofillMenu: FloatingPanelView {
     }
 
     private var rows: [AutofillRow] = []
+    private let footer = TextButton(title: "Passwords…", font: Tokens.Font.small(.medium))
+    private let footerLine = ColorView(color: Tokens.Color.separator)
+    private let hasFooter: Bool
     private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }
     var onPick: ((Item) -> Void)?
 
@@ -299,7 +302,15 @@ final class AutofillMenu: FloatingPanelView {
     private let rowHeight = Tokens.Space.x10 + Tokens.Space.x1
 
     init(items: [Item], origin: Origin) {
+        hasFooter = items.contains { if case .login = $0 { true } else { false } }
         super.init(frame: .zero)
+        if hasFooter {
+            [footerLine, footer].forEach { addSubview($0) }
+            footer.onClick = { _ in
+                Autofill.shared.hide()
+                PasswordsWindowController.show()
+            }
+        }
         radius = Tokens.Radius.panel
         rows = items.map { item in
             let row = AutofillRow(item: item, origin: origin)
@@ -314,7 +325,9 @@ final class AutofillMenu: FloatingPanelView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    var contentHeight: CGFloat { pad * 2 + CGFloat(rows.count) * rowHeight }
+    private let footerHeight = Tokens.Space.x8
+
+    var contentHeight: CGFloat { pad * 2 + CGFloat(rows.count) * rowHeight + (hasFooter ? footerHeight + pad : 0) }
 
     var selected: Item? { rows.indices.contains(selection) ? rows[selection].item : (rows.count == 1 ? rows[0].item : nil) }
 
@@ -332,6 +345,10 @@ final class AutofillMenu: FloatingPanelView {
         for (index, row) in rows.enumerated() {
             row.frame = NSRect(x: pad, y: pad + CGFloat(index) * rowHeight, width: bounds.width - pad * 2, height: rowHeight)
         }
+        guard hasFooter else { return }
+        let y = pad + CGFloat(rows.count) * rowHeight + pad / 2
+        footerLine.frame = NSRect(x: pad + Tokens.Space.x2, y: y, width: bounds.width - (pad + Tokens.Space.x2) * 2, height: Tokens.Metric.hairline)
+        footer.frame = NSRect(x: pad, y: y + pad / 2, width: footer.fittingWidth, height: footerHeight)
     }
 }
 
