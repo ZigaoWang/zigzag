@@ -1,0 +1,6 @@
+<!doctype html><title>Strict rules</title><body style="font:14px system-ui;margin:40px"><h1>Create account (strict rules)</h1>
+<p>12 to 14 characters, letters and digits, and one of ! or #.</p>
+<form action="done.html"><p><input name="email" type="email" autocomplete="username" placeholder="Email"></p>
+<p><input name="pw" type="password" autocomplete="new-password" minlength="12" maxlength="14" pattern="[A-Za-z0-9!#]*[!#][A-Za-z0-9!#]*"
+  passwordrules="minlength: 12; maxlength: 14; required: lower; required: upper; required: digit; required: [!#];" placeholder="Password"></p>
+<p><button type="submit">Create account</button></p></form>

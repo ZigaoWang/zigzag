@@ -1,0 +1,6 @@
+<!doctype html><title>Hidden fields</title><body style="font:14px system-ui;margin:40px"><h1>Sign in</h1>
+<p>Has hidden username and password fields a page could read. Autofill must leave them empty.</p>
+<form action="done.html">
+<input name="trap-user" type="text" style="display:none"><input name="trap-pw" type="password" style="position:absolute;left:-9999px;width:0;height:0;opacity:0">
+<p><input name="email" type="email" autocomplete="username" placeholder="Email"></p>
+<p><input name="pw" type="password" autocomplete="current-password" placeholder="Password"></p><p><button type="submit">Sign in</button></p></form>
