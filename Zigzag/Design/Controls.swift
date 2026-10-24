@@ -571,3 +571,167 @@ final class SegmentedPills: NSView {
         }
     }
 }
+
+/// Zigzag's switch: a capsule in the space's accent when on, a knob that slides on a soft spring.
+final class Toggle: InteractiveView {
+    private let knob = CALayer()
+    var onChange: ((Bool) -> Void)?
+    var isOn = false { didSet { if oldValue != isOn { update(animated: window != nil) } } }
+
+    init(isOn: Bool = false) {
+        self.isOn = isOn
+        super.init(frame: NSRect(x: 0, y: 0, width: 34, height: 20))
+        layer?.cornerRadius = 10
+        knob.backgroundColor = NSColor.white.cgColor
+        knob.cornerRadius = 8
+        knob.shadowColor = NSColor.black.cgColor
+        knob.shadowOpacity = 0.22
+        knob.shadowRadius = 1.5
+        knob.shadowOffset = CGSize(width: 0, height: -0.5)
+        layer?.addSublayer(knob)
+        onClick = { [weak self] _ in
+            guard let self, self.isEnabled else { return }
+            self.isOn.toggle()
+            self.onChange?(self.isOn)
+        }
+        setAccessibilityRole(.checkBox)
+        update(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 34, height: 20) }
+    override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
+
+    private var knobFrame: CGRect {
+        let side: CGFloat = 16
+        return CGRect(x: isOn ? bounds.width - side - 2 : 2, y: (bounds.height - side) / 2, width: side, height: side)
+    }
+
+    override func layout() {
+        super.layout()
+        Tokens.Motion.withoutAnimation { knob.frame = knobFrame }
+    }
+
+    private func update(animated: Bool) {
+        stateDidChange(animated: animated)
+        guard animated else { Tokens.Motion.withoutAnimation { knob.frame = knobFrame }; return }
+        let move = CASpringAnimation(keyPath: "position.x")
+        move.damping = 20
+        move.stiffness = 300
+        move.fromValue = knob.presentation()?.position.x ?? knob.position.x
+        move.toValue = knobFrame.midX
+        move.duration = move.settlingDuration
+        knob.add(move, forKey: "move")
+        Tokens.Motion.withoutAnimation { knob.frame = knobFrame }
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let off = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.13), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.18))
+        let track = isOn ? Tokens.Color.accent : off
+        layer?.set(backgroundColor: cgColor(isPressed ? (track.blended(withFraction: 0.08, of: .black) ?? track) : track), animated: animated)
+        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+    }
+}
+
+/// A choice from a list, in Zigzag's style: the current choice (with its icon) on a quiet fill and a chevron;
+/// clicking opens the native menu right over it.
+final class MenuButton: InteractiveView {
+    struct Option { var title: String; var image: NSImage? }
+    private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+    private let icon = NSImageView()
+    private let chevron = NSImageView()
+    var options: [Option] = [] { didSet { refresh() } }
+    var selectedIndex = 0 { didSet { refresh() } }
+    var onSelect: ((Int) -> Void)?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerCurve = .continuous
+        chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)
+        chevron.contentTintColor = Tokens.Color.textSecondary
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        [icon, label, chevron].forEach { addSubview($0) }
+        onClick = { [weak self] _ in self?.openMenu() }
+        setAccessibilityRole(.popUpButton)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var current: Option? { options.indices.contains(selectedIndex) ? options[selectedIndex] : nil }
+
+    private func refresh() {
+        label.stringValue = current?.title ?? ""
+        icon.image = current?.image
+        icon.isHidden = current?.image == nil
+        setAccessibilityValue(label.stringValue)
+        invalidateIntrinsicContentSize()
+        needsLayout = true
+        superview?.needsLayout = true
+    }
+
+    override var intrinsicContentSize: NSSize {
+        let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.body(.medium)]).width }.max() ?? 0
+        let iconWidth: CGFloat = options.contains { $0.image != nil } ? 16 + Tokens.Space.x2 : 0
+        return NSSize(width: ceil(Tokens.Space.x3 + iconWidth + widest + Tokens.Space.x2 + 12 + Tokens.Space.x3), height: Tokens.Space.x7Height)
+    }
+
+    override func layout() {
+        super.layout()
+        var x = Tokens.Space.x3
+        if !icon.isHidden {
+            icon.frame = NSRect(x: x, y: (bounds.height - 16) / 2, width: 16, height: 16)
+            x = icon.frame.maxX + Tokens.Space.x2
+        }
+        chevron.frame = NSRect(x: bounds.width - Tokens.Space.x3 - 10, y: (bounds.height - 12) / 2, width: 10, height: 12)
+        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: chevron.frame.minX - x - Tokens.Space.x1, height: label.lineHeight)
+    }
+
+    private func openMenu() {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for (index, option) in options.enumerated() {
+            let item = SidebarMenus.Item(option.title) { [weak self] in
+                self?.selectedIndex = index
+                self?.onSelect?(index)
+            }
+            item.image = option.image
+            item.state = index == selectedIndex ? .on : .off
+            menu.addItem(item)
+        }
+        menu.minimumWidth = bounds.width
+        menu.popUp(positioning: menu.items.indices.contains(selectedIndex) ? menu.items[selectedIndex] : nil,
+                   at: NSPoint(x: Tokens.Space.x1, y: bounds.height - 3), in: self)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+    }
+}
+
+/// A state, said calmly: a check in the space's accent and a few words ("Zigzag is your default browser").
+final class StatusLabel: NSView {
+    private let check = NSImageView()
+    private let label: Label
+
+    init(_ text: String, symbol: String = "checkmark.circle.fill") {
+        label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
+        check.contentTintColor = Tokens.Color.accent
+        [check, label].forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 16 + Tokens.Space.x2 + label.inkWidth + Label.inset, height: Tokens.Space.x7Height) }
+
+    override func layout() {
+        super.layout()
+        check.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 16, height: 16)
+        label.frame = NSRect(x: 16 + Tokens.Space.x2 - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+    }
+}
