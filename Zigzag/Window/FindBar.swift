@@ -216,38 +216,51 @@ class FloatingPanelView: NSView {
         }
     }
 
-    /// Springs in: a short scale up from 97% with a fade. Skipped for keyboard actions unless `always`.
+    /// The one way a panel arrives: it fades in while settling down 4pt from its top edge, as if dropping from
+    /// whatever opened it. Opacity and movement run together on the layer, so they never drift apart.
     func present(always: Bool = false) {
         layoutSubtreeIfNeeded()
-        guard let layer, always || !Tokens.Motion.isKeyboardDriven else { alphaValue = 1; return }
-        alphaValue = 0
-        let scale = Tokens.Motion.springAnimation(keyPath: "transform")
-        let from = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-bounds.midX, -bounds.midY, 0), CATransform3DMakeScale(0.97, 0.97, 1)), CATransform3DMakeTranslation(bounds.midX, bounds.midY, 0))
-        scale.fromValue = from
-        scale.toValue = CATransform3DIdentity
-        layer.add(scale, forKey: "present")
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Tokens.Motion.quick
-            self.animator().alphaValue = 1
-        }
+        layer?.removeAnimation(forKey: "dismiss")
+        alphaValue = 1
+        guard let layer, always || !Tokens.Motion.isKeyboardDriven else { return }
+        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = 0.14
+        let drop = CABasicAnimation(keyPath: "transform.translation.y")
+        drop.fromValue = isFlippedInSuperview ? -4 : 4
+        drop.toValue = 0
+        drop.duration = 0.2
+        let group = CAAnimationGroup()
+        group.animations = [fade, drop]
+        group.duration = 0.2
+        group.timingFunction = curve
+        layer.add(group, forKey: "present")
     }
 
+    private var isFlippedInSuperview: Bool { superview?.isFlipped ?? true }
+
+    /// The one way a panel leaves: a quick fade, nothing else moving.
     func dismiss(always: Bool = false, completion: (() -> Void)? = nil) {
-        let fade = { self.animator().alphaValue = 0 }
-        let done = {
+        guard let layer else { removeFromSuperview(); completion?(); return }
+        layer.removeAnimation(forKey: "present")
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            // Shown again while fading (a repeat toast): it stays.
+            guard let self, self.layer?.opacity == 0 else { completion?(); return }
             self.removeFromSuperview()
-            self.alphaValue = 1
+            self.layer?.opacity = 1
             completion?()
         }
-        if always {
-            NSAnimationContext.runAnimationGroup({ ctx in ctx.duration = Tokens.Motion.standard; fade() }, completionHandler: done)
-            return
-        }
-        Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: {
-            self.removeFromSuperview()
-            self.alphaValue = 1
-            completion?()
-        })
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = layer.presentation()?.opacity ?? 1
+        fade.toValue = 0
+        fade.duration = 0.12
+        fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        layer.add(fade, forKey: "dismiss")
+        layer.opacity = 0
+        CATransaction.commit()
     }
 }
 
