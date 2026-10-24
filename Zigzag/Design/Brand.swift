@@ -251,6 +251,7 @@ final class RibbonView: NSView {
     /// Writes the ribbon in along its path, once.
     func drawIn(delay: CFTimeInterval = 0, duration: CFTimeInterval = Brand.drawDuration) {
         layoutSubtreeIfNeeded()
+        resetStroke()
         let draw = CABasicAnimation(keyPath: "strokeEnd")
         draw.fromValue = 0
         draw.toValue = 1
@@ -273,6 +274,7 @@ final class RibbonView: NSView {
         guard !isLooping else { return }
         isLooping = true
         layoutSubtreeIfNeeded()
+        resetStroke()
         let cycle: CFTimeInterval = 1.5
         let end = CAKeyframeAnimation(keyPath: "strokeEnd")
         end.values = [0, 1, 1]
@@ -290,10 +292,25 @@ final class RibbonView: NSView {
         stroke.add(group, forKey: "loop")
     }
 
+    /// Stops where it is: the stroke freezes at the frame on screen, so whatever fades it out shows no jump.
+    /// It's reset to the whole ribbon when it next starts or draws.
     func stopLooping() {
         guard isLooping else { return }
         isLooping = false
+        let now = stroke.presentation()
+        Tokens.Motion.withoutAnimation {
+            stroke.strokeStart = now?.strokeStart ?? 0
+            stroke.strokeEnd = now?.strokeEnd ?? 1
+        }
         stroke.removeAnimation(forKey: "loop")
+    }
+
+    /// Back to the whole ribbon at rest.
+    private func resetStroke() {
+        Tokens.Motion.withoutAnimation {
+            stroke.strokeStart = 0
+            stroke.strokeEnd = 1
+        }
     }
 }
 

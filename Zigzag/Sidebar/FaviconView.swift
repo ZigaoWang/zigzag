@@ -95,7 +95,7 @@ final class FaviconView: NSView {
             layer.add(fade, forKey: "fade")
             Tokens.Motion.withoutAnimation { layer.opacity = target }
         }
-        if showSpinner { startSpinning() } else { spinner.stopLooping() }
+        if showSpinner { startSpinning() } else { spinner.stopLooping() }   // frozen mid-stroke while it fades
         Tokens.Motion.withoutAnimation { backing.isHidden = !(needsBacking && effectiveAppearance.isDark) || showSpinner }
     }
 
