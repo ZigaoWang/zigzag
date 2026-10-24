@@ -47,6 +47,7 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
+        case "bartab": controller.commandBar.debugTab()
         case "tour": Tutorial.restart(); GuidedTour.start(in: controller)
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
