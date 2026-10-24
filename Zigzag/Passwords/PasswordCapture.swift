@@ -51,6 +51,14 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         let store = PasswordStore.shared
         guard await !store.neverSaves(on: origin) else { return }
         let saved = (try? await store.credentials(for: origin)) ?? []
+        // A strong password filled here was saved without a username; the sign-up form now supplies it.
+        if !username.isEmpty, let generated = saved.first(where: { $0.username.isEmpty }),
+           let stored = try? await store.password(for: generated.id), stored.matches(password) {
+            var named = generated
+            named.username = username
+            try? await store.update(named)
+            return
+        }
         // A change form often has no username; if there's one login for the site, it's that one.
         let target = saved.first { $0.username == username } ?? (isChange && username.isEmpty && saved.count == 1 ? saved.first : nil)
         if let target {
