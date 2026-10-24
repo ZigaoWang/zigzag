@@ -184,7 +184,14 @@ enum Tokens {
 
         @discardableResult
         static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy, fromKeyboard: Bool = false) -> TimeInterval {
-            guard let layer = view.layer, offset != 0, fromKeyboard || !isKeyboardDriven, !reduceMotion else { return 0 }
+            guard let layer = view.layer, fromKeyboard || !isKeyboardDriven, !reduceMotion else { return 0 }
+            // Interrupting a slide carries on from where it is on screen, not from where it was headed.
+            var offset = offset
+            if layer.animation(forKey: "slide") != nil,
+               let shown = layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat {
+                offset += shown
+            }
+            guard abs(offset) > 0.5 else { layer.removeAnimation(forKey: "slide"); return 0 }
             let animation: CABasicAnimation
             if let bounce = curve.bounce {
                 let spring = CASpringAnimation(perceptualDuration: curve.duration, bounce: bounce)
