@@ -187,7 +187,11 @@ enum DebugBridge {
             let r = ArcImporter.importAll()
             debugLog("arc import: spaces=\(r.result.spaces) bookmarks=\(r.result.bookmarks) history=\(r.result.historyEntries)")
             if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
-        case "welcome": controller.showWelcome()
+        case "welcome": WelcomeWindowController.show {}
+        case "welcomesuccess":
+            WelcomeWindowController.show {}
+            func find(_ view: NSView?) -> ImportView? { view as? ImportView ?? view?.subviews.lazy.compactMap { find($0) }.first }
+            find(WelcomeWindowController.shared?.window?.contentView)?.debugShowSuccess()
         case "importwindow": ImportWindowController.show()
         case "closewindow":
             // closewindow <title>: closes Zigzag's window with that title (Import, Passwords, Settings).
