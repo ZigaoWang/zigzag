@@ -245,6 +245,26 @@ final class Tab: NSObject {
     static func load(_ url: URL, in webView: WKWebView) {
         // WebKit quietly ignores a page from an extension it doesn't have; say what happened instead.
         if isExtensionPage(url), extensionConfiguration(for: url) == nil {
+            // Opened by an extension that's still loading (1Password's welcome page, right after it installs):
+            // wait for it, briefly, before saying the page is unavailable.
+            if #available(macOS 15.4, *) {
+                var token: SignalToken?
+                var waited = false
+                token = ExtensionHost.shared.changed.observe { [weak webView] in
+                    guard let webView, !waited, extensionConfiguration(for: url) != nil else { return }
+                    waited = true
+                    token = nil
+                    (webView as? BrowserWebView)?.owner?.load(url)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak webView] in
+                    guard !waited, let webView else { return }
+                    waited = true
+                    token = nil
+                    ErrorPage.show(error: NSError(domain: NSURLErrorDomain, code: NSURLErrorResourceUnavailable), url: url, in: webView)
+                }
+                _ = token
+                return
+            }
             ErrorPage.show(error: NSError(domain: NSURLErrorDomain, code: NSURLErrorResourceUnavailable), url: url, in: webView)
             return
         }
