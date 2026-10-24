@@ -923,6 +923,10 @@ private struct Suggestion {
     var icon: URL?
     /// No sharp icon on the web: suggested only when its app is here, to borrow the app's icon.
     var onlyWithApp = false
+    /// An icon shipped with Zigzag, by resource name.
+    var bundled: String? = nil
+    /// Always suggested, whatever's installed.
+    var always = false
     var appURL: URL? { app.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) } }
 }
 
@@ -951,7 +955,31 @@ private func iconSource(site: URL, explicit: URL?) -> URL? {
     explicit ?? site.host().flatMap { URL(string: "https://www.google.com/s2/favicons?domain=\($0)&sz=128") }
 }
 
-private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: URL? = nil) {
+/// A web logo set in a white rounded tile the size of a Mac app icon's artwork, so logos and app icons read as
+/// one set side by side.
+private func appTile(_ logo: NSImage) -> NSImage {
+    NSImage(size: NSSize(width: 128, height: 128), flipped: false) { rect in
+        let tile = rect.insetBy(dx: 12, dy: 12)
+        NSGraphicsContext.current?.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
+        shadow.shadowBlurRadius = 4
+        shadow.shadowOffset = NSSize(width: 0, height: -1.5)
+        shadow.set()
+        NSColor.white.setFill()
+        NSBezierPath(roundedRect: tile, xRadius: 24, yRadius: 24).fill()
+        NSGraphicsContext.current?.restoreGraphicsState()
+        logo.draw(in: tile.insetBy(dx: 20, dy: 20), from: .zero, operation: .sourceOver, fraction: 1)
+        return true
+    }
+}
+
+private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: URL? = nil, bundled: String? = nil) {
+    if let bundled, let url = Bundle.main.url(forResource: bundled, withExtension: "png"), let image = NSImage(contentsOf: url) {
+        tile.icon.image = image.size.width >= 128 && bundled == "avoidxray" ? appTileFull(image) : appTile(image)
+        tile.icon.contentTintColor = nil
+        return
+    }
     if let app {
         tile.icon.image = NSWorkspace.shared.icon(forFile: app.path)
         tile.icon.contentTintColor = nil
@@ -961,8 +989,18 @@ private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: UR
     tile.icon.contentTintColor = Onboard.dim(0.7)
     guard let source = iconSource(site: site, explicit: explicit) else { return }
     fetchIcon(source) { [weak tile] image in
-        tile?.icon.image = image
+        tile?.icon.image = appTile(image)
         tile?.icon.contentTintColor = nil
+    }
+}
+
+/// An icon that's already a full square design, rounded and sized like an app icon.
+private func appTileFull(_ art: NSImage) -> NSImage {
+    NSImage(size: NSSize(width: 128, height: 128), flipped: false) { rect in
+        let tile = rect.insetBy(dx: 12, dy: 12)
+        NSBezierPath(roundedRect: tile, xRadius: 24, yRadius: 24).addClip()
+        art.draw(in: tile, from: .zero, operation: .sourceOver, fraction: 1)
+        return true
     }
 }
 
@@ -986,7 +1024,8 @@ final class SitesPicker: StepContent {
         Suggestion(name: "Spotify", url: URL(string: "https://open.spotify.com")!, app: "com.spotify.client"),
         Suggestion(name: "Slack", url: URL(string: "https://app.slack.com")!, app: "com.tinyspeck.slackmacgap"),
         Suggestion(name: "Figma", url: URL(string: "https://www.figma.com")!, app: "com.figma.Desktop"),
-        Suggestion(name: "GitHub", url: URL(string: "https://github.com")!, app: "com.github.GitHubClient"),
+        Suggestion(name: "GitHub", url: URL(string: "https://github.com")!, app: nil),
+        Suggestion(name: "AvoidXray", url: URL(string: "https://avoidxray.com")!, app: nil, bundled: "avoidxray", always: true),
         Suggestion(name: "WhatsApp", url: URL(string: "https://web.whatsapp.com")!, app: "net.whatsapp.WhatsApp", onlyWithApp: true),
         Suggestion(name: "Discord", url: URL(string: "https://discord.com/app")!, app: "com.hnc.Discord"),
         Suggestion(name: "X", url: URL(string: "https://x.com")!, app: nil),
@@ -999,8 +1038,9 @@ final class SitesPicker: StepContent {
 
     /// Twelve: the ones whose apps are on this Mac first, since those are the ones you use.
     private static var sites: [Suggestion] {
-        let (have, rest) = (all.filter { $0.appURL != nil }, all.filter { $0.appURL == nil && !$0.onlyWithApp })
-        return Array((have + rest).prefix(12))
+        let pinned = all.filter(\.always)
+        let (have, rest) = (all.filter { $0.appURL != nil && !$0.always }, all.filter { $0.appURL == nil && !$0.onlyWithApp && !$0.always })
+        return Array((have + pinned + rest).prefix(12))
     }
     private var tiles: [(PickTile, URL, String)] = []
 
@@ -1013,7 +1053,7 @@ final class SitesPicker: StepContent {
             tile.onToggle = { [weak self] in self?.onChange?() }
             addSubview(tile)
             tiles.append((tile, site.url, site.name))
-            loadIcon(tile, site: site.url, app: site.appURL, explicit: site.icon)
+            loadIcon(tile, site: site.url, app: site.appURL, explicit: site.icon, bundled: site.bundled)
         }
     }
 
@@ -1043,120 +1083,229 @@ final class SitesPicker: StepContent {
 
 // MARK: - Extensions
 
-/// Popular extensions as tiles; the ones you pick are added from the Chrome Web Store when you press Next, each
-/// showing how it went.
+/// Popular extensions in a list like the import step's: tick the ones you use, and each row shows its install
+/// as it happens: a spinner, then Added, or what went wrong.
 private final class ExtensionsPicker: StepContent {
-    private static let suggestions: [(id: String, name: String, kind: String, site: String)] = [
-        (ExtensionStore.onePasswordID, "1Password", "Passwords", "https://1password.com"),
-        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", "Passwords", "https://bitwarden.com"),
-        ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", "Writing", "https://www.grammarly.com"),
-        ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", "Dark mode for sites", "https://darkreader.org"),
-        ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Save pages", "https://www.notion.so"),
-        ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", "Translation", "https://translate.google.com"),
+    private static let suggestions: [(id: String, name: String, kind: String, site: String, app: String?)] = [
+        (ExtensionStore.onePasswordID, "1Password", "Fills your passwords", "https://1password.com", "com.1password.1password"),
+        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", "Fills your passwords", "https://bitwarden.com", "com.bitwarden.desktop"),
+        ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", "Checks your writing", "https://www.grammarly.com", nil),
+        ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", "Dark mode for every site", "https://darkreader.org", nil),
+        ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Saves pages to Notion", "https://www.notion.so", nil),
+        ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", "Translates what you select", "https://translate.google.com", nil),
     ]
-    private var tiles: [(PickTile, String)] = []
+    private let list = ColorView(color: Brand.ribbon.withAlphaComponent(0.07))
+    private var rows: [(ExtensionRow, String)] = []
+    private var separators: [ColorView] = []
     private var installing = false
     private var finished = false
-    private let note = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.7))
+    private let note = Label("Find more in the Chrome Web Store, then choose Add to Zigzag.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        list.wantsLayer = true
+        list.layer?.cornerRadius = 12
+        list.layer?.cornerCurve = .continuous
+        list.layer?.borderWidth = 1
+        list.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.1).cgColor
+        addSubview(list)
         var installed: Set<String> = []
         if #available(macOS 15.4, *) { installed = Set(ExtensionHost.shared.installed.keys) }
-        for s in Self.suggestions {
-            let tile = PickTile(name: s.name, horizontal: true)
-            tile.detail.stringValue = installed.contains(s.id) ? "Already added" : s.kind
-            tile.isPicked = installed.contains(s.id)
-            tile.isLocked = installed.contains(s.id)
-            tile.onToggle = { [weak self] in self?.onChange?() }
-            addSubview(tile)
-            tiles.append((tile, s.id))
-        }
-        let apps: [String: String] = [ExtensionStore.onePasswordID: "com.1password.1password", "nngceckbapebfimnlniiiahkandclblb": "com.bitwarden.desktop"]
-        for ((tile, id), s) in zip(tiles, Self.suggestions) {
-            guard let site = URL(string: s.site) else { continue }
-            loadIcon(tile, site: site, app: apps[id].flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
+        for (i, s) in Self.suggestions.enumerated() {
+            let row = ExtensionRow(name: s.name, kind: s.kind)
+            if installed.contains(s.id) { row.state = .added }
+            row.onChange = { [weak self] in self?.onChange?() }
+            list.addSubview(row)
+            rows.append((row, s.id))
+            if i > 0 {
+                let line = ColorView(color: Brand.ribbon.withAlphaComponent(0.09))
+                list.addSubview(line)
+                separators.append(line)
+            }
+            let tile = row.iconTile
+            if let site = URL(string: s.site) {
+                loadIcon(tile, site: site, app: s.app.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
+            }
         }
         note.alignment = .center
-        note.stringValue = "More anytime from the Chrome Web Store: choose Add to Zigzag."
         addSubview(note)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private var toAdd: [(PickTile, String)] { tiles.filter { $0.0.isPicked && !$0.0.isLocked } }
-    override var primaryTitle: String { installing ? "Adding…" : (toAdd.isEmpty || finished) ? "Next" : "Add \(toAdd.count)" }
+    private var toAdd: [(ExtensionRow, String)] { rows.filter { $0.0.isChosen && $0.0.state == .idle } }
+    override var primaryTitle: String { installing ? "Adding…" : toAdd.isEmpty ? "Next" : toAdd.count == 1 ? "Add 1 Extension" : "Add \(toAdd.count) Extensions" }
     override var isBusy: Bool { installing }
 
     override func commit(_ done: @escaping () -> Void) {
         let work = toAdd
-        guard !work.isEmpty, !finished else { done(); return }
+        guard !work.isEmpty else { done(); return }
         installing = true
+        rows.forEach { $0.0.isLocked = true }
+        work.forEach { $0.0.state = .waiting }
         onChange?()
         Task { @MainActor in
             var failed = false
-            for (tile, id) in work {
-                tile.isLocked = true
-                tile.setWorking(true)
-                tile.detail.stringValue = "Adding…"
-                let result = await ExtensionStore.install(id)
-                tile.setWorking(false)
-                switch result {
-                case .success: tile.detail.stringValue = "Added"
+            for (row, id) in work {
+                row.state = .working
+                switch await ExtensionStore.install(id) {
+                case .success: row.state = .added
                 case .failure(let error):
                     failed = true
-                    tile.isPicked = false
-                    tile.isLocked = false
-                    tile.detail.stringValue = "Couldn’t add it"
-                    tile.toolTip = error.message
+                    row.state = .failed(error.message)
                 }
             }
             self.installing = false
-            self.finished = true
+            self.rows.forEach { $0.0.isLocked = false }
             if failed {
-                // Say so, and wait: Next then moves on.
-                self.note.stringValue = "Some couldn’t be added. Check your connection, or add them later from the Chrome Web Store."
+                // Say so and wait: Next then moves on.
+                self.note.stringValue = "Some couldn’t be added. You can add them later from the Chrome Web Store."
                 self.onChange?()
             } else {
-                done()
+                // A beat to see them all marked Added, then on.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { done() }
             }
         }
     }
 
     override func layout() {
         super.layout()
-        let w: CGFloat = 228, h: CGFloat = 64, gap: CGFloat = 12
-        let total = w * 2 + gap
-        let rows = CGFloat((tiles.count + 1) / 2)
-        let blockH = rows * h + (rows - 1) * gap
-        let x0 = (bounds.width - total) / 2, y0 = max(0, (bounds.height - blockH - 40) / 2)
-        for (i, (tile, _)) in tiles.enumerated() {
-            tile.frame = NSRect(x: x0 + CGFloat(i % 2) * (w + gap), y: y0 + CGFloat(i / 2) * (h + gap), width: w, height: h)
+        let width: CGFloat = 480, rowH: CGFloat = 58
+        let height = CGFloat(rows.count) * rowH
+        let x = (bounds.width - width) / 2
+        let y = max(0, (bounds.height - height - 40) / 2)
+        list.frame = NSRect(x: x, y: y, width: width, height: height)
+        for (i, (row, _)) in rows.enumerated() {
+            row.frame = NSRect(x: 0, y: CGFloat(i) * rowH, width: width, height: rowH)
+            if i > 0 { separators[i - 1].frame = NSRect(x: 62, y: CGFloat(i) * rowH, width: width - 62, height: Tokens.Metric.hairline) }
         }
-        note.frame = NSRect(x: 0, y: y0 + blockH + 20, width: bounds.width, height: note.lineHeight)
+        note.frame = NSRect(x: 0, y: list.frame.maxY + 18, width: bounds.width, height: note.lineHeight)
+    }
+}
+
+/// One suggested extension: checkbox, icon, name and what it does; on the right, how adding it went.
+private final class ExtensionRow: InteractiveView {
+    enum State: Equatable { case idle, waiting, working, added, failed(String) }
+    var state = State.idle { didSet { refresh() } }
+    var isChosen = false { didSet { refresh() } }
+    var isLocked = false
+    var onChange: (() -> Void)?
+    /// Holds the icon; borrowed for loading.
+    let iconTile = PickTile(name: "")
+    private let box = ColorView(color: .clear)
+    private let tick = NSImageView()
+    private let name: Label
+    private let kind: Label
+    private let status = Label("", font: Tokens.Font.small(.medium), color: Onboard.ink)
+    private let statusIcon = NSImageView()
+    private let spinner = NSProgressIndicator()
+
+    init(name text: String, kind detail: String) {
+        name = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
+        kind = Label(detail, font: Tokens.Font.small(), color: Onboard.dim(0.62))
+        super.init(frame: .zero)
+        box.wantsLayer = true
+        box.layer?.cornerRadius = 6
+        box.layer?.borderWidth = 1.5
+        tick.image = Tokens.Symbol.image("checkmark", size: 10)
+        tick.contentTintColor = Brand.navy
+        box.addSubview(tick)
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.appearance = NSAppearance(named: .darkAqua)
+        status.alignment = .right
+        [box, iconTile.icon, name, kind, status, statusIcon, spinner].forEach { addSubview($0) }
+        onClick = { [weak self] _ in
+            guard let self, !self.isLocked, self.state == .idle || { if case .failed = self.state { true } else { false } }() else { return }
+            if case .failed = self.state { self.state = .idle }
+            self.isChosen.toggle()
+            self.onChange?()
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(text)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    override func stateDidChange(animated: Bool) { refresh() }
+
+    private func refresh() {
+        let added = state == .added
+        let on = isChosen || added
+        box.layer?.backgroundColor = on ? Brand.ribbon.cgColor : nil
+        box.layer?.borderColor = Brand.ribbon.withAlphaComponent(on ? 1 : 0.45).cgColor
+        tick.isHidden = !on
+        box.alphaValue = added ? 0.5 : 1
+        layer?.backgroundColor = isHovered && state == .idle && !isLocked ? Brand.ribbon.withAlphaComponent(0.05).cgColor : nil
+        statusIcon.isHidden = true
+        status.textColor = Onboard.ink
+        switch state {
+        case .idle: status.stringValue = ""
+        case .waiting: status.stringValue = "Waiting"; status.textColor = Onboard.dim(0.55)
+        case .working: status.stringValue = "Adding"
+        case .added:
+            status.stringValue = "Added"
+            statusIcon.image = Tokens.Symbol.image("checkmark.circle.fill", size: 15)
+            statusIcon.contentTintColor = NSColor(srgbRed: 0.45, green: 0.85, blue: 0.6, alpha: 1)
+            statusIcon.isHidden = false
+        case .failed(let message):
+            status.stringValue = "Couldn’t add"
+            status.textColor = NSColor(srgbRed: 1, green: 0.82, blue: 0.55, alpha: 1)
+            toolTip = message
+        }
+        state == .working ? spinner.startAnimation(nil) : spinner.stopAnimation(nil)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let h = bounds.height, pad = Tokens.Space.x4
+        box.frame = NSRect(x: pad, y: (h - 18) / 2, width: 18, height: 18)
+        tick.frame = box.bounds.insetBy(dx: 3, dy: 3)
+        iconTile.icon.frame = NSRect(x: box.frame.maxX + 10, y: (h - 38) / 2, width: 38, height: 38)
+        let x = iconTile.icon.frame.maxX + 10
+        var right = bounds.width - pad
+        if !statusIcon.isHidden {
+            statusIcon.frame = NSRect(x: right - 15, y: (h - 15) / 2, width: 15, height: 15)
+            right = statusIcon.frame.minX - 6
+        }
+        if !spinner.isHidden || state == .working {
+            spinner.frame = NSRect(x: right - 16, y: (h - 16) / 2, width: 16, height: 16)
+            right = spinner.frame.minX - 6
+        }
+        let sw = status.textWidth + 2
+        status.frame = NSRect(x: right - sw, y: (h - status.lineHeight) / 2, width: sw, height: status.lineHeight)
+        let block = name.lineHeight + 1 + kind.lineHeight
+        name.frame = NSRect(x: x, y: (h - block) / 2, width: status.frame.minX - x - 8, height: name.lineHeight)
+        kind.frame = NSRect(x: x, y: name.frame.maxY + 1, width: status.frame.minX - x - 8, height: kind.lineHeight)
     }
 }
 
 // MARK: - Ads
 
-/// Two clear answers, one picked: block ads and trackers, or leave sites as they are.
+/// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
+/// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let block = ChoiceCard(title: "Block ads and trackers", detail: "Pages load faster, and fewer sites follow you around.", recommended: true)
-    private let allow = ChoiceCard(title: "Leave them on", detail: "Sites show everything, ads included.", recommended: false)
+    private let preview = AdsPreview()
+    private let block = ChoiceCard(title: "Block ads", detail: "Faster pages, less tracking.", recommended: true)
+    private let allow = ChoiceCard(title: "Show ads", detail: "Sites as they come.", recommended: false)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [block, allow].forEach { addSubview($0) }
-        pick(ContentBlocker.isEnabled)
-        block.onClick = { [weak self] _ in self?.pick(true) }
-        allow.onClick = { [weak self] _ in self?.pick(false) }
+        [preview, block, allow].forEach { addSubview($0) }
+        pick(ContentBlocker.isEnabled, animated: false)
+        block.onClick = { [weak self] _ in self?.pick(true, animated: true) }
+        allow.onClick = { [weak self] _ in self?.pick(false, animated: true) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func pick(_ on: Bool) {
+    private func pick(_ on: Bool, animated: Bool) {
         block.isChosen = on
         allow.isChosen = !on
+        preview.setBlocked(on, animated: animated)
     }
 
     override func commit(_ done: @escaping () -> Void) {
@@ -1166,10 +1315,86 @@ private final class AdsPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let w: CGFloat = 420, h: CGFloat = 76, gap: CGFloat = 14
-        let y0 = max(0, (bounds.height - h * 2 - gap) / 2)
-        block.frame = NSRect(x: (bounds.width - w) / 2, y: y0, width: w, height: h)
-        allow.frame = NSRect(x: (bounds.width - w) / 2, y: y0 + h + gap, width: w, height: h)
+        let w: CGFloat = 460, ph: CGFloat = 230, ch: CGFloat = 70, gap: CGFloat = 12
+        let total = ph + 20 + ch
+        let x = (bounds.width - w) / 2, y = max(0, (bounds.height - total) / 2)
+        preview.frame = NSRect(x: x, y: y, width: w, height: ph)
+        let cw = (w - gap) / 2
+        block.frame = NSRect(x: x, y: preview.frame.maxY + 20, width: cw, height: ch)
+        allow.frame = NSRect(x: x + cw + gap, y: preview.frame.maxY + 20, width: cw, height: ch)
+    }
+}
+
+/// A small article page; the ad layer fades in or out over it.
+private final class AdsPreview: NSView {
+    private let ads = NSView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        ads.wantsLayer = true
+        addSubview(PageDrawing())
+        addSubview(ads)
+        ads.addSubview(AdsDrawing())
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    func setBlocked(_ blocked: Bool, animated: Bool) {
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = animated ? 0.3 : 0
+            ads.animator().alphaValue = blocked ? 0 : 1
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        subviews.forEach { $0.frame = bounds }
+        ads.subviews.forEach { $0.frame = bounds }
+    }
+
+    private final class PageDrawing: NSView {
+        override var isFlipped: Bool { true }
+        override func draw(_ dirtyRect: NSRect) {
+            NSColor.white.setFill()
+            bounds.fill()
+            func bar(_ r: NSRect, _ c: NSColor, _ radius: CGFloat = 3) { c.setFill(); NSBezierPath(roundedRect: r, xRadius: radius, yRadius: radius).fill() }
+            bar(NSRect(x: 0, y: 0, width: bounds.width, height: 26), NSColor(white: 0.95, alpha: 1), 0)
+            bar(NSRect(x: 14, y: 9, width: 60, height: 8), NSColor(white: 0.75, alpha: 1))
+            bar(NSRect(x: 40, y: 46, width: bounds.width * 0.55, height: 12), NSColor(white: 0.2, alpha: 1))
+            for (k, f) in [0.82, 0.78, 0.8, 0.7, 0.76, 0.6, 0.8, 0.74].enumerated() {
+                bar(NSRect(x: 40, y: 72 + CGFloat(k) * 16, width: (bounds.width - 80) * f, height: 6), NSColor(white: 0.82, alpha: 1))
+            }
+        }
+    }
+
+    private final class AdsDrawing: NSView {
+        override var isFlipped: Bool { true }
+        override func draw(_ dirtyRect: NSRect) {
+            func ad(_ r: NSRect, _ c: NSColor, label: Bool = true) {
+                c.setFill()
+                NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6).fill()
+                guard label else { return }
+                let text = NSAttributedString(string: "AD", attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .heavy), .foregroundColor: NSColor.white.withAlphaComponent(0.9)])
+                text.draw(at: NSPoint(x: r.minX + 8, y: r.minY + 6))
+            }
+            // A banner across the top, a box in the text, a sticky bar, and a pop-up in the middle.
+            ad(NSRect(x: 40, y: 34, width: bounds.width - 80, height: 34), NSColor.systemOrange.withAlphaComponent(0.85))
+            ad(NSRect(x: bounds.width - 150, y: 82, width: 110, height: 90), NSColor.systemPink.withAlphaComponent(0.8))
+            ad(NSRect(x: 0, y: bounds.height - 30, width: bounds.width, height: 30), NSColor.systemPurple.withAlphaComponent(0.8))
+            NSColor.black.withAlphaComponent(0.25).setFill()
+            NSBezierPath(rect: bounds).fill()
+            let popup = NSRect(x: bounds.midX - 90, y: bounds.midY - 46, width: 180, height: 84)
+            NSColor.white.setFill()
+            NSBezierPath(roundedRect: popup, xRadius: 10, yRadius: 10).fill()
+            ad(NSRect(x: popup.minX + 12, y: popup.minY + 12, width: popup.width - 24, height: 34), NSColor.systemBlue.withAlphaComponent(0.85))
+            NSColor(white: 0.8, alpha: 1).setFill()
+            NSBezierPath(roundedRect: NSRect(x: popup.minX + 12, y: popup.minY + 56, width: 90, height: 8), xRadius: 3, yRadius: 3).fill()
+        }
     }
 }
 
@@ -1224,10 +1449,11 @@ private final class ChoiceCard: InteractiveView {
         dot.frame = NSRect(x: 5, y: 5, width: 10, height: 10)
         let x = ring.frame.maxX + 16
         let block = title.lineHeight + 2 + detail.lineHeight
-        title.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: title.textWidth + 4, height: title.lineHeight)
+        title.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: min(title.textWidth + 4, bounds.width - x - 12), height: title.lineHeight)
         detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: bounds.width - x - 16, height: detail.lineHeight)
         let bw = badge.textWidth + 14
-        badgeFill.frame = NSRect(x: title.frame.maxX + 8, y: title.frame.midY - 10, width: bw, height: 20)
+        // Top right, clear of the title however narrow the card.
+        badgeFill.frame = NSRect(x: bounds.width - bw - 10, y: 10, width: bw, height: 20)
         badge.frame = NSRect(x: 0, y: (20 - badge.lineHeight) / 2, width: bw, height: badge.lineHeight)
     }
 }
@@ -1292,7 +1518,7 @@ private final class ColorPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let ww: CGFloat = 400, wh: CGFloat = 230
+        let ww: CGFloat = 480, wh: CGFloat = 270
         let size: CGFloat = 30, gap: CGFloat = 12
         let swW = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap
         let lookW = looks.map { $0.1.fittingWidth }.reduce(0, +) + CGFloat(looks.count - 1) * 8
@@ -1354,44 +1580,60 @@ private final class MiniBrowser: NSView {
             color.setFill()
             NSBezierPath(roundedRect: r, xRadius: radius, yRadius: radius).fill()
         }
-        let side: CGFloat = 112, pad: CGFloat = 10
+        func text(_ string: String, _ point: NSPoint, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor, width: CGFloat = 200) {
+            let style = NSMutableParagraphStyle()
+            style.lineBreakMode = .byTruncatingTail
+            NSAttributedString(string: string, attributes: [.font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color, .paragraphStyle: style])
+                .draw(with: NSRect(x: point.x, y: point.y, width: width, height: size * 1.4), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
+        }
+        let side: CGFloat = 150, pad: CGFloat = 12
         // Traffic lights.
         for (i, c) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
-            c.withAlphaComponent(0.9).setFill()
-            NSBezierPath(ovalIn: NSRect(x: pad + CGFloat(i) * 11, y: 10, width: 7, height: 7)).fill()
+            c.setFill()
+            NSBezierPath(ovalIn: NSRect(x: pad + CGFloat(i) * 13, y: 12, width: 8, height: 8)).fill()
         }
         // Address field.
-        box(NSRect(x: pad, y: 26, width: side - pad * 2, height: 14), ink.withAlphaComponent(0.07), 5)
-        // Favorites.
+        box(NSRect(x: pad, y: 30, width: side - pad * 2, height: 20), ink.withAlphaComponent(0.07), 6)
+        text("wikipedia.org", NSPoint(x: pad + 8, y: 33), size: 10, color: ink.withAlphaComponent(0.55), width: side - pad * 2 - 12)
+        // Favorites: the sites you picked, with their own icons.
+        let picks = Library.shared.favorites.prefix(3)
         let favW = (side - pad * 2 - 8) / 3
-        let favColors: [NSColor] = [.systemRed, .systemRed.blended(withFraction: 0.3, of: .systemOrange) ?? .systemRed, .systemBlue]
         for i in 0..<3 {
-            let r = NSRect(x: pad + CGFloat(i) * (favW + 4), y: 46, width: favW, height: 20)
-            box(r, ink.withAlphaComponent(0.06), 5)
-            box(NSRect(x: r.midX - 4, y: r.midY - 4, width: 8, height: 8), favColors[i].withAlphaComponent(0.85), 2)
+            let r = NSRect(x: pad + CGFloat(i) * (favW + 4), y: 58, width: favW, height: 28)
+            box(r, ink.withAlphaComponent(0.06), 7)
+            if i < picks.count, let icon = FaviconStore.shared.cachedIcon(for: picks[picks.startIndex + i].url) {
+                icon.draw(in: NSRect(x: r.midX - 7, y: r.midY - 7, width: 14, height: 14))
+            } else {
+                box(NSRect(x: r.midX - 5, y: r.midY - 5, width: 10, height: 10), ink.withAlphaComponent(0.15), 3)
+            }
         }
-        // Tabs: one selected, lit like the real thing.
-        for i in 0..<4 {
-            let r = NSRect(x: pad - 2, y: 76 + CGFloat(i) * 18, width: side - pad * 2 + 4, height: 15)
-            if i == 1 { box(r, isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.8), 5) }
-            box(NSRect(x: r.minX + 5, y: r.midY - 3, width: 6, height: 6), (i == 1 ? accent : ink.withAlphaComponent(0.25)), 2)
-            box(NSRect(x: r.minX + 15, y: r.midY - 2, width: [52, 62, 44, 56][i], height: 4), ink.withAlphaComponent(i == 1 ? 0.45 : 0.18), 2)
+        // The space's name and its tabs, one selected.
+        text(Library.shared.spaces.first?.name ?? "Personal", NSPoint(x: pad + 2, y: 96), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
+        for (i, title) in ["Wikipedia", "Getting started", "Recipes", "Trip ideas"].enumerated() {
+            let r = NSRect(x: pad - 3, y: 114 + CGFloat(i) * 24, width: side - pad * 2 + 6, height: 21)
+            if i == 0 { box(r, isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.85), 6) }
+            box(NSRect(x: r.minX + 6, y: r.midY - 4, width: 8, height: 8), i == 0 ? accent : ink.withAlphaComponent(0.25), 2)
+            text(title, NSPoint(x: r.minX + 20, y: r.minY + 4), size: 10.5, weight: i == 0 ? .medium : .regular,
+                 color: ink.withAlphaComponent(i == 0 ? 0.85 : 0.6), width: r.width - 26)
         }
         // Space dots, the current one in the accent.
         for i in 0..<3 {
             (i == 0 ? accent : ink.withAlphaComponent(0.2)).setFill()
-            NSBezierPath(ovalIn: NSRect(x: side / 2 - 16 + CGFloat(i) * 13, y: bounds.height - 16, width: 6, height: 6)).fill()
+            NSBezierPath(ovalIn: NSRect(x: side / 2 - 18 + CGFloat(i) * 14, y: bounds.height - 18, width: 7, height: 7)).fill()
         }
         // The page.
-        let page = NSRect(x: side, y: 8, width: bounds.width - side - 8, height: bounds.height - 16)
-        box(page, isDark ? NSColor(white: 0.12, alpha: 1) : .white, 8)
-        let text = (isDark ? NSColor.white : NSColor.black)
-        box(NSRect(x: page.minX + 14, y: page.minY + 16, width: page.width * 0.5, height: 8), text.withAlphaComponent(0.7), 3)
-        for (k, w) in [0.86, 0.78, 0.82, 0.6].enumerated() {
-            box(NSRect(x: page.minX + 14, y: page.minY + 34 + CGFloat(k) * 11, width: (page.width - 28) * w, height: 5), text.withAlphaComponent(0.14), 2)
+        let page = NSRect(x: side, y: 10, width: bounds.width - side - 10, height: bounds.height - 20)
+        let pageInk = isDark ? NSColor.white : NSColor.black
+        box(page, isDark ? NSColor(white: 0.12, alpha: 1) : .white, 9)
+        text("Wikipedia", NSPoint(x: page.minX + 18, y: page.minY + 16), size: 16, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: page.width - 36)
+        text("The free encyclopedia", NSPoint(x: page.minX + 18, y: page.minY + 38), size: 10, color: pageInk.withAlphaComponent(0.5), width: page.width - 36)
+        for (k, w) in [0.9, 0.82, 0.86, 0.64].enumerated() {
+            box(NSRect(x: page.minX + 18, y: page.minY + 64 + CGFloat(k) * 12, width: (page.width - 36) * w, height: 5), pageInk.withAlphaComponent(0.12), 2)
         }
-        box(NSRect(x: page.minX + 14, y: page.minY + 86, width: page.width - 28, height: page.height - 100), accent.withAlphaComponent(0.18), 6)
-        box(NSRect(x: page.minX + 14, y: page.minY + 86, width: 54, height: 16), accent, 5)
+        let card = NSRect(x: page.minX + 18, y: page.minY + 122, width: page.width - 36, height: page.height - 140)
+        box(card, accent.withAlphaComponent(0.16), 8)
+        box(NSRect(x: card.minX + 12, y: card.minY + 12, width: 70, height: 20), accent, 6)
+        text("Read more", NSPoint(x: card.minX + 20, y: card.minY + 15), size: 9.5, weight: .semibold, color: .white, width: 60)
     }
 }
 

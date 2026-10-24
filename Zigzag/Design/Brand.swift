@@ -120,6 +120,9 @@ enum Brand {
     /// Display type for brand moments: SF Pro, heavy, tight.
     /// `wraps` lets a heading run onto more lines instead of ending in "…"; use it wherever the text is a
     /// sentence or a name of unknown length.
+    /// The display face on its own, for labels that set their own text.
+    static func displayFont(_ size: CGFloat) -> NSFont { .systemFont(ofSize: size, weight: .heavy) }
+
     static func display(_ text: String, size: CGFloat, color: NSColor, alignment: NSTextAlignment = .natural, wraps: Bool = false) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = alignment
