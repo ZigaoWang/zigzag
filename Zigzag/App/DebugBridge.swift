@@ -188,6 +188,7 @@ enum DebugBridge {
             debugLog("arc import: spaces=\(r.result.spaces) bookmarks=\(r.result.bookmarks) history=\(r.result.historyEntries)")
             if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
         case "welcome": controller.showWelcome()
+        case "importwindow": ImportWindowController.show()
         case "key":
             // key <char> [cmd|shift|ctrl|opt...] — goes through the real event path, menus included.
             let f = arg.split(separator: " ").map(String.init)
