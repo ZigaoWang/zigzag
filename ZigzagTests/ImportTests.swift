@@ -89,3 +89,36 @@ struct CSVImportTests {
         if case .success = CSVImporter.parse("a,b,c\n1,2,3") { Issue.record("should not parse") }
     }
 }
+
+/// Against a profile built outside Zigzag by scripts/make_firefox_fixture.py from NSS's formats.
+struct FirefoxDecryptionTests {
+    var profile: URL {
+        get throws {
+            let key4 = try #require(Bundle(for: FixtureMarker.self).url(forResource: "key4", withExtension: "db"))
+            return key4.deletingLastPathComponent()
+        }
+    }
+
+    @Test func unwrapsTheLoginKeyWithNoPrimaryPassword() throws {
+        guard case .success(let key) = FirefoxImporter.key(in: try profile, primaryPassword: "") else { Issue.record("no key"); return }
+        #expect(key == Data(100..<124))
+    }
+
+    @Test func decryptsALogin() throws {
+        guard case .success(let key) = FirefoxImporter.key(in: try profile, primaryPassword: "") else { Issue.record("no key"); return }
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: try profile.appendingPathComponent("logins.json"))) as? [String: Any]
+        let login = try #require((json?["logins"] as? [[String: Any]])?.first)
+        let user = try #require(FirefoxImporter.decryptField(login["encryptedUsername"] as! String, key: key))
+        let password = try #require(FirefoxImporter.decryptField(login["encryptedPassword"] as! String, key: key))
+        #expect(user.matches(SecretString("octocat")))
+        #expect(password.matches(SecretString("zigzag-firefox-test")))
+    }
+
+    @Test func aWrongPrimaryPasswordIsRefused() throws {
+        guard case .failure(.primaryPassword) = FirefoxImporter.key(in: try profile, primaryPassword: "not it") else {
+            Issue.record("a wrong primary password must not open the key"); return
+        }
+    }
+}
+
+private final class FixtureMarker {}
