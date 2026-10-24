@@ -31,7 +31,7 @@ nonisolated struct ImportProblem: Sendable, Hashable {
         case retry
         /// Ask for a primary password and try again.
         case primaryPassword
-        /// Open System Settings › Privacy & Security › Full Disk Access.
+        /// Open System Settings › Privacy & Security › Files & Folders, where macOS lists the browsers Zigzag asked for.
         case fullDiskAccess
         /// Show how to export passwords from Safari or the Passwords app, then choose the file.
         case exportFromApplePasswords

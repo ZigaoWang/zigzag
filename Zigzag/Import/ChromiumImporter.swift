@@ -63,7 +63,7 @@ nonisolated enum ChromiumImporter {
         let files = profiles.flatMap { profile in ["Login Data", "Bookmarks", "History"].map { profile.appendingPathComponent($0) } }
         if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) })
             || (profiles.isEmpty && FileManager.default.fileExists(atPath: rootURL(of: browser).path)) {
-            batch.problems.append(ImportProblem(message: "macOS is keeping \(browser.name)'s data private. Give Zigzag Full Disk Access in System Settings, then try again.", fix: .fullDiskAccess))
+            batch.problems.append(ImportProblem(message: "macOS keeps \(browser.name)’s data private until you allow it. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on \(browser.name), then try again.", fix: .fullDiskAccess))
             return batch
         }
         if choice.contains(.passwords) {

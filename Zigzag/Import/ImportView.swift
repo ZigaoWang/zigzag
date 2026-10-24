@@ -212,9 +212,11 @@ final class ImportView: NSView {
                 finish()
             }
         case .fullDiskAccess:
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
         case .exportFromApplePasswords:
-            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Passwords") {
+            // Safari's own export holds its bookmarks and history; for passwords alone it's the Passwords app.
+            let isSafari: Bool = { if case .safari = row.source.kind { true } else { false } }()
+            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: isSafari ? SafariImporter.bundleID : "com.apple.Passwords") {
                 NSWorkspace.shared.openApplication(at: app, configuration: .init())
             }
             pickFile()
@@ -445,7 +447,7 @@ private final class SourceRow: InteractiveView {
         let title: String
         switch fix {
         case .retry: title = "Try Again"
-        case .fullDiskAccess: title = "Open Full Disk Access"
+        case .fullDiskAccess: title = "Open Settings"
         case .exportFromApplePasswords: title = "Show Me How"
         case .primaryPassword: title = "Unlock"
         case .none: return

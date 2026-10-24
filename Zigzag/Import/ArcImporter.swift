@@ -15,14 +15,14 @@ enum ArcImporter {
 
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Zigzag", category: "import")
 
-    /// Turns a file error into something to show: macOS refusing access gets the Full Disk Access fix.
+    /// Turns a file error into something to show: macOS refusing access gets the fix that opens its setting.
     private static func problem(reading what: String, _ error: Error) -> ImportProblem {
         let ns = error as NSError
         log.error("Arc import: couldn't read \(what, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
         let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
             || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
         if denied {
-            return ImportProblem(message: "macOS didn’t let Zigzag read Arc’s \(what). Allow Zigzag in Full Disk Access, then try again.", fix: .fullDiskAccess)
+            return ImportProblem(message: "macOS didn’t let Zigzag read Arc’s \(what). In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.", fix: .fullDiskAccess)
         }
         return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what) (\(ns.localizedDescription)). Try again.", fix: .retry)
     }
