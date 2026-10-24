@@ -7,12 +7,16 @@ import UniformTypeIdentifiers
 final class ImportView: NSView {
     var onClose: (() -> Void)?
 
-    /// First launch shows it in the empty page, under the wordmark; elsewhere it's its own window, under a banner.
+    /// First launch shows it as the right half of the welcome window (the brand panel on the left carries the
+    /// titles); from Settings and the command bar it's its own window, under a header.
     enum Presentation { case welcome, window }
     let presentation: Presentation
 
-    private enum Stage { case choose, importing, done }
-    private var stage = Stage.choose
+    enum Stage { case choose, importing, done }
+    private(set) var stage = Stage.choose { didSet { if oldValue != stage { onStageChange?(stage) } } }
+    /// The welcome window follows along, retitling its brand panel at each step.
+    var onStageChange: ((Stage) -> Void)?
+    private let showPasswords = TextButton(title: "Open Zigzag Passwords", font: Tokens.Font.body(.medium))
 
     private let hero = ImportHero()
     private let banner = BrandBanner()
@@ -35,11 +39,9 @@ final class ImportView: NSView {
         wantsLayer = true
         switch presentation {
         case .welcome:
-            // It sits in the page; whatever page is there stays out of sight behind it.
-            layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
-            title.stringValue = "Welcome to Zigzag"
-            subtitle.stringValue = "Bring your passwords, bookmarks and Arc spaces over in one go. Your other browser stays exactly as it is."
-            addSubview(hero)
+            title.stringValue = ""
+            subtitle.stringValue = ""
+            secondary.title = "Skip"
         case .window:
             title.stringValue = ""
             subtitle.stringValue = ""
@@ -62,6 +64,10 @@ final class ImportView: NSView {
             choiceButtons.append((choice, box))
         }
         chooseFile.onClick = { [weak self] _ in self?.pickFile() }
+        showPasswords.showsFillAtRest = true
+        showPasswords.isHidden = true
+        showPasswords.onClick = { _ in PasswordsWindowController.show() }
+        addSubview(showPasswords)
         primary.onClick = { [weak self] _ in self?.primaryAction() }
         secondary.onClick = { [weak self] _ in self?.onClose?() }
         reloadSources()
@@ -69,18 +75,6 @@ final class ImportView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        if presentation == .welcome { layer?.backgroundColor = cgColor(Tokens.Color.cardBackground) }
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        guard window != nil, presentation == .welcome else { return }
-        hero.showWordmark(drawIn: !Brand.hasDrawnIn)
-        Brand.hasDrawnIn = true
-    }
 
     private func reloadSources() {
         rows.forEach { $0.removeFromSuperview() }
@@ -155,13 +149,17 @@ final class ImportView: NSView {
 
     private func finish() {
         stage = .done
-        title.stringValue = "You’re all set"
-        subtitle.stringValue = "Passwords are in your Keychain and sync with iCloud Keychain. They’re in Passwords whenever you need them."
+        title.stringValue = presentation == .window ? "You’re all set" : ""
+        let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
+        subtitle.stringValue = passwords > 0
+            ? "Your passwords are saved in Zigzag: in your Mac’s Keychain, synced with iCloud Keychain. Find them in Zigzag’s Passwords window, from Settings or the command bar."
+            : "Everything that came over is in your sidebar. You can bring more over anytime from Settings."
+        showPasswords.isHidden = passwords == 0
         // The finished moment: the lit surface, the count, and the ribbon writing itself across it.
         if hero.superview == nil { addSubview(hero) }
         banner.isHidden = true
         hero.showSuccess(summaries)
-        primary.title = "Done"
+        primary.title = presentation == .welcome ? "Start Browsing" : "Done"
         fitWindow()
         primary.isEnabled = true
         needsLayout = true
@@ -239,7 +237,7 @@ final class ImportView: NSView {
 
     override func layout() {
         super.layout()
-        let width: CGFloat = 440
+        let width: CGFloat = min(440, bounds.width - Tokens.Space.x8 * 2)
         let x = round((bounds.width - width) / 2)
         var y: CGFloat = 0
         func place(_ view: NSView, height: CGFloat, gap: CGFloat = 0) {
@@ -262,7 +260,7 @@ final class ImportView: NSView {
             banner.contentInset = x
             y = (banner.isHidden ? Tokens.Space.x12 : banner.frame.maxY + Tokens.Space.x6)
         } else {
-            y = max(Tokens.Space.x8, round((bounds.height - total) / 2))
+            y = max(Tokens.Space.x16, round((bounds.height - total) / 2))
         }
         if showsHero {
             hero.frame = NSRect(x: x, y: y, width: width, height: ImportHero.height)
@@ -270,10 +268,8 @@ final class ImportView: NSView {
         }
         title.alignment = .left
         title.attributedStringValue = Brand.display(title.stringValue, size: 22, color: Tokens.Color.textPrimary)
-        if !title.stringValue.isEmpty {
-            place(title, height: titleHeight, gap: Tokens.Space.x2)
-            place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6)
-        }
+        if !title.stringValue.isEmpty { place(title, height: titleHeight, gap: Tokens.Space.x2) }
+        if !subtitle.stringValue.isEmpty { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
         if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
         for row in visibleRows { place(row, height: row.preferredHeight, gap: Tokens.Space.x2) }
         if showsChoices {
@@ -296,6 +292,10 @@ final class ImportView: NSView {
         if !secondary.isHidden {
             let sw = secondary.fittingWidth
             secondary.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - sw, y: y, width: sw, height: buttonHeight)
+        }
+        if !showPasswords.isHidden {
+            let w = showPasswords.fittingWidth + Tokens.Space.x2
+            showPasswords.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - w, y: y, width: w, height: buttonHeight)
         }
         if !chooseFile.isHidden {
             chooseFile.frame = NSRect(x: x - Tokens.Space.x2, y: y, width: chooseFile.fittingWidth, height: buttonHeight)
