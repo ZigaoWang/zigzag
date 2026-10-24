@@ -46,6 +46,10 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
+        case "settingsspaceedit":
+            func rows(_ v: NSView) -> [SpaceSettingsRow] { (v as? SpaceSettingsRow).map { [$0] } ?? v.subviews.flatMap(rows) }
+            if let root = SettingsWindowController.shared.window?.contentView { rows(root).first?.openEditor() }
+        case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
         case "space": controller.tabManager.switchSpace(by: Int(arg) ?? 1)
         case "newspace":
