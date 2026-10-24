@@ -9,16 +9,30 @@ enum Tutorial {
     struct Task {
         let id: String
         let title: String
+        /// What it's for, in a sentence.
+        let why: String
+        /// Exactly what to do now, building on the step before.
         let how: String
         let keys: [String]
     }
 
+    /// In order: each step uses what the one before left on screen.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Open a new website", how: "Press ⌘T, type an address or a search, and press Return.", keys: ["⌘", "T"]),
-        Task(id: "pin", title: "Pin a page you use a lot", how: "On any page, press ⌘D. It stays at the top of your sidebar, even after you close it.", keys: ["⌘", "D"]),
-        Task(id: "peek", title: "Peek at a link", how: "Hold Shift and click a link. It opens over the page, and Esc puts it away.", keys: ["⇧", "Click"]),
-        Task(id: "split", title: "Put two pages side by side", how: "Drag a tab from the sidebar onto the page, or right-click a tab and choose Open in Split View.", keys: ["Drag"]),
-        Task(id: "space", title: "Make a space", how: "Click + next to the dots at the bottom of the sidebar. Each space keeps its own tabs and pins.", keys: ["⌥", "⌘", "N"]),
+        Task(id: "newTab", title: "Open a website",
+             why: "One field for addresses and searches, from anywhere.",
+             how: "Press ⌘T, type wikipedia.org, and press Return.", keys: ["⌘", "T"]),
+        Task(id: "pin", title: "Pin it",
+             why: "Pinned pages stay at the top of the sidebar, even after you close them.",
+             how: "With that page open, press ⌘D.", keys: ["⌘", "D"]),
+        Task(id: "peek", title: "Peek at a link",
+             why: "Look at a link without leaving the page you’re on.",
+             how: "Hold Shift and click any link on the page. Press Esc to close it.", keys: ["⇧", "Click"]),
+        Task(id: "split", title: "See two pages at once",
+             why: "Split view puts two pages side by side in one window.",
+             how: "Right-click Getting started in the sidebar and choose Open in Split View.", keys: ["Right-click"]),
+        Task(id: "space", title: "Make a space",
+             why: "A space for each part of your life, each with its own tabs and pins.",
+             how: "Click + at the bottom of the sidebar, next to the dots.", keys: ["+"]),
     ]
 
     private static let key = "TutorialDone"
@@ -27,29 +41,47 @@ enum Tutorial {
         set { UserDefaults.standard.set(Array(newValue), forKey: key) }
     }
 
+    /// The step to do now: the first in order that isn't done.
+    static var current: Task? { tasks.first { !done.contains($0.id) } }
+
+    /// Closed from the guide card; Help › Getting Started opens it again.
+    static var isHidden: Bool {
+        get { UserDefaults.standard.bool(forKey: "TutorialHidden") }
+        set { UserDefaults.standard.set(newValue, forKey: "TutorialHidden") }
+    }
+
+    /// Sent when a step is done, skipped, or the guide is shown or hidden.
+    @MainActor static let changed = Signal<Void>()
+
     static func isWelcome(_ url: URL?) -> Bool { url?.scheme == "zigzag" && url?.host() == "welcome" }
 
     /// You did one: remember it, and tick it on any Getting started page that's open.
     @MainActor static func complete(_ id: String) {
         guard !done.contains(id), tasks.contains(where: { $0.id == id }) else { return }
         done.insert(id)
+        let next = current?.id ?? ""
         for controller in WindowManager.shared.controllers {
             for tab in controller.tabManager.allTabs where isWelcome(tab.url) {
-                tab.webView?.evaluateJavaScript("window.zzDone && zzDone('\(id)')")
+                tab.webView?.evaluateJavaScript("window.zzDone && zzDone('\(id)', '\(next)')")
             }
         }
+        changed.send(())
     }
+
+    @MainActor static func skip() { if let current { complete(current.id) } }
 
     // MARK: The page
 
     static func html() -> String {
         let done = self.done
-        let rows = tasks.map { task in
+        let now = current?.id
+        let rows = tasks.enumerated().map { i, task in
             let keys = task.keys.map { "<kbd>\($0)</kbd>" }.joined()
+            let state = done.contains(task.id) ? " done" : task.id == now ? " now" : ""
             return """
-            <li class="task\(done.contains(task.id) ? " done" : "")" id="\(task.id)">
-              <span class="check"><svg viewBox="0 0 16 16"><path d="M4 8.5l2.6 2.6L12 5.6"/></svg></span>
-              <div class="text"><h3>\(task.title)</h3><p>\(task.how)</p></div>
+            <li class="task\(state)" id="\(task.id)">
+              <span class="check"><b>\(i + 1)</b><svg viewBox="0 0 16 16"><path d="M4 8.5l2.6 2.6L12 5.6"/></svg></span>
+              <div class="text"><h3>\(task.title)<em>Up next</em></h3><p>\(task.why)</p><p class="how">\(task.how)</p></div>
               <span class="keys">\(keys)</span>
             </li>
             """
@@ -78,14 +110,24 @@ enum Tutorial {
                overflow: hidden; }
           .task { display: flex; align-items: center; gap: 16px; padding: 18px 20px; }
           .task + .task { border-top: 1px solid var(--line); }
-          .check { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line);
+          .check { position: relative; flex: none; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line);
                    display: grid; place-items: center; transition: background .3s, border-color .3s; }
-          .check svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+          .check b { font-size: 12px; font-weight: 600; color: var(--dim); }
+          .done .check b { display: none; }
+          .check svg { position: absolute; width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
                        stroke-dasharray: 14; stroke-dashoffset: 14; transition: stroke-dashoffset .35s .1s ease-out; }
           .done .check { background: var(--accent); border-color: var(--accent); }
           .done .check svg { stroke-dashoffset: 0; }
           @media (prefers-color-scheme: dark) { .check svg { stroke: #151A22; } }
           .text { flex: 1; min-width: 0; }
+          .how { display: none; color: var(--ink); margin-top: 6px; font-weight: 500; }
+          .now { background: var(--accent-soft); }
+          .now .how { display: block; }
+          .now .check { border-color: var(--accent); }
+          .now .check b { color: var(--accent); }
+          h3 em { display: none; font-style: normal; font-size: 11px; font-weight: 600; color: var(--accent); margin-left: 8px;
+                  padding: 2px 7px; border-radius: 6px; background: var(--card); vertical-align: 1px; }
+          .now h3 em { display: inline-block; }
           h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; transition: color .3s; }
           p { margin: 0; color: var(--dim); font-size: 13.5px; }
           .done h3 { color: var(--dim); }
@@ -98,21 +140,24 @@ enum Tutorial {
         </style></head>
         <body class="\(done.count == tasks.count ? "all" : "")"><main>
           <p class="eyebrow">Getting started</p>
-          <h1>Five things worth trying</h1>
-          <p class="lead">Each one ticks itself off when you do it. Start with the first: it’s the one you’ll use most.</p>
+          <h1>Learn Zigzag in five steps</h1>
+          <p class="lead">A guide in the bottom corner of the window shows each step as you go, on any tab. Do it, and the next one appears.</p>
           <div class="progress"><span id="count">\(done.count) of \(tasks.count)</span><div class="bar"><i id="fill" style="width:\(Int(Double(done.count) / Double(tasks.count) * 100))%"></i></div></div>
           <ol>
           \(rows)
           </ol>
-          <div class="finished"><strong>You’ve got it.</strong> Close this tab with ⌘W whenever you like; it’s pinned, so it’s here if you want it again.</div>
+          <div class="finished"><strong>That’s the basics.</strong> Close this tab with ⌘W whenever you like. Help › Getting Started brings it back.</div>
           <footer>Every shortcut is in Settings › Shortcuts, and you can change any of them there.</footer>
         </main>
         <script>
           const total = \(tasks.count);
-          window.zzDone = (id) => {
+          window.zzDone = (id, next) => {
             const el = document.getElementById(id);
             if (!el || el.classList.contains('done')) return;
+            el.classList.remove('now');
             el.classList.add('done');
+            const up = next && document.getElementById(next);
+            if (up) up.classList.add('now');
             const n = document.querySelectorAll('.task.done').length;
             document.getElementById('count').textContent = n + ' of ' + total;
             document.getElementById('fill').style.width = (n / total * 100) + '%';
