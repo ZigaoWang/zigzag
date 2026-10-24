@@ -417,6 +417,11 @@ extension Tab: WKNavigationDelegate {
             return (.cancel, preferences)
         }
 
+        // The page's ad blocking follows where it's going: allowed sites load without it.
+        if navigationAction.targetFrame?.isMainFrame ?? true, !showsExtensionPage {
+            ContentBlocker.apply(to: webView, for: url)
+        }
+
         // Going between an extension's pages and the web takes a different web view.
         if navigationAction.targetFrame?.isMainFrame ?? true, Self.isExtensionPage(url) != showsExtensionPage,
            ["http", "https", "webkit-extension"].contains(url.scheme?.lowercased() ?? "") {

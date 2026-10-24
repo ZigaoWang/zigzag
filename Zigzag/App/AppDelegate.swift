@@ -4,6 +4,7 @@ import WebKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
     private var launched = false
+    private var blockerToken: SignalToken?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.build()
@@ -15,6 +16,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = Library.shared
         _ = HistoryStore.shared
         ContentBlocker.prepare()
+        // New lists or settings reach open pages on their next load.
+        blockerToken = ContentBlocker.changed.observe {
+            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+                if let webView = tab.webView, !Tab.isExtensionPage(tab.url) { ContentBlocker.apply(to: webView, for: tab.url) }
+            }
+        }
         if #available(macOS 15.4, *) {
             ExtensionStore.setUpIfNeeded()
         }
