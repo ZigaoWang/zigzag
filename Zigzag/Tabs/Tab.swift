@@ -91,7 +91,11 @@ final class Tab: NSObject {
     private var extensionToken: SignalToken?
 
     var isSuspended: Bool { webView == nil }
+    /// A name you gave the tab (double-click to rename); it stays whatever the page calls itself.
+    var customTitle: String? { didSet { if oldValue != customTitle { changed.send(.title) } } }
+
     var displayTitle: String {
+        if let customTitle, !customTitle.isEmpty { return customTitle }
         if !title.isEmpty { return title }
         return url?.host() ?? "New Tab"
     }

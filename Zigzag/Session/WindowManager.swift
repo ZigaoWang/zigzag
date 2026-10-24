@@ -8,6 +8,8 @@ struct SessionState: Codable {
         var title: String
         var lastActivated: Date
         var createdAt: Date
+        /// A name you gave the tab; older sessions don't have one.
+        var customTitle: String? = nil
     }
 
     struct SpaceTabs: Codable {
@@ -169,7 +171,8 @@ final class WindowManager {
         let manager = controller.tabManager
         let frame = controller.window?.frame ?? .zero
         func state(_ tab: Tab) -> SessionState.TabState {
-            SessionState.TabState(id: tab.id, url: tab.url, title: tab.displayTitle, lastActivated: tab.lastActivated, createdAt: tab.createdAt)
+            SessionState.TabState(id: tab.id, url: tab.url, title: tab.title.isEmpty ? tab.displayTitle : tab.title, lastActivated: tab.lastActivated,
+                                  createdAt: tab.createdAt, customTitle: tab.customTitle)
         }
         let spaces = Library.shared.spaces.map { space in
             SessionState.SpaceTabs(spaceID: space.id, tabs: manager.tabs(in: space.id).filter { $0.url != nil }.map(state),
@@ -225,8 +228,10 @@ final class WindowManager {
 
     private func restoreTab(_ state: SessionState.TabState, spaceID: UUID) -> Tab {
         let interaction = try? Data(contentsOf: Paths.tabState.appendingPathComponent(state.id.uuidString))
-        return Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
-                   lastActivated: state.lastActivated, createdAt: state.createdAt)
+        let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
+                      lastActivated: state.lastActivated, createdAt: state.createdAt)
+        tab.customTitle = state.customTitle
+        return tab
     }
 
     func prepareForTermination() {
