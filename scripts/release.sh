@@ -8,6 +8,7 @@
 # Usage: scripts/release.sh            build, sign, notarize, staple, appcast
 #        scripts/release.sh --publish  also create the GitHub release with gh
 #        scripts/release.sh --local    build and sign with Developer ID only, to use on this Mac
+#        (plain run: build, sign, notarize and staple; --publish also writes the appcast and releases)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -48,11 +49,11 @@ xcrun stapler staple "$APP"
 rm "$ZIP" && ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 spctl --assess --type execute --verbose "$APP"
 
-echo "Writing appcast…"
-GENERATE=$(find build/rd/SourcePackages build/dd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1)
-"$GENERATE" --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" "$OUT/updates"
-
 if [[ "${1:-}" == "--publish" ]]; then
+  # The appcast needs Sparkle's signing key from the keychain, which may ask; only publishing needs it.
+  echo "Writing appcast…"
+  GENERATE=$(find build/rd/SourcePackages build/dd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1)
+  "$GENERATE" --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" "$OUT/updates"
   gh release create "v$VERSION" "$ZIP" "$OUT/updates/appcast.xml" --repo "$REPO" --title "Zigzag $VERSION" --notes "Zigzag $VERSION"
 fi
 echo "Done: $ZIP"
