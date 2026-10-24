@@ -347,8 +347,15 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         lastAction = action
         guard let popover = action.popupPopover else { completionHandler(nil); return }
-        let anchor = actionAnchor ?? WindowManager.shared.keyController?.sidebar.address
-        guard let anchor, anchor.window != nil else { completionHandler(nil); return }
+        // Asked by the page (1Password's "Unlock" button) rather than a click: the button pressed last may be
+        // gone with its panel, so the popup comes from the address bar instead of not at all.
+        let pressed = actionAnchor.flatMap { $0.window != nil ? $0 : nil }
+        let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
+        guard let anchor = pressed ?? controller?.sidebar.address, anchor.window != nil else {
+            completionHandler(NSError(domain: "Zigzag", code: 2, userInfo: [NSLocalizedDescriptionKey: "No window to show the popup in"]))
+            return
+        }
+        if pressed == nil { controller?.closeFloatingPanels() }
         popover.behavior = .semitransient
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
         completionHandler(nil)
