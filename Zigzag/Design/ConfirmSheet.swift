@@ -52,6 +52,12 @@ final class ConfirmSheet: NSView {
         }
     }
 
+    /// Something that didn't work, said plainly, with one button to acknowledge it.
+    static func notice(in host: NSView, title: String, message: String) {
+        show(in: host, title: title, message: message, confirmTitle: "OK") { _ in }
+        (host.subviews.last as? ConfirmSheet)?.cancel.isHidden = true
+    }
+
     private func finish(_ confirmed: Bool) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
