@@ -879,8 +879,11 @@ private final class BringPicker: StepContent {
 
 /// The import step's picture: the browsers you've picked, the way across, and Zigzag. While importing, dots
 /// run along the way across; when it's done, Zigzag gets a check.
-private final class IntoZigzag: NSView {
+final class IntoZigzag: NSView {
     enum State { case idle, importing, done }
+    #if DEBUG
+    static weak var shown: IntoZigzag?
+    #endif
     private var sources: [NSImageView] = []
     private let zigzag = NSImageView()
     private var dots: [CALayer] = []
@@ -892,6 +895,10 @@ private final class IntoZigzag: NSView {
         super.init(frame: frame)
         wantsLayer = true
         zigzag.image = NSApp.applicationIconImage
+        zigzag.wantsLayer = true
+        #if DEBUG
+        Self.shown = self
+        #endif
         badge.image = Tokens.Symbol.image("checkmark.circle.fill", size: 38)
         badge.contentTintColor = Tokens.Color.success
         badge.wantsLayer = true
@@ -937,7 +944,40 @@ private final class IntoZigzag: NSView {
             dot.add(pulse, forKey: "run")
         }
         caption.stringValue = new == .importing ? "Bringing it over…" : new == .done ? "All in Zigzag" : ""
-        badge.isHidden = new != .done
+        badge.isHidden = true
+        if new == .done {
+            // Each browser glides into Zigzag and fades, one after another; then Zigzag gets a little pop.
+            let target = zigzag.frame
+            for (k, view) in sources.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.07) {
+                    NSAnimationContext.runAnimationGroup({ ctx in
+                        ctx.duration = 0.45
+                        ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.5, 0, 0.3, 1)
+                        view.animator().frame = target.insetBy(dx: 26, dy: 26)
+                        view.animator().alphaValue = 0
+                    }, completionHandler: { view.removeFromSuperview() })
+                }
+            }
+            Tokens.Motion.withoutAnimation { dots.forEach { $0.isHidden = true } }
+            let delay = 0.45 + Double(max(sources.count - 1, 0)) * 0.07
+            sources = []
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, let layer = self.zigzag.layer else { return }
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.5
+                    ctx.allowsImplicitAnimation = true
+                    self.layoutSubtreeIfNeeded()
+                }
+                let pop = CASpringAnimation(keyPath: "transform.scale")
+                pop.fromValue = 0.9
+                pop.toValue = 1
+                pop.damping = 10
+                pop.duration = pop.settlingDuration
+                layer.add(pop, forKey: "pop")
+                self.needsLayout = true
+            }
+            return
+        }
         if new == .done, let layer = badge.layer {
             // The check lands with a little give, once.
             layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
@@ -984,6 +1024,17 @@ private final class IntoZigzag: NSView {
         // Done: the dots give way to one check, halfway across.
         badge.frame = NSRect(x: x - way / 2 - 20, y: mid - 20, width: 40, height: 40)
         caption.frame = NSRect(x: 0, y: top + size + 28, width: bounds.width, height: caption.lineHeight)
+        if state == .done {
+            let check = NSTextAttachment()
+            let symbol = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold).applying(.init(paletteColors: [.white, Tokens.Color.success])))
+            check.image = symbol
+            let text = NSMutableAttributedString(attachment: check)
+            text.append(NSAttributedString(string: "  All in Zigzag", attributes: [.font: NSFont.systemFont(ofSize: 15, weight: .semibold), .foregroundColor: Brand.ribbon]))
+            let style = NSMutableParagraphStyle(); style.alignment = .center
+            text.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: text.length))
+            caption.attributedStringValue = text
+        }
     }
 }
 
@@ -1580,6 +1631,8 @@ private final class ColorPicker: StepContent {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        // A colorless space starts on Zigzag's blue, so the knob, the swatch and the window all agree from the start.
+        if let id = self.space?.id, self.space?.hue == nil, self.space?.color == .graphite { Library.shared.setColor(.sky, for: id) }
         let space = self.space
         canvas.hue = space?.hue ?? space?.color.hue ?? 0.6
         canvas.intensity = space?.intensity ?? SpaceColor.defaultIntensity
