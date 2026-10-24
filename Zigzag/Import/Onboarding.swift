@@ -907,58 +907,81 @@ private final class PickTile: InteractiveView {
             name.frame = NSRect(x: x, y: (bounds.height - block) / 2, width: bounds.width - x - 28, height: name.lineHeight)
             detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: bounds.width - x - 12, height: detail.lineHeight)
         } else {
-            let s: CGFloat = 34
-            icon.frame = NSRect(x: (bounds.width - s) / 2, y: bounds.height / 2 - s + 2, width: s, height: s)
+            let s: CGFloat = 40
+            icon.frame = NSRect(x: (bounds.width - s) / 2, y: bounds.height / 2 - s + 4, width: s, height: s)
             name.frame = NSRect(x: 4, y: icon.frame.maxY + 8, width: bounds.width - 8, height: name.lineHeight)
         }
     }
 }
 
-/// Icons for the suggested sites and extensions, sharp at tile size. They come from one icon service by domain
-/// (nothing about you is sent), with a globe until each arrives.
-private func loadIcons(_ pairs: [(PickTile, URL)]) {
-    for (tile, url) in pairs {
-        tile.icon.image = Tokens.Symbol.image("globe", size: 22)
-        tile.icon.contentTintColor = Onboard.dim(0.7)
-        if let cached = FaviconStore.shared.cachedIcon(for: url), cached.size.width >= 32 {
-            tile.icon.image = cached
-            tile.icon.contentTintColor = nil
-            continue
-        }
-        guard let host = url.host(),
-              let source = URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=128") else { continue }
-        Task { @MainActor [weak tile] in
-            guard let (data, _) = try? await URLSession.shared.data(from: source), let image = NSImage(data: data), image.isValid,
-                  let tile else { return }
-            tile.icon.image = image
-            tile.icon.contentTintColor = nil
-        }
+/// A site you might use every day, with the Mac app that goes with it (for its icon) when there is one.
+private struct Suggestion {
+    let name: String
+    let url: URL
+    let app: String?
+    var icon: URL?
+    var appURL: URL? { app.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) } }
+}
+
+/// Icons, sharp at tile size: the Mac app's own icon if it's installed, else the site's large icon, fetched by
+/// domain from one icon service (nothing about you is sent). A globe shows until each arrives.
+private func loadIcon(_ tile: PickTile, site: URL, app: URL? = nil, explicit: URL? = nil) {
+    if let app {
+        tile.icon.image = NSWorkspace.shared.icon(forFile: app.path)
+        tile.icon.contentTintColor = nil
+        return
+    }
+    tile.icon.image = Tokens.Symbol.image("globe", size: 22)
+    tile.icon.contentTintColor = Onboard.dim(0.7)
+    guard let host = site.host(),
+          let source = explicit ?? URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=128") else { return }
+    Task { @MainActor [weak tile] in
+        guard let (data, _) = try? await URLSession.shared.data(from: source), let image = NSImage(data: data), image.isValid,
+              let tile else { return }
+        tile.icon.image = image
+        tile.icon.contentTintColor = nil
     }
 }
+
+private func loadIcons(_ pairs: [(PickTile, URL)]) { for (tile, url) in pairs { loadIcon(tile, site: url) } }
 
 // MARK: - Everyday sites
 
 /// The sites people open every day, as tiles: the ones you pick become favorites at the top of the sidebar.
 private final class SitesPicker: StepContent {
-    private static let sites: [(String, String)] = [
-        ("Gmail", "https://mail.google.com"), ("YouTube", "https://www.youtube.com"), ("Calendar", "https://calendar.google.com"),
-        ("Notion", "https://www.notion.so"), ("ChatGPT", "https://chatgpt.com"), ("Spotify", "https://open.spotify.com"),
-        ("Slack", "https://app.slack.com"), ("Figma", "https://www.figma.com"), ("X", "https://x.com"),
+    private static let all: [Suggestion] = [
+        Suggestion(name: "Gmail", url: URL(string: "https://mail.google.com")!, app: nil),
+        Suggestion(name: "Calendar", url: URL(string: "https://calendar.google.com")!, app: nil,
+                   icon: URL(string: "https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png")),
+        Suggestion(name: "YouTube", url: URL(string: "https://www.youtube.com")!, app: nil),
+        Suggestion(name: "Drive", url: URL(string: "https://drive.google.com")!, app: "com.google.drivefs"),
+        Suggestion(name: "Notion", url: URL(string: "https://www.notion.so")!, app: "notion.id"),
+        Suggestion(name: "ChatGPT", url: URL(string: "https://chatgpt.com")!, app: "com.openai.chat"),
+        Suggestion(name: "Spotify", url: URL(string: "https://open.spotify.com")!, app: "com.spotify.client"),
+        Suggestion(name: "Slack", url: URL(string: "https://app.slack.com")!, app: "com.tinyspeck.slackmacgap"),
+        Suggestion(name: "Figma", url: URL(string: "https://www.figma.com")!, app: "com.figma.Desktop"),
+        Suggestion(name: "GitHub", url: URL(string: "https://github.com")!, app: "com.github.GitHubClient"),
+        Suggestion(name: "WhatsApp", url: URL(string: "https://web.whatsapp.com")!, app: "net.whatsapp.WhatsApp"),
+        Suggestion(name: "Discord", url: URL(string: "https://discord.com/app")!, app: "com.hnc.Discord"),
     ]
+    /// Nine: the ones whose apps are on this Mac first, since those are the ones you use.
+    private static var sites: [Suggestion] {
+        let (have, rest) = (all.filter { $0.appURL != nil }, all.filter { $0.appURL == nil })
+        return Array((have + rest).prefix(9))
+    }
     private var tiles: [(PickTile, URL, String)] = []
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
-        for (name, string) in Self.sites {
-            guard let url = URL(string: string) else { continue }
-            let tile = PickTile(name: name)
-            tile.isPicked = have.contains(TabManager.normalize(url))
+        for site in Self.sites {
+            let tile = PickTile(name: site.name)
+            tile.isPicked = have.contains(TabManager.normalize(site.url))
             tile.onToggle = { [weak self] in self?.onChange?() }
             addSubview(tile)
-            tiles.append((tile, url, name))
+            tiles.append((tile, site.url, site.name))
+            loadIcon(tile, site: site.url, app: site.appURL, explicit: site.icon)
         }
-        loadIcons(tiles.map { ($0.0, $0.1) })
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1005,17 +1028,20 @@ private final class ExtensionsPicker: StepContent {
         super.init(frame: frame)
         var installed: Set<String> = []
         if #available(macOS 15.4, *) { installed = Set(ExtensionHost.shared.installed.keys) }
-        let hasOnePassword = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") != nil
         for s in Self.suggestions {
             let tile = PickTile(name: s.name, horizontal: true)
             tile.detail.stringValue = installed.contains(s.id) ? "Already added" : s.kind
-            tile.isPicked = installed.contains(s.id) || (s.id == ExtensionStore.onePasswordID && hasOnePassword)
+            tile.isPicked = installed.contains(s.id)
             tile.isLocked = installed.contains(s.id)
             tile.onToggle = { [weak self] in self?.onChange?() }
             addSubview(tile)
             tiles.append((tile, s.id))
         }
-        loadIcons(zip(tiles.map(\.0), Self.suggestions.compactMap { URL(string: $0.site) }).map { ($0, $1) })
+        let apps: [String: String] = [ExtensionStore.onePasswordID: "com.1password.1password", "nngceckbapebfimnlniiiahkandclblb": "com.bitwarden.desktop"]
+        for ((tile, id), s) in zip(tiles, Self.suggestions) {
+            guard let site = URL(string: s.site) else { continue }
+            loadIcon(tile, site: site, app: apps[id].flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
+        }
         note.alignment = .center
         note.stringValue = "More anytime from the Chrome Web Store: choose Add to Zigzag."
         addSubview(note)
@@ -1231,7 +1257,7 @@ private final class ColorPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let ww: CGFloat = 320, wh: CGFloat = 190
+        let ww: CGFloat = 400, wh: CGFloat = 230
         let size: CGFloat = 30, gap: CGFloat = 12
         let swW = CGFloat(swatches.count) * size + CGFloat(swatches.count - 1) * gap
         let lookW = looks.map { $0.1.fittingWidth }.reduce(0, +) + CGFloat(looks.count - 1) * 8
@@ -1255,30 +1281,21 @@ private final class ColorPicker: StepContent {
     }
 }
 
-/// A drawing of a Zigzag window: a sidebar in the space's color, a few rows, and a page.
+/// A drawing of a Zigzag window in your space's color: traffic lights, the address field, three favorites, a
+/// few tabs with one selected, the space dots, and a page. Drawn rather than captured, so it changes as you pick.
 private final class MiniBrowser: NSView {
-    private let sidebar = ColorView(color: .clear)
-    private let page = ColorView(color: .white)
-    private var rows: [ColorView] = []
+    private var background: NSColor = SpaceColor.sky.background
+    private var accent: NSColor = Brand.Theme.brand.accent
+    private var isDark = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer?.cornerRadius = 12
+        layer?.cornerRadius = 14
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
-        addSubview(sidebar)
-        addSubview(page)
-        page.wantsLayer = true
-        page.layer?.cornerRadius = 6
-        for i in 0..<5 {
-            let row = ColorView(color: .clear)
-            row.wantsLayer = true
-            row.layer?.cornerRadius = 4
-            addSubview(row)
-            rows.append(row)
-            _ = i
-        }
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1287,24 +1304,59 @@ private final class MiniBrowser: NSView {
     func show(background: NSColor, appearance: String?) {
         self.appearance = appearance == "dark" ? NSAppearance(named: .darkAqua) : appearance == "light" ? NSAppearance(named: .aqua) : nil
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            let bg = background.usingColorSpace(.sRGB) ?? background
-            layer?.backgroundColor = bg.cgColor
-            sidebar.color = .clear
-            let dark = effectiveAppearance.isDark
-            page.color = dark ? NSColor(white: 0.13, alpha: 1) : .white
-            for (i, row) in rows.enumerated() {
-                row.color = (dark ? NSColor.white : NSColor.black).withAlphaComponent(i == 1 ? 0.12 : 0.06)
-            }
+            self.isDark = self.effectiveAppearance.isDark
+            self.background = background.usingColorSpace(.sRGB) ?? background
+            self.accent = Brand.Theme.of(Library.shared.spaces.first).accent.usingColorSpace(.sRGB) ?? Brand.Theme.brand.accent
         }
+        needsDisplay = true
     }
 
-    override func layout() {
-        super.layout()
-        let side: CGFloat = 96
-        for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: 10, y: 34 + CGFloat(i) * 22, width: side - 20, height: 14)
+    override func draw(_ dirtyRect: NSRect) {
+        let ink = isDark ? NSColor.white : NSColor.black
+        background.setFill()
+        bounds.fill()
+        func box(_ r: NSRect, _ color: NSColor, _ radius: CGFloat) {
+            color.setFill()
+            NSBezierPath(roundedRect: r, xRadius: radius, yRadius: radius).fill()
         }
-        page.frame = NSRect(x: side, y: 8, width: bounds.width - side - 8, height: bounds.height - 16)
+        let side: CGFloat = 112, pad: CGFloat = 10
+        // Traffic lights.
+        for (i, c) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
+            c.withAlphaComponent(0.9).setFill()
+            NSBezierPath(ovalIn: NSRect(x: pad + CGFloat(i) * 11, y: 10, width: 7, height: 7)).fill()
+        }
+        // Address field.
+        box(NSRect(x: pad, y: 26, width: side - pad * 2, height: 14), ink.withAlphaComponent(0.07), 5)
+        // Favorites.
+        let favW = (side - pad * 2 - 8) / 3
+        let favColors: [NSColor] = [.systemRed, .systemRed.blended(withFraction: 0.3, of: .systemOrange) ?? .systemRed, .systemBlue]
+        for i in 0..<3 {
+            let r = NSRect(x: pad + CGFloat(i) * (favW + 4), y: 46, width: favW, height: 20)
+            box(r, ink.withAlphaComponent(0.06), 5)
+            box(NSRect(x: r.midX - 4, y: r.midY - 4, width: 8, height: 8), favColors[i].withAlphaComponent(0.85), 2)
+        }
+        // Tabs: one selected, lit like the real thing.
+        for i in 0..<4 {
+            let r = NSRect(x: pad - 2, y: 76 + CGFloat(i) * 18, width: side - pad * 2 + 4, height: 15)
+            if i == 1 { box(r, isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.8), 5) }
+            box(NSRect(x: r.minX + 5, y: r.midY - 3, width: 6, height: 6), (i == 1 ? accent : ink.withAlphaComponent(0.25)), 2)
+            box(NSRect(x: r.minX + 15, y: r.midY - 2, width: [52, 62, 44, 56][i], height: 4), ink.withAlphaComponent(i == 1 ? 0.45 : 0.18), 2)
+        }
+        // Space dots, the current one in the accent.
+        for i in 0..<3 {
+            (i == 0 ? accent : ink.withAlphaComponent(0.2)).setFill()
+            NSBezierPath(ovalIn: NSRect(x: side / 2 - 16 + CGFloat(i) * 13, y: bounds.height - 16, width: 6, height: 6)).fill()
+        }
+        // The page.
+        let page = NSRect(x: side, y: 8, width: bounds.width - side - 8, height: bounds.height - 16)
+        box(page, isDark ? NSColor(white: 0.12, alpha: 1) : .white, 8)
+        let text = (isDark ? NSColor.white : NSColor.black)
+        box(NSRect(x: page.minX + 14, y: page.minY + 16, width: page.width * 0.5, height: 8), text.withAlphaComponent(0.7), 3)
+        for (k, w) in [0.86, 0.78, 0.82, 0.6].enumerated() {
+            box(NSRect(x: page.minX + 14, y: page.minY + 34 + CGFloat(k) * 11, width: (page.width - 28) * w, height: 5), text.withAlphaComponent(0.14), 2)
+        }
+        box(NSRect(x: page.minX + 14, y: page.minY + 86, width: page.width - 28, height: page.height - 100), accent.withAlphaComponent(0.18), 6)
+        box(NSRect(x: page.minX + 14, y: page.minY + 86, width: 54, height: 16), accent, 5)
     }
 }
 
