@@ -738,7 +738,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .backgroundTab:
             tabManager.newTab(url: url, select: false, opener: opener)
         case .peek:
-            Tutorial.complete("peek")
             showPeek(url: url, configuration: nil)
         case .newWindow:
             WindowManager.shared.newWindow(url: url)

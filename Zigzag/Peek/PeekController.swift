@@ -36,6 +36,8 @@ final class PeekController {
     private weak var controller: BrowserWindowController?
     private let scrim = ScrimView()
     private let panel = FloatingPanelView()
+    /// The peek's window, for pointing at it (the Getting started guide).
+    var panelView: NSView { panel }
     private let header = PeekHeaderView()
     private let content = NSView()
     private(set) var tab: Tab?

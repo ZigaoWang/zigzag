@@ -6,17 +6,17 @@ enum Tutorial {
     struct Task {
         let id: String
         let title: String
-        /// Exactly what to do now, building on the step before.
-        let how: String
         let keys: [String]
+        /// Said for a moment once it's done, pointing at what changed, so you see what happened.
+        let done: String
     }
 
     /// Each step is the keys and three words: nothing to read.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Open a website", how: "", keys: ["⌘", "T"]),
-        Task(id: "pin", title: "Pin this page", how: "", keys: ["⌘", "D"]),
-        Task(id: "peek", title: "Peek at a link", how: "", keys: ["⇧", "Click"]),
-        Task(id: "space", title: "Make a space", how: "", keys: ["+"]),
+        Task(id: "newTab", title: "Open a website", keys: ["⌘", "T"], done: "It opened as a tab, here."),
+        Task(id: "pin", title: "Pin this page", keys: ["⌘", "D"], done: "Pinned. It stays up here."),
+        Task(id: "peek", title: "Shift-click a link", keys: ["⇧", "Click"], done: "That’s Peek: a look without leaving."),
+        Task(id: "space", title: "Make a space", keys: ["+"], done: "A new space. The dots switch spaces."),
     ]
 
     private static let key = "TutorialDone"

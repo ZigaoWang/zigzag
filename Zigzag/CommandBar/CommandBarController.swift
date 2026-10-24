@@ -85,6 +85,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// Catches clicks outside the bar; it doesn't dim the page.
     private let scrim = ScrimView(dims: false)
     private let panel = FloatingPanelView()
+    /// The bar itself, for pointing at it (the Getting started guide).
+    var panelView: NSView { panel }
     private let field = PlainTextField(font: Tokens.Font.large(), placeholder: "Search or enter address")
     private let fieldIcon = NSImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
