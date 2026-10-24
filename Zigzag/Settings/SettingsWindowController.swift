@@ -560,7 +560,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if pane == .shortcuts { reloadShortcuts() }
         layoutRoot()
         documentView.scroll(.zero)
-        Brand.enter(Array(documentView.subviews.prefix(4)))
+        // Panes cross-fade: quick, and nothing moves.
+        documentView.wantsLayer = true
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.0
+        fade.toValue = 1.0
+        fade.duration = 0.15
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        documentView.layer?.add(fade, forKey: "pane")
     }
 
     // MARK: Groups
