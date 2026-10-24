@@ -921,6 +921,8 @@ private struct Suggestion {
     let url: URL
     let app: String?
     var icon: URL?
+    /// No sharp icon on the web: suggested only when its app is here, to borrow the app's icon.
+    var onlyWithApp = false
     var appURL: URL? { app.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) } }
 }
 
@@ -980,22 +982,25 @@ final class SitesPicker: StepContent {
                    icon: URL(string: "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png")),
         Suggestion(name: "Notion", url: URL(string: "https://www.notion.so")!, app: "notion.id"),
         Suggestion(name: "ChatGPT", url: URL(string: "https://chatgpt.com")!, app: "com.openai.chat"),
+        Suggestion(name: "Claude", url: URL(string: "https://claude.ai")!, app: "com.anthropic.claudefordesktop"),
         Suggestion(name: "Spotify", url: URL(string: "https://open.spotify.com")!, app: "com.spotify.client"),
         Suggestion(name: "Slack", url: URL(string: "https://app.slack.com")!, app: "com.tinyspeck.slackmacgap"),
         Suggestion(name: "Figma", url: URL(string: "https://www.figma.com")!, app: "com.figma.Desktop"),
         Suggestion(name: "GitHub", url: URL(string: "https://github.com")!, app: "com.github.GitHubClient"),
-        Suggestion(name: "WhatsApp", url: URL(string: "https://web.whatsapp.com")!, app: "net.whatsapp.WhatsApp"),
+        Suggestion(name: "WhatsApp", url: URL(string: "https://web.whatsapp.com")!, app: "net.whatsapp.WhatsApp", onlyWithApp: true),
         Suggestion(name: "Discord", url: URL(string: "https://discord.com/app")!, app: "com.hnc.Discord"),
+        Suggestion(name: "X", url: URL(string: "https://x.com")!, app: nil),
+        Suggestion(name: "Instagram", url: URL(string: "https://www.instagram.com")!, app: nil),
     ]
     /// Starts the icons while you're still on the first screens.
     static func preload() {
         for site in sites where site.appURL == nil { if let source = iconSource(site: site.url, explicit: site.icon) { fetchIcon(source) } }
     }
 
-    /// Nine: the ones whose apps are on this Mac first, since those are the ones you use.
+    /// Twelve: the ones whose apps are on this Mac first, since those are the ones you use.
     private static var sites: [Suggestion] {
-        let (have, rest) = (all.filter { $0.appURL != nil }, all.filter { $0.appURL == nil })
-        return Array((have + rest).prefix(9))
+        let (have, rest) = (all.filter { $0.appURL != nil }, all.filter { $0.appURL == nil && !$0.onlyWithApp })
+        return Array((have + rest).prefix(12))
     }
     private var tiles: [(PickTile, URL, String)] = []
 
@@ -1025,11 +1030,13 @@ final class SitesPicker: StepContent {
 
     override func layout() {
         super.layout()
-        let size: CGFloat = 104, gap: CGFloat = 12
-        let total = size * 3 + gap * 2
-        let x0 = (bounds.width - total) / 2, y0 = max(0, (bounds.height - total) / 2)
+        let size: CGFloat = 100, gap: CGFloat = 12, columns = 4
+        let rows = (tiles.count + columns - 1) / columns
+        let width = CGFloat(columns) * size + CGFloat(columns - 1) * gap
+        let height = CGFloat(rows) * size + CGFloat(rows - 1) * gap
+        let x0 = (bounds.width - width) / 2, y0 = max(0, (bounds.height - height) / 2)
         for (i, (tile, _, _)) in tiles.enumerated() {
-            tile.frame = NSRect(x: x0 + CGFloat(i % 3) * (size + gap), y: y0 + CGFloat(i / 3) * (size + gap), width: size, height: size)
+            tile.frame = NSRect(x: x0 + CGFloat(i % columns) * (size + gap), y: y0 + CGFloat(i / columns) * (size + gap), width: size, height: size)
         }
     }
 }
