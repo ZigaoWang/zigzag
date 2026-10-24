@@ -439,7 +439,8 @@ final class WordmarkView: NSView {
         let g = arc(27, 30, 30, .pi * 0.28, .pi * 2 - 0.02, 40) + [CGPoint(x: 57, y: 30), CGPoint(x: 36, y: 30)]
         let a = [CGPoint(x: 0, y: 0), CGPoint(x: 26, y: 60), CGPoint(x: 52, y: 0)]
         let bar = [CGPoint(x: 12, y: 20), CGPoint(x: 40, y: 20)]
-        return [(50, [z]), (0, [i]), (54, [g]), (50, [z]), (52, [a, bar]), (54, [g])]
+        // The I gets a little room after it: against the G's round side the even gap looks tight.
+        return [(50, [z]), (5, [i]), (54, [g]), (50, [z]), (52, [a, bar]), (54, [g])]
     }()
     private static let gap: CGFloat = 17
     private static let strokeWeight: CGFloat = 13
