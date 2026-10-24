@@ -88,9 +88,12 @@ final class DownloadRowView: InteractiveView {
 /// Downloads, shown above the sidebar's download button. Closes when you click anywhere else.
 enum DownloadsPanel {
     private static weak var current: DownloadsPanelView?
+    static var isOpen: Bool { current?.superview != nil }
+    static func closeCurrent() { current?.close() }
 
     static func show(from anchor: NSView, in controller: BrowserWindowController) {
         if let current { current.close(); return }
+        controller.closeFloatingPanels()
         let panel = DownloadsPanelView(controller: controller)
         current = panel
         panel.show(from: anchor)

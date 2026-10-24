@@ -121,6 +121,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         mouseAtOpen = NSEvent.mouseLocation
         let card = controller.root.cardFrame
         if !isVisible {
+            // One floating thing at a time.
+            SitePanel.closeCurrent()
+            DownloadsPanel.closeCurrent()
+            SpaceEditorPanel.current?.close()
+            controller.previews.hide()
+            controller.linkStatus.show(nil, in: controller.root.cardFrame)
             isVisible = true
             scrim.frame = isAnchored ? controller.root.bounds : card
             controller.root.overlay.addSubview(scrim)

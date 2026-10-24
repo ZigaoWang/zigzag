@@ -5,6 +5,8 @@ import WebKit
 /// site's own settings, and clearing its cache or cookies. Changes apply at once and say so.
 final class SitePanel: FloatingPanelView {
     private static weak var current: SitePanel?
+    static var isOpen: Bool { current?.superview != nil }
+    static func closeCurrent() { current?.close() }
 
     private weak var controller: BrowserWindowController?
     private weak var anchor: NSView?
@@ -69,6 +71,7 @@ final class SitePanel: FloatingPanelView {
     static func toggle(in controller: BrowserWindowController, from anchor: NSView) {
         if let current, current.superview != nil { current.close(); return }
         guard let panel = SitePanel(controller: controller) else { return }
+        controller.closeFloatingPanels()
         panel.anchor = anchor
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + Tokens.Space.x2)
@@ -406,7 +409,6 @@ final class PanelRow: NSView {
     private let title: Label
     private let control: NSView
     private let value: Label?
-    private var handler: SidebarMenus.Handler?
 
     private init(_ title: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -421,15 +423,9 @@ final class PanelRow: NSView {
     override var isFlipped: Bool { true }
 
     static func toggle(_ title: String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
-        let toggle = NSSwitch()
-        toggle.controlSize = .small
-        toggle.state = on ? .on : .off
-        let row = PanelRow(title, control: toggle)
-        let handler = SidebarMenus.Handler { [weak toggle] in changed(toggle?.state == .on) }
-        toggle.target = handler
-        toggle.action = #selector(SidebarMenus.Handler.runAction(_:))
-        row.handler = handler
-        return row
+        let toggle = Toggle(isOn: on)
+        toggle.onChange = changed
+        return PanelRow(title, control: toggle)
     }
 
     static func value(_ title: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {

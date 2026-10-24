@@ -563,6 +563,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             current.close()
             if same { return }
         }
+        controller.closeFloatingPanels()
         let panel = SpaceEditorPanel(spaceID: spaceID, controller: controller)
         current = panel
         panel.show()

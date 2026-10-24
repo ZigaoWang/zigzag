@@ -828,7 +828,21 @@ extension BrowserWindowController: TabHost {
 
     func tab(_ tab: Tab, hoveringLink url: URL?) {
         guard tab === tabManager.selectedTab || tab.isPeek else { return }
-        linkStatus.show(url, in: tab.isPeek ? peek.contentFrame : root.cardFrame)
+        // Nothing about the page while a panel is over it.
+        linkStatus.show(hasFloatingPanel ? nil : url, in: tab.isPeek ? peek.contentFrame : root.cardFrame)
+    }
+
+    /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
+    /// others when they open, and previews and the link bubble stay away while any of them is up.
+    var hasFloatingPanel: Bool { commandBar.isVisible || SitePanel.isOpen || DownloadsPanel.isOpen || SpaceEditorPanel.current != nil }
+
+    func closeFloatingPanels() {
+        if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
+        SitePanel.closeCurrent()
+        DownloadsPanel.closeCurrent()
+        SpaceEditorPanel.current?.close()
+        previews.hide()
+        linkStatus.show(nil, in: root.cardFrame)
     }
 }
 

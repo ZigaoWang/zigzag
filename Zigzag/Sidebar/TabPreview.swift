@@ -75,7 +75,8 @@ final class TabPreviewController {
     init(controller: BrowserWindowController) { self.controller = controller }
 
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
-        guard let row, tab != nil || bookmark != nil else {
+        // No preview over an open panel.
+        guard controller?.hasFloatingPanel != true, let row, tab != nil || bookmark != nil else {
             scheduleHide()
             return
         }
