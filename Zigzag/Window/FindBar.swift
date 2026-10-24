@@ -188,6 +188,9 @@ class FloatingPanelView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// Empties the panel so it can show something else in the same place.
+    func removeContent() { surface.subviews.forEach { $0.removeFromSuperview() } }
+
     /// Content goes in the surface so it is clipped to the rounded shape.
     override func addSubview(_ view: NSView) {
         if view === surface { super.addSubview(view) } else { surface.addSubview(view) }
@@ -218,11 +221,24 @@ class FloatingPanelView: NSView {
 
     /// The one way a panel arrives: it fades in while settling down 4pt from its top edge, as if dropping from
     /// whatever opened it. Opacity and movement run together on the layer, so they never drift apart.
-    func present(always: Bool = false) {
+    /// How a panel arrives. Anything attached to what opened it (the address dropdown) just appears; small panels
+    /// from a button fade; free-floating notices drop in slightly.
+    enum Arrival { case drop, fade, instant }
+
+    func present(always: Bool = false, arrival: Arrival = .drop) {
         layoutSubtreeIfNeeded()
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
-        guard let layer, always || !Tokens.Motion.isKeyboardDriven else { return }
+        guard let layer, arrival != .instant, always || !Tokens.Motion.isKeyboardDriven else { return }
+        if arrival == .fade {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.1
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            layer.add(fade, forKey: "present")
+            return
+        }
         let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
@@ -242,8 +258,8 @@ class FloatingPanelView: NSView {
     private var isFlippedInSuperview: Bool { superview?.isFlipped ?? true }
 
     /// The one way a panel leaves: a quick fade, nothing else moving.
-    func dismiss(always: Bool = false, completion: (() -> Void)? = nil) {
-        guard let layer else { removeFromSuperview(); completion?(); return }
+    func dismiss(always: Bool = false, instantly: Bool = false, completion: (() -> Void)? = nil) {
+        guard let layer, !instantly else { removeFromSuperview(); completion?(); return }
         layer.removeAnimation(forKey: "present")
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in

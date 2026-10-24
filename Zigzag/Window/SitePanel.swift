@@ -77,7 +77,7 @@ final class SitePanel: FloatingPanelView {
         panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + Tokens.Space.x2)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
-        panel.present()
+        panel.present(arrival: .fade)
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }

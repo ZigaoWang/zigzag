@@ -147,7 +147,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         suggestions = []
         refreshResults(animated: false)
         panel.frame = panelFrame()
-        panel.present()
+        // Attached to the address, it's simply there; over the page it arrives with the usual drop.
+        panel.present(arrival: isAnchored ? .instant : .drop)
         controller.window?.makeFirstResponder(field)
         field.currentEditor()?.selectAll(nil)
     }
@@ -157,7 +158,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         isVisible = false
         fetcher.cancel()
         scrim.hide()
-        panel.dismiss()
+        panel.dismiss(instantly: isAnchored)
         if restoringFocus, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
     }
 
@@ -260,7 +261,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if !results.isEmpty { selectedIndex = 0 }
         updateSelection()
         let frame = panelFrame()
-        if animated && panel.frame.height != frame.height {
+        // Suggestions change as you type; the list resizes at once rather than stretching.
+        if animated && !isAnchored && panel.frame.height != frame.height {
             Tokens.Motion.animate(Tokens.Motion.snappy) { self.panel.animator().frame = frame }
         } else {
             panel.frame = frame

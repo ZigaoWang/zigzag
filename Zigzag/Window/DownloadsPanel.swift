@@ -134,7 +134,7 @@ final class DownloadsPanelView: FloatingPanelView {
         self.anchor = anchor
         controller.root.overlay.addSubview(self)
         reload()
-        present()
+        present(arrival: .fade)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
