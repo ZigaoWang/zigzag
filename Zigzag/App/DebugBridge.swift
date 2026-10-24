@@ -117,6 +117,19 @@ enum DebugBridge {
             }
         case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
         case "action": controller.sidebar.address.actionButtons[min(Int(arg) ?? 0, controller.sidebar.address.actionButtons.count - 1)].onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
+        case "keychainprobe":
+            // Adds, reads and deletes a dummy item in Zigzag's data protection keychain group; logs only status codes.
+            let group = (Bundle.main.object(forInfoDictionaryKey: "AppIdentifierPrefix") as? String ?? "432GL3WKY2.") + "app.zigzag.passwords"
+            let base: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: "app.zigzag.probe", kSecAttrAccount: "probe",
+                                         kSecUseDataProtectionKeychain: true, kSecAttrAccessGroup: group, kSecAttrSynchronizable: true]
+            SecItemDelete(base as CFDictionary)
+            var add = base; add[kSecValueData] = Data("not a password".utf8)
+            let added = SecItemAdd(add as CFDictionary, nil)
+            var query = base; query[kSecReturnData] = true
+            var out: CFTypeRef?
+            let read = SecItemCopyMatching(query as CFDictionary, &out)
+            let deleted = SecItemDelete(base as CFDictionary)
+            debugLog("keychainprobe group=\(group) add=\(added) read=\(read) matches=\((out as? Data) == Data("not a password".utf8)) delete=\(deleted)")
         case "popupcatch":
             // Records the popup's errors from its first line on, then reloads it; read them with popupjs "__errors".
             if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
