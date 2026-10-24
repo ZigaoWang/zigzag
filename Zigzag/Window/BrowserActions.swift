@@ -27,6 +27,33 @@ extension BrowserWindowController: NSMenuItemValidation {
         closeWithUndo(tab)
     }
     @objc func closeWindow(_ sender: Any?) { window?.performClose(sender) }
+
+    @objc func showDownloads(_ sender: Any?) {
+        // From the sidebar's Downloads button when it's there; from the address otherwise.
+        let anchor = sidebar.downloadsAnchor.isHidden ? sidebar.address : sidebar.downloadsAnchor
+        if !root.sidebarVisible { toggleBrowserSidebar(sender) }
+        DownloadsPanel.show(from: anchor, in: self)
+    }
+
+    @objc func clearCache(_ sender: Any?) {
+        Task { @MainActor in
+            await WebsiteData.clear(.cache)
+            Toast.show("Cache cleared. Pages load fresh.", symbol: "arrow.clockwise", duration: 2, in: self)
+        }
+    }
+
+    @objc func clearCookies(_ sender: Any?) { confirmClearCookies() }
+
+    /// History can't come back once it's gone, so it asks first.
+    @objc func clearHistory(_ sender: Any?) {
+        ConfirmSheet.show(in: root.overlay, title: "Clear all history?",
+                          message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, bookmarks and passwords stay.",
+                          confirmTitle: "Clear History", destructive: true) { [weak self] confirmed in
+            guard confirmed, let self else { return }
+            HistoryStore.shared.clearAll()
+            Toast.show("History cleared", symbol: "clock.arrow.circlepath", duration: 2, in: self)
+        }
+    }
     @objc func reopenClosedTab(_ sender: Any?) { tabManager.reopenClosedTab() }
 
     @objc func openDocument(_ sender: Any?) {

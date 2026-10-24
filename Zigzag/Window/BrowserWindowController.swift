@@ -299,7 +299,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func confirmClearCookies() {
         ConfirmSheet.show(in: root.overlay, title: "Clear cookies for every site?",
                           message: "You’ll be signed out of every website. Your passwords, bookmarks and history stay.",
-                          confirmTitle: "Clear Cookies") { [weak self] confirmed in
+                          confirmTitle: "Clear Cookies", destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
                 await WebsiteData.clear(.cookies)
