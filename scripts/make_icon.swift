@@ -1,37 +1,47 @@
 import AppKit
-// Zigzag's icon: the browser itself, reduced to two flat shapes. A dark sidebar and a light page,
-// meeting along one zigzag seam. No gradients, no shadows; macOS adds its own depth.
+// Zigzag's icon: one paper ribbon on an ink tile, folding back on itself four times. It reads as a Z,
+// and it is a zigzag. Flat, two colors, no gradients or shadows; macOS adds its own depth.
 let size: CGFloat = 1024
 
 func color(_ hex: UInt32) -> NSColor {
     NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
 }
 
-let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
-    let tile = NSRect(x: 100, y: 100, width: 824, height: 824)
-    let squircle = NSBezierPath(roundedRect: tile, xRadius: 186, yRadius: 186)
-    color(0xF3F0EA).setFill()   // paper
-    squircle.fill()
-    squircle.addClip()
-
-    // The sidebar: everything left of the seam.
-    let seamX: CGFloat = 420
-    let amplitude: CGFloat = 110
-    let teeth = 2
-    let top = tile.maxY, bottom = tile.minY
-    let step = (top - bottom) / CGFloat(teeth * 2)
-    let sidebar = NSBezierPath()
-    sidebar.move(to: NSPoint(x: tile.minX, y: bottom))
-    sidebar.line(to: NSPoint(x: seamX - amplitude / 2, y: bottom))
-    var y = bottom
-    for i in 0..<(teeth * 2) {
-        y += step
-        sidebar.line(to: NSPoint(x: i % 2 == 0 ? seamX + amplitude / 2 : seamX - amplitude / 2, y: y))
+/// Apple's continuous-corner tile is a superellipse, not a rounded rectangle.
+func squircle(_ rect: NSRect, exponent n: CGFloat = 5) -> NSBezierPath {
+    let path = NSBezierPath()
+    let a = rect.width / 2, b = rect.height / 2
+    for i in 0...720 {
+        let t = CGFloat(i) / 720 * 2 * .pi
+        let c = cos(t), s = sin(t)
+        let point = NSPoint(x: rect.midX + a * (c < 0 ? -1 : 1) * pow(abs(c), 2 / n),
+                            y: rect.midY + b * (s < 0 ? -1 : 1) * pow(abs(s), 2 / n))
+        i == 0 ? path.move(to: point) : path.line(to: point)
     }
-    sidebar.line(to: NSPoint(x: tile.minX, y: top))
-    sidebar.close()
+    path.close()
+    return path
+}
+
+let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+    // The standard macOS icon grid: an 824pt tile centered on the 1024pt canvas.
+    let tile = NSRect(x: 100, y: 100, width: 824, height: 824)
     color(0x1D1D21).setFill()   // ink
-    sidebar.fill()
+    squircle(tile).fill()
+
+    let left: CGFloat = 322, right: CGFloat = 702, top: CGFloat = 694, bottom: CGFloat = 330
+    let middle = (top + bottom) / 2, fold: CGFloat = 150
+    let ribbon = NSBezierPath()
+    ribbon.move(to: NSPoint(x: left, y: top))
+    ribbon.line(to: NSPoint(x: right, y: top))
+    ribbon.line(to: NSPoint(x: 512 - fold, y: middle))
+    ribbon.line(to: NSPoint(x: 512 + fold, y: middle))
+    ribbon.line(to: NSPoint(x: left, y: bottom))
+    ribbon.line(to: NSPoint(x: right, y: bottom))
+    ribbon.lineWidth = 96
+    ribbon.lineCapStyle = .round
+    ribbon.lineJoinStyle = .round
+    color(0xF3F0EA).setStroke()   // paper
+    ribbon.stroke()
     return true
 }
 
