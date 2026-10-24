@@ -207,7 +207,7 @@ final class ExtensionHost: NSObject {
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
         actionAnchor = anchor
         if let attention = item.attention, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
-            AttentionHint.show(attention, below: anchor, in: controller)
+            AttentionHint.show(attention, icon: item.icon, below: anchor, in: controller)
             return
         }
         // "When you click it": clicking gives it this site from now on.
@@ -595,47 +595,109 @@ func debugLog(_ message: String) {
     #endif
 }
 
-/// Explains the one step only the person can do, like telling 1Password to trust Zigzag.
+/// Explains the one step only the person can do, like telling 1Password to trust Zigzag. Opened from the site
+/// panel it takes that panel's place, so there's still one panel on screen.
 @available(macOS 15.4, *)
 enum AttentionHint {
     private static weak var current: FloatingPanelView?
 
-    static func show(_ attention: ExtensionHost.Attention, below anchor: NSView, in controller: BrowserWindowController) {
+    static func show(_ attention: ExtensionHost.Attention, icon: NSImage? = nil, below anchor: NSView, in controller: BrowserWindowController) {
         current?.dismiss()
-        let panel = FloatingPanelView()
-        let title = Label(attention.title, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-        let body = NSTextField(wrappingLabelWithString: attention.message)
-        body.font = Tokens.Font.body()
-        body.textColor = Tokens.Color.textSecondary
-        body.isSelectable = false
-        let open = TextButton(title: attention.buttonTitle, font: Tokens.Font.body(.medium))
+        let overlay = controller.root.overlay
+        // The panel the anchor sits in, if any: the hint replaces what it shows.
+        var host: NSView? = anchor.superview
+        while let view = host, !(view is FloatingPanelView) { host = view.superview }
+        let panel = (host as? FloatingPanelView) ?? FloatingPanelView()
+        let reusing = host != nil
+        panel.removeContent()
+
+        let width: CGFloat = reusing ? panel.frame.width : 300
+        let pad = Tokens.Space.x5
+        let inner = width - pad * 2
+        var y = pad
+
+        if let icon {
+            let image = NSImageView(image: icon)
+            image.frame = NSRect(x: pad, y: y, width: 32, height: 32)
+            panel.addSubview(image)
+            y = image.frame.maxY + Tokens.Space.x3
+        }
+        let title = NSTextField(wrappingLabelWithString: "")
+        title.attributedStringValue = Brand.display(attention.title, size: 17, color: Tokens.Color.textPrimary, wraps: true)
+        title.isSelectable = false
+        let titleHeight = ceil(title.sizeThatFits(NSSize(width: inner, height: 200)).height)
+        title.frame = NSRect(x: pad, y: y, width: inner, height: titleHeight)
+        panel.addSubview(title)
+        y = title.frame.maxY + Tokens.Space.x4
+
+        // "1. Do this" lines become numbered steps; anything else is a note under them.
+        let lines = attention.message.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        var note: [String] = []
+        var number = 0
+        for line in lines {
+            guard let dot = line.firstIndex(of: "."), Int(line[..<dot]) != nil else { note.append(line); continue }
+            number += 1
+            let text = line[line.index(after: dot)...].trimmingCharacters(in: .whitespaces)
+            let badge = ColorView(color: Tokens.Color.accent.withAlphaComponent(0.16))
+            badge.wantsLayer = true
+            badge.layer?.cornerRadius = 10
+            let digit = Label("\(number)", font: Tokens.Font.small(.semibold), color: Tokens.Color.accent)
+            digit.alignment = .center
+            badge.addSubview(digit)
+            let body = NSTextField(wrappingLabelWithString: text)
+            body.font = Tokens.Font.body()
+            body.textColor = Tokens.Color.textPrimary
+            body.isSelectable = false
+            let textX = pad + 20 + Tokens.Space.x3
+            let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width - textX - pad, height: 200)).height)
+            badge.frame = NSRect(x: pad, y: y, width: 20, height: 20)
+            digit.frame = NSRect(x: 0, y: (20 - digit.lineHeight) / 2, width: 20, height: digit.lineHeight)
+            body.frame = NSRect(x: textX, y: y + 1, width: width - textX - pad, height: bodyHeight)
+            panel.addSubview(badge)
+            panel.addSubview(body)
+            y = max(badge.frame.maxY, body.frame.maxY) + Tokens.Space.x3
+        }
+        if !note.isEmpty {
+            let body = NSTextField(wrappingLabelWithString: note.joined(separator: " "))
+            body.font = Tokens.Font.small()
+            body.textColor = Tokens.Color.textSecondary
+            body.isSelectable = false
+            let h = ceil(body.sizeThatFits(NSSize(width: inner, height: 200)).height)
+            body.frame = NSRect(x: pad, y: y + Tokens.Space.x1, width: inner, height: h)
+            panel.addSubview(body)
+            y = body.frame.maxY + Tokens.Space.x5
+        }
+
+        let open = PrimaryButton(title: attention.buttonTitle)
+        open.frame = NSRect(x: pad, y: y, width: inner, height: Tokens.Space.x8)
+        panel.addSubview(open)
+        y = open.frame.maxY + pad
         open.onClick = { _ in
             if let bundleID = attention.appBundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 NSWorkspace.shared.openApplication(at: app, configuration: .init())
             }
-            panel.dismiss()
+            if reusing, let site = panel as? SitePanel { site.close() } else { panel.dismiss() }
         }
-        let width: CGFloat = 288
-        let pad = Tokens.Space.x4
-        let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width - pad * 2, height: 400)).height)
-        let height = pad + title.lineHeight + Tokens.Space.x2 + bodyHeight + Tokens.Space.x3 + Tokens.Space.x8 + Tokens.Space.x3
-        let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
-        panel.frame = NSRect(x: max(Tokens.Metric.cardInset, anchorFrame.maxX - width), y: anchorFrame.maxY + Tokens.Space.x2, width: width, height: height)
-        panel.addSubview(title)
-        panel.addSubview(body)
-        panel.addSubview(open)
-        title.frame = NSRect(x: pad, y: pad, width: width - pad * 2, height: title.lineHeight)
-        body.frame = NSRect(x: pad, y: title.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: bodyHeight)
-        let ow = open.fittingWidth
-        open.frame = NSRect(x: width - pad - ow + Tokens.Space.x2, y: body.frame.maxY + Tokens.Space.x3, width: ow, height: Tokens.Space.x8)
-        controller.root.overlay.addSubview(panel)
-        panel.present()
+
+        if reusing {
+            Tokens.Motion.withoutAnimation { panel.frame.size.height = y }
+            // A quick fade between what the panel showed and the hint.
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 0.12
+            panel.layer?.add(fade, forKey: "content")
+            return
+        }
+        let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
+        panel.frame = NSRect(x: max(Tokens.Metric.cardInset, anchorFrame.maxX - width), y: anchorFrame.maxY + Tokens.Space.x2, width: width, height: y)
+        overlay.addSubview(panel)
+        panel.present(arrival: .fade)
         current = panel
         var monitor: Any?
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { if let m = monitor { NSEvent.removeMonitor(m) }; return event }
             let inside = panel.bounds.contains(panel.convert(event.locationInWindow, from: nil))
-            if event.type == .keyDown || !inside {
+            if event.type == .keyDown && event.keyCode == 53 || event.type == .leftMouseDown && !inside {
                 panel.dismiss()
                 if let m = monitor { NSEvent.removeMonitor(m) }
             }
