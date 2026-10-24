@@ -205,6 +205,14 @@ final class ExtensionHost: NSObject {
     weak var lastAction: WKWebExtension.Action?
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
+        var anchor = anchor
+        // From the site panel: the panel steps aside and the popup opens from the address bar, where it stays put.
+        var inPanel: NSView? = anchor.superview
+        while let view = inPanel, !(view is SitePanel) { inPanel = view.superview }
+        if let panel = inPanel as? SitePanel, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
+            panel.close()
+            anchor = controller.sidebar.address
+        }
         actionAnchor = anchor
         // Its own popup always opens; if it still needs a step only you can do (1Password trusting Zigzag), a
         // short note says so, with the way there.
