@@ -458,10 +458,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// settings, and clearing its data. It shows a dot when an extension needs attention.
     func refreshExtensionActions() {
         let tab = tabManager.selectedTab
-        guard let url = tab?.url, ["http", "https"].contains(url.scheme ?? "") || url.scheme == "webkit-extension" else {
-            sidebar.address.setActions([])
-            return
-        }
+        // Always there, even on a new tab: it's also where your extensions live.
+        _ = tab?.url
         var attention = false
         if #available(macOS 15.4, *) { attention = ExtensionHost.shared.actions(for: tab).contains { $0.attention != nil } }
         sidebar.address.setActions([AddressView.ActionButton(symbol: "slider.horizontal.3", label: "Site Controls", needsAttention: attention,

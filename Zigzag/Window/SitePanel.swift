@@ -16,6 +16,7 @@ final class SitePanel: FloatingPanelView {
     private let tab: Tab
     private let url: URL
     private let site: String
+    private let isBlank: Bool
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
@@ -36,17 +37,21 @@ final class SitePanel: FloatingPanelView {
     private let pad = Tokens.Space.x4
 
     private init?(controller: BrowserWindowController) {
-        guard let tab = controller.tabManager.selectedTab, let url = tab.url else { return nil }
+        // With no page (a new tab), it still opens: your extensions are always one click away.
+        let tab = controller.tabManager.selectedTab ?? Tab(url: nil, spaceID: controller.tabManager.currentSpaceID)
+        let url = tab.url.flatMap { ["http", "https", "webkit-extension"].contains($0.scheme ?? "") ? $0 : nil }
+        isBlank = url == nil
         self.controller = controller
         self.tab = tab
-        self.url = url
-        site = ContentBlocker.site(of: url) ?? url.host() ?? url.absoluteString
+        self.url = url ?? URL(string: "about:blank")!
+        site = url.map { ContentBlocker.site(of: $0) ?? $0.host() ?? $0.absoluteString } ?? "New Tab"
         super.init(frame: .zero)
         radius = Tokens.Radius.panel + Tokens.Space.x1
         icon.image = tab.favicon
         siteName.stringValue = site
-        let secure = url.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
-        security.stringValue = url.scheme == "https" ? (secure ? "Secure connection" : "Some content isn’t secure") : (url.scheme == "http" ? "Not secure" : "")
+        let page = self.url
+        let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
+        security.stringValue = page.scheme == "https" ? (secure ? "Secure connection" : "Some content isn’t secure") : (page.scheme == "http" ? "Not secure" : "")
         securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : "lock.open.fill", size: Tokens.TypeSize.small)
         securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
         [icon, siteName, security, securityIcon, copyButton, topDivider, divider, clearCache, clearCookies].forEach { addSubview($0) }
@@ -55,12 +60,17 @@ final class SitePanel: FloatingPanelView {
             self.controller?.copyLink(self.url)
             self.close()
         }
-        buildTiles()
+        if isBlank {
+            [security, securityIcon, copyButton, clearCache, clearCookies, divider].forEach { $0.isHidden = true }
+            icon.image = Tokens.Symbol.image("plus.square.on.square", size: 16)
+        } else {
+            buildTiles()
+            buildRows()
+        }
         buildExtensions()
-        buildRows()
         clearCache.onClick = { [weak self] _ in self?.clear(.cache) }
         clearCookies.onClick = { [weak self] _ in self?.clear(.cookies) }
-        if tab.isPrivate { [clearCache, clearCookies, divider].forEach { $0.isHidden = true } }
+        if tab.isPrivate || isBlank { [clearCache, clearCookies, divider].forEach { $0.isHidden = true } }
         onLayout = { [weak self] in self?.layoutContent() }
         frame.size = NSSize(width: Self.width, height: layoutContent(dryRun: true))
         setAccessibilityLabel("Site controls for \(site)")
