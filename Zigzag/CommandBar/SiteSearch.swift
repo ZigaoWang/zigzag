@@ -25,6 +25,7 @@ struct SiteSearch: Equatable {
     static let all: [SiteSearch] = [
         SiteSearch(name: "YouTube", keys: ["youtube", "youtube.com", "yt"], template: "https://www.youtube.com/results?search_query=%s", home: URL(string: "https://www.youtube.com")!, color: hex(0xFF0033)),
         SiteSearch(name: "GitHub", keys: ["github", "github.com", "gh"], template: "https://github.com/search?q=%s&type=repositories", home: URL(string: "https://github.com")!, color: hex(0x24292F)),
+        SiteSearch(name: "AvoidXray", keys: ["avoidxray", "avoidxray.com", "axr"], template: "https://avoidxray.com/search?q=%s", home: URL(string: "https://avoidxray.com")!, color: hex(0xD8352B)),
         SiteSearch(name: "Google", keys: ["google", "google.com"], template: "https://www.google.com/search?q=%s", home: URL(string: "https://www.google.com")!, color: hex(0x4285F4)),
         SiteSearch(name: "Wikipedia", keys: ["wikipedia", "wikipedia.org", "wiki"], template: "https://en.wikipedia.org/w/index.php?search=%s", home: URL(string: "https://en.wikipedia.org")!, color: hex(0x3A3A3A)),
         SiteSearch(name: "Claude", keys: ["claude", "claude.ai"], template: "https://claude.ai/new?q=%s", home: URL(string: "https://claude.ai")!, color: hex(0xD97757)),
