@@ -282,6 +282,7 @@ final class ExtensionHost: NSObject {
         let dict = message as? [String: Any]
         let inner = (dict?["content"] as? [String: Any])?["content"] as? [String: Any]
         guard let type = inner?["type"] as? String else { return }
+        ExtensionLog.write("1Password app replied: \(type)")
         setAttention(type == "BrowserVerificationFailed" ? Attention(
             title: "Connect 1Password to Zigzag",
             message: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.",
