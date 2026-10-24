@@ -30,6 +30,7 @@ final class BrowserWindow: NSWindow {
     }
 
     private var relayoutScheduled = false
+    private var buttonSpacing: CGFloat?
     private var isPlacingTrafficLights = false
 
     /// Puts the buttons back the moment AppKit moves them, so the wrong spot never reaches the screen,
@@ -140,10 +141,11 @@ final class BrowserWindow: NSWindow {
               let titlebar = close.superview else { return }
         guard !styleMask.contains(.fullScreen) else { return }
         let height = close.frame.height
-        let spacing: CGFloat = {
-            guard let mini = standardWindowButton(.miniaturizeButton) else { return 20 }
-            return mini.frame.minX - close.frame.minX
-        }()
+        // Measured once, from AppKit's own layout: read later, mid-move, it can come out wrong and bunch the buttons up.
+        if buttonSpacing == nil, let mini = standardWindowButton(.miniaturizeButton), mini.frame.minX > close.frame.minX {
+            buttonSpacing = mini.frame.minX - close.frame.minX
+        }
+        let spacing = buttonSpacing ?? 20
         // Grow the titlebar so the buttons can sit lower than AppKit's default.
         if let container = titlebar.superview {
             let wanted = origin.y + height + Tokens.Space.x1
