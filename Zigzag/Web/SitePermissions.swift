@@ -26,6 +26,14 @@ enum SitePermissions {
         UserDefaults.standard.set(all, forKey: key)
     }
 
+    /// Sites with a remembered camera or microphone choice.
+    static var sites: Set<String> {
+        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        return Set(all.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
+    }
+
+    static func forgetAll() { UserDefaults.standard.removeObject(forKey: key) }
+
     static func forget(host: String) {
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         for k in all.keys where k.hasPrefix(host + "|") { all[k] = nil }
