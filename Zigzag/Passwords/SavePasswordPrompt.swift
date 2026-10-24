@@ -32,6 +32,9 @@ final class SavePasswordPrompt: FloatingPanelView {
         case .update: titleLabel = Label("Update password for \(origin.displayName)?", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
         }
         isUpdate = { if case .update = kind { true } else { false } }()
+        // A long site name shortens in the middle, so the question stays on one line; the full name is a hover away.
+        titleLabel.lineBreakMode = .byTruncatingMiddle
+        titleLabel.toolTip = origin.displayName
         saveButton = PrimaryButton(title: { if case .update = kind { "Update" } else { "Save" } }())
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: 0))
         icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill")
