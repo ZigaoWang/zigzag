@@ -251,7 +251,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         fieldIcon.frame = NSRect(x: Tokens.Space.x4, y: (fieldHeight - iconSize) / 2, width: iconSize, height: iconSize)
         let textHeight = ceil(field.intrinsicContentSize.height)
         var fieldX = fieldIcon.frame.maxX + Tokens.Space.x2
-        if !chip.isHidden {
+        if scope != nil {
             let cw = chipLabel.textWidth + Tokens.Space.x5
             let ch: CGFloat = 26
             chip.frame = NSRect(x: fieldX, y: (fieldHeight - ch) / 2, width: cw, height: ch)
@@ -292,6 +292,20 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             results = queries.compactMap { query in
                 scope.url(for: query).map { CommandResult(kind: .searchOn($0), title: query, detail: "Search \(scope.name)",
                                                          icon: FaviconStore.shared.cachedIcon(for: scope.home), symbol: "magnifyingglass") }
+            }
+            // Nothing typed yet: the site itself and where you've been on it, so the bar doesn't empty out at Tab.
+            if q.isEmpty {
+                let domain = (scope.home.host() ?? "").split(separator: ".").suffix(2).joined(separator: ".")
+                var seen = Set([TabManager.normalize(scope.home)])
+                results = [CommandResult(kind: .open(scope.home), title: scope.name, detail: CommandRanker.displayURL(scope.home),
+                                         icon: FaviconStore.shared.cachedIcon(for: scope.home), symbol: "globe")]
+                for entry in HistoryStore.shared.search(domain, limit: 12) where results.count < 6 {
+                    let key = TabManager.normalize(entry.url)
+                    guard entry.url.host()?.hasSuffix(domain) == true, entry.url.path.count > 1, !SearchFolding.isSearchResultsPage(entry.url),
+                          seen.insert(key).inserted else { continue }
+                    results.append(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? CommandRanker.displayURL(entry.url) : entry.title,
+                                                 detail: CommandRanker.displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)))
+                }
             }
         }
         // An inline completion becomes the first result.
@@ -362,8 +376,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     #endif
 
     private func setScope(_ site: SiteSearch?) {
+        let entering = site != nil && scope == nil, leaving = site == nil && scope != nil
+        let before = field.frame
         scope = site
-        chip.isHidden = site == nil
+        if leaving { fadeOutChip() } else { chip.isHidden = site == nil }
         chip.color = site?.color ?? .clear
         chipLabel.stringValue = site?.name ?? ""
         completionURL = nil
@@ -378,6 +394,64 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if let site { FaviconStore.shared.prefetch(for: site.home) }
         refreshHint()
         refreshResults(animated: true)
+        if entering || leaving { animateScope(entering: entering, fieldFrom: before) }
+    }
+
+    /// Tab into a site: its chip pops in where your words were, and the field slides over to make room. Leaving
+    /// slides it back. Nothing jumps.
+    private func animateScope(entering: Bool, fieldFrom before: NSRect) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        panel.layoutSubtreeIfNeeded()
+        let after = field.frame
+        if before != after, before != .zero {
+            field.frame = before
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.26
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+                field.animator().frame = after
+            }
+        }
+        // The words you typed fade as the field empties, rather than vanishing.
+        let fade = CATransition()
+        fade.type = .fade
+        fade.duration = 0.18
+        field.layer?.add(fade, forKey: "scope")
+        guard entering, let layer = chip.layer else { return }
+        // Grows from the chip's own middle: layers scale from their corner, so shift by half the shrink.
+        let size = chip.bounds.size, k: CGFloat = 0.6
+        let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                        CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
+        let pop = CASpringAnimation(keyPath: "transform")
+        pop.fromValue = NSValue(caTransform3D: small)
+        pop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        pop.mass = 1
+        pop.stiffness = 420
+        pop.damping = 22
+        pop.duration = pop.settlingDuration
+        let show = CABasicAnimation(keyPath: "opacity")
+        show.fromValue = 0
+        show.toValue = 1
+        show.duration = 0.14
+        layer.add(pop, forKey: "pop")
+        layer.add(show, forKey: "show")
+    }
+
+    private func fadeOutChip() {
+        guard let layer = chip.layer, !chip.isHidden else { chip.isHidden = true; return }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            guard let self, self.scope == nil else { return }
+            self.chip.isHidden = true
+            layer.opacity = 1
+            self.panel.needsLayout = true
+        }
+        let out = CABasicAnimation(keyPath: "opacity")
+        out.fromValue = 1
+        out.toValue = 0
+        out.duration = 0.14
+        layer.add(out, forKey: "hide")
+        layer.opacity = 0
+        CATransaction.commit()
     }
 
     // MARK: Typing
