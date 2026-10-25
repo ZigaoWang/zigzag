@@ -104,6 +104,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
     private var scope: SiteSearch?
+    /// What you'd typed before Tab took you into a site, so Esc can give it back.
+    private var typedBeforeScope = ""
     private let chip = ColorView(color: .clear)
     private let chipLabel = Label("", font: Tokens.Font.body(.semibold), color: .white)
     /// "Search YouTube  Tab", at the right of the field, when what you've typed names a site.
@@ -413,9 +415,16 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         chipLabel.stringValue = site?.name ?? ""
         completionURL = nil
         if site != nil {
+            if entering { typedBeforeScope = typed }
             field.stringValue = ""
             typed = ""
             suggestions = []
+        } else if leaving {
+            // Back to exactly what you'd typed, cursor at its end: Tab by mistake costs nothing.
+            field.stringValue = typedBeforeScope
+            typed = typedBeforeScope
+            suppressCompletion = true
+            (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (typedBeforeScope as NSString).length, length: 0)
         }
         let font = field.font ?? Tokens.Font.large()
         field.placeholderAttributedString = NSAttributedString(string: site.map { "Search \($0.name)" } ?? (mode == .history ? "Search history" : "Search or enter address"),
@@ -435,7 +444,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if before != after, before != .zero {
             field.frame = before
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.26
+                ctx.duration = 0.2
                 ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
                 field.animator().frame = after
             }
@@ -447,20 +456,18 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         field.layer?.add(fade, forKey: "scope")
         guard entering, let layer = chip.layer else { return }
         // Grows from the chip's own middle: layers scale from their corner, so shift by half the shrink.
-        let size = chip.bounds.size, k: CGFloat = 0.6
+        let size = chip.bounds.size, k: CGFloat = 0.92
         let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                         CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
-        let pop = CASpringAnimation(keyPath: "transform")
+        let pop = CABasicAnimation(keyPath: "transform")
         pop.fromValue = NSValue(caTransform3D: small)
         pop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        pop.mass = 1
-        pop.stiffness = 420
-        pop.damping = 22
-        pop.duration = pop.settlingDuration
+        pop.duration = 0.2
+        pop.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
         let show = CABasicAnimation(keyPath: "opacity")
         show.fromValue = 0
         show.toValue = 1
-        show.duration = 0.14
+        show.duration = 0.16
         layer.add(pop, forKey: "pop")
         layer.add(show, forKey: "show")
     }
