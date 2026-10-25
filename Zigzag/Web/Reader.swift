@@ -153,6 +153,9 @@ final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
     var onOpenLink: ((URL) -> Void)?
+    /// Shift-click: a look at the link in Peek, over the article. ⌘-click: a tab in the background.
+    var onPeekLink: ((URL) -> Void)?
+    var onBackgroundLink: ((URL) -> Void)?
     private let controls = ReaderControls()
 
     override init(frame: NSRect) {
@@ -237,7 +240,7 @@ final class ReaderControls: FloatingPanelView {
         guard let host = superview else { return }
         options.preferences = preferences
         let size = options.panelSize
-        options.frame = NSRect(x: frame.maxX - size.width, y: frame.maxY + Tokens.Space.x2, width: size.width, height: size.height)
+        options.frame = NSRect(x: frame.maxX - size.width, y: frame.maxY + 6, width: size.width, height: size.height)
         host.addSubview(options)
         options.present()
         style.isSelected = true
@@ -264,34 +267,35 @@ final class ReaderControls: FloatingPanelView {
     }
 }
 
-/// How it reads: size, typeface, colours. Three short rows, nothing else.
+/// How it reads: size, typeface, colours. Three even rows, each one control across the panel.
 private final class ReaderOptions: FloatingPanelView {
     var onChange: ((Reader.Preferences) -> Void)?
     var preferences = Reader.Preferences.saved { didSet { refresh() } }
 
-    private let smaller = TextButton(title: "A", font: .systemFont(ofSize: 13, weight: .medium))
-    private let larger = TextButton(title: "A", font: .systemFont(ofSize: 19, weight: .medium))
-    private let face = SegmentedPills(["Serif", "Sans"])
-    private var swatches: [(Reader.Preferences.Theme, ThemeSwatch)] = []
-    private let rule1 = ColorView(color: Tokens.Color.separator)
-    private let rule2 = ColorView(color: Tokens.Color.separator)
+    private let size = ReaderSegments([.text("A", .systemFont(ofSize: 13, weight: .semibold)), .text("A", .systemFont(ofSize: 19, weight: .semibold))],
+                                      toggles: false)
+    private let face = ReaderSegments([.text("Serif", NSFont(descriptor: NSFont.systemFont(ofSize: 14, weight: .medium).fontDescriptor.withDesign(.serif)!, size: 14)!),
+                                       .text("Sans", .systemFont(ofSize: 14, weight: .medium))], toggles: true)
+    private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
 
-    var panelSize: NSSize { NSSize(width: 216, height: 160) }
+    static let width: CGFloat = 236
+    private static let pad: CGFloat = 10, row: CGFloat = 36, gap: CGFloat = 8
+    var panelSize: NSSize { NSSize(width: Self.width, height: Self.pad * 2 + Self.row * 3 + Self.gap * 2) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [smaller, larger, rule1, face, rule2].forEach { addSubview($0) }
-        smaller.toolTip = "Smaller Text"
-        larger.toolTip = "Larger Text"
+        radius = 16
+        [size, face].forEach { addSubview($0) }
         for theme in Reader.Preferences.Theme.allCases {
-            let swatch = ThemeSwatch(theme: theme)
-            swatch.onClick = { [weak self] in self?.change { $0.theme = theme } }
-            addSubview(swatch)
-            swatches.append((theme, swatch))
+            let tile = ThemeTile(theme: theme)
+            tile.onClick = { [weak self] _ in self?.change { $0.theme = theme } }
+            addSubview(tile)
+            tiles.append((theme, tile))
         }
-        smaller.onClick = { [weak self] _ in self?.change { $0.size = max(Reader.Preferences.sizes.lowerBound, $0.size - 1) } }
-        larger.onClick = { [weak self] _ in self?.change { $0.size = min(Reader.Preferences.sizes.upperBound, $0.size + 1) } }
-        face.onChange = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
+        size.onPick = { [weak self] index in
+            self?.change { $0.size = index == 0 ? max(Reader.Preferences.sizes.lowerBound, $0.size - 1) : min(Reader.Preferences.sizes.upperBound, $0.size + 1) }
+        }
+        face.onPick = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
         onLayout = { [weak self] in self?.layoutContent() }
         refresh()
     }
@@ -306,87 +310,205 @@ private final class ReaderOptions: FloatingPanelView {
     }
 
     private func refresh() {
-        face.selectedIndex = preferences.face == .serif ? 0 : 1
-        for (theme, swatch) in swatches { swatch.isChosen = theme == preferences.theme }
-        smaller.isEnabled = preferences.size > Reader.Preferences.sizes.lowerBound
-        larger.isEnabled = preferences.size < Reader.Preferences.sizes.upperBound
+        face.selected = preferences.face == .serif ? 0 : 1
+        size.setEnabled(0, preferences.size > Reader.Preferences.sizes.lowerBound)
+        size.setEnabled(1, preferences.size < Reader.Preferences.sizes.upperBound)
+        for (theme, tile) in tiles { tile.isSelected = theme == preferences.theme }
     }
 
     private func layoutContent() {
-        let w = bounds.width, pad = Tokens.Space.x3, inner = w - pad * 2
-        // Size: a small A and a big A, each half the row.
-        let rowH: CGFloat = 40
-        smaller.frame = NSRect(x: pad, y: pad - 2, width: inner / 2, height: rowH)
-        larger.frame = NSRect(x: pad + inner / 2, y: pad - 2, width: inner / 2, height: rowH)
-        rule1.frame = NSRect(x: pad, y: smaller.frame.maxY + 4, width: inner, height: 1)
-        let fw = ceil(face.fittingWidth)
-        face.frame = NSRect(x: (w - fw) / 2, y: rule1.frame.maxY + 9, width: fw, height: 30)
-        rule2.frame = NSRect(x: pad, y: face.frame.maxY + 9, width: inner, height: 1)
-        let dot: CGFloat = 30
-        let gap = (inner - dot * CGFloat(swatches.count)) / CGFloat(max(swatches.count - 1, 1))
-        for (i, (_, swatch)) in swatches.enumerated() {
-            swatch.frame = NSRect(x: pad + CGFloat(i) * (dot + gap), y: rule2.frame.maxY + 11, width: dot, height: dot)
+        let pad = Self.pad, inner = bounds.width - pad * 2
+        size.frame = NSRect(x: pad, y: pad, width: inner, height: Self.row)
+        face.frame = NSRect(x: pad, y: size.frame.maxY + Self.gap, width: inner, height: Self.row)
+        let y = face.frame.maxY + Self.gap, gap: CGFloat = 6
+        let w = (inner - gap * CGFloat(tiles.count - 1)) / CGFloat(tiles.count)
+        for (i, (_, tile)) in tiles.enumerated() {
+            tile.frame = NSRect(x: pad + CGFloat(i) * (w + gap), y: y, width: w, height: Self.row)
         }
     }
 }
 
-/// One theme: a plain round sample of its paper, ringed when chosen. Auto is half light, half dark.
-private final class ThemeSwatch: NSView {
-    var onClick: (() -> Void)?
-    var isChosen = false { didSet { ring.isHidden = !isChosen } }
-    private let ring = CAShapeLayer()
-    private let fill = CALayer()
-    private let half = CALayer()
+/// A row of equal halves in one soft field: either a choice (one lit, sliding between) or a pair of buttons.
+private final class ReaderSegments: NSView {
+    enum Item { case text(String, NSFont) }
+    var onPick: ((Int) -> Void)?
+    var selected = 0 { didSet { if toggles { moveHighlight(animated: window != nil && oldValue != selected) } } }
+    private let toggles: Bool
+    private let highlight = ColorView(color: Tokens.Color.selectedFill)
+    private var segments: [InteractiveView] = []
+    private var labels: [Label] = []
+    private let divider = ColorView(color: Tokens.Color.separator)
 
-    init(theme: Reader.Preferences.Theme) {
+    init(_ items: [Item], toggles: Bool) {
+        self.toggles = toggles
         super.init(frame: .zero)
         wantsLayer = true
-        let paper: NSColor
+        layer?.cornerRadius = 10
+        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
+        highlight.wantsLayer = true
+        highlight.layer?.cornerRadius = 8
+        highlight.layer?.cornerCurve = .continuous
+        highlight.isHidden = !toggles
+        addSubview(highlight)
+        divider.isHidden = toggles
+        addSubview(divider)
+        for (i, item) in items.enumerated() {
+            let segment = InteractiveView()
+            segment.wantsLayer = true
+            segment.layer?.cornerRadius = 8
+            segment.layer?.cornerCurve = .continuous
+            guard case .text(let text, let font) = item else { continue }
+            let label = Label(text, font: font, color: Tokens.Color.textPrimary)
+            label.alignment = .center
+            segment.addSubview(label)
+            segment.onClick = { [weak self] _ in
+                guard let self, segment.isEnabled else { return }
+                if self.toggles { self.selected = i }
+                self.onPick?(i)
+            }
+            segment.hoverChanged = { [weak segment, weak self] hovering in
+                guard let segment, let self, !self.toggles || self.selected != i else { return }
+                segment.layer?.backgroundColor = hovering && segment.isEnabled ? self.cgColor(Tokens.Color.hoverFill) : nil
+            }
+            addSubview(segment)
+            segments.append(segment)
+            labels.append(label)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    func setEnabled(_ index: Int, _ enabled: Bool) {
+        guard segments.indices.contains(index) else { return }
+        segments[index].isEnabled = enabled
+        labels[index].textColor = enabled ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
+        if !enabled { segments[index].layer?.backgroundColor = nil }
+    }
+
+    private func frame(of index: Int) -> NSRect {
+        let inset: CGFloat = 3, w = (bounds.width - inset * 2) / CGFloat(max(segments.count, 1))
+        return NSRect(x: inset + CGFloat(index) * w, y: inset, width: w, height: bounds.height - inset * 2)
+    }
+
+    private func moveHighlight(animated: Bool) {
+        guard segments.indices.contains(selected) else { return }
+        for (i, label) in labels.enumerated() { label.textColor = i == selected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary }
+        segments[selected].layer?.backgroundColor = nil
+        let target = frame(of: selected)
+        if animated {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.22
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+                highlight.animator().frame = target
+            }
+        } else {
+            highlight.frame = target
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        for (i, segment) in segments.enumerated() {
+            segment.frame = frame(of: i)
+            let label = labels[i]
+            label.frame = NSRect(x: 0, y: (segment.bounds.height - label.lineHeight) / 2, width: segment.bounds.width, height: label.lineHeight)
+        }
+        divider.frame = NSRect(x: bounds.midX, y: 9, width: 1, height: bounds.height - 18)
+        if toggles { moveHighlight(animated: false) }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
+    }
+}
+
+/// One theme as it reads: "Aa" in its own ink on its own paper. Auto is half light, half dark.
+private final class ThemeTile: InteractiveView {
+    private let theme: Reader.Preferences.Theme
+    private let darkHalf = CALayer()
+    private let lightInk = CATextLayer()
+    private let darkInk = CATextLayer()
+    private let ring = CAShapeLayer()
+
+    private static func colors(_ theme: Reader.Preferences.Theme) -> (paper: NSColor, ink: NSColor) {
         switch theme {
-        case .auto, .light: paper = Tokens.Color.hex(0xFDFCFA)
-        case .sepia: paper = Tokens.Color.hex(0xF3E9D6)
-        case .dark: paper = Tokens.Color.hex(0x1B1B1D)
+        case .auto, .light: return (Tokens.Color.hex(0xFDFCFA), Tokens.Color.hex(0x1F1F21))
+        case .sepia: return (Tokens.Color.hex(0xF3E9D6), Tokens.Color.hex(0x45372A))
+        case .dark: return (Tokens.Color.hex(0x1B1B1D), Tokens.Color.hex(0xE6E4E0))
         }
-        fill.backgroundColor = paper.cgColor
-        fill.borderWidth = 1
-        fill.borderColor = NSColor.black.withAlphaComponent(0.12).cgColor
-        fill.masksToBounds = true
-        layer?.addSublayer(fill)
+    }
+
+    init(theme: Reader.Preferences.Theme) {
+        self.theme = theme
+        super.init(frame: .zero)
+        wantsLayer = true
+        let (paper, ink) = Self.colors(theme)
+        layer?.backgroundColor = paper.cgColor
+        layer?.cornerRadius = 10
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.black.withAlphaComponent(0.1).cgColor
         if theme == .auto {
-            half.backgroundColor = Tokens.Color.hex(0x1B1B1D).cgColor
-            fill.addSublayer(half)
+            darkHalf.backgroundColor = Tokens.Color.hex(0x1B1B1D).cgColor
+            layer?.addSublayer(darkHalf)
         }
+        for (text, color) in [(lightInk, ink), (darkInk, Tokens.Color.hex(0xE6E4E0))] {
+            text.string = "Aa"
+            text.font = NSFont(descriptor: NSFont.systemFont(ofSize: 14, weight: .semibold).fontDescriptor.withDesign(.serif)!, size: 14)
+            text.fontSize = 14
+            text.alignmentMode = .center
+            text.foregroundColor = color.cgColor
+            text.contentsScale = 2
+            layer?.addSublayer(text)
+        }
+        darkInk.isHidden = theme != .auto
         ring.fillColor = nil
-        ring.lineWidth = 2
+        ring.lineWidth = 2.5
         ring.isHidden = true
         layer?.addSublayer(ring)
-        toolTip = theme.rawValue.capitalized
+        toolTip = theme == .auto ? "Auto: follows your Mac" : theme.rawValue.capitalized
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(theme.rawValue.capitalized)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func stateDidChange(animated: Bool) {
+        ring.isHidden = !isSelected
+    }
+
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
-            let inner = bounds.insetBy(dx: 4, dy: 4)
-            fill.frame = inner
-            fill.cornerRadius = inner.width / 2
-            half.frame = CGRect(x: inner.width / 2, y: 0, width: inner.width / 2, height: inner.height)
-            ring.path = CGPath(ellipseIn: bounds.insetBy(dx: 1, dy: 1), transform: nil)
+            let h = bounds.height, textH: CGFloat = 18
+            darkHalf.frame = CGRect(x: bounds.midX, y: 0, width: bounds.width / 2, height: h)
+            if theme == .auto {
+                // "A" on the light half, "a" on the dark: the same word, both ways.
+                lightInk.string = "A"
+                darkInk.string = "a"
+                lightInk.frame = CGRect(x: 0, y: (h - textH) / 2, width: bounds.width / 2, height: textH)
+                darkInk.frame = CGRect(x: bounds.midX, y: (h - textH) / 2, width: bounds.width / 2, height: textH)
+            } else {
+                lightInk.frame = CGRect(x: 0, y: (h - textH) / 2, width: bounds.width, height: textH)
+            }
+            ring.path = CGPath(roundedRect: bounds.insetBy(dx: 1.25, dy: 1.25), cornerWidth: 9, cornerHeight: 9, transform: nil)
             ring.strokeColor = Tokens.Color.accent.cgColor
         }
     }
-
-    override func mouseDown(with event: NSEvent) { onClick?() }
 }
 
 extension ReaderView: WKNavigationDelegate {
     /// Links in an article open in the page, not inside the reader.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
-            onOpenLink?(url)
+            let flags = navigationAction.modifierFlags
+            if flags.contains(.shift) { onPeekLink?(url) }
+            else if flags.contains(.command) || navigationAction.buttonNumber == 4 { onBackgroundLink?(url) }
+            else { onOpenLink?(url) }
             return .cancel
         }
         return .allow
