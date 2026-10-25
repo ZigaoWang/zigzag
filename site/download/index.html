@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download Zigzag</title>
+<meta name="description" content="Download Zigzag, a browser for the Mac.">
+<link rel="icon" type="image/png" href="/assets/favicon-64.png">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="/" aria-label="Zigzag"><span class="wordmark" aria-hidden="true"></span></a>
+  <nav><a href="/">Tour</a></nav>
+</header>
+<main class="page">
+  <h1>Your download is <em>starting.</em></h1>
+  <p class="lede">If it doesn’t, <a href="/releases/latest" id="get">download Zigzag here</a>.</p>
+  <ol class="steps">
+    <li><strong>Open Zigzag.zip.</strong> It unzips to Zigzag.</li>
+    <li><strong>Drag Zigzag to Applications,</strong> then open it from there.</li>
+    <li><strong>Bring your things over.</strong> Zigzag offers to import from the browser you use now.</li>
+  </ol>
+  <p class="fine">macOS 15.4 or later · Apple silicon and Intel · Notarized by Apple</p>
+</main>
+<footer class="foot"><span>Made in Shanghai</span><span>© 2026 Zigao Wang</span></footer>
+<script>
+  // Start the download once, a beat after the page shows; the link is there if it doesn't.
+  setTimeout(function () { window.location.href = document.getElementById("get").href; }, 700);
+</script>
+</body>
+</html>
