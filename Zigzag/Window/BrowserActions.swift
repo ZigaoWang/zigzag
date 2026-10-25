@@ -232,7 +232,11 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func toggleBookmark(_ sender: Any?) {
         guard let tab = selectedTab else { return }
-        if let bookmarkID = tab.bookmarkID {
+        if let bookmarkID = tab.bookmarkID, tab.isFavorite {
+            // A favorite stays open as a tab; ⌘Z puts it back in Favorites.
+            unfavoriteWithUndo(bookmarkID, to: 0)
+            Toast.show("Removed from Favorites", symbol: "star.slash", in: self)
+        } else if let bookmarkID = tab.bookmarkID {
             unbookmarkWithUndo(bookmarkID, to: 0)
             Toast.show("Bookmark removed", symbol: "bookmark.slash", in: self)
         } else {
