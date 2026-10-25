@@ -75,7 +75,13 @@ final class FavoritesView: NSView {
 
     /// Which slot a point (in this view) falls in, for reordering.
     func index(at point: NSPoint) -> Int {
-        tiles.firstIndex { point.x < $0.frame.midX && point.y < $0.frame.maxY } ?? tiles.count
+        // Before the first tile that's in a lower row, or in this row and right of the point.
+        tiles.firstIndex { tile in
+            let gap = Tokens.Space.x2
+            let below = point.y < tile.frame.minY - gap
+            let sameRow = point.y >= tile.frame.minY - gap && point.y < tile.frame.maxY + gap
+            return below || (sameRow && point.x < tile.frame.midX)
+        } ?? tiles.count
     }
 
     /// Lifts the tile into a see-through floating copy that follows the pointer anywhere.
