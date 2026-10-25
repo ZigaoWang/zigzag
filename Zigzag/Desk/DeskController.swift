@@ -109,27 +109,80 @@ final class DeskController {
 
         // Zoom out: the current page shrinks into its card while the others fade in.
         let current = controller.tabManager.selectedTab.flatMap { cards[$0.id] }
+        settleIn(except: current)
         if let current, let snapshot = current.tab?.snapshot {
-            let ghost = NSImageView(image: snapshot)
-            ghost.imageScaling = .scaleAxesIndependently
-            ghost.wantsLayer = true
-            ghost.layer?.cornerRadius = Tokens.Radius.card
-            ghost.layer?.masksToBounds = true
-            ghost.frame = root.cardFrame
-            root.overlay.addSubview(ghost)
+            // Where it lands is only known once the cards are laid out.
+            backdrop.layoutSubtreeIfNeeded()
             let target = current.imageClip.convert(current.imageClip.bounds, to: root.overlay)
             current.alphaValue = 0
-            backdrop.alphaValue = 0
-            Tokens.Motion.animate(Tokens.Motion.gentle, {
-                ghost.animator().frame = target
-                self.backdrop.animator().alphaValue = 1
-            }, completion: {
-                current.alphaValue = 1
-                ghost.removeFromSuperview()
-            })
-        } else {
-            backdrop.alphaValue = 0
-            Tokens.Motion.animate(Tokens.Motion.gentle) { self.backdrop.animator().alphaValue = 1 }
+            zoom(snapshot, from: root.cardFrame, to: target, in: root.overlay) { current.alphaValue = 1 }
+        }
+        backdrop.alphaValue = 0
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) { self.backdrop.animator().alphaValue = 1 }
+    }
+
+    /// The page flying between full size and its card: a plain layer over everything, moved by Core Animation on
+    /// the render server, so it never stutters or hides behind the desk.
+    private func zoom(_ image: NSImage, from: NSRect, to: NSRect, in overlay: NSView, completion: @escaping () -> Void) {
+        guard let host = overlay.layer, !Tokens.Motion.reduceMotion else { completion(); return }
+        let ghost = CALayer()
+        ghost.contents = image
+        ghost.contentsGravity = .resize
+        ghost.cornerRadius = Tokens.Radius.card
+        ghost.cornerCurve = .continuous
+        ghost.masksToBounds = true
+        ghost.zPosition = 1000
+        ghost.anchorPoint = .zero
+        // A flipped view's layer is flipped with it, so view and layer coordinates agree.
+        let start = from, end = to
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        ghost.frame = end
+        host.addSublayer(ghost)
+        CATransaction.commit()
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { ghost.removeFromSuperlayer(); completion() }
+        let duration = Tokens.Motion.gentle.duration * Tokens.Motion.debugSlowdown
+        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+        for (key, a, b) in [("position", NSValue(point: start.origin), NSValue(point: end.origin)),
+                            ("bounds.size", NSValue(size: start.size), NSValue(size: end.size))] {
+            let move = CABasicAnimation(keyPath: key)
+            move.fromValue = a
+            move.toValue = b
+            move.duration = duration
+            move.timingFunction = curve
+            ghost.add(move, forKey: key)
+        }
+        CATransaction.commit()
+    }
+
+    /// The other cards arrive a beat after one another, in reading order: each fades in while growing the last
+    /// few percent from its own middle. Short enough that the last one lands with the zoom.
+    private func settleIn(except skipped: NSView?) {
+        guard !Tokens.Motion.reduceMotion else { return }
+        let ordered = cards.values.filter { $0 !== skipped }.sorted {
+            $0.frame.minY != $1.frame.minY ? $0.frame.minY < $1.frame.minY : $0.frame.minX < $1.frame.minX
+        }
+        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+        let now = CACurrentMediaTime()
+        for (i, card) in ordered.prefix(24).enumerated() {
+            guard let layer = card.layer else { continue }
+            let k: CGFloat = 0.94, size = card.bounds.size
+            let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                            CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
+            let grow = CABasicAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: small)
+            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            let group = CAAnimationGroup()
+            group.animations = [grow, fade]
+            group.duration = 0.3
+            group.timingFunction = curve
+            group.beginTime = now + min(Double(i) * 0.018, 0.16)
+            group.fillMode = .backwards
+            layer.add(group, forKey: "settle")
         }
     }
 
@@ -141,27 +194,17 @@ final class DeskController {
         let target = tab ?? controller.tabManager.selectedTab
         if let target, let card = cards[target.id], let image = target.snapshot ?? card.tab?.snapshot {
             // Zoom into the chosen card.
-            let ghost = NSImageView(image: image)
-            ghost.imageScaling = .scaleAxesIndependently
-            ghost.wantsLayer = true
-            ghost.layer?.cornerRadius = Tokens.Radius.card
-            ghost.layer?.masksToBounds = true
-            ghost.frame = card.imageClip.convert(card.imageClip.bounds, to: root.overlay)
-            root.overlay.addSubview(ghost)
+            let from = card.imageClip.convert(card.imageClip.bounds, to: root.overlay)
             card.alphaValue = 0
             if let tab { controller.tabManager.select(tab) }
-            Tokens.Motion.animate(Tokens.Motion.gentle, {
-                ghost.animator().frame = root.cardFrame
-                self.backdrop.animator().alphaValue = 0
-            }, completion: {
-                ghost.removeFromSuperview()
+            zoom(image, from: from, to: root.cardFrame, in: root.overlay) { card.alphaValue = 1 }
+            Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: {
                 self.backdrop.removeFromSuperview()
                 self.backdrop.alphaValue = 1
-                card.alphaValue = 1
             })
         } else {
             if let tab { controller.tabManager.select(tab) }
-            Tokens.Motion.animate(Tokens.Motion.snappy, { self.backdrop.animator().alphaValue = 0 }, completion: {
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: {
                 self.backdrop.removeFromSuperview()
                 self.backdrop.alphaValue = 1
             })
