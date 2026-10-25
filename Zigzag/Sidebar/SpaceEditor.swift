@@ -101,8 +101,6 @@ final class GrainSlider: NSView {
     var isTone = false { didSet { needsLayout = true; setAccessibilityLabel(isTone ? "Brightness" : "Grain"); toolTip = isTone ? "Brightness" : "Grain" } }
     var toneColors: [NSColor] = [.white, .black] { didSet { needsLayout = true } }
     var showsChecker = false { didSet { needsLayout = true } }
-    /// Automatic: no value chosen, so the knob steps away until you drag.
-    var isIdle = false { didSet { needsLayout = true } }
     private let checker = CALayer()
     /// Called while dragging (`final` false) and once on release (`final` true).
     var onChange: ((Double, Bool) -> Void)?
@@ -190,8 +188,7 @@ final class GrainSlider: NSView {
             stopDots.path = path
             stopDots.fillColor = NSColor.black.withAlphaComponent(0.18).cgColor
         }
-        knob.opacity = isIdle ? 0 : 1
-        stopDots.isHidden = isIdle
+        knob.opacity = 1
         // Held, the knob swells a little under your finger.
         knob.setAffineTransform(pressed ? CGAffineTransform(scaleX: 1.12, y: 1.12) : .identity)
         setAccessibilityValue(grain < 0.01 ? "Smooth" : "\(Int(grain * 100)) percent")
@@ -231,7 +228,6 @@ final class GrainSlider: NSView {
 
     override func mouseDown(with event: NSEvent) {
         lastStop = Self.stops.first { abs($0 - grain) < 0.001 }
-        isIdle = false
         pressed = true
         grain = value(at: event)
         layoutSubtreeIfNeeded()
@@ -815,52 +811,6 @@ final class DirectionKnob: NSView {
     override func accessibilityPerformDecrement() -> Bool { angle = (angle + 315).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
 }
 
-/// "Auto": on, the space follows the system, light by day and dark at night; off, the slider beside it decides.
-final class AutoChip: InteractiveView {
-    private let pill = CALayer()
-    private let title = Label("Auto", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        layer?.cornerCurve = .continuous
-        pill.cornerCurve = .continuous
-        pill.shadowOpacity = 1
-        pill.shadowRadius = 1.5
-        pill.shadowOffset = CGSize(width: 0, height: -0.5)
-        layer?.addSublayer(pill)
-        title.alignment = .center
-        addSubview(title)
-        toolTip = "Light by day, dark at night, with your Mac"
-        setAccessibilityRole(.checkBox)
-        setAccessibilityLabel("Automatic brightness")
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func layout() {
-        super.layout()
-        stateDidChange(animated: false)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        layer?.cornerRadius = bounds.height / 2
-        Tokens.Motion.withoutAnimation {
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
-                pill.frame = bounds.insetBy(dx: 3, dy: 3)
-                pill.cornerRadius = pill.frame.height / 2
-                pill.backgroundColor = Tokens.Color.panelBackground.cgColor
-                pill.shadowColor = NSColor.black.withAlphaComponent(0.14).cgColor
-            }
-        }
-        pill.opacity = isSelected ? 1 : 0
-        title.textColor = isSelected || isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-        title.font = Tokens.Font.body(isSelected ? .semibold : .medium)
-        title.frame = NSRect(x: 0, y: (bounds.height - title.lineHeight) / 2, width: bounds.width, height: title.lineHeight)
-        setAccessibilityValue(isSelected ? 1 : 0)
-    }
-}
-
 final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
@@ -870,8 +820,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// What kind of look: one color, two that fade into each other, or frosted glass.
     private let kindSwitch = SlidingSwitch([.text("Solid"), .text("Gradient"), .text("Glass")])
     private let canvas = ColorCanvas()
-    /// How light or dark, the same in every kind; the window's mode follows. Auto leaves it to the system.
-    private let autoChip = AutoChip()
+    /// Glass: how light or dark, clear white to smoked black; the window's mode follows.
     private let brightnessSlider = GrainSlider()
     /// A few ready-made looks for the chosen kind.
     private var swatches: [TintSwatch] = []
@@ -899,7 +848,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
-        [nameBackground, nameField, kindSwitch, canvas, autoChip, brightnessSlider, grainSlider, dial].forEach { addSubview($0) }
+        [nameBackground, nameField, kindSwitch, canvas, brightnessSlider, grainSlider, dial].forEach { addSubview($0) }
         brightnessSlider.isTone = true
         brightnessSlider.onChange = { [weak self] value, final in
             guard let self else { return }
@@ -908,33 +857,18 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
                 self.edited = true
                 self.refresh()
             } else {
-                self.autoChip.isSelected = false
                 self.preview(brightness: value)
             }
         }
-        autoChip.onClick = { [weak self] _ in
-            guard let self else { return }
-            let auto = Library.shared.space(self.spaceID)?.brightness == nil
-            // Off: starts from how it looks right now, so nothing jumps.
-            let now: Double? = auto ? (self.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.85 : 0.1) : nil
-            Library.shared.setBrightness(now, for: self.spaceID)
-            self.edited = true
-            self.refresh()
-        }
-
         kindSwitch.selectedIndex = kind.rawValue
         kindSwitch.onChange = { [weak self] index in self?.switchKind(Kind(rawValue: index) ?? .solid) }
 
         canvas.onChange = { [weak self] hue, depth, final in
             guard let self, let space = Library.shared.space(self.spaceID) else { return }
             if final {
-                // Auto: farther out is a stronger tint, light by day and dark at night. Otherwise: farther out is darker.
-                if space.brightness == nil {
-                    Library.shared.setHue(hue, intensity: depth, for: self.spaceID)
-                } else {
-                    Library.shared.setHue(hue, intensity: space.hue == nil ? Self.vivid : space.intensity ?? Self.vivid, for: self.spaceID)
-                    Library.shared.setBrightness(depth, for: self.spaceID)
-                }
+                // Farther out is darker, and past the middle the window turns dark with it.
+                Library.shared.setHue(hue, intensity: Self.vivid, for: self.spaceID)
+                Library.shared.setBrightness(depth, for: self.spaceID)
                 self.edited = true
                 self.refresh()
             } else {
@@ -944,12 +878,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         canvas.onChange2 = { [weak self] hue2, depth, final in
             guard let self, let space = Library.shared.space(self.spaceID) else { return }
             if final {
-                if space.brightness == nil {
-                    Library.shared.setSecondHue(hue2, intensity: depth, for: self.spaceID)
-                } else {
-                    Library.shared.setSecondHue(hue2, intensity: space.intensity ?? Self.vivid, for: self.spaceID)
-                    Library.shared.setSecondBrightness(depth, for: self.spaceID)
-                }
+                if space.brightness == nil { Library.shared.setBrightness(self.shownBrightness(space), for: self.spaceID) }
+                Library.shared.setSecondHue(hue2, intensity: Self.vivid, for: self.spaceID)
+                Library.shared.setSecondBrightness(depth, for: self.spaceID)
                 self.edited = true
                 self.refresh()
             } else {
@@ -1071,12 +1002,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// Everything on the panel from what's saved.
     private func refresh() {
         guard let space = Library.shared.space(spaceID) else { return }
-        let auto = space.brightness == nil
         canvas.hue = space.baseHue
-        canvas.intensity = auto ? space.intensity ?? SpaceColor.defaultIntensity : space.brightness ?? 0
+        canvas.intensity = shownBrightness(space)
         canvas.hue2 = space.hue2
-        canvas.intensity2 = auto ? space.intensity2 : space.brightness2 ?? space.brightness
-        canvas.colorAt = Self.dotColor(auto: auto, intensity: space.intensity ?? Self.vivid)
+        canvas.intensity2 = space.brightness2 ?? shownBrightness(space)
+        canvas.colorAt = Self.dotColor
         dial.angle = space.gradientAngle
         dial.isHidden = space.hue2 == nil
         kindSwitch.selectedIndex = kind.rawValue
@@ -1085,9 +1015,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         for (i, swatch) in swatches.enumerated() { swatch.isSelected = matches(looks[i], space) }
         let glass = kind == .glass
         canvas.isHidden = glass
-        autoChip.isSelected = space.brightness == nil
-        brightnessSlider.isIdle = space.brightness == nil
-        brightnessSlider.grain = space.brightness ?? 0.5
+        brightnessSlider.grain = shownBrightness(space)
         brightnessSlider.showsChecker = glass
         brightnessSlider.isHidden = !glass
         brightnessSlider.toneColors = brightnessTrack(space)
@@ -1111,28 +1039,28 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// How vivid a color is when its dot sets darkness rather than strength.
     private static let vivid = 0.6
 
-    /// The color a dot shows: strong enough to read at a glance, deeper as it goes out when not automatic.
-    private static func dotColor(auto: Bool, intensity: Double) -> (Double, Double) -> NSColor {
-        { hue, depth in
-            auto ? NSColor(hue: hue, saturation: 0.18 + 0.5 * depth, brightness: 0.95 - 0.12 * depth, alpha: 1)
-                : NSColor(hue: hue, saturation: 0.3 + 0.5 * depth, brightness: 0.97 - 0.47 * depth, alpha: 1)
-        }
+    /// The color a dot shows: strong enough to read at a glance, deeper as it goes out.
+    private static func dotColor(hue: Double, depth: Double) -> NSColor {
+        NSColor(hue: hue, saturation: 0.3 + 0.5 * depth, brightness: 0.97 - 0.47 * depth, alpha: 1)
+    }
+
+    /// How dark it is. A space never touched follows the Mac, so its dot starts where it looks right now.
+    private func shownBrightness(_ space: SpaceInfo) -> Double {
+        if let brightness = space.brightness { return brightness }
+        return effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.85 : 0.15
     }
 
     /// The space as the pad, knob and sliders have it right now, saved or not.
     private func draft(brightness: Double?? = nil) -> SpaceInfo? {
         guard var space = Library.shared.space(spaceID) else { return nil }
-        let auto = space.brightness == nil
         if space.glass != true {
             space.hue = canvas.hue
-            if auto { space.intensity = canvas.intensity } else {
-                space.intensity = space.intensity ?? Self.vivid
-                space.brightness = canvas.intensity
-                space.appearance = canvas.intensity < 0.5 ? "light" : "dark"
-            }
+            space.intensity = Self.vivid
+            space.brightness = canvas.intensity
+            space.appearance = canvas.intensity < 0.5 ? "light" : "dark"
         }
         space.hue2 = canvas.hue2
-        if auto { space.intensity2 = canvas.intensity2 } else { space.brightness2 = canvas.intensity2 }
+        if space.hue2 != nil { space.intensity2 = Self.vivid; space.brightness2 = canvas.intensity2 }
         space.angle = dial.angle
         if let brightness {
             space.brightness = brightness
@@ -1189,13 +1117,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let width = bounds.width - pad * 2
         var y = pad
         let nameHeight = Tokens.Space.x8 + 2
-        // The name, and at its right, Auto: light by day and dark at night with the Mac.
-        let chipWidth: CGFloat = 64
-        let nameWidth = width - chipWidth - Tokens.Space.x2
+        let nameWidth = width
         let fh = ceil(nameField.intrinsicContentSize.height)
         nameBackground.frame = NSRect(x: pad, y: y, width: nameWidth, height: nameHeight)
         nameField.frame = NSRect(x: pad + Tokens.Space.x2, y: y + (nameHeight - fh) / 2, width: nameWidth - Tokens.Space.x4, height: fh)
-        autoChip.frame = NSRect(x: pad + width - chipWidth, y: y, width: chipWidth, height: nameHeight)
         y += nameHeight + Tokens.Space.x3
         kindSwitch.frame = NSRect(x: pad, y: y, width: width, height: rowHeight)
         y += rowHeight + Tokens.Space.x3
