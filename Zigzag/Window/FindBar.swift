@@ -264,7 +264,8 @@ class FloatingPanelView: NSView {
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
         guard let layer, arrival != .instant, always || !Tokens.Motion.isKeyboardDriven else { return }
-        if arrival == .fade {
+        // With Reduce Motion on, panels only fade in; nothing moves.
+        if arrival == .fade || Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1

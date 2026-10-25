@@ -273,7 +273,7 @@ final class GuidedTour: NSView {
         if hole != .zero { cut.addRoundedRect(in: hole, cornerWidth: 12, cornerHeight: 12) }
         let ringPath: CGPath = hole == .zero ? CGMutablePath() : CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil)
         let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
-        if animated, ring.path != ringPath {
+        if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {
                 let move = CABasicAnimation(keyPath: "path")
                 move.fromValue = layer.presentation()?.path ?? layer.path
