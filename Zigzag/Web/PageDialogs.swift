@@ -9,41 +9,45 @@ enum PageDialogs {
         return origin.host.isEmpty ? "This page" : origin.host
     }
 
-    private static func run(_ alert: NSAlert, window: NSWindow?) async -> NSApplication.ModalResponse {
-        guard let window else { return alert.runModal() }
-        return await withCheckedContinuation { continuation in
-            alert.beginSheetModal(for: window) { continuation.resume(returning: $0) }
+    /// Dialogs shown per page (web view and the address it's on), and pages whose dialogs were blocked.
+    private static var shown: [ObjectIdentifier: (url: URL?, count: Int)] = [:]
+    private static var blocked: [ObjectIdentifier: URL?] = [:]
+
+    /// Asks in Zigzag's own sheet. A page whose dialogs were blocked gets its quiet default at once, until it
+    /// loads something new.
+    private static func ask(_ frame: WKFrameInfo, window: NSWindow?, message: String, fields: [PageDialogSheet.Field] = [],
+                            showsCancel: Bool) async -> PageDialogSheet.Result {
+        guard let window else { return .cancelled }
+        let page = frame.webView.map(ObjectIdentifier.init)
+        let url = frame.webView?.url
+        if let page, let blockedURL = blocked[page] {
+            if blockedURL == url { return .cancelled }
+            blocked[page] = nil
         }
+        var count = 1
+        if let page {
+            count = shown[page].map { $0.url == url ? $0.count + 1 : 1 } ?? 1
+            shown[page] = (url, count)
+        }
+        let result = await PageDialogSheet.ask(in: window, title: "\(originText(frame)) says", message: message, fields: fields,
+                                               showsCancel: showsCancel, offersBlock: count >= 2)
+        if case .blocked = result, let page { blocked[page] = url }
+        return result
     }
 
     static func alert(message: String, frame: WKFrameInfo, window: NSWindow?) async {
-        let alert = NSAlert()
-        alert.messageText = "\(originText(frame)) says"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        _ = await run(alert, window: window)
+        _ = await ask(frame, window: window, message: message, showsCancel: false)
     }
 
     static func confirm(message: String, frame: WKFrameInfo, window: NSWindow?) async -> Bool {
-        let alert = NSAlert()
-        alert.messageText = "\(originText(frame)) says"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-        return await run(alert, window: window) == .alertFirstButtonReturn
+        if case .confirmed = await ask(frame, window: window, message: message, showsCancel: true) { return true }
+        return false
     }
 
     static func prompt(message: String, defaultText: String?, frame: WKFrameInfo, window: NSWindow?) async -> String? {
-        let alert = NSAlert()
-        alert.messageText = "\(originText(frame)) says"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-        let field = NSTextField(string: defaultText ?? "")
-        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
-        alert.accessoryView = field
-        alert.window.initialFirstResponder = field
-        return await run(alert, window: window) == .alertFirstButtonReturn ? field.stringValue : nil
+        let result = await ask(frame, window: window, message: message, fields: [.init(placeholder: "", value: defaultText ?? "")], showsCancel: true)
+        if case .confirmed(let values) = result { return values.first ?? "" }
+        return nil
     }
 
     static func openPanel(parameters: WKOpenPanelParameters, window: NSWindow?) async -> [URL]? {
@@ -74,38 +78,13 @@ enum AuthenticationPrompt {
         if challenge.previousFailureCount == 0, let saved = URLCredentialStorage.shared.defaultCredential(for: challenge.protectionSpace) {
             return (.useCredential, saved)
         }
-        let alert = NSAlert()
-        alert.messageText = "Sign in to \(challenge.protectionSpace.host)"
-        alert.informativeText = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
-        alert.addButton(withTitle: "Sign In")
-        alert.addButton(withTitle: "Cancel")
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.spacing = Tokens.Space.x2
-        let user = NSTextField()
-        user.placeholderString = "Name"
-        user.contentType = .username
-        let pass = NSSecureTextField()
-        pass.placeholderString = "Password"
-        pass.contentType = .password
-        for field in [user, pass] {
-            field.translatesAutoresizingMaskIntoConstraints = false
-            field.widthAnchor.constraint(equalToConstant: 260).isActive = true
-            stack.addArrangedSubview(field)
-        }
-        stack.frame = NSRect(x: 0, y: 0, width: 260, height: 56)
-        alert.accessoryView = stack
-        alert.window.initialFirstResponder = user
-        let response: NSApplication.ModalResponse
-        if let window {
-            response = await withCheckedContinuation { continuation in
-                alert.beginSheetModal(for: window) { continuation.resume(returning: $0) }
-            }
-        } else {
-            response = alert.runModal()
-        }
-        guard response == .alertFirstButtonReturn else { return (.cancelAuthenticationChallenge, nil) }
-        return (.useCredential, URLCredential(user: user.stringValue, password: pass.stringValue, persistence: .forSession))
+        guard let window else { return (.cancelAuthenticationChallenge, nil) }
+        let message = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
+        let result = await PageDialogSheet.ask(in: window, title: "Sign in to \(challenge.protectionSpace.host)", message: message,
+                                               fields: [.init(placeholder: "Name"), .init(placeholder: "Password", secure: true)],
+                                               confirmTitle: "Sign In", showsCancel: true, offersBlock: false)
+        guard case .confirmed(let values) = result, values.count == 2 else { return (.cancelAuthenticationChallenge, nil) }
+        return (.useCredential, URLCredential(user: values[0], password: values[1], persistence: .forSession))
     }
 }
 
