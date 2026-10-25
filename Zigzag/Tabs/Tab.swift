@@ -440,8 +440,9 @@ final class Tab: NSObject {
     }
 
     fileprivate func refreshFavicon() {
-        guard let webView, let pageURL = webView.url, !isPrivate else { return }
-        if Self.isExtensionPage(pageURL) {
+        guard let webView, let pageURL = webView.url else { return }
+        // Private tabs only use icons already saved from normal browsing; they never fetch or save one.
+        if isPrivate || Self.isExtensionPage(pageURL) {
             favicon = FaviconStore.shared.cachedIcon(for: pageURL)
             changed.send(.favicon)
             return
