@@ -27,6 +27,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var angle: Double? = nil
     /// The frame is frosted glass: the desktop shows through, softly tinted. Nil: solid.
     var glass: Bool? = nil
+    /// The glass's shade, from clear white (0) to smoked black (1). Nil: 0.
+    var glassTone: Double? = nil
+    /// What washes over the glass.
+    var glassColor: NSColor { NSColor(white: 1 - CGFloat(glassTone ?? 0), alpha: 0.5) }
 
     /// The window frame color for this space.
     var background: NSColor { hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background }
@@ -205,6 +209,12 @@ final class Library {
     func setGradientAngle(_ angle: Double, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].angle = angle
+        commit()
+    }
+
+    func setGlassTone(_ tone: Double, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].glassTone = tone
         commit()
     }
 

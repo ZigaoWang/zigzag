@@ -232,6 +232,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
 
+    /// While the glass's shade is being dragged: the window shows it live.
+    func previewGlassTone(_ tone: Double, for spaceID: UUID) {
+        guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate, tabManager.currentSpace.glass == true else { return }
+        root.setColor(NSColor(white: 1 - CGFloat(tone), alpha: 0.5), animated: false)
+    }
+
     /// While a gradient is being shaped in the space editor: the window shows it live.
     func previewSpaceGradient(hue: Double, intensity: Double, hue2: Double?, intensity2: Double, angle: Double, for spaceID: UUID) {
         guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
@@ -258,17 +264,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             default: window?.appearance = nil
             }
         }
-        let color = tabManager.isPrivate ? SpaceColor.graphite.background : tabManager.currentSpace.background
         let space = tabManager.currentSpace
         let glass = !tabManager.isPrivate && space.glass == true
+        let color = tabManager.isPrivate ? SpaceColor.graphite.background : glass ? space.glassColor : space.background
         // Glass: the window lets the desktop through, and the space's color washes over it instead of covering it.
         window?.isOpaque = !glass
         window?.backgroundColor = glass ? .clear : .windowBackgroundColor
         root.setGlass(glass)
         let end = tabManager.isPrivate ? nil : space.background2
         if glass {
-            root.setColor(.clear, animated: animated)
-            root.setGradient(from: color.withAlphaComponent(0.45), to: (end ?? color).withAlphaComponent(0.45), angle: space.gradientAngle, animated: animated)
+            root.setColor(color, animated: animated)
+            root.setGradient(from: color, to: nil, animated: animated)
         } else {
             root.setColor(color, animated: animated)
             root.setGradient(from: color, to: end, angle: space.gradientAngle, animated: animated)

@@ -761,3 +761,102 @@ final class StatusLabel: NSView {
         label.frame = NSRect(x: 16 + Tokens.Space.x2 - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
     }
 }
+
+/// A few choices on one soft track, the chosen one on a raised pill that slides to it. Words or icons; every
+/// two- or three-way choice in Zigzag uses this, so they all look and move the same.
+final class SlidingSwitch: NSView {
+    enum Item { case text(String), symbol(String, toolTip: String) }
+    var selectedIndex = 0 { didSet { if oldValue != selectedIndex { layoutPill(animated: window != nil) } } }
+    var onChange: ((Int) -> Void)?
+    private let items: [Item]
+    private let track = ColorView(color: Tokens.Color.fieldFill)
+    private let pill = ColorView(color: Tokens.Color.panelBackground)
+    private var labels: [Label] = []
+    private var icons: [NSImageView] = []
+    private let inset: CGFloat = 3
+
+    init(_ items: [Item]) {
+        self.items = items
+        super.init(frame: .zero)
+        for view in [track, pill] {
+            view.wantsLayer = true
+            view.layer?.cornerCurve = .continuous
+            addSubview(view)
+        }
+        pill.layer?.shadowOpacity = 1
+        pill.layer?.shadowRadius = 1.5
+        pill.layer?.shadowOffset = CGSize(width: 0, height: -0.5)
+        for item in items {
+            switch item {
+            case .text(let title):
+                let label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+                labels.append(label)
+                addSubview(label)
+            case .symbol(let name, let tip):
+                let icon = NSImageView(image: Tokens.Symbol.image(name, size: 13))
+                icon.imageScaling = .scaleNone
+                icon.toolTip = tip
+                icons.append(icon)
+                addSubview(icon)
+            }
+        }
+        setAccessibilityRole(.radioGroup)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    private var segmentWidth: CGFloat { (bounds.width - inset * 2) / CGFloat(max(items.count, 1)) }
+
+    private func segment(_ i: Int) -> NSRect {
+        NSRect(x: inset + CGFloat(i) * segmentWidth, y: inset, width: segmentWidth, height: bounds.height - inset * 2)
+    }
+
+    override func layout() {
+        super.layout()
+        track.frame = bounds
+        track.layer?.cornerRadius = min(bounds.height / 2, Tokens.Radius.control + 2 + inset)
+        // Each title spans its whole segment, centered, so bold or not it sits in the middle.
+        for (i, label) in labels.enumerated() {
+            let r = segment(i)
+            label.alignment = .center
+            label.frame = NSRect(x: r.minX, y: (r.midY - label.lineHeight / 2).rounded(), width: r.width, height: label.lineHeight)
+        }
+        for (i, icon) in icons.enumerated() { icon.frame = segment(i) }
+        layoutPill(animated: false)
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            pill.layer?.shadowColor = NSColor.black.withAlphaComponent(0.14).cgColor
+        }
+    }
+
+    private func layoutPill(animated: Bool) {
+        let target = segment(selectedIndex)
+        // Concentric with the track: the pill's corners follow the track's at the same inset.
+        pill.layer?.cornerRadius = max((track.layer?.cornerRadius ?? 0) - inset, 0)
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Tokens.Motion.standard
+                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1)
+                pill.animator().frame = target
+            }
+        } else {
+            pill.frame = target
+        }
+        for (i, label) in labels.enumerated() {
+            label.textColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            label.font = Tokens.Font.body(i == selectedIndex ? .semibold : .medium)
+        }
+        for (i, icon) in icons.enumerated() { icon.contentTintColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.icon }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let x = convert(event.locationInWindow, from: nil).x
+        let index = min(max(Int((x - inset) / segmentWidth), 0), items.count - 1)
+        guard index != selectedIndex else { return }
+        selectedIndex = index
+        onChange?(index)
+    }
+}
