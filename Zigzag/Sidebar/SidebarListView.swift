@@ -241,6 +241,8 @@ final class SidebarListView: NSView {
             row.onDoubleClick = { [weak row] in row?.beginRename() }
             row.onRename = { [weak row] name in row?.tab?.customTitle = name.isEmpty ? nil : name }
             row.onClose = { [weak self, weak row] in
+                // Away from its page, the button says "Back to Pinned Page", and does that.
+                if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
                 if let tab = row?.tab { self?.delegate?.listClose(tab) }
             }
             row.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: item) }
