@@ -297,6 +297,11 @@ enum DebugBridge {
                 debugLog("pwclear removed \(samples.count)")
             }
         case "about": AboutWindowController.show()
+        case "reader": controller.toggleReader()
+        case "readerstyle":
+            func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
+            if let content = controller.window?.contentView { find(content)?.toggleOptions() }
+        case "hidetoasts": Toast.hide(in: controller)
         case "clearsite":
             // clearsite <cache|cookies> <site>
             let f = arg.split(separator: " ").map(String.init)
