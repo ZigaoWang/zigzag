@@ -83,6 +83,7 @@ enum DebugBridge {
                 controller.tabManager.makeSplit(tab, with: list[n])
             }
         case "unsplit": controller.closeSplitView(nil)
+        case "closetab": controller.closeTab(nil)
         case "flydownload": controller.debugFlyDownload(arg.isEmpty ? "Shanghai Guide.pdf" : arg)
         case "readerjs":
             controller.debugReaderWebView?.evaluateJavaScript(arg) { result, error in
