@@ -292,7 +292,8 @@ enum DebugBridge {
         case "pwclear":
             Task {
                 let all = (try? await PasswordStore.shared.all()) ?? []
-                let samples = all.filter { $0.username.hasSuffix("@example.com") }
+                // Test logins: fake @example.com accounts, and anything saved for the local test site.
+                let samples = all.filter { $0.username.hasSuffix("@example.com") || $0.origin.host == "127.0.0.1" }
                 for credential in samples { try? await PasswordStore.shared.delete(credential.id) }
                 debugLog("pwclear removed \(samples.count)")
             }
