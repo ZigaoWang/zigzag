@@ -23,6 +23,10 @@ final class ExtensionHost: NSObject {
         configuration.webViewConfiguration.applicationNameForUserAgent = "Chrome/140.0.0.0 Safari/537.36"
         // Profiles' page preludes reach every extension page through the shared configuration; each runs only on
         // its own extension's pages, before their scripts.
+        // The compatibility layer on every extension page too (popups, options), before their own scripts.
+        configuration.webViewConfiguration.userContentController.addUserScript(
+            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionProfile.compatibility)\n}",
+                         injectionTime: .atDocumentStart, forMainFrameOnly: false))
         for (id, source) in ExtensionProfile.pagePreludes {
             let guarded = "if (location.host === '\(id)') {\n\(source)\n}"
             configuration.webViewConfiguration.userContentController.addUserScript(

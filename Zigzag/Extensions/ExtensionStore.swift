@@ -509,7 +509,78 @@ enum ExtensionProfile {
         let replace: String
     }
 
-    static func profile(for id: String) -> Profile? { profiles[id] }
+    /// Every extension gets the compatibility layer first; some get their own fixes on top.
+    static func profile(for id: String) -> Profile? {
+        var profile = profiles[id] ?? Profile()
+        profile.backgroundPrelude = compatibility + (profile.backgroundPrelude ?? "")
+        #if DEBUG
+        profile.backgroundPrelude = errorRecorder + (profile.backgroundPrelude ?? "")
+        #endif
+        return profile
+    }
+
+    #if DEBUG
+    /// Testing builds: a background's uncaught errors, kept in its own storage under "__zigzagErrors", for
+    /// reading back from one of its pages.
+    static let errorRecorder = """
+    (() => {
+      const api = globalThis.chrome || globalThis.browser;
+      if (!api || !api.storage || !api.storage.local) return;
+      const keep = (text) => { try { api.storage.local.get('__zigzagErrors', (o) => { const list = (o && o.__zigzagErrors) || []; list.push(String(text).slice(0, 300)); api.storage.local.set({ __zigzagErrors: list.slice(-30) }); }); } catch (e) {} };
+      globalThis.addEventListener && globalThis.addEventListener('error', (e) => keep('error: ' + e.message + ' @ ' + String(e.filename || '').split('/').pop() + ':' + e.lineno));
+      globalThis.addEventListener && globalThis.addEventListener('unhandledrejection', (e) => keep('rejection: ' + ((e.reason && (e.reason.message || e.reason)) || '')));
+      keep('started ' + new Date().toISOString());
+    })();
+
+    """
+    #endif
+
+    /// Chrome APIs WebKit doesn't have. An extension that asked for one (in its manifest) and calls it without
+    /// checking would stop dead on its first line, its popup waiting forever on a background that never started.
+    /// So for those, and only those, a stand-in that does nothing harmful: empty answers, quiet no-ops, or a
+    /// clear "not available" where it must act. Extensions that check first still take their own path.
+    static let compatibility = """
+    (() => {
+      const api = globalThis.chrome || globalThis.browser;
+      if (!api || !api.runtime || globalThis.__zigzagCompat) return;
+      globalThis.__zigzagCompat = true;
+      const held = (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []);
+      const noop = () => {};
+      const event = () => ({ addListener: noop, removeListener: noop, hasListener: () => false, hasListeners: () => false });
+      const done = (value) => (...args) => { const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null; if (cb) { setTimeout(() => cb(value), 0); return; } return Promise.resolve(value); };
+      const no = (what) => (...args) => { const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null; const e = new Error(what + " isn't available in Zigzag"); if (cb) { setTimeout(() => cb(undefined), 0); return; } return Promise.reject(e); };
+      let manifest = {};
+      try { manifest = api.runtime.getManifest() || {}; } catch (e) {}
+      const asked = new Set([...(manifest.permissions || []), ...(manifest.optional_permissions || [])]);
+      const add = (name, value) => { if (asked.has(name) && !(name in api)) { try { api[name] = value; held.push(value); } catch (e) {} } };
+      const fill = (name, values) => { const target = api[name]; if (!target) return; held.push(target); for (const [k, v] of Object.entries(values)) { if (!(k in target)) { try { target[k] = v; } catch (e) {} } } };
+      // Missing calls on namespaces WebKit does have: often called unconditionally.
+      fill('action', { setBadgeTextColor: done(), getBadgeTextColor: done([0, 0, 0, 255]), getUserSettings: done({ isOnToolbar: true }) });
+      fill('tabs', { group: no('Tab groups'), ungroup: done(), discard: done(), highlight: done() });
+      fill('runtime', { getContexts: done([]), onSuspend: event(), onSuspendCanceled: event() });
+      fill('i18n', { detectLanguage: done({ isReliable: false, languages: [] }) });
+      fill('storage', { managed: { get: done({}), getBytesInUse: done(0), onChanged: event() } });
+      // Whole namespaces, only where asked for.
+      add('tabGroups', { TAB_GROUP_ID_NONE: -1, query: done([]), get: no('Tab groups'), update: no('Tab groups'), move: no('Tab groups'), onCreated: event(), onUpdated: event(), onRemoved: event(), onMoved: event() });
+      add('sidePanel', { setPanelBehavior: done(), setOptions: done(), getOptions: done({ enabled: false }), getPanelBehavior: done({ openPanelOnActionClick: false }), open: no('The side panel') });
+      add('offscreen', { createDocument: no('Offscreen documents'), closeDocument: done(), hasDocument: done(false), Reason: {} });
+      add('idle', { queryState: done('active'), setDetectionInterval: noop, getAutoLockDelay: done(0), onStateChanged: event() });
+      add('notifications', { create: done(''), update: done(false), clear: done(false), getAll: done({}), getPermissionLevel: done('denied'), onClicked: event(), onClosed: event(), onButtonClicked: event(), onShowSettings: event() });
+      add('downloads', { download: no('Downloads from extensions'), search: done([]), cancel: done(), erase: done([]), show: noop, showDefaultFolder: noop, open: no('Opening downloads'), setUiOptions: done(), onCreated: event(), onChanged: event(), onErased: event(), onDeterminingFilename: event() });
+      add('history', { search: done([]), getVisits: done([]), addUrl: done(), deleteUrl: done(), deleteRange: done(), deleteAll: done(), onVisited: event(), onVisitRemoved: event() });
+      add('bookmarks', { getTree: done([{ id: '0', title: '', children: [] }]), get: done([]), getChildren: done([]), getRecent: done([]), search: done([]), create: no('Bookmarks from extensions'), update: no('Bookmarks from extensions'), remove: no('Bookmarks from extensions'), onCreated: event(), onRemoved: event(), onChanged: event(), onMoved: event() });
+      add('sessions', { getRecentlyClosed: done([]), getDevices: done([]), restore: no('Restoring sessions'), MAX_SESSION_RESULTS: 25, onChanged: event() });
+      add('topSites', { get: done([]) });
+      add('management', { getSelf: done({ id: api.runtime.id, name: manifest.name, version: manifest.version, enabled: true, installType: 'normal', type: 'extension' }), getAll: done([]), get: no('Other extensions'), setEnabled: no('Turning other extensions off'), onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event() });
+      add('identity', { getRedirectURL: (path) => 'https://' + api.runtime.id + '.chromiumapp.org/' + (path || ''), launchWebAuthFlow: no('Signing in through the browser'), getAuthToken: no('Signing in through the browser'), getProfileUserInfo: done({ email: '', id: '' }), onSignInChanged: event() });
+      add('tts', { speak: done(), stop: noop, getVoices: done([]), isSpeaking: done(false), onEvent: event() });
+      add('fontSettings', { getFontList: done([]), getFont: done({ fontId: '' }), setFont: done(), clearFont: done(), onFontChanged: event() });
+      add('privacy', { services: {}, network: {}, websites: {} });
+      add('power', { requestKeepAwake: noop, releaseKeepAwake: noop });
+      add('search', { query: no('Searching from extensions') });
+    })();
+
+    """
 
     /// Every page prelude, by extension ID.
     static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
