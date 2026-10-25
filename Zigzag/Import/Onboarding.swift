@@ -1704,97 +1704,67 @@ private final class ChoiceCard: InteractiveView {
 
 // MARK: - Color
 
-/// A small Zigzag window that takes on your space's color as you pick it, with the colors and Light, Dark or
-/// Automatic underneath.
+/// The same wheel and presets as the space editor, and the window on the right wearing whatever you pick. Deeper
+/// colors turn the window dark.
 private final class ColorPicker: StepContent {
     var onColor: (() -> Void)?
-    /// The same color field as the space editor: drag anywhere for any hue and strength.
-    private let canvas = ColorCanvas()
-    private let looks = AppearanceOption.Mode.allCases.map { AppearanceOption(mode: $0) }
-    private var swatches: [(SpaceColor, ColorView)] = []
+    private let wheel = ColorWheel()
+    private let swatches = SpaceLook.colors.map { LookSwatch(look: $0) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         // A colorless space starts on Zigzag's blue, so the knob, the swatch and the window all agree from the start.
-        if let id = self.space?.id, self.space?.hue == nil, self.space?.color == .graphite { Library.shared.setColor(.sky, for: id) }
-        let space = self.space
-        canvas.hue = space?.hue ?? space?.color.hue ?? 0.6
-        canvas.intensity = space?.intensity ?? SpaceColor.defaultIntensity
-        canvas.wantsLayer = true
-        canvas.layer?.cornerRadius = 12
-        canvas.layer?.masksToBounds = true
-        addSubview(canvas)
-        canvas.onChange = { [weak self] hue, intensity, _ in
-            guard let self, let id = self.space?.id else { return }
+        if var space = self.space, space.brightness == nil {
+            SpaceLook.colors[4].apply(to: &space)
+            space.appearance = "light"
+            Library.shared.setLook(space)
+        }
+        addSubview(wheel)
+        wheel.onChange = { [weak self] _, spot, _ in
+            guard let self, var space = self.space else { return }
             // Live as you drag: the window and the whole right side follow your finger.
-            Library.shared.setHue(hue, intensity: intensity, for: id)
-            self.refresh()
+            space.hue = spot.hue
+            space.intensity = nil
+            space.brightness = spot.depth
+            space.appearance = spot.depth < 0.5 ? "light" : "dark"
+            Library.shared.setLook(space)
+            self.refresh(animated: false)
             self.onColor?()
         }
-        for option in looks {
-            option.onClick = { [weak self, weak option] _ in
-                guard let self, let option, let id = self.space?.id else { return }
-                Library.shared.setAppearance(option.mode == .light ? "light" : option.mode == .dark ? "dark" : nil, for: id)
-                self.refresh()
+        for swatch in swatches {
+            swatch.onClick = { [weak self, weak swatch] _ in
+                guard let self, let look = swatch?.look, var space = self.space else { return }
+                look.apply(to: &space)
+                space.appearance = look.depth < 0.5 ? "light" : "dark"
+                Library.shared.setLook(space)
+                self.refresh(animated: true)
+                self.onColor?()
             }
-            addSubview(option)
-        }
-        for color in SpaceColor.allCases {
-            let dot = ColorView(color: color.swatch)
-            dot.wantsLayer = true
-            dot.toolTip = color.name
-            dot.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(picked(_:))))
-            addSubview(dot)
-            swatches.append((color, dot))
+            addSubview(swatch)
         }
         preview.page = .wikipedia
-        refresh()
+        refresh(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var space: SpaceInfo? { Library.shared.spaces.first }
 
-    @objc private func picked(_ gesture: NSClickGestureRecognizer) {
-        guard let view = gesture.view, let color = swatches.first(where: { $0.1 === view })?.0, let id = space?.id else { return }
-        Library.shared.setColor(color, for: id)
-        canvas.hue = color.hue
-        canvas.intensity = SpaceColor.defaultIntensity
-        refresh()
-        onColor?()
-    }
-
-    private func refresh() {
-        let current = space
-        for (color, dot) in swatches {
-            let on = current?.hue == nil && current?.color == color
-            dot.layer?.borderWidth = on ? 2.5 : 0
-            dot.layer?.borderColor = Onboard.paper.cgColor
-        }
-        for option in looks {
-            switch option.mode {
-            case .auto: option.isSelected = current?.appearance == nil
-            case .light: option.isSelected = current?.appearance == "light"
-            case .dark: option.isSelected = current?.appearance == "dark"
-            }
-            option.show(current?.background ?? SpaceColor.sky.background)
-        }
+    private func refresh(animated: Bool) {
+        guard let space else { return }
+        wheel.show([ColorWheel.Spot(hue: space.baseHue, depth: space.isNeutral ? 0 : space.brightness ?? 0.2)],
+                   colors: [space.background], animated: animated)
+        for swatch in swatches { swatch.isSelected = swatch.look.matches(space) }
         preview.refreshColors()
     }
 
     override func layout() {
         super.layout()
         let w = bounds.width
-        canvas.frame = NSRect(x: 0, y: 0, width: w, height: 150)
-        let size: CGFloat = 24, gap = (w - size * CGFloat(swatches.count)) / CGFloat(max(swatches.count - 1, 1))
-        for (i, (_, dot)) in swatches.enumerated() {
-            dot.frame = NSRect(x: CGFloat(i) * (size + gap), y: canvas.frame.maxY + 14, width: size, height: size)
-            dot.layer?.cornerRadius = size / 2
-        }
-        let y = canvas.frame.maxY + 14 + size + 18
-        let ow = (w - 16) / 3
-        for (i, option) in looks.enumerated() {
-            option.frame = NSRect(x: CGFloat(i) * (ow + 8), y: y, width: ow, height: 70)
+        wheel.frame = NSRect(x: 0, y: 0, width: w, height: 220)
+        let size: CGFloat = 26, gap = (w - size * CGFloat(swatches.count)) / CGFloat(max(swatches.count - 1, 1))
+        for (i, swatch) in swatches.enumerated() {
+            swatch.frame = NSRect(x: CGFloat(i) * (size + gap), y: wheel.frame.maxY + 16, width: size, height: size)
         }
     }
 }

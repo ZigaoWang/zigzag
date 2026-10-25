@@ -38,23 +38,29 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             ?? Tokens.Color.dynamic(light: NSColor(white: 1, alpha: 0.5), dark: NSColor(white: 0, alpha: 0.5))
     }
 
+    /// No hue of its own: white, a gray, or black.
+    var isNeutral: Bool { hue == nil && color.isNeutral }
+
     /// The window frame color for this space.
     var background: NSColor {
-        if let brightness {
-            return SpaceColor.fixed(hue: baseHue, intensity: hue == nil ? SpaceColor.defaultIntensity : intensity ?? SpaceColor.defaultIntensity,
-                                    brightness: brightness, neutral: hue == nil && color.isNeutral)
-        }
+        if let brightness { return SpaceColor.paint(hue: baseHue, depth: brightness, neutral: isNeutral) }
         return hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background
     }
     /// The strong version, for dots and swatches.
-    var swatch: NSColor { hue.map(SpaceColor.swatch(hue:)) ?? color.swatch }
+    var swatch: NSColor {
+        if let brightness {
+            return isNeutral ? NSColor(white: 0.86 - 0.56 * brightness, alpha: 1)
+                : SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * brightness)
+        }
+        return hue.map(SpaceColor.swatch(hue:)) ?? color.swatch
+    }
     /// The hue the space is built on, curated or custom.
     var baseHue: Double { hue ?? color.hue }
-    /// Where the gradient ends, at the same strength as the first color.
+    /// Where the gradient ends.
     var background2: NSColor? {
         hue2.map { h in
-            let i = intensity2 ?? intensity ?? SpaceColor.defaultIntensity
-            return (brightness2 ?? brightness).map { SpaceColor.fixed(hue: h, intensity: i, brightness: $0, neutral: false) } ?? SpaceColor.background(hue: h, intensity: i)
+            if let depth = brightness2 ?? brightness { return SpaceColor.paint(hue: h, depth: depth) }
+            return SpaceColor.background(hue: h, intensity: intensity2 ?? intensity ?? SpaceColor.defaultIntensity)
         }
     }
     var gradientAngle: Double { angle ?? 45 }
@@ -218,6 +224,23 @@ final class Library {
         guard let i = index(of: id) else { return }
         spaces[i].hue2 = hue.map { $0.truncatingRemainder(dividingBy: 1) }
         spaces[i].intensity2 = hue == nil ? nil : intensity ?? spaces[i].intensity2
+        commit()
+    }
+
+    /// Everything about how a space looks, from the space editor, in one save.
+    func setLook(_ look: SpaceInfo) {
+        guard let i = index(of: look.id) else { return }
+        spaces[i].color = look.color
+        spaces[i].hue = look.hue
+        spaces[i].intensity = look.intensity
+        spaces[i].hue2 = look.hue2
+        spaces[i].intensity2 = look.intensity2
+        spaces[i].brightness = look.brightness
+        spaces[i].brightness2 = look.brightness2
+        spaces[i].angle = look.angle
+        spaces[i].glass = look.glass
+        spaces[i].grain = look.grain
+        spaces[i].appearance = look.appearance
         commit()
     }
 

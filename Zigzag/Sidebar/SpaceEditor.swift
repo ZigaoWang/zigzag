@@ -1,28 +1,37 @@
 import AppKit
 
-/// A hue slider drawn in the space tints themselves, so it shows what you'll get, not a raw rainbow.
-final class HueSlider: NSView {
-    var hue: Double = 0.6 { didSet { needsLayout = true } }
-    /// Called while dragging (`final` false) and once on release (`final` true).
-    var onChange: ((Double, Bool) -> Void)?
-    private let track = CAGradientLayer()
-    private let knob = CALayer()
-    private let knobFill = CALayer()
+/// The space's color wheel: a disc of small dots, each painted the very color it gives. Around the disc picks the
+/// hue; the middle is white, and toward the rim the color deepens until it's nearly black, with the window turning
+/// dark past halfway. Drag the knob, or click any dot to jump there. With a gradient there are two knobs, and a drag
+/// moves whichever is nearer.
+final class ColorWheel: NSView {
+    struct Spot: Equatable {
+        var hue: Double
+        var depth: Double
+    }
+
+    /// One or two: the color, or where a gradient starts and ends.
+    private(set) var spots: [Spot] = [Spot(hue: 0.6, depth: 0.3)]
+    /// A gray or black has no hue: its knob sits in the middle, showing that gray, until you move it.
+    private(set) var knobColors: [NSColor] = []
+    /// Called while dragging (`final` false) and once on release (`final` true), with which knob moved.
+    var onChange: ((Int, Spot, Bool) -> Void)?
+
+    private let dots = CALayer()
+    /// A faint disc behind the dots, so the wheel stays round where its deepest colors meet a dark panel.
+    private let disc = CALayer()
+    private let knobs = [WheelKnob(), WheelKnob()]
+    private var paintedSize: CGSize = .zero
+    private var pressed: Int?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        track.startPoint = CGPoint(x: 0, y: 0.5)
-        track.endPoint = CGPoint(x: 1, y: 0.5)
-        track.cornerCurve = .continuous
-        layer?.addSublayer(track)
-        knob.shadowOpacity = 1
-        knob.shadowRadius = 4
-        knob.shadowOffset = CGSize(width: 0, height: -1)
-        layer?.addSublayer(knob)
-        knob.addSublayer(knobFill)
-        setAccessibilityRole(.slider)
-        setAccessibilityLabel("Custom color")
+        layer?.addSublayer(disc)
+        layer?.addSublayer(dots)
+        knobs.forEach { layer?.addSublayer($0.layer) }
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Color")
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -31,62 +40,259 @@ final class HueSlider: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    private let knobSize: CGFloat = Tokens.Space.x6
-    private var trackInset: CGFloat { knobSize / 2 }
-
-    override func layout() {
-        super.layout()
-        Tokens.Motion.withoutAnimation {
-            let h: CGFloat = Tokens.Space.x3
-            track.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
-            track.cornerRadius = h / 2
-            track.colors = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { cgColor(SpaceColor.swatch(hue: $0)) }
-            let x = trackInset + CGFloat(hue) * (bounds.width - trackInset * 2)
-            knob.frame = NSRect(x: x - knobSize / 2, y: (bounds.height - knobSize) / 2, width: knobSize, height: knobSize)
-            knob.cornerRadius = knobSize / 2
-            knob.backgroundColor = .white
-            knob.shadowColor = cgColor(Tokens.Color.panelShadow)
-            knobFill.frame = knob.bounds.insetBy(dx: 3, dy: 3)
-            knobFill.cornerRadius = knobFill.frame.width / 2
-            knobFill.backgroundColor = cgColor(SpaceColor.swatch(hue: hue))
-        }
-        setAccessibilityValue("\(Int(hue * 360)) degrees")
-    }
-
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         needsLayout = true
     }
 
-    private func hue(at event: NSEvent) -> Double {
-        let x = convert(event.locationInWindow, from: nil).x
-        return Double(min(max((x - trackInset) / (bounds.width - trackInset * 2), 0), 1))
+    /// Shows these spots; `animated` glides the knobs there, as when a preset is picked.
+    func show(_ spots: [Spot], colors: [NSColor], animated: Bool) {
+        self.spots = spots
+        knobColors = colors
+        placeKnobs(animated: animated)
+    }
+
+    private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
+    private var radius: CGFloat { min(bounds.width, bounds.height) / 2 - 4 }
+
+    private func point(_ spot: Spot) -> CGPoint {
+        let a = spot.hue * 2 * .pi - .pi / 2
+        let r = radius * CGFloat(spot.depth)
+        return CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
+    }
+
+    private func spot(at p: CGPoint, keeping hue: Double) -> Spot {
+        let dx = p.x - center.x, dy = p.y - center.y
+        let depth = min(Double(hypot(dx, dy) / radius), 1)
+        // Right in the middle every hue is the same white: keep the one it had.
+        guard depth > 0.03 else { return Spot(hue: hue, depth: depth) }
+        var h = (atan2(dy, dx) + .pi / 2) / (2 * .pi)
+        if h < 0 { h += 1 }
+        return Spot(hue: Double(h), depth: depth)
+    }
+
+    override func layout() {
+        super.layout()
+        if bounds.size != paintedSize { paintDots() }
+        Tokens.Motion.withoutAnimation {
+            let r = radius + 6
+            disc.frame = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+            disc.cornerRadius = r
+            effectiveAppearance.performAsCurrentDrawingAppearance { disc.backgroundColor = Tokens.Color.fieldFill.cgColor }
+        }
+        placeKnobs(animated: false)
+    }
+
+    /// The dots on a honeycomb, so the disc's edge reads round. They never change, so they're painted once.
+    private func paintDots() {
+        paintedSize = bounds.size
+        let scale = window?.backingScaleFactor ?? 2
+        let w = Int(bounds.width * scale), h = Int(bounds.height * scale)
+        guard w > 0, h > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: 0, y: bounds.height)
+        context.scaleBy(x: 1, y: -1)
+        let step: CGFloat = 9.6, size: CGFloat = 6
+        let rowStep = step * 0.866
+        let rows = Int(radius / rowStep)
+        for row in -rows...rows {
+            let y = center.y + CGFloat(row) * rowStep
+            let offset = row % 2 == 0 ? 0 : step / 2
+            let columns = Int(radius / step) + 1
+            for column in -columns...columns {
+                let x = center.x + CGFloat(column) * step + offset
+                guard hypot(x - center.x, y - center.y) <= radius - size / 2 + 0.5 else { continue }
+                let spot = spot(at: CGPoint(x: x, y: y), keeping: 0)
+                context.setFillColor(SpaceColor.paint(hue: spot.hue, depth: spot.depth).cgColor)
+                context.fillEllipse(in: CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size))
+            }
+        }
+        Tokens.Motion.withoutAnimation {
+            dots.frame = bounds
+            dots.contentsScale = scale
+            dots.contents = context.makeImage()
+        }
+    }
+
+    private func placeKnobs(animated: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(!animated)
+        CATransaction.setAnimationDuration(0.35)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1))
+        for (i, knob) in knobs.enumerated() {
+            knob.layer.isHidden = i >= spots.count
+            guard i < spots.count else { continue }
+            knob.layer.position = point(spots[i])
+            knob.fill = i < knobColors.count ? knobColors[i] : SpaceColor.paint(hue: spots[i].hue, depth: spots[i].depth)
+            knob.isPressed = pressed == i
+            // The one you're holding rides on top.
+            knob.layer.zPosition = pressed == i ? 2 : CGFloat(1 - i)
+        }
+        CATransaction.commit()
+        setAccessibilityValue(spots.map { "\(Int($0.depth * 100)) percent deep" }.joined(separator: ", "))
     }
 
     override func mouseDown(with event: NSEvent) {
-        hue = hue(at: event)
-        layoutSubtreeIfNeeded()
-        onChange?(hue, false)
+        let p = convert(event.locationInWindow, from: nil)
+        let index = spots.indices.min { hypot(point(spots[$0]).x - p.x, point(spots[$0]).y - p.y) < hypot(point(spots[$1]).x - p.x, point(spots[$1]).y - p.y) } ?? 0
+        pressed = index
+        move(index, to: p, final: false)
         window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
-            self.hue = self.hue(at: event)
-            self.layoutSubtreeIfNeeded()
+            let p = self.convert(event.locationInWindow, from: nil)
             if event.type == .leftMouseUp {
                 stop.pointee = true
-                self.onChange?(self.hue, true)
+                self.pressed = nil
+                self.move(index, to: p, final: true)
             } else {
-                self.onChange?(self.hue, false)
+                self.move(index, to: p, final: false)
             }
         }
     }
 
-    override func accessibilityPerformIncrement() -> Bool { step(1.0 / 24) }
-    override func accessibilityPerformDecrement() -> Bool { step(-1.0 / 24) }
+    private func move(_ index: Int, to p: CGPoint, final: Bool) {
+        guard index < spots.count else { return }
+        let spot = spot(at: p, keeping: spots[index].hue)
+        spots[index] = spot
+        if index < knobColors.count { knobColors[index] = SpaceColor.paint(hue: spot.hue, depth: spot.depth) }
+        placeKnobs(animated: false)
+        onChange?(index, spot, final)
+    }
+}
 
-    private func step(_ delta: Double) -> Bool {
-        hue = min(max(hue + delta, 0), 1)
-        onChange?(hue, true)
+/// A knob on the wheel: the chosen color in a white ring, lifted by a soft shadow. It swells a little while held.
+private final class WheelKnob {
+    let layer = CALayer()
+    private let inner = CALayer()
+    var fill: NSColor = .white { didSet { inner.backgroundColor = fill.cgColor } }
+    var isPressed = false { didSet { layer.setAffineTransform(isPressed ? CGAffineTransform(scaleX: 1.2, y: 1.2) : .identity) } }
+
+    init() {
+        let size: CGFloat = 24
+        layer.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+        layer.cornerRadius = size / 2
+        layer.backgroundColor = .white
+        layer.shadowColor = .black
+        layer.shadowOpacity = 0.3
+        layer.shadowRadius = 4
+        layer.shadowOffset = CGSize(width: 0, height: 1.5)
+        inner.frame = layer.bounds.insetBy(dx: 3.5, dy: 3.5)
+        inner.cornerRadius = inner.frame.width / 2
+        inner.borderWidth = Tokens.Metric.hairline
+        inner.borderColor = NSColor.black.withAlphaComponent(0.12).cgColor
+        layer.addSublayer(inner)
+    }
+}
+
+/// A ready-made look: a color, or two in a gradient, at a spot on the wheel.
+struct SpaceLook {
+    let name: String
+    /// Nil: no hue, for white, grays and black.
+    var hue: Double?
+    var depth: Double
+    var hue2: Double? = nil
+    var depth2: Double = 0
+    var angle: Double = 90
+
+    var colors: [NSColor] {
+        let first = SpaceColor.paint(hue: hue ?? 0, depth: depth, neutral: hue == nil)
+        return [first, hue2.map { SpaceColor.paint(hue: $0, depth: depth2) } ?? first]
+    }
+
+    func apply(to space: inout SpaceInfo) {
+        space.glass = nil
+        if let hue { space.hue = hue } else {
+            space.hue = nil
+            space.color = .graphite
+        }
+        space.intensity = nil
+        space.brightness = depth
+        space.hue2 = hue2
+        space.intensity2 = nil
+        space.brightness2 = hue2 == nil ? nil : depth2
+        if hue2 != nil { space.angle = angle }
+    }
+
+    func matches(_ space: SpaceInfo) -> Bool {
+        guard space.glass != true, let b = space.brightness, abs(b - depth) < 0.005 else { return false }
+        if let hue { guard let h = space.hue, abs(h - hue) < 0.002 else { return false } } else if !space.isNeutral { return false }
+        guard let hue2 else { return space.hue2 == nil }
+        guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005 else { return false }
         return true
+    }
+
+    /// The four you can't get from the wheel, white to black, and three colors to start from, Zigzag's navy among them.
+    static let colors: [SpaceLook] = [
+        SpaceLook(name: "White", hue: nil, depth: 0),
+        SpaceLook(name: "Silver", hue: nil, depth: 0.22),
+        SpaceLook(name: "Graphite", hue: nil, depth: 0.74),
+        SpaceLook(name: "Black", hue: nil, depth: 1),
+        SpaceLook(name: "Sky", hue: 0.57, depth: 0.22),
+        SpaceLook(name: "Rose", hue: 0.96, depth: 0.2),
+        SpaceLook(name: "Navy", hue: 0.62, depth: 0.82),
+    ]
+
+    /// Neighbors on the wheel, one a little deeper than the other, the way light falls across a wall.
+    static let gradients: [SpaceLook] = [
+        SpaceLook(name: "Dawn", hue: 0.07, depth: 0.16, hue2: 0.95, depth2: 0.3, angle: 90),
+        SpaceLook(name: "Lagoon", hue: 0.47, depth: 0.16, hue2: 0.58, depth2: 0.34, angle: 90),
+        SpaceLook(name: "Meadow", hue: 0.17, depth: 0.14, hue2: 0.33, depth2: 0.3, angle: 45),
+        SpaceLook(name: "Lilac", hue: 0.78, depth: 0.15, hue2: 0.62, depth2: 0.3, angle: 45),
+        SpaceLook(name: "Ember", hue: 0.06, depth: 0.62, hue2: 0.97, depth2: 0.84, angle: 90),
+        SpaceLook(name: "Deep Sea", hue: 0.5, depth: 0.62, hue2: 0.63, depth2: 0.86, angle: 90),
+        SpaceLook(name: "Midnight", hue: 0.62, depth: 0.74, hue2: 0.76, depth2: 0.92, angle: 45),
+    ]
+}
+
+/// One preset: a round swatch of the look, ringed when it's the one in use.
+final class LookSwatch: InteractiveView {
+    let look: SpaceLook
+    private let fill = CAGradientLayer()
+    private let ring = CALayer()
+
+    init(look: SpaceLook) {
+        self.look = look
+        super.init(frame: .zero)
+        layer?.addSublayer(ring)
+        layer?.addSublayer(fill)
+        fill.masksToBounds = true
+        toolTip = look.name
+        setAccessibilityRole(.radioButton)
+        setAccessibilityLabel(look.name)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        stateDidChange(animated: false)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        Tokens.Motion.withoutAnimation {
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                ring.frame = bounds
+                ring.cornerRadius = bounds.width / 2
+                ring.borderWidth = 2
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : .clear).cgColor
+                let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
+                fill.frame = bounds.insetBy(dx: inset, dy: inset)
+                fill.cornerRadius = fill.frame.width / 2
+                fill.colors = look.colors.map(\.cgColor)
+                fill.startPoint = CGPoint(x: 0.2, y: 0.1)
+                fill.endPoint = CGPoint(x: 0.8, y: 0.9)
+                fill.borderWidth = Tokens.Metric.hairline
+                fill.borderColor = Tokens.Color.panelEdge.cgColor
+            }
+        }
+        setAccessibilityValue(isSelected ? "selected" : nil)
     }
 }
 
@@ -256,428 +462,6 @@ final class GrainSlider: NSView {
     }
 }
 
-/// One round choice in the look row: a ready-made look (a color, a gradient, or tinted glass), or the custom wheel.
-final class TintSwatch: InteractiveView {
-    enum Kind { case tint(SpaceColor), look(SpaceLook, glass: Bool), custom }
-    var kind: Kind { didSet { applyKind(); stateDidChange(animated: false) } }
-    private let fill = CAGradientLayer()
-    private let checker = CALayer()
-    private let wheel = CAGradientLayer()
-    private let ring = CALayer()
-
-    init(kind: Kind) {
-        self.kind = kind
-        super.init(frame: .zero)
-        layer?.addSublayer(ring)
-        layer?.addSublayer(checker)
-        layer?.addSublayer(fill)
-        layer?.addSublayer(wheel)
-        applyKind()
-        setAccessibilityRole(.radioButton)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func applyKind() {
-        wheel.isHidden = true
-        checker.isHidden = true
-        fill.isHidden = false
-        switch kind {
-        case .custom:
-            wheel.type = .conic
-            wheel.startPoint = CGPoint(x: 0.5, y: 0.5)
-            wheel.endPoint = CGPoint(x: 0.5, y: 0)
-            wheel.isHidden = false
-            fill.isHidden = true
-            toolTip = "Custom"
-            setAccessibilityLabel("Custom color")
-        case .tint(let color):
-            toolTip = color.name
-            setAccessibilityLabel(color.name)
-        case .look(let look, let glass):
-            checker.isHidden = !glass
-            toolTip = look.name
-            setAccessibilityLabel(look.name)
-        }
-    }
-
-    /// The checkerboard everyone reads as "see-through".
-    private static let checkerImage = NSImage(size: NSSize(width: 6, height: 6), flipped: false) { rect in
-        NSColor(white: 0.98, alpha: 1).setFill()
-        rect.fill()
-        NSColor(white: 0.8, alpha: 1).setFill()
-        NSRect(x: 0, y: 0, width: 3, height: 3).fill()
-        NSRect(x: 3, y: 3, width: 3, height: 3).fill()
-        return true
-    }
-
-    override func layout() {
-        super.layout()
-        stateDidChange(animated: false)
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        stateDidChange(animated: false)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        Tokens.Motion.withoutAnimation {
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                ring.frame = bounds
-                ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : .clear).cgColor
-                // The chosen swatch sits inside its ring; the others grow slightly under the pointer.
-                let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
-                let inner = bounds.insetBy(dx: inset, dy: inset)
-                for l in [fill, checker, wheel] as [CALayer] {
-                    l.frame = inner
-                    l.cornerRadius = inner.width / 2
-                    l.masksToBounds = true
-                }
-                wheel.colors = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { SpaceColor.swatch(hue: $0).cgColor }
-                fill.borderWidth = 0
-                switch kind {
-                case .tint(let color):
-                    fill.colors = [color.swatch.cgColor, color.swatch.cgColor]
-                    fill.startPoint = CGPoint(x: 0.5, y: 0)
-                    fill.endPoint = CGPoint(x: 0.5, y: 1)
-                    if color == .snow || color == .ink { fill.borderWidth = Tokens.Metric.hairline }
-                case .look(let look, let glass):
-                    let (a, b) = look.swatchColors
-                    let alpha: CGFloat = glass ? 0.6 : 1
-                    fill.colors = [a.withAlphaComponent(alpha).cgColor, b.withAlphaComponent(alpha).cgColor]
-                    fill.startPoint = CGPoint(x: 0.15, y: 0.85)
-                    fill.endPoint = CGPoint(x: 0.85, y: 0.15)
-                    checker.backgroundColor = NSColor(patternImage: Self.checkerImage).cgColor
-                    if look.color == .snow || look.color == .ink || glass { fill.borderWidth = Tokens.Metric.hairline }
-                case .custom: break
-                }
-                fill.borderColor = Tokens.Color.panelEdge.cgColor
-            }
-        }
-        setAccessibilityValue(isSelected ? "selected" : nil)
-    }
-}
-
-/// The color field: quiet dotted paper, and a dot you place on it. Around the middle picks the hue; the middle is
-/// light and the edges deep. Each dot casts a soft glow of its color, so the paper shows what you're choosing.
-final class ColorCanvas: NSView {
-    var hue: Double = 0.6 { didSet { needsLayout = true } }
-    /// How far out the dot sits: 0 the middle (lightest), 1 the edge (deepest).
-    var intensity: Double = SpaceColor.defaultIntensity { didSet { needsLayout = true } }
-    /// The gradient's second color, a smaller dot. Nil: none.
-    var hue2: Double? { didSet { needsLayout = true } }
-    var intensity2: Double? { didSet { needsLayout = true } }
-    /// The color a spot stands for, to fill the dot and its glow.
-    var colorAt: (Double, Double) -> NSColor = { hue, _ in SpaceColor.swatch(hue: hue) } { didSet { needsLayout = true } }
-    var onChange: ((Double, Double, Bool) -> Void)?
-    var onChange2: ((Double, Double, Bool) -> Void)?
-
-    private let dots = CALayer()
-    private let glow = CAGradientLayer()
-    private let glow2 = CAGradientLayer()
-    private let knob = CALayer()
-    private let knobFill = CALayer()
-    private let knob2 = CALayer()
-    private let knob2Fill = CALayer()
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.panel - 2
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-        for g in [glow2, glow] {
-            g.type = .radial
-            g.startPoint = CGPoint(x: 0.5, y: 0.5)
-            g.endPoint = CGPoint(x: 1, y: 1)
-            layer?.addSublayer(g)
-        }
-        layer?.addSublayer(dots)
-        for (k, fill) in [(knob2, knob2Fill), (knob, knobFill)] {
-            k.backgroundColor = .white
-            k.shadowOpacity = 1
-            k.shadowRadius = 4
-            k.shadowOffset = CGSize(width: 0, height: -1)
-            k.addSublayer(fill)
-            layer?.addSublayer(k)
-        }
-        setAccessibilityRole(.colorWell)
-        setAccessibilityLabel("Space color")
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-    override var mouseDownCanMoveWindow: Bool { false }
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    private let knobSize: CGFloat = 30
-    private let knob2Size: CGFloat = 22
-
-    /// Where a hue and depth sit: an ellipse filling the field, the hue going around it.
-    private func point(hue: Double, depth: Double) -> CGPoint {
-        let a = hue * 2 * .pi - .pi / 2
-        let rx = bounds.width / 2 - knobSize / 2 - 2, ry = bounds.height / 2 - knobSize / 2 - 2
-        return CGPoint(x: bounds.midX + cos(a) * rx * depth, y: bounds.midY + sin(a) * ry * depth)
-    }
-
-    private func value(at p: CGPoint) -> (hue: Double, depth: Double) {
-        let rx = bounds.width / 2 - knobSize / 2 - 2, ry = bounds.height / 2 - knobSize / 2 - 2
-        let dx = (p.x - bounds.midX) / rx, dy = (p.y - bounds.midY) / ry
-        var h = (atan2(dy, dx) + .pi / 2) / (2 * .pi)
-        if h < 0 { h += 1 }
-        return (Double(h), Double(min(hypot(dx, dy), 1)))
-    }
-
-    override func layout() {
-        super.layout()
-        Tokens.Motion.withoutAnimation {
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
-                knob.shadowColor = Tokens.Color.panelShadow.cgColor
-                knob2.shadowColor = Tokens.Color.panelShadow.cgColor
-            }
-            drawDots()
-            place(knob, fill: knobFill, glow: glow, size: knobSize, hue: hue, depth: intensity)
-            knob2.isHidden = hue2 == nil
-            glow2.isHidden = hue2 == nil
-            if let hue2 { place(knob2, fill: knob2Fill, glow: glow2, size: knob2Size, hue: hue2, depth: intensity2 ?? intensity) }
-        }
-    }
-
-    private func place(_ knob: CALayer, fill: CALayer, glow: CAGradientLayer, size: CGFloat, hue: Double, depth: Double) {
-        let c = point(hue: hue, depth: depth)
-        knob.frame = CGRect(x: c.x - size / 2, y: c.y - size / 2, width: size, height: size)
-        knob.cornerRadius = size / 2
-        fill.frame = knob.bounds.insetBy(dx: 3.5, dy: 3.5)
-        fill.cornerRadius = fill.frame.width / 2
-        let color = colorAt(hue, depth)
-        fill.backgroundColor = color.cgColor
-        let g: CGFloat = 150
-        glow.frame = CGRect(x: c.x - g / 2, y: c.y - g / 2, width: g, height: g)
-        glow.colors = [color.withAlphaComponent(0.45).cgColor, color.withAlphaComponent(0.12).cgColor, color.withAlphaComponent(0).cgColor]
-        glow.locations = [0, 0.45, 1]
-    }
-
-    /// A fine dot grid, like graph paper.
-    private var dotsSize: CGSize = .zero
-    private func drawDots() {
-        dots.frame = bounds
-        guard dotsSize != bounds.size || dots.contents == nil else { return }
-        dotsSize = bounds.size
-        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let step: CGFloat = 8
-        dots.contents = NSImage(size: bounds.size, flipped: true) { rect in
-            (dark ? NSColor.white.withAlphaComponent(0.16) : NSColor.black.withAlphaComponent(0.14)).setFill()
-            var y = step / 2
-            while y < rect.height {
-                var x = step / 2
-                while x < rect.width {
-                    NSBezierPath(ovalIn: NSRect(x: x - 0.75, y: y - 0.75, width: 1.5, height: 1.5)).fill()
-                    x += step
-                }
-                y += step
-            }
-            return true
-        }
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        dots.contents = nil
-        needsLayout = true
-    }
-
-    /// Which dot a drag moves: the nearer one.
-    private var draggingSecond = false
-
-    private func update(from event: NSEvent) {
-        let v = value(at: convert(event.locationInWindow, from: nil))
-        if draggingSecond {
-            hue2 = v.hue
-            intensity2 = v.depth
-        } else {
-            hue = v.hue
-            intensity = v.depth
-        }
-        layoutSubtreeIfNeeded()
-    }
-
-    private func report(final: Bool) {
-        if draggingSecond, let hue2 { onChange2?(hue2, intensity2 ?? intensity, final) } else { onChange?(hue, intensity, final) }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        draggingSecond = !knob2.isHidden && hypot(p.x - knob2.frame.midX, p.y - knob2.frame.midY) < hypot(p.x - knob.frame.midX, p.y - knob.frame.midY)
-        update(from: event)
-        report(final: false)
-        window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
-            guard let event else { return }
-            self.update(from: event)
-            if event.type == .leftMouseUp {
-                stop.pointee = true
-                self.report(final: true)
-            } else {
-                self.report(final: false)
-            }
-        }
-    }
-}
-
-/// One appearance choice for a space: a tiny window drawn in that mode, tinted like the space.
-/// "Auto" is drawn half light, half dark. Click to choose.
-final class AppearanceOption: InteractiveView {
-    enum Mode: CaseIterable { case auto, light, dark }
-    let mode: Mode
-    private let lightHalf = MiniWindow(dark: false)
-    private let darkHalf = MiniWindow(dark: true)
-    private let clip = NSView()
-    private let ring = CALayer()
-    private let label: Label
-
-    init(mode: Mode) {
-        self.mode = mode
-        label = Label(mode == .auto ? "Auto" : mode == .light ? "Light" : "Dark", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
-        label.alignment = .center
-        super.init(frame: .zero)
-        clip.wantsLayer = true
-        clip.layer?.cornerRadius = Tokens.Radius.control + 1
-        clip.layer?.cornerCurve = .continuous
-        clip.layer?.masksToBounds = true
-        addSubview(clip)
-        if mode != .dark { clip.addSubview(lightHalf) }
-        if mode != .light { clip.addSubview(darkHalf) }
-        addSubview(label)
-        ring.borderWidth = 2
-        ring.cornerRadius = Tokens.Radius.control + 4
-        ring.cornerCurve = .continuous
-        layer?.addSublayer(ring)
-        ring.zPosition = 5
-        setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(label.stringValue + " appearance")
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    func show(_ background: NSColor) {
-        lightHalf.show(background)
-        darkHalf.show(background)
-    }
-
-    override func layout() {
-        super.layout()
-        let labelHeight = label.lineHeight
-        let preview = NSRect(x: 3, y: 3, width: bounds.width - 6, height: bounds.height - labelHeight - Tokens.Space.x2 - 3)
-        clip.frame = preview
-        switch mode {
-        case .auto:
-            lightHalf.frame = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height)
-            darkHalf.frame = NSRect(x: clip.bounds.width / 2, y: 0, width: clip.bounds.width / 2, height: clip.bounds.height)
-            darkHalf.offset = clip.bounds.width / 2
-        case .light: lightHalf.frame = clip.bounds
-        case .dark: darkHalf.frame = clip.bounds
-        }
-        label.frame = NSRect(x: 0, y: preview.maxY + Tokens.Space.x1, width: bounds.width, height: labelHeight)
-        stateDidChange(animated: false)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        Tokens.Motion.withoutAnimation {
-            ring.frame = clip.frame.insetBy(dx: -3, dy: -3)
-            ring.borderColor = cgColor(isSelected ? Brand.Theme.for(self).accent : (isHovered ? Tokens.Color.textTertiary : .clear))
-        }
-        label.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-        setAccessibilityValue(isSelected ? "selected" : nil)
-    }
-}
-
-/// A tiny window in light or dark: frame tint, sidebar lines, page card.
-final class MiniWindow: NSView {
-    private let frameView = ColorView()
-    private let card = ColorView()
-    private let lines: [ColorView] = (0..<3).map { _ in ColorView() }
-    /// For the dark half of "Auto": draw as if this view started this far into the full preview.
-    var offset: CGFloat = 0 { didSet { needsLayout = true } }
-
-    init(dark: Bool) {
-        super.init(frame: .zero)
-        appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        card.wantsLayer = true
-        card.layer?.cornerRadius = 3
-        card.color = Tokens.Color.cardBackground
-        addSubview(frameView)
-        frameView.addSubview(card)
-        for line in lines {
-            line.wantsLayer = true
-            line.layer?.cornerRadius = 1.5
-            line.color = Tokens.Color.textTertiary
-            frameView.addSubview(line)
-        }
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    func show(_ background: NSColor) { frameView.color = background }
-
-    override func layout() {
-        super.layout()
-        let full = bounds.width + offset
-        frameView.frame = NSRect(x: -offset, y: 0, width: full, height: bounds.height)
-        let sidebarWidth = full * 0.3
-        card.frame = NSRect(x: sidebarWidth, y: 4, width: full - sidebarWidth - 4, height: bounds.height - 8)
-        for (i, line) in lines.enumerated() {
-            line.frame = NSRect(x: 5, y: 7 + CGFloat(i) * 6, width: sidebarWidth - 10 - CGFloat(i % 2) * 4, height: 3)
-        }
-    }
-}
-
-/// Edits one space: its name and its color. A panel beside the sidebar, Arc-style but our own:
-/// a living color field, light and dark previews, and the curated tints. The window is the preview too.
-/// A ready-made look for a space: a curated color, or a hue and how strong it is, and optionally a second color and
-/// which way the two run.
-struct SpaceLook {
-    let name: String
-    var color: SpaceColor? = nil
-    var hue: Double = 0, intensity: Double = SpaceColor.defaultIntensity
-    var hue2: Double? = nil, intensity2: Double? = nil
-    var angle: Double = 45
-
-    static func tint(_ color: SpaceColor) -> SpaceLook { SpaceLook(name: color.name, color: color, hue: color.hue) }
-
-    /// Bright enough to recognize at swatch size.
-    var swatchColors: (NSColor, NSColor) {
-        let a = color?.swatch ?? Self.swatch(hue: hue, intensity: intensity)
-        return (a, hue2.map { Self.swatch(hue: $0, intensity: intensity2 ?? intensity) } ?? a)
-    }
-
-    private static func swatch(hue: Double, intensity: Double) -> NSColor {
-        NSColor(hue: hue, saturation: 0.22 + 0.33 * intensity, brightness: 0.9 - 0.3 * intensity, alpha: 1)
-    }
-
-    /// A few that look good: white, gray and black, and four soft tints. The pad does the rest.
-    static let solids: [SpaceLook] = [.tint(.snow), .tint(.graphite), .tint(.ink), .tint(.sky), .tint(.sage), .tint(.rose), .tint(.lavender)]
-
-    /// Close, quiet pairs, the way light changes across a wall, rather than two loud colors fighting.
-    static let gradients: [SpaceLook] = [
-        SpaceLook(name: "Mist", hue: 0.58, intensity: 0.35, hue2: 0.68, intensity2: 0.4, angle: 90),
-        SpaceLook(name: "Dusk", hue: 0.74, intensity: 0.5, hue2: 0.94, intensity2: 0.45, angle: 45),
-        SpaceLook(name: "Sea", hue: 0.5, intensity: 0.5, hue2: 0.58, intensity2: 0.6, angle: 90),
-        SpaceLook(name: "Moss", hue: 0.28, intensity: 0.4, hue2: 0.4, intensity2: 0.45, angle: 45),
-        SpaceLook(name: "Sand", hue: 0.09, intensity: 0.4, hue2: 0.13, intensity2: 0.3, angle: 90),
-        SpaceLook(name: "Blush", hue: 0.97, intensity: 0.4, hue2: 0.06, intensity2: 0.4, angle: 45),
-        SpaceLook(name: "Night", hue: 0.63, intensity: 0.85, hue2: 0.72, intensity2: 0.8, angle: 90),
-    ]
-
-}
-
 /// Which way the gradient runs: a knob you turn, like one on a good amplifier. A raised disc with a notch, a ring of
 /// dots around it, and a soft click at each of the eight main directions. Drag around it, or click where it should point.
 final class DirectionKnob: NSView {
@@ -811,289 +595,228 @@ final class DirectionKnob: NSView {
     override func accessibilityPerformDecrement() -> Bool { angle = (angle + 315).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
 }
 
+/// Edits one space: its name and how it looks. Color, Gradient or Glass on top; then the wheel and a row of presets
+/// (or, for glass, how light or dark the glass is); then grain, and for a gradient its direction. Everything shows in
+/// the window as you drag, and saves when you let go.
 final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
     private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
     /// The name sits on a soft field, so it reads as something you can type into.
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
-    /// What kind of look: one color, two that fade into each other, or frosted glass.
-    private let kindSwitch = SlidingSwitch([.text("Solid"), .text("Gradient"), .text("Glass")])
-    private let canvas = ColorCanvas()
-    /// Glass: how light or dark, clear white to smoked black; the window's mode follows.
-    private let brightnessSlider = GrainSlider()
-    /// A few ready-made looks for the chosen kind.
-    private var swatches: [TintSwatch] = []
+    private let kindSwitch = SlidingSwitch([.text("Color"), .text("Gradient"), .text("Glass")])
+    private let wheel = ColorWheel()
+    private let colorSwatches = SpaceLook.colors.map { LookSwatch(look: $0) }
+    private let gradientSwatches = SpaceLook.gradients.map { LookSwatch(look: $0) }
+    private let shadeLabel = SpaceEditorPanel.rowLabel("Shade")
+    /// Glass: clear white to smoked black.
+    private let shadeSlider = GrainSlider()
+    private let grainLabel = SpaceEditorPanel.rowLabel("Grain")
     private let grainSlider = GrainSlider()
-    /// With a gradient: which way it runs.
+    private let directionLabel = SpaceEditorPanel.rowLabel("Direction")
     private let dial = DirectionKnob()
     private var monitor: Any?
-    static let width: CGFloat = 316
+    static let width: CGFloat = 300
 
-    private enum Kind: Int { case solid, gradient, glass }
-    private var kind: Kind {
-        guard let space = Library.shared.space(spaceID) else { return .solid }
-        return space.glass == true ? .glass : space.hue2 != nil ? .gradient : .solid
-    }
+    /// The space as the editor has it right now; the window shows it while you drag and it's saved on each release.
+    private var draft: SpaceInfo
+    /// As it was when the editor opened.
+    private let original: SpaceInfo
+    /// A space never given a color follows the Mac, light by day and dark at night, until you choose one.
+    private var colorChosen: Bool
+
+    private enum Kind: Int { case color, gradient, glass }
+    private var kind: Kind { draft.glass == true ? .glass : draft.hue2 != nil ? .gradient : .color }
 
     /// `controller` is the browser window it belongs to; Settings passes nil and hosts it in its own window.
     init(spaceID: UUID, controller: BrowserWindowController?) {
         self.spaceID = spaceID
         self.controller = controller
+        let space = Library.shared.space(spaceID) ?? SpaceInfo(name: "", color: .sky)
+        original = space
+        draft = space
+        colorChosen = space.brightness != nil
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
-        let space = Library.shared.space(spaceID)
-        nameField.stringValue = space?.name ?? ""
+        if draft.brightness == nil { draft.brightness = startingDepth(space) }
+        nameField.stringValue = space.name
         nameField.delegate = self
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
-        [nameBackground, nameField, kindSwitch, canvas, brightnessSlider, grainSlider, dial].forEach { addSubview($0) }
-        brightnessSlider.isTone = true
-        brightnessSlider.onChange = { [weak self] value, final in
-            guard let self else { return }
-            if final {
-                Library.shared.setBrightness(value, for: self.spaceID)
-                self.edited = true
-                self.refresh()
-            } else {
-                self.preview(brightness: value)
-            }
-        }
-        kindSwitch.selectedIndex = kind.rawValue
-        kindSwitch.onChange = { [weak self] index in self?.switchKind(Kind(rawValue: index) ?? .solid) }
+        let views: [NSView] = [nameBackground, nameField, kindSwitch, wheel, shadeLabel, shadeSlider, grainLabel, grainSlider, directionLabel, dial]
+        (views + colorSwatches + gradientSwatches).forEach { addSubview($0) }
 
-        canvas.onChange = { [weak self] hue, depth, final in
-            guard let self, let space = Library.shared.space(self.spaceID) else { return }
-            if final {
-                // Farther out is darker, and past the middle the window turns dark with it.
-                Library.shared.setHue(hue, intensity: Self.vivid, for: self.spaceID)
-                Library.shared.setBrightness(depth, for: self.spaceID)
-                self.edited = true
-                self.refresh()
-            } else {
-                self.preview()
-            }
-        }
-        canvas.onChange2 = { [weak self] hue2, depth, final in
-            guard let self, let space = Library.shared.space(self.spaceID) else { return }
-            if final {
-                if space.brightness == nil { Library.shared.setBrightness(self.shownBrightness(space), for: self.spaceID) }
-                Library.shared.setSecondHue(hue2, intensity: Self.vivid, for: self.spaceID)
-                Library.shared.setSecondBrightness(depth, for: self.spaceID)
-                self.edited = true
-                self.refresh()
-            } else {
-                self.preview()
-            }
-        }
-        dial.onChange = { [weak self] angle, final in
+        kindSwitch.selectedIndex = kind.rawValue
+        kindSwitch.onChange = { [weak self] index in self?.switchKind(Kind(rawValue: index) ?? .color) }
+
+        wheel.onChange = { [weak self] index, spot, final in
             guard let self else { return }
-            if final {
-                Library.shared.setGradientAngle(angle, for: self.spaceID)
-                self.edited = true
-                self.refresh()
+            if index == 0 {
+                self.draft.hue = spot.hue
+                self.draft.brightness = spot.depth
             } else {
-                self.preview()
+                self.draft.hue2 = spot.hue
+                self.draft.brightness2 = spot.depth
+            }
+            self.draft.intensity = nil
+            self.draft.intensity2 = nil
+            self.colorChosen = true
+            self.changed(final: final, wheel: false)
+        }
+        for swatch in colorSwatches + gradientSwatches {
+            swatch.onClick = { [weak self, weak swatch] _ in
+                guard let self, let look = swatch?.look else { return }
+                look.apply(to: &self.draft)
+                self.colorChosen = true
+                self.changed(final: true, wheel: true)
             }
         }
-        grainSlider.grain = space?.grain ?? 0
+        shadeSlider.isTone = true
+        shadeSlider.showsChecker = true
+        shadeSlider.toneColors = [.white, .black]
+        shadeSlider.setAccessibilityLabel("Shade")
+        shadeSlider.toolTip = nil
+        shadeSlider.onChange = { [weak self] value, final in
+            guard let self else { return }
+            self.draft.brightness = value
+            self.colorChosen = true
+            self.changed(final: final, wheel: false)
+        }
+        grainSlider.toolTip = nil
         grainSlider.onChange = { [weak self] grain, final in
             guard let self else { return }
-            if final {
-                Library.shared.setGrain(grain, for: self.spaceID)
-                self.edited = true
-            } else {
-                (self.controller ?? BrowserWindowController.undoTarget)?.previewSpaceGrain(grain, for: self.spaceID)
-            }
+            self.draft.grain = grain > 0.01 ? grain : nil
+            self.changed(final: final, wheel: false)
         }
-        rebuildSwatches()
-        refresh()
+        dial.toolTip = nil
+        dial.onChange = { [weak self] angle, final in
+            guard let self else { return }
+            self.draft.angle = angle
+            self.changed(final: final, wheel: false)
+        }
+        sync(animated: false)
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    // MARK: Changing the look
+    private static func rowLabel(_ text: String) -> Label {
+        Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+    }
 
-    private var looks: [SpaceLook] {
-        switch kind {
-        case .solid: SpaceLook.solids
-        case .gradient: SpaceLook.gradients
-        case .glass: []
+    /// Where the knob starts for a space that follows the Mac: about how it looks right now, so nothing jumps.
+    private func startingDepth(_ space: SpaceInfo) -> Double {
+        let dark = (controller?.window?.effectiveAppearance ?? NSApp.effectiveAppearance).bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        if space.isNeutral || space.hue == nil && space.color.isNeutral { return dark ? 0.9 : 0.06 }
+        let strength = space.intensity ?? SpaceColor.defaultIntensity
+        return dark ? 0.86 : 0.06 + 0.2 * strength
+    }
+
+    // MARK: Changing it
+
+    /// The space as it should be saved or shown: untouched colors keep following the Mac.
+    private var look: SpaceInfo {
+        var space = draft
+        if !colorChosen {
+            space.brightness = original.brightness
+            space.brightness2 = original.brightness2
+            space.appearance = original.appearance
+            return space
         }
+        // The window's mode follows how deep the first color is, the one the sidebar starts on: light for the
+        // lighter half of the wheel, dark for the deeper.
+        space.appearance = (draft.brightness ?? 0) < 0.5 ? "light" : "dark"
+        return space
+    }
+
+    private func changed(final: Bool, wheel moveWheel: Bool) {
+        if final {
+            Library.shared.setLook(look)
+            edited = true
+        } else {
+            (controller ?? BrowserWindowController.undoTarget)?.previewSpace(look)
+        }
+        sync(animated: moveWheel)
     }
 
     private func switchKind(_ new: Kind) {
-        guard let space = Library.shared.space(spaceID), new != kind else { return }
+        guard new != kind else { return }
         switch new {
-        case .solid:
-            Library.shared.setGlass(false, for: spaceID)
-            Library.shared.setSecondHue(nil, for: spaceID)
+        case .color:
+            draft.glass = nil
+            draft.hue2 = nil
+            draft.brightness2 = nil
         case .gradient:
-            Library.shared.setGlass(false, for: spaceID)
-            // Starts from the color you had, fading into a neighbor; pick a ready-made one below or drag either knob.
-            if space.hue == nil { Library.shared.setHue(space.baseHue, intensity: SpaceColor.defaultIntensity, for: spaceID) }
-            let base = Library.shared.space(spaceID)!
-            Library.shared.setSecondHue((base.baseHue + 0.2).truncatingRemainder(dividingBy: 1), intensity: base.intensity, for: spaceID)
+            draft.glass = nil
+            // A gradient needs two colors: a gray takes on Zigzag's blue, and the second starts as its neighbor.
+            if draft.hue == nil { draft.hue = 0.6 }
+            let depth = min(max(draft.brightness ?? 0.3, 0.12), 0.88)
+            draft.brightness = depth
+            draft.hue2 = (draft.hue! + 0.1).truncatingRemainder(dividingBy: 1)
+            draft.brightness2 = depth < 0.6 ? depth + 0.16 : depth - 0.16
+            draft.angle = draft.angle ?? 90
         case .glass:
-            Library.shared.setSecondHue(nil, for: spaceID)
-            Library.shared.setGlass(true, for: spaceID)
+            draft.glass = true
+            draft.hue2 = nil
+            draft.brightness2 = nil
         }
-        edited = true
-        rebuildSwatches()
-        refresh()
+        colorChosen = true
+        changed(final: true, wheel: false)
         resizeToFit()
-    }
-
-    private func apply(_ look: SpaceLook) {
-        let glass = kind == .glass
-        let before = Library.shared.space(spaceID)
-        if let color = look.color {
-            Library.shared.setColor(color, for: spaceID)
-        } else {
-            Library.shared.setHue(look.hue, intensity: look.intensity, for: spaceID)
-        }
-        Library.shared.setSecondHue(look.hue2, intensity: look.intensity2, for: spaceID)
-        if look.hue2 != nil { Library.shared.setGradientAngle(look.angle, for: spaceID) }
-        Library.shared.setGlass(glass, for: spaceID)
-        // White is as light as it gets and black as dark; other colors keep the brightness you set.
-        if look.color == .snow { Library.shared.setBrightness(0, for: spaceID) }
-        if look.color == .ink { Library.shared.setBrightness(1, for: spaceID) }
-        _ = before
-        edited = true
-        refresh()
-    }
-
-    private func matches(_ look: SpaceLook, _ space: SpaceInfo) -> Bool {
-        if let color = look.color { return space.hue == nil && space.color == color && space.hue2 == nil }
-        guard let hue = space.hue, abs(hue - look.hue) < 0.001, abs((space.intensity ?? SpaceColor.defaultIntensity) - look.intensity) < 0.001 else { return false }
-        guard let h2 = look.hue2 else { return space.hue2 == nil }
-        return space.hue2.map { abs($0 - h2) < 0.001 } == true && space.gradientAngle == look.angle
-    }
-
-    /// The same seven swatches stay put; switching kinds only changes what they show, with a quick fade.
-    private func rebuildSwatches() {
-        let glass = kind == .glass
-        let looks = self.looks
-        if swatches.count != looks.count {
-            swatches.forEach { $0.removeFromSuperview() }
-            swatches = looks.map { TintSwatch(kind: .look($0, glass: glass)) }
-            for (i, swatch) in swatches.enumerated() {
-                swatch.onClick = { [weak self] _ in
-                    guard let self, i < self.looks.count else { return }
-                    self.apply(self.looks[i])
-                }
-                addSubview(swatch)
-            }
-            needsLayout = true
-            return
-        }
-        for (swatch, look) in zip(swatches, looks) {
-            let fade = CATransition()
-            fade.duration = Tokens.Motion.standard
-            swatch.layer?.add(fade, forKey: "look")
-            swatch.kind = .look(look, glass: glass)
-        }
     }
 
     // MARK: Showing it
 
-    /// Everything on the panel from what's saved.
-    private func refresh() {
-        guard let space = Library.shared.space(spaceID) else { return }
-        canvas.hue = space.baseHue
-        canvas.intensity = shownBrightness(space)
-        canvas.hue2 = space.hue2
-        canvas.intensity2 = space.brightness2 ?? shownBrightness(space)
-        canvas.colorAt = Self.dotColor
-        dial.angle = space.gradientAngle
-        dial.isHidden = space.hue2 == nil
+    /// Every control from the draft.
+    private func sync(animated: Bool) {
+        let space = draft
         kindSwitch.selectedIndex = kind.rawValue
-        grainSlider.tint = glassTint(space) ?? space.background
-        grainSlider.tint2 = space.glass == true ? nil : space.background2
-        for (i, swatch) in swatches.enumerated() { swatch.isSelected = matches(looks[i], space) }
+        var spots = [ColorWheel.Spot(hue: space.baseHue, depth: space.isNeutral ? 0 : space.brightness ?? 0)]
+        var colors = [space.background]
+        if let hue2 = space.hue2, let end = space.background2 {
+            spots.append(ColorWheel.Spot(hue: hue2, depth: space.brightness2 ?? space.brightness ?? 0))
+            colors.append(end)
+        }
+        wheel.show(spots, colors: colors, animated: animated)
+        for swatch in colorSwatches + gradientSwatches { swatch.isSelected = swatch.look.matches(space) }
+        let shown = look
+        grainSlider.grain = space.grain ?? 0
+        grainSlider.tint = kind == .glass ? NSColor(white: 0.92 - 0.75 * CGFloat(space.brightness ?? 0), alpha: 1) : shown.background
+        grainSlider.tint2 = kind == .glass ? nil : shown.background2
+        shadeSlider.grain = space.brightness ?? 0
+        dial.angle = space.gradientAngle
         let glass = kind == .glass
-        canvas.isHidden = glass
-        brightnessSlider.grain = shownBrightness(space)
-        brightnessSlider.showsChecker = glass
-        brightnessSlider.isHidden = !glass
-        brightnessSlider.toneColors = brightnessTrack(space)
+        wheel.isHidden = glass
+        colorSwatches.forEach { $0.isHidden = kind != .color }
+        gradientSwatches.forEach { $0.isHidden = kind != .gradient }
+        shadeLabel.isHidden = !glass
+        shadeSlider.isHidden = !glass
+        directionLabel.isHidden = kind != .gradient
+        dial.isHidden = kind != .gradient
         needsLayout = true
-    }
-
-    /// Glass's grain shows on its shade, opaque so the texture reads.
-    private func glassTint(_ space: SpaceInfo) -> NSColor? {
-        space.glass == true ? NSColor(white: 0.92 - 0.75 * CGFloat(space.brightness ?? 0), alpha: 1) : nil
-    }
-
-    /// The brightness track: this very color from its lightest to its darkest (white to black for glass and neutrals).
-    private func brightnessTrack(_ space: SpaceInfo) -> [NSColor] {
-        let neutral = space.glass == true || (space.hue == nil && space.color.isNeutral)
-        let intensity = space.hue == nil ? SpaceColor.defaultIntensity : space.intensity ?? SpaceColor.defaultIntensity
-        return stride(from: 0.0, through: 1.0, by: 0.25).map {
-            SpaceColor.fixed(hue: space.baseHue, intensity: intensity, brightness: $0, neutral: neutral)
-        }
-    }
-
-    /// How vivid a color is when its dot sets darkness rather than strength.
-    private static let vivid = 0.6
-
-    /// The color a dot shows: strong enough to read at a glance, deeper as it goes out.
-    private static func dotColor(hue: Double, depth: Double) -> NSColor {
-        NSColor(hue: hue, saturation: 0.3 + 0.5 * depth, brightness: 0.97 - 0.47 * depth, alpha: 1)
-    }
-
-    /// How dark it is. A space never touched follows the Mac, so its dot starts where it looks right now.
-    private func shownBrightness(_ space: SpaceInfo) -> Double {
-        if let brightness = space.brightness { return brightness }
-        return effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.85 : 0.15
-    }
-
-    /// The space as the pad, knob and sliders have it right now, saved or not.
-    private func draft(brightness: Double?? = nil) -> SpaceInfo? {
-        guard var space = Library.shared.space(spaceID) else { return nil }
-        if space.glass != true {
-            space.hue = canvas.hue
-            space.intensity = Self.vivid
-            space.brightness = canvas.intensity
-            space.appearance = canvas.intensity < 0.5 ? "light" : "dark"
-        }
-        space.hue2 = canvas.hue2
-        if space.hue2 != nil { space.intensity2 = Self.vivid; space.brightness2 = canvas.intensity2 }
-        space.angle = dial.angle
-        if let brightness {
-            space.brightness = brightness
-            space.appearance = brightness.map { $0 < 0.5 ? "light" : "dark" }
-        }
-        return space
-    }
-
-    /// Mid-drag: the window and the sliders show it before anything is saved.
-    private func preview(brightness: Double?? = nil) {
-        guard let draft = draft(brightness: brightness) else { return }
-        (controller ?? BrowserWindowController.undoTarget)?.previewSpace(draft)
-        grainSlider.tint = glassTint(draft) ?? draft.background
-        grainSlider.tint2 = draft.glass == true ? nil : draft.background2
-        brightnessSlider.toneColors = brightnessTrack(draft)
     }
 
     // MARK: Layout
 
     private let pad = Tokens.Space.x4
-    private let canvasHeight: CGFloat = 210
-    private let swatchSize: CGFloat = 24
-    private let rowHeight: CGFloat = 30
-    private let knobSize: CGFloat = 76
-    private let sliderHeight: CGFloat = 34
+    private let nameHeight: CGFloat = 34
+    private let switchHeight: CGFloat = 30
+    private let wheelHeight: CGFloat = 236
+    private let swatchSize: CGFloat = 26
+    private let sliderHeight: CGFloat = 30
+    private let dialSize: CGFloat = 60
+    private let labelWidth: CGFloat = 72
 
     var contentHeight: CGFloat {
-        let middle = kind == .glass ? sliderHeight + Tokens.Space.x3 : canvasHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x4
-        return pad + Tokens.Space.x8 + 2 + Tokens.Space.x3 + rowHeight + Tokens.Space.x3 + middle
-            + (kind == .gradient ? knobSize : sliderHeight) + pad
+        var height = pad + nameHeight + Tokens.Space.x3 + switchHeight + Tokens.Space.x4
+        height += kind == .glass ? sliderHeight + Tokens.Space.x3 : wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5
+        height += sliderHeight
+        if kind == .gradient { height += Tokens.Space.x3 + dialSize }
+        return height + pad
     }
 
-    /// A gradient brings the direction knob; the panel grows or shrinks for it, keeping the edge nearest what opened it.
+    /// The panel grows or shrinks with the kind, keeping the edge nearest what opened it.
     private func resizeToFit() {
         guard superview != nil, abs(frame.height - contentHeight) > 0.5 else { return }
         var target = frame
@@ -1116,37 +839,38 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private func layoutContent() {
         let width = bounds.width - pad * 2
         var y = pad
-        let nameHeight = Tokens.Space.x8 + 2
-        let nameWidth = width
         let fh = ceil(nameField.intrinsicContentSize.height)
-        nameBackground.frame = NSRect(x: pad, y: y, width: nameWidth, height: nameHeight)
-        nameField.frame = NSRect(x: pad + Tokens.Space.x2, y: y + (nameHeight - fh) / 2, width: nameWidth - Tokens.Space.x4, height: fh)
+        nameBackground.frame = NSRect(x: pad, y: y, width: width, height: nameHeight)
+        nameField.frame = NSRect(x: pad + Tokens.Space.x2 + 2, y: y + (nameHeight - fh) / 2, width: width - Tokens.Space.x4, height: fh)
         y += nameHeight + Tokens.Space.x3
-        kindSwitch.frame = NSRect(x: pad, y: y, width: width, height: rowHeight)
-        y += rowHeight + Tokens.Space.x3
-        if kind != .glass {
-            canvas.frame = NSRect(x: pad, y: y, width: width, height: canvasHeight)
-            y = canvas.frame.maxY + Tokens.Space.x3
-            // The ready-made looks, spread evenly across the width.
-            let count = CGFloat(swatches.count)
-            let gap = (width - count * swatchSize) / max(count - 1, 1)
-            for (i, swatch) in swatches.enumerated() {
-                swatch.frame = NSRect(x: pad + CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
-            }
-            y += swatchSize + Tokens.Space.x4
-        }
-        // Glass: its shade, clear white to smoked black.
+        kindSwitch.frame = NSRect(x: pad, y: y, width: width, height: switchHeight)
+        y += switchHeight + Tokens.Space.x4
         if kind == .glass {
-            brightnessSlider.frame = NSRect(x: pad, y: y, width: width, height: sliderHeight)
+            row(shadeLabel, shadeSlider, y: y, height: sliderHeight, width: width)
             y += sliderHeight + Tokens.Space.x3
-        }
-        // How textured, and with a gradient, the knob that turns it.
-        if kind == .gradient {
-            dial.frame = NSRect(x: pad + width - knobSize, y: y, width: knobSize, height: knobSize)
-            grainSlider.frame = NSRect(x: pad, y: y + (knobSize - sliderHeight) / 2, width: width - knobSize - Tokens.Space.x3, height: sliderHeight)
         } else {
-            grainSlider.frame = NSRect(x: pad, y: y, width: width, height: sliderHeight)
+            wheel.frame = NSRect(x: pad, y: y, width: width, height: wheelHeight)
+            y += wheelHeight + Tokens.Space.x3
+            for swatches in [colorSwatches, gradientSwatches] {
+                let count = CGFloat(swatches.count)
+                let gap = (width - count * swatchSize) / max(count - 1, 1)
+                for (i, swatch) in swatches.enumerated() {
+                    swatch.frame = NSRect(x: pad + CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
+                }
+            }
+            y += swatchSize + Tokens.Space.x5
         }
+        row(grainLabel, grainSlider, y: y, height: sliderHeight, width: width)
+        y += sliderHeight + Tokens.Space.x3
+        if kind == .gradient { row(directionLabel, dial, y: y, height: dialSize, width: dialSize) }
+    }
+
+    /// A name on the left and its control beside it, every control starting at the same line.
+    private func row(_ label: Label, _ control: NSView, y: CGFloat, height: CGFloat, width: CGFloat) {
+        let lh = ceil(label.intrinsicContentSize.height)
+        label.frame = NSRect(x: pad, y: y + (height - lh) / 2, width: labelWidth, height: lh)
+        let x = pad + labelWidth
+        control.frame = NSRect(x: x, y: y, width: min(width, bounds.width - pad - x), height: height)
     }
 
     func show(from anchor: NSView? = nil) {

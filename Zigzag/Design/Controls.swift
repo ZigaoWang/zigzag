@@ -852,6 +852,11 @@ final class SlidingSwitch: NSView {
         for (i, icon) in icons.enumerated() { icon.contentTintColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.icon }
     }
 
+    /// The labels span whole segments, so a click anywhere lands on the switch, not on a label.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        frame.contains(point) ? self : nil
+    }
+
     override func mouseDown(with event: NSEvent) {
         let x = convert(event.locationInWindow, from: nil).x
         let index = min(max(Int((x - inset) / segmentWidth), 0), items.count - 1)

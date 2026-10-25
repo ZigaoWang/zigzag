@@ -58,13 +58,33 @@ enum SpaceColor: String, Codable, CaseIterable {
                                     dark: NSColor(hue: hue, saturation: 0.12 + 0.45 * t, brightness: 0.15 + 0.06 * t, alpha: 1))
     }
 
-    /// One color, whatever the system's mode: how vivid, and how light or dark (0 lightest, 1 darkest).
-    /// Neutral drops the hue for white, grays and black.
-    static func fixed(hue: Double, intensity: Double, brightness: Double, neutral: Bool) -> NSColor {
-        let t = min(max(intensity, 0), 1), b = min(max(brightness, 0), 1)
-        let saturation = neutral ? 0 : (0.04 + 0.26 * t) * (1 - b) + (0.12 + 0.45 * t) * b + 0.12 * t * sin(.pi * b)
-        let value = neutral ? 1 - 0.93 * b : (0.97 - 0.05 * t) * (1 - b) + (0.13 + 0.06 * t) * b
-        return NSColor(hue: hue, saturation: saturation, brightness: value, alpha: 1)
+    /// A color on the space wheel: `hue` around it (red at 0, as on any color wheel), `depth` from the middle, near
+    /// white, out to the rim, deep. Mixed in OKLCH, so every hue at one depth is equally light: a yellow and a blue the
+    /// same distance out weigh the same, and the window's mode can follow depth alone. Neutral drops the hue for
+    /// white, grays and black.
+    static func paint(hue: Double, depth: Double, neutral: Bool = false) -> NSColor {
+        let d = min(max(depth, 0), 1)
+        let lightness = 0.975 - 0.69 * d
+        // A whisper of color in the middle, richest around halfway, a little quieter again in the deep.
+        let rise = min(d / 0.5, 1)
+        var chroma = neutral ? 0 : 0.02 + 0.13 * rise * rise * (3 - 2 * rise) - 0.03 * max(0, d - 0.65) / 0.35
+        let angle = okHue(hue)
+        // Some hues can't be that rich at that lightness on a screen: back off until it fits.
+        var rgb = OKLab.rgb(l: lightness, a: chroma * cos(angle), b: chroma * sin(angle))
+        while !OKLab.inGamut(rgb), chroma > 0.002 {
+            chroma *= 0.94
+            rgb = OKLab.rgb(l: lightness, a: chroma * cos(angle), b: chroma * sin(angle))
+        }
+        let c = rgb.map { OKLab.encode(min(max($0, 0), 1)) }
+        return NSColor(srgbRed: c[0], green: c[1], blue: c[2], alpha: 1)
+    }
+
+    /// The OKLCH hue angle of a wheel hue, so the wheel keeps its familiar order: red, orange, yellow, green, blue.
+    private static func okHue(_ hue: Double) -> Double {
+        let pure = NSColor(hue: CGFloat(hue.truncatingRemainder(dividingBy: 1) + (hue < 0 ? 1 : 0)), saturation: 1, brightness: 1, alpha: 1)
+            .usingColorSpace(.sRGB) ?? .red
+        let lab = OKLab.lab(r: OKLab.decode(pure.redComponent), g: OKLab.decode(pure.greenComponent), b: OKLab.decode(pure.blueComponent))
+        return atan2(lab.b, lab.a)
     }
 
     static func swatch(hue: Double) -> NSColor {
@@ -93,4 +113,31 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .peach: Tokens.Color.dynamic(light: Tokens.Color.hex(0xD58A5C), dark: Tokens.Color.hex(0xE0976A))
         }
     }
+}
+
+/// Björn Ottosson's OKLab, the perceptual space behind `SpaceColor.paint`.
+private enum OKLab {
+    static func rgb(l: Double, a: Double, b: Double) -> [Double] {
+        let l1 = pow(l + 0.3963377774 * a + 0.2158037573 * b, 3)
+        let m1 = pow(l - 0.1055613458 * a - 0.0638541728 * b, 3)
+        let s1 = pow(l - 0.0894841775 * a - 1.2914855480 * b, 3)
+        return [4.0767416621 * l1 - 3.3077115913 * m1 + 0.2309699292 * s1,
+                -1.2684380046 * l1 + 2.6097574011 * m1 - 0.3413193965 * s1,
+                -0.0041960863 * l1 - 0.7034186147 * m1 + 1.7076147010 * s1]
+    }
+
+    static func lab(r: Double, g: Double, b: Double) -> (l: Double, a: Double, b: Double) {
+        let l1 = cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+        let m1 = cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+        let s1 = cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+        return (0.2104542553 * l1 + 0.7936177850 * m1 - 0.0040720468 * s1,
+                1.9779984951 * l1 - 2.4285922050 * m1 + 0.4505937099 * s1,
+                0.0259040371 * l1 + 0.7827717662 * m1 - 0.8086757660 * s1)
+    }
+
+    static func inGamut(_ rgb: [Double]) -> Bool { rgb.allSatisfy { $0 >= -0.0005 && $0 <= 1.0005 } }
+
+    /// Linear light to sRGB, and back.
+    static func encode(_ x: Double) -> Double { x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1 / 2.4) - 0.055 }
+    static func decode(_ x: CGFloat) -> Double { let x = Double(x); return x <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4) }
 }
