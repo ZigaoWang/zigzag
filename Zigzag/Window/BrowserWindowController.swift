@@ -624,6 +624,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private var reader: ReaderView?
     private weak var readerTab: Tab?
+    /// The pane the reading page covers: in a split, the one its tab is in.
+    private weak var readerCard: PageCardView?
     private var readerURL: URL?
     private var readerKeyMonitor: Any?
 
@@ -644,7 +646,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.reader = view
             self.readerTab = tab
             self.readerURL = url
-            self.root.card.setOverlay(view)
+            let card = self.tabManager.split(for: tab)?.right == tab.id ? self.root.secondCard : self.root.card
+            self.readerCard = card
+            card.setOverlay(view)
             view.alphaValue = 0
             Tokens.Motion.animate(Tokens.Motion.feedback) { view.animator().alphaValue = 1 }
             self.window?.makeFirstResponder(view.webView)
@@ -664,11 +668,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         reader = nil
         readerTab = nil
         readerURL = nil
+        let card = readerCard ?? root.card
+        readerCard = nil
         if let monitor = readerKeyMonitor { NSEvent.removeMonitor(monitor) }
         readerKeyMonitor = nil
-        Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { [weak self] in
-            guard let self, self.reader == nil, self.root.card.overlay === view else { view.removeFromSuperview(); return }
-            self.root.card.setOverlay(nil)
+        Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: {
+            guard card.overlay === view else { view.removeFromSuperview(); return }
+            card.setOverlay(nil)
         })
         if let webView = tabManager.selectedTab?.webView { window?.makeFirstResponder(webView) }
         updateReaderButton()
