@@ -249,7 +249,7 @@ class FloatingPanelView: NSView {
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
             layer?.shadowOpacity = isElevated ? 1 : 0
             layer?.shadowRadius = Tokens.Shadow.panelRadius / 2
-            layer?.shadowOffset = CGSize(width: 0, height: -Tokens.Space.x2)
+            layer?.shadowOffset = Tokens.Shadow.panelOffset(flipped: isFlipped)
         }
     }
 

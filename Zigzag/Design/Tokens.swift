@@ -288,7 +288,7 @@ enum Tokens {
         /// Floating surfaces (command bar, previews, switcher).
         static let panelBackground = dynamic(light: hex(0xFCFCFC), dark: hex(0x2A2A2D))
         static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0xFFFFFF, alpha: 0.10))
-        static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.18), dark: hex(0x000000, alpha: 0.5))
+        static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.13), dark: hex(0x000000, alpha: 0.42))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
         /// Zigzag's one accent: the space's own, so progress, focus, selection and actions agree everywhere.
@@ -317,9 +317,12 @@ enum Tokens {
         /// Card: barely there, separates page from frame.
         static let cardRadius: CGFloat = 2
         static let cardOffset = CGSize(width: 0, height: -1)
-        /// Floating panels sit above the page and need real depth.
-        static let panelRadius: CGFloat = 24
-        static let panelOffset = CGSize(width: 0, height: -8)
+        /// Floating panels sit just above the page: a soft, short shadow that falls below them, never above.
+        static let panelRadius: CGFloat = 16
+        static let panelDrop: CGFloat = 3
+
+        /// The drop as a layer offset: flipped views measure y downward, so the sign follows the view.
+        static func panelOffset(flipped: Bool) -> CGSize { CGSize(width: 0, height: flipped ? panelDrop : -panelDrop) }
     }
 }
 
