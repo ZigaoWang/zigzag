@@ -200,6 +200,9 @@ final class PeekController {
 
     /// Opens out of the link with a little spring, so you see where it came from.
     private func grow() {
+        // Peeked again while the last one was still leaving: start from a clean, opaque card.
+        panel.layer?.removeAnimation(forKey: "shrink")
+        panel.layer?.opacity = 1
         panel.alphaValue = 1
         panel.layoutSubtreeIfNeeded()
         origin = clickPoint()
@@ -235,8 +238,9 @@ final class PeekController {
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
             guard let self else { return }
-            self.panel.removeFromSuperview()
-            layer.removeAllAnimations()
+            // Peeked again meanwhile: the card is in use, so it stays.
+            if !self.isVisible { self.panel.removeFromSuperview() }
+            layer.removeAnimation(forKey: "shrink")
             layer.transform = CATransform3DIdentity
             layer.opacity = 1
             done()
@@ -281,12 +285,16 @@ final class PeekController {
         token = nil
         self.tab = nil
         tab.isPeek = false
+        // Promoted before it finished loading: it never gets the peek's "painted" step, so it draws its own
+        // background from here on, like any tab.
+        tab.webView?.setValue(true, forKey: "drawsBackground")
+        content.layer?.backgroundColor = nil
         let target = controller.root.cardFrame
         scrim.hide()
         Tokens.Motion.animate(Tokens.Motion.snappy, {
             self.panel.animator().frame = target
         }, completion: {
-            self.panel.removeFromSuperview()
+            if !self.isVisible { self.panel.removeFromSuperview() }
             self.panel.alphaValue = 1
             controller.tabManager.insert(tab)
         })
