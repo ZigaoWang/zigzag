@@ -1,4 +1,57 @@
+# Build output
 build/
-*.xcodeproj/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+*.xcarchive
+*.dSYM/
+*.dSYM.zip
+*.ipa
+/releases/
+/site/releases/
+/site/updates/
+.build/
+.swiftpm/
+
+# Xcode per-user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Test output
+*.xcresult
+*.profraw
+*.profdata
+test-results/
+fastlane/test_output/
+
+# Signing and secrets
+*.p8
+*.p12
+*.pem
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+.env
+.env*
+!.env.example
+*.secret
+secrets/
+
+# Local config
+*.local
+*.local.*
+*.xcconfig.local
+Local.xcconfig
+.vscode/
+.idea/
+.claude/settings.local.json
+CLAUDE.local.md
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
