@@ -742,6 +742,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         layoutTrafficLights()
         root.needsLayout = true
     }
+    func windowDidResignKey(_ notification: Notification) { switcher.windowResignedKey() }
+
     func windowDidBecomeKey(_ notification: Notification) {
         // Brand moments in other windows (Settings, Passwords) follow the space in front.
         Brand.themeChanged.send(())

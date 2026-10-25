@@ -122,6 +122,8 @@ final class TabSwitcher {
     func handle(_ event: NSEvent) -> Bool {
         switch event.type {
         case .keyDown:
+            // Control was let go somewhere we didn't see (another app): the switch is over, and the key is yours.
+            if isActive, !event.modifierFlags.contains(.control) { cancel(); return false }
             guard event.keyCode == 48 /* tab */, event.modifierFlags.contains(.control) else {
                 if isActive, event.keyCode == 53 /* esc */ { cancel(); return true }
                 return isActive
@@ -201,6 +203,9 @@ final class TabSwitcher {
     }
 
     private func cancel() { finish() }
+
+    /// The window lost focus mid-switch (⌘Tab away): put it away, staying on the current tab.
+    func windowResignedKey() { if isActive { cancel() } }
 
     private func finish() {
         isActive = false
