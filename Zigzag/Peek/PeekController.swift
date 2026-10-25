@@ -222,13 +222,14 @@ final class PeekController {
         layer.add(fade, forKey: "fade")
     }
 
-    /// Goes back toward the link it came from, fading as it goes.
+    /// Steps back and fades.
     private func shrink(_ done: @escaping () -> Void) {
         guard let layer = panel.layer, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.dismiss(completion: done)
             return
         }
-        let end = shrunk(toward: origin ?? NSPoint(x: panel.frame.midX, y: panel.frame.midY), scale: origin == nil ? 0.97 : 0.9)
+        // Settles back a touch, in place, and fades: quick and quiet, nothing flying across the page.
+        let end = shrunk(toward: NSPoint(x: panel.frame.midX, y: panel.frame.midY), scale: 0.96)
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
             guard let self else { return }
@@ -246,8 +247,8 @@ final class PeekController {
         fade.toValue = 0
         let both = CAAnimationGroup()
         both.animations = [move, fade]
-        both.duration = 0.18
-        both.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        both.duration = 0.16
+        both.timingFunction = CAMediaTimingFunction(name: .easeOut)
         both.fillMode = .forwards
         both.isRemovedOnCompletion = false
         layer.add(both, forKey: "shrink")
