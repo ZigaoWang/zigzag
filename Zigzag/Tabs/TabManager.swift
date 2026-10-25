@@ -222,6 +222,8 @@ final class TabManager {
     /// Turns a tab into a favorite at a position. Its page stays open behind the tile.
     func favoriteTab(_ tab: Tab, at index: Int? = nil) {
         guard let url = tab.url else { return }
+        // A favorite has no row to carry a split, so it leaves the one it was in.
+        unsplit(tab)
         if let bookmarkID = tab.bookmarkID {
             Library.shared.makeFavorite(bookmarkID)
             if let index { Library.shared.moveFavorite(bookmarkID, to: index) }
@@ -323,6 +325,7 @@ final class TabManager {
     func bookmarkTab(_ tab: Tab, at index: Int? = nil, in spaceID: UUID? = nil) {
         guard tab.bookmarkID == nil, let url = tab.url else { return }
         let space = spaceID ?? tab.spaceID
+        unsplit(tab)
         removeFromList(tab)
         let bookmarkID = UUID()
         tab.bookmarkID = bookmarkID
@@ -570,12 +573,17 @@ final class TabManager {
         return self.tab(with: pair.left == tab.id ? pair.right : pair.left)
     }
 
+    /// Only ordinary tabs split: a pinned page or favorite has no row of its own to carry the pair.
+    func canSplit(_ tab: Tab, with other: Tab) -> Bool {
+        tab !== other && tab.bookmarkID == nil && other.bookmarkID == nil
+    }
+
     /// Puts `other` beside `tab` (on the right or left), ending any splits either was in.
     func makeSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
-        guard tab !== other else { return }
+        guard canSplit(tab, with: other) else { return }
         unsplit(tab, notify: false)
         unsplit(other, notify: false)
-        if other.spaceID != tab.spaceID, other.bookmarkID == nil {
+        if other.spaceID != tab.spaceID {
             removeFromList(other)
             other.spaceID = tab.spaceID
             tabsBySpace[tab.spaceID, default: []].insert(other, at: 0)
@@ -634,7 +642,10 @@ final class TabManager {
     }
 
     func restoreSplits(_ pairs: [SplitPair]) {
-        splits = pairs.filter { tab(with: $0.left) != nil && tab(with: $0.right) != nil }
+        splits = pairs.filter { pair in
+            guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }
+            return canSplit(left, with: right)
+        }
     }
 
     // MARK: Suspension

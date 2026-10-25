@@ -30,7 +30,7 @@ enum SidebarMenus {
         menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
         if manager.split(for: tab) != nil {
             menu.addItem(Item("Close Split View") { controller.unsplitWithUndo(tab) })
-        } else if let current = manager.selectedTab, current !== tab {
+        } else if let current = manager.selectedTab, manager.canSplit(current, with: tab) {
             menu.addItem(Item("Open in Split View") { controller.splitWithUndo(current, with: tab) })
         }
         menu.addItem(Item("Duplicate Tab") { controller.duplicate(tab) })

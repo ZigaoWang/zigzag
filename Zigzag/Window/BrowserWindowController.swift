@@ -1126,14 +1126,14 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listDragOverPage(at windowPoint: NSPoint, tab: Tab) {
         // Only another tab can open beside the current page.
-        guard let current = tabManager.selectedTab, current !== tab else { root.splitDropHint.show(nil); return }
+        guard let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { root.splitDropHint.show(nil); return }
         root.splitDropHint.show(root.splitDropHint.side(at: windowPoint))
     }
 
     func listDropOnPage(_ tab: Tab) -> Bool {
         let side = root.splitDropHint.side
         root.splitDropHint.show(nil)
-        guard let side, let current = tabManager.selectedTab, current !== tab else { return false }
+        guard let side, let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { return false }
         splitWithUndo(current, with: tab, otherOnRight: side == .right)
         return true
     }

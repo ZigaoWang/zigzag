@@ -120,9 +120,11 @@ final class SidebarListView: NSView {
         if bookmarks.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
         if !shown.isEmpty || includeEmptyBookmarkSection { result.append(.separator) }
         result.append(.newTab)
-        // The right half of a split rides in its left half's row.
-        let rightHalves = Set(manager.splits.map(\.right))
-        result += manager.tabs(in: spaceID).filter { !rightHalves.contains($0.id) }.map { .tab($0.id) }
+        // The right half of a split rides in its left half's row, when that row is here to carry it.
+        let tabs = manager.tabs(in: spaceID)
+        let rowIDs = Set(tabs.map(\.id))
+        let rightHalves = Set(manager.splits.filter { rowIDs.contains($0.left) }.map(\.right))
+        result += tabs.filter { !rightHalves.contains($0.id) }.map { .tab($0.id) }
         return result
     }
 
