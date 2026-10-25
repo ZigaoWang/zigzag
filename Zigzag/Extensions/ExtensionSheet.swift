@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// The one place an extension asks for something: before it's added, and when an update wants more access.
 /// It floats over the top of the page like the other panels. Return confirms, Escape cancels.
@@ -101,9 +102,13 @@ final class ExtensionSheet: FloatingPanelView {
         sheet.present()
         current = sheet
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
-            guard let sheet, event.window === sheet.window else { return event }
+            guard let sheet, let window = sheet.window, event.window === window else { return event }
+            // Return goes to whatever you're typing in (a page's field, a word being composed), never to "Add".
+            var view = window.firstResponder as? NSView
+            while let current = view, !(current is WKWebView) { view = current.superview }
+            let typing = window.firstResponder is NSTextView || view != nil
             switch event.keyCode {
-            case 36, 76: sheet.finish(confirmed: true); return nil   // Return, Enter
+            case 36, 76 where !typing: sheet.finish(confirmed: true); return nil   // Return, Enter
             case 53: sheet.finish(confirmed: false); return nil      // Escape
             default: return event
             }
