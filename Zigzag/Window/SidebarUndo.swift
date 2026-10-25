@@ -137,12 +137,19 @@ extension BrowserWindowController {
     /// Deletes a space; ⌘Z brings back the space, its bookmarks and its tabs.
     func removeSpaceWithUndo(_ id: UUID) {
         let before = Library.shared.snapshot
-        let tabs = tabManager.tabs(in: id).compactMap { tab in tab.url.map { ($0, tab.displayTitle) } }
+        // The space's tabs in every window close with it, so remember each window's, to put back where they were.
+        let tabs = WindowManager.shared.controllers.map { window in
+            (window: ObjectIdentifier(window), tabs: window.tabManager.tabs(in: id).compactMap { tab in tab.url.map { ($0, tab.displayTitle) } })
+        }
         Library.shared.removeSpace(id)
         sidebarUndo.registerUndo(withTarget: self) { controller in
             Library.shared.restore(before)
-            for (url, title) in tabs.reversed() {
-                _ = controller.tabManager.newTab(url: url, spaceID: id, select: false, title: title)
+            for (window, list) in tabs {
+                // A window closed since: its tabs come back here.
+                let target = WindowManager.shared.controllers.first { ObjectIdentifier($0) == window } ?? controller
+                for (url, title) in list.reversed() {
+                    _ = target.tabManager.newTab(url: url, spaceID: id, select: false, title: title)
+                }
             }
             controller.tabManager.switchToSpace(id)
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.removeSpaceWithUndo(id) }
