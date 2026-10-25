@@ -133,12 +133,13 @@ extension BrowserWindowController {
 
     /// Closes several tabs; ⌘Z reopens them all.
     func closeManyWithUndo(_ tabs: [Tab]) {
-        let count = tabs.filter { $0.bookmarkID == nil }.count
+        let ids = tabs.filter { $0.bookmarkID == nil }.map(\.id)
         tabManager.close(tabs)
-        guard count > 0 else { return }
+        guard !ids.isEmpty else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in
+            // By id, so a tab reopened meanwhile with ⇧⌘T doesn't make this bring back an unrelated one.
             var reopened: [Tab] = []
-            for _ in 0..<count { if let tab = controller.tabManager.reopenClosedTab() { reopened.append(tab) } }
+            for id in ids.reversed() { if let tab = controller.tabManager.reopenClosedTab(id) { reopened.append(tab) } }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.closeManyWithUndo(reopened) }
             controller.sidebarUndo.setActionName("Close Tabs")
         }
