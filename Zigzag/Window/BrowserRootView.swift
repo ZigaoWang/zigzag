@@ -92,7 +92,8 @@ final class BrowserRootView: ColorView {
         let oldLeft = card.frame
         splitRatio = ratio
         splitVertical = vertical
-        guard animated, !Tokens.Motion.isKeyboardDriven, window != nil else { needsLayout = true; return }
+        // Like the sidebar, a split moves the window's layout: it animates from the keyboard too.
+        guard animated, !Tokens.Motion.reduceMotion, window != nil else { needsLayout = true; return }
         layoutSubtreeIfNeeded()
         let panes = paneFrames
         card.frame = oldLeft
@@ -100,7 +101,7 @@ final class BrowserRootView: ColorView {
             secondCard.alphaValue = 0
             secondCard.frame = vertical ? right.offsetBy(dx: 0, dy: Tokens.Space.x6) : right.offsetBy(dx: Tokens.Space.x6, dy: 0)
         }
-        Tokens.Motion.animate(Tokens.Motion.gentle) {
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) {
             self.card.animator().frame = panes.left
             if let right = panes.right {
                 self.secondCard.animator().frame = right
@@ -252,7 +253,8 @@ final class BrowserRootView: ColorView {
         sidebarRevealed = false
         watchPointer(false)
         sidebarContainer.isFloating = !visible
-        guard animated, !Tokens.Motion.isKeyboardDriven, !Tokens.Motion.reduceMotion else {
+        // It slides however it was asked for, the keyboard included: where the sidebar went is worth seeing.
+        guard animated, !Tokens.Motion.reduceMotion else {
             needsLayout = true
             layoutSubtreeIfNeeded()
             return
@@ -260,9 +262,9 @@ final class BrowserRootView: ColorView {
         // The page card resizes with AppKit's animator; the sidebar slides on the render server.
         let targetSidebar = visible ? sidebarFrame : NSRect(x: -sidebarWidth, y: 0, width: sidebarWidth, height: bounds.height)
         Tokens.Motion.withoutAnimation { sidebarContainer.frame = targetSidebar }
-        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide)
+        let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide, fromKeyboard: true)
         onSlide?(duration)
-        Tokens.Motion.animate(Tokens.Motion.slide, {
+        Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, {
             self.card.animator().frame = self.paneFrames.left
             if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
         }, completion: {

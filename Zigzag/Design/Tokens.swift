@@ -142,8 +142,10 @@ enum Tokens {
 
         /// Runs AppKit animator() changes. Frames jump to their final values right away (so layout and
         /// hit-testing always see the truth); only what's drawn animates.
-        static func animate(_ curve: Curve = snappy, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
-            if isKeyboardDriven {
+        /// `evenFromKeyboard`: for changes to the window's layout (the sidebar, a split), where seeing where things
+        /// went matters more than a few milliseconds.
+        static func animate(_ curve: Curve = snappy, evenFromKeyboard: Bool = false, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+            if isKeyboardDriven && !evenFromKeyboard {
                 NSAnimationContext.runAnimationGroup({ ctx in
                     ctx.duration = 0
                     ctx.allowsImplicitAnimation = false
