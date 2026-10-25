@@ -107,6 +107,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
 
+    // With Settings or Passwords in front, or no window open, these reach here rather than a browser window: that
+    // window comes forward (or the closed one comes back) and does it, instead of the menu item being greyed out.
+    @objc func newTab(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .newTab) }
+    @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
+    @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
+
+    private func frontBrowserWindow() -> BrowserWindowController? {
+        if WindowManager.shared.controllers.isEmpty { WindowManager.shared.reopen() }
+        // Onboarding still showing: the window waits behind it.
+        guard WelcomeWindowController.shared == nil, let controller = WindowManager.shared.keyController else { return nil }
+        controller.window?.makeKeyAndOrderFront(nil)
+        return controller
+    }
+
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
 
     @objc func showSettings(_ sender: Any?) { SettingsWindowController.shared.show() }
