@@ -495,6 +495,8 @@ final class TabManager {
     func move(_ tab: Tab, to index: Int, in spaceID: UUID? = nil) {
         guard tab.bookmarkID == nil else { return }
         let target = spaceID ?? tab.spaceID
+        // A split can't span two spaces: moving either half out ends it.
+        if target != tab.spaceID { splits.removeAll { $0.left == tab.id || $0.right == tab.id } }
         removeFromList(tab)
         tab.spaceID = target
         var list = tabsBySpace[target] ?? []
@@ -506,11 +508,12 @@ final class TabManager {
         changed.send(.structure)
     }
 
-    func moveTabToSpace(_ tab: Tab, spaceID: UUID) {
+    /// Into another space: at `index` where it was dropped, else at the top.
+    func moveTabToSpace(_ tab: Tab, spaceID: UUID, at index: Int = 0) {
         let wasSelected = selectedTab === tab
-        let index = tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
-        move(tab, to: 0, in: spaceID)
-        if wasSelected { selectAfterClosing(Tab(url: nil, spaceID: currentSpaceID), index: index) }
+        let oldIndex = tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
+        move(tab, to: index, in: spaceID)
+        if wasSelected { selectAfterClosing(Tab(url: nil, spaceID: currentSpaceID), index: oldIndex) }
     }
 
     // MARK: Duplicates

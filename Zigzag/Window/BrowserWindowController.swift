@@ -926,7 +926,7 @@ extension BrowserWindowController: SidebarDelegate {
     func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID) {
         let oldSpace = tab.spaceID
         let oldIndex = tabManager.tabs(in: oldSpace).firstIndex { $0 === tab } ?? 0
-        if spaceID == oldSpace { tabManager.move(tab, to: index) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID) }
+        if spaceID == oldSpace { tabManager.move(tab, to: index) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index) }
         sidebarUndo.registerUndo(withTarget: self) { $0.moveWithUndo(tab, to: oldIndex, in: oldSpace) }
         sidebarUndo.setActionName(spaceID == oldSpace ? "Move Tab" : "Move to Space")
     }
