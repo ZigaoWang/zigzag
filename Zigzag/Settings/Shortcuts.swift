@@ -70,6 +70,20 @@ enum Shortcuts {
         return saved != defaults[id]
     }
 
+    /// A fixed shortcut Zigzag keeps for itself (⌘1–9 for tabs, ⌃1–9 for spaces, ⌘= beside ⌘+): its title, if
+    /// these keys are one. They can't be given to anything else, or one of the two would silently stop working.
+    static func reserved(_ combo: Combo) -> String? {
+        guard !combo.key.isEmpty else { return nil }
+        func walk(_ menu: NSMenu) -> String? {
+            for item in menu.items {
+                if let sub = item.submenu, let found = walk(sub) { return found }
+                if item.isHidden, item.allowsKeyEquivalentWhenHidden, Self.combo(of: item) == combo { return item.title }
+            }
+            return nil
+        }
+        return NSApp.mainMenu.flatMap(walk)
+    }
+
     /// The item that already answers to these keys, other than `item`.
     static func owner(of combo: Combo, besides item: NSMenuItem) -> NSMenuItem? {
         guard !combo.key.isEmpty else { return nil }

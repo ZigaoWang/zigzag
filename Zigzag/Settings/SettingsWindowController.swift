@@ -1120,6 +1120,11 @@ final class ShortcutRow: InteractiveView {
                     self.fieldLabel.textColor = Tokens.Color.caution
                     return nil
                 }
+                if let fixed = Shortcuts.reserved(combo) {
+                    self.fieldLabel.stringValue = "Used for “\(fixed)”"
+                    self.fieldLabel.textColor = Tokens.Color.caution
+                    return nil
+                }
                 let taken = Shortcuts.set(combo, for: item)
                 self.finish(taken: taken)
                 return nil
