@@ -531,8 +531,9 @@ extension BrowserWindowController: WKWebExtensionWindow {
         if window.styleMask.contains(.fullScreen) { return .fullscreen }
         return .normal
     }
-    /// WebKit keeps private windows from extensions that haven't been allowed into them.
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { tabManager.isPrivate }
+    /// Always false: saying true for private windows stopped extensions in normal windows too (WebKit, 2026-10).
+    /// Private tabs are kept out another way: their web views get no extension controller (see Tab).
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 

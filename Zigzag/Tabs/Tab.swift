@@ -127,7 +127,11 @@ final class Tab: NSObject {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         } else if !fromWebKit {
             WebKitSetup.configure(configuration)
-            if let privateStore { configuration.websiteDataStore = privateStore }
+            if let privateStore {
+                configuration.websiteDataStore = privateStore
+                // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.
+                if #available(macOS 15.4, *) { configuration.webExtensionController = nil }
+            }
         }
         showsExtensionPage = extensionConfiguration != nil
         if Self.isExtensionPage(url) { ExtensionPageErrors.attach(to: configuration) }
