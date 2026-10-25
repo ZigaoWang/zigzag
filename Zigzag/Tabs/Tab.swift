@@ -133,6 +133,7 @@ final class Tab: NSObject {
         } else if !fromWebKit {
             WebKitSetup.configure(configuration)
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
+            Passkeys.attach(to: configuration)
             if let privateStore {
                 configuration.websiteDataStore = privateStore
                 // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.
