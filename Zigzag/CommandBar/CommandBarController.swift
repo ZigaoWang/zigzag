@@ -226,7 +226,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         guard let controller else { return .zero }
         if isAnchored {
             let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
-            let width = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
+            // Nothing to suggest yet (the address as it is): it stays the address's own size, in place. It reaches
+            // into the page only once there are suggestions to show.
+            let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
+            let width = results.isEmpty ? address.width + Tokens.Space.x2 : wide
             let height = fieldHeight + listHeight
             // The field sits where the address was, so the text doesn't jump.
             let y = address.midY - fieldHeight / 2
