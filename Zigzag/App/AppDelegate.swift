@@ -55,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { WindowManager.shared.newWindow() }
+        if !flag { WindowManager.shared.reopen() }
         return true
     }
 
@@ -101,7 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: App menu actions
 
-    @objc func newWindow(_ sender: Any?) { WindowManager.shared.newWindow() }
+    @objc func newWindow(_ sender: Any?) {
+        // With every window closed, a new one brings back the one you closed, tabs and all.
+        if WindowManager.shared.controllers.contains(where: { !$0.tabManager.isPrivate }) { WindowManager.shared.newWindow() } else { WindowManager.shared.reopen() }
+    }
     @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }

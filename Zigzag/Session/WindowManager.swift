@@ -119,6 +119,13 @@ final class WindowManager {
         if !controllers.isEmpty { scheduleSave() }
     }
 
+    /// No browser window is open (the last one was closed): bring back the saved one, tabs and all, rather than
+    /// open an empty window whose first save would wipe them. Nothing saved: a new window.
+    func reopen() {
+        guard !controllers.contains(where: { !$0.tabManager.isPrivate }) else { newWindow(); return }
+        if !restoreSession() { newWindow() }
+    }
+
     /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window.
     func openExternal(_ url: URL) {
         if let controller = keyController {
