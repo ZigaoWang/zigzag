@@ -1041,7 +1041,9 @@ enum Clipboard {
     /// it's still what's on the clipboard.
     static func copy(_ text: String, concealed: Bool) {
         let board = NSPasteboard.general
-        board.clearContents()
+        // A concealed copy stays on this Mac: Universal Clipboard would hand it to your other devices, where the
+        // 90-second clear never reaches.
+        board.prepareForNewContents(with: concealed ? .currentHostOnly : [])
         board.setString(text, forType: .string)
         clearWork?.cancel()
         guard concealed else { return }
