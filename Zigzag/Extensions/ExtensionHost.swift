@@ -528,6 +528,7 @@ extension BrowserWindowController: WKWebExtensionWindow {
 final class NativeMessagingHost {
     private let executable: URL
     private let origin: String
+    private static var pointedAtApp = false
     private let extensionID: String
     private var process: Process?
     private var input: FileHandle?
@@ -638,22 +639,20 @@ final class NativeMessagingHost {
             onClose()
         })
         ExtensionLog.write("native host for \(id) started=\(started)")
-        // The app took the connection but never answers (1Password waiting on something in its own window):
-        // let the extension go on without it, so its pages and popup still work, and say what to do.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self, weak port] in
-            guard let self, let port, received == 0, self.process?.isRunning == true else { return }
-            ExtensionLog.write("native host for \(id) silent after \(sent) sent; closing")
-            self.process?.terminate()
-            port.disconnect()
-            onClose()
-            if id == ExtensionStore.onePasswordID, let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
-                Toast.show("1Password’s app didn’t answer. Open 1Password, unlock it, then in Settings › Browser add Zigzag.",
-                           symbol: "exclamationmark.circle", action: ("Open 1Password", {
-                               if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
-                                   NSWorkspace.shared.openApplication(at: app, configuration: .init())
-                               }
-                           }), duration: 8, in: controller)
-            }
+        // No answer yet usually means the app is waiting on you in its own window (unlock, or allow Zigzag the
+        // first time). Keep the connection open, never cut it, and point at that window once.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+            guard let self, received == 0, self.process?.isRunning == true else { return }
+            ExtensionLog.write("native host for \(id) waiting on the app after \(sent) sent")
+            guard id == ExtensionStore.onePasswordID, !Self.pointedAtApp,
+                  let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            Self.pointedAtApp = true
+            Toast.show("1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks.",
+                       symbol: "lock.open", action: ("Open 1Password", {
+                           if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
+                               NSWorkspace.shared.openApplication(at: app, configuration: .init())
+                           }
+                       }), duration: 10, in: controller)
         }
         guard started else { port.disconnect(); onClose(); return }
         port.messageHandler = { [weak self] message, _ in
