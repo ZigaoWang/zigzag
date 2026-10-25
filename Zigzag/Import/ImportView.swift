@@ -114,6 +114,8 @@ final class ImportView: NSView {
 
     private func startImport(_ chosen: [SourceRow]) {
         guard !chosen.isEmpty else { return }
+        // What to bring, read before the choices are hidden: a hidden choice counts as not chosen.
+        let data = chosenData
         stage = .importing
         title.stringValue = "Bringing it over…"
         subtitle.stringValue = "macOS may ask to let Zigzag open a browser’s saved passwords. Choose Allow, and it carries on."
@@ -126,7 +128,6 @@ final class ImportView: NSView {
         rows.filter { !$0.isChosen }.forEach { $0.isHidden = true }
         chosen.forEach { $0.state = .waiting }
         needsLayout = true
-        let data = chosenData
         Task { @MainActor in
             for row in chosen { await run(row, data) }
             finish()
