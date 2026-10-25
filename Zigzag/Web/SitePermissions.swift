@@ -54,7 +54,8 @@ enum SitePermissions {
             return .deny
         }
         let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
-                                                isPrivate: isPrivate, in: controller)
+                                                isPrivate: isPrivate, in: controller,
+                                                answered: { decision(host: host, type: type).map { $0 ? .allow : .deny } })
         // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
         switch answer {
         case .allow:
@@ -70,7 +71,8 @@ enum SitePermissions {
 }
 
 /// "example.com wants to use your camera": a small Zigzag panel at the top of the page, with the site's icon and
-/// two clear answers. Answering by pressing Return allows; Esc doesn't.
+/// two clear answers. Esc puts it off; Return is left to whatever you're typing in. One question at a time per
+/// window: a second request waits for the first answer.
 final class PermissionPrompt: FloatingPanelView {
     private let badge = ColorView(color: .clear)
     private let symbolView = NSImageView()
@@ -83,8 +85,27 @@ final class PermissionPrompt: FloatingPanelView {
 
     enum Answer { case allow, deny, notNow }
 
-    static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController) async -> Answer {
-        await withCheckedContinuation { continuation in
+    private static var queue: [ObjectIdentifier: Task<Answer, Never>] = [:]
+
+    /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
+    static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController,
+                    answered: @escaping () -> Answer? = { nil }) async -> Answer {
+        let key = ObjectIdentifier(controller)
+        let before = queue[key]
+        let task = Task { @MainActor in
+            _ = await before?.value
+            if let known = answered() { return known }
+            return await show(host: host, what: what, symbol: symbol, isPrivate: isPrivate, in: controller)
+        }
+        queue[key] = task
+        let answer = await task.value
+        if queue[key] == task { queue[key] = nil }
+        return answer
+    }
+
+    private static func show(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController) async -> Answer {
+        guard controller.window?.isVisible == true else { return .notNow }
+        return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: NSRect(x: 0, y: 0, width: 420, height: 72))
             // The question in big words, the site under it: short enough to never cut off.
             prompt.title.stringValue = "Use \(what)?"
