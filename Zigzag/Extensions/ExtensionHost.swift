@@ -278,11 +278,34 @@ final class ExtensionHost: NSObject {
 
     /// Native-messaging replies are read for one thing: an app saying it doesn't trust this browser yet.
     /// 1Password says so in its first message; other apps would need their own reading here.
+    /// What a message is, never what it says: its field names, and the values of fields that name its kind.
+    /// Used to follow 1Password's handshake without writing anything private down.
+    static func shape(_ message: Any, depth: Int = 0) -> String {
+        guard let dict = message as? [String: Any] else { return message is [Any] ? "[…]" : "·" }
+        let kinds: Set<String> = ["type", "name", "command", "kind", "action", "status", "error"]
+        let parts = dict.keys.sorted().map { key -> String in
+            let value = dict[key]!
+            if kinds.contains(key), let text = value as? String, text.count <= 60,
+               text.allSatisfy({ $0.isLetter || $0.isNumber || "_-.".contains($0) }) { return "\(key)=\(text)" }
+            if depth < 2, value is [String: Any] { return "\(key){\(shape(value, depth: depth + 1))}" }
+            return key
+        }
+        return parts.joined(separator: " ")
+    }
+
+    fileprivate func nativeHostSent(_ message: Any, for id: String) {
+        guard id == ExtensionStore.onePasswordID else { return }
+        ExtensionLog.write("1Password extension sent \(Self.shape(message))")
+    }
+
     fileprivate func nativeHostReplied(_ message: Any, for id: String) {
         guard id == ExtensionStore.onePasswordID else { return }
         let dict = message as? [String: Any]
         let inner = (dict?["content"] as? [String: Any])?["content"] as? [String: Any]
-        guard let type = inner?["type"] as? String else { return }
+        guard let type = inner?["type"] as? String else {
+            ExtensionLog.write("1Password app sent \(Self.shape(message))")
+            return
+        }
         ExtensionLog.write("1Password app replied: \(type)")
         // Turned away: say so where you're looking, once a session, instead of leaving 1Password's spinner going.
         if type == "BrowserVerificationFailed", !Self.toldAboutVerification,
@@ -657,6 +680,7 @@ final class NativeMessagingHost {
         guard started else { port.disconnect(); onClose(); return }
         port.messageHandler = { [weak self] message, _ in
             sent += 1
+            ExtensionHost.shared.nativeHostSent(message, for: id)
             self?.write(message)
         }
         port.disconnectHandler = { [weak self] _ in
