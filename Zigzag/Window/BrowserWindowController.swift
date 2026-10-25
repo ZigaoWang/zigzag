@@ -438,6 +438,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             root.card.show(left.ensureWebView())
             root.secondCard.show(right.ensureWebView())
+            // Either half may have crashed while out of sight (a space switch brings it back, not only selecting it).
+            left.reloadIfItStopped()
+            right.reloadIfItStopped()
             root.card.isFocusedPane = left === tab
             root.secondCard.isFocusedPane = right === tab
             root.card.showsHeader = true
@@ -449,6 +452,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         } else {
             root.setSplit(ratio: nil, vertical: false, animated: true)
             root.card.show(tab?.ensureWebView())
+            tab?.reloadIfItStopped()
             root.secondCard.show(nil)
             root.card.isFocusedPane = false
             root.secondCard.isFocusedPane = false
