@@ -551,6 +551,33 @@ enum ExtensionProfile {
       } else {
         report('wasm', 'WebAssembly is missing here');
       }
+      // Network, as host and path only (no query, no bodies): what it asked for, and what came back.
+      const place = (u) => { try { const x = new URL(String(u && u.url || u), location.href); return x.host + x.pathname.slice(0, 60); } catch (e) { return '?'; } };
+      if (globalThis.fetch) {
+        const fetched = globalThis.fetch;
+        globalThis.fetch = function (input, init) {
+          const started = Date.now(), at = place(input);
+          if (!at.startsWith('aeblfdkh')) report('fetch', 'start ' + at);
+          const result = fetched.call(this, input, init);
+          result.then((r) => { if (!at.startsWith('aeblfdkh') || !r.ok) report('fetch', r.status + ' ' + at + ' in ' + (Date.now() - started) + 'ms'); },
+                      (e) => report('fetch', 'FAILED ' + at + ' in ' + (Date.now() - started) + 'ms: ' + text(e)));
+          return result;
+        };
+      }
+      if (globalThis.WebSocket) {
+        const Socket = globalThis.WebSocket;
+        globalThis.WebSocket = function (url, protocols) {
+          const socket = protocols === undefined ? new Socket(url) : new Socket(url, protocols);
+          const at = place(url);
+          report('socket', 'open ' + at);
+          socket.addEventListener('open', () => report('socket', 'connected ' + at));
+          socket.addEventListener('error', () => report('socket', 'error ' + at));
+          socket.addEventListener('close', (e) => report('socket', 'closed ' + at + ' code ' + e.code));
+          return socket;
+        };
+        globalThis.WebSocket.prototype = Socket.prototype;
+        Object.assign(globalThis.WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
+      }
       report('started', '');
     })();
 
