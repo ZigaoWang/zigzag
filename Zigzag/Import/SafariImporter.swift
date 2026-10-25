@@ -69,8 +69,10 @@ nonisolated enum SafariImporter {
         let unzip = Process()
         unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         unzip.arguments = ["-x", "-k", zip.path, folder.path]
-        guard (try? unzip.run()) != nil else { return batch }
+        let unreadable = ImportProblem(message: "\(zip.lastPathComponent) isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes.", fix: .none)
+        guard (try? unzip.run()) != nil else { batch.problems.append(unreadable); return batch }
         unzip.waitUntilExit()
+        guard unzip.terminationStatus == 0 else { batch.problems.append(unreadable); return batch }
         let files = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)?.compactMap { $0 as? URL } ?? []
         for file in files {
             switch file.pathExtension.lowercased() {
@@ -84,6 +86,7 @@ nonisolated enum SafariImporter {
                 break
             }
         }
+        if batch.logins.isEmpty, batch.bookmarks.isEmpty, batch.history.isEmpty, batch.problems.isEmpty { batch.problems.append(unreadable) }
         return batch
     }
 
@@ -93,10 +96,36 @@ nonisolated enum SafariImporter {
               let pattern = try? NSRegularExpression(pattern: #"<A[^>]*HREF="([^"]+)"[^>]*>([^<]*)</A>"#, options: [.caseInsensitive]) else { return [] }
         return pattern.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap { match in
             guard let urlRange = Range(match.range(at: 1), in: html), let titleRange = Range(match.range(at: 2), in: html),
-                  let url = URL(string: String(html[urlRange])), url.scheme == "http" || url.scheme == "https" else { return nil }
-            let title = String(html[titleRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                  let url = URL(string: decodeEntities(String(html[urlRange]))), url.scheme == "http" || url.scheme == "https" else { return nil }
+            let title = decodeEntities(String(html[titleRange])).trimmingCharacters(in: .whitespacesAndNewlines)
             return ImportBatch.Bookmark(url: url, title: title.isEmpty ? (url.host() ?? url.absoluteString) : title)
         }
+    }
+
+    /// "Tom &amp; Jerry&#39;s" → "Tom & Jerry's": the named entities exports use, and numbered ones.
+    static func decodeEntities(_ text: String) -> String {
+        guard text.contains("&") else { return text }
+        let named = ["amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{00A0}"]
+        var result = "", rest = text[...]
+        while let amp = rest.firstIndex(of: "&") {
+            result += rest[..<amp]
+            let after = rest[rest.index(after: amp)...]
+            if let semi = after.prefix(10).firstIndex(of: ";") {
+                let name = after[..<semi]
+                var decoded: String?
+                if name.hasPrefix("#x") || name.hasPrefix("#X") { decoded = UInt32(name.dropFirst(2), radix: 16).flatMap(Unicode.Scalar.init).map { String(Character($0)) } }
+                else if name.hasPrefix("#") { decoded = UInt32(name.dropFirst()).flatMap(Unicode.Scalar.init).map { String(Character($0)) } }
+                else { decoded = named[String(name).lowercased()] }
+                if let decoded {
+                    result += decoded
+                    rest = after[after.index(after: semi)...]
+                    continue
+                }
+            }
+            result += "&"
+            rest = after
+        }
+        return result + rest
     }
 
     /// History JSON: entries with a URL, a title and a time, wherever they sit in the file.

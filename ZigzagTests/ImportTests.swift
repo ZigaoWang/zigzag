@@ -122,3 +122,11 @@ struct FirefoxDecryptionTests {
 }
 
 private final class FixtureMarker {}
+
+struct SafariExportTests {
+    @Test func decodesEntitiesInBookmarks() {
+        #expect(SafariImporter.decodeEntities("Tom &amp; Jerry&#39;s &#x263A; &lt;b&gt;") == "Tom & Jerry's ☺ <b>")
+        #expect(SafariImporter.decodeEntities("a?x=1&amp;y=2") == "a?x=1&y=2")
+        #expect(SafariImporter.decodeEntities("R&D & more &bogus;") == "R&D & more &bogus;")
+    }
+}
