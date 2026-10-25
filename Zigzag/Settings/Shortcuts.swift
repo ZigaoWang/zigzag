@@ -19,7 +19,9 @@ enum Shortcuts {
 
     /// An item is known by what it does (its action and tag), since some titles change with state.
     static func id(_ item: NSMenuItem) -> String? {
-        guard let action = item.action, !item.isAlternate else { return nil }
+        // Hidden aliases (⌘= beside ⌘+, ⌘← beside ⌘[) share their item's action and tag; they keep their own keys and
+        // aren't listed, so changing or resetting the visible one never rewrites them.
+        guard let action = item.action, !item.isAlternate, !(item.isHidden && item.allowsKeyEquivalentWhenHidden) else { return nil }
         return NSStringFromSelector(action) + "#\(item.tag)"
     }
 
