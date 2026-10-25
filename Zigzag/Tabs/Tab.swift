@@ -671,7 +671,9 @@ extension Tab: WKUIDelegate {
         await PageDialogs.openPanel(parameters: parameters, window: host?.hostWindow)
     }
 
-    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType) async -> WKPermissionDecision {
-        await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate)
+    // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
+                 type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
+        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate)) }
     }
 }
