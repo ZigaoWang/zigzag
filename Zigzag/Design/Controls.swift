@@ -35,7 +35,13 @@ class InteractiveView: NSView {
     }
     var hoverChanged: ((Bool) -> Void)?
     var isPressed = false { didSet { if oldValue != isPressed { stateDidChange(animated: false) } } }
-    var isSelected = false { didSet { if oldValue != isSelected { stateDidChange(animated: false) } } }
+    var isSelected = false {
+        didSet {
+            guard oldValue != isSelected else { return }
+            setAccessibilitySelected(isSelected)
+            stateDidChange(animated: false)
+        }
+    }
     var isEnabled = true { didSet { if oldValue != isEnabled { stateDidChange(animated: false) } } }
 
     var onClick: ((NSEvent) -> Void)?
