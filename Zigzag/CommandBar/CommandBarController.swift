@@ -150,6 +150,18 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(0.25)]
         }
         rows.forEach { $0.stateDidChange(animated: false) }
+        refreshAnchorLook()
+    }
+
+    /// Editing the address with nothing to suggest is the address bar itself: its corners, no shadow, and a soft
+    /// accent outline to say it's being edited. With suggestions it lifts into a proper panel.
+    private func refreshAnchorLook() {
+        guard let controller else { return }
+        let inPlace = isAnchored && results.isEmpty
+        let accent = Brand.Theme.of(controller.tabManager.isPrivate ? nil : controller.tabManager.currentSpace).accent
+        panel.isElevated = !inPlace
+        panel.edgeColor = inPlace ? accent.withAlphaComponent(0.5) : nil
+        panel.radius = inPlace ? controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel : Tokens.Radius.panel
     }
 
     func show(mode: Mode) {
@@ -172,7 +184,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             scrim.show()
         }
         applySpaceTheme()
-        let font = isAnchored ? NSFont.systemFont(ofSize: 15) : Tokens.Font.large()
+        let font = isAnchored ? Tokens.Font.body() : Tokens.Font.large()
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
@@ -226,14 +238,11 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         guard let controller else { return .zero }
         if isAnchored {
             let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
-            // Nothing to suggest yet (the address as it is): it stays the address's own size, in place. It reaches
-            // into the page only once there are suggestions to show.
+            // Nothing to suggest yet (the address as it is): it is the address bar, exactly. It reaches into the
+            // page only once there are suggestions to show, growing from that same top-left corner.
             let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
-            let width = results.isEmpty ? address.width + Tokens.Space.x2 : wide
-            let height = fieldHeight + listHeight
-            // The field sits where the address was, so the text doesn't jump.
-            let y = address.midY - fieldHeight / 2
-            return NSRect(x: address.minX - Tokens.Space.x1, y: max(Tokens.Space.x1, y), width: width, height: height)
+            if results.isEmpty { return address }
+            return NSRect(x: address.minX, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
         let card = controller.root.cardFrame
         let width = min(Tokens.Metric.commandBarWidth, card.width - Tokens.Space.x16)
@@ -245,15 +254,18 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     }
 
     /// Anchored to the address it's a little smaller, close to the address bar's own size.
-    private var fieldHeight: CGFloat { isAnchored ? Tokens.Space.x10 + Tokens.Space.x1 : Tokens.Metric.commandBarFieldHeight }
+    /// Anchored, the field is the address bar itself, being edited: its height, its text, its place.
+    private var fieldHeight: CGFloat { isAnchored ? Tokens.Metric.addressHeight : Tokens.Metric.commandBarFieldHeight }
 
     private func layoutPanel() {
         let b = panel.bounds
         let fieldHeight = self.fieldHeight
-        let iconSize = isAnchored ? Tokens.Space.x5 : Tokens.Space.x6
+        let iconSize = Tokens.Space.x6
         fieldIcon.frame = NSRect(x: Tokens.Space.x4, y: (fieldHeight - iconSize) / 2, width: iconSize, height: iconSize)
+        // Anchored there's no icon: the text starts exactly where the address's own text was.
+        fieldIcon.isHidden = isAnchored
         let textHeight = ceil(field.intrinsicContentSize.height)
-        var fieldX = fieldIcon.frame.maxX + Tokens.Space.x2
+        var fieldX = isAnchored ? Tokens.Space.x3 - 2 : fieldIcon.frame.maxX + Tokens.Space.x2
         if scope != nil {
             let cw = chipLabel.textWidth + Tokens.Space.x5
             let ch: CGFloat = 26
@@ -262,7 +274,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             chipLabel.alignment = .center
             fieldX = chip.frame.maxX + Tokens.Space.x2
         }
-        var fieldRight = b.width - Tokens.Space.x4
+        var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : Tokens.Space.x4)
         if !hint.isHidden {
             let kw = hintKey.width
             hintKey.frame = NSRect(x: fieldRight - kw, y: (fieldHeight - KeyHint.height) / 2, width: kw, height: KeyHint.height)
@@ -344,6 +356,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         selectedIndex = min(selectedIndex, max(0, results.count - 1))
         if !results.isEmpty { selectedIndex = 0 }
         updateSelection()
+        refreshAnchorLook()
         let frame = panelFrame()
         // Suggestions change as you type; the list resizes at once rather than stretching.
         if animated && !isAnchored && panel.frame.height != frame.height {

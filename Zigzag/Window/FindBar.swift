@@ -226,6 +226,10 @@ class FloatingPanelView: NSView {
 
     /// A color mixed into the panel's surface, like the space's own, so the panel belongs to it. Nil is plain.
     var surfaceTint: NSColor? { didSet { refreshColors() } }
+    /// Off for a panel that stands in for something in place (the address being edited): no shadow, no lift.
+    var isElevated = true { didSet { refreshColors() } }
+    /// The edge, if not the usual hairline (an edited field's soft accent outline).
+    var edgeColor: NSColor? { didSet { refreshColors() } }
 
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
@@ -238,9 +242,10 @@ class FloatingPanelView: NSView {
             } else {
                 surface.color = Tokens.Color.panelBackground
             }
-            surface.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
+            surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
+            surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
-            layer?.shadowOpacity = 1
+            layer?.shadowOpacity = isElevated ? 1 : 0
             layer?.shadowRadius = Tokens.Shadow.panelRadius / 2
             layer?.shadowOffset = CGSize(width: 0, height: -Tokens.Space.x2)
         }
