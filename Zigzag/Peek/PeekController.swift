@@ -118,6 +118,8 @@ final class PeekController {
         if let existing = tab { existing.close() }
         let spaceID = controller.tabManager.currentSpaceID
         let tab = Tab(url: url, spaceID: spaceID, configuration: configuration)
+        // A peek in a private window is private too: its own store, nothing written down.
+        tab.privateStore = controller.tabManager.privateStore
         tab.host = controller
         tab.opener = opener
         tab.isPeek = true
