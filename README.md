@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <sub>Free · macOS 15.4 or later · Apple silicon and Intel · Version 0.1.3 beta</sub>
+  <sub>Free · macOS 15.4 or later · Apple silicon and Intel · Version 0.1.4 beta</sub>
 </p>
 
 <br>
