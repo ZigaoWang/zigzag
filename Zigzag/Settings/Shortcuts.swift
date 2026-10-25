@@ -129,6 +129,13 @@ enum Shortcuts {
 
     static func caps(_ item: NSMenuItem) -> [String] { caps(combo(of: item)) }
 
+    /// " (⌘S)" for a tooltip: the shortcut as it is now (set in Settings), or nothing if there isn't one.
+    static func hint(for action: Selector) -> String {
+        guard let item = allItems.first(where: { $0.action == action }) else { return "" }
+        let keys = caps(item)
+        return keys.isEmpty ? "" : " (" + keys.joined() + ")"
+    }
+
     private static func name(of key: String) -> String {
         let special: [Int: String] = [
             NSUpArrowFunctionKey: "↑", NSDownArrowFunctionKey: "↓", NSLeftArrowFunctionKey: "←", NSRightArrowFunctionKey: "→",

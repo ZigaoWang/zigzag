@@ -402,9 +402,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
-        let sites = SiteSearch.all.map(\.name)
-        generalGroup.add(FormRow(title: "Search a site", detail: "In the address bar, type a site’s name and press Tab to search it: "
-            + ListFormatter.localizedString(byJoining: sites) + ".", control: KeyHint("Tab")))
+        let search = FormRow(title: "Search a site", detail: "In the address bar, type a site’s name, then press Tab.", control: KeyHint("Tab"))
+        search.toolTip = SiteSearch.all.map(\.name).joined(separator: ", ")
+        generalGroup.add(search)
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
@@ -608,10 +608,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillToggle))
         let open = TextButton.form("Open Passwords")
         open.onClick = { _ in PasswordsWindowController.show() }
-        passwordsWindowGroup.add(FormRow(title: "Your passwords", detail: "See, edit and export them. Also in Window › Passwords (⌥⌘K).", control: open))
+        passwordsWindowGroup.add(FormRow(title: "Your passwords", detail: "See, edit and export them. Also in Window › Passwords" + Shortcuts.hint(for: #selector(AppDelegate.showPasswords(_:))) + ".", control: open))
         let bring = TextButton.form("Import")
         bring.onClick = { _ in ImportWindowController.show() }
-        passwordsWindowGroup.add(FormRow(title: "Bring passwords over", detail: "From another browser, or a password export.", control: bring))
+        passwordsWindowGroup.add(FormRow(title: "Import from another browser", detail: "Or from a password export file.", control: bring))
     }
 
     private func reloadTranslation() {
@@ -887,7 +887,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let reset = TextButton.form("Reset All")
         reset.isEnabled = !parts.isEmpty
         reset.onClick = { [weak self] _ in
-            self?.confirm(title: "Reset every site’s exceptions?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera and microphone, and zoom goes back to 100%.",
+            self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera and microphone, and zoom goes back to 100%.",
                           action: "Reset All") {
                 ContentBlocker.allowedSites = []
                 ExtensionStore.extensionsOffSites = []

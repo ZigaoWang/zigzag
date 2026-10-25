@@ -72,8 +72,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
             let menu = NSMenu()
-            menu.addItem(SidebarMenus.Item("Stop Camera and Microphone") { tab.stopCapture() })
-            menu.addItem(SidebarMenus.Item("Ask Again Next Time") { SitePermissions.forget(host: host) })
+            menu.addItem(SidebarMenus.Item("Stop Camera and Microphone", symbol: "stop.circle") { tab.stopCapture() })
+            menu.addItem(SidebarMenus.Item("Ask Again Next Time", symbol: "arrow.counterclockwise") { SitePermissions.forget(host: host) })
             let button = self.sidebar.address.captureButton
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
         }
@@ -498,7 +498,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func extensionsFooterMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") { SettingsWindowController.shared.show() })
+        menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") {
+            SettingsWindowController.shared.show()
+            SettingsWindowController.shared.show(.extensions)
+        })
         menu.addItem(SidebarMenus.Item("Get Extensions…", symbol: "bag") { [weak self] in
             self?.tabManager.newTab(url: ExtensionStore.webStoreURL)
         })
@@ -718,7 +721,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         sidebar.trafficLightsWidth = window.styleMask.contains(.fullScreen) ? 0 : window.trafficLightsWidth
-        sidebar.sidebarButton.toolTip = docked ? "Hide Sidebar (⌘S)" : "Show Sidebar (⌘S)"
+        sidebar.sidebarButton.toolTip = (docked ? "Hide Sidebar" : "Show Sidebar") + Shortcuts.hint(for: #selector(toggleBrowserSidebar(_:)))
+        sidebar.backButton.toolTip = "Back" + Shortcuts.hint(for: #selector(goBack(_:)))
+        sidebar.forwardButton.toolTip = "Forward" + Shortcuts.hint(for: #selector(goForward(_:)))
+        sidebar.reloadButton.toolTip = "Reload" + Shortcuts.hint(for: #selector(reloadPage(_:)))
         sidebar.sidebarButton.isSelected = false
     }
 

@@ -16,9 +16,9 @@ final class AddressView: InteractiveView {
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
     static let buttonSide: CGFloat = Tokens.Space.x7Height
     static let buttonInset: CGFloat = 4
-    let captureButton = IconButton(symbol: "video.fill", size: AddressView.buttonSide, toolTip: "Using your camera")
+    let captureButton = IconButton(symbol: "video.fill", size: AddressView.buttonSide, toolTip: "Camera and Microphone")
     /// Shown on articles: opens Reader.
-    let readerButton = IconButton(symbol: "doc.plaintext", size: AddressView.buttonSide, toolTip: "Show Reader (⇧⌘R)")
+    let readerButton = IconButton(symbol: "doc.plaintext", size: AddressView.buttonSide, toolTip: "Show Reader")
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
@@ -79,7 +79,7 @@ final class AddressView: InteractiveView {
     func setReader(available: Bool, active: Bool) {
         readerButton.isHidden = !available && !active
         readerButton.isSelected = active
-        readerButton.toolTip = active ? "Hide Reader (⇧⌘R)" : "Show Reader (⇧⌘R)"
+        readerButton.toolTip = (active ? "Hide Reader" : "Show Reader") + Shortcuts.hint(for: #selector(BrowserWindowController.toggleReader(_:)))
         needsLayout = true
     }
 
@@ -177,7 +177,7 @@ final class SidebarView: NSView {
     let reloadButton = IconButton(symbol: "arrow.clockwise", toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar (⌘S)")
+    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar")
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()

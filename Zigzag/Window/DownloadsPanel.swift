@@ -106,7 +106,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private let title = Label("Downloads", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let clearButton = TextButton(title: "Clear", font: Tokens.Font.body(.medium))
     private let folderButton = TextButton(title: "Downloads Folder", font: Tokens.Font.body(.medium))
-    private let emptyNote = Label("No downloads yet. Files you download show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let emptyNote = Label("No downloads yet", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?

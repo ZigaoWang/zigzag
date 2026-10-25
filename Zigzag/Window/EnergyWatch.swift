@@ -63,11 +63,11 @@ final class EnergyWatch {
                 .compactMap { $0.webExtension.displayName }
         }
         if running.isEmpty {
-            Toast.show("\(site) is using a lot of energy.", symbol: "bolt.fill", action: ("Reload", { tab.reload() }),
+            Toast.show("\(site) is using a lot of energy", symbol: "bolt.fill", action: ("Reload", { tab.reload() }),
                        duration: 12, in: controller)
         } else {
             let who = running.count == 1 ? running[0] : "An extension"
-            Toast.show("\(who) may be slowing \(site) and using a lot of energy.", symbol: "bolt.fill",
+            Toast.show("\(who) may be slowing \(site) and using a lot of energy", symbol: "bolt.fill",
                        action: ("Turn Off Here", {
                            var sites = ExtensionStore.extensionsOffSites
                            sites.insert(site)
