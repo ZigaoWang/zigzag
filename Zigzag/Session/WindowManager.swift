@@ -112,7 +112,8 @@ final class WindowManager {
     private func windowClosed(_ controller: BrowserWindowController) {
         guard !isTerminating else { return }
         // Keep the last window's tabs for next launch even if it is closed before quitting.
-        if controllers.count == 1 { saveNow(synchronously: true) }
+        // (A private window open alongside doesn't count: it isn't saved.)
+        if !controller.tabManager.isPrivate, controllers.filter({ !$0.tabManager.isPrivate }).count == 1 { saveNow(synchronously: true) }
         controllers.removeAll { $0 === controller }
         if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
         controller.tabManager.invalidate()
