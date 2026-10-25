@@ -96,9 +96,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.shouldPerformDownload { return .download }
-        if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
-           !["http", "https", "about", "data", "blob", "javascript", "webkit-extension"].contains(scheme) {
-            NSWorkspace.shared.open(url)
+        if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
+            ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
+                               isClick: navigationAction.navigationType == .linkActivated, from: webView)
             return .cancel
         }
         return .allow

@@ -61,6 +61,7 @@
 		7C8E072F95543D8F9533BB85 /* BrowserActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */; };
 		82FC26C29ED58C84FDC746B3 /* WebKitSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */; };
 		8CB207822183B9D650B3F443 /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0560887D19F137BADD3B098 /* Tab.swift */; };
+		8D5DA9B18AB78EDB306BDE3F /* ExternalLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */; };
 		8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253D16FCBE561D267ED6957C /* BrowserRootView.swift */; };
 		92E095E45C00B0891F8EBF6B /* ConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */; };
 		94ADB66CC737D1DA231E3D74 /* ads.html in Resources */ = {isa = PBXBuildFile; fileRef = 016FF1BFB8B47B23AE450117 /* ads.html */; };
@@ -203,6 +204,7 @@
 		B0560887D19F137BADD3B098 /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmSheet.swift; sourceTree = "<group>"; };
 		BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */ = {isa = PBXFileReference; path = blocklist.json.lzfse; sourceTree = "<group>"; };
+		BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLinks.swift; sourceTree = "<group>"; };
 		C31DB0355627F311823B01A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebsiteData.swift; sourceTree = "<group>"; };
 		C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordGeneratorTests.swift; sourceTree = "<group>"; };
@@ -409,6 +411,7 @@
 				7A6A928496FC897893B22DF7 /* BrowserWebView.swift */,
 				91506D36CD561CBD7E11897D /* ContentBlocker.swift */,
 				CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */,
+				BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */,
 				D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
 				CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */,
@@ -706,6 +709,7 @@
 				72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */,
 				E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */,
 				F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */,
+				8D5DA9B18AB78EDB306BDE3F /* ExternalLinks.swift in Sources */,
 				A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */,
 				CFF40171919A4F0A934D4576 /* FaviconView.swift in Sources */,
 				2BA694E79AD875D1E25094E5 /* FavoritesView.swift in Sources */,
