@@ -7,7 +7,7 @@ import Testing
 struct CRXPackageTests {
     /// The real package is a third-party extension, kept out of the public repository; the tests that need it
     /// run only where it's present.
-    static var hasFixture: Bool { Bundle(for: Marker.self).url(forResource: "custom-progress-bar", withExtension: "crx") != nil }
+    nonisolated static var hasFixture: Bool { Bundle(for: Marker.self).url(forResource: "custom-progress-bar", withExtension: "crx") != nil }
 
     static let id = "nbkomboflhdlliegkaiepilnfmophgfg"
 
