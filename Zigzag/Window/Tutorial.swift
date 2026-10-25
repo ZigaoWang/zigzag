@@ -7,17 +7,28 @@ enum Tutorial {
         let id: String
         let title: String
         let keys: [String]
+        /// Why it's worth doing, in one short line under the title.
+        let note: String
         /// Said for a moment once it's done, pointing at what changed, so you see what happened.
         let done: String
+        /// What to do with it next, under that.
+        let doneNote: String
     }
 
-    /// Each step is the keys and three words: nothing to read.
+    /// Each step is the keys, a few words, and one short line on why: a glance, nothing to read.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Open a new tab", keys: ["⌘", "T"], done: "It opened as a tab, here."),
-        Task(id: "pin", title: "Pin this page", keys: ["⌘", "D"], done: "Pinned. It stays up here."),
-        Task(id: "peek", title: "Shift-click any link", keys: ["⇧", "Click"], done: "That’s Peek: a look without leaving."),
-        Task(id: "space", title: "Click + to make a space", keys: ["+"], done: "A new space. The dots switch spaces."),
+        Task(id: "newTab", title: "Open a new tab", keys: ["⌘", "T"], note: "Type a site or a search",
+             done: "It opened as a tab", doneNote: "Your tabs live here, in the sidebar"),
+        Task(id: "pin", title: "Pin this page", keys: ["⌘", "D"], note: "Pinned pages stay, even after you quit",
+             done: "Pinned", doneNote: "It stays at the top of this space"),
+        Task(id: "peek", title: "Shift-click any link", keys: ["⇧", "Click"], note: "It opens on top, so you keep your place",
+             done: "That’s Peek", doneNote: "A quick look without leaving the page"),
+        Task(id: "space", title: "Make a space", keys: ["+"], note: "Keep work, school and play apart",
+             done: "Your new space", doneNote: "Click a dot to switch between spaces"),
     ]
+
+    /// The step that was just skipped, so the guide moves on without saying it was done.
+    @MainActor static var skipped: String?
 
     private static let key = "TutorialDone"
     static var done: Set<String> {
@@ -46,6 +57,7 @@ enum Tutorial {
 
     @MainActor static func skip() {
         guard let current else { return }
+        skipped = current.id
         done.insert(current.id)
         changed.send(())
     }

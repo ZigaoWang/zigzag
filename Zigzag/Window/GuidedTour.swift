@@ -12,7 +12,7 @@ final class GuidedTour: NSView {
     private let step = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
     private let check = NSImageView()
     private let title = Label("", font: .systemFont(ofSize: 15, weight: .semibold), color: Tokens.Color.textPrimary)
-    private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
     private let finish = PrimaryButton(title: "Start Browsing")
@@ -136,6 +136,11 @@ final class GuidedTour: NSView {
     /// You did it: the pill turns into a short note on what changed, pointing at it, then the next step.
     private func stepDone() {
         guard confirming == nil else { return }
+        // Skipped, not done: straight on to the next step.
+        if let skipped = Tutorial.skipped {
+            Tutorial.skipped = nil
+            if skipped == lastStepID { refresh(animated: true); return }
+        }
         confirming = Tutorial.tasks.first { $0.id == lastStepID && Tutorial.done.contains($0.id) }
         refresh(animated: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [weak self] in
@@ -161,10 +166,10 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if SpaceEditorPanel.current != nil, Tutorial.current == nil || Tutorial.current?.id == "space" {
-            return Display(keys: ["↩"], title: "Name it, pick a color, then press Return", note: "", count: "", isDone: false, isFinal: false, target: "editor")
+            return Display(keys: ["↩"], title: "Name it, like Work", note: "Pick a color, then press Return", count: "", isDone: false, isFinal: false, target: "editor")
         }
         if let done = confirming {
-            return Display(keys: [], title: done.done, note: "", count: "", isDone: true, isFinal: false, target: "done." + done.id)
+            return Display(keys: [], title: done.done, note: done.doneNote, count: "", isDone: true, isFinal: false, target: "done." + done.id)
         }
         guard let task = Tutorial.current, let index = Tutorial.tasks.firstIndex(where: { $0.id == task.id }) else {
             return Display(keys: [], title: "You’re all set", note: "", count: "", isDone: false, isFinal: true, target: "")
@@ -172,12 +177,12 @@ final class GuidedTour: NSView {
         let count = "\(index + 1)/\(Tutorial.tasks.count)"
         // Mid-step hints, where you are, for the moment you'd otherwise stall.
         if task.id == "newTab", controller.commandBar.isVisible {
-            return Display(keys: ["↩"], title: "Type wikipedia.org, then Return", note: "", count: count, isDone: false, isFinal: false, target: "bar")
+            return Display(keys: ["↩"], title: "Type wikipedia.org, then Return", note: "Any site or search works", count: count, isDone: false, isFinal: false, target: "bar")
         }
         if task.id == "peek", controller.peek.isVisible {
-            return Display(keys: ["esc"], title: "Close it", note: "", count: count, isDone: false, isFinal: false, target: "peek")
+            return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: count, isDone: false, isFinal: false, target: "peek")
         }
-        return Display(keys: task.keys, title: task.title, note: "", count: count, isDone: false, isFinal: false, target: task.id)
+        return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id)
     }
 
     /// Where to point.
@@ -226,10 +231,11 @@ final class GuidedTour: NSView {
         note.stringValue = d.note
         step.stringValue = d.count
         check.isHidden = !d.isDone
-        skip.isHidden = d.isDone || d.isFinal
-        step.isHidden = d.isDone || d.isFinal
+        // Naming a new space is the middle of a step: nothing to skip there.
+        skip.isHidden = d.isDone || d.isFinal || d.target == "editor"
+        step.isHidden = d.isDone || d.isFinal || d.count.isEmpty
         finish.isHidden = !d.isFinal
-        note.isHidden = true
+        note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
         title.font = d.isFinal ? Brand.displayFont(24) : .systemFont(ofSize: 15, weight: .semibold)
         if animated {
@@ -252,9 +258,11 @@ final class GuidedTour: NSView {
             return NSSize(width: 380, height: 120 + 26 + 34 + 10 + lh + 12 + signature.lineHeight + 24 + Tokens.Space.x10 + 28)
         }
         let keys = caps.map { max(34, $0.1.inkWidth + Tokens.Space.x4) }.reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * 4
-        var width = Tokens.Space.x4 + (d.isDone ? 20 : keys) + Tokens.Space.x3 + title.textWidth + Tokens.Space.x5
-        if !d.isDone { width += step.textWidth + Tokens.Space.x3 + skip.fittingWidth - Tokens.Space.x2 }
-        return NSSize(width: ceil(width), height: 56)
+        let text = max(title.textWidth, d.note.isEmpty ? 0 : note.textWidth)
+        var width = Tokens.Space.x4 + (d.isDone ? 20 : keys) + Tokens.Space.x3 + text + Tokens.Space.x5
+        if !skip.isHidden { width += skip.fittingWidth - Tokens.Space.x2 }
+        if !step.isHidden { width += step.textWidth + Tokens.Space.x3 }
+        return NSSize(width: ceil(width), height: d.note.isEmpty ? 56 : 64)
     }
 
     private func layoutTour(_ d: Display, animated: Bool) {
@@ -341,7 +349,14 @@ final class GuidedTour: NSView {
             x += w + 4
         }
         if !caps.isEmpty { x += Tokens.Space.x3 - 4 }
-        title.frame = NSRect(x: x, y: (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
+        if note.isHidden {
+            title.frame = NSRect(x: x, y: (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
+        } else {
+            // Title, and the why beneath it, as one block in the middle.
+            let block = title.lineHeight + 2 + note.lineHeight
+            title.frame = NSRect(x: x, y: (height - block) / 2, width: title.textWidth + 4, height: title.lineHeight)
+            note.frame = NSRect(x: x, y: title.frame.maxY + 2, width: note.textWidth + 4, height: note.lineHeight)
+        }
         let sw = skip.fittingWidth
         skip.frame = NSRect(x: width - Tokens.Space.x2 - sw, y: (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
         let cw = step.textWidth + 2
