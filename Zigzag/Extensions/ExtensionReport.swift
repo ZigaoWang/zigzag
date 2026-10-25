@@ -23,7 +23,7 @@ struct ExtensionReport {
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
         abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id)
 
-        var limits: [String] = []
+        var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
         let covered = ExtensionProfile.profile(for: id)?.coveredPermissions ?? []
         for permission in requested.subtracting(recognized).subtracting(covered).sorted() {
             if let name = Self.limitNames[permission], !limits.contains(name) { limits.append(name) }
