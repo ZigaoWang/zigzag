@@ -298,6 +298,11 @@ enum DebugBridge {
                 debugLog("pwclear removed \(samples.count)")
             }
         case "about": AboutWindowController.show()
+        case "exttest":
+            // exttest <id> <url>: a fresh install, a page where it should work, then what happened, as one line.
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2, let page = URL(string: f[1]), #available(macOS 15.4, *) else { break }
+            Task { @MainActor in await DebugBridge.extensionTest(f[0], page: page, in: controller) }
         case "reader": controller.toggleReader()
         case "ua": controller.selectedWebView?.customUserAgent = arg.isEmpty ? nil : arg; controller.selectedWebView?.reload()
         case "readerstyle":
@@ -464,5 +469,53 @@ enum DebugBridge {
         default: break
         }
     }
+
+    @available(macOS 15.4, *)
+    static func extensionTest(_ id: String, page: URL, in controller: BrowserWindowController) async {
+        var report: [String: Any] = ["id": id]
+        let had = ExtensionStore.state(id) != nil
+        let started = Date()
+        if !had { report["install"] = String(describing: await ExtensionStore.install(id)).prefix(160) }
+        report["installSeconds"] = Int(Date().timeIntervalSince(started))
+        for _ in 0..<60 {
+            if ExtensionHost.shared.contexts.contains(where: { $0.uniqueIdentifier == id }) { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        let context = ExtensionHost.shared.contexts.first { $0.uniqueIdentifier == id }
+        report["loaded"] = context != nil
+        report["name"] = context?.webExtension.displayName ?? ""
+        let tabsBefore = controller.tabManager.currentTabs.count
+        controller.tabManager.newTab(url: page)
+        try? await Task.sleep(for: .seconds(9))
+        let tab = controller.tabManager.selectedTab
+        if let pid = tab?.webView?.value(forKey: "_webProcessIdentifier") as? Int32 {
+            let a = cpuTime(pid)
+            try? await Task.sleep(for: .seconds(4))
+            report["pageCPU"] = Int((cpuTime(pid) - a) / 4 * 100)
+        }
+        let item = ExtensionHost.shared.actions(for: tab).first { $0.id == id }
+        report["button"] = item != nil
+        report["badge"] = item?.badge ?? ""
+        report["needsAttention"] = item?.attention != nil
+        if let item {
+            ExtensionHost.shared.lastAction = nil
+            let tabs = controller.tabManager.currentTabs.count
+            ExtensionHost.shared.performAction(item, tab: tab, anchor: controller.sidebar.address)
+            try? await Task.sleep(for: .seconds(3))
+            let popup = ExtensionHost.shared.lastAction?.popupWebView
+            report["popup"] = popup != nil
+            if let popup {
+                let text = try? await popup.evaluateJavaScript("(document.body && document.body.innerText || '').trim().length")
+                report["popupTextLength"] = (text as? Int) ?? 0
+            }
+            report["openedTab"] = controller.tabManager.currentTabs.count > tabs
+            ExtensionHost.shared.lastAction?.popupPopover?.close()
+        }
+        debugLog("exttest " + ((try? String(data: JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), encoding: .utf8)) ?? "?") ?? "?")
+        while controller.tabManager.currentTabs.count > tabsBefore, let last = controller.tabManager.selectedTab { controller.tabManager.close(last) }
+        if !had { ExtensionStore.uninstall(id) }
+    }
+
+    static func cpuTime(_ pid: Int32) -> Double { ProcessCPU.seconds(pid) }
     #endif
 }
