@@ -440,6 +440,13 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
+        if applicationIdentifier == ExtensionProfile.diagnosticsHost {
+            let report = message as? [String: Any]
+            let line = ((report?["text"] as? String) ?? "").replacingOccurrences(of: "\n", with: " ⏎ ")
+            ExtensionLog.write("\(extensionContext.webExtension.displayName ?? "extension") [\(report?["where"] ?? "?")] \(report?["kind"] ?? "?"): \(line)")
+            replyHandler(nil, nil)
+            return
+        }
         guard let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext) else {
             companionAppMissing(for: extensionContext)
             replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))

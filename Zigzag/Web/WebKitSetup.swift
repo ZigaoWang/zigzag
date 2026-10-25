@@ -120,6 +120,15 @@ final class ExtensionPageErrors: NSObject, WKScriptMessageHandler {
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
 
+    /// Extension pages are built from the extension's own setup, so they get this separately, once.
+    static func attach(to configuration: WKWebViewConfiguration) {
+        let controller = configuration.userContentController
+        guard !controller.userScripts.contains(where: { $0.source == script.source }) else { return }
+        controller.addUserScript(script)
+        controller.removeScriptMessageHandler(forName: messageName, contentWorld: .page)
+        controller.add(shared, contentWorld: .page, name: messageName)
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.securityOrigin.protocol == "webkit-extension", let text = message.body as? String else { return }
         ExtensionLog.write("page \(message.frameInfo.securityOrigin.host.prefix(8)) \(text)")

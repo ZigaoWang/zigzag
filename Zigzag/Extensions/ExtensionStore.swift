@@ -505,9 +505,36 @@ enum ExtensionProfile {
     static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
 
     private static let profiles: [String: Profile] = [
-        ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, coveredPermissions: ["management", "privacy", "idle"]),
+        ExtensionStore.onePasswordID: Profile(backgroundPrelude: diagnostics + onePasswordPrelude, pagePrelude: diagnostics,
+                                              coveredPermissions: ["management", "privacy", "idle"]),
         "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
     ]
+
+    /// Reports the extension's uncaught errors, failed promises and console errors to Zigzag's extensions log,
+    /// through a native host only Zigzag answers. Only error text, cut short; never the extension's data.
+    static let diagnosticsHost = "zigzag.diagnostics"
+    private static let diagnostics = """
+    (() => {
+      const api = globalThis.browser || globalThis.chrome;
+      const where = (globalThis.location && location.pathname.split('/').pop()) || 'worker';
+      const text = (x) => {
+        if (typeof x === 'string') return x;
+        if (!x || typeof x !== 'object') return String(x);
+        const name = x.name || (x.constructor && x.constructor.name) || '';
+        const top = String(x.stack || '').split('\\n')[0];
+        return [name, x.message || x.errorClass || '', top].filter(Boolean).join(' | ');
+      };
+      const report = (kind, value) => {
+        try { const sent = api.runtime.sendNativeMessage('\(diagnosticsHost)', { kind, where, text: String(value).slice(0, 400) }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
+      };
+      globalThis.addEventListener && globalThis.addEventListener('error', (e) => report('error', (e.message || '') + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || 0)));
+      globalThis.addEventListener && globalThis.addEventListener('unhandledrejection', (e) => report('rejection', text(e.reason)));
+      const original = console.error;
+      console.error = function (...args) { report('console.error', args.map(text).filter(Boolean).join(' ')); return original.apply(this, args); };
+      report('started', '');
+    })();
+
+    """
 
     /// Bitwarden's background reads the `scripting.ExecutionWorld` constants (WebKit supports the worlds but not
     /// the names) and asks for contexts and offscreen documents before falling back to its popup for clipboard work.

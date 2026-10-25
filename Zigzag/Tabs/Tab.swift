@@ -122,6 +122,7 @@ final class Tab: NSObject {
             if let privateStore { configuration.websiteDataStore = privateStore }
         }
         showsExtensionPage = extensionConfiguration != nil
+        if Self.isExtensionPage(url) { ExtensionPageErrors.attach(to: configuration) }
 
         let webView = BrowserWebView(frame: NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize), configuration: configuration)
         webView.owner = self
