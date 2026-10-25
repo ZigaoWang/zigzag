@@ -168,6 +168,18 @@ enum CommandRanker {
             }
         }
 
+        // Tabs that tidied themselves away: still a few letters from coming back.
+        if !historyOnly {
+            for entry in TabArchive.shared.search(words, limit: 2) {
+                let key = TabManager.normalize(entry.url)
+                guard !seen.contains(key) else { continue }
+                let space = Library.shared.space(entry.spaceID)?.name
+                add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
+                                  detail: ["Archived", space].compactMap { $0 }.joined(separator: " · "),
+                                  icon: FaviconStore.shared.cachedIcon(for: entry.url), symbol: "archivebox"), key: key)
+            }
+        }
+
         var historyCount = 0
         let historyLimit = historyOnly ? 10 : 4
         for entry in HistoryStore.shared.search(query, limit: historyLimit * 2) where historyCount < historyLimit {

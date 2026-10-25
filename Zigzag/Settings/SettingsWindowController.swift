@@ -331,6 +331,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let shortcutSearch = FilledField(placeholder: "Search shortcuts")
 
     private let engine = MenuButton()
+    private let archiveAfter = MenuButton()
     private let defaultButton = TextButton.form("Make Default")
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
@@ -410,6 +411,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         askToggle.onChange = { on in DownloadManager.asksWhereToSave = on }
+        archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
+        archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
+        behaviorGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
         behaviorGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
         behaviorGroup.add(FormRow(title: "Ask where to save each download", detail: "Off: downloads go straight to your Downloads folder.", control: askToggle))
@@ -778,6 +782,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         blockingToggle.isOn = ContentBlocker.isEnabled
         pipToggle.isOn = PictureInPicture.followsTabs
         askToggle.isOn = DownloadManager.asksWhereToSave
+        archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
         translateOffer.isOn = PageTranslator.offers

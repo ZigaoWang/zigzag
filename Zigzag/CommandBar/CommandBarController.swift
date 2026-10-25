@@ -615,6 +615,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         }
         switch result.kind {
         case .open(let url), .history(let url):
+            // Back from the archive: it's a tab again, so it leaves the archive.
+            TabArchive.shared.remove(url: url)
             open(url)
         case .search(let query), .suggestion(let query):
             open(Library.shared.searchEngine.searchURL(query), search: true)

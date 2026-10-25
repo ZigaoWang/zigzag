@@ -659,5 +659,27 @@ final class TabManager {
                 liveCount -= 1
             }
         }
+        archiveStaleTabs(keeping: selectedIDs)
+    }
+
+    /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
+    /// what's on screen, a split, anything playing or in a call, or a private window's tabs.
+    private func archiveStaleTabs(keeping onScreen: Set<UUID>) {
+        guard !isPrivate, let limit = TabArchive.after.interval else { return }
+        let now = Date()
+        let stale = tabsBySpace.values.flatMap { $0 }.filter {
+            $0.bookmarkID == nil && !onScreen.contains($0.id) && partner(of: $0) == nil && !$0.isPlayingAudio && !$0.isInUse
+                && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
+        }
+        guard !stale.isEmpty else { return }
+        for tab in stale {
+            guard let url = tab.url, var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { continue }
+            TabArchive.shared.add(ArchivedTab(url: url, title: tab.displayTitle, spaceID: tab.spaceID, archivedAt: now))
+            list.remove(at: index)
+            tabsBySpace[tab.spaceID] = list
+            recentTabIDs.removeAll { $0 == tab.id }
+            tab.close()
+        }
+        changed.send(.structure)
     }
 }

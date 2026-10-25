@@ -55,6 +55,7 @@
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
 		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
+		70473A9BA477CEFAB852CC91 /* TabArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17AF38DFC935177F4D6F19F5 /* TabArchive.swift */; };
 		72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30417C99681AAC2507555F94 /* ExtensionReport.swift */; };
 		75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C34787271E39E26E0156FC /* MainMenu.swift */; };
 		793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */; };
@@ -142,6 +143,7 @@
 		16FC91D0E7086B1EC211FD6F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		175D363890A811683DC2D9E7 /* TabSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcher.swift; sourceTree = "<group>"; };
 		17A229EAFF40049CACFF0C03 /* key4.db */ = {isa = PBXFileReference; path = key4.db; sourceTree = "<group>"; };
+		17AF38DFC935177F4D6F19F5 /* TabArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabArchive.swift; sourceTree = "<group>"; };
 		18FC50557675B6C303B2E0AE /* Reader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reader.swift; sourceTree = "<group>"; };
 		192303361A76A758A8F9346F /* FaviconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconView.swift; sourceTree = "<group>"; };
 		1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceColor.swift; sourceTree = "<group>"; };
@@ -480,6 +482,7 @@
 			isa = PBXGroup;
 			children = (
 				B0560887D19F137BADD3B098 /* Tab.swift */,
+				17AF38DFC935177F4D6F19F5 /* TabArchive.swift */,
 				79F70CA73E1EF5C8460E9286 /* TabManager.swift */,
 			);
 			path = Tabs;
@@ -767,6 +770,7 @@
 				D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */,
 				0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */,
 				8CB207822183B9D650B3F443 /* Tab.swift in Sources */,
+				70473A9BA477CEFAB852CC91 /* TabArchive.swift in Sources */,
 				C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */,
 				36BC4DAF8C508734F781BA47 /* TabPreview.swift in Sources */,
 				C6692ED12FCC1152B3774192 /* TabSwitcher.swift in Sources */,
