@@ -82,8 +82,30 @@ final class FaviconView: NSView {
         fallback.isHidden = image != nil || isLoading
     }
 
+    /// When loading began, so a page that's done almost at once doesn't flash the loader.
+    private var loadingSince: Date?
+    private var pendingLoad: DispatchWorkItem?
+
     private func refreshLoading() {
-        let showSpinner = isLoading
+        pendingLoad?.cancel()
+        // Only show the loader once loading has gone on a moment; quick pages just keep their icon.
+        if isLoading, loadingSince == nil {
+            loadingSince = Date()
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated { if let self, self.isLoading { self.showLoading(true) } }
+            }
+            pendingLoad = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+            return
+        }
+        if !isLoading {
+            loadingSince = nil
+            showLoading(false)
+        }
+    }
+
+    private func showLoading(_ on: Bool) {
+        let showSpinner = on
         fallback.isHidden = image != nil || isLoading
         let toSpinner: Float = showSpinner ? 1 : 0
         let toImage: Float = showSpinner ? 0 : 1
@@ -95,7 +117,14 @@ final class FaviconView: NSView {
             layer.add(fade, forKey: "fade")
             Tokens.Motion.withoutAnimation { layer.opacity = target }
         }
-        if showSpinner { startSpinning() } else { spinner.stopLooping() }   // frozen mid-stroke while it fades
+        if showSpinner {
+            startSpinning()
+        } else if spinner.isLooping {
+            // Keeps flowing while it fades, then stops out of sight.
+            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.quick + 0.05) { [weak self] in
+                MainActor.assumeIsolated { if let self, !self.isLoading { self.spinner.stopLooping() } }
+            }
+        }
         Tokens.Motion.withoutAnimation { backing.isHidden = !(needsBacking && effectiveAppearance.isDark) || showSpinner }
     }
 

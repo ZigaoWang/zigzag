@@ -250,7 +250,7 @@ final class RibbonView: NSView {
         Tokens.Motion.withoutAnimation {
             stroke.frame = bounds
             stroke.lineWidth = rect.width * weight
-            stroke.path = Brand.path(Brand.centerline(in: rect))
+            stroke.path = isLooping ? loopPath : Brand.path(Brand.centerline(in: rect))
         }
     }
 
@@ -284,47 +284,46 @@ final class RibbonView: NSView {
         stroke.add(fade, forKey: "fade")
     }
 
-    /// Writes, lifts from the start, writes again, for as long as something loads.
+    /// The ribbon twice over, end to end: a stretch of stroke can run off the end of one and straight into
+    /// the start of the next, so the loop never restarts.
+    private var loopPath: CGPath {
+        let single = Brand.path(Brand.centerline(in: rect))
+        let doubled = CGMutablePath()
+        doubled.addPath(single)
+        doubled.addPath(single)
+        return doubled
+    }
+
+    /// A stretch of stroke flows along the ribbon at an even pace for as long as something loads: as it leaves
+    /// the end it is already coming back in at the start, so there's no pause, no restart and no easing seam.
     func startLooping() {
         guard !isLooping else { return }
         isLooping = true
         layoutSubtreeIfNeeded()
-        resetStroke()
-        // One continuous motion: the head runs the length of the ribbon, the tail follows a beat behind, so the
-        // stroke grows, travels and shrinks away with no pause at either end.
-        let cycle: CFTimeInterval = 1.6
-        let ease = CAMediaTimingFunction(name: .easeInEaseOut)
-        let end = CABasicAnimation(keyPath: "strokeEnd")
-        end.fromValue = 0
-        end.toValue = 1
-        end.duration = cycle * 0.66
-        end.timingFunction = ease
-        end.fillMode = .both
+        stroke.removeAllAnimations()
+        Tokens.Motion.withoutAnimation { stroke.path = loopPath }
+        let cycle: CFTimeInterval = 1.1, length: CGFloat = 0.2
         let start = CABasicAnimation(keyPath: "strokeStart")
         start.fromValue = 0
-        start.toValue = 1
-        start.beginTime = cycle * 0.34
-        start.duration = cycle * 0.66
-        start.timingFunction = ease
-        start.fillMode = .both
+        start.toValue = 0.5
+        let end = CABasicAnimation(keyPath: "strokeEnd")
+        end.fromValue = length
+        end.toValue = 0.5 + length
         let group = CAAnimationGroup()
-        group.animations = [end, start]
+        group.animations = [start, end]
         group.duration = cycle
         group.repeatCount = .infinity
+        group.timingFunction = CAMediaTimingFunction(name: .linear)
         stroke.add(group, forKey: "loop")
     }
 
-    /// Stops where it is: the stroke freezes at the frame on screen, so whatever fades it out shows no jump.
-    /// It's reset to the whole ribbon when it next starts or draws.
+    /// Stops and goes back to the whole ribbon. Callers fade it out first, while it's still moving.
     func stopLooping() {
         guard isLooping else { return }
         isLooping = false
-        let now = stroke.presentation()
-        Tokens.Motion.withoutAnimation {
-            stroke.strokeStart = now?.strokeStart ?? 0
-            stroke.strokeEnd = now?.strokeEnd ?? 1
-        }
         stroke.removeAnimation(forKey: "loop")
+        Tokens.Motion.withoutAnimation { stroke.path = Brand.path(Brand.centerline(in: rect)) }
+        resetStroke()
     }
 
     /// Back to the whole ribbon at rest.
