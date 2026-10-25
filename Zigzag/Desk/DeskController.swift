@@ -199,12 +199,15 @@ final class DeskController {
             if let tab { controller.tabManager.select(tab) }
             zoom(image, from: from, to: root.cardFrame, in: root.overlay) { card.alphaValue = 1 }
             Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: {
+                // Opened again before this finished: it stays.
+                guard !self.isVisible else { return }
                 self.backdrop.removeFromSuperview()
                 self.backdrop.alphaValue = 1
             })
         } else {
             if let tab { controller.tabManager.select(tab) }
             Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: {
+                guard !self.isVisible else { return }
                 self.backdrop.removeFromSuperview()
                 self.backdrop.alphaValue = 1
             })
