@@ -36,6 +36,16 @@ struct CRXPackageTests {
         }
     }
 
+    @Test func refusesAHeaderWithAnImpossibleLength() {
+        // Field 2, length-delimited, with a length of 2^63 - 1: must be refused, never overflow.
+        let header: [UInt8] = [0x12, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F]
+        var bytes: [UInt8] = Array("Cr24".utf8) + [3, 0, 0, 0, UInt8(header.count), 0, 0, 0] + header
+        bytes += [0x50, 0x4B]
+        #expect(throws: CRXPackage.Failure.malformed) {
+            try CRXPackage(Data(bytes), expectedID: Self.id)
+        }
+    }
+
     @Test func refusesSomethingThatIsntAPackage() {
         #expect(throws: CRXPackage.Failure.notCRX3) {
             try CRXPackage(Data("PK\u{3}\u{4} just a zip".utf8), expectedID: Self.id)

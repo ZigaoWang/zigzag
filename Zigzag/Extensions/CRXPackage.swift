@@ -105,8 +105,7 @@ struct CRXPackage {
             switch key & 7 {
             case 0: _ = try varint()
             case 2:
-                let length = Int(try varint())
-                guard length >= 0, index + length <= bytes.count else { throw Failure.malformed }
+                guard let length = Int(exactly: try varint()), length <= bytes.count - index else { throw Failure.malformed }
                 result.append((Int(key >> 3), Array(bytes[index..<(index + length)])))
                 index += length
             default: throw Failure.malformed
