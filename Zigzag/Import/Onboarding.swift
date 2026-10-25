@@ -787,12 +787,12 @@ private final class BringPicker: StepContent {
         onChange?()
     }
 
-    private func run(_ rows: [BrowserRow]) {
+    private func run(_ rows: [BrowserRow], only: ImportCoordinator.Choice? = nil) {
         isImporting = true
         arrow.set(.importing)
         rows.forEach { $0.state = .waiting }
         refresh()
-        let choice = self.choice
+        let choice = only ?? self.choice
         let started = Date()
         Task { @MainActor in
             for row in rows {
@@ -823,7 +823,9 @@ private final class BringPicker: StepContent {
         switch fix {
         case .retry:
             row.isChosen = true
-            run([row])
+            var only: ImportCoordinator.Choice?
+            if case .done(let summary) = row.state { only = ImportCoordinator.Choice.retrying(summary.problems, else: choice) }
+            run([row], only: only)
         case .fullDiskAccess:
             allow(row)
         case .primaryPassword, .exportFromApplePasswords:

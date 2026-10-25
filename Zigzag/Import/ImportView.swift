@@ -207,8 +207,10 @@ final class ImportView: NSView {
         case .retry, .primaryPassword:
             stage = .importing
             primary.isEnabled = false
+            var scope = data
+            if case .done(let summary) = row.state { scope = ImportCoordinator.Choice.retrying(summary.problems, else: data) }
             Task { @MainActor in
-                await run(row, data, primaryPassword: primaryPassword)
+                await run(row, scope, primaryPassword: primaryPassword)
                 finish()
             }
         case .fullDiskAccess:

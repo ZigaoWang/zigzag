@@ -24,7 +24,7 @@ enum ArcImporter {
         if denied {
             return ImportProblem(message: "macOS didn’t let Zigzag read Arc’s \(what). In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.", fix: .fullDiskAccess)
         }
-        return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what) (\(ns.localizedDescription)). Try again.", fix: .retry)
+        return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what) (\(ns.localizedDescription)). Try again.", fix: .retry, retries: 8)
     }
 
     static var arcSupport: URL {
