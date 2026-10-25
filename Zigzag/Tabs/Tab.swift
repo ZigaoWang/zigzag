@@ -63,6 +63,9 @@ final class Tab: NSObject {
     weak var opener: Tab?
 
     weak var host: TabHost?
+    /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
+    private var crashes: [Date] = []
+    private var reloadWhenShown = false
     let changed = Signal<Change>()
 
     private(set) var webView: BrowserWebView?
@@ -601,8 +604,24 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        // A crashed page reloads quietly instead of leaving a blank card.
-        webView.reload()
+        // Out of sight, it waits until it's next shown: memory pressure doesn't reload every background tab at once.
+        guard webView.window != nil else { reloadWhenShown = true; return }
+        let now = Date()
+        crashes = crashes.filter { now.timeIntervalSince($0) < 60 } + [now]
+        // Twice in a minute: say so, rather than crash and reload forever.
+        if crashes.count >= 2 {
+            ErrorPage.show(error: NSError(domain: ErrorPage.crashDomain, code: 1), url: url ?? webView.url, in: webView)
+            return
+        }
+        // Crashed before anything loaded: load its address, since there's nothing to reload.
+        if webView.url == nil, let url { Self.load(url, in: webView) } else { webView.reload() }
+    }
+
+    /// Shown again after its page stopped while out of sight.
+    func reloadIfItStopped() {
+        guard reloadWhenShown, let webView else { return }
+        reloadWhenShown = false
+        if webView.url == nil, let url { Self.load(url, in: webView) } else { webView.reload() }
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {

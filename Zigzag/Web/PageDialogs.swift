@@ -111,6 +111,9 @@ enum AuthenticationPrompt {
 
 /// A calm page shown in place of a load error. Reload tries the real URL again.
 enum ErrorPage {
+    /// A page whose process stopped twice in a row.
+    static let crashDomain = "ZigzagPageStopped"
+
     static func show(error: NSError, url: URL?, in webView: WKWebView) {
         guard let url else { return }
         let (title, message) = describe(error, url: url)
@@ -147,6 +150,9 @@ enum ErrorPage {
         // An extension's own page, from an extension that's been removed or turned off.
         if url.scheme == "webkit-extension" {
             return ("This extension isn’t here", "The page belongs to an extension that has been removed or turned off. Turn it back on in Settings › Extensions, or close this tab.")
+        }
+        if error.domain == crashDomain {
+            return ("This page keeps stopping", "It may need more memory than your Mac can spare right now. Close some tabs, then try again.")
         }
         switch error.code {
         case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:

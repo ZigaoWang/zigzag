@@ -180,6 +180,7 @@ final class TabManager {
         tab.markActivated()
         promote(tab)
         tab.ensureWebView()
+        tab.reloadIfItStopped()
         if #available(macOS 15.4, *), previous !== tab { ExtensionHost.shared.tabActivated(tab, previous: previous) }
         changed.send(.selection)
     }
