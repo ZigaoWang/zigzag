@@ -293,7 +293,7 @@ final class ExtensionHost: NSObject {
         if type == "BrowserVerificationFailed", !Self.toldAboutVerification,
            let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
             Self.toldAboutVerification = true
-            Toast.show("1Password doesn’t trust Zigzag yet. In 1Password, open Settings › Browser, click Add Browser, and choose Zigzag in Applications.",
+            Toast.show("1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag.",
                        symbol: "exclamationmark.circle", action: ("Open 1Password", {
                            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
                                NSWorkspace.shared.openApplication(at: app, configuration: .init())
