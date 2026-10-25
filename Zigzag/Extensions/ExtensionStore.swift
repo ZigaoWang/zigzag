@@ -497,6 +497,16 @@ enum ExtensionProfile {
         var pagePrelude: String?
         /// Permissions the prelude stands in for well enough that the person won't miss them.
         var coveredPermissions: Set<String> = []
+        /// Small fixes to the extension's own files where it misbehaves in WebKit, applied to a copy at load.
+        var patches: [Patch] = []
+    }
+
+    /// Replace `find` with `replace` in one of the extension's files. Skipped, and logged, if `find` isn't there
+    /// (a newer version that changed), so an update never breaks on an old fix.
+    struct Patch {
+        let file: String
+        let find: String
+        let replace: String
     }
 
     static func profile(for id: String) -> Profile? { profiles[id] }
@@ -508,7 +518,66 @@ enum ExtensionProfile {
         ExtensionStore.onePasswordID: Profile(backgroundPrelude: webSocketShim + diagnostics + onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
+        // Return YouTube Dislike, as "Bring Back YouTube Dislikes".
+        "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
+        "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
     ]
+
+    /// Return YouTube Dislike writes its count into a copy of YouTube's label, class names and all. YouTube's
+    /// own like and dislike code find their labels by class, so both write into the copy, in turns ("0", the
+    /// count, "0"…), forever, and the page pins a CPU core. The copy keeps the look but drops the class names,
+    /// and YouTube's own label is hidden once.
+    /// It decides whether to write by reading the label back (`innerText`), which in WebKit never matches what
+    /// it wrote, so it writes every time it hears the page change, including its own writes. It remembers what
+    /// it wrote instead, and writes only when the number changes.
+    private static let dislikeWritePatch = Patch(file: "ryd.content-script.js", find: """
+      if (_dislikeText != null && _container?.innerText !== _dislikeText) {
+        _container.innerText = _dislikeText;
+      }
+    """, replace: """
+      if (_dislikeText != null && _container && _container.__zigzagShown !== String(_dislikeText)) {
+        _container.__zigzagShown = String(_dislikeText);
+        _container.innerText = _dislikeText;
+      }
+    """)
+
+    /// Its watchers hear its own writes to its label and write again; they now ignore changes inside its own
+    /// label, so nothing it does can wake it up again. Changes to YouTube's page still reach them.
+    private static let dislikeObserverPatch = Patch(file: "ryd.content-script.js", find: """
+      observerWrapper.observer = new MutationObserver(callback);
+    """, replace: """
+      observerWrapper.observer = new MutationObserver((records, observer) => {
+        const outside = records.filter((r) => !(r.target.closest ? r.target.closest("[data-zigzag-count]") : r.target.parentElement?.closest("[data-zigzag-count]")));
+        if (outside.length) callback(outside, observer);
+      });
+    """)
+
+    private static let dislikeCountPatch = Patch(file: "ryd.content-script.js", find: """
+    function getDislikeTextContainer() {
+      let result;
+    """, replace: """
+    function getDislikeTextContainer() {
+      const zigzagButton = getDislikeButton();
+      const zigzagOwn = zigzagButton && zigzagButton.querySelector("[data-zigzag-count]");
+      if (zigzagOwn) return zigzagOwn;
+      if (zigzagButton) {
+        const zigzagMade = createDislikeTextContainer();
+        // Same look as YouTube's label, but none of its class names: YouTube's own code finds its labels by
+        // class, and would otherwise keep writing into this one.
+        const look = getComputedStyle(zigzagMade);
+        const style = ["font-family", "font-size", "font-weight", "line-height", "color", "letter-spacing", "white-space",
+                       "margin-left", "margin-right", "padding-left", "padding-right"].map((p) => p + ":" + look.getPropertyValue(p)).join(";");
+        for (const node of [zigzagMade, ...zigzagMade.querySelectorAll("[class]")]) node.removeAttribute("class");
+        zigzagMade.setAttribute("style", style);
+        zigzagMade.setAttribute("data-zigzag-count", "");
+        for (const selector of _state__WEBPACK_IMPORTED_MODULE_0__.zO.selectors.dislikeTextContainer) {
+          const theirs = zigzagButton.querySelector(selector + ":not([data-zigzag-count])");
+          if (theirs && !zigzagMade.contains(theirs) && !theirs.contains(zigzagMade) && theirs.style.display !== "none") theirs.style.display = "none";
+        }
+        return zigzagMade;
+      }
+      let result;
+    """)
 
     /// WebKit's extension service workers freeze on `new WebSocket(…)`. This stands in for it, with the same
     /// events and methods, and Zigzag opens the real connection over a native port (WebSocketBridge).
@@ -685,13 +754,43 @@ extension ExtensionStore {
     /// the prelude first. The package keeps its exact bytes either way.
     static func loadDirectory(for id: String) -> URL? {
         guard let package = packageDirectory(for: id), let state = state(id) else { return nil }
-        guard let prelude = ExtensionProfile.profile(for: id)?.backgroundPrelude else { return package }
+        let profile = ExtensionProfile.profile(for: id)
+        let prelude = profile?.backgroundPrelude
+        let patches = profile?.patches ?? []
+        guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = folder(for: id).appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(state.version, isDirectory: true)
-        let marker = overlay.appendingPathComponent("zigzag-prelude.js")
-        if (try? String(contentsOf: marker, encoding: .utf8)) == prelude { return overlay }
+        // What this overlay was made from: rebuilt whenever the prelude or a patch changes.
+        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined()
+        let marker = overlay.appendingPathComponent("zigzag-profile.txt")
+        if (try? String(contentsOf: marker, encoding: .utf8)) == signature { return overlay }
         try? FileManager.default.removeItem(at: overlay.deletingLastPathComponent())
-        guard linkTree(from: package, to: overlay), writeOverlayManifest(in: overlay, from: package, prelude: prelude) else { return package }
+        guard linkTree(from: package, to: overlay) else { return package }
+        if let prelude {
+            guard writeOverlayManifest(in: overlay, from: package, prelude: prelude) else { return package }
+        } else {
+            guard (try? FileManager.default.linkItem(at: package.appendingPathComponent("manifest.json"), to: overlay.appendingPathComponent("manifest.json"))) != nil else { return package }
+        }
+        // Patches to the same file build on each other, in order.
+        for file in Array(NSOrderedSet(array: patches.map(\.file))) as? [String] ?? [] {
+            apply(patches.filter { $0.file == file }, to: file, in: overlay, from: package, id: id)
+        }
+        try? signature.write(to: marker, atomically: true, encoding: .utf8)
         return overlay
+    }
+
+    /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
+    private static func apply(_ patches: [ExtensionProfile.Patch], to file: String, in overlay: URL, from package: URL, id: String) {
+        let source = package.appendingPathComponent(file), target = overlay.appendingPathComponent(file)
+        guard var text = try? String(contentsOf: source, encoding: .utf8) else { return }
+        for patch in patches {
+            guard text.contains(patch.find) else {
+                ExtensionLog.write("patch for \(id) in \(file) skipped: this version changed")
+                continue
+            }
+            text = text.replacingOccurrences(of: patch.find, with: patch.replace)
+        }
+        try? FileManager.default.removeItem(at: target)
+        try? text.write(to: target, atomically: true, encoding: .utf8)
     }
 
     private static func linkTree(from source: URL, to target: URL) -> Bool {
