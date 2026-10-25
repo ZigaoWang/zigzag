@@ -573,6 +573,13 @@ extension Tab: WKNavigationDelegate {
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
         hasLoadedOnce = true
+        // A new page under a tab that isn't showing: its picture is of the old one, and can't be retaken until it
+        // shows. The card falls back to the site's icon rather than show the wrong page.
+        if webView.window == nil, snapshot != nil {
+            snapshot = nil
+            SnapshotStore.remove(id)
+            changed.send(.snapshot)
+        }
         if let url = webView.url {
             let zoom = ZoomLevels.zoom(for: url)
             if webView.pageZoom != zoom { webView.pageZoom = zoom }
@@ -584,6 +591,13 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
         refreshFavicon()
+        // A tab without a picture yet gets one once its page has drawn.
+        if snapshot == nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self, self.webView === webView, self.snapshot == nil else { return }
+                self.captureSnapshot()
+            }
+        }
         Task { [weak self] in
             let article = await Reader.isArticle(webView)
             guard let self, self.webView === webView, article != self.isArticle else { return }
