@@ -70,6 +70,14 @@ enum DebugBridge {
         case "bookmark": if let tab = controller.tabManager.selectedTab { controller.tabManager.bookmarkTab(tab) }
         case "hover": controller.debugHover(index: Int(arg) ?? 0)
         case "desk": controller.toggleDeskView(nil)
+        case "reader": controller.toggleReader()
+        case "split":
+            // Splits the shown tab with the one at this sidebar position.
+            let list = controller.tabManager.navigableTabs
+            if let tab = controller.tabManager.selectedTab, let n = Int(arg), list.indices.contains(n), list[n] !== tab {
+                controller.tabManager.makeSplit(tab, with: list[n])
+            }
+        case "unsplit": controller.closeSplitView(nil)
         case "find": controller.findBar.show(query: arg)
         case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
         case "peekclose": controller.peek.close()
