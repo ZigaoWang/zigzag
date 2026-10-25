@@ -54,6 +54,11 @@ final class Tab: NSObject {
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
+    /// In a call (camera or microphone on, even muted) or floating in Picture in Picture: not to be put to sleep.
+    var isInUse: Bool {
+        guard let webView else { return false }
+        return webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none || webView.isPictureInPictureActive
+    }
     /// The tab that opened this one, so closing it can return there.
     weak var opener: Tab?
 

@@ -633,13 +633,15 @@ final class TabManager {
 
     /// Background tabs nobody has looked at in a while give their memory back.
     private func suspendIdleTabs() {
-        let selectedIDs = Set(selectedBySpace.values)
+        // Kept awake: what's on screen (both halves of a split), and anything in a call or floating.
+        var selectedIDs = Set(selectedBySpace.values)
+        for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
         let live = allTabs.filter { !$0.isSuspended }
         let idleLimit: TimeInterval = 15 * 60
         let maxLive = 10
         let now = Date()
         let candidates = live
-            .filter { !selectedIDs.contains($0.id) && !$0.isPlayingAudio }
+            .filter { !selectedIDs.contains($0.id) && !$0.isPlayingAudio && !$0.isInUse }
             .sorted { $0.lastActivated < $1.lastActivated }
         var liveCount = live.count
         for tab in candidates {
