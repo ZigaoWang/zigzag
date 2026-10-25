@@ -375,7 +375,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 let content = ExtensionSheet.Content(
                     icon: info.icon(for: NSSize(width: 40, height: 40)),
                     title: "Add \(info.displayName ?? "this extension")?",
-                    subtitle: "Chrome Web Store · Version \(prepared.version)",
+                    subtitle: "Version \(prepared.version), from the Chrome Web Store",
                     heading: "It will be able to",
                     report: prepared.report,
                     confirm: "Add Extension", cancel: "Cancel")

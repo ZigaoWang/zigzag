@@ -14,7 +14,6 @@
   <img class="dl-icon" src="/assets/icon-256.png" width="104" height="104" alt="">
   <h1>Thanks for downloading <span class="wm" role="img" aria-label="Zigzag"></span></h1>
   <p class="lede">Your download should start on its own. If it doesn’t, <a href="/releases/latest" id="get">download it directly</a>.</p>
-  <p class="fine"><span data-version>Version 0.1.4 beta</span> · macOS 15.4 or later · Apple silicon and Intel · Notarized by Apple</p>
 
   <ol class="dl-steps">
     <li><span class="n">1</span><b>Open Zigzag.dmg</b><span>You’ll find it in your Downloads.</span></li>
@@ -24,14 +23,10 @@
 
   <figure class="dl-shot"><img src="/assets/install.png" width="1100" alt="The Zigzag install window: the app on the left, an arrow, and the Applications folder on the right."></figure>
 </main>
-<footer class="end"><p class="fine">Made in Shanghai by <a href="https://zigao.wang">Zigao Wang</a> · No cookies, no trackers</p></footer>
+<footer class="end"><p class="fine">Made in Shanghai by <a href="https://zigao.wang">Zigao Wang</a></p></footer>
 <script>
   // Start the download once, a beat after the page shows; the link is there if it doesn't.
   setTimeout(function () { window.location.href = document.getElementById("get").href; }, 700);
-  fetch("/updates/appcast.xml", { cache: "no-cache" }).then(function (r) { return r.text(); }).then(function (x) {
-    var m = x.match(/<sparkle:shortVersionString>([^<]+)</);
-    if (m) document.querySelectorAll("[data-version]").forEach(function (e) { e.textContent = "Version " + m[1] + " beta"; });
-  }).catch(function () {});
 </script>
 </body>
 </html>

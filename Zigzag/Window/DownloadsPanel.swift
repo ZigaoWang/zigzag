@@ -43,7 +43,7 @@ final class DownloadRowView: InteractiveView {
         case .failed, .cancelled:
             // Say what happened, and offer to try again rather than only to remove it.
             let canRetry = DownloadManager.shared.canRetry(item)
-            status.stringValue = item.state == .failed ? "Didn’t finish" + (canRetry ? " · Try again" : "") : "Canceled"
+            status.stringValue = item.state == .failed ? "Didn’t finish" : "Canceled"
             actionButton.symbol = canRetry ? "arrow.clockwise" : "xmark"
             actionButton.toolTip = canRetry ? "Try Again" : "Remove"
         }

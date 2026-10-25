@@ -553,7 +553,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let stack = NSStackView(views: controls)
         stack.spacing = Tokens.Space.x2
 
-        // "Version 1.2 · Unpacked · 1 feature won't work here": what matters about it at a glance.
+        // What matters about it at a glance, as one plain sentence.
         var detail: [String] = [ext.version.map { "Version \($0)" } ?? ""].filter { !$0.isEmpty }
         if ExtensionStore.isUnpacked(id) { detail.append("Unpacked") }
         if ExtensionStore.needsApproval(id) { detail.append("Update wants more access") }
@@ -566,7 +566,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 limitsNote = "Won’t work in Zigzag: " + ListFormatter.localizedString(byJoining: names) + "."
             }
         }
-        let row = FormRow(title: ext.displayName ?? id, detail: detail.joined(separator: " · "), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? "" : ListFormatter.localizedString(byJoining: detail), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
         row.toolTip = limitsNote
         return row
     }
@@ -907,7 +907,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             }
         }
         let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads, a camera or notifications, show up here."
-            : parts.joined(separator: " · ").prefix(1).uppercased() + parts.joined(separator: " · ").dropFirst() + "."
+            : ListFormatter.localizedString(byJoining: parts).prefix(1).uppercased() + ListFormatter.localizedString(byJoining: parts).dropFirst() + "."
         privacyGroup.add(FormRow(title: "Site choices", detail: summary, control: reset))
     }
 

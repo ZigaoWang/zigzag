@@ -290,7 +290,7 @@ final class SidebarListView: NSView {
             let spaceName = Library.shared.space(spaceID)?.name ?? ""
             (view as? SpaceHeaderView)?.canCollapse = !Library.shared.bookmarks(in: spaceID).isEmpty
             (view as? SpaceHeaderView)?.isCollapsed = Self.isCollapsed(spaceID)
-            (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "Private · \(spaceName)" : spaceName
+            (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "\(spaceName) (Private)" : spaceName
             view.needsLayout = true
 
         case .tab(let id):

@@ -68,11 +68,11 @@ enum ImportCoordinator {
     static func detectedSources() -> [Source] {
         var sources: [Source] = []
         for browser in ChromiumImporter.browsers where ChromiumImporter.isInstalled(browser) {
-            // Several profiles: each is its own choice ("Chrome · Work"), as other browsers' importers do.
+            // Several profiles: each is its own choice ("Chrome (Work)"), as other browsers' importers do.
             let profiles = browser.name == "Arc" ? [] : ChromiumImporter.profileNames(of: browser)
             if profiles.count > 1 {
                 for (folder, display) in profiles {
-                    sources.append(Source(kind: .chromium(browser.only(folder, named: display)), name: "\(browser.name) · \(display)", bundleID: browser.bundleID))
+                    sources.append(Source(kind: .chromium(browser.only(folder, named: display)), name: "\(browser.name) (\(display))", bundleID: browser.bundleID))
                 }
             } else {
                 sources.append(Source(kind: .chromium(browser), name: browser.name, bundleID: browser.bundleID))
@@ -91,7 +91,7 @@ enum ImportCoordinator {
         Source(kind: .file(url), name: url.lastPathComponent, bundleID: nil)
     }
 
-    /// What a source holds, counted without decrypting anything: "6 passwords · 57 bookmarks · history".
+    /// What a source holds, counted without decrypting anything: "6 passwords, 57 bookmarks and history".
     static func preview(_ source: Source) async -> String {
         let kind = source.kind
         return await Task.detached(priority: .utility) { () -> String in
@@ -106,13 +106,13 @@ enum ImportCoordinator {
                 let counts = ChromiumImporter.counts(browser)
                 let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"),
                              counts.history > 0 ? "history" : nil, browser.name == "Arc" ? "spaces and pinned tabs" : nil].compactMap { $0 }
-                return parts.isEmpty ? "Nothing to bring over" : parts.joined(separator: " · ")
+                return parts.isEmpty ? "Nothing to bring over" : ListFormatter.localizedString(byJoining: parts)
             case .firefox(let browser):
                 let counts = FirefoxImporter.counts(browser)
                 let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
-                return parts.isEmpty ? "Nothing to bring over" : parts.joined(separator: " · ")
+                return parts.isEmpty ? "Nothing to bring over" : ListFormatter.localizedString(byJoining: parts)
             case .safari:
-                return SafariImporter.hasAccess ? "Bookmarks and history · passwords from the Passwords app" : "Bookmarks and history need your permission · passwords from the Passwords app"
+                return SafariImporter.hasAccess ? "Bookmarks and history. Passwords come from the Passwords app." : "Bookmarks and history need your permission. Passwords come from the Passwords app."
             case .file(let url):
                 return url.lastPathComponent
             }

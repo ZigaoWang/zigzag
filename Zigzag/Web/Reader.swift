@@ -164,10 +164,10 @@ enum Reader {
     /// summary, who wrote it), the lead picture, then the text at a book's measure. On a wide window small pictures
     /// sit in a margin beside the text with their captions, and wide ones span both; narrower, it's one column.
     static func html(for article: Article, preferences: Preferences = .saved) -> String {
-        let minutes = max(1, Int((Double(article.length) / 1100).rounded()))
         // A credit that names no one ("Contributors to Wikimedia projects") says nothing; leave it out.
         let author = article.byline.lowercased().contains("contributors") ? "" : article.byline
-        let meta = [article.site, author, "\(minutes) min"].filter { !$0.isEmpty }.map(escape).joined(separator: "<span class=\"dot\">·</span>")
+        // Where it's from, and who wrote it when the page says.
+        let meta = escape(author.isEmpty ? article.site : "\(article.site), by \(author)")
         let dek = (article.dek ?? "").isEmpty ? "" : "<p class=\"dek\">\(escape(article.dek ?? ""))</p>"
         let heroSource = article.image.map { leadPictures[$0] ?? $0 } ?? ""
         let hero = heroSource.isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(heroSource))\" alt=\"\"></figure>"

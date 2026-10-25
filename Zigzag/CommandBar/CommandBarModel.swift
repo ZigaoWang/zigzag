@@ -196,7 +196,7 @@ enum CommandRanker {
                 guard !seen.contains(key) else { continue }
                 let space = Library.shared.space(entry.spaceID)?.name
                 add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
-                                  detail: ["Archived", space].compactMap { $0 }.joined(separator: " · "),
+                                  detail: space.map { "Archived from \($0)" } ?? "Archived",
                                   icon: FaviconStore.shared.cachedIcon(for: entry.url), symbol: "archivebox"), key: key)
             }
         }

@@ -205,7 +205,7 @@ final class PasswordsView: NSView {
         filters.selectedIndex = Category.allCases.firstIndex(of: category) ?? 0
         search.tint = Brand.Theme.brand.accent
         let n = credentials.count
-        header.subtitle = n == 0 ? "In your Keychain, synced with iCloud Keychain" : "\(n.formatted()) saved · in your Keychain, synced with iCloud Keychain"
+        header.subtitle = n == 0 ? "In your Keychain, synced with iCloud Keychain" : "\(n.formatted()) saved in your Keychain, synced with iCloud Keychain"
     }
 
     private func choose(_ category: Category) {

@@ -480,7 +480,7 @@ private final class BrowserRow: InteractiveView {
                 self.fixKind = .fullDiskAccess
                 self.onChange?()
             } else {
-                self.detail.stringValue = text.replacingOccurrences(of: " · passwords from the Passwords app", with: "")
+                self.detail.stringValue = text.replacingOccurrences(of: " Passwords come from the Passwords app.", with: "")
                     .replacingOccurrences(of: "spaces and pinned tabs", with: "spaces and pinned tabs")
             }
             self.refresh()
@@ -751,7 +751,7 @@ private final class BringPicker: StepContent {
         return row
     }
 
-    /// Once a browser can be read, several profiles become several rows ("Chrome · Work"), each its own choice.
+    /// Once a browser can be read, several profiles become several rows ("Chrome (Work)"), each its own choice.
     private func splitIntoProfiles(_ row: BrowserRow) {
         guard case .chromium(let browser) = row.source.kind, browser.profile == nil, browser.name != "Arc",
               let index = rows.firstIndex(where: { $0 === row }) else { return }
@@ -764,13 +764,13 @@ private final class BringPicker: StepContent {
         let all = rows
         rows = []
         for (k, old) in all.enumerated() {
-            if k == index { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) · \(name)", bundleID: browser.bundleID), chosen: true) } }
+            if k == index { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) (\(name))", bundleID: browser.bundleID), chosen: true) } }
             old.removeFromSuperview()
             rows.append(old)
             list.addSubview(old)
             if rows.count > 1 { let line = ColorView(color: Onboard.tint.withAlphaComponent(0.09)); list.addSubview(line); separators.append(line) }
         }
-        if index >= all.count { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) · \(name)", bundleID: browser.bundleID), chosen: true) } }
+        if index >= all.count { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) (\(name))", bundleID: browser.bundleID), chosen: true) } }
         refresh()
     }
 

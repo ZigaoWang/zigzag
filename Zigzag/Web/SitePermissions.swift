@@ -170,7 +170,7 @@ final class PermissionPrompt: FloatingPanelView {
             let prompt = PermissionPrompt(frame: NSRect(x: 0, y: 0, width: 420, height: 72))
             // The question in big words, the site under it: short enough to never cut off.
             prompt.title.stringValue = "Use \(what)?"
-            prompt.line.stringValue = host + (isPrivate ? " · this private window only" : "")
+            prompt.line.stringValue = isPrivate ? "\(host), for this private window only" : host
             prompt.symbolView.image = Tokens.Symbol.image(symbol, size: 16)
             prompt.answer = { continuation.resume(returning: $0) }
             let card = controller.root.cardFrame

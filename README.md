@@ -14,16 +14,6 @@
 
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a>
-  &nbsp;·&nbsp;
-  <a href="https://zigzagbrowser.com">Website</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/ZigaoWang/zigzag/issues/new/choose">Report a bug</a>
-  &nbsp;·&nbsp;
-  <a href="LICENSE">License</a>
-</p>
-
-<p align="center">
-  <sub>Free · macOS 15.4 or later · Apple silicon and Intel · Version 0.1.4 beta</sub>
 </p>
 
 <br>
@@ -53,7 +43,7 @@ updates arrive with macOS. There's no account and no server: your data stays on 
 ## Install
 
 Download the DMG from [zigzagbrowser.com](https://zigzagbrowser.com/download), open it, and drag Zigzag to
-Applications. Builds are signed and notarized by Apple, and updates install automatically.
+Applications. Updates install automatically.
 
 ## Feedback
 
