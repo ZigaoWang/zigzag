@@ -895,10 +895,11 @@ extension BrowserWindowController: SidebarDelegate {
     /// Closes a tab; ⌘Z brings it back with its history, ⇧⌘Z closes it again.
     func closeWithUndo(_ tab: Tab) {
         let wasBookmark = tab.bookmarkID != nil
+        let id = tab.id
         tabManager.close(tab)
         guard !wasBookmark else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in
-            guard let reopened = controller.tabManager.reopenClosedTab() else { return }
+            guard let reopened = controller.tabManager.reopenClosedTab(id) else { return }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.closeWithUndo(reopened) }
             controller.sidebarUndo.setActionName("Close Tab")
         }

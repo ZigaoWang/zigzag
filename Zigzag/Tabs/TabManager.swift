@@ -38,6 +38,8 @@ final class TabManager {
     private var suspendTimer: Timer?
 
     struct ClosedTab {
+        /// The closed tab's own id, so undo brings back that tab, not just the latest closed one.
+        var id = UUID()
         let url: URL?
         let title: String
         let spaceID: UUID
@@ -416,7 +418,7 @@ final class TabManager {
             return
         }
         guard var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { return }
-        closedTabs.append(ClosedTab(url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
+        closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
                                     interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle))
         if closedTabs.count > 50 { closedTabs.removeFirst() }
         list.remove(at: index)
@@ -432,7 +434,7 @@ final class TabManager {
         if let bookmarkID = tab.bookmarkID {
             bookmarkTabs[bookmarkID] = nil
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
-            closedTabs.append(ClosedTab(url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
+            closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
                                         interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle))
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
@@ -466,8 +468,11 @@ final class TabManager {
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
 
     @discardableResult
-    func reopenClosedTab() -> Tab? {
-        guard let closed = closedTabs.popLast() else { return nil }
+    /// The latest closed tab (⇧⌘T), or, with an id, that one (⌘Z after closing it).
+    func reopenClosedTab(_ id: UUID? = nil) -> Tab? {
+        let found: Int? = id.map { id in closedTabs.lastIndex { $0.id == id } } ?? (closedTabs.isEmpty ? nil : closedTabs.count - 1)
+        guard let index = found else { return nil }
+        let closed = closedTabs.remove(at: index)
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
         let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState)
         tab.customTitle = closed.customTitle
