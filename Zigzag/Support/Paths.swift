@@ -31,7 +31,13 @@ nonisolated enum JSONStore {
         guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
-        return try? decoder.decode(type, from: data)
+        if let value = try? decoder.decode(type, from: data) { return value }
+        // There, but unreadable (cut short, or written by a newer Zigzag): kept aside, never written over, so
+        // starting fresh can't erase it and it can still be recovered.
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(stamp).\(url.pathExtension)")
+        try? FileManager.default.moveItem(at: url, to: aside)
+        return nil
     }
 
     static func save<T: Encodable>(_ value: T, to url: URL) {

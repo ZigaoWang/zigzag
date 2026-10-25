@@ -5,6 +5,12 @@ import AppKit
 enum SpaceColor: String, Codable, CaseIterable {
     case graphite, sky, sage, sand, rose, lavender, mint, peach
 
+    /// A colour this version doesn't know (saved by a newer one) reads as graphite, rather than making the whole
+    /// library unreadable.
+    init(from decoder: Decoder) throws {
+        self = SpaceColor(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .graphite
+    }
+
     var name: String {
         switch self {
         case .graphite: "Graphite"
