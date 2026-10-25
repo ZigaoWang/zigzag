@@ -77,6 +77,9 @@ final class TabPreviewController {
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         // No preview over an open panel.
         guard controller?.hasFloatingPanel != true, let row, tab != nil || bookmark != nil else {
+            // One about to appear doesn't: leaving the row, or starting to drag it, means you've moved on.
+            showWork?.cancel()
+            showWork = nil
             scheduleHide()
             return
         }
@@ -92,7 +95,8 @@ final class TabPreviewController {
             showWork?.cancel()
             let work = DispatchWorkItem { [weak self, weak row] in
                 MainActor.assumeIsolated {
-                    guard let self, let row, row.window != nil else { return }
+                    // Pressed meanwhile (a click or the start of a drag): no preview.
+                    guard let self, let row, row.window != nil, NSEvent.pressedMouseButtons == 0 else { return }
                     self.present(tab, bookmark: bookmark, row: row)
                 }
             }
