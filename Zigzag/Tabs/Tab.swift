@@ -163,6 +163,9 @@ final class Tab: NSObject {
         } else if let url, !fromWebKit {
             Self.load(url, in: webView)
         }
+        // A new web view starts with sound and playing; carry over what you'd set on the old one.
+        if isMuted { setMuted(true) }
+        isPlaybackPaused = false
         changed.send(.webView)
         return webView
     }
