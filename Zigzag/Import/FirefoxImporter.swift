@@ -142,6 +142,8 @@ nonisolated enum FirefoxImporter {
               let iterations = kdfParams.children[1].integer,
               cipher.children.first?.oid == "2.16.840.1.101.3.4.1.42", let ivTail = cipher.children.dropFirst().first?.bytes else { return nil }
         let keyLength = kdfParams.children.count >= 3 ? (kdfParams.children[2].integer ?? 32) : 32
+        // From a file on disk: numbers out of any sensible range mean it's damaged, never a reason to crash or stall.
+        guard (1...10_000_000).contains(iterations), (16...64).contains(keyLength) else { return nil }
         let base = Data(Insecure.SHA1.hash(data: globalSalt + Data(password.utf8)))
         let key = pbkdf2SHA256(password: base, salt: salt, iterations: iterations, length: keyLength)
         // NSS stores 14 bytes of the IV and the DER prefix of an OCTET STRING (04 0e) supplies the rest.
