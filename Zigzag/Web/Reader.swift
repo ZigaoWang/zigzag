@@ -22,7 +22,7 @@ enum Reader {
                 copy.querySelectorAll('.infobox, .navbox, .vertical-navbox, .sidebar, .metadata, .ambox, .hatnote, .shortdescription, ' +
                   '.mw-editsection, sup.reference, .mw-jump-link, #toc, .toc, .noprint, .mw-empty-elt').forEach(el => el.remove());
                 // The little ⓘ after a pronunciation plays a sound on the page; in reading it's just a mark.
-                copy.querySelectorAll('a, span, sup').forEach(el => { if (el.textContent.trim() === 'ⓘ') el.remove(); });
+                copy.querySelectorAll('a, span, sup').forEach(el => { if (el.childElementCount === 0 && el.textContent.trim() === 'ⓘ') el.remove(); });
               }
               // Icons and spacers aren't pictures; big pictures get the full measure.
               copy.querySelectorAll('img').forEach(img => {
