@@ -1,0 +1,28 @@
+name: Feature request
+description: An idea for something Zigzag should do, or do better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the idea. Issues are public, so please leave out anything personal.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The problem or the moment where Zigzag gets in your way.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd like
+      description: How you'd like it to work.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything else
+      description: Workarounds you use today, or how another browser does it. Optional.
+    validations:
+      required: false
