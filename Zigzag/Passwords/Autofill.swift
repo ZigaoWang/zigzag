@@ -205,12 +205,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       };
       const wanted = (el) => signIn(el) || isNew(el);
       document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target)) report(e.target); }, true);
-      document.addEventListener('mousedown', (e) => { if (e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
+      document.addEventListener('mousedown', (e) => { if (e.isTrusted && e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
       document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && wanted(e.target)) post({ kind: 'blur' }); }, true);
       window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
       document.addEventListener('keydown', (e) => {
-        if (!window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+        // Only keys a person pressed: a page can send itself key events, but must never pick a login with them.
+        if (!e.isTrusted || !window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
         if (e.key === 'Enter' && !window.__zigzagSelected) return;
         e.preventDefault(); e.stopPropagation();
         post({ kind: 'key', key: e.key });
