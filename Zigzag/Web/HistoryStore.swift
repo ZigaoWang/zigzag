@@ -72,10 +72,26 @@ final class HistoryStore {
         sqlite3_step(statement)
     }
 
-    /// Bulk import inside one transaction.
+    /// Bulk import inside one transaction, with one statement. A page already here keeps the larger count, not
+    /// the sum: importing the same browser again never doubles its visits.
     func importVisits(_ entries: [(URL, String, Int, Date)]) {
+        guard let statement = prepare("""
+        INSERT INTO visits (url, host, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)
+        ON CONFLICT(url) DO UPDATE SET visit_count = MAX(visit_count, ?4),
+            last_visit = MAX(last_visit, ?5),
+            title = CASE WHEN ?3 = '' THEN title ELSE ?3 END
+        """) else { return }
+        defer { sqlite3_finalize(statement) }
         exec("BEGIN")
-        for (url, title, count, date) in entries { recordVisit(url: url, title: title, at: date, count: max(1, count)) }
+        for (url, title, count, date) in entries where Self.shouldRecord(url) {
+            sqlite3_reset(statement)
+            sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
+            sqlite3_bind_text(statement, 2, Self.normalizedHost(url), -1, transient)
+            sqlite3_bind_text(statement, 3, title, -1, transient)
+            sqlite3_bind_int(statement, 4, Int32(clamping: max(1, count)))
+            sqlite3_bind_double(statement, 5, date.timeIntervalSince1970)
+            sqlite3_step(statement)
+        }
         exec("COMMIT")
     }
 
