@@ -1,8 +1,13 @@
 <p align="center">
-  <img src="Zigzag/Resources/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="96" alt="">
+  <img src="Zigzag/Resources/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="88" alt="">
 </p>
 
-<h1 align="center">Zigzag</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg">
+    <img src="docs/wordmark-light.svg" width="280" alt="Zigzag">
+  </picture>
+</h1>
 
 <p align="center">
   <b>Feels great. Weighs nothing.</b><br>
