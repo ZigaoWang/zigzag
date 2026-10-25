@@ -81,6 +81,24 @@ final class DownloadManager: NSObject {
         NSWorkspace.shared.open(url)
     }
 
+    /// Starts a failed or cancelled download again: from where it stopped when the server allows, else from the
+    /// start. The new attempt takes the old row's place.
+    func retry(_ item: DownloadItem, in webView: WKWebView) {
+        let finish: (WKDownload) -> Void = { [weak self] download in
+            MainActor.assumeIsolated {
+                self?.items.removeAll { $0 === item }
+                self?.track(download, window: webView.window)
+            }
+        }
+        if let data = item.resumeData {
+            webView.resumeDownload(fromResumeData: data, completionHandler: finish)
+        } else if let url = item.sourceURL {
+            webView.startDownload(using: URLRequest(url: url), completionHandler: finish)
+        }
+    }
+
+    var canRetry: (DownloadItem) -> Bool { { $0.resumeData != nil || $0.sourceURL != nil } }
+
     func remove(_ item: DownloadItem) {
         if item.state == .downloading { cancel(item) }
         items.removeAll { $0 === item }

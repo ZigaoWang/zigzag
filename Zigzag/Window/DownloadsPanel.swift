@@ -40,20 +40,20 @@ final class DownloadRowView: InteractiveView {
             status.stringValue = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             actionButton.symbol = "magnifyingglass"
             actionButton.toolTip = "Show in Finder"
-        case .failed:
-            status.stringValue = "Failed"
-            actionButton.symbol = "xmark"
-            actionButton.toolTip = "Remove"
-        case .cancelled:
-            status.stringValue = "Cancelled"
-            actionButton.symbol = "xmark"
-            actionButton.toolTip = "Remove"
+        case .failed, .cancelled:
+            // Say what happened, and offer to try again rather than only to remove it.
+            let canRetry = DownloadManager.shared.canRetry(item)
+            status.stringValue = item.state == .failed ? "Didn’t finish" + (canRetry ? " · Try again" : "") : "Cancelled"
+            actionButton.symbol = canRetry ? "arrow.clockwise" : "xmark"
+            actionButton.toolTip = canRetry ? "Try Again" : "Remove"
         }
         bar.isHidden = item.state != .downloading
         let path = item.destination?.path ?? item.filename
         icon.image = NSWorkspace.shared.icon(for: .init(filenameExtension: (path as NSString).pathExtension) ?? .data)
         isEnabled = true
         alphaValue = item.state == .finished || item.state == .downloading ? 1 : 0.6
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(item.filename + ", " + status.stringValue)
         needsLayout = true
     }
 
@@ -165,7 +165,12 @@ final class DownloadsPanelView: FloatingPanelView {
                 switch item.state {
                 case .downloading: DownloadManager.shared.cancel(item)
                 case .finished: DownloadManager.shared.reveal(item)
-                default: DownloadManager.shared.remove(item)
+                default:
+                    if DownloadManager.shared.canRetry(item), let webView = WindowManager.shared.keyController?.selectedWebView {
+                        DownloadManager.shared.retry(item, in: webView)
+                    } else {
+                        DownloadManager.shared.remove(item)
+                    }
                 }
             }
             rows.append(row)
