@@ -381,15 +381,28 @@ final class ToastView: FloatingPanelView {
 }
 
 enum Toast {
-    private static weak var current: ToastView?
-    private static var hideWork: DispatchWorkItem?
+    /// Each window's toast and its timer, so a toast in one window never cancels another window's.
+    private final class Showing {
+        weak var toast: ToastView?
+        var hideWork: DispatchWorkItem?
+    }
+    private static var showing: [ObjectIdentifier: Showing] = [:]
+
+    private static func state(for host: NSView) -> Showing {
+        showing = showing.filter { $0.value.toast?.superview != nil }
+        if let state = showing[ObjectIdentifier(host)] { return state }
+        let state = Showing()
+        showing[ObjectIdentifier(host)] = state
+        return state
+    }
 
     /// Takes down the toast showing in this window, if any.
     static func hide(in controller: BrowserWindowController) {
-        guard let toast = current, toast.superview === controller.root.overlay else { return }
-        hideWork?.cancel()
+        let state = state(for: controller.root.overlay)
+        guard let toast = state.toast, toast.superview === controller.root.overlay else { return }
+        state.hideWork?.cancel()
         toast.dismiss(always: true)
-        current = nil
+        state.toast = nil
     }
 
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
@@ -400,9 +413,10 @@ enum Toast {
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, over host: NSView, area: NSRect) {
+        let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
-        if let existing = current, existing.superview === host {
+        if let existing = state.toast, existing.superview === host {
             toast = existing
             isNew = false
         } else {
@@ -434,21 +448,21 @@ enum Toast {
             pulse.duration = Tokens.Motion.standard
             toast.layer?.add(pulse, forKey: "pulse")
         }
-        current = toast
-        hideWork?.cancel()
+        state.toast = toast
+        state.hideWork?.cancel()
         // Toasts with an action wait for the pointer to leave before going.
         let work = DispatchWorkItem { [weak toast] in
             MainActor.assumeIsolated {
                 guard let toast, toast.superview != nil else { return }
                 if action != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
-                    Toast.hideWork = nil
+                    state.hideWork = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak toast] in toast?.dismiss(always: true) }
                     return
                 }
                 toast.dismiss(always: true)
             }
         }
-        hideWork = work
+        state.hideWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
     }
 }
