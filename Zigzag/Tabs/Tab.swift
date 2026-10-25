@@ -600,6 +600,7 @@ extension Tab: WKNavigationDelegate {
         }
         Task { [weak self] in
             let article = await Reader.isArticle(webView)
+            if article { Reader.prepare(webView) }
             guard let self, self.webView === webView, article != self.isArticle else { return }
             self.isArticle = article
             self.changed.send(.reader)

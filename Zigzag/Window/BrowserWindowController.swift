@@ -658,7 +658,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.readerCard = card
             card.setOverlay(view)
             view.alphaValue = 0
-            Tokens.Motion.animate(Tokens.Motion.feedback) { view.animator().alphaValue = 1 }
+            view.onReady = { [weak view] in
+                guard let view else { return }
+                Tokens.Motion.animate(Tokens.Motion.feedback) { view.animator().alphaValue = 1 }
+            }
             self.window?.makeFirstResponder(view.webView)
             // Opened again quickly: one listener, never two.
             if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }

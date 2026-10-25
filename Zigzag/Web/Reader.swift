@@ -13,6 +13,18 @@ enum Reader {
         window.__zigzagReader = {
           // Readability's defaults pass over short articles (three good paragraphs); Safari offers Reader for those too.
           isArticle: () => { try { return isProbablyReaderable(document, { minScore: 10, minContentLength: 100 }); } catch (e) { return false; } },
+          // Done ahead, while the page is idle, so opening Reader is instant. Kept for this address only.
+          prepare: () => {
+            const r = window.__zigzagReader;
+            if (r.cached && r.cached.url === location.href) return;
+            const run = () => { try { r.cached = { url: location.href, json: r.parse() }; } catch (e) {} };
+            (window.requestIdleCallback || ((f) => setTimeout(f, 300)))(run, { timeout: 3000 });
+          },
+          take: () => {
+            const r = window.__zigzagReader;
+            if (r.cached && r.cached.url === location.href && r.cached.json) return r.cached.json;
+            return r.parse();
+          },
           parse: () => {
             try {
               const copy = document.cloneNode(true);
@@ -72,6 +84,11 @@ enum Reader {
         return try? String(contentsOf: url, encoding: .utf8)
     }
 
+    /// Reads the article ahead of time, while the page is idle.
+    static func prepare(_ webView: WKWebView) {
+        webView.evaluateJavaScript("window.__zigzagReader && window.__zigzagReader.prepare(); 0", in: nil, in: .defaultClient, completionHandler: nil)
+    }
+
     /// Whether the page in a web view looks like an article.
     static func isArticle(_ webView: WKWebView) async -> Bool {
         let result = try? await webView.evaluateJavaScript("window.__zigzagReader ? window.__zigzagReader.isArticle() : false", in: nil, contentWorld: .defaultClient)
@@ -91,7 +108,7 @@ enum Reader {
     }
 
     static func article(in webView: WKWebView) async -> Article? {
-        guard let json = try? await webView.evaluateJavaScript("window.__zigzagReader ? window.__zigzagReader.parse() : null", in: nil, contentWorld: .defaultClient) as? String,
+        guard let json = try? await webView.evaluateJavaScript("window.__zigzagReader ? window.__zigzagReader.take() : null", in: nil, contentWorld: .defaultClient) as? String,
               let data = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(Article.self, from: data)
     }
@@ -266,6 +283,9 @@ enum Reader {
 final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
+    /// Once the article has drawn (or a moment has passed), so it never fades in blank.
+    var onReady: (() -> Void)? { didSet { DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in self?.becomeReady() } } }
+    private var isReady = false
     var onOpenLink: ((URL) -> Void)?
     /// Shift-click: a look at the link in Peek, over the article. ⌘-click: a tab in the background.
     var onPeekLink: ((URL) -> Void)?
@@ -308,6 +328,12 @@ final class ReaderView: NSView {
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { onClose?() } else { super.keyDown(with: event) }
+    }
+
+    fileprivate func becomeReady() {
+        guard !isReady, let onReady else { return }
+        isReady = true
+        onReady()
     }
 }
 
@@ -628,6 +654,7 @@ private final class ThemeTile: InteractiveView {
 }
 
 extension ReaderView: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { becomeReady() }
     /// Links in an article open in the page, not inside the reader.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
