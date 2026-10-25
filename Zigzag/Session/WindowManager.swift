@@ -115,6 +115,7 @@ final class WindowManager {
         // (A private window open alongside doesn't count: it isn't saved.)
         if !controller.tabManager.isPrivate, controllers.filter({ !$0.tabManager.isPrivate }).count == 1 { saveNow(synchronously: true) }
         controllers.removeAll { $0 === controller }
+        if lastKey === controller { lastKey = nil }
         if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
         controller.tabManager.invalidate()
         if controller.tabManager.isPrivate, !controllers.contains(where: { $0.tabManager.isPrivate }) { DownloadManager.shared.forgetPrivate() }
@@ -136,9 +137,11 @@ final class WindowManager {
         return controllers.last { !$0.tabManager.isPrivate }
     }
 
-    /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window.
+    /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window. Never a private one: a link
+    /// from elsewhere doesn't get to choose that.
     func openExternal(_ url: URL) {
-        if let controller = keyController ?? restoreIfNoWindows() {
+        let key = keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
+        if let controller = key ?? controllers.last(where: { !$0.tabManager.isPrivate }) ?? restoreIfNoWindows() {
             controller.open(url, disposition: .foregroundTab)
             controller.window?.makeKeyAndOrderFront(nil)
         } else {
