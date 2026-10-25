@@ -365,26 +365,27 @@ final class TintSwatch: InteractiveView {
     }
 }
 
-/// A two-dimensional color field: across is hue, up is how strong the tint is.
-/// Drawn in the space tints themselves, so what you touch is what the window becomes.
+/// The color field: quiet dotted paper, and a dot you place on it. Around the middle picks the hue; the middle is
+/// light and the edges deep. Each dot casts a soft glow of its color, so the paper shows what you're choosing.
 final class ColorCanvas: NSView {
     var hue: Double = 0.6 { didSet { needsLayout = true } }
+    /// How far out the dot sits: 0 the middle (lightest), 1 the edge (deepest).
     var intensity: Double = SpaceColor.defaultIntensity { didSet { needsLayout = true } }
-    /// The gradient's second color: a second knob at the same height, joined to the first. Nil: none.
+    /// The gradient's second color, a smaller dot. Nil: none.
     var hue2: Double? { didSet { needsLayout = true } }
-    /// The second color's own strength; nil: the same as the first.
     var intensity2: Double? { didSet { needsLayout = true } }
+    /// The color a spot stands for, to fill the dot and its glow.
+    var colorAt: (Double, Double) -> NSColor = { hue, _ in SpaceColor.swatch(hue: hue) } { didSet { needsLayout = true } }
     var onChange: ((Double, Double, Bool) -> Void)?
-    /// The second knob moved: its hue, the shared intensity, and whether the drag has ended.
     var onChange2: ((Double, Double, Bool) -> Void)?
-    private let knob2 = CALayer()
-    private let knob2Fill = CALayer()
 
-    private let hues = CAGradientLayer()
-    private let fade = CAGradientLayer()
     private let dots = CALayer()
+    private let glow = CAGradientLayer()
+    private let glow2 = CAGradientLayer()
     private let knob = CALayer()
     private let knobFill = CALayer()
+    private let knob2 = CALayer()
+    private let knob2Fill = CALayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -392,21 +393,21 @@ final class ColorCanvas: NSView {
         layer?.cornerRadius = Tokens.Radius.panel - 2
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
-        hues.startPoint = CGPoint(x: 0, y: 0.5)
-        hues.endPoint = CGPoint(x: 1, y: 0.5)
-        fade.startPoint = CGPoint(x: 0.5, y: 0)
-        fade.endPoint = CGPoint(x: 0.5, y: 1)
-        layer?.addSublayer(hues)
-        layer?.addSublayer(fade)
+        for g in [glow2, glow] {
+            g.type = .radial
+            g.startPoint = CGPoint(x: 0.5, y: 0.5)
+            g.endPoint = CGPoint(x: 1, y: 1)
+            layer?.addSublayer(g)
+        }
         layer?.addSublayer(dots)
-        for k in [knob2, knob] {
+        for (k, fill) in [(knob2, knob2Fill), (knob, knobFill)] {
+            k.backgroundColor = .white
             k.shadowOpacity = 1
             k.shadowRadius = 4
             k.shadowOffset = CGSize(width: 0, height: -1)
+            k.addSublayer(fill)
             layer?.addSublayer(k)
         }
-        knob.addSublayer(knobFill)
-        knob2.addSublayer(knob2Fill)
         setAccessibilityRole(.colorWell)
         setAccessibilityLabel("Space color")
     }
@@ -417,82 +418,94 @@ final class ColorCanvas: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    private let knobSize = Tokens.Space.x6
+    private let knobSize: CGFloat = 30
+    private let knob2Size: CGFloat = 22
+
+    /// Where a hue and depth sit: an ellipse filling the field, the hue going around it.
+    private func point(hue: Double, depth: Double) -> CGPoint {
+        let a = hue * 2 * .pi - .pi / 2
+        let rx = bounds.width / 2 - knobSize / 2 - 2, ry = bounds.height / 2 - knobSize / 2 - 2
+        return CGPoint(x: bounds.midX + cos(a) * rx * depth, y: bounds.midY + sin(a) * ry * depth)
+    }
+
+    private func value(at p: CGPoint) -> (hue: Double, depth: Double) {
+        let rx = bounds.width / 2 - knobSize / 2 - 2, ry = bounds.height / 2 - knobSize / 2 - 2
+        let dx = (p.x - bounds.midX) / rx, dy = (p.y - bounds.midY) / ry
+        var h = (atan2(dy, dx) + .pi / 2) / (2 * .pi)
+        if h < 0 { h += 1 }
+        return (Double(h), Double(min(hypot(dx, dy), 1)))
+    }
 
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
-            hues.frame = bounds
-            fade.frame = bounds
-            hues.colors = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { cgColor(SpaceColor.swatch(hue: $0)) }
-            // Toward the bottom the tint fades to the page color: less intense.
-            let base = cgColor(Tokens.Color.panelBackground)
-            fade.colors = [base.copy(alpha: 0) ?? base, base.copy(alpha: 0.55) ?? base]
-            drawDots()
-            // The knob's center keeps half a knob from each edge, so it's never cut off.
-            let r = knobSize / 2
-            let x = r + CGFloat(hue) * (bounds.width - knobSize)
-            let y = r + (1 - CGFloat(intensity)) * (bounds.height - knobSize)
-            knob.frame = NSRect(x: x - knobSize / 2, y: y - knobSize / 2, width: knobSize, height: knobSize)
-            knob.cornerRadius = knobSize / 2
-            knob.backgroundColor = .white
-            knob.shadowColor = cgColor(Tokens.Color.panelShadow)
-            knobFill.frame = knob.bounds.insetBy(dx: 4, dy: 4)
-            knobFill.cornerRadius = knobFill.frame.width / 2
-            knobFill.backgroundColor = cgColor(SpaceColor.swatch(hue: hue))
-            knob2.isHidden = hue2 == nil
-            if let hue2 {
-                let x2 = r + CGFloat(hue2) * (bounds.width - knobSize)
-                let y2 = r + (1 - CGFloat(intensity2 ?? intensity)) * (bounds.height - knobSize)
-                knob2.frame = NSRect(x: x2 - knobSize / 2, y: y2 - knobSize / 2, width: knobSize, height: knobSize)
-                knob2.cornerRadius = knobSize / 2
-                knob2.backgroundColor = .white
-                knob2.shadowColor = cgColor(Tokens.Color.panelShadow)
-                knob2Fill.frame = knob2.bounds.insetBy(dx: 4, dy: 4)
-                knob2Fill.cornerRadius = knob2Fill.frame.width / 2
-                knob2Fill.backgroundColor = cgColor(SpaceColor.swatch(hue: hue2))
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
+                knob.shadowColor = Tokens.Color.panelShadow.cgColor
+                knob2.shadowColor = Tokens.Color.panelShadow.cgColor
             }
+            drawDots()
+            place(knob, fill: knobFill, glow: glow, size: knobSize, hue: hue, depth: intensity)
+            knob2.isHidden = hue2 == nil
+            glow2.isHidden = hue2 == nil
+            if let hue2 { place(knob2, fill: knob2Fill, glow: glow2, size: knob2Size, hue: hue2, depth: intensity2 ?? intensity) }
         }
     }
 
-    /// A fine dot grid gives the field texture and a sense of position, like graph paper.
+    private func place(_ knob: CALayer, fill: CALayer, glow: CAGradientLayer, size: CGFloat, hue: Double, depth: Double) {
+        let c = point(hue: hue, depth: depth)
+        knob.frame = CGRect(x: c.x - size / 2, y: c.y - size / 2, width: size, height: size)
+        knob.cornerRadius = size / 2
+        fill.frame = knob.bounds.insetBy(dx: 3.5, dy: 3.5)
+        fill.cornerRadius = fill.frame.width / 2
+        let color = colorAt(hue, depth)
+        fill.backgroundColor = color.cgColor
+        let g: CGFloat = 150
+        glow.frame = CGRect(x: c.x - g / 2, y: c.y - g / 2, width: g, height: g)
+        glow.colors = [color.withAlphaComponent(0.45).cgColor, color.withAlphaComponent(0.12).cgColor, color.withAlphaComponent(0).cgColor]
+        glow.locations = [0, 0.45, 1]
+    }
+
+    /// A fine dot grid, like graph paper.
+    private var dotsSize: CGSize = .zero
     private func drawDots() {
         dots.frame = bounds
-        let step: CGFloat = 12
-        let image = NSImage(size: bounds.size, flipped: true) { rect in
-            NSColor.white.withAlphaComponent(0.35).setFill()
+        guard dotsSize != bounds.size || dots.contents == nil else { return }
+        dotsSize = bounds.size
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let step: CGFloat = 8
+        dots.contents = NSImage(size: bounds.size, flipped: true) { rect in
+            (dark ? NSColor.white.withAlphaComponent(0.16) : NSColor.black.withAlphaComponent(0.14)).setFill()
             var y = step / 2
             while y < rect.height {
                 var x = step / 2
                 while x < rect.width {
-                    NSBezierPath(ovalIn: NSRect(x: x - 1, y: y - 1, width: 2, height: 2)).fill()
+                    NSBezierPath(ovalIn: NSRect(x: x - 0.75, y: y - 0.75, width: 1.5, height: 1.5)).fill()
                     x += step
                 }
                 y += step
             }
             return true
         }
-        dots.contents = image
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        dots.contents = nil
         needsLayout = true
     }
 
-    /// Which knob a drag moves: the second one when it's nearer the pointer.
+    /// Which dot a drag moves: the nearer one.
     private var draggingSecond = false
 
     private func update(from event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        let r = knobSize / 2
-        let h = Double(min(max((p.x - r) / (bounds.width - knobSize), 0), 0.999))
+        let v = value(at: convert(event.locationInWindow, from: nil))
         if draggingSecond {
-            hue2 = h
-            intensity2 = Double(min(max(1 - (p.y - r) / (bounds.height - knobSize), 0), 1))
+            hue2 = v.hue
+            intensity2 = v.depth
         } else {
-            hue = h
-            intensity = Double(min(max(1 - (p.y - r) / (bounds.height - knobSize), 0), 1))
+            hue = v.hue
+            intensity = v.depth
         }
         layoutSubtreeIfNeeded()
     }
@@ -912,21 +925,31 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         kindSwitch.selectedIndex = kind.rawValue
         kindSwitch.onChange = { [weak self] index in self?.switchKind(Kind(rawValue: index) ?? .solid) }
 
-        canvas.onChange = { [weak self] hue, intensity, final in
-            guard let self else { return }
+        canvas.onChange = { [weak self] hue, depth, final in
+            guard let self, let space = Library.shared.space(self.spaceID) else { return }
             if final {
-                Library.shared.setHue(hue, intensity: intensity, for: self.spaceID)
+                // Auto: farther out is a stronger tint, light by day and dark at night. Otherwise: farther out is darker.
+                if space.brightness == nil {
+                    Library.shared.setHue(hue, intensity: depth, for: self.spaceID)
+                } else {
+                    Library.shared.setHue(hue, intensity: space.hue == nil ? Self.vivid : space.intensity ?? Self.vivid, for: self.spaceID)
+                    Library.shared.setBrightness(depth, for: self.spaceID)
+                }
                 self.edited = true
                 self.refresh()
             } else {
                 self.preview()
             }
         }
-        canvas.onChange2 = { [weak self] hue2, intensity2, final in
-            guard let self else { return }
+        canvas.onChange2 = { [weak self] hue2, depth, final in
+            guard let self, let space = Library.shared.space(self.spaceID) else { return }
             if final {
-                Library.shared.setHue(self.canvas.hue, intensity: self.canvas.intensity, for: self.spaceID)
-                Library.shared.setSecondHue(hue2, intensity: intensity2, for: self.spaceID)
+                if space.brightness == nil {
+                    Library.shared.setSecondHue(hue2, intensity: depth, for: self.spaceID)
+                } else {
+                    Library.shared.setSecondHue(hue2, intensity: space.intensity ?? Self.vivid, for: self.spaceID)
+                    Library.shared.setSecondBrightness(depth, for: self.spaceID)
+                }
                 self.edited = true
                 self.refresh()
             } else {
@@ -1048,10 +1071,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// Everything on the panel from what's saved.
     private func refresh() {
         guard let space = Library.shared.space(spaceID) else { return }
+        let auto = space.brightness == nil
         canvas.hue = space.baseHue
-        canvas.intensity = space.intensity ?? SpaceColor.defaultIntensity
+        canvas.intensity = auto ? space.intensity ?? SpaceColor.defaultIntensity : space.brightness ?? 0
         canvas.hue2 = space.hue2
-        canvas.intensity2 = space.intensity2
+        canvas.intensity2 = auto ? space.intensity2 : space.brightness2 ?? space.brightness
+        canvas.colorAt = Self.dotColor(auto: auto, intensity: space.intensity ?? Self.vivid)
         dial.angle = space.gradientAngle
         dial.isHidden = space.hue2 == nil
         kindSwitch.selectedIndex = kind.rawValue
@@ -1064,6 +1089,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         brightnessSlider.isIdle = space.brightness == nil
         brightnessSlider.grain = space.brightness ?? 0.5
         brightnessSlider.showsChecker = glass
+        brightnessSlider.isHidden = !glass
         brightnessSlider.toneColors = brightnessTrack(space)
         needsLayout = true
     }
@@ -1082,15 +1108,31 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
+    /// How vivid a color is when its dot sets darkness rather than strength.
+    private static let vivid = 0.6
+
+    /// The color a dot shows: strong enough to read at a glance, deeper as it goes out when not automatic.
+    private static func dotColor(auto: Bool, intensity: Double) -> (Double, Double) -> NSColor {
+        { hue, depth in
+            auto ? NSColor(hue: hue, saturation: 0.18 + 0.5 * depth, brightness: 0.95 - 0.12 * depth, alpha: 1)
+                : NSColor(hue: hue, saturation: 0.3 + 0.5 * depth, brightness: 0.97 - 0.47 * depth, alpha: 1)
+        }
+    }
+
     /// The space as the pad, knob and sliders have it right now, saved or not.
     private func draft(brightness: Double?? = nil) -> SpaceInfo? {
         guard var space = Library.shared.space(spaceID) else { return nil }
-        if space.glass != true, !(space.hue == nil && canvas.hue == space.baseHue && canvas.intensity == (space.intensity ?? SpaceColor.defaultIntensity)) {
+        let auto = space.brightness == nil
+        if space.glass != true {
             space.hue = canvas.hue
-            space.intensity = canvas.intensity
+            if auto { space.intensity = canvas.intensity } else {
+                space.intensity = space.intensity ?? Self.vivid
+                space.brightness = canvas.intensity
+                space.appearance = canvas.intensity < 0.5 ? "light" : "dark"
+            }
         }
         space.hue2 = canvas.hue2
-        space.intensity2 = canvas.intensity2
+        if auto { space.intensity2 = canvas.intensity2 } else { space.brightness2 = canvas.intensity2 }
         space.angle = dial.angle
         if let brightness {
             space.brightness = brightness
@@ -1111,16 +1153,16 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     // MARK: Layout
 
     private let pad = Tokens.Space.x4
-    private let canvasHeight: CGFloat = 172
+    private let canvasHeight: CGFloat = 210
     private let swatchSize: CGFloat = 24
     private let rowHeight: CGFloat = 30
     private let knobSize: CGFloat = 76
     private let sliderHeight: CGFloat = 34
 
     var contentHeight: CGFloat {
-        let middle = kind == .glass ? 0 : canvasHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x4
+        let middle = kind == .glass ? sliderHeight + Tokens.Space.x3 : canvasHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x4
         return pad + Tokens.Space.x8 + 2 + Tokens.Space.x3 + rowHeight + Tokens.Space.x3 + middle
-            + sliderHeight + Tokens.Space.x3 + (kind == .gradient ? knobSize : sliderHeight) + pad
+            + (kind == .gradient ? knobSize : sliderHeight) + pad
     }
 
     /// A gradient brings the direction knob; the panel grows or shrinks for it, keeping the edge nearest what opened it.
@@ -1147,11 +1189,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let width = bounds.width - pad * 2
         var y = pad
         let nameHeight = Tokens.Space.x8 + 2
-        // The name, and at its right, how the space looks: system, light or dark.
-        let nameWidth = width
+        // The name, and at its right, Auto: light by day and dark at night with the Mac.
+        let chipWidth: CGFloat = 64
+        let nameWidth = width - chipWidth - Tokens.Space.x2
         let fh = ceil(nameField.intrinsicContentSize.height)
         nameBackground.frame = NSRect(x: pad, y: y, width: nameWidth, height: nameHeight)
         nameField.frame = NSRect(x: pad + Tokens.Space.x2, y: y + (nameHeight - fh) / 2, width: nameWidth - Tokens.Space.x4, height: fh)
+        autoChip.frame = NSRect(x: pad + width - chipWidth, y: y, width: chipWidth, height: nameHeight)
         y += nameHeight + Tokens.Space.x3
         kindSwitch.frame = NSRect(x: pad, y: y, width: width, height: rowHeight)
         y += rowHeight + Tokens.Space.x3
@@ -1166,11 +1210,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             }
             y += swatchSize + Tokens.Space.x4
         }
-        // Brightness: Auto, or the slider from light to dark.
-        let chipWidth: CGFloat = 64
-        autoChip.frame = NSRect(x: pad, y: y, width: chipWidth, height: sliderHeight)
-        brightnessSlider.frame = NSRect(x: pad + chipWidth + Tokens.Space.x2, y: y, width: width - chipWidth - Tokens.Space.x2, height: sliderHeight)
-        y += sliderHeight + Tokens.Space.x3
+        // Glass: its shade, clear white to smoked black.
+        if kind == .glass {
+            brightnessSlider.frame = NSRect(x: pad, y: y, width: width, height: sliderHeight)
+            y += sliderHeight + Tokens.Space.x3
+        }
         // How textured, and with a gradient, the knob that turns it.
         if kind == .gradient {
             dial.frame = NSRect(x: pad + width - knobSize, y: y, width: knobSize, height: knobSize)

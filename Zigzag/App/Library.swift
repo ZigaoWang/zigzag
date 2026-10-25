@@ -30,6 +30,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// How light or dark the space is, from 0 (lightest) to 1 (darkest); the window's mode follows it.
     /// Nil: automatic, light by day and dark at night with the system.
     var brightness: Double? = nil
+    /// The second color's own brightness; nil: the same as the first.
+    var brightness2: Double? = nil
     /// What washes over the glass: white to black with the brightness, or with the system when automatic.
     var glassColor: NSColor {
         brightness.map { NSColor(white: 1 - CGFloat($0), alpha: 0.5) }
@@ -52,7 +54,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var background2: NSColor? {
         hue2.map { h in
             let i = intensity2 ?? intensity ?? SpaceColor.defaultIntensity
-            return brightness.map { SpaceColor.fixed(hue: h, intensity: i, brightness: $0, neutral: false) } ?? SpaceColor.background(hue: h, intensity: i)
+            return (brightness2 ?? brightness).map { SpaceColor.fixed(hue: h, intensity: i, brightness: $0, neutral: false) } ?? SpaceColor.background(hue: h, intensity: i)
         }
     }
     var gradientAngle: Double { angle ?? 45 }
@@ -216,6 +218,12 @@ final class Library {
         guard let i = index(of: id) else { return }
         spaces[i].hue2 = hue.map { $0.truncatingRemainder(dividingBy: 1) }
         spaces[i].intensity2 = hue == nil ? nil : intensity ?? spaces[i].intensity2
+        commit()
+    }
+
+    func setSecondBrightness(_ brightness: Double?, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].brightness2 = brightness
         commit()
     }
 
