@@ -793,6 +793,7 @@ private final class BringPicker: StepContent {
         rows.forEach { $0.state = .waiting }
         refresh()
         let choice = self.choice
+        let started = Date()
         Task { @MainActor in
             for row in rows {
                 row.state = .working
@@ -807,6 +808,10 @@ private final class BringPicker: StepContent {
                 }
                 self.needsLayout = true
             }
+            // A quick import still shows the wave for two full rounds, so it reads as work done, not a flicker.
+            let shortest = IntoZigzag.wave * 2
+            let elapsed = Date().timeIntervalSince(started)
+            if elapsed < shortest { try? await Task.sleep(for: .seconds(shortest - elapsed)) }
             self.isImporting = false
             let failed = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
             self.arrow.set(failed ? .idle : .done)
@@ -925,6 +930,8 @@ private final class BringPicker: StepContent {
 /// run along the way across; when it's done, Zigzag gets a check.
 final class IntoZigzag: NSView {
     enum State { case idle, importing, done }
+    /// One round of the importing wave, in seconds.
+    static let wave: Double = 1.2
     #if DEBUG
     static weak var shown: IntoZigzag?
     #endif
@@ -975,17 +982,27 @@ final class IntoZigzag: NSView {
     func set(_ new: State) {
         guard new != state else { return }
         state = new
-        // The dots run toward Zigzag, one after another, while it works.
+        // One wave rolls toward Zigzag over and over while it works: every dot is already moving, each a step
+        // behind the one before and spaced so one is always lit: no start-up, no dark gap between rounds.
+        let period = Self.wave
+        let now = CACurrentMediaTime()
         for (i, dot) in dots.enumerated() {
             dot.removeAllAnimations()
             guard new == .importing else { continue }
-            let pulse = CAKeyframeAnimation(keyPath: "opacity")
-            pulse.values = [0.2, 1, 0.2]
-            pulse.keyTimes = [0, 0.3, 1]
-            pulse.duration = 0.9
-            pulse.repeatCount = .infinity
-            pulse.beginTime = CACurrentMediaTime() + Double(i) * 0.18
-            dot.add(pulse, forKey: "run")
+            let glow = CAKeyframeAnimation(keyPath: "opacity")
+            glow.values = [0.25, 1, 0.25, 0.25]
+            glow.keyTimes = [0, 0.25, 0.6, 1]
+            let grow = CAKeyframeAnimation(keyPath: "transform.scale")
+            grow.values = [1, 1.35, 1, 1]
+            grow.keyTimes = [0, 0.25, 0.6, 1]
+            let both = CAAnimationGroup()
+            both.animations = [glow, grow]
+            both.duration = period
+            both.repeatCount = .infinity
+            both.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            // Started in the past, so it's mid-wave from the first frame.
+            both.beginTime = now - period + Double(i) * period / Double(max(dots.count, 1))
+            dot.add(both, forKey: "run")
         }
         caption.stringValue = new == .importing ? "Bringing it over…" : new == .done ? "All in Zigzag" : ""
         badge.isHidden = true
