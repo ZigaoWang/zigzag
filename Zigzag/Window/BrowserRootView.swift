@@ -312,12 +312,16 @@ final class BrowserRootView: ColorView {
         pointerTimer = nil
         pointerLeftAt = nil
         guard on else { return }
-        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.followPointer() }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            // The view went away while the sidebar floated: nothing left to follow for.
+            guard let self else { timer.invalidate(); return }
+            MainActor.assumeIsolated { self.followPointer() }
         }
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
     }
+
+    isolated deinit { pointerTimer?.invalidate() }
 
     private func followPointer() {
         guard let window, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
