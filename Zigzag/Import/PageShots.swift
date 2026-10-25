@@ -11,6 +11,8 @@ import WebKit
     let changed = Signal<Void>()
     private var window: NSWindow?
     private var views: [Shot: WKWebView] = [:]
+    /// Pages that got as far as showing something.
+    private var committed: Set<ObjectIdentifier> = []
     private var started = false
 
     /// A laptop-ish column: wide enough for a real layout, narrow enough to read once shrunk into the preview.
@@ -43,10 +45,10 @@ import WebKit
             views[shot] = view
             view.load(URLRequest(url: url, timeoutInterval: 20))
             _ = shot
-            // Heavy pages may never quite finish; take what's there after a while.
+            // Heavy pages may never quite finish; take what's there after a while, if anything arrived at all.
             DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self, weak view] in
                 guard let self, let view, self.views[shot] === view else { return }
-                self.capture(shot, view)
+                if self.committed.contains(ObjectIdentifier(view)) { self.capture(shot, view) } else { self.drop(shot, view) }
             }
         }
     }
@@ -64,6 +66,31 @@ import WebKit
         }
         window?.contentView?.addSubview(view)
         return view
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        committed.insert(ObjectIdentifier(webView))
+    }
+
+    // Offline, or the site is down: no picture, so the preview draws its own stand-in instead of a blank page.
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // A page replacing its own load (a redirect) cancels the first one; that isn't a failure.
+        guard (error as NSError).code != NSURLErrorCancelled, let shot = views.first(where: { $0.value === webView })?.key else { return }
+        drop(shot, webView)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        // A page replacing its own load (a redirect) cancels the first one; that isn't a failure.
+        guard (error as NSError).code != NSURLErrorCancelled, let shot = views.first(where: { $0.value === webView })?.key else { return }
+        drop(shot, webView)
+    }
+
+    private func drop(_ shot: Shot, _ webView: WKWebView) {
+        views[shot] = nil
+        webView.stopLoading()
+        webView.removeFromSuperview()
+        if views.isEmpty { window?.close(); window = nil }
+        changed.send(())
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
