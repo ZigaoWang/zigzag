@@ -1,3 +1,4 @@
+import os
 import AppKit
 import CommonCrypto
 import Security
@@ -110,7 +111,7 @@ nonisolated enum ChromiumImporter {
                     }
                 }
             case .failure(.denied):
-                batch.problems.append(ImportProblem(message: "\(browser.name)'s passwords stayed locked. When macOS asks, choose Allow (or Always Allow).", fix: .retry))
+                batch.problems.append(ImportProblem(message: "\(browser.name)'s passwords stayed locked. When macOS asks, choose Allow (or Always Allow).", fix: .retry, retries: 1))
             case .failure(.missing):
                 break  // No passwords saved there: nothing to say.
             }
@@ -142,8 +143,19 @@ nonisolated enum ChromiumImporter {
 
     enum KeyError: Error { case denied, missing }
 
+    /// Keys already unlocked this session, in memory only and for a few minutes, so importing several profiles
+    /// of one browser asks macOS once, not once per profile.
+    private static let unlocked = OSAllocatedUnfairLock(initialState: [String: (key: Data, at: Date)]())
+
     /// The browser's "Safe Storage" secret, turned into its AES key. Asks macOS, which asks the person.
     static func safeStorageKey(_ browser: Browser) -> Result<Data, KeyError> {
+        if let kept = unlocked.withLock({ $0[browser.keychainService] }), Date().timeIntervalSince(kept.at) < 600 { return .success(kept.key) }
+        let result = askForKey(browser)
+        if case .success(let key) = result { unlocked.withLock { $0[browser.keychainService] = (key, Date()) } }
+        return result
+    }
+
+    private static func askForKey(_ browser: Browser) -> Result<Data, KeyError> {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: browser.keychainService,
@@ -213,11 +225,19 @@ nonisolated enum ChromiumImporter {
     private static func logins(at file: URL, key: Data) -> [ImportBatch.Login] {
         guard FileManager.default.fileExists(atPath: file.path), let db = SQLiteReader(file) else { return [] }
         var result: [ImportBatch.Login] = []
-        // Rows marked "never save" are choices, not logins.
-        db.rows("SELECT origin_url, username_value, password_value, date_created FROM logins WHERE blacklisted_by_user = 0") { row in
-            guard let url = URL(string: row.string(0)), let password = decrypt(row.data(2), key: key), !password.isEmpty else { return }
-            result.append(ImportBatch.Login(url: url, username: row.string(1), password: password, created: date(row.int(3))))
+        // Rows marked "never save" are choices, not logins. Newer Chrome also says when each password changed;
+        // older builds don't have that column, so those are read without it.
+        func read(_ withChanged: Bool) {
+            let columns = "origin_url, username_value, password_value, date_created" + (withChanged ? ", date_password_modified" : "")
+            db.rows("SELECT \(columns) FROM logins WHERE blacklisted_by_user = 0") { row in
+                guard let url = URL(string: row.string(0)), let password = decrypt(row.data(2), key: key), !password.isEmpty else { return }
+                var login = ImportBatch.Login(url: url, username: row.string(1), password: password, created: date(row.int(3)))
+                if withChanged { login.changed = date(row.int(4)) }
+                result.append(login)
+            }
         }
+        read(true)
+        if result.isEmpty { read(false) }
         return result
     }
 

@@ -8,6 +8,8 @@ nonisolated struct ImportBatch: Sendable {
         let username: String
         let password: SecretString
         let created: Date?
+        /// When its password last changed, where the source keeps that: newer wins when the same login is here.
+        var changed: Date? = nil
         var notes = ""
         var otpAuth = ""
     }
@@ -40,6 +42,9 @@ nonisolated struct ImportProblem: Sendable, Hashable {
 
     let message: String
     let fix: Fix
+    /// What fixing it runs again (an `ImportCoordinator.Choice`'s raw value): only the part that failed, so
+    /// trying again never brings history or tabs over a second time. Zero means everything.
+    var retries: Int = 0
 }
 
 /// Reads a browser's SQLite database through a private copy: browsers keep theirs open and locked.

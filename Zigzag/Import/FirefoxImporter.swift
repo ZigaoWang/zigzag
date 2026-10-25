@@ -95,7 +95,9 @@ nonisolated enum FirefoxImporter {
                           let user = (login["encryptedUsername"] as? String).flatMap({ decryptField($0, key: key) }),
                           let password = (login["encryptedPassword"] as? String).flatMap({ decryptField($0, key: key) }), !password.isEmpty else { continue }
                     let created = (login["timeCreated"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
-                    batch.logins.append(ImportBatch.Login(url: url, username: user.withUnsafeString { $0 }, password: password, created: created))
+                    var imported = ImportBatch.Login(url: url, username: user.withUnsafeString { $0 }, password: password, created: created)
+                    imported.changed = (login["timePasswordChanged"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
+                    batch.logins.append(imported)
                 }
             }
             return

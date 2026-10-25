@@ -29,6 +29,11 @@ nonisolated struct Origin: Hashable, Sendable, CustomStringConvertible {
     /// What a person calls the site: "github.com".
     var displayName: String { host.hasPrefix("www.") ? String(host.dropFirst(4)) : host }
     var url: URL? { URL(string: description) }
+    /// Whether a login saved here may fill on `page`: the same origin, or an old http login on the same site's
+    /// secure page (never the other way round).
+    func fills(on page: Origin) -> Bool {
+        self == page || (scheme == "http" && page.scheme == "https" && host == page.host && port == nil && page.port == nil)
+    }
 }
 
 /// One saved login. The password stays in the Keychain until it's needed for filling, revealing or copying.
@@ -133,6 +138,32 @@ actor PasswordStore {
         guard status == errSecSuccess else { throw Failure.keychain(status) }
         notify()
     }
+
+    /// Adds an imported login without looking anything up first (the importer already knows what's here) and
+    /// without announcing it: the importer announces the whole batch once.
+    @discardableResult
+    func addImported(origin: Origin, username: String, password: SecretString, notes: String, otpAuth: String,
+                     created: Date, modified: Date) throws -> Credential {
+        let credential = Credential(id: UUID(), origin: origin, username: username, title: origin.displayName,
+                                    notes: notes, otpAuth: otpAuth, created: created, modified: modified, lastUsed: nil)
+        var item = attributes(for: credential)
+        item[kSecValueData] = password.data
+        let status = SecItemAdd(item as CFDictionary, nil)
+        guard status == errSecSuccess else { throw Failure.keychain(status) }
+        return credential
+    }
+
+    /// Replaces an imported login's password, quietly, for the same reason.
+    func replaceImported(_ credential: Credential, password: SecretString) throws {
+        var changes = attributes(for: credential)
+        for key in [kSecClass, kSecUseDataProtectionKeychain, kSecAttrAccessGroup, kSecAttrSynchronizable] { changes[key] = nil }
+        changes[kSecValueData] = password.data
+        let status = SecItemUpdate(try itemQuery(for: credential.id) as CFDictionary, changes as CFDictionary)
+        guard status == errSecSuccess else { throw Failure.keychain(status) }
+    }
+
+    /// Tells everyone listening that passwords changed, once, after a batch.
+    func announceChanges() { notify() }
 
     func markUsed(_ id: UUID) throws {
         guard var credential = try all().first(where: { $0.id == id }) else { return }

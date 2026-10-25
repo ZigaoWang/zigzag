@@ -45,6 +45,16 @@ enum ImportCoordinator {
         /// Arc's spaces, pinned tabs and favorites.
         static let tabs = Choice(rawValue: 8)
 
+        /// What trying again after these problems should run: just the parts that failed, or everything.
+        static func retrying(_ problems: [ImportProblem], else all: Choice) -> Choice {
+            let scopes: [Choice] = problems.filter { $0.fix == .retry || $0.fix == .primaryPassword }
+                .map { $0.fix == .primaryPassword ? Choice.passwords : Choice(rawValue: $0.retries) }
+            guard !scopes.isEmpty, !scopes.contains(where: { $0.isEmpty }) else { return all }
+            var union: Choice = []
+            for scope in scopes { union.formUnion(scope) }
+            return union.intersection(all)
+        }
+
         var reading: ChromiumImporter.Choice {
             var choice: ChromiumImporter.Choice = []
             if contains(.passwords) { choice.insert(.passwords) }
@@ -175,22 +185,49 @@ enum ImportCoordinator {
         return summary
     }
 
-    /// New logins are saved; a login already here is replaced only when the imported one is newer.
+    /// New logins are saved. A login already here is replaced only when the imported password is known to be
+    /// newer: a source without dates (a CSV file) never overwrites one. The same login twice in one import (Chrome
+    /// keeps it in two files) counts once, the newer copy.
     private static func savePasswords(_ logins: [ImportBatch.Login], into summary: inout Summary) async {
-        let store = PasswordStore.shared
-        let existing = (try? await store.all()) ?? []
+        struct Key: Hashable { let origin: Origin; let username: String }
+        func when(_ login: ImportBatch.Login) -> Date? { login.changed ?? login.created }
+        var newest: [Key: ImportBatch.Login] = [:]
+        var order: [Key] = []
         for login in logins {
             guard let origin = Origin(login.url) else { continue }
-            if let current = existing.first(where: { $0.origin == origin && $0.username == login.username }) {
-                if let created = login.created, created <= current.modified { continue }
-                if let saved = try? await store.password(for: current.id), saved.matches(login.password) { continue }
-                if (try? await store.save(origin: origin, username: login.username, password: login.password,
-                                          notes: login.notes, otpAuth: login.otpAuth)) != nil { summary.updatedPasswords += 1 }
-            } else if (try? await store.save(origin: origin, username: login.username, password: login.password, notes: login.notes,
-                                             otpAuth: login.otpAuth, created: login.created ?? Date())) != nil {
-                summary.passwords += 1
+            let key = Key(origin: origin, username: login.username)
+            if let seen = newest[key] {
+                if (when(login) ?? .distantPast) > (when(seen) ?? .distantPast) { newest[key] = login }
+            } else {
+                newest[key] = login
+                order.append(key)
             }
         }
+        let store = PasswordStore.shared
+        // What's here already, looked up once.
+        var here: [Key: Credential] = [:]
+        for credential in (try? await store.all()) ?? [] { here[Key(origin: credential.origin, username: credential.username)] = credential }
+        var changed = false
+        for key in order {
+            guard let login = newest[key] else { continue }
+            if var current = here[key] {
+                guard let date = when(login), date > current.modified else { continue }
+                if let saved = try? await store.password(for: current.id), saved.matches(login.password) { continue }
+                current.modified = date
+                if (try? await store.replaceImported(current, password: login.password)) != nil {
+                    here[key] = current
+                    summary.updatedPasswords += 1
+                    changed = true
+                }
+            } else if let added = try? await store.addImported(origin: key.origin, username: key.username, password: login.password,
+                                                                notes: login.notes, otpAuth: login.otpAuth,
+                                                                created: login.created ?? Date(), modified: when(login) ?? Date()) {
+                here[key] = added
+                summary.passwords += 1
+                changed = true
+            }
+        }
+        if changed { await store.announceChanges() }
     }
 
     /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded.
