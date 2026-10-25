@@ -38,8 +38,19 @@ final class TabArchive {
     }
 
     static var after: After {
-        get { After(rawValue: UserDefaults.standard.string(forKey: "ArchiveTabsAfter") ?? "") ?? .twelveHours }
+        // Off until you ask for it: tabs disappearing on their own is something you choose.
+        get { After(rawValue: UserDefaults.standard.string(forKey: "ArchiveTabsAfter") ?? "") ?? .never }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: "ArchiveTabsAfter") }
+    }
+
+    /// Once, when a space's list has grown long: a quiet offer to turn archiving on. Never asked again.
+    static func offerIfCrowded(tabCount: Int) {
+        let d = UserDefaults.standard
+        guard after == .never, d.string(forKey: "ArchiveTabsAfter") == nil, !d.bool(forKey: "ArchiveOffered"), tabCount >= 20,
+              let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate else { return }
+        d.set(true, forKey: "ArchiveOffered")
+        Toast.show("Tidy tabs you haven’t used in a day?", symbol: "archivebox", action: ("Turn On", { after = .day }),
+                   duration: 10, in: controller)
     }
 
     private(set) var entries: [ArchivedTab]

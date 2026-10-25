@@ -699,6 +699,7 @@ final class TabManager {
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
     /// what's on screen, a split, anything playing or in a call, or a private window's tabs.
     private func archiveStaleTabs(keeping onScreen: Set<UUID>) {
+        if !isPrivate { TabArchive.offerIfCrowded(tabCount: tabsBySpace.values.map(\.count).max() ?? 0) }
         guard !isPrivate, let limit = TabArchive.after.interval else { return }
         let now = Date()
         let stale = tabsBySpace.values.flatMap { $0 }.filter {
