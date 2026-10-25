@@ -411,7 +411,7 @@ final class BrandSurface: NSView {
         let image = NSImage(size: NSSize(width: size, height: size))
         if let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8, samplesPerPixel: 4,
                                       hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: size * 4, bitsPerPixel: 32) {
-            bytes.withUnsafeBufferPointer { memcpy(rep.bitmapData!, $0.baseAddress!, bytes.count) }
+            _ = bytes.withUnsafeBufferPointer { memcpy(rep.bitmapData!, $0.baseAddress!, bytes.count) }
             image.addRepresentation(rep)
         }
         return image
