@@ -404,12 +404,8 @@ final class TabManager {
         let wasSelected = selectedTab === tab
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
-            // A pinned tab that moved on goes back to its pinned page first; closing it again unloads it.
-            if isAway(bookmarkID) {
-                resetBookmarkTab(bookmarkID)
-                return
-            }
-            // Closing a bookmark only unloads its page; the bookmark stays.
+            // Closing a pinned page closes it, wherever it had got to: one ⌘W, never two. The pin stays, and
+            // opens fresh at its own address next time.
             bookmarkTabs[bookmarkID] = nil
             recentTabIDs.removeAll { $0 == tab.id }
             tab.close()
