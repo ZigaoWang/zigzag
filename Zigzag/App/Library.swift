@@ -27,20 +27,33 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var angle: Double? = nil
     /// The frame is frosted glass: the desktop shows through, softly tinted. Nil: solid.
     var glass: Bool? = nil
-    /// The glass's shade, from clear white (0) to smoked black (1). Nil: 0.
-    var glassTone: Double? = nil
-    /// What washes over the glass.
-    var glassColor: NSColor { NSColor(white: 1 - CGFloat(glassTone ?? 0), alpha: 0.5) }
+    /// How light or dark the space is, from 0 (lightest) to 1 (darkest); the window's mode follows it.
+    /// Nil: automatic, light by day and dark at night with the system.
+    var brightness: Double? = nil
+    /// What washes over the glass: white to black with the brightness, or with the system when automatic.
+    var glassColor: NSColor {
+        brightness.map { NSColor(white: 1 - CGFloat($0), alpha: 0.5) }
+            ?? Tokens.Color.dynamic(light: NSColor(white: 1, alpha: 0.5), dark: NSColor(white: 0, alpha: 0.5))
+    }
 
     /// The window frame color for this space.
-    var background: NSColor { hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background }
+    var background: NSColor {
+        if let brightness {
+            return SpaceColor.fixed(hue: baseHue, intensity: hue == nil ? SpaceColor.defaultIntensity : intensity ?? SpaceColor.defaultIntensity,
+                                    brightness: brightness, neutral: hue == nil && color.isNeutral)
+        }
+        return hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background
+    }
     /// The strong version, for dots and swatches.
     var swatch: NSColor { hue.map(SpaceColor.swatch(hue:)) ?? color.swatch }
     /// The hue the space is built on, curated or custom.
     var baseHue: Double { hue ?? color.hue }
     /// Where the gradient ends, at the same strength as the first color.
     var background2: NSColor? {
-        hue2.map { SpaceColor.background(hue: $0, intensity: intensity2 ?? intensity ?? SpaceColor.defaultIntensity) }
+        hue2.map { h in
+            let i = intensity2 ?? intensity ?? SpaceColor.defaultIntensity
+            return brightness.map { SpaceColor.fixed(hue: h, intensity: i, brightness: $0, neutral: false) } ?? SpaceColor.background(hue: h, intensity: i)
+        }
     }
     var gradientAngle: Double { angle ?? 45 }
 }
@@ -212,9 +225,11 @@ final class Library {
         commit()
     }
 
-    func setGlassTone(_ tone: Double, for id: UUID) {
+    /// Nil: automatic. Otherwise the window's mode follows it: light for the lighter half, dark for the darker.
+    func setBrightness(_ brightness: Double?, for id: UUID) {
         guard let i = index(of: id) else { return }
-        spaces[i].glassTone = tone
+        spaces[i].brightness = brightness
+        spaces[i].appearance = brightness.map { $0 < 0.5 ? "light" : "dark" }
         commit()
     }
 

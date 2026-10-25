@@ -232,21 +232,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
 
-    /// While the glass's shade is being dragged: the window shows it live.
-    func previewGlassTone(_ tone: Double, for spaceID: UUID) {
-        guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate, tabManager.currentSpace.glass == true else { return }
-        root.setColor(NSColor(white: 1 - CGFloat(tone), alpha: 0.5), animated: false)
-    }
-
-    /// While a gradient is being shaped in the space editor: the window shows it live.
-    func previewSpaceGradient(hue: Double, intensity: Double, hue2: Double?, intensity2: Double, angle: Double, for spaceID: UUID) {
-        guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
-        let glass = tabManager.currentSpace.glass == true
-        let alpha: CGFloat = glass ? 0.45 : 1
-        let start = SpaceColor.background(hue: hue, intensity: intensity)
-        if !glass { root.setColor(start, animated: false) }
-        root.setGradient(from: start.withAlphaComponent(alpha), to: hue2.map { SpaceColor.background(hue: $0, intensity: intensity2).withAlphaComponent(alpha) },
-                         angle: angle, animated: false)
+    /// While anything is being dragged in the space editor: the window shows that version of the space, unsaved.
+    func previewSpace(_ draft: SpaceInfo) {
+        sidebar.previewDotColor(draft.swatch, for: draft.id)
+        guard draft.id == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
+        render(draft, animated: false)
     }
 
     /// While the grain is being dragged in the space editor: the window shows it live.
@@ -257,14 +247,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
+        render(tabManager.currentSpace, animated: animated)
+    }
+
+    /// Draws the window for a space: its mode, color or glass, gradient and grain.
+    private func render(_ space: SpaceInfo, animated: Bool) {
         if !tabManager.isPrivate {
-            switch tabManager.currentSpace.appearance {
-            case "light": window?.appearance = NSAppearance(named: .aqua)
-            case "dark": window?.appearance = NSAppearance(named: .darkAqua)
-            default: window?.appearance = nil
-            }
+            let name: NSAppearance.Name? = space.appearance == "light" ? .aqua : space.appearance == "dark" ? .darkAqua : nil
+            if window?.appearance?.name != name { window?.appearance = name.flatMap(NSAppearance.init(named:)) }
         }
-        let space = tabManager.currentSpace
         let glass = !tabManager.isPrivate && space.glass == true
         let color = tabManager.isPrivate ? SpaceColor.graphite.background : glass ? space.glassColor : space.background
         // Glass: the window lets the desktop through, and the space's color washes over it instead of covering it.

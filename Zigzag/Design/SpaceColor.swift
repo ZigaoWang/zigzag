@@ -58,6 +58,15 @@ enum SpaceColor: String, Codable, CaseIterable {
                                     dark: NSColor(hue: hue, saturation: 0.12 + 0.45 * t, brightness: 0.15 + 0.06 * t, alpha: 1))
     }
 
+    /// One color, whatever the system's mode: how vivid, and how light or dark (0 lightest, 1 darkest).
+    /// Neutral drops the hue for white, grays and black.
+    static func fixed(hue: Double, intensity: Double, brightness: Double, neutral: Bool) -> NSColor {
+        let t = min(max(intensity, 0), 1), b = min(max(brightness, 0), 1)
+        let saturation = neutral ? 0 : (0.04 + 0.26 * t) * (1 - b) + (0.12 + 0.45 * t) * b + 0.12 * t * sin(.pi * b)
+        let value = neutral ? 1 - 0.93 * b : (0.97 - 0.05 * t) * (1 - b) + (0.13 + 0.06 * t) * b
+        return NSColor(hue: hue, saturation: saturation, brightness: value, alpha: 1)
+    }
+
     static func swatch(hue: Double) -> NSColor {
         Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.5, brightness: 0.8, alpha: 1),
                              dark: NSColor(hue: hue, saturation: 0.45, brightness: 0.85, alpha: 1))
