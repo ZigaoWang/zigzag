@@ -298,6 +298,7 @@ enum DebugBridge {
             }
         case "about": AboutWindowController.show()
         case "reader": controller.toggleReader()
+        case "ua": controller.selectedWebView?.customUserAgent = arg.isEmpty ? nil : arg; controller.selectedWebView?.reload()
         case "readerstyle":
             func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
             if let content = controller.window?.contentView { find(content)?.toggleOptions() }

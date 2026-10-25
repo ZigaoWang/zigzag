@@ -29,6 +29,10 @@ enum WebKitSetup {
         configuration.preferences.isFraudulentWebsiteWarningEnabled = true
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        #if DEBUG
+        // Testing on video sites: nothing plays until clicked, so nothing makes a sound.
+        if UserDefaults.standard.bool(forKey: "DebugNoAutoplay") { configuration.mediaTypesRequiringUserActionForPlayback = .all }
+        #endif
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
