@@ -1022,6 +1022,16 @@ extension BrowserWindowController: SidebarDelegate {
     func closeWithUndo(_ tab: Tab) {
         let wasBookmark = tab.bookmarkID != nil
         let id = tab.id
+        // A pinned page you'd wandered away from: the pin keeps its own address, and the note offers to keep where
+        // you were instead, so the page you were reading isn't simply gone.
+        if let bookmarkID = tab.bookmarkID, let here = tab.url, let pin = Library.shared.bookmark(bookmarkID),
+           TabManager.normalize(here) != TabManager.normalize(pin.url) {
+            tabManager.close(tab)
+            Toast.show("\(pin.title) stays pinned to its own page", symbol: "pin", action: ("Pin This Page", { [weak self] in
+                self?.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(bookmarkID, url: here) }
+            }), duration: 6, in: self)
+            return
+        }
         tabManager.close(tab)
         guard !wasBookmark else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in

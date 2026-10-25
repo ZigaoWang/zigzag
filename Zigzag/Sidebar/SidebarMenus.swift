@@ -69,8 +69,8 @@ enum SidebarMenus {
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(bookmark.id) })
             menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(bookmark.id) })
-            menu.addItem(Item("Use Current Page as Bookmark") {
-                controller.libraryChange("Update Bookmark") { Library.shared.updateBookmark(bookmark.id, url: url) }
+            menu.addItem(Item("Pin This Page Instead") {
+                controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(bookmark.id, url: url) }
             })
         }
         menu.addItem(Item("Copy Link") { controller.copyLink(bookmark.url) })
@@ -106,6 +106,9 @@ enum SidebarMenus {
         menu.addItem(Item("Copy Link") { controller.copyLink(favorite.url) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(favorite.id) })
+            menu.addItem(Item("Pin This Page Instead") {
+                controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(favorite.id, url: url) }
+            })
         }
         menu.addItem(Item("Move to Tabs") { controller.unfavoriteWithUndo(favorite.id, to: 0) })
         menu.addItem(.separator())
