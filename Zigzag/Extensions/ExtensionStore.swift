@@ -276,6 +276,11 @@ enum ExtensionStore {
         ]
         guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return .failure(.download) }
+        // Checking the signature over the whole package and unpacking it take a moment: off the main thread.
+        return await Task.detached(priority: .userInitiated) { unpack(data, id: id) }.value
+    }
+
+    nonisolated private static func unpack(_ data: Data, id: String) -> Result<(folder: URL, version: String), InstallError> {
         guard let package = try? CRXPackage(data, expectedID: id) else { return .failure(.verification) }
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-ext-\(UUID().uuidString)")
         let zipFile = staging.appendingPathExtension("zip")
@@ -319,12 +324,12 @@ enum ExtensionStore {
     /// The current version's manifest.
     static func manifest(for id: String) -> [String: Any]? { packageDirectory(for: id).flatMap(manifest(in:)) }
 
-    private static func manifest(in folder: URL) -> [String: Any]? {
+    nonisolated private static func manifest(in folder: URL) -> [String: Any]? {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")) else { return nil }
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
-    private static func manifestVersion(in folder: URL) -> String? {
+    nonisolated private static func manifestVersion(in folder: URL) -> String? {
         guard let version = manifest(in: folder)?["version"] as? String, !version.isEmpty, !version.contains("/") else { return nil }
         return version
     }

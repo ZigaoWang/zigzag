@@ -5,7 +5,7 @@ import Security
 /// A Chrome Web Store package (CRX3): a protobuf header of signatures, then a zip. Opening one checks that it
 /// really is the extension it claims to be: the header names an ID, a key in the header hashes to that ID, and
 /// that key's signature covers the zip byte for byte. Anything else is refused.
-struct CRXPackage {
+nonisolated struct CRXPackage {
     let id: String
     let zip: Data
 
@@ -116,7 +116,7 @@ struct CRXPackage {
 }
 
 /// Reads DER tag-length-value items in order.
-private struct DER {
+nonisolated private struct DER {
     private var bytes: ArraySlice<UInt8>
     init(_ bytes: [UInt8]) { self.bytes = bytes[...] }
     private init(slice: ArraySlice<UInt8>) { bytes = slice }
