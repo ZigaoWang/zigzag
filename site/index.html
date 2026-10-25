@@ -5,12 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zigzag</title>
 <meta name="description" content="Zigzag is a browser for the Mac. A space for each part of your life, your tabs down the side, and the page in front.">
-<meta name="theme-color" content="#F6F2EC" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#131214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#1E3A5F">
 <link rel="icon" type="image/png" href="/assets/favicon-64.png">
 <link rel="apple-touch-icon" href="/assets/icon-256.png">
-<link rel="preload" href="/assets/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/assets/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
 <meta property="og:title" content="Zigzag">
 <meta property="og:description" content="A browser for the Mac. A space for each part of your life, your tabs down the side, and the page in front.">
 <meta property="og:image" content="https://zigzagbrowser.com/assets/og.png">
@@ -21,100 +18,75 @@
 <body>
 
 <header class="bar">
-  <a class="home" href="/" aria-label="Zigzag"><span class="wordmark" aria-hidden="true"></span></a>
-  <nav>
-    <a href="#scenes">Tour</a>
-    <a class="pill" href="/download">Download</a>
-  </nav>
+  <a href="/" aria-label="Zigzag"><span class="wordmark" aria-hidden="true"></span></a>
+  <a class="button" href="/download">Download</a>
 </header>
 
 <main>
   <section class="hero">
-    <p class="eyebrow">Zigzag, a browser for the Mac</p>
-    <h1>Shanghai on Friday.<br><em>New York</em> by Sunday.<br>Work on Monday.</h1>
-    <div class="hero-foot">
-      <p>Give each part of your life its own space, with its own tabs and its own color. Swipe between them; nothing spills over.</p>
-      <div class="get">
-        <a class="pill big" href="/download">Download for Mac</a>
-        <span>Free · macOS 15.4 or later</span>
-      </div>
-    </div>
-    <figure class="film hero-film">
-      <video src="/assets/clips/spaces.mp4" poster="/assets/clips/spaces.jpg" muted loop playsinline preload="metadata"
-             aria-label="Switching from a Shanghai space to New York, a studio space and work, each with its own color and tabs."></video>
-    </figure>
+    <svg class="ribbon" viewBox="0 0 468 444" aria-hidden="true"><path pathLength="1" d="M50,50 L418,50 L84,222 L384,222 L50,394 L418,394"/></svg>
+    <h1>A space for every part of your life.</h1>
+    <p>Zigzag is a browser for the Mac. Each space keeps its own tabs and its own color, so a trip to Shanghai, a weekend in New York and Monday’s work never mix.</p>
+    <a class="button large" href="/download">Download for Mac</a>
+    <p class="fine">Free · macOS 15.4 or later</p>
   </section>
 
-  <div id="scenes">
-    <section class="scene" style="--tint: var(--rose)">
-      <div class="scene-head">
-        <p class="kicker"><span class="dot"></span>Shanghai</p>
-        <h2>The Aman on one side, <em>Wukang Mansion</em> on the other.</h2>
-        <p class="note">Split view puts two pages in one window: the hotel, and the walk down Huaihai Road you’re planning from it.</p>
-      </div>
-      <figure class="film"><video src="/assets/clips/split.mp4" poster="/assets/clips/split.jpg" muted loop playsinline preload="none"
-        aria-label="Two pages side by side in split view."></video></figure>
-    </section>
+  <figure class="film">
+    <video src="/assets/clips/spaces.mp4" poster="/assets/clips/spaces.jpg" muted loop playsinline preload="metadata"
+           aria-label="Clicking through four spaces, each with its own color and tabs."></video>
+  </figure>
 
-    <section class="scene" style="--tint: var(--peach)">
-      <div class="scene-head">
-        <p class="kicker"><span class="dot"></span>New York</p>
-        <h2>Look it up <em>without leaving</em> Katz’s.</h2>
-        <p class="note">Shift-click a link and it opens over the page you’re on. Read about the pastrami on rye, then press Escape and carry on.</p>
-      </div>
-      <figure class="film"><video src="/assets/clips/peek.mp4" poster="/assets/clips/peek.jpg" muted loop playsinline preload="none"
-        aria-label="A linked article opening in a panel over the current page, then closing."></video></figure>
-    </section>
+  <section class="feature">
+    <h2>Split View</h2>
+    <p>Drag a tab onto the page to open it beside the one you’re on.</p>
+  </section>
+  <figure class="film"><video src="/assets/clips/split.mp4" poster="/assets/clips/split.jpg" muted loop playsinline preload="none"
+    aria-label="A tab dragged from the sidebar onto the page opens beside it."></video></figure>
 
-    <section class="scene" style="--tint: var(--peach)">
-      <div class="scene-head">
-        <p class="kicker"><span class="dot"></span>Already open</p>
-        <h2>Type <em>katz</em>. It’s the tab you already have.</h2>
-        <p class="note">Press Command-T and start typing. Zigzag finds the tab before it opens a new one, so the same page never turns up twice.</p>
-      </div>
-      <figure class="film"><video src="/assets/clips/command.mp4" poster="/assets/clips/command.jpg" muted loop playsinline preload="none"
-        aria-label="Typing in the command bar, which offers to switch to an open tab."></video></figure>
-    </section>
+  <section class="feature">
+    <h2>Peek</h2>
+    <p>Shift-click a link to read it over the page. Press Escape and you’re back where you were.</p>
+  </section>
+  <figure class="film"><video src="/assets/clips/peek.mp4" poster="/assets/clips/peek.jpg" muted loop playsinline preload="none"
+    aria-label="Shift-clicking a link opens it in a panel over the page."></video></figure>
 
-    <section class="scene" style="--tint: var(--peach)">
-      <div class="scene-head">
-        <p class="kicker"><span class="dot"></span>The whole weekend</p>
-        <h2>Every tab, <em>laid out</em> like a contact sheet.</h2>
-        <p class="note">Shift-Command-Backslash shows every space at once. Pick the one you meant, or clear out a few.</p>
-      </div>
-      <figure class="film"><video src="/assets/clips/desk.mp4" poster="/assets/clips/desk.jpg" muted loop playsinline preload="none"
-        aria-label="All open tabs shown as cards, grouped by space."></video></figure>
-    </section>
+  <section class="feature">
+    <h2>Type to find it</h2>
+    <p>Press ⌘T and type. If the page is already open, Zigzag takes you to that tab instead of opening it twice.</p>
+  </section>
+  <figure class="film"><video src="/assets/clips/command.mp4" poster="/assets/clips/command.jpg" muted loop playsinline preload="none"
+    aria-label="Typing katz in the command bar switches to the tab already open."></video></figure>
 
-    <section class="scene" style="--tint: var(--lavender)">
-      <div class="scene-head">
-        <p class="kicker"><span class="dot"></span>Studio</p>
-        <h2>The Bauhaus, <em>set like a magazine.</em></h2>
-        <p class="note">Reader keeps the words and the pictures and drops everything else: big type, a lead photograph, pictures in the margin.</p>
-      </div>
-      <figure class="film"><video src="/assets/clips/reader.mp4" poster="/assets/clips/reader.jpg" muted loop playsinline preload="none"
-        aria-label="An article opening in Reader, with large type and pictures in the margin."></video></figure>
-    </section>
-  </div>
+  <section class="feature">
+    <h2>Every tab at once</h2>
+    <p>Press ⇧⌘\ to see the tabs in every space, then click the one you want.</p>
+  </section>
+  <figure class="film"><video src="/assets/clips/desk.mp4" poster="/assets/clips/desk.jpg" muted loop playsinline preload="none"
+    aria-label="All tabs shown as cards, grouped by space; clicking one opens it."></video></figure>
 
-  <section class="also">
-    <h2>And the <em>rest</em> of it.</h2>
+  <section class="feature">
+    <h2>Reader</h2>
+    <p>Just the article: big type, the lead photo, and pictures in the margin.</p>
+  </section>
+  <figure class="film"><video src="/assets/clips/reader.mp4" poster="/assets/clips/reader.jpg" muted loop playsinline preload="none"
+    aria-label="An article opened in Reader, scrolled, then closed."></video></figure>
+
+  <section class="list">
+    <h2>Also in Zigzag</h2>
     <dl>
-      <div><dt>Passwords</dt><dd>Kept in your Mac’s Keychain and filled in with a click. A strong one for every new account.</dd></div>
-      <div><dt>Extensions</dt><dd>Add them from the Chrome Web Store. Zigzag shows what each one can see first.</dd></div>
-      <div><dt>Blocking</dt><dd>Ads and trackers stopped as pages load. Turn it off for a site you want to support.</dd></div>
-      <div><dt>Private windows</dt><dd>No history, no cookies, no extensions. Close the window and it’s gone.</dd></div>
-      <div><dt>Translate</dt><dd>Pages translated on your Mac with Apple’s translation. The text never leaves it.</dd></div>
-      <div><dt>Switching</dt><dd>Bring bookmarks, history and passwords from Arc, Chrome, Safari, Firefox, Edge, Brave, Dia, Vivaldi or Opera. Arc spaces come over as they were.</dd></div>
+      <dt>Passwords</dt><dd>Kept in your Mac’s Keychain and filled in with a click.</dd>
+      <dt>Extensions</dt><dd>From the Chrome Web Store, with what each one can see shown first.</dd>
+      <dt>Ad blocking</dt><dd>Ads and trackers stopped as pages load. Allow a site with one click.</dd>
+      <dt>Private windows</dt><dd>No history, no cookies, no extensions.</dd>
+      <dt>Translate</dt><dd>Pages translated on your Mac. The text never leaves it.</dd>
+      <dt>Import</dt><dd>Bookmarks, history and passwords from Arc, Chrome, Safari, Firefox, Edge, Brave, Dia, Vivaldi and Opera.</dd>
     </dl>
   </section>
 
-  <section class="last">
-    <span class="wordmark giant" aria-hidden="true"></span>
-    <div class="get">
-      <a class="pill big" href="/download">Download for Mac</a>
-      <span>Free · macOS 15.4 or later · Apple silicon and Intel</span>
-    </div>
+  <section class="end">
+    <span class="wordmark big" aria-hidden="true"></span>
+    <a class="button large" href="/download">Download for Mac</a>
+    <p class="fine">Free · macOS 15.4 or later · Apple silicon and Intel</p>
   </section>
 </main>
 
@@ -124,19 +96,16 @@
 </footer>
 
 <script>
-  // Films play while they're on screen and rest when they're not; with Reduce Motion they stay on their first frame.
+  // Clips play while on screen and rest when not; with Reduce Motion they stay still.
   (function () {
-    var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var films = document.querySelectorAll(".film video");
-    if (still || !("IntersectionObserver" in window)) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
     var seen = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
         var v = e.target;
-        if (e.isIntersecting) { if (v.preload === "none") v.preload = "auto"; var p = v.play(); if (p) p.catch(function () {}); }
-        else v.pause();
+        if (e.isIntersecting) { v.preload = "auto"; var p = v.play(); if (p) p.catch(function () {}); } else v.pause();
       });
-    }, { threshold: 0.35 });
-    films.forEach(function (v) { seen.observe(v); });
+    }, { threshold: 0.4 });
+    document.querySelectorAll(".film video").forEach(function (v) { seen.observe(v); });
   })();
 </script>
 </body>
