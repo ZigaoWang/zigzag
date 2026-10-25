@@ -102,7 +102,8 @@ final class OnboardingView: NSView {
     private func slide(from old: NSView, to new: NSView, forward: Bool) {
         [old, new].forEach { $0.wantsLayer = true }
         guard let oldLayer = old.layer, let newLayer = new.layer else { old.removeFromSuperview(); return }
-        let distance: CGFloat = forward ? 36 : -36
+        // With Reduce Motion, a cross-fade in place.
+        let distance: CGFloat = Tokens.Motion.reduceMotion ? 0 : forward ? 36 : -36
         let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         func animation(_ key: String, _ from: Any, _ to: Any, _ duration: CFTimeInterval) -> CABasicAnimation {
             let a = CABasicAnimation(keyPath: key)
@@ -1007,7 +1008,8 @@ final class IntoZigzag: NSView {
             let grow = CAKeyframeAnimation(keyPath: "transform.scale")
             grow.values = bump.map { 1 + 0.3 * $0 }
             let both = CAAnimationGroup()
-            both.animations = [glow, grow]
+            // With Reduce Motion, the dots only glow in turn; nothing swells.
+            both.animations = Tokens.Motion.reduceMotion ? [glow] : [glow, grow]
             both.duration = period
             both.repeatCount = .infinity
             both.timingFunction = CAMediaTimingFunction(name: .linear)
@@ -1024,7 +1026,7 @@ final class IntoZigzag: NSView {
                     NSAnimationContext.runAnimationGroup({ ctx in
                         ctx.duration = 0.45
                         ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.5, 0, 0.3, 1)
-                        view.animator().frame = target.insetBy(dx: 26, dy: 26)
+                        if !Tokens.Motion.reduceMotion { view.animator().frame = target.insetBy(dx: 26, dy: 26) }
                         view.animator().alphaValue = 0
                     }, completionHandler: { view.removeFromSuperview() })
                 }
@@ -1048,6 +1050,7 @@ final class IntoZigzag: NSView {
                     ctx.allowsImplicitAnimation = true
                     self.layoutSubtreeIfNeeded()
                 }
+                guard !Tokens.Motion.reduceMotion else { self.needsLayout = true; return }
                 let pop = CASpringAnimation(keyPath: "transform.scale")
                 pop.fromValue = 0.9
                 pop.toValue = 1
