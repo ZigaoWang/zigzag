@@ -646,6 +646,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             guard self.tabManager.selectedTab === tab, self.reader == nil else { return }
             let view = ReaderView()
+            view.onClose = { [weak self] in self?.closeReader() }
             view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link) }
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab) }
