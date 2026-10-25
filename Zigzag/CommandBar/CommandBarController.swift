@@ -166,7 +166,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     func show(mode: Mode) {
         guard let controller else { return }
-        if !isVisible { setScope(nil) }
+        // A fresh bar, or a different one (⌘L over ⌘T): no leftover site scope, and no hint from the last thing typed.
+        if !isVisible || mode != self.mode {
+            typed = ""
+            field.stringValue = ""
+            setScope(nil)
+        }
         self.mode = mode
         mouseAtOpen = NSEvent.mouseLocation
         let card = controller.root.cardFrame
