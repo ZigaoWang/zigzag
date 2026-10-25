@@ -44,6 +44,9 @@ enum WebKitSetup {
             configuration.userContentController.addUserScript(Autofill.script)
             configuration.userContentController.add(Autofill.shared, contentWorld: .defaultClient, name: Autofill.messageName)
             ContentBlocker.attach(to: configuration)
+            // Extension pages only: their uncaught errors go to the extensions log, so a page that stalls says why.
+            configuration.userContentController.addUserScript(ExtensionPageErrors.script)
+            configuration.userContentController.add(ExtensionPageErrors.shared, contentWorld: .page, name: ExtensionPageErrors.messageName)
         }
     }
 }
@@ -92,5 +95,33 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
         guard message.name == "zigzagHover", let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return }
         let text = message.body as? String ?? ""
         tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+    }
+}
+
+/// Uncaught errors and failed promises on an extension's own pages, as one line each in the extensions log: the
+/// error's message and where it was thrown, nothing from the page's data. Ordinary websites never send these.
+final class ExtensionPageErrors: NSObject, WKScriptMessageHandler {
+    static let shared = ExtensionPageErrors()
+    static let messageName = "zigzagExtensionError"
+
+    static let script = WKUserScript(source: """
+    (() => {
+      if (location.protocol !== 'webkit-extension:') return;
+      const post = (kind, text) => { try { window.webkit.messageHandlers.\(messageName).postMessage(kind + ': ' + String(text).slice(0, 240)); } catch (e) {} };
+      window.addEventListener('error', (e) => post('error', (e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || 0)));
+      window.addEventListener('unhandledrejection', (e) => post('rejection', (e.reason && (e.reason.message || e.reason.name)) || e.reason));
+      const failed = new Set();
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.responseStatus >= 400 && !failed.has(entry.name)) { failed.add(entry.name); post('http ' + entry.responseStatus, entry.name.split('?')[0]); }
+        }
+      }).observe({ type: 'resource', buffered: true });
+      post('loaded', location.pathname + location.hash.split('?')[0]);
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.frameInfo.securityOrigin.protocol == "webkit-extension", let text = message.body as? String else { return }
+        ExtensionLog.write("page \(message.frameInfo.securityOrigin.host.prefix(8)) \(text)")
     }
 }
