@@ -19,11 +19,26 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var appearance: String? = nil
     /// How much grain the window's frame has in this space (0 = smooth, 1 = most). Nil: smooth.
     var grain: Double? = nil
+    /// A second hue the frame fades into. Nil: one color.
+    var hue2: Double? = nil
+    /// How strong the second color is; nil: the same as the first.
+    var intensity2: Double? = nil
+    /// Which way the gradient runs, in degrees (0: left to right, 90: top to bottom). Nil: 45, top left to bottom right.
+    var angle: Double? = nil
+    /// The frame is frosted glass: the desktop shows through, softly tinted. Nil: solid.
+    var glass: Bool? = nil
 
     /// The window frame color for this space.
     var background: NSColor { hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background }
     /// The strong version, for dots and swatches.
     var swatch: NSColor { hue.map(SpaceColor.swatch(hue:)) ?? color.swatch }
+    /// The hue the space is built on, curated or custom.
+    var baseHue: Double { hue ?? color.hue }
+    /// Where the gradient ends, at the same strength as the first color.
+    var background2: NSColor? {
+        hue2.map { SpaceColor.background(hue: $0, intensity: intensity2 ?? intensity ?? SpaceColor.defaultIntensity) }
+    }
+    var gradientAngle: Double { angle ?? 45 }
 }
 
 enum SearchEngine: String, Codable, CaseIterable {
@@ -151,7 +166,7 @@ final class Library {
     @discardableResult
     func addSpace(name: String? = nil, color: SpaceColor? = nil) -> SpaceInfo {
         let used = Set(spaces.map(\.color))
-        let pick = color ?? SpaceColor.allCases.first { $0 != .graphite && !used.contains($0) } ?? SpaceColor.allCases[spaces.count % SpaceColor.allCases.count]
+        let pick = color ?? SpaceColor.allCases.first { !$0.isNeutral && !used.contains($0) } ?? SpaceColor.allCases[spaces.count % SpaceColor.allCases.count]
         let space = SpaceInfo(name: name ?? "Space \(spaces.count + 1)", color: pick)
         spaces.append(space)
         commit()
@@ -177,6 +192,25 @@ final class Library {
     func setAppearance(_ appearance: String?, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].appearance = appearance
+        commit()
+    }
+
+    func setSecondHue(_ hue: Double?, intensity: Double? = nil, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].hue2 = hue.map { $0.truncatingRemainder(dividingBy: 1) }
+        spaces[i].intensity2 = hue == nil ? nil : intensity ?? spaces[i].intensity2
+        commit()
+    }
+
+    func setGradientAngle(_ angle: Double, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].angle = angle
+        commit()
+    }
+
+    func setGlass(_ on: Bool, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].glass = on ? true : nil
         commit()
     }
 

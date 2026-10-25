@@ -90,7 +90,7 @@ enum Brand {
         static func of(_ space: SpaceInfo?) -> Theme {
             guard let space else { return .navy }
             if let hue = space.hue { return Theme(hue: hue) }
-            return space.color == .graphite || space.color == .sky ? .navy : Theme(hue: space.color.hue)
+            return space.color.isNeutral || space.color == .sky ? .navy : Theme(hue: space.color.hue)
         }
 
         /// The space in front: the key browser window's, or the first one's.

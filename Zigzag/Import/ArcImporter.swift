@@ -160,7 +160,7 @@ enum ArcImporter {
         let color = NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
         if color.saturationComponent < 0.15 { return .graphite }
         let hue = color.hueComponent
-        let candidates = SpaceColor.allCases.filter { $0 != .graphite }
+        let candidates = SpaceColor.allCases.filter { !$0.isNeutral }
         return candidates.min { a, b in
             hueDistance(hue, (a.swatch.usingColorSpace(.sRGB)?.hueComponent ?? 0)) < hueDistance(hue, (b.swatch.usingColorSpace(.sRGB)?.hueComponent ?? 0))
         } ?? .sky

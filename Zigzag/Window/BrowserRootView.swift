@@ -234,6 +234,69 @@ final class BrowserRootView: ColorView {
         return NSRect(x: x, y: inset, width: sidebarWidth, height: bounds.height - inset * 2)
     }
 
+    /// Frosted glass behind the frame, for spaces that want the desktop to show through.
+    private lazy var glassView: NSVisualEffectView = {
+        let glass = NSVisualEffectView()
+        glass.blendingMode = .behindWindow
+        glass.material = .underWindowBackground
+        glass.state = .active
+        glass.isHidden = true
+        addSubview(glass, positioned: .below, relativeTo: nil)
+        glass.wantsLayer = true
+        glass.layer?.zPosition = -3
+        return glass
+    }()
+
+    func setGlass(_ on: Bool) {
+        glassView.isHidden = !on
+        if on { glassView.frame = bounds }
+    }
+
+    /// A second color the frame fades into, corner to corner, under the grain.
+    private lazy var gradientLayer: CAGradientLayer = {
+        let gradient = CAGradientLayer()
+        gradient.startPoint = CGPoint(x: 0, y: 0)
+        gradient.endPoint = CGPoint(x: 1, y: 1)
+        gradient.zPosition = -2
+        gradient.opacity = 0
+        layer?.insertSublayer(gradient, at: 0)
+        return gradient
+    }()
+    private var gradientColors: (NSColor, NSColor)?
+
+    func setGradient(from start: NSColor, to end: NSColor?, angle: Double = 45, animated: Bool) {
+        gradientColors = end.map { (start, $0) }
+        // The angle as two points on the unit square, through its middle (0° runs left to right, 90° top to bottom;
+        // the view is flipped, so y grows downward here too).
+        let r = angle * .pi / 180
+        let dx = cos(r) / 2, dy = sin(r) / 2
+        Tokens.Motion.withoutAnimation {
+            gradientLayer.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 - dy)
+            gradientLayer.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 + dy)
+        }
+        applyGradient(animated: animated)
+    }
+
+    private func applyGradient(animated: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(!animated)
+        CATransaction.setAnimationDuration(Tokens.Motion.large)
+        if let (start, end) = gradientColors {
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                gradientLayer.colors = [start.cgColor, end.cgColor]
+            }
+            gradientLayer.opacity = 1
+        } else {
+            gradientLayer.opacity = 0
+        }
+        CATransaction.commit()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyGradient(animated: false)
+    }
+
     /// The frame's grain, under everything else: the same fine noise as Zigzag's own branded screens.
     private lazy var grainLayer: CALayer = {
         let grain = CALayer()
@@ -258,7 +321,8 @@ final class BrowserRootView: ColorView {
 
     override func layout() {
         super.layout()
-        Tokens.Motion.withoutAnimation { grainLayer.frame = bounds }
+        Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
+        if !glassView.isHidden { glassView.frame = bounds }
         layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible

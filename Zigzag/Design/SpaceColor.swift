@@ -3,7 +3,10 @@ import AppKit
 /// The curated set of space tints. One color per space colors the whole window frame.
 /// Light values are pale enough for dark text, dark values deep enough for light text.
 enum SpaceColor: String, Codable, CaseIterable {
-    case graphite, sky, sage, sand, rose, lavender, mint, peach
+    case snow, graphite, ink, sky, sage, sand, rose, lavender, mint, peach
+
+    /// Without a hue: pure white, gray and black. A gradient or a hue doesn't apply to them.
+    var isNeutral: Bool { self == .snow || self == .graphite || self == .ink }
 
     /// A colour this version doesn't know (saved by a newer one) reads as graphite, rather than making the whole
     /// library unreadable.
@@ -13,7 +16,9 @@ enum SpaceColor: String, Codable, CaseIterable {
 
     var name: String {
         switch self {
+        case .snow: "White"
         case .graphite: "Graphite"
+        case .ink: "Black"
         case .sky: "Sky"
         case .sage: "Sage"
         case .sand: "Sand"
@@ -26,7 +31,9 @@ enum SpaceColor: String, Codable, CaseIterable {
 
     private var pair: (light: UInt32, dark: UInt32) {
         switch self {
+        case .snow: (0xFFFFFF, 0x2C2C2E)
         case .graphite: (0xE6E6E8, 0x1D1D20)
+        case .ink: (0x1C1C1E, 0x000000)
         case .sky: (0xDAE5F2, 0x18212D)
         case .sage: (0xDDE7DA, 0x1A231B)
         case .sand: (0xEDE4D5, 0x262118)
@@ -65,7 +72,9 @@ enum SpaceColor: String, Codable, CaseIterable {
     /// A saturated version used for small swatches and the space dot.
     var swatch: NSColor {
         switch self {
+        case .snow: Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF), dark: Tokens.Color.hex(0xF2F2F7))
         case .graphite: Tokens.Color.dynamic(light: Tokens.Color.hex(0x8E8E93), dark: Tokens.Color.hex(0x98989D))
+        case .ink: Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x000000))
         case .sky: Tokens.Color.dynamic(light: Tokens.Color.hex(0x5B8FD0), dark: Tokens.Color.hex(0x6E9EDB))
         case .sage: Tokens.Color.dynamic(light: Tokens.Color.hex(0x6E9A6A), dark: Tokens.Color.hex(0x7DAA78))
         case .sand: Tokens.Color.dynamic(light: Tokens.Color.hex(0xB89A64), dark: Tokens.Color.hex(0xC6A970))

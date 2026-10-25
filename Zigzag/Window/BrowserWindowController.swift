@@ -232,6 +232,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
 
+    /// While a gradient is being shaped in the space editor: the window shows it live.
+    func previewSpaceGradient(hue: Double, intensity: Double, hue2: Double?, intensity2: Double, angle: Double, for spaceID: UUID) {
+        guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
+        let glass = tabManager.currentSpace.glass == true
+        let alpha: CGFloat = glass ? 0.45 : 1
+        let start = SpaceColor.background(hue: hue, intensity: intensity)
+        if !glass { root.setColor(start, animated: false) }
+        root.setGradient(from: start.withAlphaComponent(alpha), to: hue2.map { SpaceColor.background(hue: $0, intensity: intensity2).withAlphaComponent(alpha) },
+                         angle: angle, animated: false)
+    }
+
     /// While the grain is being dragged in the space editor: the window shows it live.
     func previewSpaceGrain(_ grain: Double, for spaceID: UUID) {
         guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
@@ -248,8 +259,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         let color = tabManager.isPrivate ? SpaceColor.graphite.background : tabManager.currentSpace.background
-        root.setColor(color, animated: animated)
-        root.setGrain(tabManager.isPrivate ? 0 : tabManager.currentSpace.grain ?? 0, animated: animated)
+        let space = tabManager.currentSpace
+        let glass = !tabManager.isPrivate && space.glass == true
+        // Glass: the window lets the desktop through, and the space's color washes over it instead of covering it.
+        window?.isOpaque = !glass
+        window?.backgroundColor = glass ? .clear : .windowBackgroundColor
+        root.setGlass(glass)
+        let end = tabManager.isPrivate ? nil : space.background2
+        if glass {
+            root.setColor(.clear, animated: animated)
+            root.setGradient(from: color.withAlphaComponent(0.45), to: (end ?? color).withAlphaComponent(0.45), angle: space.gradientAngle, animated: animated)
+        } else {
+            root.setColor(color, animated: animated)
+            root.setGradient(from: color, to: end, angle: space.gradientAngle, animated: animated)
+        }
+        root.setGrain(tabManager.isPrivate ? 0 : space.grain ?? 0, animated: animated)
         root.sidebarContainer.tint = color
     }
 
