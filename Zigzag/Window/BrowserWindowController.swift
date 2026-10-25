@@ -1035,6 +1035,8 @@ extension BrowserWindowController: SidebarDelegate {
         let oldSpace = tab.spaceID
         let oldIndex = tabManager.tabs(in: oldSpace).firstIndex { $0 === tab } ?? 0
         if spaceID == oldSpace { tabManager.move(tab, to: index) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index) }
+        // Dropped into the space a drag opened, with the old page still showing: you're there now, so it's this tab.
+        if spaceID != oldSpace, spaceID == tabManager.currentSpaceID, shownTab !== tabManager.selectedTab { tabManager.select(tab) }
         sidebarUndo.registerUndo(withTarget: self) { $0.moveWithUndo(tab, to: oldIndex, in: oldSpace) }
         sidebarUndo.setActionName(spaceID == oldSpace ? "Move Tab" : "Move to Space")
     }
@@ -1068,6 +1070,12 @@ extension BrowserWindowController: SidebarDelegate {
     func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() { sidebar.clearDropTargets() }
+    /// A drag that opened another space kept the page on screen. However it ended, the selection matches what's
+    /// showing again, so ⌘W closes the page you see.
+    func listDropFinished() {
+        guard shownTab !== tabManager.selectedTab else { return }
+        if let shown = shownTab, tabManager.tab(with: shown.id) != nil { tabManager.select(shown) } else { showSelectedTab() }
+    }
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
         libraryChange("Move Bookmark") { Library.shared.moveBookmark(id, to: index, in: spaceID) }

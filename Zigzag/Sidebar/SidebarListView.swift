@@ -14,6 +14,8 @@ protocol SidebarListDelegate: AnyObject {
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID?
     func listDragEnded()
+    /// The drop has been handled, whatever it did.
+    func listDropFinished()
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID)
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID)
     func listUnbookmark(_ bookmarkID: UUID, to index: Int)
@@ -700,6 +702,7 @@ final class SidebarListView: NSView {
     private func endDrag(with event: NSEvent) {
         guard let drag else { return }
         drop(drag, event: event)
+        delegate?.listDropFinished()
         settle(drag)
     }
 

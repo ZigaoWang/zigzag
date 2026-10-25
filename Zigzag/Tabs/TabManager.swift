@@ -502,9 +502,8 @@ final class TabManager {
         var list = tabsBySpace[target] ?? []
         list.insert(tab, at: max(0, min(index, list.count)))
         tabsBySpace[target] = list
-        if selectedBySpace.values.contains(tab.id), target != currentSpaceID {
-            for (space, id) in selectedBySpace where id == tab.id { selectedBySpace[space] = nil }
-        }
+        // No other space keeps it selected, whichever one is showing.
+        for (space, id) in selectedBySpace where id == tab.id && space != target { selectedBySpace[space] = nil }
         changed.send(.structure)
     }
 
