@@ -178,9 +178,11 @@ final class Tab: NSObject {
         }
     }
 
-    func close() {
+    /// `keepingSnapshot`: its window closed but the tab may come back (reopening the last window), so its
+    /// thumbnail stays until the next save prunes what isn't kept.
+    func close(keepingSnapshot: Bool = false) {
         if let webView { tearDown(webView) }
-        SnapshotStore.remove(id)
+        if !keepingSnapshot { SnapshotStore.remove(id) }
     }
 
     private func tearDown(_ webView: BrowserWebView) {

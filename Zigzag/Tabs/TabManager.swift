@@ -67,7 +67,7 @@ final class TabManager {
 
     func invalidate() {
         suspendTimer?.invalidate()
-        allTabs.forEach { $0.close() }
+        allTabs.forEach { $0.close(keepingSnapshot: !isPrivate) }
         tabsBySpace = [:]
         bookmarkTabs = [:]
     }
