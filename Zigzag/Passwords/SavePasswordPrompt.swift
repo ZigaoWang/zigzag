@@ -105,14 +105,13 @@ final class SavePasswordPrompt: FloatingPanelView {
         Tokens.Motion.slideVertically(prompt, fromOffsetY: -Tokens.Space.x2)
         current = prompt
         prompt.scheduleHide()
-        // You just signed in, so the prompt takes the keyboard: Return saves, Esc says Not Now. Clicking the page
-        // gives the keyboard back and the keys stop meaning anything here.
-        controller.window?.makeFirstResponder(prompt.usernameField)
-        if let editor = prompt.usernameField.currentEditor() { editor.selectedRange = NSRange(location: prompt.usernameField.stringValue.count, length: 0) }
+        // The keyboard stays where you were typing: a prompt that appears mid-sign-in must never catch the rest of
+        // a password, or a second Return. Once you click into it, Return saves and Esc says Not Now.
         prompt.keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
             guard let prompt, prompt.superview != nil, let window = prompt.window, event.window === window else { return event }
             let focused = (window.firstResponder as? NSView).map { $0 === prompt || $0.isDescendant(of: prompt) } ?? false
-            guard focused else { return event }
+            // Return that commits a word being composed (Chinese, Japanese) belongs to the field.
+            guard focused, !((window.firstResponder as? NSTextView)?.hasMarkedText() ?? false) else { return event }
             switch event.keyCode {
             case 36, 76: prompt.close(saved: true); return nil
             case 53: prompt.close(saved: false); return nil
