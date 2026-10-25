@@ -28,7 +28,10 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
   background: var(--line); box-shadow: 0 0 0 1px var(--line), 0 24px 60px -32px rgba(0,0,0,.35); }
 .clip figcaption { margin-top: 18px; text-align: center; font-size: 15px; color: var(--soft); }
 
-.end { padding: 24px 0 80px; text-align: center; border-top: 1px solid var(--line); }
+.pitch { padding: 40px 0 140px; text-align: center; }
+.pitch h2 { margin: 0; font-size: clamp(28px, 3.6vw, 40px); line-height: 1.12; font-weight: 700; letter-spacing: -0.025em; text-wrap: balance; }
+.pitch p:not(.fine) { margin: 18px auto 0; max-width: 560px; font-size: 17px; color: var(--soft); text-wrap: pretty; }
+.end { padding: 24px 0 64px; text-align: center; border-top: 1px solid var(--line); }
 
 /* Download page */
 .page { max-width: 640px; margin: 0 auto; padding: 120px 24px 80px; text-align: center; }
