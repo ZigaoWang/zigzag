@@ -30,8 +30,8 @@ final class SitePanel: FloatingPanelView {
     private var rows: [PanelRow] = []
     private let topDivider = ColorView(color: Tokens.Color.separator)
     private let divider = ColorView(color: Tokens.Color.separator)
-    private let clearCache = TextButton(title: "Clear Cache", font: Tokens.Font.body(.medium))
-    private let clearCookies = TextButton(title: "Clear Cookies", font: Tokens.Font.body(.medium))
+    private let clearCache = TextButton.form("Clear Cache")
+    private let clearCookies = TextButton.form("Clear Cookies")
 
     static let width: CGFloat = 300
     private let pad = Tokens.Space.x4
@@ -143,7 +143,6 @@ final class SitePanel: FloatingPanelView {
         let items = ExtensionHost.shared.actions(for: tab)
         extensionTiles = items.map { item in
             let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
-            tile.restsPlain = true
             tile.toolTip = item.attention != nil ? "\(item.label): needs attention" : item.label
             tile.badge = item.attention != nil ? "!" : item.badge
             tile.isAttention = item.attention != nil
@@ -156,7 +155,6 @@ final class SitePanel: FloatingPanelView {
             return tile
         }
         let add = PanelTile(symbol: "plus", caption: nil)
-        add.restsPlain = true
         add.toolTip = "Get Extensions"
         add.onClick = { [weak self] _ in
             self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
@@ -245,8 +243,9 @@ final class SitePanel: FloatingPanelView {
         // Header: the site, whether the connection is private, and Copy Link.
         let iconSide = Tokens.Space.x6
         let copySide = Tokens.Space.x7Height
-        place(copyButton, NSRect(x: Self.width - pad - copySide + Tokens.Space.x1, y: y + 1, width: copySide, height: copySide))
-        place(icon, NSRect(x: pad, y: y + 3, width: iconSide, height: iconSide))
+        let headerHeight = siteName.lineHeight + security.lineHeight + 4
+        place(copyButton, NSRect(x: Self.width - pad - copySide + Tokens.Space.x1, y: y + (headerHeight - copySide) / 2, width: copySide, height: copySide))
+        place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
         let textWidth = Self.width - textX - pad - copySide
         place(siteName, NSRect(x: textX, y: y, width: textWidth, height: siteName.lineHeight))
@@ -266,21 +265,24 @@ final class SitePanel: FloatingPanelView {
             }
             y += Tokens.Space.x7Height + Tokens.Space.x3
         }
-        place(topDivider, NSRect(x: pad, y: y, width: inner, height: Tokens.Metric.hairline))
-        y += Tokens.Space.x3
+        // Sections are set apart by space, not lines.
+        topDivider.isHidden = true
+        y += Tokens.Space.x1
 
         // Extensions: plain icons, one line (two if there are many), Get Extensions at the end.
         if !extensionTiles.isEmpty {
             place(extensionsLabel, NSRect(x: pad, y: y, width: inner, height: extensionsLabel.lineHeight))
             y += extensionsLabel.lineHeight + Tokens.Space.x1
-            let side: CGFloat = 36
-            let columns = Int((inner + 4) / (side + 4))
+            y += Tokens.Space.x1
+            // Every icon on the same tile, the same size, lined up with the text above; + is one of them.
+            let gap: CGFloat = 8, columns = 6
+            let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
             for (i, tile) in extensionTiles.enumerated() {
                 let column = i % columns, row = i / columns
-                place(tile, NSRect(x: pad - 6 + CGFloat(column) * (side + 4), y: y + CGFloat(row) * (side + 4), width: side, height: side))
+                place(tile, NSRect(x: pad + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (side + gap), width: side, height: side))
             }
             let rowsCount = (extensionTiles.count + columns - 1) / columns
-            y += CGFloat(rowsCount) * (side + 4) + Tokens.Space.x2
+            y += CGFloat(rowsCount) * (side + gap) - gap + Tokens.Space.x5
         }
 
         // This site's own settings.
@@ -291,17 +293,18 @@ final class SitePanel: FloatingPanelView {
                 place(row, NSRect(x: pad, y: y, width: inner, height: PanelRow.height))
                 y += PanelRow.height
             }
-            y += Tokens.Space.x2
+            y += Tokens.Space.x3
         }
 
-        // Clearing, for this site only.
+        // Clearing, for this site only: two equal buttons across the bottom.
         if !clearCache.isHidden {
-            place(divider, NSRect(x: pad, y: y, width: inner, height: Tokens.Metric.hairline))
-            y += Tokens.Space.x2
-            let w1 = clearCache.fittingWidth
-            place(clearCache, NSRect(x: pad - Tokens.Space.x2, y: y, width: w1, height: Tokens.Space.x7Height))
-            place(clearCookies, NSRect(x: pad - Tokens.Space.x2 + w1 + Tokens.Space.x1, y: y, width: clearCookies.fittingWidth, height: Tokens.Space.x7Height))
-            y += Tokens.Space.x7Height - Tokens.Space.x1
+            divider.isHidden = true
+            let half = (inner - Tokens.Space.x2) / 2, h = Tokens.Space.x8
+            place(clearCache, NSRect(x: pad, y: y, width: half, height: h))
+            place(clearCookies, NSRect(x: pad + half + Tokens.Space.x2, y: y, width: half, height: h))
+            y += h
+        } else {
+            y -= Tokens.Space.x3
         }
         return y + pad
     }
@@ -388,7 +391,8 @@ final class PanelTile: InteractiveView {
 
     override func layout() {
         super.layout()
-        let side: CGFloat = caption == nil ? min(bounds.width, bounds.height) * 0.56 : 20
+        // One size for every icon, whatever its artwork, so a row of them reads as a set.
+        let side: CGFloat = caption == nil ? 22 : 20
         if let caption {
             let total = side + Tokens.Space.x1 + caption.lineHeight
             let top = (bounds.height - total) / 2
