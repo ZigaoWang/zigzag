@@ -771,7 +771,9 @@ private final class BringPicker: StepContent {
         refresh()
     }
 
-    private var waiting: [BrowserRow] { rows.filter { $0.isChosen && !$0.isFinished } }
+    /// Chosen and not yet imported. A row that came over with a problem is retried from its own fix, never by
+    /// importing everything from it again.
+    private var waiting: [BrowserRow] { rows.filter { row in if case .done = row.state { false } else { row.isChosen } } }
     private var choice: ImportCoordinator.Choice { pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } } }
 
     private func refresh() {
