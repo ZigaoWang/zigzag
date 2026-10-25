@@ -986,20 +986,26 @@ final class IntoZigzag: NSView {
         // behind the one before and spaced so one is always lit: no start-up, no dark gap between rounds.
         let period = Self.wave
         let now = CACurrentMediaTime()
+        // Where each dot is right now, so finishing fades from there instead of snapping.
+        let showing = dots.map { $0.presentation()?.opacity ?? $0.opacity }
         for (i, dot) in dots.enumerated() {
             dot.removeAllAnimations()
             guard new == .importing else { continue }
+            // One smooth bump per round, sampled finely and played at an even pace, so the loop has no seam.
+            let samples = 48
+            let bump = (0...samples).map { k -> Double in
+                let t = Double(k) / Double(samples)
+                return pow(0.5 + 0.5 * cos(2 * .pi * t), 3)
+            }
             let glow = CAKeyframeAnimation(keyPath: "opacity")
-            glow.values = [0.25, 1, 0.25, 0.25]
-            glow.keyTimes = [0, 0.25, 0.6, 1]
+            glow.values = bump.map { 0.25 + 0.75 * $0 }
             let grow = CAKeyframeAnimation(keyPath: "transform.scale")
-            grow.values = [1, 1.35, 1, 1]
-            grow.keyTimes = [0, 0.25, 0.6, 1]
+            grow.values = bump.map { 1 + 0.3 * $0 }
             let both = CAAnimationGroup()
             both.animations = [glow, grow]
             both.duration = period
             both.repeatCount = .infinity
-            both.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            both.timingFunction = CAMediaTimingFunction(name: .linear)
             // Started in the past, so it's mid-wave from the first frame.
             both.beginTime = now - period + Double(i) * period / Double(max(dots.count, 1))
             dot.add(both, forKey: "run")
@@ -1019,7 +1025,16 @@ final class IntoZigzag: NSView {
                     }, completionHandler: { view.removeFromSuperview() })
                 }
             }
-            Tokens.Motion.withoutAnimation { dots.forEach { $0.isHidden = true } }
+            // The wave fades out where it is, rather than vanishing mid-step.
+            for (dot, from) in zip(dots, showing) {
+                let out = CABasicAnimation(keyPath: "opacity")
+                out.fromValue = from
+                out.toValue = 0
+                out.duration = 0.3
+                out.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                dot.add(out, forKey: "out")
+                dot.opacity = 0
+            }
             let delay = 0.45 + Double(max(sources.count - 1, 0)) * 0.07
             sources = []
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
@@ -1075,9 +1090,9 @@ final class IntoZigzag: NSView {
         let mid = top + size / 2
         Tokens.Motion.withoutAnimation {
             for (i, dot) in dots.enumerated() {
-                dot.isHidden = sources.isEmpty || state == .done
+                dot.isHidden = sources.isEmpty && state != .done
                 dot.frame = CGRect(x: x + (way - 8 * 3 - 12 * 2) / 2 + CGFloat(i) * 20, y: mid - 4, width: 8, height: 8)
-                dot.opacity = state == .importing ? 0.2 : 0.6
+                dot.opacity = state == .importing ? 0.2 : state == .done ? 0 : 0.6
             }
         }
         if !sources.isEmpty { x += way }
