@@ -550,6 +550,8 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // A sign-in menu belongs to the page it opened on.
+        Autofill.shared.hide()
         hasLoadedOnce = true
         if let url = webView.url {
             let zoom = ZoomLevels.zoom(for: url)

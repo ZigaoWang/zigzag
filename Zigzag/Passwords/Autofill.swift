@@ -50,7 +50,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 return
             }
             Task {
-                let logins = ((try? await PasswordStore.shared.credentials(for: origin)) ?? [])
+                let logins = ((try? await PasswordStore.shared.all()) ?? []).filter { $0.origin.fills(on: origin) }
                     .sorted { ($0.lastUsed ?? $0.modified) > ($1.lastUsed ?? $1.modified) }
                 guard current == self.generation, !logins.isEmpty else { if current == self.generation { self.hide() }; return }
                 self.show(logins.map { .login($0) }, under: field, in: webView, frame: frame, origin: origin)
@@ -65,8 +65,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         case "key":
             guard let menu, let key = body["key"] as? String else { return }
             switch key {
-            case "ArrowDown": menu.move(1)
-            case "ArrowUp": menu.move(-1)
+            case "ArrowDown": menu.move(1); markSelected(menu.selected != nil)
+            case "ArrowUp": menu.move(-1); markSelected(menu.selected != nil)
             case "Enter": if let item = menu.selected { pick(item) }
             case "Escape": hide()
             default: break
@@ -78,7 +78,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private func show(_ items: [AutofillMenu.Item], under field: NSRect, in webView: BrowserWebView, frame: WKFrameInfo, origin: Origin) {
         guard let overlay = WindowManager.shared.controllers.first(where: { $0.window === webView.window })?.root.overlay else { return }
         menu?.removeFromSuperview()
-        let menu = AutofillMenu(items: Array(items.prefix(5)), origin: origin)
+        let menu = AutofillMenu(items: Array(items.prefix(8)), origin: origin)
         menu.onPick = { [weak self] item in self?.pick(item) }
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         let width = min(max(fieldInOverlay.width, 260), 360)
@@ -102,10 +102,16 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         menu.dismiss(always: true)
     }
 
-    /// While the menu is up, the page script hands arrow keys, Return and Escape to it.
+    /// While the menu is up, the page script hands arrow keys and Escape to it; Return only once a login in it is
+    /// highlighted, so Return in a field still signs in as usual.
     private func setSuggesting(_ on: Bool) {
         guard let target else { return }
-        target.webView.evaluateJavaScript("window.__zigzagSuggesting = \(on)", in: target.frame, in: .defaultClient)
+        target.webView.evaluateJavaScript("window.__zigzagSuggesting = \(on); window.__zigzagSelected = false", in: target.frame, in: .defaultClient)
+    }
+
+    private func markSelected(_ on: Bool) {
+        guard let target else { return }
+        target.webView.evaluateJavaScript("window.__zigzagSelected = \(on)", in: target.frame, in: .defaultClient)
     }
 
     private func pick(_ item: AutofillMenu.Item) {
@@ -144,11 +150,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     private func fill(_ login: Credential) {
         guard let target else { return }
-        let security = target.frame.securityOrigin
-        let now = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)
         hide()
-        // The page may have moved on since the menu opened; only the exact origin the login belongs to gets it.
-        guard now == login.origin, now == target.origin else { return }
+        // The page may have moved on since the menu opened: it must still be the login's own site, in the tab
+        // you're looking at. The page script checks again at the moment it fills.
+        let controller = WindowManager.shared.controllers.first { $0.window === target.webView.window }
+        guard login.origin.fills(on: target.origin), Origin(target.webView.url) == target.origin,
+              controller?.selectedWebView === target.webView else { return }
         Task {
             guard let password = try? await PasswordStore.shared.password(for: login.id) else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
@@ -157,9 +164,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 return
             }
             // Passed as an argument, never pasted into the script's source, and held only for the call.
-            let arguments: [String: Any] = ["username": login.username, "password": password.withUnsafeString { String($0) }]
-            _ = try? await target.webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
-            try? await PasswordStore.shared.markUsed(login.id)
+            let arguments: [String: Any] = ["username": login.username, "password": password.withUnsafeString { String($0) },
+                                            "expectedOrigin": target.origin.description]
+            let filled = try? await target.webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
+            // Private windows leave no trace, not even "last used".
+            if (filled as? Bool) != false, !(target.webView.owner?.isPrivate ?? false) { try? await PasswordStore.shared.markUsed(login.id) }
         }
     }
 
@@ -195,13 +204,14 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
       };
       const wanted = (el) => signIn(el) || isNew(el);
-      document.addEventListener('focusin', (e) => { if (wanted(e.target)) report(e.target); }, true);
+      document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('mousedown', (e) => { if (e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
       document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && wanted(e.target)) post({ kind: 'blur' }); }, true);
       window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
       document.addEventListener('keydown', (e) => {
         if (!window.__zigzagSuggesting || !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+        if (e.key === 'Enter' && !window.__zigzagSelected) return;
         e.preventDefault(); e.stopPropagation();
         post({ kind: 'key', key: e.key });
       }, true);
@@ -255,6 +265,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
     private static let filler = """
+    // Checked here, at the moment of filling: only the exact site the login belongs to gets it.
+    if (location.origin !== expectedOrigin) return false;
     const active = document.activeElement;
     const scope = (active && active.form) || document;
     // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
@@ -279,8 +291,14 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     };
-    if (userField && username) set(userField, username);
-    if (passwordField) set(passwordField, password);
+    // Focusing the fields to fill them mustn't bring the menu back.
+    window.__zigzagFilling = true;
+    try {
+      if (userField && username) set(userField, username);
+      if (passwordField) set(passwordField, password);
+    } finally {
+      setTimeout(() => { window.__zigzagFilling = false; }, 0);
+    }
     """
 }
 

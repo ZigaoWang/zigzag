@@ -169,6 +169,7 @@ final class TabManager {
     // MARK: Selecting
 
     func select(_ tab: Tab) {
+        Autofill.shared.hide()
         if tab.spaceID != currentSpaceID {
             currentSpaceID = tab.spaceID
             changed.send(.space)
