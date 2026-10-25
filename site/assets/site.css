@@ -60,76 +60,39 @@ a { color: inherit; }
   max-width: var(--wrap); margin: 0 auto; padding: 22px 24px;
 }
 
-/* Hero: centered, the ribbon drawn in above the line, as the app's first launch does. */
-.hero { max-width: 760px; margin: 0 auto; padding: 88px 24px 0; text-align: center; }
-.ribbon { display: block; width: 72px; height: 68px; margin: 0 auto 36px; }
-.ribbon path {
-  fill: none; stroke: var(--ribbon); stroke-width: 100; stroke-linecap: round; stroke-linejoin: round;
-  stroke-dasharray: 1; stroke-dashoffset: 1; animation: write .7s cubic-bezier(.22,.7,.18,1) .15s forwards;
+/* Hero: the drawn wordmark, one line, the button, then the app itself. */
+.hero { max-width: 1180px; margin: 0 auto; padding: 96px 24px 0; text-align: center; }
+.wordmark-hero {
+  margin: 0 auto; width: min(560px, 82vw); aspect-ratio: 372 / 73; background: var(--ribbon);
+  -webkit-mask: url(/assets/wordmark.svg) center / contain no-repeat; mask: url(/assets/wordmark.svg) center / contain no-repeat;
 }
-@keyframes write { to { stroke-dashoffset: 0; } }
-h1 {
-  font: 800 clamp(40px, 6.4vw, 68px)/1.04 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  letter-spacing: -0.03em; color: #FFFFFF; text-wrap: balance;
-}
-.hero > p:not(.fine) { margin: 24px auto 36px; max-width: 580px; font-size: 19px; color: var(--soft); text-wrap: pretty; }
+.tagline { margin-top: 40px; font: 700 clamp(28px, 3.6vw, 40px)/1.15 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  letter-spacing: -0.02em; color: #FFFFFF; }
+.sub { margin: 18px auto 34px; max-width: 600px; font-size: 18px; color: var(--soft); text-wrap: pretty; }
 .fine { margin-top: 14px; font-size: 13px; color: var(--soft); }
+.hero-film { margin: 72px auto 0; }
 
 /* Clips: the window itself, with a window's shadow. */
-.film { max-width: var(--wrap); margin: 72px auto 0; padding: 0 24px; }
+.film { max-width: 1120px; margin: 0 auto; }
 .film video {
   display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 12px;
-  background: var(--shade);
-  box-shadow: 0 0 0 1px var(--rule), 0 30px 80px -20px rgba(0, 0, 0, .55);
+  background: rgba(0,0,0,.15);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 40px 90px -30px rgba(0, 0, 0, .55);
 }
 
-/* Bands: each demo on its own brand surface, in the color a space of that hue gives Zigzag's big moments.
-   Deep in the hue, lit from one corner by its accent, the ribbon written large and tone on tone. */
-.band {
-  --deep: #1E3A5F; --lit: #354E6F; --shade: #162A44; --tint: #DAE5F2; --glow: #7FA6DC;
-  position: relative; overflow: hidden; isolation: isolate;
-  max-width: 1280px; margin: 120px auto 0; border-radius: 18px;
-  padding: 72px 64px;
-  background:
-    radial-gradient(900px 600px at var(--gx, 0%) var(--gy, 0%), color-mix(in srgb, var(--glow) 42%, transparent), transparent 70%),
-    linear-gradient(160deg, var(--lit) 0%, var(--deep) 45%, var(--shade) 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
-  display: grid; gap: 48px; align-items: center;
-}
-.band.rose     { --deep: #61232D; --lit: #743D46; --shade: #461921; --tint: #F5D0D6; --glow: #DB7284; }
-.band.peach    { --deep: #613A23; --lit: #74523D; --shade: #462A19; --tint: #F5DED0; --glow: #DB9A72; --gx: 100%; }
-.band.sand     { --deep: #614B23; --lit: #74603D; --shade: #463619; --tint: #F5E8D0; --glow: #DBB672; --gx: 50%; }
-.band.mint     { --deep: #236155; --lit: #3D746A; --shade: #19463D; --tint: #D0F5EE; --glow: #72DBC8; --gy: 100%; }
-.band.lavender { --deep: #322361; --lit: #4A3D74; --shade: #241946; --tint: #D9D0F5; --glow: #8B72DB; --gx: 100%; --gy: 100%; }
+/* Bands: one idea each, edge to edge, in a clear color of its own. */
+.band { padding: 120px 24px; text-align: center; color: #FFFFFF; }
+.hero + .band { margin-top: 140px; }
+.band.rose   { background: #D24D63; }
+.band.violet { background: #6C55D3; }
+.band.orange { background: #E0753A; }
+.band.teal   { background: #1F8F7E; }
+.band.blue   { background: #2F6FD0; }
+.band h2 { font: 800 clamp(34px, 4.6vw, 56px)/1.04 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  letter-spacing: -0.03em; color: #FFFFFF; text-wrap: balance; }
+.band p { margin: 16px auto 56px; max-width: 520px; font-size: 19px; color: rgba(255,255,255,.86); text-wrap: pretty; }
 
-.band .mark { position: absolute; z-index: -1; width: 640px; height: 607px; pointer-events: none; }
-.band .mark path { fill: none; stroke: var(--tint); stroke-opacity: .13; stroke-width: 100; stroke-linecap: round; stroke-linejoin: round; }
-.band.rose .mark     { right: -120px; bottom: -180px; }
-.band.peach .mark    { left: -160px; top: -140px; transform: rotate(-8deg); }
-.band.sand .mark     { left: 50%; top: -260px; transform: translateX(-50%) scale(1.3); }
-.band.mint .mark     { right: -200px; top: -120px; }
-.band.lavender .mark { left: -140px; bottom: -220px; transform: rotate(6deg); }
-
-.band h2 { font: 800 clamp(30px, 3.6vw, 48px)/1.05 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance; }
-.band p { margin-top: 16px; color: color-mix(in srgb, var(--tint) 78%, transparent); font-size: 18px; max-width: 420px; text-wrap: pretty; }
-.band .film { margin: 0; padding: 0; max-width: none; }
-.band .film video { box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 30px 70px -24px rgba(0,0,0,.6); }
-
-/* Layouts, so no two in a row look alike. */
-.band.side { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); }
-.band.side.flip { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
-.band.side.flip .copy { order: 2; }
-.band.stack { grid-template-columns: 1fr; text-align: center; padding-bottom: 0; align-items: end; }
-.band.stack p { margin-left: auto; margin-right: auto; }
-.band.stack .film { max-width: 980px; margin: 0 auto; width: 100%; }
-.band.stack .film video { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.band.wide { grid-template-columns: 1fr; padding: 0; gap: 0; }
-.band.wide .copy { padding: 56px 64px 40px; display: flex; align-items: baseline; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
-.band.wide .copy p { margin: 0; }
-.band.wide .film video { border-radius: 0; box-shadow: none; }
-
-.list { max-width: var(--wrap); margin: 160px auto 0; padding: 0 24px; }
+.list { max-width: var(--wrap); margin: 140px auto 0; padding: 0 24px; }
 .list dl { display: grid; grid-template-columns: 200px 1fr; margin-top: 28px; border-top: 1px solid var(--rule); }
 .list dt, .list dd { padding: 16px 0; border-bottom: 1px solid var(--rule); }
 .list dt { font-weight: 600; color: #FFFFFF; }
@@ -155,14 +118,9 @@ h1 {
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .bar, .film, .list, .end, .hero, .page { padding-left: 16px; padding-right: 16px; }
-  .band { margin: 64px 12px 0; padding: 40px 20px; border-radius: 16px; gap: 28px; }
-  .band.side, .band.side.flip { grid-template-columns: 1fr; }
-  .band.side.flip .copy { order: 0; }
-  .band.stack { padding-bottom: 0; }
-  .band.wide { padding: 0; }
-  .band.wide .copy { padding: 36px 20px 24px; }
-  .band .mark { width: 420px; height: 398px; }
-  .band p { font-size: 16px; }
+  .band { padding: 72px 16px; }
+  .band p { font-size: 16px; margin-bottom: 36px; }
+  .hero + .band { margin-top: 88px; }
   .hero { padding-top: 56px; }
   .hero > p:not(.fine) { font-size: 17px; }
   .film { margin-top: 48px; }
