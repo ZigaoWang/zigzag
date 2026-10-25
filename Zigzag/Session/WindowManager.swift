@@ -116,6 +116,7 @@ final class WindowManager {
         controllers.removeAll { $0 === controller }
         if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
         controller.tabManager.invalidate()
+        if controller.tabManager.isPrivate, !controllers.contains(where: { $0.tabManager.isPrivate }) { DownloadManager.shared.forgetPrivate() }
         if !controllers.isEmpty { scheduleSave() }
     }
 

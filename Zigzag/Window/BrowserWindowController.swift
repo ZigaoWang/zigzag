@@ -686,7 +686,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func downloadsChanged() {
         let manager = DownloadManager.shared
-        sidebar.updateDownloads(active: manager.activeCount, hasAny: !manager.items.isEmpty)
+        let mine = manager.items(isPrivate: tabManager.isPrivate)
+        sidebar.updateDownloads(active: mine.filter { $0.state == .downloading }.count, hasAny: !mine.isEmpty)
     }
 
     // MARK: Traffic lights

@@ -118,7 +118,7 @@ final class DownloadsPanelView: FloatingPanelView {
         self.controller = controller
         super.init(frame: .zero)
         [title, clearButton, folderButton, emptyNote].forEach { addSubview($0) }
-        clearButton.onClick = { _ in DownloadManager.shared.clearFinished() }
+        clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             NSWorkspace.shared.open(FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
             self?.close()
@@ -128,6 +128,8 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private var isPrivate: Bool { controller?.tabManager.isPrivate ?? false }
 
     func show(from anchor: NSView) {
         guard let controller else { return }
@@ -156,7 +158,8 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     private func reload() {
-        let items = Array(DownloadManager.shared.items.prefix(8))
+        let all = DownloadManager.shared.items(isPrivate: isPrivate)
+        let items = Array(all.prefix(8))
         while rows.count < items.count {
             let row = DownloadRowView()
             row.onClick = { [weak row] _ in if let item = row?.item { DownloadManager.shared.open(item) } }
@@ -166,7 +169,9 @@ final class DownloadsPanelView: FloatingPanelView {
                 case .downloading: DownloadManager.shared.cancel(item)
                 case .finished: DownloadManager.shared.reveal(item)
                 default:
-                    if DownloadManager.shared.canRetry(item), let webView = WindowManager.shared.keyController?.selectedWebView {
+                    // Fetched again from a window of the same kind, so a private download never uses your cookies.
+                    if DownloadManager.shared.canRetry(item),
+                       let webView = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView {
                         DownloadManager.shared.retry(item, in: webView)
                     } else {
                         DownloadManager.shared.remove(item)
@@ -178,7 +183,7 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         while rows.count > items.count { rows.removeLast().removeFromSuperview() }
         for (row, item) in zip(rows, items) { row.configure(item) }
-        clearButton.isEnabled = DownloadManager.shared.items.contains { $0.state != .downloading }
+        clearButton.isEnabled = all.contains { $0.state != .downloading }
         clearButton.isHidden = items.isEmpty
         emptyNote.isHidden = !items.isEmpty
         reposition()

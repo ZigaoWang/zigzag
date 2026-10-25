@@ -16,10 +16,13 @@ final class DownloadItem {
     fileprivate var progressObservation: NSKeyValueObservation?
     fileprivate var resumeData: Data?
     fileprivate let sourceURL: URL?
+    /// From a private window: listed only in private windows, and forgotten when the last one closes.
+    let isPrivate: Bool
 
-    init(filename: String, sourceURL: URL?) {
+    init(filename: String, sourceURL: URL?, isPrivate: Bool) {
         self.filename = filename
         self.sourceURL = sourceURL
+        self.isPrivate = isPrivate
     }
 }
 
@@ -31,6 +34,16 @@ final class DownloadManager: NSObject {
     let changed = Signal<DownloadItem?>()
 
     var activeCount: Int { items.filter { $0.state == .downloading }.count }
+
+    /// What a window lists: a private window its own downloads, a normal window everything else.
+    func items(isPrivate: Bool) -> [DownloadItem] { items.filter { $0.isPrivate == isPrivate } }
+
+    /// The last private window closed: its finished downloads leave the list (the files stay in Downloads).
+    func forgetPrivate() {
+        let before = items.count
+        items.removeAll { $0.isPrivate && $0.state != .downloading }
+        if items.count != before { changed.send(nil) }
+    }
     var overallProgress: Double {
         let active = items.filter { $0.state == .downloading }
         guard !active.isEmpty else { return 1 }
@@ -39,7 +52,9 @@ final class DownloadManager: NSObject {
 
     func track(_ download: WKDownload, window: NSWindow?) {
         download.delegate = self
-        let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url)
+        let isPrivate = download.webView.map { !$0.configuration.websiteDataStore.isPersistent } ?? false
+        let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url,
+                                isPrivate: isPrivate)
         item.download = download
         item.progressObservation = download.progress.observe(\.fractionCompleted) { [weak self, weak item] progress, _ in
             let fraction = progress.fractionCompleted
@@ -108,8 +123,8 @@ final class DownloadManager: NSObject {
         changed.send(nil)
     }
 
-    func clearFinished() {
-        items.removeAll { $0.state != .downloading }
+    func clearFinished(isPrivate: Bool) {
+        items.removeAll { $0.state != .downloading && $0.isPrivate == isPrivate }
         changed.send(nil)
     }
 
