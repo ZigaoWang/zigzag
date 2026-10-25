@@ -119,12 +119,24 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         post({ kind: change ? 'change' : 'login', username: usernameBefore(passwords[0], scope), password: chosen.value });
       };
       document.addEventListener('submit', (e) => capture(e.target), true);
+      // A button that sends the form, not one that shows the password or links to "Forgot?": a submit button, or
+      // one labelled like signing in.
+      const label = (el) => ((el.getAttribute('aria-label') || '') + ' ' + (el.value || '') + ' ' + (el.textContent || '')).trim();
+      const sends = (button) => {
+        const text = label(button);
+        if (/show|hide|reveal|forgot|reset|visib|显示|隐藏|忘记/i.test(text)) return false;
+        if (button.matches('input[type=submit], button[type=submit]') || (button.tagName === 'BUTTON' && !button.getAttribute('type') && button.form)) return true;
+        return /log ?in|sign ?in|sign ?up|log ?on|continue|next|submit|register|create|save|update|change|登录|登入|注册|继续|下一步|确定|提交/i.test(text);
+      };
       document.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
         const button = e.target && e.target.closest ? e.target.closest('button, input[type=submit], [role=button]') : null;
-        if (button) capture(button.form || button.closest('form') || document);
+        if (button && sends(button)) capture(button.form || button.closest('form') || document);
       }, true);
+      // Return in the password field, or in the username on its own page of a two-step sign-in.
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') capture(e.target.form || document);
+        if (!e.isTrusted || e.key !== 'Enter' || e.isComposing || !e.target || e.target.tagName !== 'INPUT') return;
+        if (e.target.type === 'password' || isUserField(e.target)) capture(e.target.form || document);
       }, true);
       window.addEventListener('pagehide', () => {
         if (fields(document).some((el) => el.type === 'password' && el.value && typed.has(el))) capture(document);
