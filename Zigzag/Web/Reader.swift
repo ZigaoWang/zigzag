@@ -152,11 +152,11 @@ enum Reader {
         let minutes = max(1, Int((Double(article.length) / 1100).rounded()))
         // A credit that names no one ("Contributors to Wikimedia projects") says nothing; leave it out.
         let author = article.byline.lowercased().contains("contributors") ? "" : article.byline
-        let credit = [author, "\(minutes) min read"].filter { !$0.isEmpty }.map(escape).joined(separator: "<span class=\"dot\">·</span>")
+        let meta = [article.site, author, "\(minutes) min"].filter { !$0.isEmpty }.map(escape).joined(separator: "<span class=\"dot\">·</span>")
         let dek = (article.dek ?? "").isEmpty ? "" : "<p class=\"dek\">\(escape(article.dek ?? ""))</p>"
         let hero = (article.image ?? "").isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(article.image ?? ""))\" alt=\"\"></figure>"
         let source = (article.url ?? "").isEmpty ? "" :
-            "<footer class=\"end\"><span class=\"mark\"></span><a href=\"\(escape(article.url ?? ""))\">Read the original on \(escape(article.site))</a></footer>"
+            "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">Read the original on \(escape(article.site))</a></footer>"
         return """
         <!doctype html><html lang="\(escape(article.lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="--size: \(preferences.size)px">
         <head><meta charset="utf-8">
@@ -177,94 +177,70 @@ enum Reader {
         }
         html { background: var(--bg); transition: background .25s ease; }
         ::selection { background: var(--select); }
-        body { margin: 0; padding: 104px 40px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.62;
+        body { margin: 0; padding: 112px 48px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.65;
                -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-kerning: normal; hanging-punctuation: first;
-               transition: color .25s ease; animation: rise .55s cubic-bezier(.2,.85,.25,1) both; }
-        :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.58; letter-spacing: -0.003em; }
-        @keyframes rise { from { transform: translateY(18px); } to { transform: none; } }
-        @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) { body { animation-name: appear; } html, body { transition: none; } }
+               transition: color .25s ease; animation: rise .5s cubic-bezier(.2,.85,.25,1) both; }
+        :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.6; letter-spacing: -0.003em; }
+        @keyframes rise { from { transform: translateY(14px); } to { transform: none; } }
+        @media (prefers-reduced-motion: reduce) { body { animation: none; } html, body { transition: none; } }
 
-        /* How far through: a hairline across the top, drawn by the scroll itself. */
-        @supports (animation-timeline: scroll()) {
-          html::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--text); opacity: .5;
-                         transform-origin: 0 50%; animation: progress linear both; animation-timeline: scroll(root); z-index: 2; }
-          @keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-        }
+        /* One centered column at a book's measure: nothing to the side, nothing competing. */
+        main { max-width: 34em; margin: 0 auto; }
 
-        /* The page: one column at a book's measure, with a margin beside it when the window has room. */
-        main { max-width: var(--measure); margin: 0 auto; }
-        @media (min-width: 960px) {
-          main { max-width: calc(var(--measure) + var(--gap) + var(--margin)); padding-right: calc(var(--gap) + var(--margin)); box-sizing: border-box; }
-        }
+        /* The title page: the headline, the site's summary, then where it's from in small type. */
+        header { margin: 0 0 3em; }
+        h1.title { font-family: var(--serif); font-size: 2.05em; font-weight: 600; line-height: 1.14; letter-spacing: -0.012em;
+                   margin: 0; text-wrap: balance; }
+        :root[data-face="sans"] h1.title { font-family: var(--sans); font-weight: 700; letter-spacing: -0.022em; }
+        .dek { font-size: 1.12em; line-height: 1.45; color: var(--soft); margin: .6em 0 0; text-wrap: pretty; }
+        .meta { font: 13px/1.4 var(--sans); color: var(--soft); margin: 1.4em 0 0; }
+        .meta .dot { margin: 0 .5em; color: var(--faint); }
+        figure.hero { margin: 2.2em 0 0; }
+        figure.hero img { width: 100%; max-height: 22em; object-fit: cover; border-radius: 8px; margin: 0; }
 
-        header { margin-bottom: 2.4em; }
-        .site { font: 500 14px/1.3 var(--sans); color: var(--soft); margin: 0 0 22px; }
-        h1.title { font-family: var(--serif); font-size: 2.5em; font-weight: 700; line-height: 1.06; letter-spacing: -0.026em; margin: 0;
-                   text-wrap: balance; }
-        :root[data-face="sans"] h1.title { font-family: var(--sans); letter-spacing: -0.032em; }
-        .dek { font-size: 1.22em; line-height: 1.42; color: var(--soft); margin: .7em 0 0; text-wrap: pretty; }
-        .credit { font: 14px/1.4 var(--sans); color: var(--soft); margin: 22px 0 0; }
-        .credit .dot { margin: 0 .5em; color: var(--faint); }
-        figure.hero { margin: 2.4em 0 0; }
-        figure.hero img { width: 100%; max-height: 70vh; object-fit: cover; border-radius: 4px; margin: 0; }
-        @media (min-width: 960px) { figure.hero { margin-right: calc(-1 * (var(--gap) + var(--margin))); } }
-
-        h1, h2, h3, h4 { line-height: 1.2; margin: 2.1em 0 .5em; letter-spacing: -0.014em; text-wrap: balance; font-weight: 700; }
-        h2 { font-size: 1.36em; } h3 { font-size: 1.1em; } h4 { font-size: 1em; }
-        h3, h4 { font-family: var(--sans); font-weight: 600; letter-spacing: -0.006em; }
-        p, ul, ol, blockquote, figure, pre, table, dl { margin: 0 0 1em; }
+        h1, h2, h3, h4 { line-height: 1.25; margin: 2em 0 .5em; letter-spacing: -0.01em; text-wrap: balance; font-weight: 600; }
+        h2 { font-size: 1.3em; } h3 { font-size: 1.08em; } h4 { font-size: 1em; }
+        h3, h4 { font-family: var(--sans); letter-spacing: -0.004em; }
+        p, ul, ol, blockquote, figure, pre, table, dl { margin: 0 0 1.05em; }
         p { text-wrap: pretty; }
         li { margin: .3em 0; } ul, ol { padding-left: 1.15em; } li::marker { color: var(--soft); }
 
-        /* The opening line in small capitals, the way a magazine starts a story. */
-        p.lead::first-line { font-variant-caps: all-small-caps; letter-spacing: .045em; font-weight: 600; }
-
         /* Links read as part of the sentence; the underline is barely there until you point at it. */
         a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .22em;
-            text-decoration-color: color-mix(in srgb, var(--text) 18%, transparent); transition: color .15s, text-decoration-color .15s; }
+            text-decoration-color: color-mix(in srgb, var(--text) 22%, transparent); transition: color .15s, text-decoration-color .15s; }
         a:hover { color: var(--link); text-decoration-color: currentColor; }
         h1 a, h2 a, h3 a, figcaption a { text-decoration: none; }
 
-        img, video, svg, picture { display: block; max-width: 100%; height: auto; margin: 1.8em 0; border-radius: 4px; }
-        figure { margin: 2em 0; } figure img, figure picture, figure video { margin: 0; }
-        figcaption { font: 13px/1.5 var(--sans); color: var(--soft); margin-top: 10px; text-wrap: pretty; }
-        /* Big pictures go wide, across the margin too. */
+        /* Pictures sit in the column at their own size, centered; captions small and quiet beneath. */
+        img, video, svg, picture { display: block; max-width: 100%; height: auto; margin: 1.8em auto; border-radius: 6px; }
+        figure { margin: 2em 0; text-align: center; } figure img, figure picture, figure video { margin: 0 auto; }
         img.wide, figure:has(img.wide) img { width: 100%; }
-        @media (min-width: 960px) {
-          figure:has(img.wide), p > img.wide:only-child, main img.wide:not(figure img) { margin-right: calc(-1 * (var(--gap) + var(--margin))); }
-          figure:has(img.wide) img, main img.wide:not(figure img) { width: 100%; }
-          figure:has(img.wide) figcaption { max-width: var(--measure); }
-          /* Small pictures move to the margin, caption under them, level with the text they belong to. */
-          figure:has(img.inset), p > img.inset:only-child, main img.inset:not(figure img) {
-            float: right; clear: right; width: var(--margin); margin: .3em calc(-1 * (var(--gap) + var(--margin))) 1.4em 0; }
-          figure:has(img.inset) img { width: 100%; }
-        }
+        /* Picture galleries come as lists: no bullets, just the pictures. */
+        ul:has(> li img), ol:has(> li img) { list-style: none; padding: 0; }
+        li:has(img) { margin: 0; } li:has(img)::marker { content: none; }
+        figcaption { font: 13px/1.5 var(--sans); color: var(--soft); margin: 10px auto 0; max-width: 30em; text-wrap: pretty; }
 
-        blockquote { margin: 1.6em 0; padding: 0 0 0 1em; border-left: 2px solid var(--text); }
+        blockquote { margin: 1.6em 0; padding: 0 0 0 1em; border-left: 2px solid var(--rule); color: var(--soft); }
         blockquote p:last-child { margin-bottom: 0; }
         pre, code, kbd { font: .84em/1.55 ui-monospace, "SF Mono", Menlo, monospace; }
         code { background: var(--code); padding: .12em .36em; border-radius: 4px; }
         pre { overflow-x: auto; padding: 16px 18px; border-radius: 8px; background: var(--code); } pre code { background: none; padding: 0; }
-        hr { border: 0; height: 0; margin: 2.4em 0; text-align: center; } hr::after { content: "⁂"; color: var(--soft); font-size: 1.1em; }
+        hr { border: 0; border-top: 1px solid var(--rule); margin: 2.4em auto; width: 4em; }
         table { border-collapse: collapse; width: 100%; font: 14px/1.5 var(--sans); margin: 1.6em 0; }
         td, th { border-bottom: 1px solid var(--rule); padding: 8px 12px 8px 0; text-align: left; vertical-align: top; }
         th { font-weight: 600; }
         sup, sub { line-height: 0; font-size: .68em; }
 
-        /* The end: a small mark, and the way back to where it came from. */
-        .end { margin-top: 3em; padding-top: 1.4em; border-top: 1px solid var(--rule); font: 14px/1.4 var(--sans); color: var(--soft); clear: both; }
-        .end .mark { display: inline-block; width: .55em; height: .55em; background: var(--text); margin-right: .8em; vertical-align: .05em; }
+        .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: 13px/1.4 var(--sans); color: var(--soft); }
         .end a { text-decoration-color: var(--rule); }
 
         /* Leftovers from the page that don't belong in reading. */
         button, input, select, textarea, form, iframe, nav, aside, [role="button"], [aria-hidden="true"] { display: none !important; }
         </style></head><body><main>
         <header>
-        <p class="site">\(escape(article.site))</p>
         <h1 class="title">\(escape(article.title))</h1>
         \(dek)
-        <p class="credit">\(credit)</p>
+        <p class="meta">\(meta)</p>
         \(hero)
         </header>
         \(article.content)
