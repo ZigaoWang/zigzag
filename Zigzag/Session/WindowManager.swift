@@ -90,6 +90,9 @@ final class WindowManager {
             return controller
         }
         controller.showWindow(nil)
+        // Opened straight into a page (a link, the very first launch): onboarding is skipped for good, or the next
+        // launch would show it instead of restoring this window and then save over it.
+        if !isPrivate, Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
         if let url {
             manager.newTab(url: url)
         } else if isPrivate {
