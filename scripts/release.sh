@@ -53,11 +53,17 @@ spctl --assess --type execute --verbose "$APP"
 
 # The DMG people download: the app beside an Applications shortcut, signed, notarized and stapled itself, so it
 # opens without a warning on a Mac that has never seen Zigzag. (Updates use the zip above.)
+# The window it opens to: Zigzag on the left, Applications on the right, an arrow between, the wordmark above.
+# 500 tall: Finder's tab and status bars take ~100 of it, leaving the 400 the background is drawn for.
 DMG="$OUT/Zigzag-$VERSION.dmg"
 STAGE=$(mktemp -d)
 ditto "$APP" "$STAGE/Zigzag.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Zigzag" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
+SetFile -a E "$STAGE/Zigzag.app"
+rm -f "$DMG"
+create-dmg --volname "Zigzag" --volicon "$APP/Contents/Resources/AppIcon.icns" \
+  --background scripts/dmg-background.tiff --window-pos 200 160 --window-size 640 500 --text-size 13 \
+  --icon-size 112 --icon "Zigzag.app" 180 200 --hide-extension "Zigzag.app" --app-drop-link 460 200 \
+  --no-internet-enable --format UDZO "$DMG" "$STAGE" >/dev/null
 rm -rf "$STAGE"
 IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')
 codesign --sign "$IDENTITY" --timestamp "$DMG"
