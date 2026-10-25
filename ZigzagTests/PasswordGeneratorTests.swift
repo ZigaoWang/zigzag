@@ -50,6 +50,24 @@ struct PasswordRulesTests {
         }
     }
 
+    @Test func hostileRulesStayInBounds() {
+        for rules in [PasswordGenerator.Rules(passwordRules: "maxlength: -1;"), PasswordGenerator.Rules(passwordRules: "maxlength: 1;"),
+                      PasswordGenerator.Rules(passwordRules: "maxlength: 0;"), PasswordGenerator.Rules(minLength: 1_000_000),
+                      PasswordGenerator.Rules(passwordRules: "minlength: 30; maxlength: 10;")] {
+            let password = PasswordGenerator.generate(rules).withUnsafeString { String($0) }
+            #expect((4...128).contains(password.count))
+        }
+    }
+
+    @Test func onlyTheAllowedClasses() {
+        let rules = PasswordGenerator.Rules(passwordRules: "allowed: lower, digit;")
+        for _ in 0..<100 {
+            let password = PasswordGenerator.generate(rules).withUnsafeString { String($0) }
+            #expect(!password.contains { $0.isUppercase })
+            #expect(password.contains { $0.isNumber })
+        }
+    }
+
     @Test func longerWhenMinLengthAsks() {
         let password = PasswordGenerator.generate(PasswordGenerator.Rules(minLength: 32)).withUnsafeString { String($0) }
         #expect(password.count == 32)
