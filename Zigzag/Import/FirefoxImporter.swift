@@ -85,7 +85,9 @@ nonisolated enum FirefoxImporter {
             switch key(in: profile, primaryPassword: primaryPassword) {
             case .failure(.primaryPassword):
                 if !batch.problems.contains(where: { $0.fix == .primaryPassword }) {
-                    batch.problems.append(ImportProblem(message: "\(browser.name) has a primary password. Type it to bring its passwords over.", fix: .primaryPassword))
+                    let message = primaryPassword.isEmpty ? "\(browser.name) has a primary password. Type it to bring its passwords over."
+                        : "That isn’t \(browser.name)’s primary password. Check it and try again."
+                    batch.problems.append(ImportProblem(message: message, fix: .primaryPassword))
                 }
             case .failure(.unreadable):
                 batch.problems.append(ImportProblem(message: "\(browser.name)'s passwords are in a format Zigzag can't read. Export them from \(browser.name)'s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
@@ -121,12 +123,13 @@ nonisolated enum FirefoxImporter {
         var globalSalt = Data(), check = Data()
         db.rows("SELECT item1, item2 FROM metaData WHERE id = 'password'") { globalSalt = $0.data(0); check = $0.data(1) }
         guard !globalSalt.isEmpty, !check.isEmpty else { return .failure(.unreadable) }
-        // If the check value doesn't come out as "password-check", the primary password is missing or wrong.
-        guard let checkPlain = decryptPBE(check, globalSalt: globalSalt, password: primaryPassword),
-              checkPlain.prefix(14) == Data("password-check".utf8) else { return .failure(.primaryPassword) }
+        // If the check value doesn't come out as "password-check", the primary password is missing or wrong. Each
+        // profile has its own: one without any opens with an empty one, whatever was typed for another.
+        let opens = { (password: String) in decryptPBE(check, globalSalt: globalSalt, password: password)?.prefix(14) == Data("password-check".utf8) }
+        guard let password = ["", primaryPassword].first(where: opens) else { return .failure(.primaryPassword) }
         var wrapped = Data()
         db.rows("SELECT a11 FROM nssPrivate") { if wrapped.isEmpty { wrapped = $0.data(0) } }
-        guard let key = decryptPBE(wrapped, globalSalt: globalSalt, password: primaryPassword) else { return .failure(.unreadable) }
+        guard let key = decryptPBE(wrapped, globalSalt: globalSalt, password: password) else { return .failure(.unreadable) }
         return .success(key)
     }
 
