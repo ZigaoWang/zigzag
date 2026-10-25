@@ -257,13 +257,14 @@ class FloatingPanelView: NSView {
     /// whatever opened it. Opacity and movement run together on the layer, so they never drift apart.
     /// How a panel arrives. Anything attached to what opened it (the address dropdown) just appears; small panels
     /// from a button fade; free-floating notices drop in slightly.
-    enum Arrival { case drop, fade, instant }
+    enum Arrival { case drop, fade, instant, zoom }
 
     func present(always: Bool = false, arrival: Arrival = .drop) {
         layoutSubtreeIfNeeded()
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
-        guard let layer, arrival != .instant, always || !Tokens.Motion.isKeyboardDriven else { return }
+        // Shown from the keyboard too: a panel appearing out of nowhere reads as a glitch, and this takes 0.2s.
+        guard let layer, arrival != .instant else { return }
         // With Reduce Motion on, panels only fade in; nothing moves.
         if arrival == .fade || Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
@@ -279,6 +280,22 @@ class FloatingPanelView: NSView {
         fade.fromValue = 0
         fade.toValue = 1
         fade.duration = 0.14
+        if arrival == .zoom {
+            // Grows a touch from its own middle, as Spotlight does: layers scale from their corner, so it's
+            // shifted by half the shrink to stay centered.
+            let k: CGFloat = 0.96, size = bounds.size
+            let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                            CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
+            let grow = CABasicAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: small)
+            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            let group = CAAnimationGroup()
+            group.animations = [fade, grow]
+            group.duration = 0.2
+            group.timingFunction = curve
+            layer.add(group, forKey: "present")
+            return
+        }
         let drop = CABasicAnimation(keyPath: "transform.translation.y")
         drop.fromValue = isFlippedInSuperview ? -4 : 4
         drop.toValue = 0

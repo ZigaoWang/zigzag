@@ -206,7 +206,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         refreshResults(animated: false)
         panel.frame = panelFrame()
         // Attached to the address, it's simply there; over the page it arrives with the usual drop.
-        panel.present(arrival: isAnchored ? .instant : .drop)
+        panel.present(arrival: isAnchored ? .instant : .zoom)
         controller.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)

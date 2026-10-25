@@ -660,7 +660,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.alphaValue = 0
             view.onReady = { [weak view] in
                 guard let view else { return }
-                Tokens.Motion.animate(Tokens.Motion.feedback) { view.animator().alphaValue = 1 }
+                Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true) { view.animator().alphaValue = 1 }
             }
             self.window?.makeFirstResponder(view.webView)
             // Opened again quickly: one listener, never two.
@@ -684,7 +684,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         readerCard = nil
         if let monitor = readerKeyMonitor { NSEvent.removeMonitor(monitor) }
         readerKeyMonitor = nil
-        Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: {
+        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { view.animator().alphaValue = 0 }, completion: {
             guard card.overlay === view else { view.removeFromSuperview(); return }
             card.setOverlay(nil)
         })
