@@ -84,10 +84,25 @@ enum Reader {
         return try? String(contentsOf: url, encoding: .utf8)
     }
 
-    /// Reads the article ahead of time, while the page is idle.
+    /// Reads the article ahead of time, while the page is idle, and fetches its lead picture, so Reader opens
+    /// complete instead of with a gap that fills in later.
     static func prepare(_ webView: WKWebView) {
         webView.evaluateJavaScript("window.__zigzagReader && window.__zigzagReader.prepare(); 0", in: nil, in: .defaultClient, completionHandler: nil)
+        let script = "(document.querySelector('meta[property=\"og:image\"]')||document.querySelector('meta[name=\"twitter:image\"]')||{}).content || ''"
+        webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { result in
+            guard case .success(let value) = result, let text = value as? String, let url = URL(string: text, relativeTo: webView.url)?.absoluteURL,
+                  url.scheme == "https", leadPictures[url.absoluteString] == nil else { return }
+            Task {
+                guard let (data, response) = try? await URLSession.shared.data(from: url), data.count < 3_000_000,
+                      let type = (response as? HTTPURLResponse)?.mimeType, type.hasPrefix("image/") else { return }
+                leadPictures[url.absoluteString] = "data:\(type);base64," + data.base64EncodedString()
+                if leadPictures.count > 12 { leadPictures.removeValue(forKey: leadPictures.keys.first!) }
+            }
+        }
     }
+
+    /// Lead pictures fetched ahead, by address, as data the reading page can show at once.
+    private static var leadPictures: [String: String] = [:]
 
     /// Whether the page in a web view looks like an article.
     static func isArticle(_ webView: WKWebView) async -> Bool {
@@ -127,7 +142,7 @@ enum Reader {
                 let d = UserDefaults.standard
                 let size = d.integer(forKey: "ReaderSize")
                 return Preferences(size: sizes.contains(size) ? size : 19,
-                                   face: Face(rawValue: d.string(forKey: "ReaderFace") ?? "") ?? .serif,
+                                   face: Face(rawValue: d.string(forKey: "ReaderFace") ?? "") ?? .sans,
                                    theme: Theme(rawValue: d.string(forKey: "ReaderTheme") ?? "") ?? .auto)
             }
             set {
@@ -154,7 +169,8 @@ enum Reader {
         let author = article.byline.lowercased().contains("contributors") ? "" : article.byline
         let meta = [article.site, author, "\(minutes) min"].filter { !$0.isEmpty }.map(escape).joined(separator: "<span class=\"dot\">·</span>")
         let dek = (article.dek ?? "").isEmpty ? "" : "<p class=\"dek\">\(escape(article.dek ?? ""))</p>"
-        let hero = (article.image ?? "").isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(article.image ?? ""))\" alt=\"\"></figure>"
+        let heroSource = article.image.map { leadPictures[$0] ?? $0 } ?? ""
+        let hero = heroSource.isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(heroSource))\" alt=\"\"></figure>"
         let source = (article.url ?? "").isEmpty ? "" :
             "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">Read the original on \(escape(article.site))</a></footer>"
         return """
