@@ -202,6 +202,21 @@ class FloatingPanelView: NSView {
         surface.layer?.cornerRadius = radius
         layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         onLayout?()
+        matchCorners()
+    }
+
+    /// A button tucked into one of the panel's rounded corners follows that corner: its own radius is the panel's
+    /// less the gap between them, so the two curves run side by side instead of a square-ish fill in a round shape.
+    private func matchCorners() {
+        for view in surface.subviews {
+            guard view is IconButton || view is TextButton, !view.isHidden, let layer = view.layer else { continue }
+            let f = view.frame
+            let dx = min(f.minX, bounds.width - f.maxX), dy = min(f.minY, bounds.height - f.maxY)
+            guard dx >= 0, dy >= 0, dx < radius, dy < radius else { continue }
+            let fitted = min(max(radius - max(dx, dy), Tokens.Radius.control), min(f.width, f.height) / 2)
+            if let button = view as? IconButton { button.radius = fitted } else { layer.cornerRadius = fitted }
+            layer.cornerCurve = .continuous
+        }
     }
 
     override func viewDidChangeEffectiveAppearance() {
