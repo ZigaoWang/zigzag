@@ -174,7 +174,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        clicksOnMouseDown = true
+        // Chosen on release, so pressing a row to drag it never switches the page first.
+        clicksOnMouseDown = false
         closeButton.onClick = { [weak self] _ in self?.onClose?() }
         closeButton.isHidden = true
         audioButton.onClick = { [weak self] _ in
