@@ -505,13 +505,87 @@ enum ExtensionProfile {
     static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
 
     private static let profiles: [String: Profile] = [
-        ExtensionStore.onePasswordID: Profile(backgroundPrelude: diagnostics + onePasswordPrelude, pagePrelude: diagnostics,
+        ExtensionStore.onePasswordID: Profile(backgroundPrelude: webSocketShim + diagnostics + onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
     ]
 
-    /// Reports the extension's uncaught errors, failed promises and console errors to Zigzag's extensions log,
-    /// through a native host only Zigzag answers. Only error text, cut short; never the extension's data.
+    /// WebKit's extension service workers freeze on `new WebSocket(…)`. This stands in for it, with the same
+    /// events and methods, and Zigzag opens the real connection over a native port (WebSocketBridge).
+    private static let webSocketShim = """
+    (() => {
+      const api = globalThis.browser || globalThis.chrome;
+      if (!api || !api.runtime || typeof api.runtime.connectNative !== 'function') return;
+      const toBase64 = (buffer) => { const bytes = new Uint8Array(buffer); let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); };
+      const fromBase64 = (text) => { const s = atob(text); const bytes = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i); return bytes.buffer; };
+      class WebSocket extends EventTarget {
+        constructor(url, protocols) {
+          super();
+          this.url = String(url);
+          this.readyState = 0;
+          this.protocol = '';
+          this.extensions = '';
+          this.bufferedAmount = 0;
+          this.binaryType = 'blob';
+          this.onopen = this.onmessage = this.onerror = this.onclose = null;
+          try {
+            this._port = api.runtime.connectNative('\(WebSocketBridge.host)');
+          } catch (e) {
+            setTimeout(() => { this._emit('error'); this._closed(1006, ''); }, 0);
+            return;
+          }
+          this._port.onMessage.addListener((m) => this._receive(m));
+          this._port.onDisconnect.addListener(() => this._closed(1006, ''));
+          this._port.postMessage({ op: 'open', url: this.url, protocols: protocols === undefined ? [] : [].concat(protocols) });
+        }
+        _emit(type, init) {
+          let event;
+          if (type === 'message') event = new MessageEvent('message', init);
+          else if (type === 'close' && typeof CloseEvent === 'function') event = new CloseEvent('close', init);
+          else { event = new Event(type); if (init) for (const k of Object.keys(init)) Object.defineProperty(event, k, { value: init[k] }); }
+          this.dispatchEvent(event);
+          const handler = this['on' + type];
+          if (typeof handler === 'function') handler.call(this, event);
+        }
+        _receive(m) {
+          if (!m || this.readyState === 3) return;
+          if (m.ev === 'open') { this.readyState = 1; this.protocol = m.protocol || ''; this._emit('open'); }
+          else if (m.ev === 'message') {
+            let data = m.text;
+            if (m.binary !== undefined) { const buffer = fromBase64(m.binary); data = this.binaryType === 'arraybuffer' ? buffer : new Blob([buffer]); }
+            this._emit('message', { data });
+          }
+          else if (m.ev === 'error') this._emit('error');
+          else if (m.ev === 'close') this._closed(m.code || 1006, m.reason || '');
+        }
+        _closed(code, reason) {
+          if (this.readyState === 3) return;
+          this.readyState = 3;
+          this._emit('close', { code, reason, wasClean: code === 1000 });
+          try { this._port && this._port.disconnect(); } catch (e) {}
+        }
+        send(data) {
+          if (this.readyState === 0) throw new DOMException('Still connecting', 'InvalidStateError');
+          if (this.readyState !== 1) return;
+          if (typeof data === 'string') this._port.postMessage({ op: 'send', text: data });
+          else if (data instanceof ArrayBuffer) this._port.postMessage({ op: 'send', binary: toBase64(data) });
+          else if (ArrayBuffer.isView(data)) this._port.postMessage({ op: 'send', binary: toBase64(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)) });
+          else if (data instanceof Blob) data.arrayBuffer().then((b) => this.readyState === 1 && this._port.postMessage({ op: 'send', binary: toBase64(b) }));
+        }
+        close(code, reason) {
+          if (this.readyState >= 2) return;
+          this.readyState = 2;
+          try { this._port.postMessage({ op: 'close', code: code || 1000, reason: reason || '' }); } catch (e) { this._closed(code || 1000, reason || ''); }
+        }
+      }
+      for (const [name, value] of Object.entries({ CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 })) { WebSocket[name] = value; WebSocket.prototype[name] = value; }
+      globalThis.WebSocket = WebSocket;
+    })();
+
+    """
+
+    /// Reports the extension's uncaught errors, failed promises and WebAssembly that won't load to Zigzag's
+    /// extensions log, through a native host only Zigzag answers. Only error text, cut short; never its data.
     static let diagnosticsHost = "zigzag.diagnostics"
     private static let diagnostics = """
     (() => {
@@ -525,158 +599,19 @@ enum ExtensionProfile {
         return [name, x.message || x.errorClass || '', top].filter(Boolean).join(' | ');
       };
       const report = (kind, value) => {
-        try { const sent = api.runtime.sendNativeMessage('\(diagnosticsHost)', { kind, where, text: String(value).slice(0, 400) }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
+        try { const sent = api.runtime.sendNativeMessage('\(diagnosticsHost)', { kind, where, text: String(value).slice(0, 300) }); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
       };
       globalThis.addEventListener && globalThis.addEventListener('error', (e) => report('error', (e.message || '') + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || 0)));
       globalThis.addEventListener && globalThis.addEventListener('unhandledrejection', (e) => report('rejection', text(e.reason)));
-      const original = console.error;
-      console.error = function (...args) { report('console.error', args.map(text).filter(Boolean).join(' ')); return original.apply(this, args); };
-      const warn = console.warn;
-      console.warn = function (...args) { report('console.warn', args.map(text).filter(Boolean).join(' ')); return warn.apply(this, args); };
-      // How WebAssembly loads: what, how big, how long, and whether it worked.
-      if (globalThis.WebAssembly) {
-        for (const name of ['instantiate', 'instantiateStreaming', 'compile', 'compileStreaming']) {
-          const original = WebAssembly[name];
-          if (typeof original !== 'function') continue;
-          WebAssembly[name] = function (source, ...rest) {
-            const started = Date.now();
-            const what = source && source.byteLength !== undefined ? source.byteLength + ' bytes' : (source && source.url) || (source instanceof Promise ? 'response' : typeof source);
-            report('wasm', name + ' start ' + what);
-            const result = original.call(this, source, ...rest);
-            Promise.resolve(result).then(() => report('wasm', name + ' ok in ' + (Date.now() - started) + 'ms'),
-                                         (e) => report('wasm', name + ' FAILED in ' + (Date.now() - started) + 'ms: ' + text(e)));
-            return result;
-          };
-        }
-      } else {
-        report('wasm', 'WebAssembly is missing here');
-      }
-      // Network, as host and path only (no query, no bodies): what it asked for, and what came back.
-      function place(u) { try { const x = new URL(String(u && u.url || u), location.href); return x.host + x.pathname.slice(0, 60); } catch (e) { return '?'; } }
-      if (globalThis.fetch) {
-        const fetched = globalThis.fetch;
-        globalThis.fetch = function (input, init) {
-          const started = Date.now(), at = place(input);
-          if (!at.startsWith('aeblfdkh')) report('fetch', 'start ' + at);
-          const result = fetched.call(this, input, init);
-          result.then((r) => { if (!at.startsWith('aeblfdkh') || !r.ok) report('fetch', r.status + ' ' + at + ' in ' + (Date.now() - started) + 'ms'); },
-                      (e) => report('fetch', 'FAILED ' + at + ' in ' + (Date.now() - started) + 'ms: ' + text(e)));
+      // WebAssembly that won't load leaves an extension's core dead; say so.
+      if (globalThis.WebAssembly && typeof WebAssembly.instantiate === 'function') {
+        const instantiate = WebAssembly.instantiate;
+        WebAssembly.instantiate = function (...args) {
+          const result = instantiate.apply(this, args);
+          Promise.resolve(result).catch((e) => report('wasm', 'failed to load: ' + text(e)));
           return result;
         };
       }
-      if (globalThis.WebSocket) {
-        const Socket = globalThis.WebSocket;
-        globalThis.WebSocket = function (url, protocols) {
-          const socket = protocols === undefined ? new Socket(url) : new Socket(url, protocols);
-          const at = place(url);
-          report('socket', 'open ' + at);
-          socket.addEventListener('open', () => report('socket', 'connected ' + at));
-          socket.addEventListener('error', () => report('socket', 'error ' + at));
-          socket.addEventListener('close', (e) => report('socket', 'closed ' + at + ' code ' + e.code));
-          return socket;
-        };
-        globalThis.WebSocket.prototype = Socket.prototype;
-        Object.assign(globalThis.WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
-      }
-      // Messages between the extension's pages and its background: their kind only, never what they carry.
-      const kind = (m) => {
-        if (!m || typeof m !== 'object') return typeof m;
-        for (const k of ['type', 'name', 'command', 'action', 'method', 'kind', 'event', 'msg', 'message']) {
-          const v = m[k];
-          if (typeof v === 'string' && v.length <= 60) return k + '=' + v;
-          if (typeof v === 'number') return k + '=' + v;
-        }
-        return '{' + Object.keys(m).slice(0, 6).join(',') + '}';
-      };
-      const seen = new WeakSet();
-      const watchRuntime = (runtime, label) => {
-        if (!runtime || runtime.__zigzagWatched) return;
-        try { runtime.__zigzagWatched = true; } catch (e) {}
-        const sendMessage = runtime.sendMessage.bind(runtime);
-        runtime.sendMessage = function (...args) {
-          const message = typeof args[0] === 'string' ? args[1] : args[0];
-          const what = kind(message), started = Date.now();
-          let answered = false;
-          const timer = setTimeout(() => { if (!answered) report('msg', what + ' has no answer after 3s'); }, 3000);
-          const finish = (how) => { answered = true; clearTimeout(timer); if (Date.now() - started > 1000 || how !== 'answered') report('msg', what + ' ' + how + ' after ' + (Date.now() - started) + 'ms'); };
-          const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
-          if (callback) return sendMessage(...args, (reply) => { finish(api.runtime.lastError ? 'failed: ' + api.runtime.lastError.message : 'answered'); callback(reply); });
-          const result = sendMessage(...args);
-          if (result && result.then) result.then(() => finish('answered'), (e) => finish('failed: ' + text(e)));
-          return result;
-        };
-        const addListener = runtime.onMessage.addListener.bind(runtime.onMessage);
-        runtime.onMessage.addListener = function (listener) {
-          return addListener(function (message, sender) {
-            if (message && typeof message === 'object' && !seen.has(message)) { seen.add(message); if (where !== 'zigzag-entry.js' && where !== 'worker') report('msg', 'got ' + kind(message)); }
-            return listener.apply(this, arguments);
-          });
-        };
-      };
-      try {
-        watchRuntime(globalThis.chrome && chrome.runtime, 'chrome');
-        watchRuntime(globalThis.browser && browser.runtime, 'browser');
-        const connect = api.runtime.connect.bind(api.runtime);
-        const wrapPort = (port, how) => {
-          const label = how + ' port ' + (port.name || '(no name)');
-          report('port', label + ' opened');
-          const post = port.postMessage.bind(port);
-          let sent = 0, got = 0;
-          port.postMessage = (m) => { if (sent++ < 5) report('port', label + ' sent ' + kind(m)); return post(m); };
-          port.onMessage.addListener((m) => { if (got++ < 5) report('port', label + ' got ' + kind(m)); });
-          port.onDisconnect.addListener(() => report('port', label + ' closed after ' + sent + ' sent, ' + got + ' got' + (api.runtime.lastError ? ': ' + api.runtime.lastError.message : '')));
-          return port;
-        };
-        api.runtime.connect = function (...args) { return wrapPort(connect(...args), 'outgoing'); };
-        const onConnect = api.runtime.onConnect.addListener.bind(api.runtime.onConnect);
-        api.runtime.onConnect.addListener = function (listener) { return onConnect((port) => listener(wrapPort(port, 'incoming'))); };
-      } catch (e) { report('api', 'could not watch messages: ' + text(e)); }
-      // Local databases: whether opening one works, and whether a request ever finishes.
-      if (globalThis.indexedDB) {
-        const open = indexedDB.open.bind(indexedDB);
-        indexedDB.open = function (name, version) {
-          const request = version === undefined ? open(name) : open(name, version);
-          const started = Date.now(), label = 'indexedDB.open ' + String(name).slice(0, 40);
-          let done = false;
-          const timer = setTimeout(() => { if (!done) report('waiting', label + ' has not opened after 3s'); }, 3000);
-          request.addEventListener('success', () => { done = true; clearTimeout(timer); report('db', label + ' ok in ' + (Date.now() - started) + 'ms'); });
-          request.addEventListener('error', () => { done = true; clearTimeout(timer); report('db', label + ' FAILED: ' + text(request.error)); });
-          request.addEventListener('blocked', () => report('db', label + ' blocked by another connection'));
-          return request;
-        };
-      } else {
-        report('db', 'indexedDB is missing here');
-      }
-      if (globalThis.navigator && !navigator.locks) report('api', 'navigator.locks is missing here');
-      if (globalThis.caches === undefined) report('api', 'caches is missing here');
-      // Browser API calls that never answer stall an extension silently: name any still waiting after 3 seconds.
-      const watch = (path, target) => {
-        if (!target || typeof target !== 'object') return;
-        for (const key of Object.keys(Object.getPrototypeOf(target) || {}).concat(Object.keys(target))) {
-          let value;
-          try { value = target[key]; } catch (e) { continue; }
-          if (typeof value === 'function' && !key.startsWith('on') && !/^[A-Z]/.test(key)) {
-            try {
-              target[key] = function (...args) {
-                const result = value.apply(this, args);
-                if (result && typeof result.then === 'function') {
-                  let settled = false;
-                  const started = Date.now();
-                  const timer = setTimeout(() => { if (!settled) report('waiting', path + '.' + key + ' has not answered after 3s'); }, 3000);
-                  result.then(() => { settled = true; clearTimeout(timer); if (Date.now() - started > 3000) report('waiting', path + '.' + key + ' answered after ' + (Date.now() - started) + 'ms'); },
-                              (e) => { settled = true; clearTimeout(timer); report('api', path + '.' + key + ' failed: ' + text(e)); });
-                }
-                return result;
-              };
-            } catch (e) {}
-          }
-        }
-      };
-      for (const name of ['runtime', 'tabs', 'windows', 'scripting', 'action', 'alarms', 'permissions', 'contextMenus', 'declarativeNetRequest', 'webNavigation', 'cookies', 'i18n', 'commands', 'offscreen']) {
-        try { watch(name, api[name]); } catch (e) {}
-      }
-      for (const area of ['local', 'session', 'sync']) { try { watch('storage.' + area, api.storage && api.storage[area]); } catch (e) {} }
-      report('started', '');
     })();
 
     """

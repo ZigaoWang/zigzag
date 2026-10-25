@@ -113,10 +113,9 @@ final class ExtensionPageErrors: NSObject, WKScriptMessageHandler {
       const failed = new Set();
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          if (entry.responseStatus >= 400 && !failed.has(entry.name)) { failed.add(entry.name); post('http ' + entry.responseStatus, entry.name.split('?')[0]); }
+          if (entry.responseStatus >= 400 && !failed.has(entry.name)) { failed.add(entry.name); let host = '?'; try { host = new URL(entry.name).host; } catch (e) {} post('http ' + entry.responseStatus, host); }
         }
       }).observe({ type: 'resource', buffered: true });
-      post('loaded', location.pathname + location.hash.split('?')[0]);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
 
