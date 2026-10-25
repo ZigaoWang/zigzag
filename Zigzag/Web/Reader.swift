@@ -208,7 +208,9 @@ final class ReaderControls: FloatingPanelView {
     private let options = ReaderOptions()
     private var monitor: Any?
 
-    static let height: CGFloat = 40
+    /// Buttons with the same small gap all round: top, bottom and sides.
+    static let inset: CGFloat = 4
+    static var height: CGFloat { Tokens.Metric.iconButton + inset * 2 }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -226,13 +228,13 @@ final class ReaderControls: FloatingPanelView {
     required init?(coder: NSCoder) { fatalError() }
 
     var barSize: NSSize {
-        NSSize(width: Tokens.Metric.iconButton * 2 + 4 + Tokens.Space.x1 * 2, height: Self.height)
+        NSSize(width: Tokens.Metric.iconButton * 2 + 2 + Self.inset * 2, height: Self.height)
     }
 
     private func layoutContent() {
         let b = Tokens.Metric.iconButton, h = bounds.height
-        style.frame = NSRect(x: Tokens.Space.x1, y: (h - b) / 2, width: b, height: b)
-        close.frame = NSRect(x: style.frame.maxX + 4, y: (h - b) / 2, width: b, height: b)
+        style.frame = NSRect(x: Self.inset, y: (h - b) / 2, width: b, height: b)
+        close.frame = NSRect(x: style.frame.maxX + 2, y: (h - b) / 2, width: b, height: b)
     }
 
     func toggleOptions() {
