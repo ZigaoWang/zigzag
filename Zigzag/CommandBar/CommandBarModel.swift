@@ -74,7 +74,7 @@ enum CommandRanker {
         let lower = text.lowercased()
         guard lower.count >= 1, !lower.contains(" "), !lower.contains("/") else { return nil }
         func host(_ url: URL) -> String { HistoryStore.normalizedHost(url) }
-        let candidates: [URL] = manager.allTabs.compactMap(\.url) + Library.shared.allBookmarks.map(\.0.url)
+        let candidates: [URL] = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
         if let url = candidates.first(where: { host($0).hasPrefix(lower) }) {
             return (host(url), URL(string: "https://\(host(url))")!)
         }
@@ -156,7 +156,8 @@ enum CommandRanker {
                 tabCount += 1
             }
             var bookmarkCount = 0
-            for (bookmark, _) in Library.shared.allBookmarks where bookmarkCount < 3 {
+            // Favorites first: they're the sites you go to most.
+            for bookmark in Library.shared.favorites + Library.shared.allBookmarks.map(\.0) where bookmarkCount < 3 {
                 guard matches(words, bookmark.title, bookmark.url.absoluteString) else { continue }
                 let key = TabManager.normalize(bookmark.url)
                 guard !seen.contains(key) else { continue }
