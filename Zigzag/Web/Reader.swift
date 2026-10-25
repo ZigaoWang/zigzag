@@ -196,7 +196,9 @@ enum Reader {
         .meta { font: 13px/1.4 var(--sans); color: var(--soft); margin: 1.4em 0 0; }
         .meta .dot { margin: 0 .5em; color: var(--faint); }
         figure.hero { margin: 2.2em 0 0; }
-        figure.hero img { width: 100%; max-height: 22em; object-fit: cover; border-radius: 8px; margin: 0; }
+        /* Its room is kept from the start, so the text never jumps when the picture arrives. */
+        figure.hero { aspect-ratio: 16 / 9; max-height: 22em; width: 100%; border-radius: 8px; overflow: hidden; background: var(--code); }
+        figure.hero img { width: 100%; height: 100%; max-height: none; object-fit: cover; border-radius: 0; margin: 0; }
 
         h1, h2, h3, h4 { line-height: 1.25; margin: 2em 0 .5em; letter-spacing: -0.01em; text-wrap: balance; font-weight: 600; }
         h2 { font-size: 1.3em; } h3 { font-size: 1.08em; } h4 { font-size: 1em; }
