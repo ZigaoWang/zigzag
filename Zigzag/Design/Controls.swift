@@ -532,13 +532,18 @@ final class SegmentedPills: NSView {
 
         private var hasCount: Bool { !count.stringValue.isEmpty }
 
-        var fittingWidth: CGFloat { Tokens.Space.x3 * 2 + title.inkWidth + (hasCount ? Tokens.Space.x1 + 2 + count.inkWidth : 0) }
+        /// Measured in the chosen weight, so choosing a segment never squeezes its own title.
+        private var titleWidth: CGFloat {
+            ceil((title.stringValue as NSString).size(withAttributes: [.font: Tokens.Font.body(.semibold)]).width)
+        }
+
+        var fittingWidth: CGFloat { Tokens.Space.x3 * 2 + titleWidth + (hasCount ? Tokens.Space.x1 + 2 + count.inkWidth : 0) }
 
         override func layout() {
             super.layout()
             let x = Tokens.Space.x3
-            title.frame = NSRect(x: x - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: title.inkWidth + Label.inset * 2, height: title.lineHeight)
-            count.frame = NSRect(x: x + title.inkWidth + Tokens.Space.x1 + 2 - Label.inset, y: (bounds.height - count.lineHeight) / 2,
+            title.frame = NSRect(x: x - Label.inset, y: (bounds.height - title.lineHeight) / 2, width: titleWidth + Label.inset * 2, height: title.lineHeight)
+            count.frame = NSRect(x: x + titleWidth + Tokens.Space.x1 + 2 - Label.inset, y: (bounds.height - count.lineHeight) / 2,
                                  width: count.inkWidth + Label.inset * 2, height: count.lineHeight)
         }
 
