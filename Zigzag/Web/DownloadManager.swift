@@ -92,12 +92,15 @@ final class DownloadManager: NSObject {
         }
         if let data = item.resumeData {
             webView.resumeDownload(fromResumeData: data, completionHandler: finish)
-        } else if let url = item.sourceURL {
+        } else if let url = item.sourceURL, canRetry(item) {
             webView.startDownload(using: URLRequest(url: url), completionHandler: finish)
         }
     }
 
-    var canRetry: (DownloadItem) -> Bool { { $0.resumeData != nil || $0.sourceURL != nil } }
+    /// A file the page made itself (blob:, data:) can't be fetched again.
+    var canRetry: (DownloadItem) -> Bool {
+        { $0.resumeData != nil || ["http", "https"].contains($0.sourceURL?.scheme?.lowercased() ?? "") }
+    }
 
     func remove(_ item: DownloadItem) {
         if item.state == .downloading { cancel(item) }
