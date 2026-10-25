@@ -121,12 +121,16 @@ enum DebugBridge {
             let n = arg.split(separator: " ").compactMap { Double($0) }
             if n.count == 2 { (controller.window as? BrowserWindow)?.trafficLightOrigin = NSPoint(x: n[0], y: n[1]) }
         case "mouse":
-            // mouse <down|drag|up|move|click|rclick> x y  (window points, top-left origin)
+            // mouse <down|drag|up|move|click|rclick> x y [shift|cmd|opt]  (window points, top-left origin)
             let f = arg.split(separator: " ").map(String.init)
-            guard f.count == 3, let x = Double(f[1]), let y = Double(f[2]), let window = controller.window else { break }
+            guard f.count >= 3, let x = Double(f[1]), let y = Double(f[2]), let window = controller.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            if f.contains("shift") { flags.insert(.shift) }
+            if f.contains("cmd") { flags.insert(.command) }
+            if f.contains("opt") { flags.insert(.option) }
             let point = NSPoint(x: x, y: window.frame.height - y)
             func post(_ type: NSEvent.EventType, clicks: Int = 1) {
-                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1) {
                     NSApp.postEvent(event, atStart: false)
                 }
