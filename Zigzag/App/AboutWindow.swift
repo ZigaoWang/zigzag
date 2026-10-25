@@ -64,9 +64,9 @@ private final class AboutView: NSView {
         super.viewDidMoveToWindow()
         guard window != nil else { return }
         layoutSubtreeIfNeeded()
-        // The wordmark writes itself in, the way it does on the welcome screen; the rest settles in under it.
+        // The wordmark writes itself in, the way it does on the welcome screen. It's the one thing that moves:
+        // the details under it are simply there.
         wordmark.drawIn(delay: 0.15, total: 1.2)
-        Brand.enter([version, maker, updates, copyright], delay: 0.9)
     }
 
     @objc private func rewrite() { wordmark.drawIn(total: 1.2) }
