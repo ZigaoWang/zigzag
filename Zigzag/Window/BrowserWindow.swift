@@ -64,6 +64,21 @@ final class BrowserWindow: NSWindow {
            let controller = windowController as? BrowserWindowController, controller.handleUndoKey(redo: mods.contains(.shift)) {
             return true
         }
+        // ⌘← / ⌘→ move the cursor while you're typing; only away from a text field do they mean Back and Forward.
+        if mods == .command, event.keyCode == 123 || event.keyCode == 124 {
+            if firstResponder is NSText { return false }
+            if let webView = firstResponder as? WKWebView, let controller = windowController as? BrowserWindowController {
+                let back = event.keyCode == 123
+                let editing = "(() => { const e = document.activeElement; return !!e && (e.isContentEditable || /^(input|textarea|select)$/i.test(e.tagName)); })()"
+                webView.evaluateJavaScript(editing) { [weak controller] result, _ in
+                    MainActor.assumeIsolated {
+                        guard (result as? Bool) != true, let controller else { return }
+                        back ? controller.goBack(nil) : controller.goForward(nil)
+                    }
+                }
+                return false
+            }
+        }
         if let menu = NSApp.mainMenu, menu.performKeyEquivalent(with: event) { return true }
         return super.performKeyEquivalent(with: event)
     }
