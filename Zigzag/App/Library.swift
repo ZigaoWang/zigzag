@@ -301,7 +301,7 @@ final class Library {
     }
 
     /// Spaces, bookmarks and favorites as they are now, for undo.
-    struct Snapshot {
+    struct Snapshot: Equatable {
         fileprivate let spaces: [SpaceInfo]
         fileprivate let favorites: [Bookmark]
 

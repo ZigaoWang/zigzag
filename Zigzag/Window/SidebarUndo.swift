@@ -32,10 +32,19 @@ extension BrowserWindowController {
 
     private func registerLibraryUndo(_ name: String, restoring before: Library.Snapshot, redo after: Library.Snapshot) {
         sidebarUndo.registerUndo(withTarget: self) { controller in
+            // Changed since (an import, another window): putting back the old copy would undo those too.
+            guard controller.libraryUnchanged(since: after) else { return }
             Library.shared.restore(before)
             controller.registerLibraryUndo(name, restoring: after, redo: before)
         }
         sidebarUndo.setActionName(name)
+    }
+
+    /// Whether the library is still as a change left it; if not, says why ⌘Z did nothing.
+    func libraryUnchanged(since snapshot: Library.Snapshot) -> Bool {
+        guard Library.shared.snapshot != snapshot else { return true }
+        Toast.show("Can’t undo: spaces or bookmarks changed since", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        return false
     }
 
     // MARK: Split view
@@ -76,9 +85,11 @@ extension BrowserWindowController {
         let before = Library.shared.snapshot
         tabManager.favoriteTab(tab, at: index)
         guard let id = tab.bookmarkID else { return }
+        let after = Library.shared.snapshot
         sidebarUndo.registerUndo(withTarget: self) { controller in
             if wasBookmark != nil {
                 // It was a bookmark: it simply goes back to its space.
+                guard controller.libraryUnchanged(since: after) else { return }
                 Library.shared.restore(before)
                 tab.isFavorite = false
             } else {
@@ -95,11 +106,13 @@ extension BrowserWindowController {
         let before = Library.shared.snapshot
         let live = tabManager.bookmarkTab(for: id)
         tabManager.unbookmark(id, toIndex: index)
+        let after = Library.shared.snapshot
         sidebarUndo.registerUndo(withTarget: self) { controller in
             if let live {
                 let oldPosition = before.favoriteIndex(of: id) ?? Library.shared.favorites.count
                 controller.tabManager.favoriteTab(live, at: oldPosition)
             } else {
+                guard controller.libraryUnchanged(since: after) else { return }
                 Library.shared.restore(before)
             }
             let redoID = live?.bookmarkID ?? id
@@ -142,7 +155,9 @@ extension BrowserWindowController {
             (window: ObjectIdentifier(window), tabs: window.tabManager.tabs(in: id).compactMap { tab in tab.url.map { ($0, tab.displayTitle) } })
         }
         Library.shared.removeSpace(id)
+        let after = Library.shared.snapshot
         sidebarUndo.registerUndo(withTarget: self) { controller in
+            guard controller.libraryUnchanged(since: after) else { return }
             Library.shared.restore(before)
             for (window, list) in tabs {
                 // A window closed since: its tabs come back here.
