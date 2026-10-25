@@ -212,6 +212,16 @@ final class TabManager {
         select(index >= list.count ? list[list.count - 1] : list[index])
     }
 
+    /// ⌘1–⌘9: every favorite, this space's pinned pages, then its tabs, numbered as the sidebar lists them whether
+    /// open or not. An index past the end means the last.
+    func selectByNumber(_ index: Int) {
+        let bookmarks = Library.shared.favorites + Library.shared.bookmarks(in: currentSpaceID)
+        let tabs = currentTabs
+        guard !bookmarks.isEmpty || !tabs.isEmpty else { return }
+        let i = min(index, bookmarks.count + tabs.count - 1)
+        if i < bookmarks.count { openBookmark(bookmarks[i]) } else { select(tabs[i - bookmarks.count]) }
+    }
+
     /// Favorites, bookmarks, then tabs, in sidebar order: what Cmd+Option+Up/Down walk.
     var navigableTabs: [Tab] {
         let favoriteLive = Library.shared.favorites.compactMap { bookmarkTabs[$0.id] }

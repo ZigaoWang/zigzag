@@ -251,7 +251,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func selectPreviousTab(_ sender: Any?) { tabManager.selectNext(offset: -1) }
     @objc func selectTabByNumber(_ sender: NSMenuItem) {
         // Cmd+9 always means the last tab, like every browser.
-        if sender.tag == 9 { tabManager.select(at: Int.max) } else { tabManager.select(at: sender.tag - 1) }
+        if sender.tag == 9 { tabManager.selectByNumber(Int.max) } else { tabManager.selectByNumber(sender.tag - 1) }
     }
     @objc func duplicateTab(_ sender: Any?) {
         guard let tab = selectedTab else { return }
