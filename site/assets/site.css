@@ -83,10 +83,51 @@ h1 {
   box-shadow: 0 0 0 1px var(--rule), 0 30px 80px -20px rgba(0, 0, 0, .55);
 }
 
-.feature { max-width: var(--wrap); margin: 144px auto 0; padding: 0 24px; display: flex; align-items: baseline; gap: 32px; flex-wrap: wrap; }
-.feature + .film { margin-top: 32px; }
-h2 { font: 800 32px/1.1 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; letter-spacing: -0.02em; color: #FFFFFF; }
-.feature p { color: var(--soft); max-width: 520px; }
+/* Bands: each demo on its own brand surface, in the color a space of that hue gives Zigzag's big moments.
+   Deep in the hue, lit from one corner by its accent, the ribbon written large and tone on tone. */
+.band {
+  --deep: #1E3A5F; --lit: #354E6F; --shade: #162A44; --tint: #DAE5F2; --glow: #7FA6DC;
+  position: relative; overflow: hidden; isolation: isolate;
+  max-width: 1280px; margin: 120px auto 0; border-radius: 18px;
+  padding: 72px 64px;
+  background:
+    radial-gradient(900px 600px at var(--gx, 0%) var(--gy, 0%), color-mix(in srgb, var(--glow) 42%, transparent), transparent 70%),
+    linear-gradient(160deg, var(--lit) 0%, var(--deep) 45%, var(--shade) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
+  display: grid; gap: 48px; align-items: center;
+}
+.band.rose     { --deep: #61232D; --lit: #743D46; --shade: #461921; --tint: #F5D0D6; --glow: #DB7284; }
+.band.peach    { --deep: #613A23; --lit: #74523D; --shade: #462A19; --tint: #F5DED0; --glow: #DB9A72; --gx: 100%; }
+.band.sand     { --deep: #614B23; --lit: #74603D; --shade: #463619; --tint: #F5E8D0; --glow: #DBB672; --gx: 50%; }
+.band.mint     { --deep: #236155; --lit: #3D746A; --shade: #19463D; --tint: #D0F5EE; --glow: #72DBC8; --gy: 100%; }
+.band.lavender { --deep: #322361; --lit: #4A3D74; --shade: #241946; --tint: #D9D0F5; --glow: #8B72DB; --gx: 100%; --gy: 100%; }
+
+.band .mark { position: absolute; z-index: -1; width: 640px; height: 607px; pointer-events: none; }
+.band .mark path { fill: none; stroke: var(--tint); stroke-opacity: .13; stroke-width: 100; stroke-linecap: round; stroke-linejoin: round; }
+.band.rose .mark     { right: -120px; bottom: -180px; }
+.band.peach .mark    { left: -160px; top: -140px; transform: rotate(-8deg); }
+.band.sand .mark     { left: 50%; top: -260px; transform: translateX(-50%) scale(1.3); }
+.band.mint .mark     { right: -200px; top: -120px; }
+.band.lavender .mark { left: -140px; bottom: -220px; transform: rotate(6deg); }
+
+.band h2 { font: 800 clamp(30px, 3.6vw, 48px)/1.05 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance; }
+.band p { margin-top: 16px; color: color-mix(in srgb, var(--tint) 78%, transparent); font-size: 18px; max-width: 420px; text-wrap: pretty; }
+.band .film { margin: 0; padding: 0; max-width: none; }
+.band .film video { box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 30px 70px -24px rgba(0,0,0,.6); }
+
+/* Layouts, so no two in a row look alike. */
+.band.side { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); }
+.band.side.flip { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+.band.side.flip .copy { order: 2; }
+.band.stack { grid-template-columns: 1fr; text-align: center; padding-bottom: 0; align-items: end; }
+.band.stack p { margin-left: auto; margin-right: auto; }
+.band.stack .film { max-width: 980px; margin: 0 auto; width: 100%; }
+.band.stack .film video { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.band.wide { grid-template-columns: 1fr; padding: 0; gap: 0; }
+.band.wide .copy { padding: 56px 64px 40px; display: flex; align-items: baseline; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.band.wide .copy p { margin: 0; }
+.band.wide .film video { border-radius: 0; box-shadow: none; }
 
 .list { max-width: var(--wrap); margin: 160px auto 0; padding: 0 24px; }
 .list dl { display: grid; grid-template-columns: 200px 1fr; margin-top: 28px; border-top: 1px solid var(--rule); }
@@ -113,12 +154,18 @@ h2 { font: 800 32px/1.1 -apple-system, BlinkMacSystemFont, "SF Pro Display", san
 
 @media (max-width: 640px) {
   body { font-size: 16px; }
-  .bar, .film, .feature, .list, .end, .hero, .page { padding-left: 16px; padding-right: 16px; }
+  .bar, .film, .list, .end, .hero, .page { padding-left: 16px; padding-right: 16px; }
+  .band { margin: 64px 12px 0; padding: 40px 20px; border-radius: 16px; gap: 28px; }
+  .band.side, .band.side.flip { grid-template-columns: 1fr; }
+  .band.side.flip .copy { order: 0; }
+  .band.stack { padding-bottom: 0; }
+  .band.wide { padding: 0; }
+  .band.wide .copy { padding: 36px 20px 24px; }
+  .band .mark { width: 420px; height: 398px; }
+  .band p { font-size: 16px; }
   .hero { padding-top: 56px; }
   .hero > p:not(.fine) { font-size: 17px; }
   .film { margin-top: 48px; }
-  .feature { margin-top: 96px; gap: 8px; }
-  h2 { font-size: 26px; }
   .list dl { grid-template-columns: 1fr; }
   .list dt { padding-bottom: 2px; border-bottom: 0; }
   .list dd { padding-top: 0; }
