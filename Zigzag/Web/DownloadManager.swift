@@ -50,8 +50,21 @@ final class DownloadManager: NSObject {
         return active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
     }
 
+    /// Ask with a save sheet each time instead of saving straight to Downloads.
+    static var asksWhereToSave: Bool {
+        get { UserDefaults.standard.bool(forKey: "DownloadsAskWhere") }
+        set { UserDefaults.standard.set(newValue, forKey: "DownloadsAskWhere") }
+    }
+
+    /// A download got its file and is under way: the window it came from shows it leaving for Downloads.
+    let started = Signal<(DownloadItem, NSWindow?)>()
+    private var windows: [ObjectIdentifier: NSWindow] = [:]
+    /// The folder the last save sheet was pointed at, to start there next time.
+    private var lastFolder: URL?
+
     func track(_ download: WKDownload, window: NSWindow?) {
         download.delegate = self
+        if let window { windows[ObjectIdentifier(download)] = window }
         let isPrivate = download.webView.map { !$0.configuration.websiteDataStore.isPersistent } ?? false
         let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url,
                                 isPrivate: isPrivate)
@@ -149,13 +162,45 @@ final class DownloadManager: NSObject {
 extension DownloadManager: WKDownloadDelegate {
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
         let inProgress = Set(items.filter { $0.state == .downloading }.compactMap { $0.destination?.path })
-        let destination = Self.uniqueDestination(for: suggestedFilename.isEmpty ? "Download" : suggestedFilename, avoiding: inProgress)
+        let name = suggestedFilename.isEmpty ? "Download" : suggestedFilename
+        var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
+        let window = windows.removeValue(forKey: ObjectIdentifier(download))
+        if Self.asksWhereToSave {
+            guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
+                // Cancelled in the sheet: no download, and nothing left in the list.
+                items.removeAll { $0.download === download }
+                changed.send(nil)
+                return nil
+            }
+            destination = chosen
+            // The sheet already asked about replacing a file of the same name.
+            try? FileManager.default.removeItem(at: chosen)
+        }
         if let item = item(for: download) {
             item.filename = destination.lastPathComponent
             item.destination = destination
             changed.send(item)
+            started.send((item, window))
         }
         return destination
+    }
+
+    /// The standard save sheet, on the window the download came from.
+    private func askWhere(name: String, in window: NSWindow?) async -> URL? {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = name
+        panel.directoryURL = lastFolder ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        let response: NSApplication.ModalResponse
+        if let window, window.isVisible, window.attachedSheet == nil {
+            response = await panel.beginSheetModal(for: window)
+        } else {
+            response = panel.runModal()
+        }
+        guard response == .OK, let url = panel.url else { return nil }
+        lastFolder = url.deletingLastPathComponent()
+        return url
     }
 
     func downloadDidFinish(_ download: WKDownload) {

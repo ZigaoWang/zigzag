@@ -335,6 +335,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
+    private let askToggle = Toggle()
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
     private let translateOffer = Toggle()
@@ -408,8 +409,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
+        askToggle.onChange = { on in DownloadManager.asksWhereToSave = on }
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
         behaviorGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
+        behaviorGroup.add(FormRow(title: "Ask where to save each download", detail: "Off: downloads go straight to your Downloads folder.", control: askToggle))
         behaviorGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
         let importButton = TextButton.form("Import")
         importButton.onClick = { _ in ImportWindowController.show() }
@@ -774,6 +777,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
         pipToggle.isOn = PictureInPicture.followsTabs
+        askToggle.isOn = DownloadManager.asksWhereToSave
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
         translateOffer.isOn = PageTranslator.offers
