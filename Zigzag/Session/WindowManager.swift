@@ -128,9 +128,17 @@ final class WindowManager {
         if !restoreSession() { newWindow() }
     }
 
+    /// No browser window is open: brings back the saved session and returns its window, so what opens next joins it
+    /// instead of a new window whose first save would wipe it. Nil when one is open or nothing was saved.
+    @discardableResult
+    func restoreIfNoWindows() -> BrowserWindowController? {
+        guard !controllers.contains(where: { !$0.tabManager.isPrivate }), restoreSession() else { return nil }
+        return controllers.last { !$0.tabManager.isPrivate }
+    }
+
     /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window.
     func openExternal(_ url: URL) {
-        if let controller = keyController {
+        if let controller = keyController ?? restoreIfNoWindows() {
             controller.open(url, disposition: .foregroundTab)
             controller.window?.makeKeyAndOrderFront(nil)
         } else {

@@ -359,13 +359,16 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
-        let window = (configuration.window as? BrowserWindowController) ?? WindowManager.shared.keyController ?? WindowManager.shared.newWindow(showCommandBar: false)
+        let window = (configuration.window as? BrowserWindowController) ?? WindowManager.shared.keyController
+            ?? WindowManager.shared.restoreIfNoWindows() ?? WindowManager.shared.newWindow(showCommandBar: false)
         let tab = window.tabManager.newTab(url: configuration.url, select: configuration.shouldBeActive)
         completionHandler(tab, nil)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void) {
+        // The saved session comes back first, or the new window's first save would replace it.
+        WindowManager.shared.restoreIfNoWindows()
         let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, showCommandBar: false)
         for url in configuration.tabURLs.dropFirst() { window.tabManager.newTab(url: url, select: false) }
         completionHandler(window, nil)
