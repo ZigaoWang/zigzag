@@ -13,9 +13,12 @@ final class AddressView: InteractiveView {
     private let label = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
-    let captureButton = IconButton(symbol: "video.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Using your camera")
+    /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
+    static let buttonSide: CGFloat = Tokens.Space.x7Height
+    static let buttonInset: CGFloat = 4
+    let captureButton = IconButton(symbol: "video.fill", size: AddressView.buttonSide, toolTip: "Using your camera")
     /// Shown on articles: opens Reader.
-    let readerButton = IconButton(symbol: "doc.plaintext", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Show Reader (⇧⌘R)")
+    let readerButton = IconButton(symbol: "doc.plaintext", size: AddressView.buttonSide, toolTip: "Show Reader (⇧⌘R)")
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
@@ -42,7 +45,7 @@ final class AddressView: InteractiveView {
     func setActions(_ items: [ActionButton]) {
         actionButtons.forEach { $0.removeFromSuperview() }
         actionButtons = items.map { item in
-            let button = IconButton(symbol: item.symbol, size: Tokens.Space.x6, toolTip: item.label)
+            let button = IconButton(symbol: item.symbol, size: AddressView.buttonSide, toolTip: item.label)
             if let image = item.image { button.image = image }
             button.onClick = { [weak button] _ in if let button { item.action(button) } }
             button.onRightClick = { _ in item.menu() }
@@ -56,7 +59,8 @@ final class AddressView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.row
+        // Its buttons sit 4pt in, with 6pt corners: 10 here keeps the two curves running side by side.
+        layer?.cornerRadius = Tokens.Radius.control + AddressView.buttonInset
         layer?.cornerCurve = .continuous
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textTertiary
@@ -108,12 +112,13 @@ final class AddressView: InteractiveView {
             lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
             x = lock.frame.maxX + Tokens.Space.x1
         }
-        var right = bounds.width - Tokens.Space.x1
+        let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
+        var right = bounds.width - inset
         let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
         for button in trailingButtons.reversed() {
-            let side = Tokens.Space.x6
-            button.frame = NSRect(x: right - side, y: (bounds.height - side) / 2, width: side, height: side)
-            right = button.frame.minX
+            button.frame = NSRect(x: right - side, y: inset, width: side, height: side)
+            button.radius = Tokens.Radius.control
+            right = button.frame.minX - 2
         }
         let trailing = trailingButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
         let h = ceil(label.intrinsicContentSize.height)
