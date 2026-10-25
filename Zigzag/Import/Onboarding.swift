@@ -676,16 +676,28 @@ private final class BringPicker: StepContent {
     private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
     private let fileLink = Onboard.quiet("Import a password file")
     private var isImporting = false
+    /// Many browsers or profiles: the list scrolls inside its box instead of running into the buttons.
+    private let scroll = NSScrollView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        list.wantsLayer = true
-        list.layer?.cornerRadius = 12
-        list.layer?.cornerCurve = .continuous
-        list.layer?.borderWidth = 1
-        list.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
+        scroll.wantsLayer = true
+        scroll.layer?.cornerRadius = 12
+        scroll.layer?.cornerCurve = .continuous
+        scroll.layer?.borderWidth = 1
+        scroll.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
+        scroll.layer?.masksToBounds = true
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .overlay
+        scroll.verticalScrollElasticity = .allowed
+        scroll.horizontalScrollElasticity = .none
+        scroll.contentView = FlippedClipView()
+        scroll.contentView.drawsBackground = false
+        scroll.documentView = list
         hint.alignment = .center
-        [list, bringLabel, fileLink, hint].forEach { addSubview($0) }
+        [scroll, bringLabel, fileLink, hint].forEach { addSubview($0) }
         for (i, source) in ImportCoordinator.detectedSources().enumerated() { add(source, chosen: i == 0) }
         if rows.isEmpty { addSubview(empty) }
         for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
@@ -892,8 +904,10 @@ private final class BringPicker: StepContent {
         let block = ry + Tokens.Space.x5 + Tokens.Space.x8 + Tokens.Space.x3 + Tokens.Space.x8
         var y: CGFloat = 0
         _ = block
-        list.isHidden = rows.isEmpty
-        list.frame = NSRect(x: pad, y: y, width: width, height: ry)
+        scroll.isHidden = rows.isEmpty
+        let room = bounds.height - (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
+        scroll.frame = NSRect(x: pad, y: y, width: width, height: min(ry, max(room, 0)))
+        list.frame = NSRect(x: 0, y: 0, width: width, height: ry)
         if rows.isEmpty {
             empty.frame = NSRect(x: pad, y: y, width: width, height: 40)
             ry = 40
@@ -2017,3 +2031,8 @@ private final class ReadyPicker: StepContent {
 
 }
 
+
+/// A clip view whose content starts at the top, so a scrolling list reads top-down.
+final class FlippedClipView: NSClipView {
+    override var isFlipped: Bool { true }
+}
