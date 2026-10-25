@@ -110,6 +110,10 @@ final class ExtensionSheet: FloatingPanelView {
         }
     }
 
+    #if DEBUG
+    static func debugCancel() { current?.finish(confirmed: false) }
+    #endif
+
     private func finish(confirmed: Bool) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
