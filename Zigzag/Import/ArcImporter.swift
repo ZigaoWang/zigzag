@@ -16,7 +16,7 @@ enum ArcImporter {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Zigzag", category: "import")
 
     /// Turns a file error into something to show: macOS refusing access gets the fix that opens its setting.
-    private static func problem(reading what: String, _ error: Error) -> ImportProblem {
+    private static func problem(reading what: String, _ error: Error, retries: Int = 8) -> ImportProblem {
         let ns = error as NSError
         log.error("Arc import: couldn't read \(what, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
         let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
@@ -24,10 +24,10 @@ enum ArcImporter {
         if denied {
             return ImportProblem(message: "macOS didn’t let Zigzag read Arc’s \(what). In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.", fix: .fullDiskAccess)
         }
-        return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what) (\(ns.localizedDescription)). Try again.", fix: .retry, retries: 8)
+        return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what) (\(ns.localizedDescription)). Try again.", fix: .retry, retries: retries)
     }
 
-    static var arcSupport: URL {
+    nonisolated static var arcSupport: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Arc")
     }
 
@@ -35,8 +35,24 @@ enum ArcImporter {
         FileManager.default.fileExists(atPath: arcSupport.appendingPathComponent("StorableSidebar.json").path)
     }
 
+    /// Everything: the sidebar, then history.
     @discardableResult
     static func importAll() -> (result: Result, firstSpace: UUID?) {
+        var (result, first) = importSidebar()
+        do {
+            let entries = try readHistory()
+            HistoryStore.shared.importVisits(entries)
+            result.historyEntries = entries.count
+        } catch { result.problems.append(historyProblem(error)) }
+        return (result, first)
+    }
+
+    /// Trying again reads history only (`Choice.history`), never the sidebar a second time.
+    static func historyProblem(_ error: Error) -> ImportProblem { problem(reading: "history", error, retries: 4) }
+
+    /// Spaces, pinned tabs and Favorites.
+    @discardableResult
+    static func importSidebar() -> (result: Result, firstSpace: UUID?) {
         var result = Result()
         let (spaces, favorites): ([SpaceInfo], [Bookmark])
         do {
@@ -47,7 +63,7 @@ enum ArcImporter {
         }
         var newSpaces = spaces
         // Arc's Favorites are global, like ours.
-        Library.shared.appendFavorites(favorites)
+        let addedFavorites = Library.shared.appendFavorites(favorites)
         for favorite in favorites { FaviconStore.shared.prefetch(for: favorite.url) }
         result.spaces = newSpaces.count
         result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)
@@ -64,18 +80,18 @@ enum ArcImporter {
             return false
         }
         result.spaces = newSpaces.count
-        result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +) + merged + favorites.count
+        result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +) + merged + addedFavorites
         if !newSpaces.isEmpty {
-            // A fresh install's empty default space gives way to the imported ones.
-            let pristine = Library.shared.spaces.filter { space in
+            // A fresh install's one empty space gives way to the imported ones. Spaces you made yourself stay, even empty.
+            let before = Library.shared.spaces
+            let pristine = before.count == 1 ? before.filter { space in
                 space.bookmarks.isEmpty && WindowManager.shared.controllers.allSatisfy { $0.tabManager.tabs(in: space.id).isEmpty }
-            }
+            } : []
             Library.shared.appendSpaces(newSpaces)
             for space in pristine where Library.shared.spaces.count > 1 { Library.shared.removeSpace(space.id) }
             for bookmark in newSpaces.flatMap(\.bookmarks) { FaviconStore.shared.prefetch(for: bookmark.url) }
         }
-        do { result.historyEntries = try importHistory() } catch { result.problems.append(problem(reading: "history", error)) }
-        log.notice("Arc import: \(result.spaces) spaces, \(result.bookmarks) bookmarks, \(result.historyEntries) history, \(result.problems.count) problems")
+        log.notice("Arc import: \(result.spaces) spaces, \(result.bookmarks) bookmarks, \(result.problems.count) problems")
         return (result, newSpaces.first?.id)
     }
 
@@ -157,19 +173,20 @@ enum ArcImporter {
 
     // MARK: History
 
-    /// Reads Arc's Chromium history. The file is copied first because Arc keeps it locked while running.
-    private static func importHistory() throws -> Int {
+    /// Reads Arc's Chromium history, off the main thread: the file can be hundreds of megabytes. It's copied
+    /// first because Arc keeps it locked while running.
+    nonisolated static func readHistory() throws -> [(URL, String, Int, Date)] {
         let source = arcSupport.appendingPathComponent("User Data/Default/History")
-        guard FileManager.default.fileExists(atPath: source.path) else { return 0 }
+        guard FileManager.default.fileExists(atPath: source.path) else { return [] }
         let copy = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-arc-history-\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: copy) }
         try FileManager.default.copyItem(at: source, to: copy)
         var db: OpaquePointer?
-        guard sqlite3_open_v2(copy.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return 0 }
+        guard sqlite3_open_v2(copy.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_close(db) }
         var statement: OpaquePointer?
         let sql = "SELECT url, title, visit_count, last_visit_time FROM urls WHERE hidden = 0 ORDER BY last_visit_time DESC LIMIT 50000"
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return 0 }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(statement) }
         var entries: [(URL, String, Int, Date)] = []
         // Chromium time: microseconds since 1601-01-01.
@@ -183,7 +200,6 @@ enum ArcImporter {
             let date = Date(timeIntervalSince1970: micros / 1_000_000 - epochOffset)
             entries.append((url, title, count, date))
         }
-        HistoryStore.shared.importVisits(entries)
-        return entries.count
+        return entries
     }
 }

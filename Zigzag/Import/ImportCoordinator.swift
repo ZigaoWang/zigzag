@@ -151,12 +151,26 @@ enum ImportCoordinator {
 
         // Arc's spaces, pinned tabs, favorites and history come through its own importer, which knows its sidebar.
         var arcReading = reading
-        if isArc, choice.contains(.tabs) || choice.contains(.bookmarks) || choice.contains(.history) {
-            let result = ArcImporter.importAll().result
-            summary.spaces = result.spaces
-            summary.bookmarks = result.bookmarks
-            summary.history = result.historyEntries
-            summary.problems += result.problems
+        // Only the parts you chose: the sidebar for spaces and bookmarks, history for history.
+        if isArc {
+            if choice.contains(.tabs) || choice.contains(.bookmarks) {
+                let result = ArcImporter.importSidebar().result
+                summary.spaces = result.spaces
+                summary.bookmarks = result.bookmarks
+                summary.problems += result.problems
+            }
+            if choice.contains(.history) {
+                let read = await Task.detached(priority: .userInitiated) { () -> Swift.Result<[(URL, String, Int, Date)], Error> in
+                    Swift.Result { try ArcImporter.readHistory() }
+                }.value
+                switch read {
+                case .success(let entries):
+                    HistoryStore.shared.importVisits(entries)
+                    summary.history = entries.count
+                case .failure(let error):
+                    summary.problems.append(ArcImporter.historyProblem(error))
+                }
+            }
             arcReading = reading.intersection(.passwords)
         }
 

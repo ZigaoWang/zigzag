@@ -245,10 +245,14 @@ final class Library {
         commit()
     }
 
-    func appendFavorites(_ new: [Bookmark]) {
+    /// Adds the ones not already here; returns how many that was.
+    @discardableResult
+    func appendFavorites(_ new: [Bookmark]) -> Int {
         let known = Set(favorites.map { $0.url.absoluteString })
-        favorites += new.filter { !known.contains($0.url.absoluteString) }
+        let added = new.filter { !known.contains($0.url.absoluteString) }
+        favorites += added
         commit()
+        return added.count
     }
 
     func spaceID(ofBookmark id: UUID) -> UUID? {
