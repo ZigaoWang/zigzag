@@ -211,8 +211,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.stringValue = partner?.displayTitle ?? ""
         partnerIcon.image = partner?.favicon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
+        refreshAccessibilityLabel()
         refreshTitleColor()
         needsLayout = true
+    }
+
+    /// A split row reads out both of its pages.
+    private func refreshAccessibilityLabel() {
+        setAccessibilityLabel(partner == nil ? title.stringValue : "\(title.stringValue), split with \(partnerTitle.stringValue)")
     }
 
     /// Which half of a split row a point (in this view) falls in.
@@ -251,7 +257,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         audioButton.symbol = tab?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
         audioButton.toolTip = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
         siteTint = tab.flatMap { SiteTint.color(for: $0) }
-        setAccessibilityLabel(title.stringValue)
+        refreshAccessibilityLabel()
         refreshTitleColor()
         refreshAccessories()
     }
