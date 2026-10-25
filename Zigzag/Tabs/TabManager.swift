@@ -653,7 +653,9 @@ final class TabManager {
             .sorted { $0.lastActivated < $1.lastActivated }
         var liveCount = live.count
         for tab in candidates {
-            if now.timeIntervalSince(tab.lastActivated) > idleLimit || liveCount > maxLive {
+            // Over the cap a tab still gets five minutes: a half-written message in one you just left survives.
+            let idle = now.timeIntervalSince(tab.lastActivated)
+            if idle > idleLimit || (liveCount > maxLive && idle > 5 * 60) {
                 tab.suspend()
                 liveCount -= 1
             }
