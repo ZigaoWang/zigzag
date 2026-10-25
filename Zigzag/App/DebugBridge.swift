@@ -17,7 +17,9 @@ enum DebugBridge {
 
     static func start() {
         #if DEBUG
-        DistributedNotificationCenter.default().addObserver(forName: .init("app.zigzag.debug"), object: nil, queue: .main) { note in
+        // A second debug copy listens on its own channel, so commands for one never reach the other.
+        let channel = ProcessInfo.processInfo.environment["ZIGZAG_DEBUG_CHANNEL"].flatMap { $0.isEmpty ? nil : $0 } ?? "app.zigzag.debug"
+        DistributedNotificationCenter.default().addObserver(forName: .init(channel), object: nil, queue: .main) { note in
             let command = (note.object as? String) ?? ""
             MainActor.assumeIsolated { run(command) }
         }

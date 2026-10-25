@@ -5,7 +5,11 @@ nonisolated enum Paths {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         // The dev build keeps its data apart from the Zigzag you use.
         let isDev = Bundle.main.bundleIdentifier?.hasSuffix(".dev") ?? false
-        let dir = base.appendingPathComponent(isDev ? "Zigzag Dev" : "Zigzag", isDirectory: true)
+        var dir = base.appendingPathComponent(isDev ? "Zigzag Dev" : "Zigzag", isDirectory: true)
+        #if DEBUG
+        // A second debug copy (for staged screenshots) keeps its own data, apart from the dev build's.
+        if let custom = ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"], !custom.isEmpty { dir = URL(fileURLWithPath: custom, isDirectory: true) }
+        #endif
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()

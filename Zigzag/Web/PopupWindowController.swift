@@ -9,6 +9,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     let webView: WKWebView
     private var observations: [NSKeyValueObservation] = []
     private let header = PopupHeaderView()
+    private var parentObserver: Any?
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
         let controller = PopupWindowController(configuration: configuration, features: features, parent: parent)
@@ -41,6 +42,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.setFrameOrigin(origin)
         super.init(window: window)
         window.delegate = self
+        // A private window's popup shares its private session: it ends with that window, never outliving it.
+        if !configuration.websiteDataStore.isPersistent, let parent {
+            parentObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: parent, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.window?.close() }
+            }
+        }
 
         let content = ColorView(color: SpaceColor.graphite.background)
         window.contentView = content
@@ -71,6 +78,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func windowWillClose(_ notification: Notification) {
         observations.forEach { $0.invalidate() }
         webView.stopLoading()
+        if let parentObserver { NotificationCenter.default.removeObserver(parentObserver) }
+        parentObserver = nil
         Self.open.remove(self)
     }
 
