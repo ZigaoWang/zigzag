@@ -114,10 +114,12 @@ struct FirefoxDecryptionTests {
         #expect(password.matches(SecretString("zigzag-firefox-test")))
     }
 
-    @Test func aWrongPrimaryPasswordIsRefused() throws {
-        guard case .failure(.primaryPassword) = FirefoxImporter.key(in: try profile, primaryPassword: "not it") else {
-            Issue.record("a wrong primary password must not open the key"); return
+    /// One primary password is typed for every profile; a profile without one still opens, whatever was typed.
+    @Test func aProfileWithoutAPrimaryPasswordOpensWhateverWasTyped() throws {
+        guard case .success(let key) = FirefoxImporter.key(in: try profile, primaryPassword: "another profile's") else {
+            Issue.record("a profile with no primary password must open"); return
         }
+        #expect(key == Data(100..<124))
     }
 }
 
