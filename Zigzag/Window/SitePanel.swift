@@ -36,7 +36,7 @@ final class SitePanel: FloatingPanelView {
     static let width: CGFloat = 300
     static let minimumWidth: CGFloat = 256
     private var width: CGFloat = SitePanel.width
-    private let pad = Tokens.Space.x4
+    private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
 
     private init?(controller: BrowserWindowController) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
@@ -90,12 +90,17 @@ final class SitePanel: FloatingPanelView {
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         // From the address bar in the sidebar: its width and left edge, just below it, in the space's tint, so it
         // reads as part of the sidebar. Anywhere else (sidebar hidden) it keeps its own width.
-        if anchor === controller.sidebar.address, controller.root.sidebarVisible {
-            panel.width = max(anchorFrame.width, Self.minimumWidth)
+        if anchor === controller.sidebar.address, controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
+            // Part of the sidebar, not a card over it: the address bar's own width, flat (no shadow), in the
+            // sidebar's colour a shade lighter, like the address field itself.
+            panel.width = anchorFrame.width
             panel.surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
+            panel.tintStrength = 0.82
+            panel.isElevated = false
+            panel.radius = controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel
             panel.frame.size = NSSize(width: panel.width, height: panel.layoutContent(dryRun: true))
         }
-        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + 6)
+        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + 4)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
         panel.present(arrival: .fade)
@@ -284,7 +289,7 @@ final class SitePanel: FloatingPanelView {
             y += extensionsLabel.lineHeight + Tokens.Space.x1
             y += Tokens.Space.x1
             // Every icon on the same tile, the same size, lined up with the text above; + is one of them.
-            let gap: CGFloat = 8, columns = inner >= 260 ? 6 : 5
+            let gap: CGFloat = 6, columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
             let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
             for (i, tile) in extensionTiles.enumerated() {
                 let column = i % columns, row = i / columns
@@ -309,9 +314,16 @@ final class SitePanel: FloatingPanelView {
         if !clearCache.isHidden {
             divider.isHidden = true
             let half = (inner - Tokens.Space.x2) / 2, h = Tokens.Space.x8
-            place(clearCache, NSRect(x: pad, y: y, width: half, height: h))
-            place(clearCookies, NSRect(x: pad + half + Tokens.Space.x2, y: y, width: half, height: h))
-            y += h
+            if max(clearCache.fittingWidth, clearCookies.fittingWidth) + Tokens.Space.x2 <= half {
+                place(clearCache, NSRect(x: pad, y: y, width: half, height: h))
+                place(clearCookies, NSRect(x: pad + half + Tokens.Space.x2, y: y, width: half, height: h))
+                y += h
+            } else {
+                // Too narrow for both side by side (a slim sidebar): one above the other, whole names.
+                place(clearCache, NSRect(x: pad, y: y, width: inner, height: h))
+                place(clearCookies, NSRect(x: pad, y: y + h + Tokens.Space.x2, width: inner, height: h))
+                y += h * 2 + Tokens.Space.x2
+            }
         } else {
             y -= Tokens.Space.x3
         }

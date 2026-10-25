@@ -226,6 +226,8 @@ class FloatingPanelView: NSView {
 
     /// A color mixed into the panel's surface, like the space's own, so the panel belongs to it. Nil is plain.
     var surfaceTint: NSColor? { didSet { refreshColors() } }
+    /// How much of the tint goes in: more makes the panel read as part of what it's tinted from.
+    var tintStrength: CGFloat? { didSet { refreshColors() } }
     /// Off for a panel that stands in for something in place (the address being edited): no shadow, no lift.
     var isElevated = true { didSet { refreshColors() } }
     /// The edge, if not the usual hairline (an edited field's soft accent outline).
@@ -236,7 +238,7 @@ class FloatingPanelView: NSView {
             if let tint = surfaceTint {
                 effectiveAppearance.performAsCurrentDrawingAppearance {
                     let base = Tokens.Color.panelBackground.usingColorSpace(.sRGB) ?? Tokens.Color.panelBackground
-                    let mixed = base.blended(withFraction: effectiveAppearance.isDark ? 0.55 : 0.6, of: tint.usingColorSpace(.sRGB) ?? tint) ?? base
+                    let mixed = base.blended(withFraction: tintStrength ?? (effectiveAppearance.isDark ? 0.55 : 0.6), of: tint.usingColorSpace(.sRGB) ?? tint) ?? base
                     surface.color = mixed
                 }
             } else {
