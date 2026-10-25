@@ -111,6 +111,8 @@ enum Reader {
                animation: rise .45s cubic-bezier(.2,.8,.2,1) both; }
         :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.62; }
         @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { body { animation-name: appear; } }
         main { max-width: 36em; margin: 0 auto; }
         header { margin-bottom: 2em; }
         .details { font: 14px/1.4 var(--sans); color: var(--soft); margin-bottom: 10px; }
@@ -397,9 +399,10 @@ private final class ReaderSegments: NSView {
     private func moveHighlight(animated: Bool) {
         guard segments.indices.contains(selected) else { return }
         for (i, label) in labels.enumerated() { label.textColor = i == selected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary }
+        for (i, segment) in segments.enumerated() { segment.setAccessibilityValue(i == selected ? 1 : 0) }
         segments[selected].layer?.backgroundColor = nil
         let target = frame(of: selected)
-        if animated {
+        if animated, !Tokens.Motion.reduceMotion {
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.22
                 ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
