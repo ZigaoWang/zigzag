@@ -162,7 +162,7 @@ enum Tokens {
                 return
             }
             NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = curve.duration
+                ctx.duration = curve.duration * debugSlowdown
                 ctx.timingFunction = curve.timing
                 ctx.allowsImplicitAnimation = true
                 changes()
@@ -170,6 +170,15 @@ enum Tokens {
         }
 
         static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+        /// Debug builds: ZIGZAG_SLOW_ANIMATIONS=10 plays animations ten times slower, to look at them.
+        static let debugSlowdown: Double = {
+            #if DEBUG
+            return Double(ProcessInfo.processInfo.environment["ZIGZAG_SLOW_ANIMATIONS"] ?? "") ?? 1
+            #else
+            return 1
+            #endif
+        }()
 
         /// Slides a view horizontally into its current (final) position from `offset` points away, on the
         /// render server. Returns how long the slide takes, 0 if it was skipped.
