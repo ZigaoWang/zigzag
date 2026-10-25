@@ -432,6 +432,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Puts the selected tab in the page card, or both halves of its split side by side.
     private func showPages() {
+        // A link address belongs to the page it was pointed at in: a different page, a different space, it goes.
+        linkStatus.show(nil, in: root.cardFrame)
         let tab = tabManager.selectedTab
         if let tab, let pair = tabManager.split(for: tab),
            let left = tabManager.tab(with: pair.left), let right = tabManager.tab(with: pair.right) {
