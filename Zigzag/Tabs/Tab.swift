@@ -699,6 +699,13 @@ extension Tab: WKUIDelegate {
         await PageDialogs.openPanel(parameters: parameters, window: host?.hostWindow)
     }
 
+    /// WebKit's own question for location (not public API, but how Safari asks): answered with Zigzag's prompt.
+    @objc(_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:)
+    func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin, initiatedBy frame: WKFrameInfo,
+                 decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
+        Task { decisionHandler(await SitePermissions.requestLocation(origin: origin, window: host?.hostWindow, isPrivate: isPrivate)) }
+    }
+
     // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {

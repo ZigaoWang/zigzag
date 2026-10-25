@@ -40,6 +40,30 @@ enum SitePermissions {
         UserDefaults.standard.set(all, forKey: key)
     }
 
+    /// Location, asked and remembered the same way as the camera.
+    static func requestLocation(origin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool) async -> WKPermissionDecision {
+        let host = origin.host
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        if let known = all["\(host)|location"] { return known ? .grant : .deny }
+        guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return .deny }
+        let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", isPrivate: isPrivate, in: controller,
+                                                answered: {
+                                                    let now = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+                                                    return now["\(host)|location"].map { $0 ? .allow : .deny }
+                                                })
+        switch answer {
+        case .allow, .deny:
+            if !isPrivate {
+                all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+                all["\(host)|location"] = answer == .allow
+                UserDefaults.standard.set(all, forKey: key)
+            }
+            return answer == .allow ? .grant : .deny
+        case .notNow:
+            return .deny
+        }
+    }
+
     static func request(origin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool) async -> WKPermissionDecision {
         let host = origin.host
         if let known = decision(host: host, type: type) { return known ? .grant : .deny }
