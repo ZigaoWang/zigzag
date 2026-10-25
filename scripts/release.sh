@@ -51,6 +51,21 @@ xcrun stapler staple "$APP"
 rm "$ZIP" && ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 spctl --assess --type execute --verbose "$APP"
 
+# The DMG people download: the app beside an Applications shortcut, signed, notarized and stapled itself, so it
+# opens without a warning on a Mac that has never seen Zigzag. (Updates use the zip above.)
+DMG="$OUT/Zigzag-$VERSION.dmg"
+STAGE=$(mktemp -d)
+ditto "$APP" "$STAGE/Zigzag.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -volname "Zigzag" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
+rm -rf "$STAGE"
+IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+codesign --sign "$IDENTITY" --timestamp "$DMG"
+echo "Notarizing the DMG…"
+xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+xcrun stapler staple "$DMG"
+spctl --assess --type open --context context:primary-signature --verbose "$DMG"
+
 if [[ "${1:-}" == "--publish" ]]; then
   # The appcast needs Sparkle's signing key from the keychain, which may ask; only publishing needs it.
   # Builds and the feed are served from zigzagbrowser.com (reachable everywhere, no GitHub needed).
@@ -58,9 +73,9 @@ if [[ "${1:-}" == "--publish" ]]; then
   GENERATE=$(find build/rd/SourcePackages build/dd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1)
   "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"
   echo "Uploading to $SITE_HOST…"
-  rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
-  ssh "$SERVER" "ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
+  rsync -a "$ZIP" "$DMG" "$SERVER:$SITE_ROOT/releases/"
+  ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
   # The feed goes last, so no Mac is offered an update before its zip is there.
   rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
 fi
-echo "Done: $ZIP"
+echo "Done: $ZIP and $DMG"
