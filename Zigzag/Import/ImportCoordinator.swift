@@ -206,8 +206,15 @@ enum ImportCoordinator {
         let store = PasswordStore.shared
         // What's here already, looked up once.
         var here: [Key: Credential] = [:]
-        for credential in (try? await store.all()) ?? [] { here[Key(origin: credential.origin, username: credential.username)] = credential }
+        // Unreadable (the Keychain locked, or refusing): adding now would put a second copy of every login here.
+        guard let existing = try? await store.all() else {
+            summary.problems.append(ImportProblem(message: "Zigzag couldn’t read the passwords it already has, so it didn’t add any. Try again.",
+                                                  fix: .retry, retries: Choice.passwords.rawValue))
+            return
+        }
+        for credential in existing { here[Key(origin: credential.origin, username: credential.username)] = credential }
         var changed = false
+        var failed = 0
         for key in order {
             guard let login = newest[key] else { continue }
             if var current = here[key] {
@@ -218,6 +225,8 @@ enum ImportCoordinator {
                     here[key] = current
                     summary.updatedPasswords += 1
                     changed = true
+                } else {
+                    failed += 1
                 }
             } else if let added = try? await store.addImported(origin: key.origin, username: key.username, password: login.password,
                                                                 notes: login.notes, otpAuth: login.otpAuth,
@@ -225,9 +234,15 @@ enum ImportCoordinator {
                 here[key] = added
                 summary.passwords += 1
                 changed = true
+            } else {
+                failed += 1
             }
         }
         if changed { await store.announceChanges() }
+        if failed > 0 {
+            summary.problems.append(ImportProblem(message: "\(failed) \(failed == 1 ? "password" : "passwords") couldn’t be saved. Try again.",
+                                                  fix: .retry, retries: Choice.passwords.rawValue))
+        }
     }
 
     /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded.
