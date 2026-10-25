@@ -317,10 +317,15 @@ final class ExtensionHost: NSObject {
 
     // MARK: Event fan-out from our model
 
-    func tabOpened(_ tab: Tab) { controller.didOpenTab(tab) }
-    func tabClosed(_ tab: Tab, windowClosing: Bool = false) { controller.didCloseTab(tab, windowIsClosing: windowClosing) }
-    func tabActivated(_ tab: Tab, previous: Tab?) { controller.didActivateTab(tab, previousActiveTab: previous) }
+    // Private tabs are never reported: extensions don't see private browsing.
+    func tabOpened(_ tab: Tab) { if !tab.isPrivate { controller.didOpenTab(tab) } }
+    func tabClosed(_ tab: Tab, windowClosing: Bool = false) { if !tab.isPrivate { controller.didCloseTab(tab, windowIsClosing: windowClosing) } }
+    func tabActivated(_ tab: Tab, previous: Tab?) {
+        guard !tab.isPrivate else { return }
+        controller.didActivateTab(tab, previousActiveTab: previous?.isPrivate == true ? nil : previous)
+    }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
+        guard !tab.isPrivate else { return }
         switch change {
         case .url: controller.didChangeTabProperties([.URL], for: tab)
         case .title: controller.didChangeTabProperties([.title], for: tab)
@@ -526,7 +531,8 @@ extension BrowserWindowController: WKWebExtensionWindow {
         if window.styleMask.contains(.fullScreen) { return .fullscreen }
         return .normal
     }
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    /// WebKit keeps private windows from extensions that haven't been allowed into them.
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { tabManager.isPrivate }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 
