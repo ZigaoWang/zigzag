@@ -578,6 +578,33 @@ enum ExtensionProfile {
         globalThis.WebSocket.prototype = Socket.prototype;
         Object.assign(globalThis.WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
       }
+      // Browser API calls that never answer stall an extension silently: name any still waiting after 3 seconds.
+      const watch = (path, target) => {
+        if (!target || typeof target !== 'object') return;
+        for (const key of Object.keys(Object.getPrototypeOf(target) || {}).concat(Object.keys(target))) {
+          let value;
+          try { value = target[key]; } catch (e) { continue; }
+          if (typeof value === 'function' && !key.startsWith('on') && !/^[A-Z]/.test(key)) {
+            try {
+              target[key] = function (...args) {
+                const result = value.apply(this, args);
+                if (result && typeof result.then === 'function') {
+                  let settled = false;
+                  const started = Date.now();
+                  const timer = setTimeout(() => { if (!settled) report('waiting', path + '.' + key + ' has not answered after 3s'); }, 3000);
+                  result.then(() => { settled = true; clearTimeout(timer); if (Date.now() - started > 3000) report('waiting', path + '.' + key + ' answered after ' + (Date.now() - started) + 'ms'); },
+                              (e) => { settled = true; clearTimeout(timer); report('api', path + '.' + key + ' failed: ' + text(e)); });
+                }
+                return result;
+              };
+            } catch (e) {}
+          }
+        }
+      };
+      for (const name of ['runtime', 'tabs', 'windows', 'scripting', 'action', 'alarms', 'permissions', 'contextMenus', 'declarativeNetRequest', 'webNavigation', 'cookies', 'i18n', 'commands', 'offscreen']) {
+        try { watch(name, api[name]); } catch (e) {}
+      }
+      for (const area of ['local', 'session', 'sync']) { try { watch('storage.' + area, api.storage && api.storage[area]); } catch (e) {} }
       report('started', '');
     })();
 
