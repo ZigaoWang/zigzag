@@ -6,14 +6,16 @@
 #   (Sparkle's EdDSA private key lives in the login keychain; see generate_keys.)
 #
 # Usage: scripts/release.sh            build, sign, notarize, staple, appcast
-#        scripts/release.sh --publish  also create the GitHub release with gh
+#        scripts/release.sh --publish  also upload the build and appcast to zigzagbrowser.com
 #        scripts/release.sh --local    build and sign with Developer ID only, to use on this Mac
-#        (plain run: build, sign, notarize and staple; --publish also writes the appcast and releases)
+#        (plain run: build, sign, notarize and staple; --publish also writes the appcast and uploads both)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PROFILE=${NOTARY_PROFILE:-zigzag-notary}
-REPO=${GITHUB_REPO:-ZigaoWang/zigzag}
+SERVER=${SITE_SERVER:-bwh}
+SITE_HOST=zigzagbrowser.com
+SITE_ROOT=/www/wwwroot/zigzagbrowser.com
 OUT=build/release
 # Tidier build output when xcbeautify is installed; otherwise just the lines that matter.
 pretty() { if command -v xcbeautify >/dev/null; then xcbeautify; else grep -E "error:|ARCHIVE|EXPORT|BUILD" || true; fi; }
@@ -51,9 +53,14 @@ spctl --assess --type execute --verbose "$APP"
 
 if [[ "${1:-}" == "--publish" ]]; then
   # The appcast needs Sparkle's signing key from the keychain, which may ask; only publishing needs it.
+  # Builds and the feed are served from zigzagbrowser.com (reachable everywhere, no GitHub needed).
   echo "Writing appcast…"
   GENERATE=$(find build/rd/SourcePackages build/dd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1)
-  "$GENERATE" --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" "$OUT/updates"
-  gh release create "v$VERSION" "$ZIP" "$OUT/updates/appcast.xml" --repo "$REPO" --title "Zigzag $VERSION" --notes "Zigzag $VERSION"
+  "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"
+  echo "Uploading to $SITE_HOST…"
+  rsync -a "$ZIP" "$SERVER:$SITE_ROOT/releases/"
+  ssh "$SERVER" "ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
+  # The feed goes last, so no Mac is offered an update before its zip is there.
+  rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
 fi
 echo "Done: $ZIP"

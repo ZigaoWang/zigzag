@@ -62,7 +62,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
-        SUFeedURL: https://github.com/ZigaoWang/zigzag/releases/latest/download/appcast.xml
+        SUFeedURL: https://zigzagbrowser.com/updates/appcast.xml
         SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
         SUEnableAutomaticChecks: true
         SUAutomaticallyUpdate: true
