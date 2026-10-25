@@ -104,6 +104,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
     private var scope: SiteSearch?
+    private var shrinkWork: DispatchWorkItem?
     /// What you'd typed before Tab took you into a site, so Esc can give it back.
     private var typedBeforeScope = ""
     private let chip = ColorView(color: .clear)
@@ -177,6 +178,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         self.mode = mode
         mouseAtOpen = NSEvent.mouseLocation
         let card = controller.root.cardFrame
+        let opening = !isVisible
         if !isVisible {
             // One floating thing at a time.
             SitePanel.closeCurrent()
@@ -206,7 +208,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         refreshResults(animated: false)
         panel.frame = panelFrame()
         // Attached to the address, it's simply there; over the page it arrives with the usual drop.
-        panel.present(arrival: isAnchored ? .instant : .zoom)
+        // Arrives once; asked again while open (⌘T twice), it simply stays.
+        if opening { panel.present(arrival: isAnchored ? .instant : .zoom) }
         controller.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
@@ -365,12 +368,24 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         updateSelection()
         refreshAnchorLook()
         let frame = panelFrame()
-        // Suggestions change as you type; the list resizes at once rather than stretching.
-        if animated && !isAnchored && panel.frame.height != frame.height {
-            Tokens.Motion.animate(Tokens.Motion.snappy) { self.panel.animator().frame = frame }
-        } else {
-            panel.frame = frame
+        // While you type, the list never bounces: it grows at once to fit more, and gives back room only once the
+        // results have stayed fewer for a moment (web suggestions arrive a beat after what's local).
+        shrinkWork?.cancel()
+        if animated, isVisible, frame.height < panel.frame.height, frame.minY == panel.frame.minY, frame.width == panel.frame.width {
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.isVisible else { return }
+                    self.panel.frame = self.panelFrame()
+                    self.panel.needsLayout = true
+                }
+            }
+            shrinkWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+            // Meanwhile the rows that are gone just aren't drawn; the panel keeps its size.
+            panel.needsLayout = true
+            return
         }
+        panel.frame = frame
         panel.needsLayout = true
     }
 

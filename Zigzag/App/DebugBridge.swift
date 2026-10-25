@@ -45,7 +45,10 @@ enum DebugBridge {
             let w = controller.window as? BrowserWindow
             let b = w?.standardWindowButton(.closeButton)
             debugLog("lights hidden=\(b?.isHidden ?? true) frame=\(b?.frame ?? .zero) revealed=\(controller.root.isSidebarFloatingVisible) container=\(controller.root.sidebarContainer.frame.minX)")
-        case "commandbar": controller.commandBar.show(mode: .newTab); if !arg.isEmpty { controller.commandBar.debugType(arg) }
+        case "commandbar":
+            // Typing into an open bar only types, as the keyboard would.
+            if !controller.commandBar.isVisible { controller.commandBar.show(mode: .newTab) }
+            if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
