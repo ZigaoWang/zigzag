@@ -218,8 +218,15 @@ final class ImportView: NSView {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
         case .exportFromApplePasswords:
             // Safari's own export holds its bookmarks and history; for passwords alone it's the Passwords app.
-            let isSafari: Bool = { if case .safari = row.source.kind { true } else { false } }()
-            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: isSafari ? SafariImporter.bundleID : "com.apple.Passwords") {
+            // Firefox and its kin export from their own Passwords page.
+            let bundleID: String = {
+                switch row.source.kind {
+                case .safari: SafariImporter.bundleID
+                case .firefox(let browser): browser.bundleID
+                default: "com.apple.Passwords"
+                }
+            }()
+            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 NSWorkspace.shared.openApplication(at: app, configuration: .init())
             }
             pickFile()
