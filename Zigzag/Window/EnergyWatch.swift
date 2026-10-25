@@ -30,7 +30,7 @@ final class EnergyWatch {
         var seen: Set<Int32> = []
         for controller in WindowManager.shared.controllers {
             for tab in controller.tabManager.allTabs {
-                guard let webView = tab.webView, let pid = webView.value(forKey: "_webProcessIdentifier") as? Int32, pid > 0,
+                guard let webView = tab.webView, let pid = Self.processID(of: webView), pid > 0,
                       seen.insert(pid).inserted else { continue }
                 let now = ProcessCPU.seconds(pid)
                 defer { last[pid] = now }
@@ -45,6 +45,13 @@ final class EnergyWatch {
         // Forget processes that have gone.
         last = last.filter { seen.contains($0.key) }
         streak = streak.filter { seen.contains($0.key) }
+    }
+
+    /// The page's process, if WebKit still says (it's not public API, so asked carefully).
+    static func processID(of webView: WKWebView) -> Int32? {
+        let key = NSSelectorFromString("_webProcessIdentifier")
+        guard webView.responds(to: key) else { return nil }
+        return webView.value(forKey: "_webProcessIdentifier") as? Int32
     }
 
     private func warn(about tab: Tab, url: URL, in controller: BrowserWindowController) {

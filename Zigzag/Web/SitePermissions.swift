@@ -49,16 +49,23 @@ enum SitePermissions {
         case .microphone: what = "your microphone"
         default: what = "your camera and microphone"
         }
-        let allowed: Bool
-        if let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) {
-            allowed = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
-                                                 isPrivate: isPrivate, in: controller)
-        } else {
+        guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else {
             // Nowhere to ask (a popup window): say no this time, without remembering it.
             return .deny
         }
-        if !isPrivate { remember(allowed, host: host, type: type) }
-        return allowed ? .grant : .deny
+        let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
+                                                isPrivate: isPrivate, in: controller)
+        // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
+        switch answer {
+        case .allow:
+            if !isPrivate { remember(true, host: host, type: type) }
+            return .grant
+        case .deny:
+            if !isPrivate { remember(false, host: host, type: type) }
+            return .deny
+        case .notNow:
+            return .deny
+        }
     }
 }
 
@@ -71,10 +78,12 @@ final class PermissionPrompt: FloatingPanelView {
     private let line = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let allow = PrimaryButton(title: "Allow")
     private let deny = TextButton.form("Don’t Allow")
-    private var answer: ((Bool) -> Void)?
+    private var answer: ((Answer) -> Void)?
     private var monitor: Any?
 
-    static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController) async -> Bool {
+    enum Answer { case allow, deny, notNow }
+
+    static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController) async -> Answer {
         await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: NSRect(x: 0, y: 0, width: 420, height: 72))
             // The question in big words, the site under it: short enough to never cut off.
@@ -90,8 +99,8 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.present(arrival: .drop)
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
                 guard let prompt, event.window === prompt.window else { return event }
-                if event.keyCode == 53 { prompt.finish(false); return nil }
-                if event.keyCode == 36 || event.keyCode == 76 { prompt.finish(true); return nil }
+                // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.
+                if event.keyCode == 53 { prompt.finish(.notNow); return nil }
                 return event
             }
         }
@@ -106,21 +115,33 @@ final class PermissionPrompt: FloatingPanelView {
         symbolView.contentTintColor = Tokens.Color.accent
         badge.addSubview(symbolView)
         [badge, title, line, allow, deny].forEach { addSubview($0) }
-        allow.onClick = { [weak self] _ in self?.finish(true) }
-        deny.onClick = { [weak self] _ in self?.finish(false) }
+        allow.onClick = { [weak self] _ in self?.finish(.allow) }
+        deny.onClick = { [weak self] _ in self?.finish(.deny) }
         line.lineBreakMode = .byTruncatingMiddle
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func finish(_ allowed: Bool) {
+    private func finish(_ choice: Answer) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         let answer = self.answer
         self.answer = nil
-        answer?(allowed)
+        answer?(choice)
         dismiss()
+    }
+
+    /// Taken away without an answer (its window closed): the page hears "not now" rather than waiting forever.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil, answer != nil {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            let answer = self.answer
+            self.answer = nil
+            answer?(.notNow)
+        }
     }
 
     private func layoutContent() {
