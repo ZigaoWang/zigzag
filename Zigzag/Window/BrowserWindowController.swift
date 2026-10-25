@@ -662,11 +662,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let card = self.tabManager.split(for: tab)?.right == tab.id ? self.root.secondCard : self.root.card
             self.readerCard = card
             card.setOverlay(view)
-            view.alphaValue = 0
-            view.onReady = { [weak view] in
-                guard let view else { return }
-                Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true) { view.animator().alphaValue = 1 }
-            }
+            // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
+            // within a few frames, well inside the fade.
+            Self.readerTransition(view, entering: true)
             self.window?.makeFirstResponder(view.webView)
             // Opened again quickly: one listener, never two.
             if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }
@@ -689,12 +687,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         readerCard = nil
         if let monitor = readerKeyMonitor { NSEvent.removeMonitor(monitor) }
         readerKeyMonitor = nil
-        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { view.animator().alphaValue = 0 }, completion: {
+        Self.readerTransition(view, entering: false) {
             guard card.overlay === view else { view.removeFromSuperview(); return }
             card.setOverlay(nil)
-        })
+        }
         if let webView = tabManager.selectedTab?.webView { window?.makeFirstResponder(webView) }
         updateReaderButton()
+    }
+
+    /// Reader fades over the page while its text rises into place (that part is the reading page's own CSS);
+    /// leaving is a quicker fade. Only opacity is animated here: moving or transforming a view that hosts web
+    /// content stops WebKit drawing into it, and so does a fully transparent start (hence 0.01).
+    private static func readerTransition(_ view: NSView, entering: Bool, completion: (() -> Void)? = nil) {
+        if entering { view.alphaValue = 0.01 }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = (entering ? 0.3 : 0.18) * Tokens.Motion.debugSlowdown
+            ctx.timingFunction = entering ? CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
+                                          : CAMediaTimingFunction(controlPoints: 0.4, 0, 0.8, 0.4)
+            view.animator().alphaValue = entering ? 1 : 0.01
+        }, completionHandler: completion)
     }
 
     private func updateReaderButton() {

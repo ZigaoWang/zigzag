@@ -179,9 +179,9 @@ enum Reader {
         ::selection { background: var(--select); }
         body { margin: 0; padding: 104px 40px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.62;
                -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-kerning: normal; hanging-punctuation: first;
-               transition: color .25s ease; animation: rise .5s cubic-bezier(.2,.8,.2,1) both; }
+               transition: color .25s ease; animation: rise .55s cubic-bezier(.2,.85,.25,1) both; }
         :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.58; letter-spacing: -0.003em; }
-        @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @keyframes rise { from { transform: translateY(18px); } to { transform: none; } }
         @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
         @media (prefers-reduced-motion: reduce) { body { animation-name: appear; } html, body { transition: none; } }
 
@@ -283,9 +283,6 @@ enum Reader {
 final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
-    /// Once the article has drawn (or a moment has passed), so it never fades in blank.
-    var onReady: (() -> Void)? { didSet { DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in self?.becomeReady() } } }
-    private var isReady = false
     var onOpenLink: ((URL) -> Void)?
     /// Shift-click: a look at the link in Peek, over the article. ⌘-click: a tab in the background.
     var onPeekLink: ((URL) -> Void)?
@@ -293,10 +290,8 @@ final class ReaderView: NSView {
     private let controls = ReaderControls()
 
     override init(frame: NSRect) {
-        let configuration = WKWebViewConfiguration()
-        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-        configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView = WKWebView(frame: .zero, configuration: Self.configuration())
+
         super.init(frame: frame)
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
@@ -311,6 +306,25 @@ final class ReaderView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    /// One private store for every reading page: a fresh one each time starts a new web process, which is most of
+    /// a second before anything shows. Scripts stay off.
+    private static let store = WKWebsiteDataStore.nonPersistent()
+    private static func configuration() -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        configuration.websiteDataStore = store
+        return configuration
+    }
+
+    /// A reading page kept loaded in the background, so the first Reader of the session is as quick as the rest.
+    private static var warm: WKWebView?
+    static func prewarm() {
+        guard warm == nil else { return }
+        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 10, height: 10), configuration: configuration())
+        view.loadHTMLString("<!doctype html><title></title>", baseURL: nil)
+        warm = view
+    }
 
     override func layout() {
         super.layout()
@@ -330,11 +344,6 @@ final class ReaderView: NSView {
         if event.keyCode == 53 { onClose?() } else { super.keyDown(with: event) }
     }
 
-    fileprivate func becomeReady() {
-        guard !isReady, let onReady else { return }
-        isReady = true
-        onReady()
-    }
 }
 
 /// Two quiet buttons at the top right: Aa for how it reads, and done. Aa opens a small panel underneath.
@@ -654,7 +663,6 @@ private final class ThemeTile: InteractiveView {
 }
 
 extension ReaderView: WKNavigationDelegate {
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { becomeReady() }
     /// Links in an article open in the page, not inside the reader.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
