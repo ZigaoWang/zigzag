@@ -207,6 +207,9 @@ final class DeskController {
         return (headerFrames, cardFrames, y + margin)
     }
 
+    /// Tabs opened or closed while the desk is up (⌘W, a link opening a tab): the cards follow.
+    func tabsChanged() { if isVisible { reload(animated: true) } }
+
     private func reload(animated: Bool = false) {
         guard let manager else { return }
         let allTabs = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }
@@ -218,6 +221,8 @@ final class DeskController {
             } else { view.removeFromSuperview() }
         }
         selection = selection.intersection(ids)
+        // Cards kept from last time show what each tab is now.
+        for tab in allTabs { cards[tab.id]?.configure(tab) }
         for tab in allTabs where cards[tab.id] == nil {
             let card = TabThumbnailView()
             card.inset = Tokens.Space.x1

@@ -163,6 +163,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         switch change {
         case .structure:
             sidebar.list.reload(animated: window?.isVisible == true)
+            desk.tabsChanged()
         case .selection:
             showSelectedTab()
         case .space:
