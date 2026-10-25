@@ -191,6 +191,13 @@ final class Library {
         commit()
     }
 
+    /// Puts back a removed space, bookmarks and all, at its old place (undo).
+    func insertSpace(_ space: SpaceInfo, at index: Int) {
+        guard self.index(of: space.id) == nil else { return }
+        spaces.insert(space, at: max(0, min(index, spaces.count)))
+        commit()
+    }
+
     func moveSpace(_ id: UUID, to newIndex: Int) {
         guard let i = index(of: id) else { return }
         let space = spaces.remove(at: i)

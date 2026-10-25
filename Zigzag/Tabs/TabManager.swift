@@ -484,7 +484,7 @@ final class TabManager {
 
     @discardableResult
     /// The latest closed tab (⇧⌘T), or, with an id, that one (⌘Z after closing it).
-    func reopenClosedTab(_ id: UUID? = nil) -> Tab? {
+    func reopenClosedTab(_ id: UUID? = nil, select: Bool = true) -> Tab? {
         let found: Int? = id.map { id in closedTabs.lastIndex { $0.id == id } } ?? (closedTabs.isEmpty ? nil : closedTabs.count - 1)
         guard let index = found else { return nil }
         let closed = closedTabs.remove(at: index)
@@ -497,7 +497,7 @@ final class TabManager {
         list.insert(tab, at: min(closed.index, list.count))
         tabsBySpace[space] = list
         changed.send(.structure)
-        select(tab)
+        if select { self.select(tab) } else { recentTabIDs.insert(tab.id, at: min(1, recentTabIDs.count)) }
         return tab
     }
 

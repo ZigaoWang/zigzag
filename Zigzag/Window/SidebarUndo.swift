@@ -155,26 +155,34 @@ extension BrowserWindowController {
 
     // MARK: Spaces
 
-    /// Deletes a space; ⌘Z brings back the space, its bookmarks and its tabs.
+    /// Deletes a space; ⌘Z brings back the space, its bookmarks and its tabs, history and all.
     func removeSpaceWithUndo(_ id: UUID) {
-        let before = Library.shared.snapshot
-        // The space's tabs in every window close with it, so remember each window's, to put back where they were.
-        let tabs = WindowManager.shared.controllers.map { window in
-            (window: ObjectIdentifier(window), tabs: window.tabManager.tabs(in: id).compactMap { tab in tab.url.map { ($0, tab.displayTitle) } })
+        guard Library.shared.spaces.count > 1, let index = Library.shared.index(of: id), let space = Library.shared.space(id) else { return }
+        // The space's tabs in every window close first, as closed tabs, so ⌘Z can reopen each where it was.
+        let closed = WindowManager.shared.controllers.map { window in
+            let list = window.tabManager.tabs(in: id)
+            let info = Dictionary(uniqueKeysWithValues: list.map { ($0.id, (url: $0.url, title: $0.displayTitle)) })
+            let selected = window.tabManager.selectedTab(in: id)?.id
+            let order = window.tabManager.close(list)
+            return (window: ObjectIdentifier(window), selected: selected,
+                    tabs: order.compactMap { tabID in info[tabID].map { (id: tabID, url: $0.url, title: $0.title) } })
         }
         Library.shared.removeSpace(id)
-        let after = Library.shared.snapshot
         sidebarUndo.registerUndo(withTarget: self) { controller in
-            guard controller.libraryUnchanged(since: after) else { return }
-            Library.shared.restore(before)
-            for (window, list) in tabs {
+            // Only this space comes back, so whatever changed since in the others stays.
+            Library.shared.insertSpace(space, at: index)
+            var shown: Tab?
+            for entry in closed {
                 // A window closed since: its tabs come back here.
-                let target = WindowManager.shared.controllers.first { ObjectIdentifier($0) == window } ?? controller
-                for (url, title) in list.reversed() {
-                    _ = target.tabManager.newTab(url: url, spaceID: id, select: false, title: title)
+                let target = WindowManager.shared.controllers.first { ObjectIdentifier($0) == entry.window } ?? controller
+                for tab in entry.tabs.reversed() {
+                    // Too long ago to still be among the closed tabs: back as a fresh one.
+                    let reopened = target.tabManager.reopenClosedTab(tab.id, select: false)
+                        ?? target.tabManager.newTab(url: tab.url, spaceID: id, select: false, title: tab.title)
+                    if target === controller, tab.id == entry.selected { shown = reopened }
                 }
             }
-            controller.tabManager.switchToSpace(id)
+            if let shown { controller.tabManager.select(shown) } else { controller.tabManager.switchToSpace(id) }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.removeSpaceWithUndo(id) }
             controller.sidebarUndo.setActionName("Delete Space")
         }
