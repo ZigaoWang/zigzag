@@ -4,6 +4,7 @@ import WebKit
 /// Debug builds only: lets scripts drive the UI (for screenshots and testing) via distributed notifications.
 /// `xcrun swift -e` or the bundled `zz` script posts "app.zigzag.debug" with a command string.
 enum DebugBridge {
+    #if DEBUG
     static var hovered: [NSView] = []
     private static var scrollLog: [String] = []
 
@@ -14,6 +15,7 @@ enum DebugBridge {
                                 NSEvent.isSwipeTrackingFromScrollEventsEnabled ? 1 : 0))
         if scrollLog.count > 300 { scrollLog.removeFirst(scrollLog.count - 300) }
     }
+    #endif
 
     static func start() {
         #if DEBUG
