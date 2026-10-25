@@ -10,79 +10,60 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     private static weak var current: SavePasswordPrompt?
 
-    private let badge = ColorView(color: .clear)
-    private let badgeIcon = NSImageView()
-    private let titleLabel = NSTextField(wrappingLabelWithString: "")
-    private let subtitle: Label
-    private let loginCard = ColorView(color: Tokens.Color.fieldFill)
-    private let usernameLabel = Label("Username", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let usernameField = PlainTextField(font: Tokens.Font.body(.medium), placeholder: "Add a username")
-    private let usernameText = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+    private let icon = FaviconView()
+    private let titleLabel = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+    private let siteLabel = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let usernameBox = ColorView(color: Tokens.Color.fieldFill)
+    private let usernameField = PlainTextField(font: Tokens.Font.body(), placeholder: "Username")
+    private let usernameText = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let isUpdate: Bool
     private let saveButton: PrimaryButton
     private let notNowButton = TextButton.form("Not Now")
-    // The quiet choice: plain text, so the two answers on the right are the ones you see.
-    private let neverButton = TextButton(title: "Never for This Site", font: Tokens.Font.body(.medium))
-    private let saveKey = KeyHint("↩")
-    private let notNowKey = KeyHint("esc")
+    // The quiet choice, on its own at the left: the two answers on the right are the ones you see.
+    private let neverButton = TextButton(title: "Never", font: Tokens.Font.body(.medium))
     private var hideWork: DispatchWorkItem?
     private var finish: (Bool) -> Void = { _ in }
-    private var themeToken: SignalToken?
     private var keyMonitor: Any?
 
-    static let width: CGFloat = 420
-    private let pad = Tokens.Space.x5
+    static let width: CGFloat = 320
+    private let pad = Tokens.Space.x4
+    private let headerHeight: CGFloat = 36
+    private let fieldHeight: CGFloat = 36
+    private let buttonHeight = Tokens.Space.x8
 
     private init(kind: Kind, origin: Origin) {
         isUpdate = { if case .update = kind { true } else { false } }()
-        subtitle = Label(isUpdate ? "Zigzag fills in the new one next time." : "Zigzag fills it in next time, on this site only.",
-                         font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
         saveButton = PrimaryButton(title: isUpdate ? "Update" : "Save")
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: 0))
-        radius = Tokens.Radius.panel + Tokens.Space.x1
-        // The whole site name, wrapping if it's long: you should see exactly where this password goes.
-        titleLabel.attributedStringValue = Brand.display((isUpdate ? "Update password for " : "Save password for ") + origin.displayName + "?",
-                                                         size: 17, color: Tokens.Color.textPrimary, wraps: true)
-        titleLabel.isSelectable = false
-        titleLabel.toolTip = origin.displayName
-        badge.wantsLayer = true
-        badge.layer?.cornerRadius = 12
-        badge.layer?.cornerCurve = .continuous
-        badgeIcon.image = Tokens.Symbol.image("key.fill", size: 20)
-        badge.addSubview(badgeIcon)
-        loginCard.wantsLayer = true
-        loginCard.layer?.cornerRadius = Tokens.Radius.control + 2
-        loginCard.layer?.cornerCurve = .continuous
-        loginCard.addSubview(usernameLabel)
+        radius = Tokens.Radius.panel
+        titleLabel.stringValue = isUpdate ? "Update password?" : "Save password?"
+        // Exactly where this password goes, in full.
+        siteLabel.stringValue = origin.displayName
+        siteLabel.lineBreakMode = .byTruncatingMiddle
+        siteLabel.toolTip = origin.displayName
+        let site = URL(string: "\(origin.scheme)://\(origin.host)")
+        icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill", size: 14)
+        usernameBox.wantsLayer = true
+        usernameBox.layer?.cornerRadius = Tokens.Radius.control + 2
+        usernameBox.layer?.cornerCurve = .continuous
         switch kind {
         case .save(let username):
             usernameField.stringValue = username
-            loginCard.addSubview(usernameField)
+            usernameBox.addSubview(usernameField)
         case .update(let credential):
             usernameText.stringValue = credential.username.isEmpty ? "No username" : credential.username
-            loginCard.addSubview(usernameText)
+            usernameBox.addSubview(usernameText)
         }
-        [badge, titleLabel, subtitle, loginCard, neverButton, notNowButton, saveButton, notNowKey, saveKey].forEach { addSubview($0) }
+        [icon, titleLabel, siteLabel, usernameBox, neverButton, notNowButton, saveButton].forEach { addSubview($0) }
         neverButton.isHidden = isUpdate
         neverButton.textColor = Tokens.Color.textSecondary
+        neverButton.toolTip = "Never offer to save on \(origin.displayName)"
         frame.size.height = measuredHeight
         onLayout = { [weak self] in self?.layoutContent() }
-        refreshTheme()
-        themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshTheme() }
     }
 
-    private var titleHeight: CGFloat { ceil(titleLabel.sizeThatFits(NSSize(width: Self.width - pad * 2, height: 200)).height) }
-    private let badgeSize: CGFloat = 48
-    private let cardHeight: CGFloat = 44
     private var measuredHeight: CGFloat {
-        pad + badgeSize + Tokens.Space.x4 + titleHeight + Tokens.Space.x1 + subtitle.lineHeight + Tokens.Space.x4 + cardHeight + Tokens.Space.x5 + Tokens.Space.x8 + pad
-    }
-
-    /// The key tile takes the space's own color, so the prompt reads as Zigzag's and stands out from the page.
-    private func refreshTheme() {
-        let accent = Tokens.Color.accent
-        badge.color = accent.withAlphaComponent(0.16)
-        badgeIcon.contentTintColor = accent
+        pad + headerHeight + Tokens.Space.x3 + fieldHeight + Tokens.Space.x3 + buttonHeight + pad
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -187,34 +168,26 @@ final class SavePasswordPrompt: FloatingPanelView {
     }
 
     private func layoutContent() {
-        let w = bounds.width
-        badge.frame = NSRect(x: pad, y: pad, width: badgeSize, height: badgeSize)
-        badgeIcon.frame = badge.bounds.insetBy(dx: 13, dy: 13)
-        titleLabel.frame = NSRect(x: pad, y: badge.frame.maxY + Tokens.Space.x4, width: w - pad * 2, height: titleHeight)
-        subtitle.frame = NSRect(x: pad, y: titleLabel.frame.maxY + Tokens.Space.x1, width: w - pad * 2, height: subtitle.lineHeight)
-        loginCard.frame = NSRect(x: pad, y: subtitle.frame.maxY + Tokens.Space.x4, width: w - pad * 2, height: cardHeight)
-        let inner = Tokens.Space.x3
-        let labelWidth: CGFloat = 72
-        usernameLabel.frame = NSRect(x: inner, y: (cardHeight - usernameLabel.lineHeight) / 2, width: labelWidth, height: usernameLabel.lineHeight)
-        let valueX = inner + labelWidth
+        let w = bounds.width, inner = w - pad * 2
+        // The site's icon, then what's being asked and where.
+        let iconSide: CGFloat = 20
+        icon.frame = NSRect(x: pad, y: pad + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide)
+        let textX = icon.frame.maxX + Tokens.Space.x3
+        let block = titleLabel.lineHeight + siteLabel.lineHeight
+        titleLabel.frame = NSRect(x: textX, y: pad + (headerHeight - block) / 2, width: w - textX - pad, height: titleLabel.lineHeight)
+        siteLabel.frame = NSRect(x: textX, y: titleLabel.frame.maxY, width: w - textX - pad, height: siteLabel.lineHeight)
+        // The username, editable before saving.
+        usernameBox.frame = NSRect(x: pad, y: pad + headerHeight + Tokens.Space.x3, width: inner, height: fieldHeight)
         let fh = ceil(usernameField.intrinsicContentSize.height)
-        usernameField.frame = NSRect(x: valueX, y: (cardHeight - fh) / 2, width: loginCard.frame.width - valueX - inner, height: fh)
-        usernameText.frame = NSRect(x: valueX, y: (cardHeight - usernameText.lineHeight) / 2, width: loginCard.frame.width - valueX - inner, height: usernameText.lineHeight)
-
-        // Each button shows its key, the way it answers: Return saves, Esc is Not Now.
-        let y = loginCard.frame.maxY + Tokens.Space.x5
-        let h = Tokens.Space.x8
-        let hintGap = Tokens.Space.x2
-        let saveWidth = saveButton.fittingWidth + saveKey.width + hintGap
-        saveButton.frame = NSRect(x: w - pad - saveWidth, y: y, width: saveWidth, height: h)
-        saveButton.labelOffset = -(saveKey.width + hintGap) / 2
-        saveKey.frame = NSRect(x: saveButton.frame.maxX - Tokens.Space.x3 - saveKey.width, y: y + (h - KeyHint.height) / 2, width: saveKey.width, height: KeyHint.height)
-        saveKey.onAccent = true
-        let notNowWidth = notNowButton.fittingWidth + notNowKey.width + hintGap
-        notNowButton.frame = NSRect(x: saveButton.frame.minX - Tokens.Space.x2 - notNowWidth, y: y, width: notNowWidth, height: h)
-        notNowButton.labelOffset = -(notNowKey.width + hintGap) / 2
-        notNowKey.frame = NSRect(x: notNowButton.frame.maxX - Tokens.Space.x3 - notNowKey.width, y: y + (h - KeyHint.height) / 2, width: notNowKey.width, height: KeyHint.height)
-        neverButton.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: neverButton.fittingWidth, height: h)
+        usernameField.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - fh) / 2, width: inner - Tokens.Space.x3 * 2, height: fh)
+        usernameText.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - usernameText.lineHeight) / 2, width: inner - Tokens.Space.x3 * 2, height: usernameText.lineHeight)
+        // Never at the left; Not Now and Save at the right.
+        let y = usernameBox.frame.maxY + Tokens.Space.x3
+        let saveWidth = max(saveButton.fittingWidth, 76)
+        saveButton.frame = NSRect(x: w - pad - saveWidth, y: y, width: saveWidth, height: buttonHeight)
+        let notNowWidth = notNowButton.fittingWidth + Tokens.Space.x2
+        notNowButton.frame = NSRect(x: saveButton.frame.minX - Tokens.Space.x2 - notNowWidth, y: y, width: notNowWidth, height: buttonHeight)
+        neverButton.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: neverButton.fittingWidth, height: buttonHeight)
     }
 }
 
