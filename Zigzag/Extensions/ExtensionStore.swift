@@ -552,7 +552,7 @@ enum ExtensionProfile {
         report('wasm', 'WebAssembly is missing here');
       }
       // Network, as host and path only (no query, no bodies): what it asked for, and what came back.
-      const place = (u) => { try { const x = new URL(String(u && u.url || u), location.href); return x.host + x.pathname.slice(0, 60); } catch (e) { return '?'; } };
+      function place(u) { try { const x = new URL(String(u && u.url || u), location.href); return x.host + x.pathname.slice(0, 60); } catch (e) { return '?'; } }
       if (globalThis.fetch) {
         const fetched = globalThis.fetch;
         globalThis.fetch = function (input, init) {
@@ -578,6 +578,45 @@ enum ExtensionProfile {
         globalThis.WebSocket.prototype = Socket.prototype;
         Object.assign(globalThis.WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
       }
+      // Messages between the extension's pages and its background: their kind only, never what they carry.
+      const kind = (m) => {
+        if (!m || typeof m !== 'object') return typeof m;
+        for (const k of ['type', 'name', 'command', 'action', 'method', 'kind', 'event', 'msg', 'message']) {
+          const v = m[k];
+          if (typeof v === 'string' && v.length <= 60) return k + '=' + v;
+          if (typeof v === 'number') return k + '=' + v;
+        }
+        return '{' + Object.keys(m).slice(0, 6).join(',') + '}';
+      };
+      try {
+        const sendMessage = api.runtime.sendMessage.bind(api.runtime);
+        api.runtime.sendMessage = function (...args) {
+          const message = typeof args[0] === 'string' ? args[1] : args[0];
+          report('msg', 'sent ' + kind(message));
+          return sendMessage(...args);
+        };
+        const addListener = api.runtime.onMessage.addListener.bind(api.runtime.onMessage);
+        api.runtime.onMessage.addListener = function (listener) {
+          return addListener(function (message, sender, respond) {
+            report('msg', 'got ' + kind(message) + ' from ' + (sender && sender.url ? place(sender.url) : sender && sender.id ? 'extension' : '?'));
+            return listener.apply(this, arguments);
+          });
+        };
+        const connect = api.runtime.connect.bind(api.runtime);
+        const wrapPort = (port, how) => {
+          const label = how + ' port ' + (port.name || '(no name)');
+          report('port', label + ' opened');
+          const post = port.postMessage.bind(port);
+          let sent = 0, got = 0;
+          port.postMessage = (m) => { if (sent++ < 5) report('port', label + ' sent ' + kind(m)); return post(m); };
+          port.onMessage.addListener((m) => { if (got++ < 5) report('port', label + ' got ' + kind(m)); });
+          port.onDisconnect.addListener(() => report('port', label + ' closed after ' + sent + ' sent, ' + got + ' got' + (api.runtime.lastError ? ': ' + api.runtime.lastError.message : '')));
+          return port;
+        };
+        api.runtime.connect = function (...args) { return wrapPort(connect(...args), 'outgoing'); };
+        const onConnect = api.runtime.onConnect.addListener.bind(api.runtime.onConnect);
+        api.runtime.onConnect.addListener = function (listener) { return onConnect((port) => listener(wrapPort(port, 'incoming'))); };
+      } catch (e) { report('api', 'could not watch messages: ' + text(e)); }
       // Local databases: whether opening one works, and whether a request ever finishes.
       if (globalThis.indexedDB) {
         const open = indexedDB.open.bind(indexedDB);
