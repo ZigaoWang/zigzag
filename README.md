@@ -1,13 +1,11 @@
 <p align="center">
-  <img src="Zigzag/Resources/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="88" alt="">
+  <img src="Zigzag/Resources/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="96" alt="Zigzag app icon">
 </p>
 
-<h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg">
-    <img src="docs/wordmark-light.svg" width="280" alt="Zigzag">
-  </picture>
-</h1>
+<p align="center">
+  <img src="docs/wordmark-light.svg#gh-light-mode-only" width="260" alt="Zigzag">
+  <img src="docs/wordmark-dark.svg#gh-dark-mode-only" width="260" alt="Zigzag">
+</p>
 
 <p align="center">
   <b>Feels great. Weighs nothing.</b><br>
@@ -15,44 +13,60 @@
 </p>
 
 <p align="center">
-  <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a> ·
-  <a href="https://zigzagbrowser.com">Website</a> ·
-  <a href="https://github.com/ZigaoWang/zigzag/issues/new/choose">Report a bug</a> ·
+  <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://zigzagbrowser.com">Website</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/ZigaoWang/zigzag/issues/new/choose">Report a bug</a>
+  &nbsp;·&nbsp;
   <a href="LICENSE">License</a>
 </p>
 
 <p align="center">
-  Free · macOS 15.4 or later · Version 0.1.3 beta
+  <sub>Free · macOS 15.4 or later · Apple silicon and Intel · Version 0.1.3 beta</sub>
 </p>
 
-![Zigzag](docs/screenshot.png)
+<br>
 
-## What it is
+![Zigzag on a Mac: the sidebar with spaces and tabs, and a page beside it](docs/screenshot.png)
 
-Zigzag is a Mac browser with a sidebar, spaces, and a page that floats. It's built from scratch in Swift on
-Safari's engine, so it's light on memory and battery, and security updates for the engine come from Apple with
-macOS. There's no account and no servers.
+## About
 
-- **Spaces:** each with its own tabs and color.
-- **Command bar:** find tabs, history and sites. Type "you", press Tab, and search YouTube right there.
-- **Peek:** shift-click a link to read it over the page.
-- **Split View:** drag a tab onto the page to open it beside.
-- **Reader:** just the words and pictures.
-- **Ad blocking:** built in.
-- **Passwords:** kept in your Mac's Keychain, imported from any browser.
-- **Import:** one click from Arc, Chrome, Safari, Dia, Edge, Brave or Firefox.
-- **Chrome extensions:** most popular ones, straight from the Chrome Web Store.
+Zigzag is a browser for the Mac with a sidebar, spaces, and a page that floats. It's written from scratch in
+Swift and AppKit on WebKit, Safari's engine, so it stays light on memory and battery, and engine security
+updates arrive with macOS. There's no account and no server: your data stays on your Mac.
 
-## Status
+## Features
 
-Zigzag is in **beta**. It works well for everyday browsing, and updates install themselves.
+| | |
+|---|---|
+| **Spaces** | Separate sets of tabs, each with its own color. |
+| **Command bar** | Find open tabs, history and sites. Type `you`, press Tab, and search YouTube. |
+| **Peek** | Shift-click a link to read it over the page you're on. |
+| **Split View** | Drag a tab onto the page to open it beside. |
+| **Reader** | The article alone, in clean, readable type. |
+| **Ad blocking** | Built in, with EasyList and EasyPrivacy. |
+| **Passwords** | Stored in your Mac's Keychain; import from any browser. |
+| **Import** | One click from Arc, Chrome, Safari, Dia, Edge, Brave or Firefox. |
+| **Extensions** | Most popular Chrome extensions, from the Chrome Web Store. |
 
-Found a bug, a site that breaks, or something that feels off? Choose **Help › Send Feedback…** in the app,
-[open an issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), or email a@zigao.wang.
+## Install
+
+Download the DMG from [zigzagbrowser.com](https://zigzagbrowser.com/download), open it, and drag Zigzag to
+Applications. Builds are signed and notarized by Apple, and updates install automatically.
+
+## Feedback
+
+Zigzag is in **beta**: ready for everyday use, with rough edges still being polished.
+
+- **Bugs and ideas:** [open an issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), or choose
+  **Help › Send Feedback…** in the app.
+- **Email:** a@zigao.wang
+- **Security problems:** see [SECURITY.md](SECURITY.md). Please don't report them in public issues.
 
 ## Build from source
 
-You need Xcode 26 or later and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Requirements: macOS 15.4 or later, Xcode 26 or later, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 brew install xcodegen
@@ -63,10 +77,10 @@ open Zigzag.xcodeproj
 ```
 
 Run the **Zigzag** scheme. Debug builds run as a separate app, "Zigzag Dev", with their own data, so they never
-touch the Zigzag you use. To sign builds yourself, set your team in `project.yml` (`DEVELOPMENT_TEAM`) and run
+touch your everyday Zigzag. To sign with your own Apple ID, set `DEVELOPMENT_TEAM` in `project.yml` and run
 `xcodegen generate` again.
 
-Tests:
+Run the tests:
 
 ```sh
 xcodebuild test -scheme Zigzag
@@ -74,23 +88,23 @@ xcodebuild test -scheme Zigzag
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). For security problems, see
-[SECURITY.md](SECURITY.md) and please don't open a public issue.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for how the project is built, tested and
+styled.
 
 ## License
 
-Zigzag is source available under the [Functional Source License (FSL-1.1-MIT)](LICENSE). Each version becomes
-MIT licensed two years after its release. Forks and contributions are welcome.
+Zigzag is source available under the [Functional Source License, Version 1.1, MIT Future License
+(FSL-1.1-MIT)](LICENSE). Each version becomes MIT licensed two years after its release. Forks and contributions
+are welcome.
 
-| You can | Until a version turns two, you can't |
+| Allowed | Not allowed, until a version turns two |
 |---|---|
-| Read, build and run the code | Offer it, or something built from it, as a competing product |
-| Fork it and change it | |
-| Contribute back | |
+| Reading, building and running the code | Offering it, or a product built from it, as a competing commercial product |
+| Forking and changing it | |
+| Contributing back | |
 
-Two years after each release, that version is under the [MIT license](https://opensource.org/license/mit)
-with no restrictions. The [LICENSE](LICENSE) file has the full terms. Zigzag also uses work by others, including
-EasyList and EasyPrivacy by The EasyList authors (CC BY-SA 3.0): see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+After two years, each version is available under the [MIT license](https://opensource.org/license/mit). See
+[LICENSE](LICENSE) for the full terms and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the work of
+others included in Zigzag.
 
-Zigzag isn't affiliated with The Browser Company.
+<sub>Zigzag isn't affiliated with The Browser Company. © 2026 Zigao Wang.</sub>
