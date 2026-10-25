@@ -232,6 +232,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
 
+    /// While the grain is being dragged in the space editor: the window shows it live.
+    func previewSpaceGrain(_ grain: Double, for spaceID: UUID) {
+        guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
+        root.setGrain(grain, animated: false)
+    }
+
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
         if !tabManager.isPrivate {
@@ -243,6 +249,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         let color = tabManager.isPrivate ? SpaceColor.graphite.background : tabManager.currentSpace.background
         root.setColor(color, animated: animated)
+        root.setGrain(tabManager.isPrivate ? 0 : tabManager.currentSpace.grain ?? 0, animated: animated)
         root.sidebarContainer.tint = color
     }
 

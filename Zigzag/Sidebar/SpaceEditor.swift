@@ -90,6 +90,112 @@ final class HueSlider: NSView {
     }
 }
 
+/// How grainy the space's frame is: a pill that goes from smooth on the left to the most grain on the right,
+/// tinted like the space, so the track itself shows what each point gives.
+final class GrainSlider: NSView {
+    var grain: Double = 0 { didSet { needsLayout = true } }
+    var tint: NSColor = SpaceColor.sky.background { didSet { needsLayout = true } }
+    /// Called while dragging (`final` false) and once on release (`final` true).
+    var onChange: ((Double, Bool) -> Void)?
+    private let track = CALayer()
+    private let texture = CALayer()
+    private let ramp = CAGradientLayer()
+    private let knob = CALayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        track.masksToBounds = true
+        track.cornerCurve = .continuous
+        track.borderWidth = Tokens.Metric.hairline
+        texture.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
+        texture.compositingFilter = "overlayBlendMode"
+        // The texture fades in from the left: smooth at 0, full grain at 1.
+        ramp.startPoint = CGPoint(x: 0, y: 0.5)
+        ramp.endPoint = CGPoint(x: 1, y: 0.5)
+        ramp.colors = [NSColor.clear.cgColor, NSColor.black.cgColor]
+        texture.mask = ramp
+        track.addSublayer(texture)
+        layer?.addSublayer(track)
+        knob.shadowOpacity = 1
+        knob.shadowRadius = 3
+        knob.shadowOffset = CGSize(width: 0, height: -1)
+        knob.borderWidth = 2
+        layer?.addSublayer(knob)
+        setAccessibilityRole(.slider)
+        setAccessibilityLabel("Grain")
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    private let knobSize: CGFloat = 18
+    private var inset: CGFloat { 5 + knobSize / 2 }
+
+    override func layout() {
+        super.layout()
+        Tokens.Motion.withoutAnimation {
+            track.frame = bounds
+            track.cornerRadius = bounds.height / 2
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                track.backgroundColor = tint.cgColor
+                track.borderColor = Tokens.Color.panelEdge.cgColor
+                knob.shadowColor = Tokens.Color.panelShadow.cgColor
+            }
+            texture.frame = track.bounds
+            texture.opacity = 0.9
+            ramp.frame = texture.bounds
+            let x = inset + CGFloat(grain) * (bounds.width - inset * 2)
+            knob.frame = NSRect(x: x - knobSize / 2, y: (bounds.height - knobSize) / 2, width: knobSize, height: knobSize)
+            knob.cornerRadius = knobSize / 2
+            knob.backgroundColor = .white
+            knob.borderColor = NSColor.white.cgColor
+        }
+        setAccessibilityValue(grain < 0.01 ? "Smooth" : "\(Int(grain * 100)) percent")
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
+    }
+
+    private func value(at event: NSEvent) -> Double {
+        let x = convert(event.locationInWindow, from: nil).x
+        let v = Double(min(max((x - inset) / (bounds.width - inset * 2), 0), 1))
+        // Close to the left end snaps to smooth, so "none" is easy to choose.
+        return v < 0.04 ? 0 : v
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        grain = value(at: event)
+        layoutSubtreeIfNeeded()
+        onChange?(grain, false)
+        window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
+            guard let event else { return }
+            self.grain = self.value(at: event)
+            self.layoutSubtreeIfNeeded()
+            if event.type == .leftMouseUp {
+                stop.pointee = true
+                self.onChange?(self.grain, true)
+            } else {
+                self.onChange?(self.grain, false)
+            }
+        }
+    }
+
+    override func accessibilityPerformIncrement() -> Bool { step(0.1) }
+    override func accessibilityPerformDecrement() -> Bool { step(-0.1) }
+
+    private func step(_ delta: Double) -> Bool {
+        grain = min(max(grain + delta, 0), 1)
+        onChange?(grain, true)
+        return true
+    }
+}
+
 /// One round choice in the tint row: a curated tint, or the custom wheel.
 final class TintSwatch: InteractiveView {
     enum Kind { case tint(SpaceColor), custom }
@@ -380,6 +486,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The name sits on a soft field, so it reads as something you can type into.
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let canvas = ColorCanvas()
+    private let grainLabel = Label("Grain", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+    private let grainSlider = GrainSlider()
     private let appearanceOptions = AppearanceOption.Mode.allCases.map { AppearanceOption(mode: $0) }
     private var swatches: [TintSwatch] = []
     private var monitor: Any?
@@ -400,7 +508,18 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
         nameBackground.layer?.cornerCurve = .continuous
-        [nameBackground, nameField, canvas].forEach { addSubview($0) }
+        [nameBackground, nameField, canvas, grainLabel, grainSlider].forEach { addSubview($0) }
+        grainSlider.grain = space?.grain ?? 0
+        grainSlider.tint = space?.background ?? SpaceColor.sky.background
+        grainSlider.onChange = { [weak self] grain, final in
+            guard let self else { return }
+            if final {
+                Library.shared.setGrain(grain, for: self.spaceID)
+                self.edited = true
+            } else {
+                (self.controller ?? BrowserWindowController.undoTarget)?.previewSpaceGrain(grain, for: self.spaceID)
+            }
+        }
         appearanceOptions.forEach { addSubview($0) }
         for option in appearanceOptions {
             option.onClick = { [weak self, weak option] _ in
@@ -448,13 +567,16 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let canvasHeight: CGFloat = 148
     private let previewHeight = Tokens.Space.x16
     private let swatchSize = Tokens.Space.x6
+    private let grainHeight: CGFloat = 26
 
     var contentHeight: CGFloat {
-        pad + Tokens.Space.x8 + Tokens.Space.x3 + canvasHeight + Tokens.Space.x3 + previewHeight + Tokens.Space.x4 + swatchSize + pad
+        pad + Tokens.Space.x8 + Tokens.Space.x3 + canvasHeight + Tokens.Space.x3 + previewHeight + Tokens.Space.x4 + grainHeight
+            + Tokens.Space.x4 + swatchSize + pad
     }
 
     private func showPreviews(_ background: NSColor) {
         appearanceOptions.forEach { $0.show(background) }
+        grainSlider.tint = background
     }
 
     private func refreshAppearance() {
@@ -490,6 +612,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             option.frame = NSRect(x: pad + CGFloat(i) * (optionWidth + gap), y: y, width: optionWidth, height: previewHeight)
         }
         y += previewHeight + Tokens.Space.x4
+        let labelWidth = grainLabel.textWidth + Tokens.Space.x3
+        grainLabel.frame = NSRect(x: pad, y: y + (grainHeight - grainLabel.lineHeight) / 2, width: labelWidth, height: grainLabel.lineHeight)
+        grainSlider.frame = NSRect(x: pad + labelWidth, y: y, width: width - labelWidth, height: grainHeight)
+        y += grainHeight + Tokens.Space.x4
         let count = CGFloat(swatches.count)
         let swatchGap = (width - count * swatchSize) / max(count - 1, 1)
         for (i, swatch) in swatches.enumerated() {

@@ -17,6 +17,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var intensity: Double? = nil
     /// "light" or "dark" to force the window's appearance in this space; nil follows the system.
     var appearance: String? = nil
+    /// How much grain the window's frame has in this space (0 = smooth, 1 = most). Nil: smooth.
+    var grain: Double? = nil
 
     /// The window frame color for this space.
     var background: NSColor { hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background }
@@ -175,6 +177,12 @@ final class Library {
     func setAppearance(_ appearance: String?, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].appearance = appearance
+        commit()
+    }
+
+    func setGrain(_ grain: Double, for id: UUID) {
+        guard let i = index(of: id) else { return }
+        spaces[i].grain = grain > 0.01 ? min(grain, 1) : nil
         commit()
     }
 

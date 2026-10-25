@@ -234,8 +234,31 @@ final class BrowserRootView: ColorView {
         return NSRect(x: x, y: inset, width: sidebarWidth, height: bounds.height - inset * 2)
     }
 
+    /// The frame's grain, under everything else: the same fine noise as Zigzag's own branded screens.
+    private lazy var grainLayer: CALayer = {
+        let grain = CALayer()
+        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
+        grain.compositingFilter = "overlayBlendMode"
+        grain.opacity = 0
+        grain.zPosition = -1
+        layer?.insertSublayer(grain, at: 0)
+        return grain
+    }()
+
+    /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
+    func setGrain(_ amount: Double, animated: Bool) {
+        let target = Float(min(max(amount, 0), 1) * 0.22)
+        guard grainLayer.opacity != target else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(!animated)
+        CATransaction.setAnimationDuration(Tokens.Motion.standard)
+        grainLayer.opacity = target
+        CATransaction.commit()
+    }
+
     override func layout() {
         super.layout()
+        Tokens.Motion.withoutAnimation { grainLayer.frame = bounds }
         layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible

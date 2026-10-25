@@ -423,8 +423,8 @@ final class BrandSurface: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { false }
 
-    /// Fine monochrome grain, made once.
-    private static let noise: NSImage = {
+    /// Fine monochrome grain, made once. Also the texture a space can have.
+    static let noise: NSImage = {
         let size = 96
         var bytes = [UInt8](repeating: 0, count: size * size * 4)
         var seed: UInt32 = 0x9E3779B9
