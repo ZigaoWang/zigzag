@@ -136,7 +136,8 @@ final class DownloadsPanelView: FloatingPanelView {
         reload()
         present(arrival: .fade)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
-            guard let self else { return event }
+            // Only its own window: keys and clicks in Settings or another window are theirs.
+            guard let self, event.window === self.window else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { self.close(); return nil }
                 return event

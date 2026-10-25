@@ -627,7 +627,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 if let self { Toast.show("This page doesn’t have an article to read", symbol: "doc.plaintext", duration: 2, in: self) }
                 return
             }
-            guard self.tabManager.selectedTab === tab else { return }
+            guard self.tabManager.selectedTab === tab, self.reader == nil else { return }
             let view = ReaderView()
             view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link) }
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab) }
@@ -640,6 +640,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.alphaValue = 0
             Tokens.Motion.animate(Tokens.Motion.feedback) { view.animator().alphaValue = 1 }
             self.window?.makeFirstResponder(view.webView)
+            // Opened again quickly: one listener, never two.
+            if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }
             self.readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard event.keyCode == 53, event.window === self?.window, self?.reader != nil else { return event }
                 self?.closeReader()

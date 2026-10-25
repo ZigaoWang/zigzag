@@ -185,7 +185,7 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         controller.window?.makeFirstResponder(panel.field.field)
         panel.field.field.currentEditor()?.selectAll(nil)
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
-            guard let panel else { return event }
+            guard let panel, event.window === panel.window else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { panel.close(commit: false); return nil }
                 if event.keyCode == 36 || event.keyCode == 76 { panel.close(commit: true); return nil }
