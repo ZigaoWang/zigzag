@@ -162,7 +162,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     private func setZoom(_ zoom: CGFloat) {
         guard let webView = selectedWebView, let url = selectedTab?.url else { return }
         webView.pageZoom = zoom
-        ZoomLevels.set(zoom, for: url)
+        // A private window's zoom lasts only as long as the page: nothing about the site is saved.
+        if !tabManager.isPrivate { ZoomLevels.set(zoom, for: url) }
         Toast.show("\(Int((zoom * 100).rounded()))%", symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass", in: self)
     }
 
