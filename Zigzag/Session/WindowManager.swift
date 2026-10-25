@@ -150,23 +150,26 @@ final class WindowManager {
         for controller in saved {
             for tab in controller.tabManager.allTabs {
                 keep.insert(tab.id)
+                // Compared in full: a hash of Data looks only at its length and first bytes, so going Back (same
+                // length, different place) would go unsaved and the tab reopen on the wrong page.
                 guard let data = tab.interactionStateForSaving else { continue }
-                let hash = data.hashValue
-                if savedStateHashes[tab.id] == hash { continue }
-                savedStateHashes[tab.id] = hash
+                if savedStates[tab.id] == data { continue }
+                savedStates[tab.id] = data
                 writes.append((Paths.tabState.appendingPathComponent(tab.id.uuidString), data))
             }
         }
-        for id in savedStateHashes.keys where !keep.contains(id) { savedStateHashes[id] = nil }
+        for id in savedStates.keys where !keep.contains(id) { savedStates[id] = nil }
         let directory = Paths.tabState
         if synchronously {
-            Self.writeTabStates(writes, keeping: keep, in: directory)
+            stateWriter.sync { Self.writeTabStates(writes, keeping: keep, in: directory) }
         } else {
-            DispatchQueue.global(qos: .utility).async { Self.writeTabStates(writes, keeping: keep, in: directory) }
+            stateWriter.async { Self.writeTabStates(writes, keeping: keep, in: directory) }
         }
     }
 
-    private var savedStateHashes: [UUID: Int] = [:]
+    private var savedStates: [UUID: Data] = [:]
+    /// One writer at a time, in order, so an older write can't delete a file a newer one just wrote.
+    private let stateWriter = DispatchQueue(label: "Zigzag.tab-states")
 
     /// Runs off the main thread: writes changed back/forward lists and removes ones for closed tabs.
     nonisolated private static func writeTabStates(_ writes: [(URL, Data)], keeping keep: Set<UUID>, in directory: URL) {
