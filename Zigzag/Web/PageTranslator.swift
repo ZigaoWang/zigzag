@@ -158,13 +158,18 @@ final class TranslationHost {
     /// Translates the page in a web view from one language into the reader's. Calls back with what happened.
     func translate(_ webView: WKWebView, from source: Locale.Language, progress: @escaping (Double) -> Void,
                    completion: @escaping (Result<Void, Error>) -> Void) {
-        model.job = Job(webView: webView, progress: progress, completion: completion)
+        model.job = Job(webView: webView, url: webView.url, progress: progress, completion: completion)
         model.configuration = TranslationSession.Configuration(source: source, target: PageTranslator.readerLanguage)
         model.configuration?.invalidate()
     }
 
+    /// The page went away before it was done: navigated elsewhere, or its tab closed.
+    struct Cancelled: Error {}
+
     struct Job {
         weak var webView: WKWebView?
+        /// The page it was asked for: a different page in the same web view is never translated by it.
+        let url: URL?
         let progress: (Double) -> Void
         let completion: (Result<Void, Error>) -> Void
     }
@@ -174,8 +179,9 @@ final class TranslationHost {
         @ObservationIgnored var job: Job?
 
         func run(_ session: TranslationSession) async {
-            guard let job, let webView = job.webView else { return }
+            guard let job else { return }
             self.job = nil
+            guard let webView = job.webView, webView.url == job.url else { job.completion(.failure(Cancelled())); return }
             let pieces = await PageTranslator.pieces(in: webView)
             guard !pieces.isEmpty else { job.completion(.success(())); return }
             do {
@@ -190,6 +196,7 @@ final class TranslationHost {
                     let responses = try await session.translations(from: requests)
                     var translated: [Int: String] = [:]
                     for response in responses { if let id = response.clientIdentifier.flatMap(Int.init) { translated[id] = response.targetText } }
+                    guard webView.url == job.url else { throw Cancelled() }
                     await PageTranslator.apply(translated, in: webView)
                     job.progress(Double(end) / Double(pieces.count))
                 }

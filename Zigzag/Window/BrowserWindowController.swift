@@ -606,8 +606,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         let name = PageTranslator.name(of: language)
         Toast.show("Translating from \(name)…", symbol: "translate", duration: 3600, in: self)
+        let page = webView.url
         translator.translate(webView, from: language, progress: { _ in }, completion: { [weak self] result in
             guard let self else { return }
+            // Left for another page meanwhile: that page isn't translated, and there's nothing to say.
+            if case .failure(let error) = result, error is TranslationHost.Cancelled { Toast.hide(in: self); return }
+            guard tab.webView?.url == page else { Toast.hide(in: self); return }
             switch result {
             case .success:
                 tab.isTranslated = true
