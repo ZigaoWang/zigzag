@@ -671,7 +671,7 @@ final class NativeMessagingHost {
 /// a popup opened, how many messages a companion app sent. Never what any message said.
 enum ExtensionLog {
     nonisolated static func write(_ line: String) {
-        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Zigzag", isDirectory: true)
+        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true ? "Library/Logs/Zigzag Dev" : "Library/Logs/Zigzag", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appendingPathComponent("extensions.log")
         let text = "\(Date()) \(line)\n"
