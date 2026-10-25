@@ -55,3 +55,9 @@ CLAUDE.local.md
 .AppleDouble
 .LSOverride
 ._*
+
+# Kept on the maintainer's Mac only: internal notes, the server deploy script, and a third-party test package.
+/PASSWORDS.md
+/EXTENSIONS.md
+/site/deploy.sh
+/ZigzagTests/Fixtures/custom-progress-bar.crx
