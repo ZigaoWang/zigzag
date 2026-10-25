@@ -15,12 +15,51 @@ enum Reader {
           isArticle: () => { try { return isProbablyReaderable(document, { minScore: 10, minContentLength: 100 }); } catch (e) { return false; } },
           parse: () => {
             try {
-              const article = new Readability(document.cloneNode(true)).parse();
+              const copy = document.cloneNode(true);
+              // Wikipedia and other MediaWiki sites: the fact box, notes about other pages, edit links and footnote
+              // markers are page furniture, and would otherwise open the article.
+              if (copy.querySelector('.mw-parser-output')) {
+                copy.querySelectorAll('.infobox, .navbox, .vertical-navbox, .sidebar, .metadata, .ambox, .hatnote, .shortdescription, ' +
+                  '.mw-editsection, sup.reference, .mw-jump-link, #toc, .toc, .noprint, .mw-empty-elt').forEach(el => el.remove());
+                // The little ⓘ after a pronunciation plays a sound on the page; in reading it's just a mark.
+                copy.querySelectorAll('a, span, sup').forEach(el => { if (el.textContent.trim() === 'ⓘ') el.remove(); });
+              }
+              // Icons and spacers aren't pictures; big pictures get the full measure.
+              copy.querySelectorAll('img').forEach(img => {
+                const w = parseInt(img.getAttribute('width') || '0', 10), h = parseInt(img.getAttribute('height') || '0', 10);
+                if ((w && w < 48) || (h && h < 48)) img.remove(); else if (w >= 480) img.classList.add('wide'); else if (w) img.classList.add('inset');
+              });
+              // What the site calls itself, when it says so briefly; otherwise its address. Never a company's legal name.
+              const siteName = () => {
+                const host = location.hostname.replace(/^(www|m)\\./, '');
+                if (/(^|\\.)wikipedia\\.org$/.test(host)) return 'Wikipedia';
+                const own = (meta('og:site_name') || '').trim();
+                return own && own.length <= 28 && !/\\b(inc|llc|ltd|foundation|corporation)\\b/i.test(own) ? own : host;
+              };
+              const meta = n => (document.querySelector(`meta[property="${n}"], meta[name="${n}"]`) || {}).content || '';
+              const article = new Readability(copy, { classesToPreserve: ['wide', 'inset', 'lead'] }).parse();
+              if (!article) return null;
+              const body = document.createElement('div');
+              body.innerHTML = article.content || '';
+              // The opening paragraph gets the drop cap: the first one that's a real paragraph, not a dateline.
+              const lead = [...body.querySelectorAll('p')].find(p => p.textContent.trim().length > 120 && !p.closest('figure, blockquote, li, table'));
+              if (lead) lead.classList.add('lead');
+              // The site's own summary, unless it's just the opening paragraph again.
+              const squash = t => (t || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+              let dek = squash(article.excerpt) ? (article.excerpt || '').replace(/\\s+/g, ' ').trim() : '';
+              if (!dek || dek.length > 320 || (lead && squash(lead.textContent).startsWith(squash(dek).slice(0, 60)))) dek = '';
+              // A lead picture from the page's own card, unless the article already opens with it.
+              let image = meta('og:image') || meta('twitter:image');
+              try { image = image ? new URL(image, location.href).href : ''; } catch (e) { image = ''; }
+              const firstImage = body.querySelector('img');
+              if (image && firstImage && body.innerHTML.indexOf(firstImage.outerHTML) < 400) image = '';
+              if (!/^https:/.test(image)) image = '';
               // The address says where it's from better than a publisher's legal name; a long byline is metadata, not an author.
               const byline = (article.byline || '').trim();
-              return article ? JSON.stringify({ title: article.title || document.title, byline: byline.length <= 60 ? byline : '',
-                site: location.hostname.replace(/^www\\./, ''), content: article.content || '',
-                length: article.length || 0, lang: article.lang || document.documentElement.lang || '' }) : null;
+              return JSON.stringify({ title: article.title || document.title, byline: byline.length <= 60 ? byline : '',
+                site: siteName(),
+                content: body.innerHTML, length: article.length || 0, lang: article.lang || document.documentElement.lang || '',
+                dek: dek, image: image, url: location.href });
             } catch (e) { return null; }
           }
         };
@@ -46,6 +85,9 @@ enum Reader {
         let content: String
         let length: Int
         let lang: String
+        var dek: String? = nil
+        var image: String? = nil
+        var url: String? = nil
     }
 
     static func article(in webView: WKWebView) async -> Article? {
@@ -67,7 +109,7 @@ enum Reader {
             get {
                 let d = UserDefaults.standard
                 let size = d.integer(forKey: "ReaderSize")
-                return Preferences(size: sizes.contains(size) ? size : 20,
+                return Preferences(size: sizes.contains(size) ? size : 19,
                                    face: Face(rawValue: d.string(forKey: "ReaderFace") ?? "") ?? .serif,
                                    theme: Theme(rawValue: d.string(forKey: "ReaderTheme") ?? "") ?? .auto)
             }
@@ -86,60 +128,130 @@ enum Reader {
         }
     }
 
-    /// The reading page: a comfortable line length, the system serif (or sans) for reading, and four themes.
+    /// The reading page, set like a well-made magazine: a masthead (where it's from, the title, the site's own
+    /// summary, who wrote it), the lead picture, then the text at a book's measure. On a wide window small pictures
+    /// sit in a margin beside the text with their captions, and wide ones span both; narrower, it's one column.
     static func html(for article: Article, preferences: Preferences = .saved) -> String {
         let minutes = max(1, Int((Double(article.length) / 1100).rounded()))
         // A credit that names no one ("Contributors to Wikimedia projects") says nothing; leave it out.
         let author = article.byline.lowercased().contains("contributors") ? "" : article.byline
-        let details = [article.site, author, "\(minutes) min read"].filter { !$0.isEmpty }.map(escape).joined(separator: " · ")
+        let credit = [author, "\(minutes) min read"].filter { !$0.isEmpty }.map(escape).joined(separator: "<span class=\"dot\">·</span>")
+        let dek = (article.dek ?? "").isEmpty ? "" : "<p class=\"dek\">\(escape(article.dek ?? ""))</p>"
+        let hero = (article.image ?? "").isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(article.image ?? ""))\" alt=\"\"></figure>"
+        let source = (article.url ?? "").isEmpty ? "" :
+            "<footer class=\"end\"><span class=\"mark\"></span><a href=\"\(escape(article.url ?? ""))\">Read the original on \(escape(article.site))</a></footer>"
         return """
         <!doctype html><html lang="\(escape(article.lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="--size: \(preferences.size)px">
         <head><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data:; media-src *; style-src 'unsafe-inline'; font-src *">
         <title>\(escape(article.title))</title>
         <style>
-        :root { --text: #1f1f21; --soft: #6e6e73; --rule: rgba(0,0,0,.09); --bg: #fdfcfa; --link: #2f5d9a; --code: rgba(0,0,0,.05);
-                --serif: ui-serif, "New York", Georgia, serif; --sans: -apple-system, "SF Pro Text", system-ui, sans-serif; }
-        :root[data-theme="sepia"] { --text: #45372a; --soft: #8a7560; --rule: rgba(90,60,20,.14); --bg: #f6efe2; --link: #8a5326; --code: rgba(90,60,20,.07); }
-        :root[data-theme="dark"] { --text: #e6e4e0; --soft: #9a9a9f; --rule: rgba(255,255,255,.12); --bg: #1b1b1d; --link: #8fb4e6; --code: rgba(255,255,255,.07); color-scheme: dark; }
+        :root { --text: #1d1d1f; --soft: #6e6e73; --faint: rgba(0,0,0,.42); --rule: rgba(0,0,0,.1); --bg: #fbfaf7; --link: #2f5d9a;
+                --code: rgba(0,0,0,.05); --select: rgba(47,93,154,.18);
+                --serif: "New York", ui-serif, Georgia, serif; --sans: -apple-system, "SF Pro Text", system-ui, sans-serif;
+                --measure: 32em; --margin: 12em; --gap: 2em; }
+        :root[data-theme="sepia"] { --text: #3f3226; --soft: #86705a; --faint: rgba(70,45,20,.45); --rule: rgba(90,60,20,.16); --bg: #f4ecdd;
+                --link: #8a5326; --code: rgba(90,60,20,.07); --select: rgba(138,83,38,.2); }
+        :root[data-theme="dark"] { --text: #e8e6e1; --soft: #9d9b97; --faint: rgba(255,255,255,.4); --rule: rgba(255,255,255,.12); --bg: #161618;
+                --link: #9cbcec; --code: rgba(255,255,255,.07); --select: rgba(156,188,236,.25); color-scheme: dark; }
         @media (prefers-color-scheme: dark) {
-          :root[data-theme="auto"] { --text: #e6e4e0; --soft: #9a9a9f; --rule: rgba(255,255,255,.12); --bg: #1b1b1d; --link: #8fb4e6; --code: rgba(255,255,255,.07); color-scheme: dark; }
+          :root[data-theme="auto"] { --text: #e8e6e1; --soft: #9d9b97; --faint: rgba(255,255,255,.4); --rule: rgba(255,255,255,.12); --bg: #161618;
+                --link: #9cbcec; --code: rgba(255,255,255,.07); --select: rgba(156,188,236,.25); color-scheme: dark; }
         }
         html { background: var(--bg); transition: background .25s ease; }
-        body { margin: 0; padding: 88px 32px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.7;
-               -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; transition: color .25s ease;
-               animation: rise .45s cubic-bezier(.2,.8,.2,1) both; }
-        :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.62; }
-        @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        ::selection { background: var(--select); }
+        body { margin: 0; padding: 104px 40px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.62;
+               -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-kerning: normal; hanging-punctuation: first;
+               transition: color .25s ease; animation: rise .5s cubic-bezier(.2,.8,.2,1) both; }
+        :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.58; letter-spacing: -0.003em; }
+        @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
         @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) { body { animation-name: appear; } }
-        main { max-width: 36em; margin: 0 auto; }
-        header { margin-bottom: 2em; }
-        .details { font: 14px/1.4 var(--sans); color: var(--soft); margin-bottom: 10px; }
-        h1.title { font-family: inherit; font-size: 1.9em; font-weight: 700; line-height: 1.18; letter-spacing: -0.012em; margin: 0; }
-        h1, h2, h3, h4 { line-height: 1.25; margin: 1.8em 0 .6em; letter-spacing: -0.01em; }
-        h2 { font-size: 1.35em; } h3 { font-size: 1.15em; } h4 { font-size: 1em; }
-        p, ul, ol, blockquote, figure, pre, table, dl { margin: 0 0 1.15em; }
-        li { margin: .3em 0; } ul, ol { padding-left: 1.3em; }
-        a { color: var(--link); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--link) 35%, transparent);
-            text-underline-offset: .18em; } a:hover { text-decoration-color: var(--link); }
-        img, video, svg, picture { display: block; max-width: 100%; height: auto; margin: 1.6em auto; border-radius: 8px; }
-        figure img, figure picture { margin: 0 auto; }
-        figure { margin: 1.8em 0; } figcaption { font: 13px/1.45 var(--sans); color: var(--soft); margin-top: 10px; text-align: center; }
-        blockquote { margin-left: 0; padding: .2em 0 .2em 1.1em; border-left: 3px solid var(--rule); color: var(--soft); font-style: italic; }
-        pre, code, kbd { font: .82em/1.55 ui-monospace, "SF Mono", Menlo, monospace; }
-        code { background: var(--code); padding: .1em .35em; border-radius: 4px; }
-        pre { overflow-x: auto; padding: 14px 16px; border-radius: 10px; background: var(--code); } pre code { background: none; padding: 0; }
-        hr { border: 0; border-top: 1px solid var(--rule); margin: 2.4em 0; }
-        table { border-collapse: collapse; width: 100%; font-size: .9em; } td, th { border-bottom: 1px solid var(--rule); padding: 8px 10px; text-align: left; }
+        @media (prefers-reduced-motion: reduce) { body { animation-name: appear; } html, body { transition: none; } }
+
+        /* How far through: a hairline across the top, drawn by the scroll itself. */
+        @supports (animation-timeline: scroll()) {
+          html::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--text); opacity: .5;
+                         transform-origin: 0 50%; animation: progress linear both; animation-timeline: scroll(root); z-index: 2; }
+          @keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        }
+
+        /* The page: one column at a book's measure, with a margin beside it when the window has room. */
+        main { max-width: var(--measure); margin: 0 auto; }
+        @media (min-width: 960px) {
+          main { max-width: calc(var(--measure) + var(--gap) + var(--margin)); padding-right: calc(var(--gap) + var(--margin)); box-sizing: border-box; }
+        }
+
+        header { margin-bottom: 2.4em; }
+        .site { font: 500 14px/1.3 var(--sans); color: var(--soft); margin: 0 0 22px; }
+        h1.title { font-family: var(--serif); font-size: 2.5em; font-weight: 700; line-height: 1.06; letter-spacing: -0.026em; margin: 0;
+                   text-wrap: balance; }
+        :root[data-face="sans"] h1.title { font-family: var(--sans); letter-spacing: -0.032em; }
+        .dek { font-size: 1.22em; line-height: 1.42; color: var(--soft); margin: .7em 0 0; text-wrap: pretty; }
+        .credit { font: 14px/1.4 var(--sans); color: var(--soft); margin: 22px 0 0; }
+        .credit .dot { margin: 0 .5em; color: var(--faint); }
+        figure.hero { margin: 2.4em 0 0; }
+        figure.hero img { width: 100%; max-height: 70vh; object-fit: cover; border-radius: 4px; margin: 0; }
+        @media (min-width: 960px) { figure.hero { margin-right: calc(-1 * (var(--gap) + var(--margin))); } }
+
+        h1, h2, h3, h4 { line-height: 1.2; margin: 2.1em 0 .5em; letter-spacing: -0.014em; text-wrap: balance; font-weight: 700; }
+        h2 { font-size: 1.36em; } h3 { font-size: 1.1em; } h4 { font-size: 1em; }
+        h3, h4 { font-family: var(--sans); font-weight: 600; letter-spacing: -0.006em; }
+        p, ul, ol, blockquote, figure, pre, table, dl { margin: 0 0 1em; }
+        p { text-wrap: pretty; }
+        li { margin: .3em 0; } ul, ol { padding-left: 1.15em; } li::marker { color: var(--soft); }
+
+        /* The opening line in small capitals, the way a magazine starts a story. */
+        p.lead::first-line { font-variant-caps: all-small-caps; letter-spacing: .045em; font-weight: 600; }
+
+        /* Links read as part of the sentence; the underline is barely there until you point at it. */
+        a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .22em;
+            text-decoration-color: color-mix(in srgb, var(--text) 18%, transparent); transition: color .15s, text-decoration-color .15s; }
+        a:hover { color: var(--link); text-decoration-color: currentColor; }
+        h1 a, h2 a, h3 a, figcaption a { text-decoration: none; }
+
+        img, video, svg, picture { display: block; max-width: 100%; height: auto; margin: 1.8em 0; border-radius: 4px; }
+        figure { margin: 2em 0; } figure img, figure picture, figure video { margin: 0; }
+        figcaption { font: 13px/1.5 var(--sans); color: var(--soft); margin-top: 10px; text-wrap: pretty; }
+        /* Big pictures go wide, across the margin too. */
+        img.wide, figure:has(img.wide) img { width: 100%; }
+        @media (min-width: 960px) {
+          figure:has(img.wide), p > img.wide:only-child, main img.wide:not(figure img) { margin-right: calc(-1 * (var(--gap) + var(--margin))); }
+          figure:has(img.wide) img, main img.wide:not(figure img) { width: 100%; }
+          figure:has(img.wide) figcaption { max-width: var(--measure); }
+          /* Small pictures move to the margin, caption under them, level with the text they belong to. */
+          figure:has(img.inset), p > img.inset:only-child, main img.inset:not(figure img) {
+            float: right; clear: right; width: var(--margin); margin: .3em calc(-1 * (var(--gap) + var(--margin))) 1.4em 0; }
+          figure:has(img.inset) img { width: 100%; }
+        }
+
+        blockquote { margin: 1.6em 0; padding: 0 0 0 1em; border-left: 2px solid var(--text); }
+        blockquote p:last-child { margin-bottom: 0; }
+        pre, code, kbd { font: .84em/1.55 ui-monospace, "SF Mono", Menlo, monospace; }
+        code { background: var(--code); padding: .12em .36em; border-radius: 4px; }
+        pre { overflow-x: auto; padding: 16px 18px; border-radius: 8px; background: var(--code); } pre code { background: none; padding: 0; }
+        hr { border: 0; height: 0; margin: 2.4em 0; text-align: center; } hr::after { content: "⁂"; color: var(--soft); font-size: 1.1em; }
+        table { border-collapse: collapse; width: 100%; font: 14px/1.5 var(--sans); margin: 1.6em 0; }
+        td, th { border-bottom: 1px solid var(--rule); padding: 8px 12px 8px 0; text-align: left; vertical-align: top; }
+        th { font-weight: 600; }
+        sup, sub { line-height: 0; font-size: .68em; }
+
+        /* The end: a small mark, and the way back to where it came from. */
+        .end { margin-top: 3em; padding-top: 1.4em; border-top: 1px solid var(--rule); font: 14px/1.4 var(--sans); color: var(--soft); clear: both; }
+        .end .mark { display: inline-block; width: .55em; height: .55em; background: var(--text); margin-right: .8em; vertical-align: .05em; }
+        .end a { text-decoration-color: var(--rule); }
+
         /* Leftovers from the page that don't belong in reading. */
         button, input, select, textarea, form, iframe, nav, aside, [role="button"], [aria-hidden="true"] { display: none !important; }
         </style></head><body><main>
         <header>
-        <div class="details">\(details)</div>
+        <p class="site">\(escape(article.site))</p>
         <h1 class="title">\(escape(article.title))</h1>
+        \(dek)
+        <p class="credit">\(credit)</p>
+        \(hero)
         </header>
         \(article.content)
+        \(source)
         </main></body></html>
         """
     }
