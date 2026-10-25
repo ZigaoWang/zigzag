@@ -348,6 +348,7 @@ private final class SourceRow: InteractiveView {
     var exportFile: URL?
 
     var isChosen = false { didSet { stateDidChange(animated: true); refresh() } }
+    override func accessibilityValue() -> Any? { isChosen ? 1 : 0 }
     var state = State.idle { didSet { refresh() } }
 
     private let icon = NSImageView()

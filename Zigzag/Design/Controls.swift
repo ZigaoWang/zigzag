@@ -130,6 +130,16 @@ class InteractiveView: NSView {
         if inside && !clicksOnMouseDown { onClick?(event) }
     }
 
+    /// VoiceOver's press (VO-Space) does what a click does, for any control drawn on this.
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled, let onClick else { return false }
+        let event = NSApp.currentEvent ?? NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0,
+                                                             windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+        guard let event else { return false }
+        onClick(event)
+        return true
+    }
+
     override func otherMouseUp(with event: NSEvent) {
         if event.buttonNumber == 2, bounds.contains(convert(event.locationInWindow, from: nil)) { onMiddleClick?() }
     }

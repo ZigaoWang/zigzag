@@ -355,6 +355,7 @@ private final class HelloPage: NSView {
 /// One kind of data to bring (passwords, bookmarks…): a check and a word, light on the blue.
 private final class DataToggle: InteractiveView {
     var isOn = true { didSet { refresh() } }
+    override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
     var isLocked = false { didSet { refresh() } }
     var onChange: (() -> Void)?
     private let check = NSImageView()
@@ -412,6 +413,7 @@ private final class BrowserRow: InteractiveView {
     enum State { case idle, waiting, working, done(ImportCoordinator.Summary) }
     private(set) var source: ImportCoordinator.Source
     var isChosen = false { didSet { refresh() } }
+    override func accessibilityValue() -> Any? { isChosen ? 1 : 0 }
     var isLocked = false { didSet { refresh() } }
     var onChange: (() -> Void)?
     var onFix: ((ImportProblem.Fix) -> Void)?
@@ -1126,6 +1128,7 @@ final class IntoZigzag: NSView {
 /// A square you tap to pick: an icon over a name, and a check when it's picked. Light on the blue.
 private final class PickTile: InteractiveView {
     var isPicked = false { didSet { refresh() } }
+    override func accessibilityValue() -> Any? { isPicked ? 1 : 0 }
     var isLocked = false { didSet { refresh() } }
     var onToggle: (() -> Void)?
     let icon = NSImageView()
@@ -1509,6 +1512,7 @@ private final class ExtensionRow: InteractiveView {
     enum State: Equatable { case idle, waiting, working, added, failed(String) }
     var state = State.idle { didSet { refresh() } }
     var isChosen = false { didSet { refresh() } }
+    override func accessibilityValue() -> Any? { isChosen ? 1 : 0 }
     var isLocked = false
     var onChange: (() -> Void)?
     /// Holds the icon; borrowed for loading.

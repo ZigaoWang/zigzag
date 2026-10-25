@@ -277,9 +277,9 @@ private final class ReaderOptions: FloatingPanelView {
     var preferences = Reader.Preferences.saved { didSet { refresh() } }
 
     private let size = ReaderSegments([.text("A", .systemFont(ofSize: 13, weight: .semibold)), .text("A", .systemFont(ofSize: 19, weight: .semibold))],
-                                      toggles: false)
+                                      toggles: false, accessibilityNames: ["Smaller Text", "Larger Text"])
     private let face = ReaderSegments([.text("Serif", NSFont(descriptor: NSFont.systemFont(ofSize: 14, weight: .medium).fontDescriptor.withDesign(.serif)!, size: 14)!),
-                                       .text("Sans", .systemFont(ofSize: 14, weight: .medium))], toggles: true)
+                                       .text("Sans", .systemFont(ofSize: 14, weight: .medium))], toggles: true, accessibilityNames: ["Serif", "Sans Serif"])
     private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
 
     static let width: CGFloat = 236
@@ -343,8 +343,12 @@ private final class ReaderSegments: NSView {
     private var labels: [Label] = []
     private let divider = ColorView(color: Tokens.Color.separator)
 
-    init(_ items: [Item], toggles: Bool) {
+    /// What each segment does, for VoiceOver.
+    var accessibilityNames: [String]
+
+    init(_ items: [Item], toggles: Bool, accessibilityNames: [String] = []) {
         self.toggles = toggles
+        self.accessibilityNames = accessibilityNames
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 10
@@ -366,6 +370,9 @@ private final class ReaderSegments: NSView {
             let label = Label(text, font: font, color: Tokens.Color.textPrimary)
             label.alignment = .center
             segment.addSubview(label)
+            // Two "A"s read as nothing to VoiceOver: each says what it does.
+            segment.setAccessibilityRole(toggles ? .radioButton : .button)
+            segment.setAccessibilityLabel(accessibilityNames.indices.contains(i) ? accessibilityNames[i] : text)
             segment.onClick = { [weak self] _ in
                 guard let self, segment.isEnabled else { return }
                 if self.toggles { self.selected = i }
@@ -485,6 +492,8 @@ private final class ThemeTile: InteractiveView {
     override func stateDidChange(animated: Bool) {
         ring.isHidden = !isSelected
     }
+
+    override func accessibilityValue() -> Any? { isSelected ? 1 : 0 }
 
     override func layout() {
         super.layout()
