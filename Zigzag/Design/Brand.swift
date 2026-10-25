@@ -180,6 +180,16 @@ enum Brand {
             view.wantsLayer = true
             guard let layer = view.layer else { continue }
             let begin = now + delay + stagger * Double(i)
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.22
+            fade.beginTime = begin
+            fade.fillMode = .backwards
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            layer.add(fade, forKey: "enter.fade")
+            // With Reduce Motion, it only fades in, in place.
+            guard !Tokens.Motion.reduceMotion else { continue }
             let rise = CASpringAnimation(keyPath: "transform.translation.y")
             rise.mass = 1
             rise.stiffness = 300
@@ -189,15 +199,7 @@ enum Brand {
             rise.duration = rise.settlingDuration
             rise.beginTime = begin
             rise.fillMode = .backwards
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = 0.22
-            fade.beginTime = begin
-            fade.fillMode = .backwards
-            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
             layer.add(rise, forKey: "enter.rise")
-            layer.add(fade, forKey: "enter.fade")
         }
     }
 
@@ -267,6 +269,17 @@ class RibbonView: NSView {
     func drawIn(delay: CFTimeInterval = 0, duration: CFTimeInterval = Brand.drawDuration) {
         layoutSubtreeIfNeeded()
         resetStroke()
+        // With Reduce Motion, the whole ribbon fades in rather than being written.
+        if Tokens.Motion.reduceMotion {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.2
+            fade.beginTime = CACurrentMediaTime() + delay
+            fade.fillMode = .backwards
+            stroke.add(fade, forKey: "fade")
+            return
+        }
         let draw = CABasicAnimation(keyPath: "strokeEnd")
         draw.fromValue = 0
         draw.toValue = 1
@@ -301,6 +314,18 @@ class RibbonView: NSView {
         isLooping = true
         layoutSubtreeIfNeeded()
         stroke.removeAllAnimations()
+        // With Reduce Motion, nothing travels: the whole ribbon breathes, softly, while it waits.
+        if Tokens.Motion.reduceMotion {
+            let breathe = CABasicAnimation(keyPath: "opacity")
+            breathe.fromValue = 1
+            breathe.toValue = 0.45
+            breathe.duration = 0.9
+            breathe.autoreverses = true
+            breathe.repeatCount = .infinity
+            breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            stroke.add(breathe, forKey: "loop")
+            return
+        }
         Tokens.Motion.withoutAnimation { stroke.path = loopPath }
         let cycle: CFTimeInterval = 1.1, length: CGFloat = 0.2
         let start = CABasicAnimation(keyPath: "strokeStart")
@@ -547,6 +572,16 @@ final class WordmarkView: NSView {
     /// Draws each stroke in, one after another, like a pen.
     func drawIn(delay: CFTimeInterval = 0, total: CFTimeInterval = 1.1) {
         layoutSubtreeIfNeeded()
+        if Tokens.Motion.reduceMotion {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.25
+            fade.beginTime = CACurrentMediaTime() + delay
+            fade.fillMode = .backwards
+            layer?.add(fade, forKey: "fade")
+            return
+        }
         let each = total / Double(strokes.count) * 1.6
         for (i, shape) in strokes.enumerated() {
             let draw = CABasicAnimation(keyPath: "strokeEnd")
