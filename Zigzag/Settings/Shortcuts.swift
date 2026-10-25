@@ -63,9 +63,11 @@ enum Shortcuts {
         }
     }
 
+    /// Changed by you, going by what's saved rather than the item's keys: macOS adjusts some of its own items
+    /// (Enter Full Screen) after launch, which isn't a change of yours.
     static func isCustom(_ item: NSMenuItem) -> Bool {
-        guard let id = id(item), let shipped = defaults[id] else { return false }
-        return combo(of: item) != shipped
+        guard let id = id(item), let saved = overrides[id] else { return false }
+        return saved != defaults[id]
     }
 
     /// The item that already answers to these keys, other than `item`.
