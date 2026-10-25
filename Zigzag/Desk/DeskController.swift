@@ -190,6 +190,8 @@ final class DeskController {
         guard isVisible, let controller else { return }
         isVisible = false
         actionBar.removeFromSuperview()
+        // The window's controls go back to how the sidebar has them.
+        controller.layoutTrafficLights()
         let root = controller.root
         let target = tab ?? controller.tabManager.selectedTab
         if let target, let card = cards[target.id], let image = target.snapshot ?? card.tab?.snapshot {

@@ -818,7 +818,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
     }
 
-    private func layoutTrafficLights() {
+    func layoutTrafficLights() {
         let window = browserWindow
         let floating = root.isSidebarFloatingVisible
         let docked = root.sidebarVisible
