@@ -1,13 +1,13 @@
 import AppKit
 
 /// About Zigzag: the brand at rest. The wordmark on the lit surface in the icon's own navy (About is the brand's
-/// home, so it doesn't take a space's color), the version, and a way to check for updates.
+/// home, so it doesn't take a space's color), the version, a way to check for updates, and the credits.
 final class AboutWindowController: NSWindowController, NSWindowDelegate {
     static var shared: AboutWindowController?
 
     static func show() {
         if let shared { shared.window?.makeKeyAndOrderFront(nil); return }
-        let size = NSSize(width: 360, height: 372)
+        let size = NSSize(width: 360, height: 432)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "About Zigzag"
         window.titleVisibility = .hidden
@@ -32,6 +32,9 @@ private final class AboutView: NSView {
     private let version = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private let maker = TextButton(title: "Made by Zigao Wang", font: Tokens.Font.small())
     private let updates = TextButton(title: "Check for Updates", font: Tokens.Font.body(.medium))
+    private let beta = BetaTag()
+    private let credits = NSTextField(wrappingLabelWithString: "Ad blocking uses EasyList and EasyPrivacy by the EasyList authors (CC BY-SA 3.0).")
+    private let license = Label("Source available under FSL-1.1-MIT", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let copyright = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
 
     override init(frame: NSRect) {
@@ -45,16 +48,21 @@ private final class AboutView: NSView {
         let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = info?["CFBundleVersion"] as? String ?? ""
         version.stringValue = build.isEmpty || build == short ? "Version \(short)" : "Version \(short) (\(build))"
-        version.alignment = .center
+        version.setAccessibilityLabel(version.stringValue + ", beta")
         maker.textColor = Tokens.Color.textTertiary
         maker.onClick = { _ in if let url = URL(string: "https://zigao.wang") { NSWorkspace.shared.open(url) } }
         // Click the wordmark and it writes itself again.
         wordmark.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(rewrite)))
         copyright.stringValue = info?["NSHumanReadableCopyright"] as? String ?? ""
         copyright.alignment = .center
+        credits.font = Tokens.Font.small()
+        credits.textColor = Tokens.Color.textTertiary
+        credits.alignment = .center
+        credits.isSelectable = false
+        license.alignment = .center
         updates.showsFillAtRest = true
         updates.onClick = { _ in Updater.shared.checkForUpdates() }
-        [surface, wordmark, version, maker, updates, copyright].forEach { addSubview($0) }
+        [surface, wordmark, version, beta, maker, updates, credits, license, copyright].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -80,13 +88,50 @@ private final class AboutView: NSView {
         wordmark.frame = NSRect(x: round((bounds.width - markWidth) / 2), y: round((surfaceHeight - markHeight) / 2) + 6, width: markWidth, height: markHeight)
         let pad = Tokens.Space.x8
         var y = surfaceHeight + Tokens.Space.x6
-        version.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: version.lineHeight)
+        // The version and its Beta tag, centered together.
+        let vw = version.textWidth
+        let row = vw + Tokens.Space.x1 + beta.fittingWidth
+        let vx = round((bounds.width - row) / 2)
+        version.frame = NSRect(x: vx, y: y, width: vw, height: version.lineHeight)
+        beta.frame = NSRect(x: version.frame.maxX + Tokens.Space.x1, y: round(version.frame.midY - BetaTag.height / 2), width: beta.fittingWidth, height: BetaTag.height)
         y = version.frame.maxY + Tokens.Space.x1
         let mw = maker.fittingWidth
         maker.frame = NSRect(x: round((bounds.width - mw) / 2), y: y, width: mw, height: Tokens.Space.x6)
         y = maker.frame.maxY + Tokens.Space.x5
         let w = updates.fittingWidth + Tokens.Space.x2
         updates.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Space.x8)
-        copyright.frame = NSRect(x: pad, y: bounds.height - Tokens.Space.x5 - copyright.lineHeight, width: bounds.width - pad * 2, height: copyright.lineHeight)
+        // Credits sit at the foot of the window, the copyright (when there is one) last.
+        let inner = bounds.width - pad * 2
+        var bottom = bounds.height - Tokens.Space.x5
+        if !copyright.stringValue.isEmpty {
+            copyright.frame = NSRect(x: pad, y: bottom - copyright.lineHeight, width: inner, height: copyright.lineHeight)
+            bottom = copyright.frame.minY - Tokens.Space.x1
+        }
+        license.frame = NSRect(x: pad, y: bottom - license.lineHeight, width: inner, height: license.lineHeight)
+        let creditsHeight = ceil(credits.sizeThatFits(NSSize(width: inner, height: 200)).height)
+        credits.frame = NSRect(x: pad, y: license.frame.minY - Tokens.Space.x1 - creditsHeight, width: inner, height: creditsHeight)
+    }
+}
+
+/// "Beta", quietly: a small capsule on the field fill, beside the version.
+private final class BetaTag: ColorView {
+    static let height: CGFloat = 16
+    private let label = Label("Beta", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
+
+    init() {
+        super.init(color: Tokens.Color.fieldFill)
+        layer?.cornerRadius = Self.height / 2
+        layer?.cornerCurve = .continuous
+        addSubview(label)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    var fittingWidth: CGFloat { label.inkWidth + Tokens.Space.x2 * 2 }
+
+    override func layout() {
+        super.layout()
+        label.frame = NSRect(x: Tokens.Space.x2 - Label.inset, y: round((bounds.height - label.lineHeight) / 2), width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
     }
 }
