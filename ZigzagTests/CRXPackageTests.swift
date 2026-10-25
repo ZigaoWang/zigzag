@@ -5,6 +5,10 @@ import Testing
 /// A real Chrome Web Store package (Custom Progress Bar for YouTube), used to check that only an intact,
 /// correctly signed package for the expected extension is accepted.
 struct CRXPackageTests {
+    /// The real package is a third-party extension, kept out of the public repository; the tests that need it
+    /// run only where it's present.
+    static var hasFixture: Bool { Bundle(for: Marker.self).url(forResource: "custom-progress-bar", withExtension: "crx") != nil }
+
     static let id = "nbkomboflhdlliegkaiepilnfmophgfg"
 
     static var fixture: Data {
@@ -14,19 +18,19 @@ struct CRXPackageTests {
         }
     }
 
-    @Test func acceptsTheRealPackage() throws {
+    @Test(.enabled(if: hasFixture)) func acceptsTheRealPackage() throws {
         let package = try CRXPackage(Self.fixture, expectedID: Self.id)
         #expect(package.id == Self.id)
         #expect(package.zip.prefix(2) == Data("PK".utf8))
     }
 
-    @Test func refusesAPackageForAnotherExtension() throws {
+    @Test(.enabled(if: hasFixture)) func refusesAPackageForAnotherExtension() throws {
         #expect(throws: CRXPackage.Failure.wrongExtension) {
             try CRXPackage(Self.fixture, expectedID: "aeblfdkhhhdcdjpifhhbdiojplfjncoa")
         }
     }
 
-    @Test func refusesATamperedPackage() throws {
+    @Test(.enabled(if: hasFixture)) func refusesATamperedPackage() throws {
         var data = try Self.fixture
         // Flip one byte near the end of the zip: the signature no longer covers what we'd unpack.
         let index = data.count - 100
@@ -52,7 +56,7 @@ struct CRXPackageTests {
         }
     }
 
-    @Test func refusesATruncatedHeader() throws {
+    @Test(.enabled(if: hasFixture)) func refusesATruncatedHeader() throws {
         let data = try Self.fixture.prefix(40)
         #expect(throws: CRXPackage.Failure.self) {
             try CRXPackage(Data(data), expectedID: Self.id)
