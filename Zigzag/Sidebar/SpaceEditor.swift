@@ -553,7 +553,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
-                if event.keyCode == 53 { self.close(); return nil }
+                // Esc in another window (Settings, a second browser window) is that window's.
+                if event.keyCode == 53, event.window === self.window { self.close(); return nil }
                 return event
             }
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }
