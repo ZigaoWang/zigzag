@@ -9,9 +9,6 @@
 <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
-<header class="bar">
-  <a href="/" aria-label="Zigzag"><span class="wordmark" aria-hidden="true"></span></a>
-</header>
 <main class="page">
   <h1>Your download is starting.</h1>
   <p class="lede">If it doesn’t, <a href="/releases/latest" id="get">download Zigzag here</a>.</p>
@@ -22,7 +19,6 @@
   </ol>
   <p class="fine">macOS 15.4 or later · Apple silicon and Intel · Notarized by Apple</p>
 </main>
-<footer class="foot"><span>Made in Shanghai</span><span>© 2026 Zigao Wang</span></footer>
 <script>
   // Start the download once, a beat after the page shows; the link is there if it doesn't.
   setTimeout(function () { window.location.href = document.getElementById("get").href; }, 700);

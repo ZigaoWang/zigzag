@@ -4,107 +4,68 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zigzag</title>
-<meta name="description" content="Zigzag is a Mac browser for following every tangent: Peek, Split View, spaces and a clean Reader.">
-<meta name="theme-color" content="#1E3A5F">
+<meta name="description" content="Zigzag is a browser for the Mac.">
 <link rel="icon" type="image/png" href="/assets/favicon-64.png">
 <link rel="apple-touch-icon" href="/assets/icon-256.png">
 <meta property="og:title" content="Zigzag">
-<meta property="og:description" content="Browse in every direction.">
+<meta property="og:description" content="A browser for the Mac.">
 <meta property="og:image" content="https://zigzagbrowser.com/assets/og.png">
 <meta property="og:url" content="https://zigzagbrowser.com/">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
-
-<header class="bar">
-  <a href="/" aria-label="Zigzag"><span class="wordmark" aria-hidden="true"></span></a>
-  <a class="button" href="/download">Download</a>
-</header>
-
 <main>
-  <section class="hero">
-    <h1 class="wordmark-hero" aria-label="Zigzag"></h1>
-    <p class="tagline">Browse in every direction.</p>
-    <p class="sub">A Mac browser for people who follow every tangent. Peek at links, split pages side by side, keep each part of life in its own colored space, and always find your way back.</p>
-    <a class="button large" href="/download">Download for Mac</a>
+  <header class="top">
+    <svg class="mark" viewBox="0 0 372 73" role="img" aria-label="Zigzag"><g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path pathLength="1" style="--i:0" d="M6.50,6.50 L56.50,6.50 L11.12,36.50 L51.88,36.50 L6.50,66.50 L56.50,66.50"/><path pathLength="1" style="--i:1" d="M77.50,66.50 L77.50,6.50"/><path pathLength="1" style="--i:2" d="M145.62,13.38 L142.35,11.03 L138.79,9.13 L135.00,7.73 L131.07,6.85 L127.05,6.50 L123.02,6.70 L119.05,7.44 L115.22,8.70 L111.59,10.47 L108.23,12.70 L105.20,15.37 L102.56,18.42 L100.35,21.79 L98.61,25.44 L97.38,29.28 L96.68,33.25 L96.51,37.28 L96.89,41.30 L97.80,45.23 L99.23,49.00 L101.15,52.55 L103.54,55.80 L106.33,58.71 L109.50,61.22 L112.97,63.27 L116.68,64.85 L120.57,65.91 L124.57,66.44 L128.61,66.43 L132.60,65.87 L136.49,64.79 L140.20,63.19 L143.65,61.11 L146.80,58.59 L149.58,55.66 L151.94,52.39 L153.85,48.84 L155.25,45.05 L156.14,41.12 L156.49,37.10 L156.50,36.50 L135.50,36.50"/><path pathLength="1" style="--i:3" d="M170.50,6.50 L220.50,6.50 L175.12,36.50 L215.88,36.50 L170.50,66.50 L220.50,66.50"/><path pathLength="1" style="--i:4" d="M237.50,66.50 L263.50,6.50 L289.50,66.50"/><path pathLength="1" style="--i:5" d="M249.50,46.50 L277.50,46.50"/><path pathLength="1" style="--i:6" d="M352.62,13.38 L349.35,11.03 L345.79,9.13 L342.00,7.73 L338.07,6.85 L334.05,6.50 L330.02,6.70 L326.05,7.44 L322.22,8.70 L318.59,10.47 L315.23,12.70 L312.20,15.37 L309.56,18.42 L307.35,21.79 L305.61,25.44 L304.38,29.28 L303.68,33.25 L303.51,37.28 L303.89,41.30 L304.80,45.23 L306.23,49.00 L308.15,52.55 L310.54,55.80 L313.33,58.71 L316.50,61.22 L319.97,63.27 L323.68,64.85 L327.57,65.91 L331.57,66.44 L335.61,66.43 L339.60,65.87 L343.49,64.79 L347.20,63.19 L350.65,61.11 L353.80,58.59 L356.58,55.66 L358.94,52.39 L360.85,48.84 L362.25,45.05 L363.14,41.12 L363.49,37.10 L363.50,36.50 L342.50,36.50"/></g></svg>
+    <p class="line">A browser for the Mac.</p>
+    <a class="button" href="/download">Download</a>
     <p class="fine">Free · macOS 15.4 or later</p>
-    <figure class="film hero-film">
-      <video src="/assets/clips/spaces.mp4" poster="/assets/clips/spaces.jpg" muted loop playsinline preload="metadata"
-             aria-label="Clicking through four spaces: Shanghai, New York, a dark studio and work, each with its own color and tabs."></video>
-    </figure>
-  </section>
+  </header>
 
-  <section class="band rose">
-    <h2>Peek at a link.</h2>
-    <p>Shift-click and it opens over the page you’re on. Escape, and you’re back where you were.</p>
-    <figure class="film"><video src="/assets/clips/peek.mp4" poster="/assets/clips/peek.jpg" muted loop playsinline preload="none"
-      aria-label="Shift-clicking a photo opens it over the page."></video></figure>
-  </section>
+  <figure class="clip">
+    <video src="/assets/clips/spaces.mp4" poster="/assets/clips/spaces.jpg" muted loop playsinline preload="auto" aria-label="Clicking through four spaces, each with its own color and tabs."></video>
+    <figcaption>Spaces, each with its own tabs and color.</figcaption>
+  </figure>
 
-  <section class="band violet">
-    <h2>Search any site from the address bar.</h2>
-    <p>Type a few letters of a site’s name, press Tab, and search it right there.</p>
-    <figure class="film"><video src="/assets/clips/search.mp4" poster="/assets/clips/search.jpg" muted loop playsinline preload="none"
-      aria-label="Typing avo, pressing Tab to search AvoidXray, then searching night street."></video></figure>
-  </section>
+  <figure class="clip">
+    <video src="/assets/clips/peek.mp4" poster="/assets/clips/peek.jpg" muted loop playsinline preload="none" aria-label="Shift-clicking a photo opens it over the page."></video>
+    <figcaption>Shift-click to peek at a link.</figcaption>
+  </figure>
 
-  <section class="band orange">
-    <h2>Two pages, one window.</h2>
-    <p>Drag a tab onto the page, and it opens beside it.</p>
-    <figure class="film"><video src="/assets/clips/split.mp4" poster="/assets/clips/split.jpg" muted loop playsinline preload="none"
-      aria-label="A tab dragged from the sidebar onto the page opens beside it."></video></figure>
-  </section>
+  <figure class="clip">
+    <video src="/assets/clips/split.mp4" poster="/assets/clips/split.jpg" muted loop playsinline preload="none" aria-label="A tab dragged onto the page opens beside it."></video>
+    <figcaption>Drag a tab onto the page to split it.</figcaption>
+  </figure>
 
-  <section class="band teal">
-    <h2>Read without the clutter.</h2>
-    <p>Reader keeps the words and the pictures, set in calm, clear type.</p>
-    <figure class="film"><video src="/assets/clips/reader.mp4" poster="/assets/clips/reader.jpg" muted loop playsinline preload="none"
-      aria-label="An article opened in Reader, scrolled, then closed."></video></figure>
-  </section>
+  <figure class="clip">
+    <video src="/assets/clips/search.mp4" poster="/assets/clips/search.jpg" muted loop playsinline preload="none" aria-label="Searching AvoidXray from the address bar."></video>
+    <figcaption>Type a site’s name, press Tab, search it.</figcaption>
+  </figure>
 
-  <section class="band blue">
-    <h2>Every tab, at once.</h2>
-    <p>⇧⌘\ lays out every space. Click the one you meant.</p>
-    <figure class="film"><video src="/assets/clips/desk.mp4" poster="/assets/clips/desk.jpg" muted loop playsinline preload="none"
-      aria-label="All tabs shown as cards, grouped by space; clicking one opens it."></video></figure>
-  </section>
+  <figure class="clip">
+    <video src="/assets/clips/reader.mp4" poster="/assets/clips/reader.jpg" muted loop playsinline preload="none" aria-label="An article opened in Reader."></video>
+    <figcaption>Reader, for just the words.</figcaption>
+  </figure>
 
-  <section class="list">
-    <h2>Also in Zigzag</h2>
-    <dl>
-      <dt>Passwords</dt><dd>Kept in your Mac’s Keychain and filled in with a click.</dd>
-      <dt>Extensions</dt><dd>From the Chrome Web Store, with what each one can see shown first.</dd>
-      <dt>Ad blocking</dt><dd>Ads and trackers stopped as pages load. Allow a site with one click.</dd>
-      <dt>Private windows</dt><dd>No history, no cookies, no extensions.</dd>
-      <dt>Translate</dt><dd>Pages translated on your Mac. The text never leaves it.</dd>
-      <dt>Import</dt><dd>Bookmarks, history and passwords from Arc, Chrome, Safari, Firefox, Edge, Brave, Dia, Vivaldi and Opera.</dd>
-    </dl>
-  </section>
+  <figure class="clip">
+    <video src="/assets/clips/desk.mp4" poster="/assets/clips/desk.jpg" muted loop playsinline preload="none" aria-label="All tabs shown as cards."></video>
+    <figcaption>Every tab at once, with ⇧⌘\.</figcaption>
+  </figure>
 
-  <section class="end">
-    <span class="wordmark big" aria-hidden="true"></span>
-    <a class="button large" href="/download">Download for Mac</a>
-    <p class="fine">Free · macOS 15.4 or later · Apple silicon and Intel</p>
-  </section>
+  <footer class="end">
+    <a class="button" href="/download">Download Zigzag</a>
+    <p class="fine">© 2026 Zigao Wang · Made in Shanghai</p>
+  </footer>
 </main>
-
-<footer class="foot">
-  <span>Made in Shanghai</span>
-  <span>© 2026 Zigao Wang</span>
-</footer>
-
 <script>
-  // Clips play while on screen and rest when not; with Reduce Motion they stay still.
+  // Clips play while on screen; with Reduce Motion they stay still.
   (function () {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
-    var seen = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        var v = e.target;
-        if (e.isIntersecting) { v.preload = "auto"; var p = v.play(); if (p) p.catch(function () {}); } else v.pause();
-      });
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { var v = e.target; if (e.isIntersecting) { v.preload = "auto"; var p = v.play(); if (p) p.catch(function(){}); } else v.pause(); });
     }, { threshold: 0.4 });
-    document.querySelectorAll(".film video").forEach(function (v) { seen.observe(v); });
+    document.querySelectorAll(".clip video").forEach(function (v) { io.observe(v); });
   })();
 </script>
 </body>

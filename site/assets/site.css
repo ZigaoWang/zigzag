@@ -1,136 +1,46 @@
-/* Zigzag's brand surface, as the app draws it (Brand.swift): navy lit from one corner, a glow of the accent,
-   fine grain, the pale ribbon. SF type, the app's button shape. */
-
-:root {
-  --navy: #1E3A5F;
-  --lit: #354E6F;        /* navy, 12% toward white */
-  --shade: #162A44;      /* navy, 28% toward black */
-  --ribbon: #DAE5F2;
-  --accent: #7FA6DC;     /* the brand accent in dark appearance */
-  --text: #DAE5F2;
-  --soft: rgba(218, 229, 242, 0.66);
-  --rule: rgba(255, 255, 255, 0.09);
-  --wrap: 1120px;
-  color-scheme: dark;
-}
-
+/* One quiet page: the wordmark, a line, the button, then the app itself. */
+:root { --bg: #FAFAF9; --ink: #111214; --soft: #6B6E73; --line: rgba(17,18,20,.1); color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0E0F11; --ink: #EDEEF0; --soft: #8B8F96; --line: rgba(237,238,240,.12); color-scheme: dark; } }
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; background: var(--shade); }
-body {
-  margin: 0;
-  color: var(--text);
-  font: 17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(1200px 800px at 0% 0%, rgba(127, 166, 220, 0.28), transparent 70%),
-    linear-gradient(160deg, var(--lit) 0%, var(--navy) 38%, var(--shade) 100%) fixed;
-  min-height: 100vh;
-}
-/* The grain, over everything, as faint as the app's. */
-body::after {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100;
-  background: url(/assets/grain.png); opacity: .05; mix-blend-mode: overlay;
-}
-
-h1, h2, p, dl, dt, dd, figure { margin: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
-:focus-visible { outline: 2px solid var(--ribbon); outline-offset: 3px; border-radius: 6px; }
+main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 
-.wordmark {
-  display: block; width: 96px; aspect-ratio: 372 / 73; background: var(--ribbon);
-  -webkit-mask: url(/assets/wordmark.svg) left center / contain no-repeat;
-  mask: url(/assets/wordmark.svg) left center / contain no-repeat;
-}
-.wordmark.big { width: min(520px, 80vw); margin: 0 auto 48px; }
+.top { padding: 120px 0 96px; text-align: center; }
+.mark { display: block; width: min(300px, 70vw); height: auto; margin: 0 auto; color: var(--ink); overflow: visible; }
+/* Written in stroke by stroke, as Zigzag draws it. */
+.mark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: write .55s cubic-bezier(.22,.7,.18,1) forwards;
+  animation-delay: calc(.15s + var(--i) * .09s); }
+@keyframes write { to { stroke-dashoffset: 0; } }
+.line { margin: 28px 0 0; font-size: 19px; color: var(--soft); opacity: 0; animation: show .5s ease .8s forwards; }
+.top .button, .top .fine { opacity: 0; animation: show .5s ease .95s forwards; }
+@keyframes show { to { opacity: 1; } }
 
-/* The app's primary button on the brand blue: pale, navy text, 8pt corners. */
-.button {
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 34px; padding: 0 16px; border-radius: 8px;
-  background: var(--ribbon); color: var(--navy);
-  font-size: 15px; font-weight: 600; text-decoration: none;
-  transition: background-color .15s ease, transform .1s ease;
-}
-.button:hover { background: #FFFFFF; }
-.button:active { transform: scale(.98); }
-.button.large { height: 48px; padding: 0 26px; border-radius: 10px; font-size: 17px; }
+.button { display: inline-flex; align-items: center; height: 40px; padding: 0 20px; margin-top: 28px; border-radius: 999px;
+  background: var(--ink); color: var(--bg); font-size: 15px; font-weight: 600; text-decoration: none; transition: opacity .15s; }
+.button:hover { opacity: .82; }
+.fine { margin: 12px 0 0; font-size: 13px; color: var(--soft); }
 
-.bar {
-  display: flex; align-items: center; justify-content: space-between;
-  max-width: var(--wrap); margin: 0 auto; padding: 22px 24px;
-}
+.clip { margin: 0 0 120px; }
+.clip video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 10px;
+  background: var(--line); box-shadow: 0 0 0 1px var(--line), 0 24px 60px -32px rgba(0,0,0,.35); }
+.clip figcaption { margin-top: 18px; text-align: center; font-size: 15px; color: var(--soft); }
 
-/* Hero: the drawn wordmark, one line, the button, then the app itself. */
-.hero { max-width: 1180px; margin: 0 auto; padding: 96px 24px 0; text-align: center; }
-.wordmark-hero {
-  margin: 0 auto; width: min(560px, 82vw); aspect-ratio: 372 / 73; background: var(--ribbon);
-  -webkit-mask: url(/assets/wordmark.svg) center / contain no-repeat; mask: url(/assets/wordmark.svg) center / contain no-repeat;
-}
-.tagline { margin-top: 40px; font: 700 clamp(28px, 3.6vw, 40px)/1.15 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  letter-spacing: -0.02em; color: #FFFFFF; }
-.sub { margin: 18px auto 34px; max-width: 600px; font-size: 18px; color: var(--soft); text-wrap: pretty; }
-.fine { margin-top: 14px; font-size: 13px; color: var(--soft); }
-.hero-film { margin: 72px auto 0; }
-
-/* Clips: the window itself, with a window's shadow. */
-.film { max-width: 1120px; margin: 0 auto; }
-.film video {
-  display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 12px;
-  background: rgba(0,0,0,.15);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 40px 90px -30px rgba(0, 0, 0, .55);
-}
-
-/* Bands: one idea each, edge to edge, in a clear color of its own. */
-.band { padding: 120px 24px; text-align: center; color: #FFFFFF; }
-.hero + .band { margin-top: 140px; }
-.band.rose   { background: #D24D63; }
-.band.violet { background: #6C55D3; }
-.band.orange { background: #E0753A; }
-.band.teal   { background: #1F8F7E; }
-.band.blue   { background: #2F6FD0; }
-.band h2 { font: 800 clamp(34px, 4.6vw, 56px)/1.04 -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  letter-spacing: -0.03em; color: #FFFFFF; text-wrap: balance; }
-.band p { margin: 16px auto 56px; max-width: 520px; font-size: 19px; color: rgba(255,255,255,.86); text-wrap: pretty; }
-
-.list { max-width: var(--wrap); margin: 140px auto 0; padding: 0 24px; }
-.list dl { display: grid; grid-template-columns: 200px 1fr; margin-top: 28px; border-top: 1px solid var(--rule); }
-.list dt, .list dd { padding: 16px 0; border-bottom: 1px solid var(--rule); }
-.list dt { font-weight: 600; color: #FFFFFF; }
-.list dd { color: var(--soft); }
-
-.end { margin: 176px auto 0; padding: 0 24px; text-align: center; }
-
-.foot {
-  display: flex; justify-content: space-between; max-width: var(--wrap); margin: 144px auto 0; padding: 22px 24px 40px;
-  font-size: 13px; color: var(--soft); border-top: 1px solid var(--rule);
-}
+.end { padding: 24px 0 80px; text-align: center; border-top: 1px solid var(--line); }
 
 /* Download page */
-.page { max-width: 760px; margin: 0 auto; padding: 96px 24px 0; text-align: center; }
-.page h1 { font-size: clamp(36px, 5.4vw, 56px); }
-.page .lede { margin-top: 20px; font-size: 19px; color: var(--soft); }
-.page .lede a { color: #FFFFFF; }
-.steps { list-style: none; padding: 0; margin: 64px auto 0; max-width: 560px; text-align: left; border-top: 1px solid var(--rule); counter-reset: step; }
-.steps li { display: grid; grid-template-columns: 40px 1fr; padding: 16px 0; border-bottom: 1px solid var(--rule); color: var(--soft); counter-increment: step; }
-.steps li::before { content: counter(step); font-weight: 700; color: #FFFFFF; }
-.steps strong { color: #FFFFFF; font-weight: 600; }
+.page { max-width: 640px; margin: 0 auto; padding: 120px 24px 80px; text-align: center; }
+.page h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.page .lede { margin-top: 14px; color: var(--soft); }
+.steps { list-style: none; padding: 0; margin: 56px 0 0; text-align: left; border-top: 1px solid var(--line); counter-reset: s; }
+.steps li { padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--soft); counter-increment: s; }
+.steps li::before { content: counter(s) ".  "; color: var(--ink); font-weight: 600; }
+.steps strong { color: var(--ink); font-weight: 600; }
 
-@media (max-width: 640px) {
-  body { font-size: 16px; }
-  .bar, .film, .list, .end, .hero, .page { padding-left: 16px; padding-right: 16px; }
-  .band { padding: 72px 16px; }
-  .band p { font-size: 16px; margin-bottom: 36px; }
-  .hero + .band { margin-top: 88px; }
-  .hero { padding-top: 56px; }
-  .hero > p:not(.fine) { font-size: 17px; }
-  .film { margin-top: 48px; }
-  .list dl { grid-template-columns: 1fr; }
-  .list dt { padding-bottom: 2px; border-bottom: 0; }
-  .list dd { padding-top: 0; }
-  .foot { flex-direction: column; gap: 4px; margin-left: 16px; margin-right: 16px; padding-left: 0; padding-right: 0; }
-}
-
+@media (max-width: 600px) { .top { padding: 80px 0 64px; } .clip { margin-bottom: 72px; } }
 @media (prefers-reduced-motion: reduce) {
-  .ribbon path { animation: none; stroke-dashoffset: 0; }
-  .button { transition: none; }
+  .mark path { animation: none; stroke-dashoffset: 0; }
+  .line, .top .button, .top .fine { animation: none; opacity: 1; }
 }
