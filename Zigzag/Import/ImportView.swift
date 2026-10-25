@@ -13,7 +13,14 @@ final class ImportView: NSView {
     let presentation: Presentation
 
     enum Stage { case choose, importing, done }
-    private(set) var stage = Stage.choose { didSet { if oldValue != stage { onStageChange?(stage) } } }
+    private(set) var stage = Stage.choose {
+        didSet {
+            guard oldValue != stage else { return }
+            // A row's Try Again waits while anything is importing.
+            rows.forEach { $0.fixesEnabled = stage != .importing }
+            onStageChange?(stage)
+        }
+    }
     /// The welcome window follows along, retitling its brand panel at each step.
     var onStageChange: ((Stage) -> Void)?
     private let showPasswords = TextButton(title: "Show Passwords", font: Tokens.Font.body(.medium))
@@ -206,6 +213,8 @@ final class ImportView: NSView {
     private func fix(_ fix: ImportProblem.Fix, for row: SourceRow, data: ImportCoordinator.Choice, primaryPassword: String) {
         switch fix {
         case .retry, .primaryPassword:
+            // One import at a time: while the others are still coming over, this one waits for them.
+            guard stage != .importing else { return }
             stage = .importing
             primary.isEnabled = false
             var scope = data
@@ -331,6 +340,10 @@ private final class SourceRow: InteractiveView {
     let source: ImportCoordinator.Source
     var onToggle: (() -> Void)?
     var onFix: ((ImportProblem.Fix, String) -> Void)?
+    /// Off while an import runs: the fixes that import again wait for it.
+    var fixesEnabled = true { didSet { fixViews.forEach { ($0 as? TextButton)?.isEnabled = fixesEnabled || !importsAgain($0) } } }
+    private var importButtons: [ObjectIdentifier] = []
+    private func importsAgain(_ view: NSView) -> Bool { importButtons.contains(ObjectIdentifier(view)) }
     /// A chosen export: once its passwords are in, offer to move it to the Trash, since it holds them unprotected.
     var exportFile: URL?
 
@@ -409,6 +422,7 @@ private final class SourceRow: InteractiveView {
     private func refresh() {
         fixViews.forEach { $0.removeFromSuperview() }
         fixViews = []
+        importButtons = []
         passwordField = nil
         spinner.stopLooping()
         spinner.isHidden = true
@@ -471,8 +485,12 @@ private final class SourceRow: InteractiveView {
         }
         let button = TextButton(title: title, font: Tokens.Font.body(.medium))
         button.showsFillAtRest = true
+        if fix == .retry || fix == .primaryPassword {
+            importButtons.append(ObjectIdentifier(button))
+            button.isEnabled = fixesEnabled
+        }
         button.onClick = { [weak self] _ in
-            guard let self else { return }
+            guard let self, self.fixesEnabled || !(fix == .retry || fix == .primaryPassword) else { return }
             self.onFix?(fix, self.passwordField?.stringValue ?? "")
             self.passwordField?.stringValue = ""
         }
