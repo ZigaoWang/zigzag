@@ -6,12 +6,12 @@ final class WebStoreOffer: FloatingPanelView {
     private static weak var current: WebStoreOffer?
     private weak var controller: BrowserWindowController?
     private let icon = NSImageView()
-    private let name = Label("", font: .systemFont(ofSize: 14, weight: .semibold), color: Tokens.Color.textPrimary)
+    private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let line = Label("Works in Zigzag", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let add = PrimaryButton(title: "Add to Zigzag")
     private let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: 9, toolTip: "Not Now")
     private let id: String
-    private let spinner = NSProgressIndicator()
+    private let spinner = Spinner()
     private let done = NSImageView(image: Tokens.Symbol.image("checkmark.circle.fill", size: 22))
     private var tabToken: SignalToken?
 
@@ -39,15 +39,12 @@ final class WebStoreOffer: FloatingPanelView {
         self.id = id
         self.controller = controller
         super.init(frame: NSRect(origin: .zero, size: Self.size))
-        radius = 16
+        radius = Tokens.Radius.panel
         icon.image = Tokens.Symbol.image("puzzlepiece.extension", size: 22)
         icon.contentTintColor = Tokens.Color.textSecondary
         icon.imageScaling = .scaleProportionallyUpOrDown
         refreshName()
         name.lineBreakMode = .byTruncatingTail
-        spinner.style = .spinning
-        spinner.controlSize = .small
-        spinner.isDisplayedWhenStopped = false
         done.contentTintColor = Tokens.Color.success
         done.isHidden = true
         [icon, name, line, add, close, spinner, done].forEach { addSubview($0) }
@@ -99,7 +96,7 @@ final class WebStoreOffer: FloatingPanelView {
                 self.add.isHidden = false
                 self.add.title = "Try Again"
                 self.line.stringValue = message
-                self.line.textColor = Tokens.Color.caution
+                self.line.textColor = Tokens.Color.warning
             case .cancelled:
                 self.spinner.stopAnimation(nil)
                 self.add.isHidden = false

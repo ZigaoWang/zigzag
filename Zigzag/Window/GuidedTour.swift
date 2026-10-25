@@ -55,7 +55,7 @@ final class GuidedTour: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         dim.fillRule = .evenOdd
-        dim.fillColor = NSColor.black.withAlphaComponent(0.2).cgColor
+        dim.fillColor = cgColor(Tokens.Color.scrim)
         layer?.addSublayer(dim)
         ring.fillColor = nil
         ring.lineWidth = 2.5

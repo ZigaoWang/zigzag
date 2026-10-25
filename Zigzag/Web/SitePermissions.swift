@@ -74,7 +74,7 @@ enum SitePermissions {
 final class PermissionPrompt: FloatingPanelView {
     private let badge = ColorView(color: .clear)
     private let symbolView = NSImageView()
-    private let title = Label("", font: .systemFont(ofSize: 14, weight: .semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let line = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let allow = PrimaryButton(title: "Allow")
     private let deny = TextButton.form("Don’t Allow")
@@ -108,7 +108,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        radius = 16
+        radius = Tokens.Radius.panel
         badge.wantsLayer = true
         badge.layer?.cornerRadius = 10
         badge.color = Tokens.Color.accent.withAlphaComponent(0.14)
@@ -151,7 +151,7 @@ final class PermissionPrompt: FloatingPanelView {
         let aw = max(allow.fittingWidth, 72), bh = Tokens.Space.x8
         allow.frame = NSRect(x: bounds.width - pad - aw, y: (h - bh) / 2, width: aw, height: bh)
         let dw = deny.fittingWidth
-        deny.frame = NSRect(x: allow.frame.minX - 8 - dw, y: (h - Tokens.Space.x7Height) / 2, width: dw, height: Tokens.Space.x7Height)
+        deny.frame = NSRect(x: allow.frame.minX - Tokens.Space.x2 - dw, y: (h - bh) / 2, width: dw, height: bh)
         let x = badge.frame.maxX + 12, w = deny.frame.minX - x - 10
         let block = title.lineHeight + 1 + line.lineHeight
         title.frame = NSRect(x: x, y: (h - block) / 2, width: w, height: title.lineHeight)

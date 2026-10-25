@@ -422,7 +422,7 @@ private final class SourceRow: InteractiveView {
             check.isHidden = false
             let clean = summary.problems.isEmpty
             check.image = Tokens.Symbol.image(clean ? "checkmark.circle.fill" : "exclamationmark.circle.fill", size: Tokens.TypeSize.large)
-            check.contentTintColor = clean ? .systemGreen : .systemOrange
+            check.contentTintColor = clean ? Tokens.Color.success : Tokens.Color.warning
             for problem in summary.problems { addFix(problem.fix) }
             if let exportFile, summary.passwords + summary.updatedPasswords > 0, FileManager.default.fileExists(atPath: exportFile.path) {
                 detail.stringValue += "\nThe file still holds your passwords unprotected. It's safer to move it to the Trash."

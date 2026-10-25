@@ -213,7 +213,7 @@ enum Brand {
 /// The ribbon Z. At rest it's one stroke with round joins, exactly like the icon. Its motion is writing: it draws
 /// itself in along its path when it appears, and while something loads it writes, lifts from its start, and
 /// writes again, like a pen that never stops.
-final class RibbonView: NSView {
+class RibbonView: NSView {
     var color: NSColor = Brand.mark { didSet { refreshColors() } }
     /// The stroke width as a share of the ribbon's width; the icon's own by default.
     var weight: CGFloat = Brand.weight { didSet { needsLayout = true } }
@@ -332,6 +332,28 @@ final class RibbonView: NSView {
             stroke.strokeStart = 0
             stroke.strokeEnd = 1
         }
+    }
+}
+
+/// Zigzag's spinner: the ribbon, flowing, in place of the system's. Hidden while stopped.
+final class Spinner: RibbonView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        weight = 0.3
+        color = Tokens.Color.textSecondary
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func startAnimation(_ sender: Any?) {
+        isHidden = false
+        startLooping()
+    }
+
+    func stopAnimation(_ sender: Any?) {
+        stopLooping()
+        isHidden = true
     }
 }
 

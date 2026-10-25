@@ -397,6 +397,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         scope = site
         if leaving { fadeOutChip() } else { chip.isHidden = site == nil }
         chip.color = site?.color ?? .clear
+        // Ink that reads on the site's own colour: dark on light brands (IMDb, Amazon), white on the rest; a light
+        // edge so near-black brands (X, MDN) still show on a dark panel.
+        if let fill = site?.color.usingColorSpace(.sRGB) {
+            let luminance = 0.2126 * fill.redComponent + 0.7152 * fill.greenComponent + 0.0722 * fill.blueComponent
+            chipLabel.textColor = luminance > 0.6 ? NSColor(white: 0.1, alpha: 1) : .white
+            chip.layer?.borderWidth = luminance < 0.15 ? 1 : 0
+            chip.layer?.borderColor = NSColor(white: 1, alpha: 0.22).cgColor
+        }
         chipLabel.stringValue = site?.name ?? ""
         completionURL = nil
         if site != nil {

@@ -48,7 +48,7 @@ final class SitePanel: FloatingPanelView {
         self.url = url ?? URL(string: "about:blank")!
         site = url.map { ContentBlocker.site(of: $0) ?? $0.host() ?? $0.absoluteString } ?? "New Tab"
         super.init(frame: .zero)
-        radius = Tokens.Radius.panel + Tokens.Space.x1
+        radius = Tokens.Radius.panel
         icon.image = tab.favicon
         siteName.stringValue = site
         let page = self.url

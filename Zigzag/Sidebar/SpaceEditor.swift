@@ -390,7 +390,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         self.spaceID = spaceID
         self.controller = controller
         super.init(frame: .zero)
-        radius = Tokens.Radius.panel + Tokens.Space.x1
+        radius = Tokens.Radius.panel
         let space = Library.shared.space(spaceID)
         nameField.stringValue = space?.name ?? ""
         nameField.delegate = self

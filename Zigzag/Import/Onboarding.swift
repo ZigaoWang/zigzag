@@ -688,9 +688,7 @@ private final class BringPicker: StepContent {
         scroll.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
         scroll.layer?.masksToBounds = true
         scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.scrollerStyle = .overlay
+        scroll.useSlimScroller()
         scroll.verticalScrollElasticity = .allowed
         scroll.horizontalScrollElasticity = .none
         scroll.contentView = FlippedClipView()
@@ -1516,7 +1514,7 @@ private final class ExtensionRow: InteractiveView {
     private let kind: Label
     private let status = Label("", font: Tokens.Font.small(.medium), color: Onboard.ink)
     private let statusIcon = NSImageView()
-    private let spinner = NSProgressIndicator()
+    private let spinner = Spinner()
 
     init(name text: String, kind detail: String) {
         name = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
@@ -1528,9 +1526,6 @@ private final class ExtensionRow: InteractiveView {
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
         tick.contentTintColor = NSColor.white
         box.addSubview(tick)
-        spinner.style = .spinning
-        spinner.controlSize = .small
-        spinner.isDisplayedWhenStopped = false
         status.alignment = .right
         [box, iconTile.icon, name, kind, status, statusIcon, spinner].forEach { addSubview($0) }
         onClick = { [weak self] _ in
