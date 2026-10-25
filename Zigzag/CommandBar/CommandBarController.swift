@@ -655,6 +655,7 @@ extension CommandBarController {
     }
 }
 
+#if DEBUG
 extension CommandBarController {
     func debugEnter() { commit(modifiers: []) }
 
@@ -664,6 +665,7 @@ extension CommandBarController {
         controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     }
 }
+#endif
 
 /// Dims the page under a floating panel; clicking it dismisses the panel.
 final class ScrimView: ColorView {

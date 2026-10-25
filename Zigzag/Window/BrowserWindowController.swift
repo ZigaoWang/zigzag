@@ -1159,6 +1159,7 @@ extension BrowserWindowController: SidebarDelegate {
 
 // MARK: - Debug hooks
 
+#if DEBUG
 extension BrowserWindowController {
     func debugHover(index: Int) {
         let tabs = tabManager.currentTabs
@@ -1171,3 +1172,4 @@ extension BrowserWindowController {
         _ = switcher.handle(down)
     }
 }
+#endif
