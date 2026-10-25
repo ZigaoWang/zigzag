@@ -336,7 +336,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed.
-    enum InstallStage { case downloading, reviewing, adding, added(String), failed(String), cancelled }
+    enum InstallStage {
+        case downloading, reviewing, adding, added(String), failed(String), cancelled
+        var isReviewing: Bool { if case .reviewing = self { true } else { false } }
+    }
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed. `progress`
     /// hears each stage (the store bar shows them); without it, toasts do.

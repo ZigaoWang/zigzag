@@ -77,6 +77,9 @@ final class WebStoreOffer: FloatingPanelView {
         let shown = name.stringValue
         controller?.installExtension(id) { [weak self] stage in
             guard let self else { return }
+            // The review sheet is the one thing to look at while it's up: the bar steps aside, and comes back
+            // with whatever you chose.
+            self.step(aside: stage.isReviewing)
             switch stage {
             case .downloading: self.busy("Downloading…")
             case .reviewing:
@@ -104,6 +107,15 @@ final class WebStoreOffer: FloatingPanelView {
                 self.line.textColor = Tokens.Color.textSecondary
             }
             self.needsLayout = true
+        }
+    }
+
+    private func step(aside: Bool) {
+        let alpha: CGFloat = aside ? 0 : 1
+        guard alphaValue != alpha else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            animator().alphaValue = alpha
         }
     }
 
