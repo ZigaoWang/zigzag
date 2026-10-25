@@ -44,17 +44,32 @@ enum CommandRanker {
         if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:") {
             return URL(string: trimmed)
         }
-        if lower.hasPrefix("localhost") || lower.range(of: #"^\d{1,3}(\.\d{1,3}){3}(:\d+)?(/.*)?$"#, options: .regularExpression) != nil {
+        // An email address is something to search for, not a place to go.
+        if lower.contains("@") { return nil }
+        // The host is everything before the first of / ? #; the port comes off too.
+        let hostEnd = lower.firstIndex { "/?#".contains($0) } ?? lower.endIndex
+        let hostPart = String(lower[..<hostEnd])
+        let host = hostPart.split(separator: ":", omittingEmptySubsequences: false).first.map(String.init) ?? hostPart
+        if host == "localhost" || host.range(of: #"^\d{1,3}(\.\d{1,3}){3}$"#, options: .regularExpression) != nil {
             return URL(string: "http://" + trimmed)
         }
-        // Something like "name.tld" or "name.tld/path": a dot, a plausible TLD, no spaces.
-        let hostPart = lower.split(separator: "/").first.map(String.init) ?? lower
-        let host = hostPart.split(separator: ":").first.map(String.init) ?? hostPart
-        let labels = host.split(separator: ".")
-        guard labels.count >= 2, let tld = labels.last, tld.count >= 2, tld.allSatisfy({ $0.isLetter }),
-              labels.allSatisfy({ !$0.isEmpty }) else { return nil }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2, labels.allSatisfy({ !$0.isEmpty }), let tld = labels.last.map(String.init) else { return nil }
+        // Names only a local network knows go over plain http, the way a printer or router serves them.
+        if localTLDs.contains(tld) { return URL(string: "http://" + trimmed) }
+        // A real top-level domain, so "node.js" and "readme.txt" are searched, not opened.
+        guard knownTLDs.contains(tld) || tld.hasPrefix("xn--") else { return nil }
         return URL(string: "https://" + trimmed)
     }
+
+    private static let localTLDs: Set<String> = ["local", "lan", "internal", "test", "localhost", "home", "arpa", "corp", "intranet"]
+
+    /// Every top-level domain IANA lists, bundled with the app.
+    private static let knownTLDs: Set<String> = {
+        guard let url = Bundle.main.url(forResource: "tlds", withExtension: "txt"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return ["com", "org", "net", "io", "app", "dev"] }
+        return Set(text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+    }()
 
     static func matches(_ words: [String], _ haystacks: String...) -> Bool {
         let joined = haystacks.joined(separator: " ").lowercased()
@@ -74,13 +89,19 @@ enum CommandRanker {
         let lower = text.lowercased()
         guard lower.count >= 1, !lower.contains(" "), !lower.contains("/") else { return nil }
         func host(_ url: URL) -> String { HistoryStore.normalizedHost(url) }
-        let candidates: [URL] = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
-        if let url = candidates.first(where: { host($0).hasPrefix(lower) }) {
-            return (host(url), URL(string: "https://\(host(url))")!)
+        // The site's own scheme and port come along: "loc" completes to localhost:3000 over http, as it was.
+        func root(_ url: URL) -> (String, URL)? {
+            guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
+            let h = host(url)
+            let shown = url.port.map { "\(h):\($0)" } ?? h
+            return URL(string: "\(scheme)://\(shown)").map { (shown, $0) }
         }
-        if let entry = HistoryStore.shared.bestHostCompletion(for: lower) {
-            let h = host(entry.url)
-            return (h, URL(string: "\(entry.url.scheme ?? "https")://\(h)")!)
+        let candidates: [URL] = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
+        for url in candidates where host(url).hasPrefix(lower) {
+            if let found = root(url) { return (found.0, found.1) }
+        }
+        if let entry = HistoryStore.shared.bestHostCompletion(for: lower), let found = root(entry.url) {
+            return (found.0, found.1)
         }
         return nil
     }
