@@ -758,6 +758,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         fadeTimer?.invalidate()
+        // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
+        peek.close()
         onClose?(self)
     }
 
