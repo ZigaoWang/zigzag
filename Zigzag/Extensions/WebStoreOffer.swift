@@ -9,7 +9,7 @@ final class WebStoreOffer: FloatingPanelView {
     private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let line = Label("Works in Zigzag", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let add = PrimaryButton(title: "Add to Zigzag")
-    private let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: 9, toolTip: "Not Now")
+    private let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Not Now")
     private let id: String
     private let spinner = Spinner()
     private let done = NSImageView(image: Tokens.Symbol.image("checkmark.circle.fill", size: 22))
