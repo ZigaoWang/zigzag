@@ -326,7 +326,8 @@ final class DeskController {
         guard let manager, !selection.isEmpty else { return }
         let tabs = manager.allTabs.filter { selection.contains($0.id) }
         selection = []
-        manager.close(tabs)
+        // ⌘Z brings them back, like closing them from the sidebar.
+        if let controller { controller.closeManyWithUndo(tabs) } else { manager.close(tabs) }
         reload(animated: true)
     }
 
