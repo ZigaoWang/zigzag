@@ -179,7 +179,8 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         panel.done = done
         panel.field.stringValue = title
         let card = controller.root.cardFrame
-        panel.frame.origin = NSPoint(x: card.midX - 160, y: card.minY + Tokens.Space.x12)
+        // Where the command bar opens, the other place you type a name.
+        panel.frame.origin = NSPoint(x: round(card.midX - 160), y: card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)))
         controller.root.overlay.addSubview(panel)
         panel.present(arrival: .fade)
         controller.window?.makeFirstResponder(panel.field.field)

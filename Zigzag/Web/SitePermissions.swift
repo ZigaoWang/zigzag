@@ -92,7 +92,7 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.symbolView.image = Tokens.Symbol.image(symbol, size: 16)
             prompt.answer = { continuation.resume(returning: $0) }
             let card = controller.root.cardFrame
-            prompt.frame.origin = NSPoint(x: card.midX - 210, y: card.minY + Tokens.Space.x4)
+            prompt.frame.origin = NSPoint(x: card.midX - 210, y: card.minY + Tokens.Space.x3)
             controller.closeFloatingPanels()
             Toast.hide(in: controller)
             controller.root.overlay.addSubview(prompt)

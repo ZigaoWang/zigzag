@@ -144,7 +144,7 @@ final class WebStoreOffer: FloatingPanelView {
 
     private func place() {
         guard let card = controller?.root.cardFrame else { return }
-        frame.origin = NSPoint(x: card.midX - Self.size.width / 2, y: card.minY + Tokens.Space.x4)
+        frame.origin = NSPoint(x: card.midX - Self.size.width / 2, y: card.minY + Tokens.Space.x3)
     }
 
     private func layoutContent() {
