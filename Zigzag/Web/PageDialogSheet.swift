@@ -83,6 +83,8 @@ final class PageDialogSheet: NSView {
             // Return answers (the page asked, and is waiting); Escape cancels.
             sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
                 guard let sheet, event.window === window else { return event }
+                // Return that commits a word being composed (Chinese, Japanese) belongs to the field.
+                if (window.firstResponder as? NSTextView)?.hasMarkedText() == true { return event }
                 switch event.keyCode {
                 case 36, 76: sheet.finish(.confirmed(sheet.inputs.map(\.stringValue))); return nil
                 case 53: sheet.finish(sheet.cancel.superview == nil ? .confirmed([]) : .cancelled); return nil
