@@ -367,6 +367,15 @@ final class Tab: NSObject {
         }
     }
 
+    /// The address last written to history, so a load and its address change count as one visit.
+    private var lastRecorded: URL?
+
+    private func recordHistory(_ url: URL, title: String?) {
+        guard !isPrivate, url != lastRecorded else { return }
+        lastRecorded = url
+        HistoryStore.shared.recordVisit(url: url, title: title)
+    }
+
     // MARK: Observation
 
     private func observe(_ webView: BrowserWebView) {
@@ -389,7 +398,10 @@ final class Tab: NSObject {
                         self.isTranslated = false
                         self.changed.send(.language)
                     }
+                    let changedPage = url != self.url
                     self.url = url
+                    // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
+                    if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
                     if hostChanged { self.favicon = FaviconStore.shared.cachedIcon(for: url) ?? self.favicon; self.changed.send(.favicon) }
                     self.changed.send(.url)
                 }
@@ -584,7 +596,7 @@ extension Tab: WKNavigationDelegate {
             let zoom = ZoomLevels.zoom(for: url)
             if webView.pageZoom != zoom { webView.pageZoom = zoom }
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
-            if !isPrivate { HistoryStore.shared.recordVisit(url: url, title: webView.title) }
+            recordHistory(url, title: webView.title)
         }
     }
 
