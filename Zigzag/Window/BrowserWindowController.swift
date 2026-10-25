@@ -168,6 +168,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         switch change {
         case .structure:
             sidebar.list.reload(animated: window?.isVisible == true)
+            // A favorite opened or closed: its tile shows it.
+            reloadFavorites()
             desk.tabsChanged()
         case .selection:
             showSelectedTab()
