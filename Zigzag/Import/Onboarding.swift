@@ -931,7 +931,7 @@ private final class BringPicker: StepContent {
 final class IntoZigzag: NSView {
     enum State { case idle, importing, done }
     /// One round of the importing wave, in seconds.
-    static let wave: Double = 1.2
+    static let wave: Double = 1.6
     #if DEBUG
     static weak var shown: IntoZigzag?
     #endif
@@ -983,7 +983,7 @@ final class IntoZigzag: NSView {
         guard new != state else { return }
         state = new
         // One wave rolls toward Zigzag over and over while it works: every dot is already moving, each a step
-        // behind the one before and spaced so one is always lit: no start-up, no dark gap between rounds.
+        // behind the one before.
         let period = Self.wave
         let now = CACurrentMediaTime()
         // Where each dot is right now, so finishing fades from there instead of snapping.
@@ -991,11 +991,14 @@ final class IntoZigzag: NSView {
         for (i, dot) in dots.enumerated() {
             dot.removeAllAnimations()
             guard new == .importing else { continue }
-            // One smooth bump per round, sampled finely and played at an even pace, so the loop has no seam.
-            let samples = 48
+            // A ripple: each dot swells and fades in turn, overlapping the next, then all three rest a moment
+            // before the next ripple, so it breathes instead of chasing its tail.
+            let samples = 64
+            let start = Double(i) * 0.17, width = 0.42
             let bump = (0...samples).map { k -> Double in
-                let t = Double(k) / Double(samples)
-                return pow(0.5 + 0.5 * cos(2 * .pi * t), 3)
+                let t = (Double(k) / Double(samples) - start) / width
+                guard t > 0, t < 1 else { return 0 }
+                return 0.5 - 0.5 * cos(2 * .pi * t)
             }
             let glow = CAKeyframeAnimation(keyPath: "opacity")
             glow.values = bump.map { 0.25 + 0.75 * $0 }
@@ -1006,8 +1009,7 @@ final class IntoZigzag: NSView {
             both.duration = period
             both.repeatCount = .infinity
             both.timingFunction = CAMediaTimingFunction(name: .linear)
-            // Started in the past, so it's mid-wave from the first frame.
-            both.beginTime = now - period + Double(i) * period / Double(max(dots.count, 1))
+            both.beginTime = now
             dot.add(both, forKey: "run")
         }
         caption.stringValue = new == .importing ? "Bringing it over…" : new == .done ? "All in Zigzag" : ""
