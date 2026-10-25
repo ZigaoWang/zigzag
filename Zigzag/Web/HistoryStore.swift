@@ -18,6 +18,8 @@ final class HistoryStore {
     private init() {
         guard sqlite3_open(Paths.history.path, &db) == SQLITE_OK else { db = nil; return }
         exec("PRAGMA journal_mode=WAL")
+        // With WAL this is still safe across a crash, without a full disk sync on every page visited.
+        exec("PRAGMA synchronous=NORMAL")
         exec("""
         CREATE TABLE IF NOT EXISTS visits (
             url TEXT PRIMARY KEY,

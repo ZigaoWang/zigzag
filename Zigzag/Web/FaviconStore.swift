@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 
 /// Site icons, cached in memory and on disk by host.
 final class FaviconStore {
@@ -187,21 +188,30 @@ enum SnapshotStore {
         return image
     }
 
+    /// Snapshots kept in memory, most recent last; older ones are read back from disk when needed.
+    private static var recent: [UUID] = []
+    private static let memoryLimit = 40
+
     static func save(_ image: NSImage, for id: UUID) {
         memory[id] = image
-        guard let tiff = image.tiffRepresentation else { return }
+        recent.removeAll { $0 == id }
+        recent.append(id)
+        while recent.count > memoryLimit { memory[recent.removeFirst()] = nil }
+        // The bitmap is taken here, cheaply; turning it into a JPEG happens off the main thread.
+        guard let bitmap = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
         let url = file(id)
-        DispatchQueue.global(qos: .utility).async { writeJPEG(tiff, to: url) }
+        DispatchQueue.global(qos: .utility).async { writeJPEG(bitmap, to: url) }
     }
 
-    nonisolated private static func writeJPEG(_ tiff: Data, to url: URL) {
-        guard let rep = NSBitmapImageRep(data: tiff),
-              let jpg = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else { return }
-        try? jpg.write(to: url, options: .atomic)
+    nonisolated private static func writeJPEG(_ bitmap: CGImage, to url: URL) {
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else { return }
+        CGImageDestinationAddImage(destination, bitmap, [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
+        CGImageDestinationFinalize(destination)
     }
 
     static func remove(_ id: UUID) {
         memory[id] = nil
+        recent.removeAll { $0 == id }
         try? FileManager.default.removeItem(at: file(id))
     }
 
