@@ -34,6 +34,8 @@ final class SitePanel: FloatingPanelView {
     private let clearCookies = TextButton.form("Clear Cookies")
 
     static let width: CGFloat = 300
+    static let minimumWidth: CGFloat = 256
+    private var width: CGFloat = SitePanel.width
     private let pad = Tokens.Space.x4
 
     private init?(controller: BrowserWindowController) {
@@ -72,7 +74,7 @@ final class SitePanel: FloatingPanelView {
         clearCookies.onClick = { [weak self] _ in self?.clear(.cookies) }
         if tab.isPrivate || isBlank { [clearCache, clearCookies, divider].forEach { $0.isHidden = true } }
         onLayout = { [weak self] in self?.layoutContent() }
-        frame.size = NSSize(width: Self.width, height: layoutContent(dryRun: true))
+        frame.size = NSSize(width: width, height: layoutContent(dryRun: true))
         setAccessibilityLabel("Site controls for \(site)")
     }
 
@@ -86,7 +88,14 @@ final class SitePanel: FloatingPanelView {
         controller.closeFloatingPanels()
         panel.anchor = anchor
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
-        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + Tokens.Space.x2)
+        // From the address bar in the sidebar: its width and left edge, just below it, in the space's tint, so it
+        // reads as part of the sidebar. Anywhere else (sidebar hidden) it keeps its own width.
+        if anchor === controller.sidebar.address, controller.root.sidebarVisible {
+            panel.width = max(anchorFrame.width, Self.minimumWidth)
+            panel.surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
+            panel.frame.size = NSSize(width: panel.width, height: panel.layoutContent(dryRun: true))
+        }
+        panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + 6)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
         panel.present(arrival: .fade)
@@ -236,18 +245,18 @@ final class SitePanel: FloatingPanelView {
     private func layoutContent() { _ = layoutContent(dryRun: false) }
 
     @discardableResult
-    private func layoutContent(dryRun: Bool) -> CGFloat {
+    fileprivate func layoutContent(dryRun: Bool) -> CGFloat {
         func place(_ view: NSView, _ rect: NSRect) { if !dryRun { view.frame = rect } }
-        let inner = Self.width - pad * 2
+        let inner = width - pad * 2
         var y = pad
         // Header: the site, whether the connection is private, and Copy Link.
         let iconSide = Tokens.Space.x6
         let copySide = Tokens.Space.x7Height
         let headerHeight = siteName.lineHeight + security.lineHeight + 4
-        place(copyButton, NSRect(x: Self.width - pad - copySide + Tokens.Space.x1, y: y + (headerHeight - copySide) / 2, width: copySide, height: copySide))
+        place(copyButton, NSRect(x: width - pad - copySide + Tokens.Space.x1, y: y + (headerHeight - copySide) / 2, width: copySide, height: copySide))
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
-        let textWidth = Self.width - textX - pad - copySide
+        let textWidth = width - textX - pad - copySide
         place(siteName, NSRect(x: textX, y: y, width: textWidth, height: siteName.lineHeight))
         let lockSide: CGFloat = 10
         place(securityIcon, NSRect(x: textX, y: y + siteName.lineHeight + 3, width: lockSide, height: lockSide))
@@ -259,7 +268,7 @@ final class SitePanel: FloatingPanelView {
             var x = pad
             for chip in chips {
                 let w = chip.fittingWidth
-                if x > pad, x + w > Self.width - pad { x = pad; y += Tokens.Space.x7Height + Tokens.Space.x2 }
+                if x > pad, x + w > width - pad { x = pad; y += Tokens.Space.x7Height + Tokens.Space.x2 }
                 place(chip, NSRect(x: x, y: y, width: w, height: Tokens.Space.x7Height))
                 x += w + Tokens.Space.x2
             }
@@ -275,7 +284,7 @@ final class SitePanel: FloatingPanelView {
             y += extensionsLabel.lineHeight + Tokens.Space.x1
             y += Tokens.Space.x1
             // Every icon on the same tile, the same size, lined up with the text above; + is one of them.
-            let gap: CGFloat = 8, columns = 6
+            let gap: CGFloat = 8, columns = inner >= 260 ? 6 : 5
             let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
             for (i, tile) in extensionTiles.enumerated() {
                 let column = i % columns, row = i / columns
