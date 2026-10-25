@@ -287,9 +287,11 @@ final class TabManager {
                 tab.close()
             }
         }
-        // Bookmarks moved to another space carry their live tab.
+        // Bookmarks moved to another space carry their live tab; one that became, or stopped being, a favorite
+        // (undo, another window) says so.
         for (id, tab) in bookmarkTabs {
             if let space = Library.shared.spaceID(ofBookmark: id) { tab.spaceID = space }
+            tab.isFavorite = Library.shared.isFavorite(id)
         }
         if !spaceIDs.contains(currentSpaceID) {
             currentSpaceID = Library.shared.spaces[0].id
