@@ -59,6 +59,11 @@ final class Tab: NSObject {
         guard let webView else { return false }
         return webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none || webView.isPictureInPictureActive
     }
+    /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
+    var notifiesUser: Bool {
+        guard !isPrivate, let host = url?.host()?.lowercased() else { return false }
+        return SitePermissions.notifications(host: host) == true
+    }
     /// The tab that opened this one, so closing it can return there.
     weak var opener: Tab?
 
@@ -127,6 +132,7 @@ final class Tab: NSObject {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         } else if !fromWebKit {
             WebKitSetup.configure(configuration)
+            WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
             if let privateStore {
                 configuration.websiteDataStore = privateStore
                 // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.

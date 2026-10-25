@@ -674,7 +674,7 @@ final class TabManager {
 
     /// Background tabs nobody has looked at in a while give their memory back.
     private func suspendIdleTabs() {
-        // Kept awake: what's on screen (both halves of a split), and anything in a call or floating.
+        // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
         var selectedIDs = Set(selectedBySpace.values)
         for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
         let live = allTabs.filter { !$0.isSuspended }
@@ -682,7 +682,7 @@ final class TabManager {
         let maxLive = 10
         let now = Date()
         let candidates = live
-            .filter { !selectedIDs.contains($0.id) && !$0.isPlayingAudio && !$0.isInUse }
+            .filter { !selectedIDs.contains($0.id) && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser }
             .sorted { $0.lastActivated < $1.lastActivated }
         var liveCount = live.count
         for tab in candidates {
@@ -697,13 +697,13 @@ final class TabManager {
     }
 
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
-    /// what's on screen, a split, anything playing or in a call, or a private window's tabs.
+    /// what's on screen, a split, anything playing or in a call, a site that sends notifications, or a private window's tabs.
     private func archiveStaleTabs(keeping onScreen: Set<UUID>) {
         if !isPrivate { TabArchive.offerIfCrowded(tabCount: tabsBySpace.values.map(\.count).max() ?? 0) }
         guard !isPrivate, let limit = TabArchive.after.interval else { return }
         let now = Date()
         let stale = tabsBySpace.values.flatMap { $0 }.filter {
-            $0.bookmarkID == nil && !onScreen.contains($0.id) && partner(of: $0) == nil && !$0.isPlayingAudio && !$0.isInUse
+            $0.bookmarkID == nil && !onScreen.contains($0.id) && partner(of: $0) == nil && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser
                 && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
         }
         guard !stale.isEmpty else { return }

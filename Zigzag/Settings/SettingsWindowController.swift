@@ -892,11 +892,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
         let media = SitePermissions.sites.count, zoom = ZoomLevels.count
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
-        let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "camera and microphone choices"), phrase(zoom, "zoom set")].compactMap { $0 }
+        let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set")].compactMap { $0 }
         let reset = TextButton.form("Reset All")
         reset.isEnabled = !parts.isEmpty
         reset.onClick = { [weak self] _ in
-            self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera and microphone, and zoom goes back to 100%.",
+            self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
                           action: "Reset All") {
                 ContentBlocker.allowedSites = []
                 ExtensionStore.extensionsOffSites = []
@@ -906,7 +906,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 self?.layoutDocument()
             }
         }
-        let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads or a camera, show up here."
+        let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads, a camera or notifications, show up here."
             : parts.joined(separator: " · ").prefix(1).uppercased() + parts.joined(separator: " · ").dropFirst() + "."
         privacyGroup.add(FormRow(title: "Site choices", detail: summary, control: reset))
     }

@@ -1,7 +1,8 @@
 import AppKit
 import WebKit
 
-/// Camera and microphone decisions, remembered per site. Asked once, in a sheet, never as a surprise popup.
+/// Camera, microphone, location and notification decisions, remembered per site. Asked once, in a sheet, never as
+/// a surprise popup.
 enum SitePermissions {
     private static let key = "SitePermissions"
 
@@ -26,7 +27,7 @@ enum SitePermissions {
         UserDefaults.standard.set(all, forKey: key)
     }
 
-    /// Sites with a remembered camera or microphone choice.
+    /// Sites with a remembered choice of any kind.
     static var sites: Set<String> {
         let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         return Set(all.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
@@ -34,10 +35,46 @@ enum SitePermissions {
 
     static func forgetAll() { UserDefaults.standard.removeObject(forKey: key) }
 
+    /// "Ask again" for the camera, microphone and location. Notifications have their own switch and stay as they are.
     static func forget(host: String) {
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        for k in all.keys where k.hasPrefix(host + "|") { all[k] = nil }
+        for k in all.keys where k.hasPrefix(host + "|") && k != "\(host)|notifications" { all[k] = nil }
         UserDefaults.standard.set(all, forKey: key)
+    }
+
+    /// Notifications: nil until the site has asked and you've answered.
+    static func notifications(host: String) -> Bool? {
+        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        return all["\(host)|notifications"]
+    }
+
+    static func setNotifications(_ allowed: Bool?, host: String) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        all["\(host)|notifications"] = allowed
+        UserDefaults.standard.set(all, forKey: key)
+    }
+
+    /// Every site's notification choice, for the page script: it knows the answer before the page asks.
+    static var notificationDecisions: [String: Bool] {
+        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        var out: [String: Bool] = [:]
+        for (k, v) in all where k.hasSuffix("|notifications") { out[String(k.dropLast("|notifications".count))] = v }
+        return out
+    }
+
+    /// Asked like the camera. A private window never remembers the answer, and never shows notifications anyway.
+    static func requestNotifications(host: String, window: NSWindow?, isPrivate: Bool) async -> Bool? {
+        if let known = notifications(host: host) { return known }
+        guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return nil }
+        let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", isPrivate: isPrivate, in: controller,
+                                                answered: { notifications(host: host).map { $0 ? .allow : .deny } })
+        switch answer {
+        case .allow, .deny:
+            if !isPrivate { setNotifications(answer == .allow, host: host) }
+            return answer == .allow
+        case .notNow:
+            return nil
+        }
     }
 
     /// Location, asked and remembered the same way as the camera.
