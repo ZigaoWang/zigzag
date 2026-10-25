@@ -666,7 +666,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Opened again quickly: one listener, never two.
             if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }
             self.readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard event.keyCode == 53, event.window === self?.window, self?.reader != nil else { return event }
+                // A peek opened from the article is in front: Esc closes that first, and Reader stays.
+                guard event.keyCode == 53, event.window === self?.window, self?.reader != nil, self?.peek.isVisible == false else { return event }
                 self?.closeReader()
                 return nil
             }
