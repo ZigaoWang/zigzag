@@ -899,7 +899,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads or a camera, show up here."
             : parts.joined(separator: " · ").prefix(1).uppercased() + parts.joined(separator: " · ").dropFirst() + "."
-        privacyGroup.add(FormRow(title: "Site exceptions", detail: summary, control: reset))
+        privacyGroup.add(FormRow(title: "Site choices", detail: summary, control: reset))
     }
 
     private func confirm(title: String, message: String, action: String, then run: @escaping () -> Void) {
