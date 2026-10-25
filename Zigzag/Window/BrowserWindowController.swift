@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import WebKit
 
 /// One browser window: its tabs, its sidebar, its page card, and everything floating above them.
@@ -98,6 +99,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
+        tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
+            guard let self, window == nil || window === self.window else { return }
+            self.flyDownload(item)
+        })
         if #available(macOS 15.4, *) {
             tokens.append(ExtensionHost.shared.changed.observe { [weak self] in self?.refreshExtensionActions() })
         }
@@ -710,7 +715,77 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func downloadsChanged() {
         let manager = DownloadManager.shared
         let mine = manager.items(isPrivate: tabManager.isPrivate)
-        sidebar.updateDownloads(active: mine.filter { $0.state == .downloading }.count, hasAny: !mine.isEmpty)
+        let active = mine.filter { $0.state == .downloading }
+        let progress = active.isEmpty ? 1 : active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
+        sidebar.updateDownloads(active: active.count, hasAny: !mine.isEmpty, progress: progress)
+    }
+
+    /// The file's own icon lifts off where you clicked and arcs into the Downloads button, which answers with a
+    /// small pulse: you see where it went without a word. With the sidebar hidden, just the pulse is skipped.
+    #if DEBUG
+    func debugFlyDownload(_ name: String) {
+        sidebar.updateDownloads(active: 1, hasAny: true, progress: 0.35)
+        flyDownload(DownloadItem(filename: name, sourceURL: nil, isPrivate: false), refresh: false)
+    }
+    #endif
+
+    private func flyDownload(_ item: DownloadItem, refresh: Bool = true) {
+        if refresh { downloadsChanged() }
+        sidebar.layoutSubtreeIfNeeded()
+        let overlay = root.overlay
+        guard let host = overlay.layer, let window, !Tokens.Motion.reduceMotion else { return }
+        let anchor = sidebar.downloadsAnchor
+        let sidebarShown = root.sidebarVisible || root.isSidebarFloatingVisible
+        let card = root.cardFrame
+        // From the pointer if it's over the page, otherwise the middle of the page.
+        let mouse = overlay.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        let start = card.contains(mouse) ? mouse : NSPoint(x: card.midX, y: card.midY)
+        let end: NSPoint = sidebarShown && !anchor.isHiddenOrHasHiddenAncestor
+            ? overlay.convert(NSPoint(x: anchor.bounds.midX, y: anchor.bounds.midY), from: anchor)
+            : NSPoint(x: card.minX + 24, y: card.maxY - 24)
+        let ext = (item.filename as NSString).pathExtension
+        let icon = NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data)
+        let size: CGFloat = 56
+        let flyer = CALayer()
+        flyer.contents = icon
+        flyer.contentsGravity = .resizeAspect
+        flyer.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+        flyer.position = end
+        flyer.zPosition = 2000
+        flyer.shadowColor = NSColor.black.cgColor
+        flyer.shadowOpacity = 0.18
+        flyer.shadowRadius = 6
+        flyer.shadowOffset = CGSize(width: 0, height: 3)
+        flyer.opacity = 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        host.addSublayer(flyer)
+        CATransaction.commit()
+        // An arc: up a little first, then down into the button.
+        let path = CGMutablePath()
+        path.move(to: start)
+        let lift = max(80, abs(end.x - start.x) * 0.35)
+        path.addQuadCurve(to: end, control: NSPoint(x: (start.x + end.x) / 2, y: min(start.y, end.y) - lift))
+        let duration = 0.62 * Tokens.Motion.debugSlowdown
+        let move = CAKeyframeAnimation(keyPath: "position")
+        move.path = path
+        move.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0, 0.25, 1)
+        let scale = CAKeyframeAnimation(keyPath: "transform.scale")
+        scale.values = [0.6, 1.08, 1, 0.32]
+        scale.keyTimes = [0, 0.18, 0.4, 1]
+        let fade = CAKeyframeAnimation(keyPath: "opacity")
+        fade.values = [0, 1, 1, 0.85]
+        fade.keyTimes = [0, 0.12, 0.85, 1]
+        let group = CAAnimationGroup()
+        group.animations = [move, scale, fade]
+        group.duration = duration
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            flyer.removeFromSuperlayer()
+            if sidebarShown { self?.sidebar.pulseDownloads() }
+        }
+        flyer.add(group, forKey: "fly")
+        CATransaction.commit()
     }
 
     // MARK: Traffic lights

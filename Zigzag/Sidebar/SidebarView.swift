@@ -393,9 +393,60 @@ final class SidebarView: NSView {
         dots.first { $0.spaceID == spaceID }?.color = color
     }
 
-    func updateDownloads(active: Int, hasAny: Bool) {
+    /// A thin ring around the button that fills as downloads run, and a check for a moment when they're done.
+    private let downloadsRing = CAShapeLayer()
+    private var wasDownloading = false
+
+    func updateDownloads(active: Int, hasAny: Bool, progress: Double = 1) {
+        let appearing = downloadsButton.isHidden && hasAny
         downloadsButton.isHidden = !hasAny
-        downloadsButton.symbol = active > 0 ? "arrow.down.circle.dotted" : "arrow.down.circle"
+        if appearing, !Tokens.Motion.reduceMotion, let layer = downloadsButton.layer {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.2
+            layer.add(fade, forKey: "appear")
+        }
+        let downloading = active > 0
+        if downloadsRing.superlayer == nil, let host = downloadsButton.layer {
+            downloadsRing.fillColor = nil
+            downloadsRing.lineWidth = 2
+            downloadsRing.lineCap = .round
+            downloadsRing.strokeEnd = 0
+            host.addSublayer(downloadsRing)
+        }
+        let b = downloadsButton.bounds
+        let d = min(b.width, b.height) - 6
+        let rect = CGRect(x: (b.width - d) / 2, y: (b.height - d) / 2, width: d, height: d)
+        // Starts at the top and runs clockwise, like the system's own progress rings.
+        var flip = CGAffineTransform(translationX: rect.midX, y: rect.midY).rotated(by: .pi / 2).scaledBy(x: -1, y: 1).translatedBy(x: -rect.midX, y: -rect.midY)
+        downloadsRing.path = CGPath(ellipseIn: rect, transform: &flip)
+        downloadsRing.frame = b
+        downloadsRing.strokeColor = cgColor(Brand.Theme.current.accent)
+        downloadsRing.opacity = downloading ? 1 : 0
+        downloadsRing.strokeEnd = downloading ? CGFloat(max(0.04, min(progress, 1))) : 0
+        downloadsButton.symbol = downloading ? "arrow.down" : (wasDownloading ? "checkmark.circle" : "arrow.down.circle")
+        if wasDownloading, !downloading {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+                guard let self, !self.wasDownloading else { return }
+                self.downloadsButton.symbol = "arrow.down.circle"
+            }
+        }
+        wasDownloading = downloading
+    }
+
+    /// The button answers when a download lands in it: a small press inward and back.
+    func pulseDownloads() {
+        guard !Tokens.Motion.reduceMotion, let layer = downloadsButton.layer else { return }
+        let size = downloadsButton.bounds.size, k: CGFloat = 1.18
+        let big = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                      CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
+        let pulse = CAKeyframeAnimation(keyPath: "transform")
+        pulse.values = [CATransform3DIdentity, big, CATransform3DIdentity].map { NSValue(caTransform3D: $0) }
+        pulse.keyTimes = [0, 0.35, 1]
+        pulse.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(controlPoints: 0.3, 0, 0.2, 1)]
+        pulse.duration = 0.32
+        layer.add(pulse, forKey: "pulse")
     }
 
     var downloadsAnchor: NSView { downloadsButton }

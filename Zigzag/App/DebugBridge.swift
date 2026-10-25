@@ -78,6 +78,7 @@ enum DebugBridge {
                 controller.tabManager.makeSplit(tab, with: list[n])
             }
         case "unsplit": controller.closeSplitView(nil)
+        case "flydownload": controller.debugFlyDownload(arg.isEmpty ? "Shanghai Guide.pdf" : arg)
         case "readerjs":
             controller.debugReaderWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("readerjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
