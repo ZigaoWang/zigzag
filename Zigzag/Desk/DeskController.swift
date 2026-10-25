@@ -423,6 +423,7 @@ final class DeskController {
         card.layer?.shadowRadius = Tokens.Space.x3
         card.layer?.shadowColor = canvas.cgColor(Tokens.Color.panelShadow)
         var target = (id: tab.id, space: tab.spaceID, index: manager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0)
+        let origin = target
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
             if event.type == .leftMouseUp { stop.pointee = true; return }
@@ -435,7 +436,8 @@ final class DeskController {
             }
         }
         card.layer?.shadowOpacity = 0
-        manager.move(tab, to: target.index, in: target.space)
+        // Through the window, so the selection moves on with it and ⌘Z puts it back.
+        if target != origin { controller?.moveWithUndo(tab, to: target.index, in: target.space) }
         applyLayout(animated: true)
         return true
     }
