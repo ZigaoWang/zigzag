@@ -588,20 +588,34 @@ enum ExtensionProfile {
         }
         return '{' + Object.keys(m).slice(0, 6).join(',') + '}';
       };
-      try {
-        const sendMessage = api.runtime.sendMessage.bind(api.runtime);
-        api.runtime.sendMessage = function (...args) {
+      const seen = new WeakSet();
+      const watchRuntime = (runtime, label) => {
+        if (!runtime || runtime.__zigzagWatched) return;
+        try { runtime.__zigzagWatched = true; } catch (e) {}
+        const sendMessage = runtime.sendMessage.bind(runtime);
+        runtime.sendMessage = function (...args) {
           const message = typeof args[0] === 'string' ? args[1] : args[0];
-          report('msg', 'sent ' + kind(message));
-          return sendMessage(...args);
+          const what = kind(message), started = Date.now();
+          let answered = false;
+          const timer = setTimeout(() => { if (!answered) report('msg', what + ' has no answer after 3s'); }, 3000);
+          const finish = (how) => { answered = true; clearTimeout(timer); if (Date.now() - started > 1000 || how !== 'answered') report('msg', what + ' ' + how + ' after ' + (Date.now() - started) + 'ms'); };
+          const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+          if (callback) return sendMessage(...args, (reply) => { finish(api.runtime.lastError ? 'failed: ' + api.runtime.lastError.message : 'answered'); callback(reply); });
+          const result = sendMessage(...args);
+          if (result && result.then) result.then(() => finish('answered'), (e) => finish('failed: ' + text(e)));
+          return result;
         };
-        const addListener = api.runtime.onMessage.addListener.bind(api.runtime.onMessage);
-        api.runtime.onMessage.addListener = function (listener) {
-          return addListener(function (message, sender, respond) {
-            report('msg', 'got ' + kind(message) + ' from ' + (sender && sender.url ? place(sender.url) : sender && sender.id ? 'extension' : '?'));
+        const addListener = runtime.onMessage.addListener.bind(runtime.onMessage);
+        runtime.onMessage.addListener = function (listener) {
+          return addListener(function (message, sender) {
+            if (message && typeof message === 'object' && !seen.has(message)) { seen.add(message); if (where !== 'zigzag-entry.js' && where !== 'worker') report('msg', 'got ' + kind(message)); }
             return listener.apply(this, arguments);
           });
         };
+      };
+      try {
+        watchRuntime(globalThis.chrome && chrome.runtime, 'chrome');
+        watchRuntime(globalThis.browser && browser.runtime, 'browser');
         const connect = api.runtime.connect.bind(api.runtime);
         const wrapPort = (port, how) => {
           const label = how + ' port ' + (port.name || '(no name)');
