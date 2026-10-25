@@ -197,7 +197,7 @@ final class ExtensionHost: NSObject {
     func actions(for tab: Tab?) -> [ActionItem] {
         contexts.compactMap { context in
             guard let action = context.action(for: tab) else { return nil }
-            return ActionItem(context: context, icon: action.icon(for: NSSize(width: 16, height: 16)), label: action.label,
+            return ActionItem(context: context, icon: action.icon(for: NSSize(width: 32, height: 32)), label: action.label,
                               badge: action.badgeText, attention: attention[context.uniqueIdentifier])
         }
     }

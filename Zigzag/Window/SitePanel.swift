@@ -158,8 +158,9 @@ final class SitePanel: FloatingPanelView {
         extensionTiles = items.map { item in
             let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
             tile.toolTip = item.attention != nil ? "\(item.label): needs attention" : item.label
-            tile.badge = item.attention != nil ? "!" : item.badge
+            // Attention first: the badge takes its look from it.
             tile.isAttention = item.attention != nil
+            tile.badge = item.attention != nil ? "!" : item.badge
             tile.onClick = { [weak self, weak tile] _ in
                 guard let self, let tile else { return }
                 ExtensionHost.shared.performAction(item, tab: self.tab, anchor: tile)
@@ -214,6 +215,12 @@ final class SitePanel: FloatingPanelView {
             rows.append(.value("Camera and microphone", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
                 SitePermissions.forget(host: host)
                 self?.rebuildRows()
+            })
+        }
+        if !tab.isPrivate, let allowed = SitePermissions.notifications(host: host.lowercased()) {
+            rows.append(.toggle("Notifications", on: allowed) { on in
+                SitePermissions.setNotifications(on, host: host.lowercased())
+                if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
         }
         let zoom = ZoomLevels.zoom(for: url)

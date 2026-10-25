@@ -585,7 +585,8 @@ final class BadgeView: NSView {
 
     init(text: String, attention: Bool) {
         self.attention = attention
-        label = Label(String(text.prefix(4)), font: .systemFont(ofSize: 8, weight: .bold), color: .white)
+        // Needing attention is a small dot, not a shout: the tooltip and the click say what's needed.
+        label = Label(attention ? "" : String(text.prefix(4)), font: .systemFont(ofSize: 8, weight: .bold), color: .white)
         super.init(frame: .zero)
         wantsLayer = true
         label.alignment = .center
@@ -608,11 +609,12 @@ final class BadgeView: NSView {
         guard let superview else { return }
         // A ring in the address field's color keeps the badge apart from the icon under it.
         let ring: CGFloat = 1.5
-        let height: CGFloat = 10 + ring * 2
+        let height: CGFloat = (attention ? 6 : 10) + ring * 2
         let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? NSFont.systemFont(ofSize: 8)]).width
-        let width = max(height, ceil(text) + 6 + ring * 2)
-        // Bottom-right corner of the button, like Safari's.
-        frame = NSRect(x: superview.bounds.width - width, y: superview.bounds.height - height, width: width, height: height)
+        let width = attention ? height : max(height, ceil(text) + 6 + ring * 2)
+        // A count sits bottom-right, like Safari's; the attention dot top-right, clear of the icon's artwork.
+        let y = attention ? 1 : superview.bounds.height - height
+        frame = NSRect(x: superview.bounds.width - width - (attention ? 1 : 0), y: y, width: width, height: height)
         label.frame = NSRect(x: 0, y: (height - label.lineHeight) / 2, width: width, height: label.lineHeight)
         layer?.cornerRadius = height / 2
         layer?.borderWidth = ring
