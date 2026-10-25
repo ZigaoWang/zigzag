@@ -578,6 +578,24 @@ enum ExtensionProfile {
         globalThis.WebSocket.prototype = Socket.prototype;
         Object.assign(globalThis.WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
       }
+      // Local databases: whether opening one works, and whether a request ever finishes.
+      if (globalThis.indexedDB) {
+        const open = indexedDB.open.bind(indexedDB);
+        indexedDB.open = function (name, version) {
+          const request = version === undefined ? open(name) : open(name, version);
+          const started = Date.now(), label = 'indexedDB.open ' + String(name).slice(0, 40);
+          let done = false;
+          const timer = setTimeout(() => { if (!done) report('waiting', label + ' has not opened after 3s'); }, 3000);
+          request.addEventListener('success', () => { done = true; clearTimeout(timer); report('db', label + ' ok in ' + (Date.now() - started) + 'ms'); });
+          request.addEventListener('error', () => { done = true; clearTimeout(timer); report('db', label + ' FAILED: ' + text(request.error)); });
+          request.addEventListener('blocked', () => report('db', label + ' blocked by another connection'));
+          return request;
+        };
+      } else {
+        report('db', 'indexedDB is missing here');
+      }
+      if (globalThis.navigator && !navigator.locks) report('api', 'navigator.locks is missing here');
+      if (globalThis.caches === undefined) report('api', 'caches is missing here');
       // Browser API calls that never answer stall an extension silently: name any still waiting after 3 seconds.
       const watch = (path, target) => {
         if (!target || typeof target !== 'object') return;
