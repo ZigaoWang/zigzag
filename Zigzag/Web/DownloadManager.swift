@@ -92,14 +92,16 @@ final class DownloadManager: NSObject {
         changed.send(nil)
     }
 
-    static func uniqueDestination(for filename: String) -> URL {
+    /// A free name in Downloads, also avoiding names given to downloads still in progress (their files don't
+    /// exist yet), so two "report.pdf"s started together don't collide.
+    static func uniqueDestination(for filename: String, avoiding taken: Set<String> = []) -> URL {
         let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
         let safe = filename.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
         let base = (safe as NSString).deletingPathExtension
         let ext = (safe as NSString).pathExtension
         var candidate = folder.appendingPathComponent(safe)
         var n = 2
-        while FileManager.default.fileExists(atPath: candidate.path) {
+        while FileManager.default.fileExists(atPath: candidate.path) || taken.contains(candidate.path) {
             let name = ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)"
             candidate = folder.appendingPathComponent(name)
             n += 1
@@ -110,7 +112,8 @@ final class DownloadManager: NSObject {
 
 extension DownloadManager: WKDownloadDelegate {
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
-        let destination = Self.uniqueDestination(for: suggestedFilename.isEmpty ? "Download" : suggestedFilename)
+        let inProgress = Set(items.filter { $0.state == .downloading }.compactMap { $0.destination?.path })
+        let destination = Self.uniqueDestination(for: suggestedFilename.isEmpty ? "Download" : suggestedFilename, avoiding: inProgress)
         if let item = item(for: download) {
             item.filename = destination.lastPathComponent
             item.destination = destination
