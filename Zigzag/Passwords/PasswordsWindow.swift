@@ -132,6 +132,11 @@ final class PasswordsView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    isolated deinit {
+        if let changeObserver { NotificationCenter.default.removeObserver(changeObserver) }
+        sleepObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+    }
+
     // MARK: Locking
 
     func unlock() {

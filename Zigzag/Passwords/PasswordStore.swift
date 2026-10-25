@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import LocalAuthentication
 import Security
 
@@ -297,8 +297,20 @@ actor PasswordStore {
 /// Touch ID (or the Mac's password) before a password is shown, copied or exported. Filling never asks.
 enum PasswordAuthentication {
     /// The last successful check, so one unlock covers the Passwords window for a while, even after it's closed.
-    /// It ends when the Mac sleeps or locks (see `PasswordsView`).
-    @MainActor private static var unlockedUntil: Date?
+    /// It ends when the Mac sleeps or locks, whether or not the window is open.
+    @MainActor private static var unlockedUntil: Date? { didSet { if unlockedUntil != nil { watchForSleep() } } }
+    @MainActor private static var sleepObservers: [Any] = []
+
+    /// Once, on the first unlock: sleep, the screen sleeping or another user switching in locks again.
+    @MainActor private static func watchForSleep() {
+        guard sleepObservers.isEmpty else { return }
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.willSleepNotification] {
+            sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { lock() }
+            })
+        }
+    }
 
     @MainActor static var isUnlocked: Bool { (unlockedUntil ?? .distantPast) > Date() }
 
