@@ -18,7 +18,11 @@ enum ExternalLinks {
     static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView) {
         guard isMainFrame else { return }
         let scheme = url.scheme?.lowercased() ?? ""
+        // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
+        // front one, so the link never just does nothing.
         let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
+            ?? ((webView as? BrowserWebView)?.owner?.host as? BrowserWindowController)
+            ?? WindowManager.shared.keyController
         guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
             if let controller { Toast.show("No app on this Mac opens “\(scheme):” links", symbol: "questionmark.app", duration: 3, in: controller) }
             return
