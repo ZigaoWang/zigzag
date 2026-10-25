@@ -39,7 +39,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                   let rect = body["rect"] as? [String: Double], let x = rect["x"], let y = rect["y"], let w = rect["w"], let h = rect["h"] else { hide(); return }
             let security = message.frameInfo.securityOrigin
             let origin = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)
-            let field = NSRect(x: x, y: y, width: w, height: h)
+            // The page measures in CSS pixels; at a site's zoom, each is pageZoom points.
+            let zoom = webView.pageZoom
+            let field = NSRect(x: x * zoom, y: y * zoom, width: w * zoom, height: h * zoom)
             let frame = message.frameInfo
             let current = generation
             if body["isNew"] as? Bool == true {
