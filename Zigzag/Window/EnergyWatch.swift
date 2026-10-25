@@ -57,6 +57,13 @@ final class EnergyWatch {
     private func warn(about tab: Tab, url: URL, in controller: BrowserWindowController) {
         let site = ContentBlocker.site(of: url) ?? url.host() ?? url.absoluteString
         guard told.insert("\(tab.id)|\(site)").inserted else { return }
+        // An extension's own page: name the extension, and offer to close the page.
+        if url.scheme == "webkit-extension", #available(macOS 15.4, *) {
+            let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName ?? "An extension"
+            Toast.show("\(name)’s page is using a lot of energy", symbol: "bolt.fill",
+                       action: ("Close Tab", { controller.tabManager.close(tab) }), duration: 15, in: controller)
+            return
+        }
         var running: [String] = []
         if #available(macOS 15.4, *), !ExtensionStore.extensionsOffSites.contains(site) {
             running = ExtensionHost.shared.contexts.filter { $0.hasInjectedContent(for: url) }
