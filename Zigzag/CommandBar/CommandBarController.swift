@@ -512,19 +512,18 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let text = field.stringValue
         typed = text
         completionURL = nil
-        // Inline completion: only when typing forward at the end, never after deleting.
-        if scope == nil, !suppressCompletion, editor.selectedRange.location == (text as NSString).length,
-           let controller, mode != .history,
-           let (completion, url) = CommandRanker.inlineCompletion(for: text, manager: controller.tabManager),
-           completion.lowercased().hasPrefix(text.lowercased()), completion.count > text.count {
-            let suffix = String(completion.dropFirst(text.count))
-            field.stringValue = text + suffix
-            editor.selectedRange = NSRange(location: (text as NSString).length, length: (suffix as NSString).length)
-            completionURL = url
-        } else if scope == nil, !suppressCompletion, let controller, mode != .history,
-                  let (completion, url) = CommandRanker.inlineCompletion(for: text, manager: controller.tabManager),
-                  completion.lowercased() == text.lowercased() {
-            completionURL = url
+        // Inline completion: only when typing forward at the end, never after deleting. Looked up once per keystroke.
+        if scope == nil, !suppressCompletion, let controller, mode != .history,
+           let (completion, url) = CommandRanker.inlineCompletion(for: text, manager: controller.tabManager) {
+            if editor.selectedRange.location == (text as NSString).length,
+               completion.lowercased().hasPrefix(text.lowercased()), completion.count > text.count {
+                let suffix = String(completion.dropFirst(text.count))
+                field.stringValue = text + suffix
+                editor.selectedRange = NSRange(location: (text as NSString).length, length: (suffix as NSString).length)
+                completionURL = url
+            } else if completion.lowercased() == text.lowercased() {
+                completionURL = url
+            }
         }
         suppressCompletion = false
         refreshHint()

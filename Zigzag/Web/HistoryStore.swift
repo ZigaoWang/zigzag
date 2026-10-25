@@ -31,6 +31,8 @@ final class HistoryStore {
         """)
         exec("CREATE INDEX IF NOT EXISTS visits_last ON visits(last_visit DESC)")
         exec("CREATE INDEX IF NOT EXISTS visits_host ON visits(host)")
+        // A year of history is plenty to search; older single visits go, so typing stays quick as it grows.
+        exec("DELETE FROM visits WHERE last_visit < strftime('%s','now') - 31536000 AND visit_count <= 1")
     }
 
     private func exec(_ sql: String) {
@@ -124,11 +126,12 @@ final class HistoryStore {
         let lower = prefix.lowercased()
         guard !lower.isEmpty, !lower.contains(" "), let statement = prepare("""
         SELECT url, title, SUM(visit_count) AS c, MAX(last_visit) FROM visits
-        WHERE host LIKE ?1 ESCAPE '\\' GROUP BY host ORDER BY c DESC LIMIT 1
+        WHERE host >= ?1 AND host < ?2 GROUP BY host ORDER BY c DESC LIMIT 1
         """) else { return nil }
         defer { sqlite3_finalize(statement) }
-        let escaped = lower.replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
-        sqlite3_bind_text(statement, 1, "\(escaped)%", -1, transient)
+        // Hosts are stored lowercase, so a plain range finds the prefix through the index instead of a full scan.
+        sqlite3_bind_text(statement, 1, lower, -1, transient)
+        sqlite3_bind_text(statement, 2, lower + "\u{10FFFF}", -1, transient)
         return collect(statement).first
     }
 
