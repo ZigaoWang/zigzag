@@ -57,9 +57,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             }
         case "blur":
             generation += 1
-            // A click on the menu blurs the field first; let the click land before hiding.
+            let current = generation
+            // A click on the menu blurs the field first; let the click land before hiding. Focus that moved on to
+            // another field meanwhile has its own menu, which stays.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                guard let self, let menu = self.menu, !menu.isPointerInside else { return }
+                guard let self, current == self.generation, let menu = self.menu, !menu.isPointerInside else { return }
                 self.hide()
             }
         case "key":
