@@ -78,6 +78,10 @@ enum DebugBridge {
                 controller.tabManager.makeSplit(tab, with: list[n])
             }
         case "unsplit": controller.closeSplitView(nil)
+        case "readerjs":
+            controller.debugReaderWebView?.evaluateJavaScript(arg) { result, error in
+                debugLog("readerjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
+            }
         case "find": controller.findBar.show(query: arg)
         case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
         case "peekclose": controller.peek.close()

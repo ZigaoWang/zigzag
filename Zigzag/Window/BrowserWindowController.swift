@@ -627,6 +627,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Reader
 
     private var reader: ReaderView?
+    #if DEBUG
+    var debugReaderWebView: WKWebView? { reader?.webView }
+    #endif
     private weak var readerTab: Tab?
     /// The pane the reading page covers: in a split, the one its tab is in.
     private weak var readerCard: PageCardView?
