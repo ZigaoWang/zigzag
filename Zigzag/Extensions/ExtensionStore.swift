@@ -531,6 +531,26 @@ enum ExtensionProfile {
       globalThis.addEventListener && globalThis.addEventListener('unhandledrejection', (e) => report('rejection', text(e.reason)));
       const original = console.error;
       console.error = function (...args) { report('console.error', args.map(text).filter(Boolean).join(' ')); return original.apply(this, args); };
+      const warn = console.warn;
+      console.warn = function (...args) { report('console.warn', args.map(text).filter(Boolean).join(' ')); return warn.apply(this, args); };
+      // How WebAssembly loads: what, how big, how long, and whether it worked.
+      if (globalThis.WebAssembly) {
+        for (const name of ['instantiate', 'instantiateStreaming', 'compile', 'compileStreaming']) {
+          const original = WebAssembly[name];
+          if (typeof original !== 'function') continue;
+          WebAssembly[name] = function (source, ...rest) {
+            const started = Date.now();
+            const what = source && source.byteLength !== undefined ? source.byteLength + ' bytes' : (source && source.url) || (source instanceof Promise ? 'response' : typeof source);
+            report('wasm', name + ' start ' + what);
+            const result = original.call(this, source, ...rest);
+            Promise.resolve(result).then(() => report('wasm', name + ' ok in ' + (Date.now() - started) + 'ms'),
+                                         (e) => report('wasm', name + ' FAILED in ' + (Date.now() - started) + 'ms: ' + text(e)));
+            return result;
+          };
+        }
+      } else {
+        report('wasm', 'WebAssembly is missing here');
+      }
       report('started', '');
     })();
 
