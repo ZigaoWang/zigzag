@@ -440,6 +440,9 @@ enum DebugBridge {
             func walk(_ v: NSView) { if let s = v as? NSScrollView { s.flashScrollers() }; v.subviews.forEach(walk) }
             if let root = controller.window?.contentView { walk(root) }
         case "private": WindowManager.shared.newWindow(url: URL(string: arg), isPrivate: true)
+        case "removespaceundo":
+            if let space = Library.shared.spaces.first(where: { $0.name == arg }) { controller.removeSpaceWithUndo(space.id) }
+        case "spacenames": debugLog("spaces " + Library.shared.spaces.map(\.name).joined(separator: ","))
         case "removespace":
             if let space = Library.shared.spaces.first(where: { $0.name == arg }) { Library.shared.removeSpace(space.id) }
         case "menutest":
