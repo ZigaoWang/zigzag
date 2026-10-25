@@ -227,6 +227,8 @@ final class SidebarListView: NSView {
             let row = TabRowView()
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row, let tab = row.tab else { return }
+                // Remembered in case this press turns into a drag: the page you were on comes back, to open beside.
+                self.selectedBeforePress = self.manager?.selectedTab
                 // A split row: each half selects its own page.
                 if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1, let partner = row.partner {
                     self.delegate?.listSelect(partner)
@@ -496,8 +498,17 @@ final class SidebarListView: NSView {
         return panel
     }
 
+    /// The tab that was showing before the last press on a tab row (rows select on press).
+    private weak var selectedBeforePress: Tab?
+
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
         guard let window, item.isDraggable else { return false }
+        // The press selected the tab being dragged; a drag means "take this tab somewhere", so the page you were
+        // on stays in front, and dropping on it opens the tab beside it.
+        if case .tab(let id) = item, let before = selectedBeforePress, before.id != id, manager?.tab(with: before.id) === before {
+            delegate?.listSelect(before)
+        }
+        selectedBeforePress = nil
         delegate?.listHover(nil, row: nil, bookmark: nil)
         bookmarkZoneOpen = !Library.shared.bookmarks(in: manager?.currentSpaceID ?? UUID()).isEmpty && !Self.isCollapsed(manager?.currentSpaceID ?? UUID())
         let start = convert(event.locationInWindow, from: nil)
