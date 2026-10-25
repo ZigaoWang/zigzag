@@ -172,12 +172,15 @@ final class SidebarView: NSView {
         didSet { list.delegate = delegate }
     }
 
-    let backButton = IconButton(symbol: "chevron.left", toolTip: "Back")
-    let forwardButton = IconButton(symbol: "chevron.right", toolTip: "Forward")
-    let reloadButton = IconButton(symbol: "arrow.clockwise", toolTip: "Reload")
+    /// The top row's buttons are a size up from the rest, level with the traffic lights, so they're easy to hit.
+    static let toolbarButton: CGFloat = 30
+    static let toolbarSymbol: CGFloat = 16
+    let backButton = IconButton(symbol: "chevron.left", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Back")
+    let forwardButton = IconButton(symbol: "chevron.right", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Forward")
+    let reloadButton = IconButton(symbol: "arrow.clockwise", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar")
+    let sidebarButton = IconButton(symbol: "sidebar.left", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Hide Sidebar")
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
@@ -263,8 +266,8 @@ final class SidebarView: NSView {
         let pad = Tokens.Metric.sidebarPadding
         let width = bounds.width
         let rowCenter = trafficLightCenterY
-        let button = Tokens.Metric.iconButton
-        var x = width - pad - button
+        let button = Self.toolbarButton
+        var x = width - pad - button + 2
         for b in [reloadButton, forwardButton, backButton] {
             b.frame = NSRect(x: x, y: rowCenter - button / 2, width: button, height: button)
             x -= button
