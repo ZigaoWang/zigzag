@@ -60,7 +60,9 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
             return
         }
         // A change form often has no username; if there's one login for the site, it's that one.
-        let target = saved.first { $0.username == username } ?? (isChange && username.isEmpty && saved.count == 1 ? saved.first : nil)
+        // Email addresses are the same login whatever their capitals ("Sam@x.com" is "sam@x.com").
+        let target = saved.first { $0.username.caseInsensitiveCompare(username) == .orderedSame }
+            ?? (isChange && username.isEmpty && saved.count == 1 ? saved.first : nil)
         if let target {
             if let current = try? await store.password(for: target.id), current.matches(password) {
                 try? await store.markUsed(target.id)

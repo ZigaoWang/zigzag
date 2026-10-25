@@ -81,7 +81,9 @@ final class SavePasswordPrompt: FloatingPanelView {
                 do {
                     switch kind {
                     case .save: try await store.save(origin: origin, username: username, password: password)
-                    case .update(let credential): try await store.update(credential, password: password)
+                    case .update(var credential):
+                        credential.modified = Date()
+                        try await store.update(credential, password: password)
                     }
                     Toast.show("Password saved", symbol: "key.fill", duration: 1.6, in: controller)
                 } catch {
