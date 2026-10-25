@@ -447,11 +447,15 @@ final class TabManager {
         changed.send(.structure)
     }
 
-    func close(_ tabs: [Tab]) {
+    /// Returns the ordinary tabs' ids in the order they closed: reopening in reverse puts each back where it was.
+    @discardableResult
+    func close(_ tabs: [Tab]) -> [UUID] {
         let selected = selectedTab
         let closingSelected = tabs.contains { $0 === selected }
-        for tab in tabs where tab !== selected { close(tab) }
-        if closingSelected, let selected { close(selected) }
+        let order = tabs.filter { $0 !== selected } + (closingSelected ? [selected].compactMap { $0 } : [])
+        let ids = order.filter { $0.bookmarkID == nil }.map(\.id)
+        order.forEach { close($0) }
+        return ids
     }
 
     private func selectAfterClosing(_ closed: Tab, index: Int) {
