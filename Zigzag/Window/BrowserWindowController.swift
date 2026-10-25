@@ -1055,10 +1055,9 @@ extension BrowserWindowController: SidebarDelegate {
     func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
         let spaceID = Library.shared.spaceID(ofBookmark: bookmarkID) ?? tabManager.currentSpaceID
         let oldIndex = Library.shared.bookmarks(in: spaceID).firstIndex { $0.id == bookmarkID }
-        let liveTab = tabManager.bookmarkTab(for: bookmarkID)
-        tabManager.unbookmark(bookmarkID, toIndex: index)
-        if let liveTab {
-            sidebarUndo.registerUndo(withTarget: self) { $0.bookmarkWithUndo(liveTab, at: oldIndex, in: spaceID) }
+        // Unloaded, it comes back as a new tab: ⌘Z pins that one again.
+        if let tab = tabManager.unbookmark(bookmarkID, toIndex: index) {
+            sidebarUndo.registerUndo(withTarget: self) { $0.bookmarkWithUndo(tab, at: oldIndex, in: spaceID) }
             sidebarUndo.setActionName("Remove Bookmark")
         }
     }

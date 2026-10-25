@@ -336,25 +336,31 @@ final class TabManager {
         Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), to: space, at: index, id: bookmarkID)
     }
 
-    /// Turns a bookmark's live tab back into a normal tab, removing the bookmark.
-    func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil) {
+    /// Turns a bookmark's live tab back into a normal tab, removing the bookmark. Returns the tab now in the list:
+    /// the live one, or, for an unloaded bookmark dropped at an index, a new one.
+    @discardableResult
+    func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil) -> Tab? {
         if Library.shared.isFavorite(bookmarkID) {
             // A favorite comes back as a tab in the space you're in.
             bookmarkTabs[bookmarkID]?.spaceID = currentSpaceID
             bookmarkTabs[bookmarkID]?.isFavorite = false
         }
+        var result: Tab?
         if let tab = bookmarkTabs[bookmarkID] {
             bookmarkTabs[bookmarkID] = nil
             tab.bookmarkID = nil
             let at = min(index ?? 0, tabsBySpace[tab.spaceID]?.count ?? 0)
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: at)
+            result = tab
         } else if let bookmark = Library.shared.bookmark(bookmarkID), let index {
             let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID)
             tab.host = host
             watch(tab)
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: min(index, tabsBySpace[tab.spaceID]?.count ?? 0))
+            result = tab
         }
         Library.shared.removeBookmark(bookmarkID)
+        return result
     }
 
     /// True when a pinned tab has moved on from its pinned page.
