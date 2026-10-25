@@ -839,6 +839,7 @@ private final class DetailView: NSView {
         guard !newPassword.isEmpty else { toast("A password can’t be empty."); return }
         edited.username = usernameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         edited.notes = notesField.stringValue
+        edited.modified = Date()
         Task { @MainActor in
             do {
                 try await PasswordStore.shared.update(edited, password: newPassword)
