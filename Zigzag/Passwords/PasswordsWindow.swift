@@ -797,18 +797,26 @@ private final class DetailView: NSView {
         Task { @MainActor in
             let store = PasswordStore.shared
             // Kept in memory only, so Undo can put it back.
-            let kept = try? await store.password(for: credential.id)
+            // Unreadable: deleting now would offer an Undo that can't bring it back.
+            guard let kept = try? await store.password(for: credential.id) else {
+                toast("Couldn’t delete it. Try again.")
+                return
+            }
             do { try await store.delete(credential.id) } catch {
                 toast("Couldn’t delete it. Try again.")
                 return
             }
             onDeleted?()
             guard let host = superview else { return }
-            Toast.show("Deleted \(credential.origin.displayName)", symbol: "trash", action: ("Undo", {
-                guard let kept else { return }
-                Task {
-                    _ = try? await store.save(origin: credential.origin, username: credential.username, password: kept, title: credential.title.isEmpty ? nil : credential.title,
-                                              notes: credential.notes, otpAuth: credential.otpAuth, created: credential.created)
+            let area = frame
+            Toast.show("Deleted \(credential.origin.displayName)", symbol: "trash", action: ("Undo", { [weak host] in
+                Task { @MainActor in
+                    do {
+                        _ = try await store.save(origin: credential.origin, username: credential.username, password: kept, title: credential.title.isEmpty ? nil : credential.title,
+                                                 notes: credential.notes, otpAuth: credential.otpAuth, created: credential.created)
+                    } catch {
+                        if let host { Toast.show("Couldn’t put it back.", symbol: "exclamationmark.triangle", duration: 4, over: host, area: area) }
+                    }
                 }
             }), duration: 6, over: host, area: frame)
         }
