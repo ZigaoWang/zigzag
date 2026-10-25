@@ -649,6 +649,7 @@ extension CommandBarController {
                 Toast.show("Cache cleared. Pages load fresh.", symbol: "arrow.clockwise", duration: 2, in: controller)
             }
         case "clear-cookies": controller.confirmClearCookies()
+        case "feedback": Feedback.show(in: controller)
         default: break
         }
     }

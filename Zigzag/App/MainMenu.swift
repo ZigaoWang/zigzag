@@ -165,6 +165,7 @@ enum MainMenu {
 
         let help = submenu("Help", [
             item("Getting Started", #selector(C.showGettingStarted(_:)), ""),
+            item("Send Feedback…", #selector(C.sendFeedback(_:)), ""),
         ])
         main.addItem(help)
         NSApp.helpMenu = help.submenu

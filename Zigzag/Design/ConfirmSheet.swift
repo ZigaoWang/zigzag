@@ -2,20 +2,25 @@ import AppKit
 
 /// A confirmation drawn over a window's content: a dimmed backdrop and a small panel with what will happen and
 /// two buttons. Return confirms, Escape cancels. Used where a choice needs a pause, like exporting passwords.
+/// It can offer a second way forward too (`choose`), drawn as a quiet button beside the main one.
 final class ConfirmSheet: NSView {
+    enum Choice { case confirm, alternate, cancel }
+
     private let panel = FloatingPanelView()
     private let titleLabel: Label
     private let body: NSTextField
     private let confirm: PrimaryButton
     private let cancel = TextButton(title: "Cancel", font: Tokens.Font.body(.medium))
+    private let alternate: TextButton?
     private var monitor: Any?
-    private var completion: (Bool) -> Void
+    private var completion: (Choice) -> Void
 
-    private init(title: String, message: String, confirmTitle: String, destructive: Bool, completion: @escaping (Bool) -> Void) {
+    private init(title: String, message: String, confirmTitle: String, alternateTitle: String? = nil, destructive: Bool, completion: @escaping (Choice) -> Void) {
         titleLabel = Label(title, font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
         body = NSTextField(wrappingLabelWithString: message)
         confirm = PrimaryButton(title: confirmTitle)
         confirm.isDestructive = destructive
+        alternate = alternateTitle.map(TextButton.form)
         self.completion = completion
         super.init(frame: .zero)
         wantsLayer = true
@@ -24,8 +29,10 @@ final class ConfirmSheet: NSView {
         body.isSelectable = false
         addSubview(panel)
         [titleLabel, body, cancel, confirm].forEach { panel.addSubview($0) }
-        confirm.onClick = { [weak self] _ in self?.finish(true) }
-        cancel.onClick = { [weak self] _ in self?.finish(false) }
+        if let alternate { panel.addSubview(alternate) }
+        confirm.onClick = { [weak self] _ in self?.finish(.confirm) }
+        alternate?.onClick = { [weak self] _ in self?.finish(.alternate) }
+        cancel.onClick = { [weak self] _ in self?.finish(.cancel) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         setAccessibilityRole(.sheet)
         setAccessibilityLabel(title)
@@ -35,7 +42,15 @@ final class ConfirmSheet: NSView {
     override var isFlipped: Bool { true }
 
     static func show(in host: NSView, title: String, message: String, confirmTitle: String, destructive: Bool = false, completion: @escaping (Bool) -> Void) {
-        let sheet = ConfirmSheet(title: title, message: message, confirmTitle: confirmTitle, destructive: destructive, completion: completion)
+        present(ConfirmSheet(title: title, message: message, confirmTitle: confirmTitle, destructive: destructive) { completion($0 == .confirm) }, in: host)
+    }
+
+    /// Two ways forward and Cancel: Return picks `confirmTitle`, Escape cancels.
+    static func choose(in host: NSView, title: String, message: String, confirmTitle: String, alternateTitle: String, completion: @escaping (Choice) -> Void) {
+        present(ConfirmSheet(title: title, message: message, confirmTitle: confirmTitle, alternateTitle: alternateTitle, destructive: false, completion: completion), in: host)
+    }
+
+    private static func present(_ sheet: ConfirmSheet, in host: NSView) {
         sheet.frame = host.bounds
         sheet.autoresizingMask = [.width, .height]
         host.addSubview(sheet)
@@ -45,8 +60,8 @@ final class ConfirmSheet: NSView {
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
             guard let sheet, event.window === host.window else { return event }
             switch event.keyCode {
-            case 36, 76: sheet.finish(true); return nil
-            case 53: sheet.finish(false); return nil
+            case 36, 76: sheet.finish(.confirm); return nil
+            case 53: sheet.finish(.cancel); return nil
             default: return event
             }
         }
@@ -59,16 +74,16 @@ final class ConfirmSheet: NSView {
     }
 
     #if DEBUG
-    func debugCancel() { finish(false) }
+    func debugCancel() { finish(.cancel) }
     #endif
 
-    private func finish(_ confirmed: Bool) {
+    private func finish(_ choice: Choice) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         let completion = self.completion
         self.completion = { _ in }
         Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
-        completion(confirmed)
+        completion(choice)
     }
 
     // Clicks on the backdrop don't reach the window underneath.
@@ -102,7 +117,13 @@ final class ConfirmSheet: NSView {
         let y = body.frame.maxY + Tokens.Space.x5
         let cw = max(confirm.fittingWidth, 88)
         confirm.frame = NSRect(x: panel.bounds.width - pad - cw, y: y, width: cw, height: Tokens.Space.x8)
+        var trailing = confirm.frame.minX
+        if let alternate {
+            let aw = alternate.fittingWidth + Tokens.Space.x2
+            alternate.frame = NSRect(x: trailing - Tokens.Space.x2 - aw, y: y, width: aw, height: Tokens.Space.x8)
+            trailing = alternate.frame.minX
+        }
         let xw = cancel.fittingWidth
-        cancel.frame = NSRect(x: confirm.frame.minX - Tokens.Space.x2 - xw, y: y, width: xw, height: Tokens.Space.x8)
+        cancel.frame = NSRect(x: trailing - Tokens.Space.x2 - xw, y: y, width: xw, height: Tokens.Space.x8)
     }
 }
