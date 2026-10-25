@@ -716,7 +716,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         sidebar.trafficLightsWidth = window.styleMask.contains(.fullScreen) ? 0 : window.trafficLightsWidth
-        sidebar.sidebarButton.toolTip = docked ? "Hide Sidebar (⌃⌘S)" : "Show Sidebar (⌃⌘S)"
+        sidebar.sidebarButton.toolTip = docked ? "Hide Sidebar (⌘S)" : "Show Sidebar (⌘S)"
         sidebar.sidebarButton.isSelected = false
     }
 

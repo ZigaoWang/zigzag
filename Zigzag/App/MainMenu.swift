@@ -94,7 +94,7 @@ enum MainMenu {
         ]))
 
         var viewItems: [NSMenuItem] = [
-            item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.command, .control]),
+            item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.command]),
             item("Show All Tabs", #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             item("Rotate Split View", #selector(C.toggleSplitOrientation(_:)), ""),
             item("Close Split View", #selector(C.closeSplitView(_:)), ""),

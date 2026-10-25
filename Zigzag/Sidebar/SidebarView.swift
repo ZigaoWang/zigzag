@@ -177,7 +177,7 @@ final class SidebarView: NSView {
     let reloadButton = IconButton(symbol: "arrow.clockwise", toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar (⌃⌘S)")
+    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar (⌘S)")
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
