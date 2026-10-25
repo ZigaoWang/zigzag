@@ -499,6 +499,8 @@ enum ExtensionProfile {
         var coveredPermissions: Set<String> = []
         /// Small fixes to the extension's own files where it misbehaves in WebKit, applied to a copy at load.
         var patches: [Patch] = []
+        /// What's known not to work, said before installing ("its popup").
+        var knownIssue: String?
     }
 
     /// Replace `find` with `replace` in one of the extension's files. Skipped, and logged, if `find` isn't there
@@ -557,7 +559,9 @@ enum ExtensionProfile {
       // Missing calls on namespaces WebKit does have: often called unconditionally.
       fill('action', { setBadgeTextColor: done(), getBadgeTextColor: done([0, 0, 0, 255]), getUserSettings: done({ isOnToolbar: true }) });
       fill('tabs', { group: no('Tab groups'), ungroup: done(), discard: done(), highlight: done() });
-      fill('runtime', { getContexts: done([]), onSuspend: event(), onSuspendCanceled: event() });
+      // Not getContexts: extensions check for it and fall back to getViews, and an always-empty answer ("no popup
+      // open") sends some (Bitwarden) into a loop asking again.
+      fill('runtime', { onSuspend: event(), onSuspendCanceled: event() });
       fill('i18n', { detectLanguage: done({ isReliable: false, languages: [] }) });
       fill('storage', { managed: { get: done({}), getBytesInUse: done(0), onChanged: event() } });
       // Whole namespaces, only where asked for.
@@ -588,7 +592,9 @@ enum ExtensionProfile {
     private static let profiles: [String: Profile] = [
         ExtensionStore.onePasswordID: Profile(backgroundPrelude: webSocketShim + diagnostics + onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
-        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
+        // Its popup app loops in WebKit and never draws (found in the 2026-10-25 test pass).
+        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
+                                                   knownIssue: "Its popup"),
         // Return YouTube Dislike, as "Bring Back YouTube Dislikes".
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
