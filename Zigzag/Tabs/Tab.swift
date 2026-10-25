@@ -193,6 +193,7 @@ final class Tab: NSObject {
     }
 
     private func tearDown(_ webView: BrowserWebView) {
+        PageDialogSheet.cancel(for: webView)
         observations.forEach { $0.invalidate() }
         observations = []
         if observingAudio {

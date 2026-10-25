@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// A website's alert, confirm, prompt or sign-in, drawn as Zigzag's own sheet over the window: who's asking, what
 /// they say, their fields, and Zigzag buttons. From a page's second dialog on, it offers to block the rest, so a
@@ -25,6 +26,11 @@ final class PageDialogSheet: NSView {
     private let cancel = TextButton.form("Cancel")
     private let block = TextButton(title: "Block Dialogs", font: Tokens.Font.body(.medium))
     private var monitor: Any?
+    private var closeObserver: Any?
+    /// The page that asked, when a page did: its dialog goes when the page does.
+    private weak var page: WKWebView?
+    private static var open: [WeakBox] = []
+    private struct WeakBox { weak var sheet: PageDialogSheet? }
     private var completion: (Result) -> Void
     private let width: CGFloat = 380
     private let pad = Tokens.Space.x5
@@ -69,11 +75,17 @@ final class PageDialogSheet: NSView {
 
     @MainActor
     static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = "OK",
-                    showsCancel: Bool, offersBlock: Bool) async -> Result {
+                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil) async -> Result {
         guard let host = window.contentView else { return .cancelled }
         return await withCheckedContinuation { continuation in
             let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle,
                                         showsCancel: showsCancel, offersBlock: offersBlock) { continuation.resume(returning: $0) }
+            sheet.page = page
+            open = open.filter { $0.sheet != nil } + [WeakBox(sheet: sheet)]
+            // Closing the window doesn't take its views down with it: the page hears "cancel", not silence.
+            sheet.closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak sheet] _ in
+                MainActor.assumeIsolated { sheet?.finish(.cancelled) }
+            }
             sheet.frame = host.bounds
             sheet.autoresizingMask = [.width, .height]
             host.addSubview(sheet)
@@ -94,9 +106,17 @@ final class PageDialogSheet: NSView {
         }
     }
 
+    /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
+    static func cancel(for page: WKWebView) {
+        for box in open where box.sheet?.page === page { box.sheet?.finish(.cancelled) }
+        open = open.filter { $0.sheet != nil && $0.sheet?.superview != nil }
+    }
+
     private func finish(_ result: Result) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+        closeObserver = nil
         let completion = self.completion
         self.completion = { _ in }
         removeFromSuperview()

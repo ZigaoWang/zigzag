@@ -30,7 +30,7 @@ enum PageDialogs {
             shown[page] = (url, count)
         }
         let result = await PageDialogSheet.ask(in: window, title: "\(originText(frame)) says", message: message, fields: fields,
-                                               showsCancel: showsCancel, offersBlock: count >= 2)
+                                               showsCancel: showsCancel, offersBlock: count >= 2, page: frame.webView)
         if case .blocked = result, let page { blocked[page] = url }
         return result
     }
