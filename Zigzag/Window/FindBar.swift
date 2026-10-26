@@ -269,7 +269,9 @@ class FloatingPanelView: NSView {
     /// from a button fade; free-floating notices drop in slightly.
     /// `.fade` (and `.pop`) grow out of `growsFrom`: a short, critically damped spring with no overshoot, so a panel opening from a button looks like it
     /// came out of that button. ⌘T's bar alone appears at once, being the thing you do most.
-    enum Arrival { case drop, fade, instant, zoom, pop }
+    /// `burst`: springs out of its corner from well under its size, with a touch of overshoot, for a panel that
+    /// opens because something just landed in what it grows from (a download hitting its button).
+    enum Arrival { case drop, fade, instant, zoom, pop, burst }
 
     /// Where a panel grows from, in its own bounds from the top-left: (0, 0) its top-left corner, (0.5, 0) its top
     /// middle. Set it to the side nearest what opened it.
@@ -290,7 +292,25 @@ class FloatingPanelView: NSView {
         dismissing = false
         // Shown from the keyboard too: a panel appearing out of nowhere reads as a glitch, and this takes 0.2s.
         guard let layer, arrival != .instant else { return }
-        if (arrival == .fade || arrival == .pop), !Tokens.Motion.reduceMotion {
+        if arrival == .burst, !Tokens.Motion.reduceMotion {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.12
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            let grow = CASpringAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: scaled(0.55))
+            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            grow.mass = 1
+            grow.stiffness = 420
+            grow.damping = 26
+            grow.initialVelocity = 0
+            grow.duration = grow.settlingDuration
+            layer.add(fade, forKey: "present")
+            layer.add(grow, forKey: "present.grow")
+            return
+        }
+        if (arrival == .fade || arrival == .pop || arrival == .burst), !Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
@@ -309,7 +329,7 @@ class FloatingPanelView: NSView {
             return
         }
         // With Reduce Motion on, panels only fade in; nothing moves.
-        if arrival == .fade || arrival == .pop || Tokens.Motion.reduceMotion {
+        if arrival == .fade || arrival == .pop || arrival == .burst || Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1

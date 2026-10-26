@@ -858,13 +858,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let side = 1 - pow(1 - t, 1.6)
             points.append(NSValue(point: NSPoint(x: start.x + (end.x - start.x) * side, y: start.y + b * t + a * t * t)))
         }
-        let duration = 1.3 * Tokens.Motion.debugSlowdown
+        let duration = 1.1 * Tokens.Motion.debugSlowdown
         let move = CAKeyframeAnimation(keyPath: "position")
         move.values = points
         move.calculationMode = .linear
         let scale = CAKeyframeAnimation(keyPath: "transform.scale")
-        scale.values = [0.55, 1.12, 1.0, 0.95, 0.3]
-        scale.keyTimes = [0, 0.22, 0.42, 0.7, 1]
+        scale.values = [0.55, 1.12, 1.0, 0.9, 0.42]
+        scale.keyTimes = [0, 0.22, 0.42, 0.75, 1]
         scale.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeInEaseOut),
                                  CAMediaTimingFunction(name: .linear), CAMediaTimingFunction(name: .easeIn)]
         // A small tip as it leaves and lands, so it reads as thrown, not slid.
@@ -872,17 +872,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tilt.values = [0, 0.12, 0, -0.1]
         tilt.keyTimes = [0, 0.3, 0.6, 1]
         let fade = CAKeyframeAnimation(keyPath: "opacity")
-        fade.values = [0, 1, 1, 0.9]
-        fade.keyTimes = [0, 0.1, 0.88, 1]
+        fade.values = [0, 1, 1, 1]
+        fade.keyTimes = [0, 0.1, 0.9, 1]
         let group = CAAnimationGroup()
         group.animations = [move, scale, tilt, fade]
         group.duration = duration
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
-            flyer.removeFromSuperlayer()
+            // The landing is one moment: the file goes into the button, the button takes the hit, and the panel
+            // springs open out of it, showing the file come in, and tidies itself away a while after it's done.
+            Tokens.Motion.withoutAnimation { flyer.removeFromSuperlayer() }
             guard let self, sidebarShown else { return }
             self.sidebar.pulseDownloads()
-            // Where it landed opens, showing it come in; it tidies itself away once the file is done.
             if refresh, !self.hasFloatingPanel, self.window?.isKeyWindow == true {
                 DownloadsPanel.reveal(from: self.sidebar.downloadsAnchor, in: self, closingAfter: item)
             }

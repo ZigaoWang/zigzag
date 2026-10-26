@@ -158,20 +158,20 @@ enum DownloadsPanel {
     static func isOpen(in window: NSWindow?) -> Bool { isOpen && current?.window === window }
     static func closeCurrent() { current?.close() }
 
-    /// Opened by a download landing in the button: closes by itself a few seconds after that download is done,
-    /// unless you've moved the pointer onto it.
+    /// Opened by a download landing in the button: it goes away by itself a while after that download is done,
+    /// unless you're using it; a click elsewhere closes it sooner, as always.
     static func reveal(from anchor: NSView, in controller: BrowserWindowController, closingAfter item: DownloadItem) {
         guard current == nil else { return }
-        show(from: anchor, in: controller)
+        show(from: anchor, in: controller, arrival: .burst)
         current?.closeWhenDone(item)
     }
 
-    static func show(from anchor: NSView, in controller: BrowserWindowController) {
+    static func show(from anchor: NSView, in controller: BrowserWindowController, arrival: FloatingPanelView.Arrival = .pop) {
         if let current { current.close(); return }
         controller.closeFloatingPanels()
         let panel = DownloadsPanelView(controller: controller)
         current = panel
-        panel.show(from: anchor)
+        panel.show(from: anchor, arrival: arrival)
     }
 }
 
@@ -215,13 +215,13 @@ final class DownloadsPanelView: FloatingPanelView {
 
     private var isPrivate: Bool { controller?.tabManager.isPrivate ?? false }
 
-    func show(from anchor: NSView) {
+    func show(from anchor: NSView, arrival: Arrival = .pop) {
         guard let controller else { return }
         self.anchor = anchor
         controller.root.overlay.addSubview(self)
         reload()
         growsFrom = CGPoint(x: 0.1, y: 1)
-        present(arrival: .pop)
+        present(arrival: arrival)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Only its own window: keys and clicks in Settings or another window are theirs.
             guard let self, event.window === self.window else { return event }
@@ -238,6 +238,7 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     private weak var watched: DownloadItem?
+    /// Clicked inside: it's being used, so it stays until you click away.
     private var touched = false
 
     fileprivate func closeWhenDone(_ item: DownloadItem) {
@@ -245,13 +246,17 @@ final class DownloadsPanelView: FloatingPanelView {
         checkWatched()
     }
 
-    /// The download it opened for is over: close a moment later, if nobody has reached for the panel.
     private func checkWatched() {
         guard let item = watched, item.state != .downloading else { return }
         watched = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self, self.superview != nil, !self.touched, !self.isPointerInside else { return }
-            self.close()
+        closeLater()
+    }
+
+    /// Six seconds after the download is done, if nobody has reached for it; with the pointer on it, it waits.
+    private func closeLater() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+            guard let self, self.superview != nil, !self.touched else { return }
+            if self.isPointerInside { self.closeLater() } else { self.close() }
         }
     }
 

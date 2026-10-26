@@ -27,6 +27,8 @@ final class DockProgress {
         // Not when the downloads panel is open there: it already shows the file arriving.
         if let item, item.state == .finished, !announced.contains(item.id), let controller = WindowManager.shared.keyController {
             announced.insert(item.id)
+            // With the sidebar showing, the download lands in its button and the panel opens there: that's the notice.
+            if DownloadsPanel.isOpen(in: controller.window) || controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible { return }
             if DownloadsPanel.isOpen(in: controller.window) { return }
             Toast.show("Downloaded \(item.filename)", symbol: "arrow.down.circle",
                        action: ("Show", { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
