@@ -156,6 +156,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // window comes forward (or the closed one comes back) and does it, instead of the menu item being greyed out.
     @objc func newTab(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .newTab) }
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
+    @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
+
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
 
     private func frontBrowserWindow() -> BrowserWindowController? {
@@ -177,4 +179,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func importFromBrowser(_ sender: Any?) { ImportWindowController.show() }
 
     @objc func showPasswords(_ sender: Any?) { PasswordsWindowController.show() }
+}
+
+extension AppDelegate: NSMenuItemValidation {
+    /// Reopen Closed Window is dimmed when there's nothing to bring back.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        return true
+    }
 }

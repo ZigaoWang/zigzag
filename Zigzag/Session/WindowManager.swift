@@ -117,6 +117,13 @@ final class WindowManager {
         // Keep the last window's tabs for next launch even if it is closed before quitting.
         // (A private window open alongside doesn't count: it isn't saved.)
         if !controller.tabManager.isPrivate, controllers.filter({ !$0.tabManager.isPrivate }).count == 1 { saveNow(synchronously: true) }
+        // Kept to reopen (⇧⌘T's sibling in the File menu), with each tab's back/forward list. Never private windows.
+        if !controller.tabManager.isPrivate, controller.tabManager.allTabs.contains(where: { $0.url != nil }) {
+            var history: [UUID: Data] = [:]
+            for tab in controller.tabManager.allTabs { if let data = tab.interactionStateForSaving { history[tab.id] = data } }
+            closedWindows.append((windowState(controller), history))
+            if closedWindows.count > 10 { closedWindows.removeFirst() }
+        }
         controllers.removeAll { $0 === controller }
         if lastKey === controller { lastKey = nil }
         if #available(macOS 15.4, *) { ExtensionHost.shared.windowClosed(controller) }
@@ -232,10 +239,30 @@ final class WindowManager {
         guard let state = JSONStore.load(SessionState.self, from: Paths.session), !state.windows.isEmpty else { return false }
         var allIDs = Set<UUID>()
         for windowState in state.windows {
+            allIDs.formUnion(restoreWindow(windowState))
+        }
+        SnapshotStore.prune(keeping: allIDs)
+        return !controllers.isEmpty
+    }
+
+    /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
+    private var closedWindows: [(state: SessionState.WindowState, history: [UUID: Data])] = []
+    var canReopenClosedWindow: Bool { !closedWindows.isEmpty }
+
+    /// Brings back the last closed window, its spaces, tabs, history and place on screen.
+    func reopenClosedWindow() {
+        guard let closed = closedWindows.popLast() else { return }
+        restoreWindow(closed.state, history: closed.history)
+    }
+
+    /// One window from saved state; returns its tabs' ids. `history` stands in for back/forward lists not on disk.
+    @discardableResult
+    private func restoreWindow(_ windowState: SessionState.WindowState, history: [UUID: Data] = [:]) -> Set<UUID> {
+            var allIDs = Set<UUID>()
             let manager = TabManager(spaceID: windowState.currentSpaceID)
             var selection: [UUID: UUID] = [:]
             for spaceTabs in windowState.spaces where Library.shared.space(spaceTabs.spaceID) != nil {
-                let tabs = spaceTabs.tabs.map { restoreTab($0, spaceID: spaceTabs.spaceID) }
+                let tabs = spaceTabs.tabs.map { restoreTab($0, spaceID: spaceTabs.spaceID, history: history[$0.id]) }
                 manager.adopt(tabs, in: spaceTabs.spaceID)
                 if let selected = spaceTabs.selectedTabID { selection[spaceTabs.spaceID] = selected }
                 allIDs.formUnion(tabs.map(\.id))
@@ -243,7 +270,7 @@ final class WindowManager {
             for bookmarkState in windowState.bookmarkTabs {
                 let isFavorite = Library.shared.isFavorite(bookmarkState.bookmarkID)
                 guard let spaceID = Library.shared.spaceID(ofBookmark: bookmarkState.bookmarkID) ?? (isFavorite ? windowState.currentSpaceID : nil) else { continue }
-                let tab = restoreTab(bookmarkState.tab, spaceID: spaceID)
+                let tab = restoreTab(bookmarkState.tab, spaceID: spaceID, history: history[bookmarkState.tab.id])
                 tab.isFavorite = isFavorite
                 manager.adoptBookmarkTab(tab, bookmarkID: bookmarkState.bookmarkID)
                 allIDs.insert(tab.id)
@@ -257,13 +284,11 @@ final class WindowManager {
             manager.restoreSelection(selection, currentSpaceID: windowState.currentSpaceID)
             controller.showWindow(nil)
             if windowState.isFullScreen == true { controller.window?.toggleFullScreen(nil) }
-        }
-        SnapshotStore.prune(keeping: allIDs)
-        return !controllers.isEmpty
+            return allIDs
     }
 
-    private func restoreTab(_ state: SessionState.TabState, spaceID: UUID) -> Tab {
-        let interaction = try? Data(contentsOf: Paths.tabState.appendingPathComponent(state.id.uuidString))
+    private func restoreTab(_ state: SessionState.TabState, spaceID: UUID, history: Data? = nil) -> Tab {
+        let interaction = history ?? (try? Data(contentsOf: Paths.tabState.appendingPathComponent(state.id.uuidString)))
         let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: spaceID, interactionState: interaction,
                       lastActivated: state.lastActivated, createdAt: state.createdAt)
         tab.customTitle = state.customTitle
