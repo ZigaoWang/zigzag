@@ -398,6 +398,8 @@ final class Library {
         let bookmark = Bookmark(id: id, url: url, title: title)
         let at = min(index ?? spaces[s].bookmarks.count, spaces[s].bookmarks.count)
         spaces[s].bookmarks.insert(bookmark, at: at)
+        // Landing between a folder's pages doesn't put it in the folder: it goes just after, where the sidebar shows it.
+        tidyFolders(s)
         commit()
         return bookmark
     }
