@@ -439,7 +439,7 @@ enum DebugBridge {
         case "menuaudit":
             var lines: [String] = []
             func walk(_ menu: NSMenu, _ path: String) {
-                for item in menu.items where !item.isSeparatorItem {
+                for item in menu.items where !item.isSeparatorItem && !item.isHidden && !item.isAlternate {
                     let name = path + " > " + item.title
                     if let sub = item.submenu { walk(sub, name); continue }
                     guard let action = item.action else { lines.append("NO ACTION: \(name)"); continue }
