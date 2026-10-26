@@ -8,7 +8,7 @@ final class PaneHeaderView: NSView {
     let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x6, toolTip: "Reload")
     let orientation = IconButton(symbol: "rectangle.split.1x2", size: Tokens.Space.x6, toolTip: "Stack Vertically")
     let swap = IconButton(symbol: "arrow.left.arrow.right", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Swap Sides")
-    let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Close Split View")
+    let close = IconButton(symbol: "rectangle.split.2x1.slash", size: Tokens.Space.x6, toolTip: "Separate Tabs")
     private let address = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let line = ColorView(color: Tokens.Color.separator)
     private weak var tab: Tab?

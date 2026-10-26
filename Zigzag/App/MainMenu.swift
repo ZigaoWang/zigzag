@@ -97,7 +97,7 @@ enum MainMenu {
             item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
             item("Show All Tabs", #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             item("Rotate Split View", #selector(C.toggleSplitOrientation(_:)), ""),
-            item("Close Split View", #selector(C.closeSplitView(_:)), ""),
+            item("Separate Tabs", #selector(C.closeSplitView(_:)), ""),
             .separator(),
             item("Back", #selector(C.goBack(_:)), "["),
             item("Forward", #selector(C.goForward(_:)), "]"),

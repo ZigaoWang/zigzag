@@ -73,9 +73,9 @@ extension BrowserWindowController {
             controller.tabManager.restoreSplit(pair)
             if let selected { controller.tabManager.select(selected) }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.unsplitWithUndo(tab, keep: keep) }
-            controller.sidebarUndo.setActionName("Close Split View")
+            controller.sidebarUndo.setActionName("Separate Tabs")
         }
-        sidebarUndo.setActionName("Close Split View")
+        sidebarUndo.setActionName("Separate Tabs")
     }
 
     // MARK: Favorites
