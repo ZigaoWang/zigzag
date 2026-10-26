@@ -219,6 +219,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
         setAccessibilityLabel(partner == nil ? title.stringValue : "\(title.stringValue), split with \(partnerTitle.stringValue)")
+        // What VoiceOver says after the name: the tab you're on, and whether it's playing or muted.
+        let state = [isSelected ? "current tab" : nil, tab?.isMuted == true ? "muted" : tab?.isPlayingAudio == true ? "playing audio" : nil]
+            .compactMap { $0 }.joined(separator: ", ")
+        setAccessibilityValue(state.isEmpty ? nil : state)
+        setAccessibilitySelected(isSelected)
     }
 
     /// Which half of a split row a point (in this view) falls in.
@@ -300,6 +305,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         super.stateDidChange(animated: animated)
         refreshTitleColor()
         refreshAccessories()
+        refreshAccessibilityLabel()
     }
 
 
