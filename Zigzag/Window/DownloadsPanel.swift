@@ -258,7 +258,8 @@ final class DownloadsPanelView: FloatingPanelView {
     private func checkWatched() {
         guard let item = watched, item.state != .downloading else { return }
         watched = nil
-        closeLater()
+        // Done: it tidies itself away. Paused or failed: it stays, so you see what happened.
+        if item.state == .finished { closeLater() }
     }
 
     /// Six seconds after the download is done, if nobody has reached for it; with the pointer on it, it waits.

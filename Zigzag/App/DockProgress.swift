@@ -23,15 +23,20 @@ final class DockProgress {
             tile.badgeLabel = nil
         }
         tile.display()
-        // A finished download says so once, in the window you're using.
-        // Not when the downloads panel is open there: it already shows the file arriving.
+        // A finished download says so once, in the window you're using, unless the downloads panel is open there and
+        // already shows it. One still flying to the button is announced after it lands, when that panel has opened.
         if let item, item.state == .finished, !announced.contains(item.id), let controller = WindowManager.shared.keyController {
             announced.insert(item.id)
-            // With the sidebar showing, the download lands in its button and the panel opens there: that's the notice.
-            if DownloadsPanel.isOpen(in: controller.window) || controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible { return }
-            if DownloadsPanel.isOpen(in: controller.window) { return }
-            Toast.show("Downloaded \(item.filename)", symbol: "arrow.down.circle",
-                       action: ("Show", { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
+            let announce = { [weak controller] in
+                guard let controller, !DownloadsPanel.isOpen(in: controller.window) else { return }
+                Toast.show("Downloaded \(item.filename)", symbol: "arrow.down.circle",
+                           action: ("Show", { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
+            }
+            if controller.flyingDownloads.contains(item.id) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4 * Tokens.Motion.debugSlowdown, execute: announce)
+            } else {
+                announce()
+            }
         }
     }
 

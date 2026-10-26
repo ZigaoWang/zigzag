@@ -810,6 +810,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
     #endif
 
+    /// Downloads on their way to the button: one that finishes mid-flight waits for the landing before it's announced.
+    private(set) var flyingDownloads: Set<UUID> = []
+
     private func flyDownload(_ item: DownloadItem, refresh: Bool = true) {
         if refresh { downloadsChanged() }
         sidebar.layoutSubtreeIfNeeded()
@@ -878,8 +881,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let group = CAAnimationGroup()
         group.animations = [move, scale, tilt, fade]
         group.duration = duration
+        flyingDownloads.insert(item.id)
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
+            self?.flyingDownloads.remove(item.id)
             // The landing is one moment: the file goes into the button, the button takes the hit, and the panel
             // springs open out of it, showing the file come in, and tidies itself away a while after it's done.
             Tokens.Motion.withoutAnimation { flyer.removeFromSuperlayer() }
