@@ -114,6 +114,15 @@ extension BrowserWindowController: NSMenuItemValidation {
         Toast.show(success ? "Saved as PDF" : "Couldn’t save the PDF", symbol: success ? "doc.richtext" : "exclamationmark.triangle", in: self)
     }
 
+    /// File › Share…: the page's address and title to Messages, Mail, AirDrop, Notes and the rest, from the address bar.
+    @objc func sharePage(_ sender: Any?) {
+        guard let tab = selectedTab, let url = tab.url else { return }
+        if !root.sidebarVisible { root.reveal(true) }
+        let anchor = sidebar.address
+        let picker = NSSharingServicePicker(items: [url as NSURL])
+        picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+    }
+
     /// File › Save Page As…: the page as a web archive, pictures and all, that opens offline; a PDF or picture open in
     /// the tab is saved as itself.
     @objc func savePageAs(_ sender: Any?) {

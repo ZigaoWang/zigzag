@@ -145,6 +145,7 @@ enum ErrorPage {
         <h1>\(escape(title))</h1><p>\(escape(message))</p>
         \(url.scheme == "webkit-extension" ? "" : #"<button onclick="location.reload()">Try Again</button>"#)
         \(proceed)
+        \(error.code == NSURLErrorNotConnectedToInternet || error.code == NSURLErrorNetworkConnectionLost ? "<script>addEventListener('online', () => location.reload())</script>" : "")
         </main></body></html>
         """
         // WebKit won't show anything at an address of an extension it doesn't have, so that page has none.

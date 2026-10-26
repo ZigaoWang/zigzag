@@ -60,6 +60,7 @@ enum MainMenu {
             item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),
             item("Close Window", #selector(C.closeWindow(_:)), "w", [.command, .shift]),
             .separator(),
+            item("Share…", #selector(C.sharePage(_:)), ""),
             item("Save Page As…", #selector(C.savePageAs(_:)), ""),
             item("Export as PDF…", #selector(C.exportAsPDF(_:)), ""),
             item("Print…", #selector(C.printPage(_:)), "p"),
