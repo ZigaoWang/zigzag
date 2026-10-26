@@ -678,6 +678,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var readerURL: URL?
     private var readerKeyMonitor: Any?
 
+    /// ⌘+, ⌘− and ⌘0 while Reader is up size its text instead of the page underneath. False when it isn't up.
+    func zoomReader(_ delta: Int) -> Bool {
+        guard let reader, readerTab === tabManager.selectedTab else { return false }
+        let size = reader.stepTextSize(delta)
+        let percent = Int((Double(size) / 19 * 100).rounded())
+        Toast.show("Text \(percent)%", symbol: delta < 0 ? "textformat.size.smaller" : "textformat.size.larger", in: self)
+        return true
+    }
+
     func toggleReader() {
         if reader != nil { closeReader(); return }
         guard let tab = tabManager.selectedTab, let webView = tab.webView, let url = tab.url else { return }

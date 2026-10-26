@@ -132,10 +132,16 @@ enum Reader {
     struct Preferences {
         enum Face: String, CaseIterable { case serif, sans }
         enum Theme: String, CaseIterable { case auto, light, sepia, dark }
-        static let sizes = 15...28
+        /// How wide the column of text runs. Medium is a comfortable book's measure; wide fills more of a big window.
+        enum Width: String, CaseIterable {
+            case narrow, medium, wide
+            var measure: String { switch self { case .narrow: "34em"; case .medium: "40em"; case .wide: "48em" } }
+        }
+        static let sizes = 13...32
         var size: Int
         var face: Face
         var theme: Theme
+        var width: Width = .medium
 
         static var saved: Preferences {
             get {
@@ -143,20 +149,23 @@ enum Reader {
                 let size = d.integer(forKey: "ReaderSize")
                 return Preferences(size: sizes.contains(size) ? size : 19,
                                    face: Face(rawValue: d.string(forKey: "ReaderFace") ?? "") ?? .sans,
-                                   theme: Theme(rawValue: d.string(forKey: "ReaderTheme") ?? "") ?? .auto)
+                                   theme: Theme(rawValue: d.string(forKey: "ReaderTheme") ?? "") ?? .auto,
+                                   width: Width(rawValue: d.string(forKey: "ReaderWidth") ?? "") ?? .medium)
             }
             set {
                 let d = UserDefaults.standard
                 d.set(newValue.size, forKey: "ReaderSize")
                 d.set(newValue.face.rawValue, forKey: "ReaderFace")
                 d.set(newValue.theme.rawValue, forKey: "ReaderTheme")
+                d.set(newValue.width.rawValue, forKey: "ReaderWidth")
             }
         }
 
         /// Applies these to an open reading page, without reloading it (and losing your place).
         var script: String {
             "document.documentElement.dataset.theme='\(theme.rawValue)';document.documentElement.dataset.face='\(face.rawValue)';" +
-            "document.documentElement.style.setProperty('--size','\(size)px');"
+            "document.documentElement.style.setProperty('--size','\(size)px');" +
+            "document.documentElement.style.setProperty('--measure','\(width.measure)');"
         }
     }
 
@@ -174,7 +183,7 @@ enum Reader {
         let source = (article.url ?? "").isEmpty ? "" :
             "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">Read the original on \(escape(article.site))</a></footer>"
         return """
-        <!doctype html><html lang="\(escape(article.lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="--size: \(preferences.size)px">
+        <!doctype html><html lang="\(escape(article.lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="--size: \(preferences.size)px; --measure: \(preferences.width.measure)">
         <head><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data:; media-src *; style-src 'unsafe-inline'; font-src *">
         <title>\(escape(article.title))</title>
@@ -201,7 +210,7 @@ enum Reader {
         @media (prefers-reduced-motion: reduce) { body { animation: none; } html, body { transition: none; } }
 
         /* One centered column at a book's measure: nothing to the side, nothing competing. */
-        main { max-width: 34em; margin: 0 auto; }
+        main { max-width: var(--measure, 40em); margin: 0 auto; transition: max-width .25s ease; }
 
         /* The title page: the headline, the site's summary, then where it's from in small type. */
         header { margin: 0 0 3em; }
@@ -301,6 +310,17 @@ final class ReaderView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    /// ⌘+ and ⌘−: the text a size bigger or smaller (0 back to the usual), kept for every article. Returns the new size.
+    @discardableResult
+    func stepTextSize(_ delta: Int) -> Int {
+        var preferences = controls.preferences
+        preferences.size = delta == 0 ? 19 : min(max(preferences.size + delta * 2, Reader.Preferences.sizes.lowerBound), Reader.Preferences.sizes.upperBound)
+        controls.preferences = preferences
+        Reader.Preferences.saved = preferences
+        webView.evaluateJavaScript(preferences.script, in: nil, in: .defaultClient, completionHandler: nil)
+        return preferences.size
+    }
 
     /// One private store for every reading page: a fresh one each time starts a new web process, which is most of
     /// a second before anything shows. Scripts stay off.
@@ -422,16 +442,19 @@ private final class ReaderOptions: FloatingPanelView {
                                       toggles: false, accessibilityNames: ["Smaller Text", "Larger Text"])
     private let face = ReaderSegments([.text("Serif", NSFont(descriptor: NSFont.systemFont(ofSize: 14, weight: .medium).fontDescriptor.withDesign(.serif)!, size: 14)!),
                                        .text("Sans", .systemFont(ofSize: 14, weight: .medium))], toggles: true, accessibilityNames: ["Serif", "Sans Serif"])
+    private let measure = ReaderSegments([.text("Narrow", .systemFont(ofSize: 13, weight: .medium)), .text("Medium", .systemFont(ofSize: 13, weight: .medium)),
+                                          .text("Wide", .systemFont(ofSize: 13, weight: .medium))], toggles: true,
+                                         accessibilityNames: ["Narrow Column", "Medium Column", "Wide Column"])
     private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
 
-    static let width: CGFloat = 236
+    static let width: CGFloat = 252
     private static let pad: CGFloat = 10, row: CGFloat = 36, gap: CGFloat = 8
-    var panelSize: NSSize { NSSize(width: Self.width, height: Self.pad * 2 + Self.row * 3 + Self.gap * 2) }
+    var panelSize: NSSize { NSSize(width: Self.width, height: Self.pad * 2 + Self.row * 4 + Self.gap * 3) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         radius = 16
-        [size, face].forEach { addSubview($0) }
+        [size, face, measure].forEach { addSubview($0) }
         for theme in Reader.Preferences.Theme.allCases {
             let tile = ThemeTile(theme: theme)
             tile.onClick = { [weak self] _ in self?.change { $0.theme = theme } }
@@ -442,6 +465,7 @@ private final class ReaderOptions: FloatingPanelView {
             self?.change { $0.size = index == 0 ? max(Reader.Preferences.sizes.lowerBound, $0.size - 1) : min(Reader.Preferences.sizes.upperBound, $0.size + 1) }
         }
         face.onPick = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
+        measure.onPick = { [weak self] index in self?.change { $0.width = Reader.Preferences.Width.allCases[index] } }
         onLayout = { [weak self] in self?.layoutContent() }
         refresh()
     }
@@ -457,6 +481,7 @@ private final class ReaderOptions: FloatingPanelView {
 
     private func refresh() {
         face.selected = preferences.face == .serif ? 0 : 1
+        measure.selected = Reader.Preferences.Width.allCases.firstIndex(of: preferences.width) ?? 1
         size.setEnabled(0, preferences.size > Reader.Preferences.sizes.lowerBound)
         size.setEnabled(1, preferences.size < Reader.Preferences.sizes.upperBound)
         for (theme, tile) in tiles { tile.isSelected = theme == preferences.theme }
@@ -466,7 +491,8 @@ private final class ReaderOptions: FloatingPanelView {
         let pad = Self.pad, inner = bounds.width - pad * 2
         size.frame = NSRect(x: pad, y: pad, width: inner, height: Self.row)
         face.frame = NSRect(x: pad, y: size.frame.maxY + Self.gap, width: inner, height: Self.row)
-        let y = face.frame.maxY + Self.gap, gap: CGFloat = 6
+        measure.frame = NSRect(x: pad, y: face.frame.maxY + Self.gap, width: inner, height: Self.row)
+        let y = measure.frame.maxY + Self.gap, gap: CGFloat = 6
         let w = (inner - gap * CGFloat(tiles.count - 1)) / CGFloat(tiles.count)
         for (i, (_, tile)) in tiles.enumerated() {
             tile.frame = NSRect(x: pad + CGFloat(i) * (w + gap), y: y, width: w, height: Self.row)

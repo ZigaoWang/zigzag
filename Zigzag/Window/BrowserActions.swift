@@ -143,18 +143,21 @@ extension BrowserWindowController: NSMenuItemValidation {
     private static let zoomSteps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 
     @objc func zoomIn(_ sender: Any?) {
+        if zoomReader(1) { return }
         guard let webView = selectedWebView else { return }
         let next = Self.zoomSteps.first { $0 > webView.pageZoom + 0.001 } ?? Self.zoomSteps.last!
         setZoom(next)
     }
 
     @objc func zoomOut(_ sender: Any?) {
+        if zoomReader(-1) { return }
         guard let webView = selectedWebView else { return }
         let next = Self.zoomSteps.last { $0 < webView.pageZoom - 0.001 } ?? Self.zoomSteps.first!
         setZoom(next)
     }
 
     @objc func actualSize(_ sender: Any?) {
+        if zoomReader(0) { return }
         setZoom(1)
         selectedWebView?.magnification = 1
     }
