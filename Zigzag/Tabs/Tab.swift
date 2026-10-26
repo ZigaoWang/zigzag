@@ -505,6 +505,13 @@ extension Tab: WKNavigationDelegate {
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
 
         // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
+        // "Visit this site anyway" on the certificate warning: trust it for this session and go.
+        if url.scheme == CertificateExceptions.scheme, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), let host = parts.host {
+            CertificateExceptions.allow(host)
+            parts.scheme = "https"
+            if let real = parts.url { DispatchQueue.main.async { [weak self] in self?.load(real) } }
+            return (.cancel, preferences)
+        }
         if ExternalLinks.isExternal(url) {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: navigationAction.navigationType == .linkActivated, from: webView)

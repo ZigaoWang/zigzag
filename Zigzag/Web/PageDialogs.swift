@@ -69,9 +69,23 @@ enum PageDialogs {
 }
 
 /// HTTP authentication (basic/digest) and client certificate prompts.
+/// Sites whose certificate you chose to trust anyway, from the warning page. Only until Zigzag quits, as Safari does.
+@MainActor enum CertificateExceptions {
+    private static var hosts: Set<String> = []
+    static func allow(_ host: String) { hosts.insert(host.lowercased()) }
+    static func allows(_ host: String) -> Bool { hosts.contains(host.lowercased()) }
+    /// The link the warning page's "Visit anyway" goes to; the tab catches it before it loads.
+    static let scheme = "zigzag-proceed"
+}
+
 enum AuthenticationPrompt {
     static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let method = challenge.protectionSpace.authenticationMethod
+        // A certificate you chose to trust on the warning page: accepted for this session.
+        if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
+           await CertificateExceptions.allows(challenge.protectionSpace.host) {
+            return (.useCredential, URLCredential(trust: trust))
+        }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {
             return (.performDefaultHandling, nil)
         }
@@ -96,6 +110,19 @@ enum ErrorPage {
     static func show(error: NSError, url: URL?, in webView: WKWebView) {
         guard let url else { return }
         let (title, message) = describe(error, url: url)
+        let certificate = [NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateNotYetValid,
+                           NSURLErrorServerCertificateHasUnknownRoot].contains(error.code) && error.domain == NSURLErrorDomain
+        // For a certificate you know is fine (your router, a dev server), a quiet way through, with the reason first.
+        var proceed = ""
+        if certificate, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            parts.scheme = CertificateExceptions.scheme
+            if let link = parts.url {
+                proceed = """
+                <details><summary>Show details</summary><p class="why">\(escape(certificateReason(error.code)))</p>
+                <a class="anyway" href="\(escape(link.absoluteString))">Visit this site anyway</a></details>
+                """
+            }
+        }
         let html = """
         <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
         <title>\(escape(url.host() ?? title))</title>
@@ -111,9 +138,13 @@ enum ErrorPage {
                  background: color-mix(in srgb, CanvasText 6%, transparent); color: inherit; }
         button:hover { background: color-mix(in srgb, CanvasText 10%, transparent); }
         button:active { background: color-mix(in srgb, CanvasText 14%, transparent); }
+        details { margin-top: 20px; } summary { cursor: default; color: color-mix(in srgb, CanvasText 54%, transparent); list-style: none; }
+        summary::-webkit-details-marker { display: none; } summary:hover { color: CanvasText; }
+        .why { margin: 12px 0; text-align: left; } .anyway { color: color-mix(in srgb, CanvasText 70%, transparent); }
         </style></head><body><main>
         <h1>\(escape(title))</h1><p>\(escape(message))</p>
         \(url.scheme == "webkit-extension" ? "" : #"<button onclick="location.reload()">Try Again</button>"#)
+        \(proceed)
         </main></body></html>
         """
         // WebKit won't show anything at an address of an extension it doesn't have, so that page has none.
@@ -147,6 +178,15 @@ enum ErrorPage {
             return ("Can’t connect to \(host)", "The site may be down right now.")
         default:
             return ("Can’t open this page", error.localizedDescription)
+        }
+    }
+
+    private static func certificateReason(_ code: Int) -> String {
+        switch code {
+        case NSURLErrorServerCertificateHasBadDate: "The site’s certificate has expired, or your Mac’s date and time are wrong."
+        case NSURLErrorServerCertificateNotYetValid: "The site’s certificate isn’t valid yet. Check your Mac’s date and time."
+        case NSURLErrorServerCertificateHasUnknownRoot: "The site’s certificate wasn’t issued by anyone your Mac trusts. Sites on your own network, like a router, often look like this."
+        default: "The site’s certificate is for a different address, or can’t be trusted. Someone could be pretending to be this site."
         }
     }
 
