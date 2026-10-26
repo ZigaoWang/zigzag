@@ -1,7 +1,7 @@
 import AppKit
 
 /// One download: file icon, name, progress or size, and a reveal button.
-final class DownloadRowView: InteractiveView {
+final class DownloadRowView: InteractiveView, NSDraggingSource {
     private let icon = NSImageView()
     private let name = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let status = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
@@ -21,6 +21,20 @@ final class DownloadRowView: InteractiveView {
         fill.layer?.cornerRadius = 1.5
         bar.addSubview(fill)
         [icon, name, status, bar, actionButton].forEach { addSubview($0) }
+        // A finished file drags out of the list, into Finder, Mail or any app, like a file in Finder.
+        onDragStart = { [weak self] event in
+            guard let self, let item = self.item, item.state == .finished, let url = item.destination,
+                  FileManager.default.fileExists(atPath: url.path) else { return false }
+            let dragItem = NSDraggingItem(pasteboardWriter: url as NSURL)
+            let image = NSWorkspace.shared.icon(forFile: url.path)
+            dragItem.setDraggingFrame(self.icon.frame, contents: image)
+            self.beginDraggingSession(with: [dragItem], event: event, source: self)
+            return true
+        }
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        context == .outsideApplication ? [.copy, .link, .generic] : []
     }
 
     required init?(coder: NSCoder) { fatalError() }
