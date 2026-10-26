@@ -72,16 +72,23 @@ final class WhatsNewSheet: NSView {
     private var monitor: Any?
     private let width: CGFloat = 440
     private let pad = Tokens.Space.x6
+    /// The notes scroll between the header and the buttons, so a long list never pushes Done out of reach.
+    private let scroll = NSScrollView()
+    private let notes = FlippedView()
 
     private init() {
         super.init(frame: .zero)
         wantsLayer = true
         addSubview(panel)
-        [icon, titleLabel, versionLabel, done, all].forEach { panel.addSubview($0) }
+        [icon, titleLabel, versionLabel, done, all, scroll].forEach { panel.addSubview($0) }
+        scroll.documentView = notes
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
         for section in WhatsNew.sections {
             let heading = Label(section.title, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
             headings.append(heading)
-            panel.addSubview(heading)
+            notes.addSubview(heading)
             for item in section.items {
                 let dot = ColorView(color: Tokens.Color.accent)
                 dot.wantsLayer = true
@@ -91,8 +98,8 @@ final class WhatsNewSheet: NSView {
                 text.textColor = Tokens.Color.textSecondary
                 text.isSelectable = false
                 points.append((dot, text))
-                panel.addSubview(dot)
-                panel.addSubview(text)
+                notes.addSubview(dot)
+                notes.addSubview(text)
             }
             // Marks where the next section starts.
             points.append((ColorView(color: .clear), NSTextField(labelWithString: "")))
@@ -147,56 +154,61 @@ final class WhatsNewSheet: NSView {
 
     override func layout() {
         super.layout()
-        let height = layoutPanel(measureOnly: true)
+        let maxHeight = bounds.height - Tokens.Space.x12
+        let height = min(headerHeight + notesHeight() + footerHeight, maxHeight)
         panel.frame = NSRect(x: round((bounds.width - width) / 2), y: round(max(Tokens.Space.x6, (bounds.height - height) / 2.4)),
-                             width: width, height: min(height, bounds.height - Tokens.Space.x12))
+                             width: width, height: height)
     }
 
+    private let iconSize: CGFloat = 52
+    private var headerHeight: CGFloat { pad + iconSize + Tokens.Space.x5 }
+    private var footerHeight: CGFloat { Tokens.Space.x4 + Tokens.Space.x8 + pad }
+
+    /// Lays the notes out in their scrolling column; returns how tall they are.
     @discardableResult
-    private func layoutPanel(measureOnly: Bool = false) -> CGFloat {
+    private func notesHeight(layingOut: Bool = false) -> CGFloat {
         let inner = width - pad * 2
-        let iconSize: CGFloat = 52
-        var y = pad
-        if !measureOnly {
-            icon.frame = NSRect(x: pad, y: y, width: iconSize, height: iconSize)
-            let textX = pad + iconSize + Tokens.Space.x3
-            let block = titleLabel.lineHeight + Tokens.Space.x1 + versionLabel.lineHeight
-            titleLabel.frame = NSRect(x: textX, y: y + (iconSize - block) / 2, width: inner - iconSize - Tokens.Space.x3, height: titleLabel.lineHeight)
-            versionLabel.frame = NSRect(x: textX, y: titleLabel.frame.maxY + Tokens.Space.x1, width: titleLabel.frame.width, height: versionLabel.lineHeight)
-        }
-        y += iconSize + Tokens.Space.x5
+        var y: CGFloat = 0
         var headingIndex = 0
         var startsSection = true
         for (dot, text) in points {
             if startsSection, headingIndex < headings.count {
                 let heading = headings[headingIndex]
-                if !measureOnly { heading.frame = NSRect(x: pad, y: y, width: inner, height: heading.lineHeight) }
+                if layingOut { heading.frame = NSRect(x: pad, y: y, width: inner, height: heading.lineHeight) }
                 y += heading.lineHeight + Tokens.Space.x2
                 headingIndex += 1
                 startsSection = false
             }
             if text.stringValue.isEmpty {
-                // The end of a section.
                 y += Tokens.Space.x3
                 startsSection = true
                 continue
             }
-            let textX = pad + Tokens.Space.x4
             let h = ceil(text.sizeThatFits(NSSize(width: inner - Tokens.Space.x4, height: 400)).height)
-            if !measureOnly {
-                text.frame = NSRect(x: textX, y: y, width: inner - Tokens.Space.x4, height: h)
+            if layingOut {
+                text.frame = NSRect(x: pad + Tokens.Space.x4, y: y, width: inner - Tokens.Space.x4, height: h)
                 let lineMid = y + (text.font.map { ceil($0.ascender - $0.descender + $0.leading) } ?? 16) / 2
                 dot.frame = NSRect(x: pad + Tokens.Space.x1, y: lineMid - 2.5, width: 5, height: 5)
             }
             y += h + Tokens.Space.x2
         }
-        y += Tokens.Space.x2
-        if !measureOnly {
-            let dw = max(done.fittingWidth, 88)
-            done.frame = NSRect(x: width - pad - dw, y: y, width: dw, height: Tokens.Space.x8)
-            let aw = all.fittingWidth
-            all.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: aw, height: Tokens.Space.x8)
-        }
-        return y + Tokens.Space.x8 + pad
+        return y
+    }
+
+    private func layoutPanel() {
+        let inner = width - pad * 2
+        icon.frame = NSRect(x: pad, y: pad, width: iconSize, height: iconSize)
+        let textX = pad + iconSize + Tokens.Space.x3
+        let block = titleLabel.lineHeight + Tokens.Space.x1 + versionLabel.lineHeight
+        titleLabel.frame = NSRect(x: textX, y: pad + (iconSize - block) / 2, width: inner - iconSize - Tokens.Space.x3, height: titleLabel.lineHeight)
+        versionLabel.frame = NSRect(x: textX, y: titleLabel.frame.maxY + Tokens.Space.x1, width: titleLabel.frame.width, height: versionLabel.lineHeight)
+        let contentHeight = notesHeight(layingOut: true)
+        let scrollHeight = panel.bounds.height - headerHeight - footerHeight
+        scroll.frame = NSRect(x: 0, y: headerHeight, width: width, height: max(0, scrollHeight))
+        notes.frame = NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: max(contentHeight, scroll.contentSize.height))
+        let y = panel.bounds.height - pad - Tokens.Space.x8
+        let dw = max(done.fittingWidth, 88)
+        done.frame = NSRect(x: width - pad - dw, y: y, width: dw, height: Tokens.Space.x8)
+        all.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: all.fittingWidth, height: Tokens.Space.x8)
     }
 }
