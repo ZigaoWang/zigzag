@@ -24,6 +24,7 @@ nonisolated enum Paths {
 
     static let library = file("Library.json")
     static let session = file("Session.json")
+    static let downloads = file("Downloads.json")
     static let history = file("History.sqlite")
     static let favicons = directory("Favicons")
     static let tabState = directory("TabState")

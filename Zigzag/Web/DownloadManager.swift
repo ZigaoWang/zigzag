@@ -11,7 +11,7 @@ final class DownloadItem {
     fileprivate(set) var fractionCompleted: Double = 0
     fileprivate(set) var totalBytes: Int64 = 0
     fileprivate(set) var completedBytes: Int64 = 0
-    let started = Date()
+    var started = Date()
     fileprivate weak var download: WKDownload?
     fileprivate var progressObservation: NSKeyValueObservation?
     fileprivate var resumeData: Data?
@@ -32,6 +32,43 @@ final class DownloadManager: NSObject {
 
     private(set) var items: [DownloadItem] = []
     let changed = Signal<DownloadItem?>()
+
+    /// Finished downloads are remembered between launches (never private ones), the newest 50, while the file is there.
+    private struct Saved: Codable {
+        var filename: String
+        var destination: URL
+        var sourceURL: URL?
+        var started: Date
+        var totalBytes: Int64
+    }
+
+    override init() {
+        super.init()
+        let saved = JSONStore.load([Saved].self, from: Paths.downloads) ?? []
+        items = saved.filter { FileManager.default.fileExists(atPath: $0.destination.path) }.map { entry in
+            let item = DownloadItem(filename: entry.filename, sourceURL: entry.sourceURL, isPrivate: false)
+            item.destination = entry.destination
+            item.state = .finished
+            item.fractionCompleted = 1
+            item.totalBytes = entry.totalBytes
+            item.completedBytes = entry.totalBytes
+            item.started = entry.started
+            return item
+        }
+        // Written when a download finishes or the list is cleared, not on every progress tick.
+        token = changed.observe { [weak self] item in
+            if item == nil || item?.state != .downloading { self?.save() }
+        }
+    }
+
+    private var token: SignalToken?
+
+    private func save() {
+        let kept = items.filter { !$0.isPrivate && $0.state == .finished }.prefix(50).compactMap { item in
+            item.destination.map { Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes) }
+        }
+        JSONStore.save(Array(kept), to: Paths.downloads)
+    }
 
     var activeCount: Int { items.filter { $0.state == .downloading }.count }
 
