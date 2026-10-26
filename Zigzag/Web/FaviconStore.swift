@@ -19,7 +19,22 @@ final class FaviconStore {
 
     private func key(for url: URL) -> String? {
         guard let host = url.host()?.lowercased() else { return nil }
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        // Google runs separate apps under one host, each with its own icon: Maps mustn't become Search's icon.
+        if site == "google.com", let app = url.pathComponents.dropFirst().first?.lowercased(), Self.googleApps.contains(app) {
+            return site + "/" + app
+        }
+        return site
+    }
+
+    private static let googleApps: Set<String> = ["maps", "travel", "flights", "finance", "shopping", "books", "earth"]
+
+    private init() {
+        // Before Google's apps had their own icons, one of them could have taken over google.com's.
+        if !UserDefaults.standard.bool(forKey: "faviconGoogleApps") {
+            try? FileManager.default.removeItem(at: file(for: "google.com"))
+            UserDefaults.standard.set(true, forKey: "faviconGoogleApps")
+        }
     }
 
     private func file(for key: String) -> URL {
@@ -51,7 +66,9 @@ final class FaviconStore {
     /// Loads an icon for a URL we have never visited (bookmarks, imports, history).
     func prefetch(for url: URL) {
         guard let key = key(for: url), memory[key] == nil, !inFlight.contains(key),
-              !FileManager.default.fileExists(atPath: file(for: key).path) else { return }
+              !FileManager.default.fileExists(atPath: file(for: key).path),
+              // A Google app's icon isn't at the host's root; it arrives with its page instead.
+              !key.contains("/") else { return }
         inFlight.insert(key)
         var components = URLComponents()
         components.scheme = url.scheme ?? "https"
