@@ -96,6 +96,12 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             actionButton.toolTip = "Cancel"
             pauseButton.symbol = "play.fill"
             pauseButton.toolTip = "Resume"
+        case .finished where item.fileIsMissing:
+            // Deleted or moved since: say so, and offer to fetch it again when that's possible.
+            let canFetch = ["http", "https"].contains(item.sourceURL?.scheme?.lowercased() ?? "")
+            status.stringValue = "Moved or deleted"
+            actionButton.symbol = canFetch ? "arrow.down" : "xmark"
+            actionButton.toolTip = canFetch ? "Download Again" : "Remove"
         case .finished:
             let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
@@ -106,7 +112,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         case .failed, .cancelled:
             // Say what happened, and offer to try again rather than only to remove it.
             let canRetry = DownloadManager.shared.canRetry(item)
-            status.stringValue = item.state == .failed ? "Didn’t finish" : "Canceled"
+            status.stringValue = item.state == .failed ? (item.failure.map { "Didn’t finish. \($0)." } ?? "Didn’t finish") : "Canceled"
             actionButton.symbol = canRetry ? "arrow.clockwise" : "xmark"
             actionButton.toolTip = canRetry ? "Try Again" : "Remove"
         }
@@ -116,7 +122,10 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         fill.color = item.state == .paused ? Tokens.Color.textTertiary : Tokens.Color.accent
         showIcon(for: item)
         isEnabled = true
-        alphaValue = [.finished, .downloading, .paused].contains(item.state) ? 1 : 0.6
+        let missing = item.fileIsMissing
+        // Something that needs you reads in the caution color; what's simply gone is quieter.
+        status.textColor = item.state == .failed ? Tokens.Color.caution : Tokens.Color.textSecondary
+        alphaValue = (item.state == .cancelled || missing) ? 0.6 : 1
         setAccessibilityRole(.button)
         setAccessibilityLabel(item.filename + ", " + status.stringValue)
         needsLayout = true
@@ -281,6 +290,13 @@ final class DownloadsPanelView: FloatingPanelView {
                 guard let item = row?.item else { return }
                 switch item.state {
                 case .downloading, .paused: DownloadManager.shared.cancel(item)
+                case .finished where item.fileIsMissing:
+                    if let webView = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView,
+                       ["http", "https"].contains(item.sourceURL?.scheme?.lowercased() ?? "") {
+                        DownloadManager.shared.downloadAgain(item, in: webView)
+                    } else {
+                        DownloadManager.shared.remove(item)
+                    }
                 case .finished: DownloadManager.shared.reveal(item)
                 default:
                     // Fetched again from a window of the same kind, so a private download never uses your cookies.

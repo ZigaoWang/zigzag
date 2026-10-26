@@ -20,6 +20,14 @@ final class DownloadItem {
     fileprivate(set) var speed: Double = 0
     fileprivate var lastSample: (at: Date, bytes: Int64)?
 
+    /// Why it stopped, in a few plain words, when it failed ("the connection dropped").
+    fileprivate(set) var failure: String?
+
+    /// Finished, but the file isn't where it was saved any more (deleted, or moved in Finder).
+    var fileIsMissing: Bool {
+        state == .finished && !(destination.map { FileManager.default.fileExists(atPath: $0.path) } ?? false)
+    }
+
     /// Seconds until done at the current speed, once there's enough to tell.
     var secondsLeft: Double? {
         guard state == .downloading, speed > 1, totalBytes > completedBytes else { return nil }
@@ -285,6 +293,17 @@ final class DownloadManager: NSObject {
         NSWorkspace.shared.open(url)
     }
 
+    /// Fetches a finished file again after it was deleted or moved, in the same place in the list.
+    func downloadAgain(_ item: DownloadItem, in webView: WKWebView) {
+        guard let url = item.sourceURL, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+        webView.startDownload(using: URLRequest(url: url)) { [weak self] download in
+            MainActor.assumeIsolated {
+                self?.items.removeAll { $0 === item }
+                self?.track(download, window: webView.window)
+            }
+        }
+    }
+
     /// Starts a failed or cancelled download again: from where it stopped when the server allows, else from the
     /// start. The new attempt takes the old row's place.
     func retry(_ item: DownloadItem, in webView: WKWebView) {
@@ -299,6 +318,26 @@ final class DownloadManager: NSObject {
         } else if let url = item.sourceURL, canRetry(item) {
             webView.startDownload(using: URLRequest(url: url), completionHandler: finish)
         }
+    }
+
+    /// What went wrong, the way you'd say it.
+    static func reason(for error: Error) -> String? {
+        let error = error as NSError
+        if error.domain == NSURLErrorDomain {
+            switch error.code {
+            case NSURLErrorNotConnectedToInternet: return "You’re offline"
+            case NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut, NSURLErrorCannotConnectToHost: return "The connection dropped"
+            case NSURLErrorCannotCreateFile, NSURLErrorCannotWriteToFile, NSURLErrorCannotOpenFile:
+                return "Couldn’t save it in that folder"
+            case NSURLErrorBadServerResponse, NSURLErrorResourceUnavailable, NSURLErrorFileDoesNotExist: return "The site couldn’t send it"
+            case NSURLErrorUserAuthenticationRequired, NSURLErrorNoPermissionsToReadFile: return "The site refused it"
+            default: break
+            }
+        }
+        if (error.domain == NSPOSIXErrorDomain && error.code == Int(ENOSPC)) || (error.domain == NSCocoaErrorDomain && error.code == NSFileWriteOutOfSpaceError) {
+            return "Not enough space on your Mac"
+        }
+        return nil
     }
 
     /// A file the page made itself (blob:, data:) can't be fetched again.
@@ -414,7 +453,10 @@ extension DownloadManager: WKDownloadDelegate {
         helpers[item.id] = nil
         item.resumeData = resumeData
         item.progressObservation = nil
-        if item.state != .cancelled { item.state = .failed }
+        if item.state != .cancelled {
+            item.state = .failed
+            item.failure = Self.reason(for: error)
+        }
         changed.send(item)
     }
 }
