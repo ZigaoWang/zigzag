@@ -11,9 +11,10 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .top { padding: 120px 0 96px; text-align: center; }
 .mark { display: block; width: min(380px, 76vw); height: auto; margin: 0 auto; color: var(--ink); overflow: visible; }
 /* Written in stroke by stroke, as Zigzag draws it. */
-.mark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: write .55s cubic-bezier(.22,.7,.18,1) forwards;
+/* Each stroke stays hidden until it starts: Safari paints the round end of a not-yet-drawn stroke as a dot. */
+.mark path { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; animation: write .55s cubic-bezier(.22,.7,.18,1) both;
   animation-delay: calc(.15s + var(--i) * .09s); }
-@keyframes write { to { stroke-dashoffset: 0; } }
+@keyframes write { from { opacity: 0; } 2% { opacity: 1; } to { stroke-dashoffset: 0; opacity: 1; } }
 .line { margin: 32px 0 0; font-size: 21px; color: var(--soft); opacity: 0; animation: show .6s ease .95s forwards; }
 .top .button, .top .fine { opacity: 0; animation: show .6s ease 1.1s forwards; }
 @keyframes rise { to { opacity: 1; transform: none; } }
@@ -60,7 +61,7 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 
 @media (max-width: 600px) { .top { padding: 80px 0 64px; } .clip { margin-bottom: 72px; } }
 @media (prefers-reduced-motion: reduce) {
-  .mark path { animation: none; stroke-dashoffset: 0; }
+  .mark path { animation: none; stroke-dashoffset: 0; opacity: 1; }
   .line, .top .button, .top .fine { animation: none; opacity: 1; transform: none; }
 }
 
