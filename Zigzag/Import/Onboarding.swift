@@ -65,8 +65,8 @@ final class OnboardingView: NSView {
             body = "Each one stays at the top of your sidebar."
         case .ads:
             content = AdsPicker()
-            title = "Ad blocking is built in"
-            body = "Pages load faster, with fewer trackers."
+            title = "Block ads"
+            body = "Built in, no extension needed. Pages load faster, too."
         default:
             content = ReadyPicker()
             title = "You’re all set"
@@ -1767,23 +1767,17 @@ private final class ExtensionRow: InteractiveView {
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let badge = ColorView(color: Onboard.accent)
-    private let shield = NSImageView()
+    private let demo = LiveBrowser()
     private let title = Label("Block ads and trackers", font: Tokens.Font.body(.semibold), color: Onboard.ink)
-    private let line = Label("Built into Zigzag, no extension needed.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
     private let toggle = Toggle(isOn: ContentBlocker.isEnabled)
-    private let rule = ColorView(color: Onboard.tint.withAlphaComponent(0.1))
-    private let note = Label("A site that breaks can be let through from its controls.", font: Tokens.Font.small(), color: Onboard.dim(0.6))
 
+    /// The switch, and a page that shows what it does: flip it and the banners come and go.
     override init(frame: NSRect) {
         super.init(frame: frame)
-        badge.wantsLayer = true
-        badge.layer?.cornerRadius = 12
-        badge.layer?.cornerCurve = .continuous
-        shield.image = Tokens.Symbol.image("shield.lefthalf.filled", size: 22)
-        shield.contentTintColor = .white
-        badge.addSubview(shield)
-        [badge, title, line, toggle, rule, note].forEach { addSubview($0) }
+        demo.tabs = ["The Daily Field", "Recipes", "Trip ideas"]
+        demo.page = .news(ads: !toggle.isOn)
+        toggle.onChange = { [weak self] on in self?.demo.page = .news(ads: !on) }
+        [demo, title, toggle].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1793,20 +1787,15 @@ private final class AdsPicker: StepContent {
         done()
     }
 
-    override func preferredHeight(for width: CGFloat) -> CGFloat { 52 + 33 + note.lineHeight }
+    override func preferredHeight(for width: CGFloat) -> CGFloat { round(width * 0.5) + 20 + 20 }
 
     override func layout() {
         super.layout()
-        let w = bounds.width, h: CGFloat = 52
-        badge.frame = NSRect(x: 0, y: 0, width: h, height: h)
-        shield.frame = badge.bounds
-        toggle.frame = NSRect(x: w - 34, y: (h - 20) / 2, width: 34, height: 20)
-        let tx = badge.frame.maxX + 14, tw = toggle.frame.minX - 16 - tx
-        let block = title.lineHeight + 2 + line.lineHeight
-        title.frame = NSRect(x: tx, y: (h - block) / 2, width: tw, height: title.lineHeight)
-        line.frame = NSRect(x: tx, y: title.frame.maxY + 2, width: tw, height: line.lineHeight)
-        rule.frame = NSRect(x: 0, y: h + 16, width: w, height: Tokens.Metric.hairline)
-        note.frame = NSRect(x: 0, y: rule.frame.maxY + 16, width: w, height: note.lineHeight)
+        let w = bounds.width
+        demo.frame = NSRect(x: 0, y: 0, width: w, height: round(w * 0.5))
+        let y = demo.frame.maxY + 20
+        toggle.frame = NSRect(x: w - 34, y: y, width: 34, height: 20)
+        title.frame = NSRect(x: 2, y: y + (20 - title.lineHeight) / 2, width: w - 50, height: title.lineHeight)
     }
 }
 

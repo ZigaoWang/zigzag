@@ -1263,7 +1263,15 @@ final class FlippedView: NSView {
 enum DefaultBrowser {
     static func make() {
         let app = Bundle.main.bundleURL
-        NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "http") { _ in }
-        NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in }
+        // macOS asks once, for http, and that answer makes Zigzag the web browser. Asking for https at the same time
+        // put a second, identical question on screen; it's only asked after, and only if the first didn't cover it.
+        NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "http") { error in
+            guard error == nil else { return }
+            DispatchQueue.main.async {
+                guard let https = URL(string: "https://example.com"),
+                      NSWorkspace.shared.urlForApplication(toOpen: https)?.standardizedFileURL != app.standardizedFileURL else { return }
+                NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in }
+            }
+        }
     }
 }
