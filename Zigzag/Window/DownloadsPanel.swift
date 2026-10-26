@@ -89,6 +89,7 @@ final class DownloadRowView: InteractiveView {
 enum DownloadsPanel {
     private static weak var current: DownloadsPanelView?
     static var isOpen: Bool { current?.superview != nil }
+    static func isOpen(in window: NSWindow?) -> Bool { isOpen && current?.window === window }
     static func closeCurrent() { current?.close() }
 
     static func show(from anchor: NSView, in controller: BrowserWindowController) {

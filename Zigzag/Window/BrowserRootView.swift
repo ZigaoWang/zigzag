@@ -127,6 +127,9 @@ final class BrowserRootView: ColorView {
     private var trackingArea: NSTrackingArea?
     /// Keeps the floating sidebar open, e.g. while a menu from it is showing.
     var holdReveal = false
+    /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
+    var keepsRevealed: (() -> Bool)?
+    private var isHeld: Bool { holdReveal || keepsRevealed?() == true }
 
     init(sidebar: SidebarView) {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
@@ -444,7 +447,7 @@ final class BrowserRootView: ColorView {
         // Anywhere left of the sidebar counts as on it: that's where the pointer goes to summon it.
         let keep = sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
             || (point.x < sidebar.minX && point.y >= bounds.minY && point.y <= bounds.maxY)
-        if keep || holdReveal || NSEvent.pressedMouseButtons != 0 {
+        if keep || isHeld || NSEvent.pressedMouseButtons != 0 {
             pointerLeftAt = nil
         } else if let left = pointerLeftAt {
             if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { reveal(false) }
@@ -455,7 +458,7 @@ final class BrowserRootView: ColorView {
 
     func reveal(_ show: Bool) {
         guard !sidebarVisible, show != sidebarRevealed else { return }
-        if !show && holdReveal { return }
+        if !show && isHeld { return }
         let old = sidebarContainer.frame
         sidebarRevealed = show
         watchPointer(show)

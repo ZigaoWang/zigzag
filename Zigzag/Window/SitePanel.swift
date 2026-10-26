@@ -6,6 +6,7 @@ import WebKit
 final class SitePanel: FloatingPanelView {
     private static weak var current: SitePanel?
     static var isOpen: Bool { current?.superview != nil }
+    static func isOpen(in window: NSWindow?) -> Bool { isOpen && current?.window === window }
     /// The open panel, for debugging.
     static var shown: SitePanel? { current }
     static func closeCurrent() { current?.close() }
