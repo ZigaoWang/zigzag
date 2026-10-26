@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 final class DownloadItem {
-    enum State: Equatable { case downloading, finished, failed, cancelled }
+    enum State: Equatable { case downloading, paused, finished, failed, cancelled }
 
     let id = UUID()
     fileprivate(set) var filename: String
@@ -16,6 +16,8 @@ final class DownloadItem {
     fileprivate var progressObservation: NSKeyValueObservation?
     fileprivate var resumeData: Data?
     fileprivate let sourceURL: URL?
+    /// The data store it came from, so a paused download resumes with the same cookies (a private one's own).
+    fileprivate weak var dataStore: WKWebsiteDataStore?
     /// From a private window: listed only in private windows, and forgotten when the last one closes.
     let isPrivate: Bool
 
@@ -34,12 +36,16 @@ final class DownloadManager: NSObject {
     let changed = Signal<DownloadItem?>()
 
     /// Finished downloads are remembered between launches (never private ones), the newest 50, while the file is there.
+    /// Paused ones too, with what WebKit needs to go on from where they stopped.
     private struct Saved: Codable {
         var filename: String
         var destination: URL
         var sourceURL: URL?
         var started: Date
         var totalBytes: Int64
+        var completedBytes: Int64?
+        var paused: Bool?
+        var resumeData: Data?
     }
 
     override init() {
@@ -48,11 +54,18 @@ final class DownloadManager: NSObject {
         items = saved.filter { FileManager.default.fileExists(atPath: $0.destination.path) }.map { entry in
             let item = DownloadItem(filename: entry.filename, sourceURL: entry.sourceURL, isPrivate: false)
             item.destination = entry.destination
-            item.state = .finished
-            item.fractionCompleted = 1
             item.totalBytes = entry.totalBytes
-            item.completedBytes = entry.totalBytes
             item.started = entry.started
+            if entry.paused == true {
+                item.state = .paused
+                item.resumeData = entry.resumeData
+                item.completedBytes = entry.completedBytes ?? 0
+                item.fractionCompleted = entry.totalBytes > 0 ? Double(item.completedBytes) / Double(entry.totalBytes) : 0
+            } else {
+                item.state = .finished
+                item.fractionCompleted = 1
+                item.completedBytes = entry.totalBytes
+            }
             return item
         }
         // Written when a download finishes or the list is cleared, not on every progress tick.
@@ -64,8 +77,11 @@ final class DownloadManager: NSObject {
     private var token: SignalToken?
 
     private func save() {
-        let kept = items.filter { !$0.isPrivate && $0.state == .finished }.prefix(50).compactMap { item in
-            item.destination.map { Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes) }
+        let kept = items.filter { !$0.isPrivate && [.finished, .paused].contains($0.state) }.prefix(50).compactMap { item in
+            item.destination.map {
+                Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes,
+                      completedBytes: item.completedBytes, paused: item.state == .paused ? true : nil, resumeData: item.state == .paused ? item.resumeData : nil)
+            }
         }
         JSONStore.save(Array(kept), to: Paths.downloads)
     }
@@ -78,6 +94,7 @@ final class DownloadManager: NSObject {
     /// The last private window closed: its finished downloads leave the list (the files stay in Downloads).
     func forgetPrivate() {
         let before = items.count
+        items.filter { $0.isPrivate && $0.state == .paused }.forEach(discardPartial)
         items.removeAll { $0.isPrivate && $0.state != .downloading }
         if items.count != before { changed.send(nil) }
     }
@@ -123,6 +140,14 @@ final class DownloadManager: NSObject {
         let isPrivate = download.webView.map { !$0.configuration.websiteDataStore.isPersistent } ?? false
         let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url,
                                 isPrivate: isPrivate)
+        item.dataStore = download.webView?.configuration.websiteDataStore
+        attach(download, to: item)
+        items.insert(item, at: 0)
+        changed.send(item)
+    }
+
+    /// Follows a download's progress on its row: the first attempt, or the same row after a resume.
+    private func attach(_ download: WKDownload, to item: DownloadItem) {
         item.download = download
         item.progressObservation = download.progress.observe(\.fractionCompleted) { [weak self, weak item] progress, _ in
             let fraction = progress.fractionCompleted
@@ -136,15 +161,25 @@ final class DownloadManager: NSObject {
                 self?.changed.send(item)
             }
         }
-        items.insert(item, at: 0)
-        changed.send(item)
     }
 
     private func item(for download: WKDownload) -> DownloadItem? {
         items.first { $0.download === download }
     }
 
+    /// A paused download given up on: the part already downloaded goes too.
+    private func discardPartial(_ item: DownloadItem) {
+        item.resumeData = nil
+        if let destination = item.destination { try? FileManager.default.removeItem(at: destination) }
+    }
+
     func cancel(_ item: DownloadItem) {
+        if item.state == .paused {
+            discardPartial(item)
+            item.state = .cancelled
+            changed.send(item)
+            return
+        }
         item.download?.cancel { [weak self] data in
             MainActor.assumeIsolated {
                 item.resumeData = data
@@ -153,6 +188,70 @@ final class DownloadManager: NSObject {
             }
         }
     }
+
+    /// Whether a download can stop for now and go on later: one fetched from a web address. A file the page made
+    /// itself (blob:, data:) can only be canceled.
+    func canPause(_ item: DownloadItem) -> Bool {
+        item.state == .downloading && ["http", "https"].contains(item.sourceURL?.scheme?.lowercased() ?? "")
+    }
+
+    /// Stops a download where it is, keeping what's arrived so far when the server lets it go on from there.
+    func pause(_ item: DownloadItem) {
+        guard canPause(item), let download = item.download else { return }
+        item.state = .paused
+        item.progressObservation = nil
+        changed.send(item)
+        download.cancel { [weak self] data in
+            MainActor.assumeIsolated {
+                item.resumeData = data
+                self?.changed.send(item)
+            }
+        }
+    }
+
+    /// Goes on with a paused download in the same row: from where it stopped, or from the start when the server
+    /// doesn't allow picking up partway.
+    func resume(_ item: DownloadItem) {
+        guard item.state == .paused, let webView = webView(for: item) else { return }
+        item.state = .downloading
+        changed.send(item)
+        let attach: (WKDownload) -> Void = { [weak self] download in
+            MainActor.assumeIsolated {
+                download.delegate = self
+                self?.attach(download, to: item)
+                self?.changed.send(item)
+            }
+        }
+        if let data = item.resumeData {
+            item.resumeData = nil
+            webView.resumeDownload(fromResumeData: data, completionHandler: attach)
+        } else if let url = item.sourceURL {
+            // Starting over: the new copy goes to the same file.
+            if let destination = item.destination { restarts[url] = destination }
+            item.completedBytes = 0
+            item.fractionCompleted = 0
+            webView.startDownload(using: URLRequest(url: url), completionHandler: attach)
+        }
+    }
+
+    /// Downloads started over after a pause, by address, and the file each one already had.
+    private var restarts: [URL: URL] = [:]
+
+    /// A web view to resume in: one from a window of the same kind, else a hidden one on the download's own data
+    /// store, kept until the download ends.
+    private func webView(for item: DownloadItem) -> WKWebView? {
+        if let open = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView,
+           item.dataStore == nil || open.configuration.websiteDataStore === item.dataStore {
+            return open
+        }
+        let configuration = WKWebViewConfiguration()
+        if let store = item.dataStore { configuration.websiteDataStore = store } else if item.isPrivate { return nil }
+        let hidden = WKWebView(frame: .zero, configuration: configuration)
+        helpers[item.id] = hidden
+        return hidden
+    }
+
+    private var helpers: [UUID: WKWebView] = [:]
 
     func reveal(_ item: DownloadItem) {
         guard let url = item.destination else { return }
@@ -187,12 +286,14 @@ final class DownloadManager: NSObject {
 
     func remove(_ item: DownloadItem) {
         if item.state == .downloading { cancel(item) }
+        if item.state == .paused { discardPartial(item) }
         items.removeAll { $0 === item }
         changed.send(nil)
     }
 
     func clearFinished(isPrivate: Bool) {
-        items.removeAll { $0.state != .downloading && $0.isPrivate == isPrivate }
+        // Paused downloads stay, like ones still running: Clear never throws away a half-finished file.
+        items.removeAll { ![.downloading, .paused].contains($0.state) && $0.isPrivate == isPrivate }
         changed.send(nil)
     }
 
@@ -220,6 +321,11 @@ extension DownloadManager: WKDownloadDelegate {
         let name = suggestedFilename.isEmpty ? "Download" : suggestedFilename
         var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
         let window = windows.removeValue(forKey: ObjectIdentifier(download))
+        if let url = download.originalRequest?.url, let earlier = restarts.removeValue(forKey: url) {
+            // A paused download started over: it replaces its own partial file.
+            try? FileManager.default.removeItem(at: earlier)
+            return earlier
+        }
         if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
             try? FileManager.default.removeItem(at: chosen)
             destination = chosen
@@ -263,9 +369,15 @@ extension DownloadManager: WKDownloadDelegate {
 
     func downloadDidFinish(_ download: WKDownload) {
         guard let item = item(for: download) else { return }
+        helpers[item.id] = nil
         item.state = .finished
         item.fractionCompleted = 1
         item.progressObservation = nil
+        // The file's real size: a download that had to start over after a pause counts its first bytes twice.
+        if let path = item.destination?.path, let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64 {
+            item.totalBytes = size
+            item.completedBytes = size
+        }
         if let destination = item.destination {
             // Bounce the Downloads stack in the Dock, like every Mac browser.
             DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
@@ -275,6 +387,9 @@ extension DownloadManager: WKDownloadDelegate {
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
         guard let item = item(for: download) else { return }
+        // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
+        if item.state == .paused { return }
+        helpers[item.id] = nil
         item.resumeData = resumeData
         item.progressObservation = nil
         if item.state != .cancelled { item.state = .failed }

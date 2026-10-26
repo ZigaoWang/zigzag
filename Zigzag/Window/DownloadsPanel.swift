@@ -8,6 +8,8 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     private let bar = ColorView(color: Tokens.Color.fieldFill)
     private let fill = ColorView(color: Tokens.Color.accent)
     let actionButton = IconButton(symbol: "magnifyingglass", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Show in Finder")
+    /// Pause or resume, beside Cancel, while a download is under way or paused.
+    let pauseButton = IconButton(symbol: "pause.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Pause")
     private(set) var item: DownloadItem?
 
     override init(frame: NSRect) {
@@ -20,7 +22,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         fill.wantsLayer = true
         fill.layer?.cornerRadius = 1.5
         bar.addSubview(fill)
-        [icon, name, status, bar, actionButton].forEach { addSubview($0) }
+        [icon, name, status, bar, actionButton, pauseButton].forEach { addSubview($0) }
         // A finished file drags out of the list, into Finder, Mail or any app, like a file in Finder.
         onDragStart = { [weak self] event in
             guard let self, let item = self.item, item.state == .finished, let url = item.destination,
@@ -50,6 +52,15 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             status.stringValue = item.totalBytes > 0 ? "\(done) of \(formatter.string(fromByteCount: item.totalBytes))" : done
             actionButton.symbol = "xmark"
             actionButton.toolTip = "Cancel"
+            pauseButton.symbol = "pause.fill"
+            pauseButton.toolTip = "Pause"
+        case .paused:
+            let done = formatter.string(fromByteCount: item.completedBytes)
+            status.stringValue = item.totalBytes > 0 ? "Paused, \(done) of \(formatter.string(fromByteCount: item.totalBytes))" : "Paused"
+            actionButton.symbol = "xmark"
+            actionButton.toolTip = "Cancel"
+            pauseButton.symbol = "play.fill"
+            pauseButton.toolTip = "Resume"
         case .finished:
             status.stringValue = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             actionButton.symbol = "magnifyingglass"
@@ -61,11 +72,14 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             actionButton.symbol = canRetry ? "arrow.clockwise" : "xmark"
             actionButton.toolTip = canRetry ? "Try Again" : "Remove"
         }
-        bar.isHidden = item.state != .downloading
+        bar.isHidden = item.state != .downloading && item.state != .paused
+        pauseButton.isHidden = !(item.state == .paused || DownloadManager.shared.canPause(item))
+        // A paused bar is quiet, so it reads as stopped.
+        fill.color = item.state == .paused ? Tokens.Color.textTertiary : Tokens.Color.accent
         let path = item.destination?.path ?? item.filename
         icon.image = NSWorkspace.shared.icon(for: .init(filenameExtension: (path as NSString).pathExtension) ?? .data)
         isEnabled = true
-        alphaValue = item.state == .finished || item.state == .downloading ? 1 : 0.6
+        alphaValue = [.finished, .downloading, .paused].contains(item.state) ? 1 : 0.6
         setAccessibilityRole(.button)
         setAccessibilityLabel(item.filename + ", " + status.stringValue)
         needsLayout = true
@@ -78,8 +92,9 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let b = actionButton.frame.size
         actionButton.frame.origin = NSPoint(x: bounds.width - pad - b.width, y: (bounds.height - b.height) / 2)
+        pauseButton.frame.origin = NSPoint(x: actionButton.frame.minX - Tokens.Space.x1 - pauseButton.frame.width, y: actionButton.frame.minY)
         let x = icon.frame.maxX + Tokens.Space.x2
-        let width = actionButton.frame.minX - Tokens.Space.x2 - x
+        let width = (pauseButton.isHidden ? actionButton.frame.minX : pauseButton.frame.minX) - Tokens.Space.x2 - x
         let nameH = name.lineHeight, statusH = status.lineHeight
         let top = (bounds.height - nameH - statusH - Tokens.Space.x1) / 2
         name.frame = NSRect(x: x, y: top, width: width, height: nameH)
@@ -188,7 +203,7 @@ final class DownloadsPanelView: FloatingPanelView {
             row.actionButton.onClick = { [weak row] _ in
                 guard let item = row?.item else { return }
                 switch item.state {
-                case .downloading: DownloadManager.shared.cancel(item)
+                case .downloading, .paused: DownloadManager.shared.cancel(item)
                 case .finished: DownloadManager.shared.reveal(item)
                 default:
                     // Fetched again from a window of the same kind, so a private download never uses your cookies.
@@ -200,12 +215,16 @@ final class DownloadsPanelView: FloatingPanelView {
                     }
                 }
             }
+            row.pauseButton.onClick = { [weak row] _ in
+                guard let item = row?.item else { return }
+                if item.state == .paused { DownloadManager.shared.resume(item) } else { DownloadManager.shared.pause(item) }
+            }
             rows.append(row)
             addSubview(row)
         }
         while rows.count > items.count { rows.removeLast().removeFromSuperview() }
         for (row, item) in zip(rows, items) { row.configure(item) }
-        clearButton.isEnabled = all.contains { $0.state != .downloading }
+        clearButton.isEnabled = all.contains { ![.downloading, .paused].contains($0.state) }
         clearButton.isHidden = items.isEmpty
         emptyNote.isHidden = !items.isEmpty
         emptyIcon.isHidden = !items.isEmpty

@@ -157,6 +157,13 @@ enum DebugBridge {
             default: break
             }
         case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
+        case "dl":
+            // dl pause|resume|state: acts on the newest download.
+            guard let item = DownloadManager.shared.items.first else { debugLog("dl => none"); break }
+            if arg == "pause" { DownloadManager.shared.pause(item) }
+            if arg == "resume" { DownloadManager.shared.resume(item) }
+            if arg == "cancel" { DownloadManager.shared.cancel(item) }
+            debugLog("dl => \(item.state) \(item.completedBytes)/\(item.totalBytes) \(item.destination?.lastPathComponent ?? "-")")
         case "action": controller.sidebar.address.actionButtons[min(Int(arg) ?? 0, controller.sidebar.address.actionButtons.count - 1)].onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
         case "importprobe":
             // Lists the browsers found and how many bookmarks and history pages each has; imports nothing.
