@@ -7,7 +7,6 @@
 - In Reader, ⌘+ and ⌘− make the text bigger or smaller, and the column is wider, with Narrow, Medium and Wide in the text settings.
 - Zigzag asks before quitting, so ⌘Q never closes everything by accident. Press ⌘Q again to quit, or turn it off in Settings.
 - After an update, Zigzag tells you what's new. Find it again in Help › What's New in Zigzag.
-
 - A History window (⇧⌘Y): every page by day, with search, and you can remove one page or clear the last hour, today or everything.
 - Fill your name, email, phone and address into forms from your card in Contacts.
 - Screen sharing in Meet, Zoom and Teams.
