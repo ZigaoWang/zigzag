@@ -5,6 +5,12 @@ final class SidebarContainer: NSView {
     let sidebar: SidebarView
     var isFloating = false { didSet { refresh() } }
     var tint: NSColor = SpaceColor.sky.background { didSet { refresh() } }
+    /// Floating, it carries the window's look with it: the gradient (the same slice of it the window shows there)
+    /// and the grain, so sliding it out never strips them.
+    var gradient: (end: NSColor, angle: Double)? { didSet { refresh() } }
+    var grain: Double = 0 { didSet { refresh() } }
+    private let gradientLayer = CAGradientLayer()
+    private let grainLayer = CALayer()
 
     init(sidebar: SidebarView) {
         self.sidebar = sidebar
@@ -14,6 +20,18 @@ final class SidebarContainer: NSView {
         sidebar.wantsLayer = true
         sidebar.layer?.cornerCurve = .continuous
         addSubview(sidebar)
+        // Behind the sidebar's own views, inside its rounded shape.
+        let backdrop = CALayer()
+        backdrop.masksToBounds = true
+        backdrop.cornerCurve = .continuous
+        // Top-down, like the window, so the gradient's slice lines up with the window around it.
+        backdrop.isGeometryFlipped = true
+        backdrop.addSublayer(gradientLayer)
+        grainLayer.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
+        grainLayer.compositingFilter = "overlayBlendMode"
+        backdrop.addSublayer(grainLayer)
+        sidebar.layer?.insertSublayer(backdrop, at: 0)
+        self.backdrop = backdrop
         refresh()
     }
 
@@ -21,9 +39,35 @@ final class SidebarContainer: NSView {
 
     override var isFlipped: Bool { true }
 
+    private var backdrop: CALayer?
+
+    /// The window-sized gradient, placed so this slice matches the window around it, wherever the sidebar is.
+    private func placeGradient() {
+        let window = superview?.bounds ?? bounds
+        Tokens.Motion.withoutAnimation {
+            gradientLayer.frame = CGRect(x: -frame.minX, y: -frame.minY, width: window.width, height: window.height)
+        }
+    }
+
+    // Sliding out moves the sidebar without resizing it, so layout alone wouldn't follow.
+    override func setFrameOrigin(_ newOrigin: NSPoint) {
+        super.setFrameOrigin(newOrigin)
+        placeGradient()
+    }
+
     override func layout() {
         super.layout()
         sidebar.frame = bounds
+        Tokens.Motion.withoutAnimation {
+            backdrop?.frame = sidebar.bounds
+            backdrop?.cornerRadius = isFloating ? Tokens.Radius.card : 0
+            placeGradient()
+            grainLayer.frame = sidebar.bounds
+            // The same fine noise as the window: drawn at the screen's resolution, not doubled up.
+            let scale = self.window?.backingScaleFactor ?? 2
+            backdrop?.contentsScale = scale
+            grainLayer.contentsScale = scale
+        }
         layer?.shadowPath = isFloating ? CGPath(roundedRect: bounds, cornerWidth: Tokens.Radius.card, cornerHeight: Tokens.Radius.card, transform: nil) : nil
     }
 
@@ -36,6 +80,21 @@ final class SidebarContainer: NSView {
         Tokens.Motion.withoutAnimation {
             sidebar.layer?.cornerRadius = isFloating ? Tokens.Radius.card : 0
             sidebar.layer?.backgroundColor = isFloating ? cgColor(tint) : nil
+            // The grain blends inside this clipped layer, so the color sits here too, under it, as in the window.
+            backdrop?.backgroundColor = isFloating ? cgColor(tint) : nil
+            backdrop?.isHidden = !isFloating
+            if let gradient, isFloating {
+                let r = gradient.angle * .pi / 180
+                let dx = cos(r) / 2, dy = sin(r) / 2
+                // A gradient's points count up from the bottom even in a top-down layer: the vertical turns over.
+                gradientLayer.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 + dy)
+                gradientLayer.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 - dy)
+                gradientLayer.colors = [cgColor(tint), cgColor(gradient.end)]
+                gradientLayer.isHidden = false
+            } else {
+                gradientLayer.isHidden = true
+            }
+            grainLayer.opacity = Float(min(max(grain, 0), 1) * 0.22)
             sidebar.layer?.borderWidth = isFloating ? Tokens.Metric.hairline : 0
             sidebar.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)

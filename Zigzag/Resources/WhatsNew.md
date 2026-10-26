@@ -7,3 +7,4 @@
 - Tabs in Show All Tabs fill their cards, instead of sitting in black bars.
 - With the sidebar hidden, a split view's pages meet in the middle, with no gap.
 - The site panel and downloads keep the slid-out sidebar open until you close them.
+- The slid-out sidebar keeps your space's gradient and grain.

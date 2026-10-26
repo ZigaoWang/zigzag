@@ -245,6 +245,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func previewSpaceGrain(_ grain: Double, for spaceID: UUID) {
         guard spaceID == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
         root.setGrain(grain, animated: false)
+        root.sidebarContainer.grain = grain
     }
 
     private func applySpaceColor(animated: Bool) {
@@ -274,6 +275,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         root.setGrain(tabManager.isPrivate ? 0 : space.grain ?? 0, animated: animated)
         root.sidebarContainer.tint = color
+        root.sidebarContainer.gradient = glass ? nil : end.map { ($0, space.gradientAngle) }
+        root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
     }
 
     private func showSelectedTab() {
