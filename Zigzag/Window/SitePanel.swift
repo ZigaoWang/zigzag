@@ -219,6 +219,12 @@ final class SitePanel: FloatingPanelView {
                 self?.rebuildRows()
             })
         }
+        if let allowed = SitePermissions.location(host: host) {
+            rows.append(.value("Location", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+                SitePermissions.forgetLocation(host: host)
+                self?.rebuildRows()
+            })
+        }
         if !tab.isPrivate, let allowed = SitePermissions.notifications(host: host.lowercased()) {
             rows.append(.toggle("Notifications", on: allowed) { on in
                 SitePermissions.setNotifications(on, host: host.lowercased())

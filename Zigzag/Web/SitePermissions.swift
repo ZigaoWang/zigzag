@@ -35,6 +35,17 @@ enum SitePermissions {
 
     static func forgetAll() { UserDefaults.standard.removeObject(forKey: key) }
 
+    /// A site's answer about your location, if it ever asked.
+    static func location(host: String) -> Bool? {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: Bool])?["\(host)|location"]
+    }
+
+    static func forgetLocation(host: String) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        all["\(host)|location"] = nil
+        UserDefaults.standard.set(all, forKey: key)
+    }
+
     /// "Ask again" for the camera, microphone and location. Notifications have their own switch and stay as they are.
     static func forget(host: String) {
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
