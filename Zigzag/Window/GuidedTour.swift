@@ -136,6 +136,13 @@ final class GuidedTour: NSView {
         let spaceStep = Tutorial.current?.id == "space" || confirming?.id == "space" || Tutorial.current == nil
         let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep)
         let aside = !relevant && (controller.hasFloatingPanel || peek)
+        // During the Peek step the card sits above the peek, so "Close it" is right there; otherwise it stays beneath
+        // everything that floats.
+        if let overlay = superview {
+            let onTop = peek && Tutorial.current?.id == "peek"
+            if onTop, overlay.subviews.last !== self { overlay.addSubview(self) }
+            if !onTop, overlay.subviews.first !== self { overlay.addSubview(self, positioned: .below, relativeTo: nil) }
+        }
         let alpha: CGFloat = aside ? 0 : 1
         if alphaValue != alpha {
             NSAnimationContext.runAnimationGroup { ctx in

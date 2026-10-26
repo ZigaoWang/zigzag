@@ -257,7 +257,7 @@ class FloatingPanelView: NSView {
     /// whatever opened it. Opacity and movement run together on the layer, so they never drift apart.
     /// How a panel arrives. Anything attached to what opened it (the address dropdown) just appears; small panels
     /// from a button fade; free-floating notices drop in slightly.
-    /// `.fade` (and `.pop`) grow out of `growsFrom`: a soft spring, so a panel opening from a button looks like it
+    /// `.fade` (and `.pop`) grow out of `growsFrom`: a short, critically damped spring with no overshoot, so a panel opening from a button looks like it
     /// came out of that button. ⌘T's bar alone appears at once, being the thing you do most.
     enum Arrival { case drop, fade, instant, zoom, pop }
 
@@ -287,11 +287,11 @@ class FloatingPanelView: NSView {
             fade.duration = 0.16
             fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
             let grow = CASpringAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: scaled(0.92))
+            grow.fromValue = NSValue(caTransform3D: scaled(0.97))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
             grow.mass = 1
-            grow.stiffness = 420
-            grow.damping = 32
+            grow.stiffness = 520
+            grow.damping = 48
             grow.initialVelocity = 0
             grow.duration = grow.settlingDuration
             layer.add(fade, forKey: "present")
@@ -353,7 +353,7 @@ class FloatingPanelView: NSView {
         if !Tokens.Motion.reduceMotion {
             let shrink = CABasicAnimation(keyPath: "transform")
             shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
-            shrink.toValue = NSValue(caTransform3D: scaled(0.96))
+            shrink.toValue = NSValue(caTransform3D: scaled(0.98))
             shrink.duration = 0.14
             shrink.timingFunction = CAMediaTimingFunction(name: .easeIn)
             shrink.fillMode = .forwards

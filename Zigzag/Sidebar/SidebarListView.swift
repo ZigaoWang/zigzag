@@ -156,9 +156,27 @@ final class SidebarListView: NSView {
         let layout = frames(for: displayed)
         let visible = Set(displayed)
 
+        // A page that changes kind (a tab pinned with ⌘D, or a pinned page made a tab again) keeps one row that
+        // glides from where it was to where it now belongs, instead of one fading out and another fading in.
+        func pageID(_ item: SidebarItem) -> UUID? {
+            switch item {
+            case .tab(let id): id
+            case .bookmark(let id): manager?.bookmarkTab(for: id)?.id
+            default: nil
+            }
+        }
+        var departing: [UUID: NSRect] = [:]
+        for (item, view) in rows where !visible.contains(item) && view !== drag?.view {
+            if animated, let id = pageID(item) { departing[id] = view.frame }
+        }
+
         // Leaving rows fade out where they are.
         for (item, view) in rows where !visible.contains(item) && view !== drag?.view {
             rows[item] = nil
+            if let id = pageID(item), departing[id] != nil, displayed.contains(where: { pageID($0) == id }) {
+                view.removeFromSuperview()
+                continue
+            }
             if animated {
                 Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { view.removeFromSuperview() })
             } else {
@@ -178,11 +196,16 @@ final class SidebarListView: NSView {
                 let view = makeView(for: item)
                 rows[item] = view
                 configure(view, for: item)
-                view.frame = frame
                 addSubview(view, positioned: .below, relativeTo: drag?.view)
-                if animated {
-                    view.alphaValue = 0
-                    changes.append { view.animator().alphaValue = 1 }
+                if animated, let id = pageID(item), let from = departing[id] {
+                    view.frame = from
+                    changes.append { view.animator().frame = frame }
+                } else {
+                    view.frame = frame
+                    if animated {
+                        view.alphaValue = 0
+                        changes.append { view.animator().alphaValue = 1 }
+                    }
                 }
             }
         }
