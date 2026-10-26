@@ -64,6 +64,23 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         }
     }
     var gradientAngle: Double { angle ?? 45 }
+
+    /// Light or dark for the window: whichever text reads better on this space's own colors, judged at the
+    /// harder end of a gradient. Glass and spaces that follow the Mac keep what they were given.
+    var readableAppearance: String? {
+        guard brightness != nil, glass != true else { return appearance }
+        let colors = [background] + (background2.map { [$0] } ?? [])
+        func luminance(_ color: NSColor) -> Double {
+            guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
+            func linear(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+            return 0.2126 * linear(c.redComponent) + 0.7152 * linear(c.greenComponent) + 0.0722 * linear(c.blueComponent)
+        }
+        // WCAG contrast of black text and of white text, each at its worst across the colors.
+        let lums = colors.map(luminance)
+        let black = lums.map { ($0 + 0.05) / 0.05 }.min() ?? 1
+        let white = lums.map { 1.05 / ($0 + 0.05) }.min() ?? 1
+        return black >= white ? "light" : "dark"
+    }
 }
 
 enum SearchEngine: String, Codable, CaseIterable {

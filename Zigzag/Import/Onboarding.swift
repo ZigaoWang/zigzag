@@ -1801,7 +1801,7 @@ final class LiveBrowser: NSView {
     /// Takes on the first space's color and look.
     func refreshColors() {
         let space = Library.shared.spaces.first
-        let look = space?.appearance
+        let look = space?.readableAppearance
         appearance = look == "dark" ? NSAppearance(named: .darkAqua) : look == "light" ? NSAppearance(named: .aqua) : nil
         effectiveAppearance.performAsCurrentDrawingAppearance {
             self.isDark = self.effectiveAppearance.isDark

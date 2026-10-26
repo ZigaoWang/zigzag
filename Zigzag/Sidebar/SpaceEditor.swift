@@ -714,9 +714,8 @@ final class SpaceLookEditor: NSView {
             space.appearance = original.appearance
             return space
         }
-        // The window's mode follows how deep the first color is, the one the sidebar starts on: light for the
-        // lighter half of the wheel, dark for the deeper.
-        space.appearance = (draft.brightness ?? 0) < 0.5 ? "light" : "dark"
+        // Light or dark: glass goes by its shade, a color by whichever text reads better on it.
+        space.appearance = space.glass == true ? ((draft.brightness ?? 0) < 0.5 ? "light" : "dark") : space.readableAppearance
         return space
     }
 

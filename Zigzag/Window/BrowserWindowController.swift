@@ -256,7 +256,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Draws the window for a space: its mode, color or glass, gradient and grain.
     private func render(_ space: SpaceInfo, animated: Bool) {
         if !tabManager.isPrivate {
-            let name: NSAppearance.Name? = space.appearance == "light" ? .aqua : space.appearance == "dark" ? .darkAqua : nil
+            let mode = space.readableAppearance
+            let name: NSAppearance.Name? = mode == "light" ? .aqua : mode == "dark" ? .darkAqua : nil
             if window?.appearance?.name != name { window?.appearance = name.flatMap(NSAppearance.init(named:)) }
         }
         let glass = !tabManager.isPrivate && space.glass == true

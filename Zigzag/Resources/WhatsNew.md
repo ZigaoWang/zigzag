@@ -5,6 +5,7 @@
 - After an update, Zigzag tells you what's new. Find it again in Help › What's New in Zigzag.
 
 ## Fixed
+- Text in the sidebar stays readable on every color: Zigzag picks light or dark by what actually reads better, at both ends of a gradient.
 - Tabs in Show All Tabs fill their cards, instead of sitting in black bars.
 - With the sidebar hidden, a split view's pages meet in the middle, with no gap.
 - The site panel and downloads keep the slid-out sidebar open until you close them.
