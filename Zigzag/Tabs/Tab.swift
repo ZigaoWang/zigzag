@@ -17,6 +17,7 @@ enum OpenDisposition {
     case backgroundTab
     case peek
     case newWindow
+    case privateWindow
 }
 
 /// One page in the browser. The tab owns its web view; views only borrow it to display.

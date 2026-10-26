@@ -32,6 +32,14 @@ final class BrowserWebView: WKWebView {
                 if let index = menu.items.firstIndex(of: original) {
                     menu.removeItem(at: index)
                     menu.insertItem(tabItem, at: index)
+                    // Below Peek: a new window, and a private one.
+                    for (offset, (title, selector)) in [("Open Link in New Window", #selector(openInNewWindow(_:))),
+                                                        ("Open Link in Private Window", #selector(openInPrivateWindow(_:)))].enumerated() {
+                        let windowItem = NSMenuItem(title: title, action: selector, keyEquivalent: "")
+                        windowItem.target = self
+                        windowItem.representedObject = original
+                        menu.insertItem(windowItem, at: min(index + 2 + offset, menu.items.count))
+                    }
                 }
             case "WKMenuItemIdentifierOpenImageInNewWindow":
                 item.title = "Open Image in New Tab"
@@ -39,6 +47,11 @@ final class BrowserWebView: WKWebView {
                 item.title = "Open Video in New Tab"
             case "WKMenuItemIdentifierOpenFrameInNewWindow":
                 item.isHidden = true
+            case "WKMenuItemIdentifierSearchWeb":
+                // Searches with the engine you chose in Settings, in a new tab, not always Google in Safari.
+                item.title = "Search with \(Library.shared.searchEngine.name)"
+                item.action = #selector(searchSelection(_:))
+                item.target = self
             default:
                 break
             }
@@ -51,6 +64,24 @@ final class BrowserWebView: WKWebView {
 
     @objc private func openInNewTab(_ sender: NSMenuItem) {
         trigger(sender.representedObject as? NSMenuItem, disposition: .backgroundTab)
+    }
+
+    @objc private func openInNewWindow(_ sender: NSMenuItem) {
+        trigger(sender.representedObject as? NSMenuItem, disposition: .newWindow)
+    }
+
+    @objc private func openInPrivateWindow(_ sender: NSMenuItem) {
+        trigger(sender.representedObject as? NSMenuItem, disposition: .privateWindow)
+    }
+
+    @objc private func searchSelection(_ sender: NSMenuItem) {
+        evaluateJavaScript("window.getSelection().toString()") { [weak self] result, _ in
+            MainActor.assumeIsolated {
+                guard let self, let text = (result as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
+                      let controller = WindowManager.shared.controllers.first(where: { $0.window === self.window }) else { return }
+                controller.open(Library.shared.searchEngine.searchURL(text), disposition: .foregroundTab, opener: self.owner, allowSwitch: false)
+            }
+        }
     }
 
     private func trigger(_ original: NSMenuItem?, disposition: OpenDisposition) {
