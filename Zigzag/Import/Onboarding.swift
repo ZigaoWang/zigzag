@@ -1704,12 +1704,10 @@ private final class ChoiceCard: InteractiveView {
 
 // MARK: - Color
 
-/// The same wheel and presets as the space editor, and the window on the right wearing whatever you pick. Deeper
-/// colors turn the window dark.
+/// The space editor's own look controls, the very same ones, with the window on the right wearing whatever you pick.
 private final class ColorPicker: StepContent {
     var onColor: (() -> Void)?
-    private let wheel = ColorWheel()
-    private let swatches = SpaceLook.colors.map { LookSwatch(look: $0) }
+    private var editor: SpaceLookEditor?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1719,53 +1717,33 @@ private final class ColorPicker: StepContent {
             space.appearance = "light"
             Library.shared.setLook(space)
         }
-        addSubview(wheel)
-        wheel.onChange = { [weak self] _, spot, _ in
-            guard let self, var space = self.space else { return }
-            // Live as you drag: the window and the whole right side follow your finger.
-            space.hue = spot.hue
-            space.intensity = nil
-            space.brightness = spot.depth
-            space.appearance = spot.depth < 0.5 ? "light" : "dark"
-            Library.shared.setLook(space)
-            self.refresh(animated: false)
-            self.onColor?()
-        }
-        for swatch in swatches {
-            swatch.onClick = { [weak self, weak swatch] _ in
-                guard let self, let look = swatch?.look, var space = self.space else { return }
-                look.apply(to: &space)
-                space.appearance = look.depth < 0.5 ? "light" : "dark"
-                Library.shared.setLook(space)
-                self.refresh(animated: true)
-                self.onColor?()
-            }
-            addSubview(swatch)
-        }
+        guard let space else { return }
+        let editor = SpaceLookEditor(space: space, dark: false)
+        editor.wheelHeight = 176
+        // Live as you drag: the window on the right follows your finger.
+        editor.onPreview = { [weak self] look in self?.show(look) }
+        editor.onCommit = { [weak self] look in self?.show(look) }
+        editor.onResize = { [weak self] in self?.needsLayout = true }
+        addSubview(editor)
+        self.editor = editor
         preview.page = .wikipedia
-        refresh(animated: false)
+        preview.refreshColors()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var space: SpaceInfo? { Library.shared.spaces.first }
 
-    private func refresh(animated: Bool) {
-        guard let space else { return }
-        wheel.show([ColorWheel.Spot(hue: space.baseHue, depth: space.isNeutral ? 0 : space.brightness ?? 0.2)],
-                   colors: [space.background], animated: animated)
-        for swatch in swatches { swatch.isSelected = swatch.look.matches(space) }
+    private func show(_ look: SpaceInfo) {
+        Library.shared.setLook(look)
         preview.refreshColors()
+        onColor?()
     }
 
     override func layout() {
         super.layout()
-        let w = bounds.width
-        wheel.frame = NSRect(x: 0, y: 0, width: w, height: 220)
-        let size: CGFloat = 26, gap = (w - size * CGFloat(swatches.count)) / CGFloat(max(swatches.count - 1, 1))
-        for (i, swatch) in swatches.enumerated() {
-            swatch.frame = NSRect(x: CGFloat(i) * (size + gap), y: wheel.frame.maxY + 16, width: size, height: size)
-        }
+        guard let editor else { return }
+        editor.frame = NSRect(x: 0, y: 0, width: bounds.width, height: editor.preferredHeight)
     }
 }
 
@@ -1792,6 +1770,11 @@ final class LiveBrowser: NSView {
     var page: Page = .wikipedia { didSet { needsDisplay = true } }
     var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
     private var background: NSColor = SpaceColor.sky.background
+    /// Where a gradient ends, which way it runs, how grainy, and whether it's glass: the frame as the real one draws it.
+    private var background2: NSColor?
+    private var angle: Double = 90
+    private var grain: Double = 0
+    private var glass = false
     private var accent: NSColor = Brand.Theme.brand.accent
     private var isDark = false
 
@@ -1823,8 +1806,12 @@ final class LiveBrowser: NSView {
         appearance = look == "dark" ? NSAppearance(named: .darkAqua) : look == "light" ? NSAppearance(named: .aqua) : nil
         effectiveAppearance.performAsCurrentDrawingAppearance {
             self.isDark = self.effectiveAppearance.isDark
-            let bg = space?.background ?? SpaceColor.sky.background
+            self.glass = space?.glass == true
+            let bg = self.glass ? space?.glassColor ?? .clear : space?.background ?? SpaceColor.sky.background
             self.background = bg.usingColorSpace(.sRGB) ?? bg
+            self.background2 = self.glass ? nil : space?.background2.map { $0.usingColorSpace(.sRGB) ?? $0 }
+            self.angle = space?.gradientAngle ?? 90
+            self.grain = space?.grain ?? 0
             self.accent = Brand.Theme.of(space).accent.usingColorSpace(.sRGB) ?? Brand.Theme.brand.accent
         }
         needsDisplay = true
@@ -1839,8 +1826,22 @@ final class LiveBrowser: NSView {
         let shape = NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12)
         shape.addClip()
         let ink = isDark ? NSColor.white : NSColor.black
-        background.setFill()
-        bounds.fill()
+        if let background2, let gradient = NSGradient(starting: background, ending: background2) {
+            // Flipped, so 90° runs top to bottom, as in the window.
+            gradient.draw(in: bounds, angle: CGFloat(angle))
+        } else {
+            // Glass lets the backdrop behind this little window through, washed white or smoked.
+            background.setFill()
+            bounds.fill(using: glass ? .sourceOver : .copy)
+        }
+        if grain > 0.01, let context = NSGraphicsContext.current?.cgContext {
+            context.saveGState()
+            context.setBlendMode(.overlay)
+            context.setAlpha(CGFloat(grain) * 0.22)
+            NSColor(patternImage: BrandSurface.noise).setFill()
+            bounds.fill(using: .sourceOver)
+            context.restoreGState()
+        }
         func box(_ r: NSRect, _ color: NSColor, _ radius: CGFloat) {
             color.setFill()
             NSBezierPath(roundedRect: r, xRadius: radius, yRadius: radius).fill()

@@ -595,30 +595,29 @@ final class DirectionKnob: NSView {
     override func accessibilityPerformDecrement() -> Bool { angle = (angle + 315).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
 }
 
-/// Edits one space: its name and how it looks. Color, Gradient or Glass on top; then the wheel and a row of presets
-/// (or, for glass, how light or dark the glass is); then grain, and for a gradient its direction. Everything shows in
-/// the window as you drag, and saves when you let go.
-final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
-    private weak var controller: BrowserWindowController?
-    let spaceID: UUID
-    private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
-    /// The name sits on a soft field, so it reads as something you can type into.
-    private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
+/// How a space looks, in one piece that the space editor and the first-run color step both use, so they're the
+/// same everywhere: Color, Gradient or Glass on top; then the wheel and a row of presets (or, for glass, how light or
+/// dark the glass is); then grain, and for a gradient its direction. `onPreview` fires while you drag, `onCommit`
+/// when you let go or pick something.
+final class SpaceLookEditor: NSView {
     private let kindSwitch = SlidingSwitch([.text("Color"), .text("Gradient"), .text("Glass")])
     private let wheel = ColorWheel()
     private let colorSwatches = SpaceLook.colors.map { LookSwatch(look: $0) }
     private let gradientSwatches = SpaceLook.gradients.map { LookSwatch(look: $0) }
-    private let shadeLabel = SpaceEditorPanel.rowLabel("Shade")
+    private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
     /// Glass: clear white to smoked black.
     private let shadeSlider = GrainSlider()
-    private let grainLabel = SpaceEditorPanel.rowLabel("Grain")
+    private let grainLabel = SpaceLookEditor.rowLabel("Grain")
     private let grainSlider = GrainSlider()
-    private let directionLabel = SpaceEditorPanel.rowLabel("Direction")
+    private let directionLabel = SpaceLookEditor.rowLabel("Direction")
     private let dial = DirectionKnob()
-    private var monitor: Any?
-    static let width: CGFloat = 300
 
-    /// The space as the editor has it right now; the window shows it while you drag and it's saved on each release.
+    var onPreview: ((SpaceInfo) -> Void)?
+    var onCommit: ((SpaceInfo) -> Void)?
+    /// The kind changed, and with it how tall this is.
+    var onResize: (() -> Void)?
+
+    /// The space as the editor has it right now.
     private var draft: SpaceInfo
     /// As it was when the editor opened.
     private let original: SpaceInfo
@@ -628,23 +627,14 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private enum Kind: Int { case color, gradient, glass }
     private var kind: Kind { draft.glass == true ? .glass : draft.hue2 != nil ? .gradient : .color }
 
-    /// `controller` is the browser window it belongs to; Settings passes nil and hosts it in its own window.
-    init(spaceID: UUID, controller: BrowserWindowController?) {
-        self.spaceID = spaceID
-        self.controller = controller
-        let space = Library.shared.space(spaceID) ?? SpaceInfo(name: "", color: .sky)
+    /// `dark`: whether the window looks dark right now, for where a space that follows the Mac starts on the wheel.
+    init(space: SpaceInfo, dark: Bool) {
         original = space
         draft = space
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
-        radius = Tokens.Radius.panel
-        if draft.brightness == nil { draft.brightness = startingDepth(space) }
-        nameField.stringValue = space.name
-        nameField.delegate = self
-        nameBackground.wantsLayer = true
-        nameBackground.layer?.cornerCurve = .continuous
-        nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
-        let views: [NSView] = [nameBackground, nameField, kindSwitch, wheel, shadeLabel, shadeSlider, grainLabel, grainSlider, directionLabel, dial]
+        if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
+        let views: [NSView] = [kindSwitch, wheel, shadeLabel, shadeSlider, grainLabel, grainSlider, directionLabel, dial]
         (views + colorSwatches + gradientSwatches).forEach { addSubview($0) }
 
         kindSwitch.selectedIndex = kind.rawValue
@@ -696,19 +686,19 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             self.changed(final: final, wheel: false)
         }
         sync(animated: false)
-        onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
 
     private static func rowLabel(_ text: String) -> Label {
         Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
     }
 
     /// Where the knob starts for a space that follows the Mac: about how it looks right now, so nothing jumps.
-    private func startingDepth(_ space: SpaceInfo) -> Double {
-        let dark = (controller?.window?.effectiveAppearance ?? NSApp.effectiveAppearance).bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        if space.isNeutral || space.hue == nil && space.color.isNeutral { return dark ? 0.9 : 0.06 }
+    private static func startingDepth(_ space: SpaceInfo, dark: Bool) -> Double {
+        if space.isNeutral { return dark ? 0.9 : 0.06 }
         let strength = space.intensity ?? SpaceColor.defaultIntensity
         return dark ? 0.86 : 0.06 + 0.2 * strength
     }
@@ -716,7 +706,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     // MARK: Changing it
 
     /// The space as it should be saved or shown: untouched colors keep following the Mac.
-    private var look: SpaceInfo {
+    var look: SpaceInfo {
         var space = draft
         if !colorChosen {
             space.brightness = original.brightness
@@ -731,12 +721,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
 
     private func changed(final: Bool, wheel moveWheel: Bool) {
-        if final {
-            Library.shared.setLook(look)
-            edited = true
-        } else {
-            (controller ?? BrowserWindowController.undoTarget)?.previewSpace(look)
-        }
+        if final { onCommit?(look) } else { onPreview?(look) }
         sync(animated: moveWheel)
     }
 
@@ -763,7 +748,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
         colorChosen = true
         changed(final: true, wheel: false)
-        resizeToFit()
+        onResize?()
     }
 
     // MARK: Showing it
@@ -799,22 +784,105 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     // MARK: Layout
 
-    private let pad = Tokens.Space.x4
-    private let nameHeight: CGFloat = 34
     private let switchHeight: CGFloat = 30
-    private let wheelHeight: CGFloat = 236
     private let swatchSize: CGFloat = 26
     private let sliderHeight: CGFloat = 30
     private let dialSize: CGFloat = 60
     private let labelWidth: CGFloat = 72
+    /// How tall the wheel is; the first-run step has a little less room.
+    var wheelHeight: CGFloat = 236 { didSet { needsLayout = true } }
 
-    var contentHeight: CGFloat {
-        var height = pad + nameHeight + Tokens.Space.x3 + switchHeight + Tokens.Space.x4
+    /// How tall it is for the kind it shows.
+    var preferredHeight: CGFloat {
+        var height = switchHeight + Tokens.Space.x4
         height += kind == .glass ? sliderHeight + Tokens.Space.x3 : wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5
         height += sliderHeight
         if kind == .gradient { height += Tokens.Space.x3 + dialSize }
-        return height + pad
+        return height
     }
+
+    override func layout() {
+        super.layout()
+        let width = bounds.width
+        var y: CGFloat = 0
+        kindSwitch.frame = NSRect(x: 0, y: y, width: width, height: switchHeight)
+        y += switchHeight + Tokens.Space.x4
+        if kind == .glass {
+            row(shadeLabel, shadeSlider, y: y, height: sliderHeight, width: width)
+            y += sliderHeight + Tokens.Space.x3
+        } else {
+            wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
+            y += wheelHeight + Tokens.Space.x3
+            for swatches in [colorSwatches, gradientSwatches] {
+                let count = CGFloat(swatches.count)
+                let gap = (width - count * swatchSize) / max(count - 1, 1)
+                for (i, swatch) in swatches.enumerated() {
+                    swatch.frame = NSRect(x: CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
+                }
+            }
+            y += swatchSize + Tokens.Space.x5
+        }
+        row(grainLabel, grainSlider, y: y, height: sliderHeight, width: width)
+        y += sliderHeight + Tokens.Space.x3
+        if kind == .gradient { row(directionLabel, dial, y: y, height: dialSize, width: dialSize) }
+    }
+
+    /// A name on the left and its control beside it, every control starting at the same line.
+    private func row(_ label: Label, _ control: NSView, y: CGFloat, height: CGFloat, width: CGFloat) {
+        let lh = ceil(label.intrinsicContentSize.height)
+        label.frame = NSRect(x: 0, y: y + (height - lh) / 2, width: labelWidth, height: lh)
+        control.frame = NSRect(x: labelWidth, y: y, width: min(width, bounds.width - labelWidth), height: height)
+    }
+}
+
+/// Edits one space: its name, and how it looks with `SpaceLookEditor`. Everything shows in the window as you drag,
+/// and saves when you let go.
+final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
+    private weak var controller: BrowserWindowController?
+    let spaceID: UUID
+    private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
+    /// The name sits on a soft field, so it reads as something you can type into.
+    private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
+    private let editor: SpaceLookEditor
+    private var monitor: Any?
+    static let width: CGFloat = 300
+
+    /// `controller` is the browser window it belongs to; Settings passes nil and hosts it in its own window.
+    init(spaceID: UUID, controller: BrowserWindowController?) {
+        self.spaceID = spaceID
+        self.controller = controller
+        let space = Library.shared.space(spaceID) ?? SpaceInfo(name: "", color: .sky)
+        let dark = (controller?.window?.effectiveAppearance ?? NSApp.effectiveAppearance).bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        editor = SpaceLookEditor(space: space, dark: dark)
+        super.init(frame: .zero)
+        radius = Tokens.Radius.panel
+        nameField.stringValue = space.name
+        nameField.delegate = self
+        nameBackground.wantsLayer = true
+        nameBackground.layer?.cornerCurve = .continuous
+        nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
+        [nameBackground, nameField, editor].forEach { addSubview($0) }
+        editor.onPreview = { [weak self] look in
+            guard let self else { return }
+            (self.controller ?? BrowserWindowController.undoTarget)?.previewSpace(look)
+        }
+        editor.onCommit = { [weak self] look in
+            guard let self else { return }
+            Library.shared.setLook(look)
+            self.edited = true
+        }
+        editor.onResize = { [weak self] in self?.resizeToFit() }
+        onLayout = { [weak self] in self?.layoutContent() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: Layout
+
+    private let pad = Tokens.Space.x4
+    private let nameHeight: CGFloat = 34
+
+    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + editor.preferredHeight + pad }
 
     /// The panel grows or shrinks with the kind, keeping the edge nearest what opened it.
     private func resizeToFit() {
@@ -833,44 +901,15 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    /// True when it hangs down from what opened it (Settings); false when it sits above (a space dot).
+    /// True when it hangs down from what opened it; false when it rises from the dots at the bottom.
     private var anchoredBelow = false
 
     private func layoutContent() {
         let width = bounds.width - pad * 2
-        var y = pad
         let fh = ceil(nameField.intrinsicContentSize.height)
-        nameBackground.frame = NSRect(x: pad, y: y, width: width, height: nameHeight)
-        nameField.frame = NSRect(x: pad + Tokens.Space.x2 + 2, y: y + (nameHeight - fh) / 2, width: width - Tokens.Space.x4, height: fh)
-        y += nameHeight + Tokens.Space.x3
-        kindSwitch.frame = NSRect(x: pad, y: y, width: width, height: switchHeight)
-        y += switchHeight + Tokens.Space.x4
-        if kind == .glass {
-            row(shadeLabel, shadeSlider, y: y, height: sliderHeight, width: width)
-            y += sliderHeight + Tokens.Space.x3
-        } else {
-            wheel.frame = NSRect(x: pad, y: y, width: width, height: wheelHeight)
-            y += wheelHeight + Tokens.Space.x3
-            for swatches in [colorSwatches, gradientSwatches] {
-                let count = CGFloat(swatches.count)
-                let gap = (width - count * swatchSize) / max(count - 1, 1)
-                for (i, swatch) in swatches.enumerated() {
-                    swatch.frame = NSRect(x: pad + CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
-                }
-            }
-            y += swatchSize + Tokens.Space.x5
-        }
-        row(grainLabel, grainSlider, y: y, height: sliderHeight, width: width)
-        y += sliderHeight + Tokens.Space.x3
-        if kind == .gradient { row(directionLabel, dial, y: y, height: dialSize, width: dialSize) }
-    }
-
-    /// A name on the left and its control beside it, every control starting at the same line.
-    private func row(_ label: Label, _ control: NSView, y: CGFloat, height: CGFloat, width: CGFloat) {
-        let lh = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: pad, y: y + (height - lh) / 2, width: labelWidth, height: lh)
-        let x = pad + labelWidth
-        control.frame = NSRect(x: x, y: y, width: min(width, bounds.width - pad - x), height: height)
+        nameBackground.frame = NSRect(x: pad, y: pad, width: width, height: nameHeight)
+        nameField.frame = NSRect(x: pad + Tokens.Space.x2 + 2, y: pad + (nameHeight - fh) / 2, width: width - Tokens.Space.x4, height: fh)
+        editor.frame = NSRect(x: pad, y: pad + nameHeight + Tokens.Space.x3, width: width, height: editor.preferredHeight)
     }
 
     func show(from anchor: NSView? = nil) {
