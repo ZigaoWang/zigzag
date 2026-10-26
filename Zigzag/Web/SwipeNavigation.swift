@@ -77,7 +77,8 @@ final class SwipeNavigator {
             } else {
                 state = .idle
             }
-            return wasTracking
+            // The page saw the gesture begin, so it sees it end too (an end carries no movement to scroll by).
+            return false
         default:
             return state == .tracking
         }
