@@ -133,7 +133,7 @@ final class GuidedTour: NSView {
         // Other panels (site controls, downloads) come first: the guide steps aside.
         let bar = controller.commandBar.isVisible, peek = controller.peek.isVisible
         let editing = SpaceEditorPanel.current != nil
-        let spaceStep = Tutorial.current?.id == "space" || confirming?.id == "space" || Tutorial.current == nil
+        let spaceStep = editingNewSpace || confirming?.id == "space"
         let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep)
         let aside = !relevant && (controller.hasFloatingPanel || peek)
         // During the Peek step the card sits above the peek, so "Close it" is right there; otherwise it stays beneath
@@ -184,10 +184,16 @@ final class GuidedTour: NSView {
         var clip: String? = nil
     }
 
+    /// The + made a space and opened its editor. Making it already counted, so the guide is on to "go back" by now,
+    /// but the editor is still part of the space step.
+    private var editingNewSpace: Bool {
+        SpaceEditorPanel.current != nil && [nil, "space", "switch"].contains(Tutorial.current?.id)
+    }
+
     private var display: Display {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
-        if SpaceEditorPanel.current != nil, Tutorial.current == nil || Tutorial.current?.id == "space" {
+        if editingNewSpace {
             return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Press Return when it looks right", count: "", isDone: false, isFinal: false, target: "editor", clip: "spaces")
         }
         if let done = confirming {
@@ -386,7 +392,9 @@ final class GuidedTour: NSView {
         let cut = CGMutablePath()
         let page = controller?.root.cardFrame ?? bounds
         let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek"].contains(d.target)
-        let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil) : CGMutablePath()
+        // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
+        let radius = max(hole.width, hole.height) < 44 ? min(hole.width, hole.height) / 2 : 12
+        let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
         pulse(ringed)
         let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {

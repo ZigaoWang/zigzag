@@ -59,6 +59,9 @@ enum DebugBridge {
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)
         case "bartab": controller.commandBar.debugTab()
         case "tour": Tutorial.restart(); GuidedTour.start(in: controller)
+        case "tourresume": GuidedTour.start(in: controller)
+        case "newspaceui": controller.newSpace(nil)
+        case "closeeditor": SpaceEditorPanel.current?.close()
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
         case "fullscreen": controller.window?.toggleFullScreen(nil)
