@@ -6,7 +6,7 @@ final class OnboardingView: NSView {
     var onFinish: (() -> Void)?
 
     /// The space's color comes later, in the browser itself, where you can see it on the real thing.
-    enum Step: Int, CaseIterable { case hello, bring, sites, extensions, ads, ready }
+    enum Step: Int, CaseIterable { case hello, bring, sites, ads, ready }
     private(set) var step = Step.hello
 
     private let surface = BrandSurface()
@@ -58,23 +58,19 @@ final class OnboardingView: NSView {
         case .bring:
             content = BringPicker()
             title = "Bring your stuff over"
-            body = "Passwords, bookmarks and history. Nothing changes in your old browser."
+            body = "Passwords, bookmarks and history. Your old browser stays as it is."
         case .sites:
             content = SitesPicker()
-            title = "Pin your favorites"
-            body = "Click the sites you use. They sit at the top of your sidebar, one click away."
-        case .extensions:
-            content = ExtensionsPicker()
-            title = "Add extensions"
-            body = "Use 1Password or Bitwarden? Add its extension here, or it won’t fill anything in Zigzag."
+            title = "Pin the sites you use"
+            body = "Each one stays at the top of your sidebar."
         case .ads:
             content = AdsPicker()
             title = "Block ads?"
-            body = "Faster pages, fewer trackers. Change it for any site later."
+            body = "Pages load faster, with fewer trackers."
         default:
             content = ReadyPicker()
             title = "You’re all set"
-            body = "Last thing: open links from other apps in Zigzag."
+            body = "One more thing, if you’d like."
         }
         // The steps share one frame: moving between them changes only what's on it.
         let isNew = shell == nil
@@ -103,37 +99,11 @@ final class OnboardingView: NSView {
         }
     }
 
-    /// From the welcome into the steps: the welcome lifts away and the white side sweeps in from the left over the
-    /// blue, with the picture rising onto it.
+    /// From the welcome into the steps: one crossfade.
     private func arrive(from hello: NSView, to steps: StepPage) {
-        guard !Tokens.Motion.reduceMotion else { slide(from: hello, to: steps, forward: true); return }
-        steps.wantsLayer = true
-        hello.wantsLayer = true
-        steps.layoutSubtreeIfNeeded()
-        // The welcome stays on top while it goes, so the sweep reads as the page arriving under it.
         addSubview(hello, positioned: .above, relativeTo: steps)
-        steps.sweepIn()
-        guard let layer = hello.layer else { hello.removeFromSuperview(); return }
-        let curve = CAMediaTimingFunction(controlPoints: 0.4, 0, 0.2, 1)
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { hello.removeFromSuperview() }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 1
-        fade.toValue = 0
-        fade.duration = 0.3
-        fade.timingFunction = curve
-        fade.fillMode = .forwards
-        fade.isRemovedOnCompletion = false
-        let lift = CABasicAnimation(keyPath: "transform.translation.y")
-        lift.fromValue = 0
-        lift.toValue = 24
-        lift.duration = 0.35
-        lift.timingFunction = curve
-        lift.fillMode = .forwards
-        lift.isRemovedOnCompletion = false
-        layer.add(fade, forKey: "leave.fade")
-        layer.add(lift, forKey: "leave.lift")
-        CATransaction.commit()
+        steps.rise()
+        Motion.fade(hello, from: 1, to: 0, duration: 0.25, remove: true)
     }
 
     /// Moving on: the screen you're leaving drifts a little aside as it fades, the next arrives from the other
@@ -142,7 +112,7 @@ final class OnboardingView: NSView {
         [old, new].forEach { $0.wantsLayer = true }
         guard let oldLayer = old.layer, let newLayer = new.layer else { old.removeFromSuperview(); return }
         // With Reduce Motion, a cross-fade in place.
-        let distance: CGFloat = Tokens.Motion.reduceMotion ? 0 : forward ? 36 : -36
+        let distance: CGFloat = 0
         let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         func animation(_ key: String, _ from: Any, _ to: Any, _ duration: CFTimeInterval) -> CABasicAnimation {
             let a = CABasicAnimation(keyPath: key)
@@ -183,6 +153,8 @@ class StepContent: NSView {
     var picture: NSView? { nil }
     /// The main button: do what the step needs, then call `done` to move on (now, or once it's finished).
     func commit(_ done: @escaping () -> Void) { done() }
+    /// How tall the step's choice wants to be on the card at this width; the card shrinks or scrolls past that.
+    func preferredHeight(for width: CGFloat) -> CGFloat { 300 }
     override var isFlipped: Bool { true }
 }
 
@@ -191,39 +163,39 @@ class StepContent: NSView {
 private final class StepPage: NSView {
     var onBack: (() -> Void)?
     var onNext: (() -> Void)?
-    private let left = ColorView(color: Onboard.paper)
-    private let right = BrandSurface()
-    private var bars: [ColorView] = []
-    private var fills: [ColorView] = []
+    /// The white card the choice sits on, floating on the blue. It stays from step to step and reshapes to fit.
+    private let card = ColorView(color: Onboard.paper)
+    private var dots: [ColorView] = []
     private var title = Onboard.title("")
-    private var body = Onboard.line("")
-    private let back = Onboard.quiet("Back")
-    private let next = Onboard.primary("Continue")
-    private let skip = Onboard.quiet("Skip")
+    private var body = Onboard.subtitle("")
+    private let back = Onboard.quietLight("Back")
+    private let next = Onboard.light("Continue")
+    private let skip = Onboard.quietLight("Skip")
     private var content = StepContent()
     private var index = 0
 
-    /// The frame of every step stays put (the white side, progress, the buttons, the blue); only what's on it changes.
+    static let cardWidth: CGFloat = 560
+    static let cardPad: CGFloat = 20
+
     init(count: Int) {
         super.init(frame: .zero)
-        right.cornerRadius = 0
-        right.layer?.borderWidth = 0
-        right.showsWatermark = false
-        right.fixedTheme = Brand.Theme.of(Library.shared.spaces.first)
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 22
+        card.layer?.cornerCurve = .continuous
+        card.shadow = {
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
+            shadow.shadowBlurRadius = 34
+            shadow.shadowOffset = NSSize(width: 0, height: -14)
+            return shadow
+        }()
         for _ in 0..<count {
-            let bar = ColorView(color: Onboard.tint.withAlphaComponent(0.12))
-            bar.wantsLayer = true
-            bar.layer?.cornerRadius = 2
-            let fill = ColorView(color: Onboard.accent)
-            fill.wantsLayer = true
-            fill.layer?.cornerRadius = 2
-            fill.layer?.anchorPoint = .zero
-            bar.addSubview(fill)
-            bars.append(bar)
-            fills.append(fill)
+            let dot = ColorView(color: Brand.ribbon)
+            dot.wantsLayer = true
+            dot.layer?.cornerRadius = 3
+            dots.append(dot)
         }
-        [left, right].forEach { addSubview($0) }
-        (bars + [back, skip, next] as [NSView]).forEach { addSubview($0) }
+        (dots + [card, back, skip, next] as [NSView]).forEach { addSubview($0) }
         back.onClick = { [weak self] _ in self?.onBack?() }
         skip.onClick = { [weak self] _ in self?.onNext?() }
         next.onClick = { [weak self] _ in
@@ -236,153 +208,45 @@ private final class StepPage: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    /// Puts a step on: the first time in place, after that the old one hands over to the new one.
+    // MARK: Changing step
+
     func present(title text: String, body bodyText: String, content newContent: StepContent, index newIndex: Int,
                  showsSkip: Bool, forward: Bool, animated: Bool) {
-        let old = (title: title, body: body, content: content, picture: content.picture ?? content.preview)
+        let old = (title: title, body: body, content: content)
         let first = old.content.superview == nil
+        let oldCard = card.frame
         title = Onboard.title(text)
-        body = Onboard.line(bodyText)
+        body = Onboard.subtitle(bodyText)
         content = newContent
         index = newIndex
-        let picture = newContent.picture ?? newContent.preview
-        [title, body, newContent].forEach { addSubview($0) }
-        right.addSubview(picture)
+        [title, body].forEach { addSubview($0) }
+        card.addSubview(newContent)
         newContent.onChange = { [weak self] in self?.refresh() }
         skip.isHidden = !showsSkip
         refresh()
+        let oldDots = dots.map(\.frame)
+        needsLayout = true
         layoutSubtreeIfNeeded()
         let moving = animated && !first && !Tokens.Motion.reduceMotion
-        updateProgress(animated: moving)
         guard moving else {
-            [old.title, old.body, old.content, old.picture].forEach { if $0 !== picture && $0 !== newContent { $0.removeFromSuperview() } }
+            [old.title, old.body, old.content].forEach { if $0 !== newContent && $0 !== title && $0 !== body { $0.removeFromSuperview() } }
             return
         }
-        // Words leave upward and the next ones rise into place, title first, then the line, then the choices, one
-        // after another; the picture on the blue slides across and settles, as if the next one was waiting beside it.
-        let dir: CGFloat = forward ? 1 : -1
-        for (i, view) in [old.title, old.body, old.content].enumerated() {
-            Self.animate(view, opacity: (1, 0), y: (0, -10 * dir), duration: 0.2, delay: Double(i) * 0.03, remove: true)
-        }
-        Self.animate(title, opacity: (0, 1), y: (18 * dir, 0), duration: 0.5, delay: 0.12)
-        Self.animate(body, opacity: (0, 1), y: (18 * dir, 0), duration: 0.5, delay: 0.17)
-        let pieces = Self.pieces(of: newContent)
-        if pieces.isEmpty {
-            Self.animate(newContent, opacity: (0, 1), y: (18 * dir, 0), duration: 0.5, delay: 0.22)
-        } else {
-            for (i, piece) in pieces.prefix(14).enumerated() {
-                Self.animate(piece, opacity: (0, 1), y: (14 * dir, 0), duration: 0.45, delay: 0.22 + Double(i) * 0.035)
-            }
-        }
-        Self.animate(old.picture, opacity: (1, 0), x: (0, -90 * dir), scale: (1, 0.94), duration: 0.32, delay: 0, remove: true)
-        Self.animate(picture, opacity: (0, 1), x: (140 * dir, 0), scale: (0.94, 1), duration: 0.7, delay: 0.06, spring: true)
+        // Quiet: the card eases to its new size while the old step fades out and the new one fades in.
+        Motion.easeFrame(card, from: oldCard, to: card.frame)
+        for (i, view) in dots.enumerated() { Motion.easeFrame(view, from: oldDots[i], to: view.frame) }
+        for view in [old.title, old.body, old.content] { Motion.fade(view, from: 1, to: 0, duration: 0.15, remove: true) }
+        for view in [title, body, newContent] as [NSView] { Motion.fade(view, from: 0, to: 1, duration: 0.25, delay: 0.1) }
     }
 
-    /// What arrives one by one: a list's rows, a grid's tiles; otherwise the step's choice as one piece.
-    private static func pieces(of content: NSView) -> [NSView] {
-        let direct = content.subviews.filter { !$0.isHidden }
-        if direct.count == 1, let scroll = direct.first as? NSScrollView, let list = scroll.documentView {
-            return list.subviews.filter { !$0.isHidden }.sorted { $0.frame.minY < $1.frame.minY }
-        }
-        return direct.count > 1 ? direct.sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) } : []
-    }
-
-    private static func animate(_ view: NSView, opacity: (Float, Float), x: (CGFloat, CGFloat) = (0, 0), y: (CGFloat, CGFloat) = (0, 0),
-                                scale: (CGFloat, CGFloat) = (1, 1), duration: CFTimeInterval, delay: CFTimeInterval,
-                                spring: Bool = false, remove: Bool = false) {
-        view.wantsLayer = true
-        guard let layer = view.layer else { if remove { view.removeFromSuperview() }; return }
-        let begin = CACurrentMediaTime() + delay
-        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
-        func basic(_ key: String, _ from: Any, _ to: Any) -> CABasicAnimation {
-            let a: CABasicAnimation
-            if spring {
-                let s = CASpringAnimation(keyPath: key)
-                s.stiffness = 170
-                s.damping = 22
-                s.mass = 1
-                s.duration = max(duration, s.settlingDuration)
-                a = s
-            } else {
-                a = CABasicAnimation(keyPath: key)
-                a.duration = duration
-                a.timingFunction = curve
-            }
-            a.fromValue = from
-            a.toValue = to
-            a.beginTime = begin
-            a.fillMode = .both
-            a.isRemovedOnCompletion = !remove
-            return a
-        }
-        CATransaction.begin()
-        if remove { CATransaction.setCompletionBlock { view.removeFromSuperview() } }
-        let fade = Self.plainFade(opacity, begin: begin, duration: spring ? 0.35 : duration * 0.8)
-        fade.isRemovedOnCompletion = !remove
-        layer.add(fade, forKey: "step.fade")
-        // Layers here aren't flipped: positive y on screen is down, so it's negated for the layer.
-        if x != (0, 0) || y != (0, 0) {
-            layer.add(basic("transform.translation", NSValue(size: NSSize(width: x.0, height: -y.0)),
-                            NSValue(size: NSSize(width: x.1, height: -y.1))), forKey: "step.move")
-        }
-        if scale != (1, 1) { layer.add(basic("transform.scale", scale.0, scale.1), forKey: "step.scale") }
-        CATransaction.commit()
-    }
-
-    private static func plainFade(_ opacity: (Float, Float), begin: CFTimeInterval, duration: CFTimeInterval) -> CABasicAnimation {
-        let a = CABasicAnimation(keyPath: "opacity")
-        a.fromValue = opacity.0
-        a.toValue = opacity.1
-        a.duration = duration
-        a.beginTime = begin
-        a.fillMode = .both
-        a.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
-        return a
-    }
-
-    /// Arriving from the welcome: the white side slides in from the left edge, then its words and the picture settle.
-    func sweepIn() {
-        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
-        if let layer = left.layer {
-            let move = CABasicAnimation(keyPath: "transform.translation.x")
-            move.fromValue = -Self.leftWidth
-            move.toValue = 0
-            move.duration = 0.6
-            move.timingFunction = curve
-            move.fillMode = .backwards
-            move.beginTime = CACurrentMediaTime() + 0.08
-            layer.add(move, forKey: "sweep")
-        }
-        let words: [NSView] = bars + [title, body] + (Self.pieces(of: content).isEmpty ? [content] : Self.pieces(of: content).prefix(14)) + [back, skip, next]
-        for (i, view) in words.enumerated() {
-            Self.animate(view, opacity: (0, 1), x: (-24, 0), duration: 0.5, delay: 0.3 + Double(i) * 0.025)
-        }
-        Self.animate(content.picture ?? content.preview, opacity: (0, 1), y: (60, 0), scale: (0.96, 1), duration: 0.8, delay: 0.35, spring: true)
-    }
-
-    /// The progress fills along: the step you're arriving at grows across its bar.
-    private func updateProgress(animated: Bool) {
-        for (i, fill) in fills.enumerated() {
-            let on = i <= index
-            let width: CGFloat = on ? 22 : 0
-            guard let layer = fill.layer else { continue }
-            let from = layer.presentation()?.bounds.width ?? layer.bounds.width
-            Tokens.Motion.withoutAnimation { fill.frame = NSRect(x: 0, y: 0, width: width, height: 4) }
-            if animated, from != width {
-                let grow = CABasicAnimation(keyPath: "bounds.size.width")
-                grow.fromValue = from
-                grow.toValue = width
-                grow.duration = 0.45
-                grow.beginTime = CACurrentMediaTime() + (on ? 0.15 : 0)
-                grow.fillMode = .backwards
-                grow.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
-                layer.add(grow, forKey: "grow")
-            }
-        }
+    /// Arriving from the welcome: everything fades in together.
+    func rise() {
+        guard !Tokens.Motion.reduceMotion else { return }
+        Motion.fade(self, from: 0, to: 1, duration: 0.3, delay: 0.1)
     }
 
     /// The right side follows your space's color as soon as you pick one.
-    func retint() { right.fixedTheme = Brand.Theme.of(Library.shared.spaces.first) }
+    func retint() {}
 
     private func refresh() {
         next.title = content.primaryTitle
@@ -392,39 +256,90 @@ private final class StepPage: NSView {
         needsLayout = true
     }
 
-    static let leftWidth: CGFloat = 420
-
     override func layout() {
         super.layout()
-        let lw = Self.leftWidth, pad: CGFloat = 44
-        left.frame = NSRect(x: 0, y: 0, width: lw, height: bounds.height)
-        right.frame = NSRect(x: lw, y: 0, width: bounds.width - lw, height: bounds.height)
-        let inner = lw - pad * 2
-        var y: CGFloat = 64
-        for (i, bar) in bars.enumerated() {
-            bar.frame = NSRect(x: pad + CGFloat(i) * 28, y: y, width: 22, height: 4)
+        let width = Self.cardWidth
+        let x = round((bounds.width - width) / 2)
+        // Progress at the top: dots, the step you're on drawn long, like the space dots in the sidebar.
+        let dotY: CGFloat = 22
+        let total = CGFloat(dots.count - 1) * 12 + 22
+        var dx = round((bounds.width - total) / 2)
+        for (i, dot) in dots.enumerated() {
+            let w: CGFloat = i == index ? 22 : 6
+            dot.frame = NSRect(x: dx, y: dotY, width: w, height: 6)
+            dot.alphaValue = i == index ? 0.95 : i < index ? 0.55 : 0.28
+            dx += w + 6
         }
-        y += 28
-        let th = ceil(title.sizeThatFits(NSSize(width: inner, height: 200)).height)
-        title.frame = NSRect(x: pad, y: y, width: inner, height: th)
-        let bh = ceil(body.sizeThatFits(NSSize(width: inner, height: 200)).height)
-        body.frame = NSRect(x: pad, y: title.frame.maxY + 8, width: inner, height: bh)
-        let top = body.frame.maxY + 24
+        skip.frame = NSRect(x: bounds.width - 28 - skip.fittingWidth, y: 12, width: skip.fittingWidth, height: Tokens.Space.x8)
+        let th = ceil(title.sizeThatFits(NSSize(width: width, height: 200)).height)
+        let bh0 = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)
+        let footY = bounds.height - 40 - Tokens.Space.x10
+        let head = th + 10 + bh0 + 28
+        let want = head + content.preferredHeight(for: width - Self.cardPad * 2) + Self.cardPad * 2
+        // Title and card together, in the middle of the room above the buttons (never under the progress).
+        var y = max(76, round((footY - 28 - want) / 2 + 20))
+        title.frame = NSRect(x: x, y: y, width: width, height: th)
+        y = title.frame.maxY + 10
+        let bh = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)
+        body.frame = NSRect(x: x + 40, y: y, width: width - 80, height: bh)
+        y = body.frame.maxY + 28
         let h = Tokens.Space.x10
-        let fy = bounds.height - 36 - h
-        let nw = max(next.fittingWidth, 128)
-        next.frame = NSRect(x: lw - pad - nw, y: fy, width: nw, height: h)
-        let sw = skip.fittingWidth
-        skip.frame = NSRect(x: next.frame.minX - Tokens.Space.x2 - sw, y: fy + (h - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
-        back.frame = NSRect(x: pad - Tokens.Space.x2, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
-        content.frame = NSRect(x: pad, y: top, width: inner, height: max(0, fy - 20 - top))
-        // The window sits low and to the right, running off the edge, like a real one behind this.
-        if let picture = content.picture {
-            picture.frame = right.bounds
-        } else {
-            let pw = right.bounds.width - 72, ph = min(round(pw * 0.72), bounds.height - 120)
-            content.preview.frame = NSRect(x: 36, y: (bounds.height - ph) / 2, width: pw, height: ph)
+        let fy = bounds.height - 40 - h
+        let inner = width - Self.cardPad * 2
+        let room = fy - 28 - y
+        let ch = min(room, content.preferredHeight(for: inner) + Self.cardPad * 2)
+        card.frame = NSRect(x: x, y: y, width: width, height: ch)
+        content.frame = NSRect(x: Self.cardPad, y: Self.cardPad, width: inner, height: ch - Self.cardPad * 2)
+        let nw = max(next.fittingWidth + 24, 150)
+        next.frame = NSRect(x: x + width - nw, y: fy, width: nw, height: h)
+        back.frame = NSRect(x: x - Tokens.Space.x2, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
+    }
+}
+
+/// The few fades and resizes onboarding uses, on layers so nothing waits on layout.
+private enum Motion {
+    static let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1)
+
+    static func fade(_ view: NSView, from: Float, to: Float, duration: CFTimeInterval, delay: CFTimeInterval = 0, remove: Bool = false) {
+        view.wantsLayer = true
+        guard let layer = view.layer else { if remove { view.removeFromSuperview() }; return }
+        let a = CABasicAnimation(keyPath: "opacity")
+        a.fromValue = from
+        a.toValue = to
+        a.duration = duration
+        a.beginTime = CACurrentMediaTime() + delay
+        a.fillMode = .backwards
+        a.timingFunction = curve
+        CATransaction.begin()
+        if remove {
+            layer.opacity = to
+            CATransaction.setCompletionBlock { view.removeFromSuperview() }
         }
+        layer.add(a, forKey: "m.fade")
+        CATransaction.commit()
+    }
+
+    /// From one frame to another, for something that stays and changes shape.
+    static func easeFrame(_ view: NSView, from old: NSRect, to new: NSRect) {
+        guard old != new, old != .zero, let layer = view.layer else { return }
+        for (key, from, to) in [("bounds.size", NSValue(size: old.size), NSValue(size: new.size)),
+                                ("position", NSValue(point: layer.position(for: old, in: view)), NSValue(point: layer.position))] {
+            let a = CABasicAnimation(keyPath: key)
+            a.fromValue = from
+            a.toValue = to
+            a.duration = 0.3
+            a.timingFunction = curve
+            layer.add(a, forKey: "m.\(key)")
+        }
+    }
+}
+
+private extension CALayer {
+    /// Where this layer's position would be with its view at `frame` (the view's parent is flipped, as all of these are).
+    func position(for frame: NSRect, in view: NSView) -> CGPoint {
+        let current = view.frame
+        return CGPoint(x: position.x + (frame.minX - current.minX) + (frame.width - current.width) * anchorPoint.x,
+                       y: position.y + (frame.minY - current.minY) + (frame.height - current.height) * anchorPoint.y)
     }
 }
 
@@ -437,19 +352,40 @@ private enum Onboard {
     static let tint = Tokens.Color.dynamic(light: Tokens.Color.hex(0x1E3A5F), dark: Tokens.Color.hex(0xDAE5F2))
     static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Tokens.Color.textPrimary.withAlphaComponent(alpha * 0.85) }
 
+    /// A step's title, on the blue.
     static func title(_ text: String) -> NSTextField {
-        let field = NSTextField(wrappingLabelWithString: "")
+        let field = NSTextField(wrappingLabelWithString: text)
         field.isSelectable = false
-        field.attributedStringValue = Brand.display(text, size: 28, color: ink, wraps: true)
+        field.font = .systemFont(ofSize: 30, weight: .bold)
+        field.textColor = Brand.ribbon
+        field.alignment = .center
         return field
     }
 
+    /// The line under a step's title, on the blue.
+    static func subtitle(_ text: String) -> NSTextField {
+        let field = NSTextField(wrappingLabelWithString: text)
+        field.isSelectable = false
+        field.font = .systemFont(ofSize: 15)
+        field.textColor = Brand.ribbon.withAlphaComponent(0.72)
+        field.alignment = .center
+        return field
+    }
+
+    /// Plain text on the white card.
     static func line(_ text: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.isSelectable = false
         field.font = .systemFont(ofSize: 14)
         field.textColor = Tokens.Color.textSecondary
         return field
+    }
+
+    /// Back and Skip, quiet on the blue.
+    static func quietLight(_ title: String) -> TextButton {
+        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
+        button.textColor = Brand.ribbon.withAlphaComponent(0.75)
+        return button
     }
 
     /// The main action on a step: the brand's blue.
@@ -857,7 +793,7 @@ private final class BrowserRow: InteractiveView {
 private final class BringPicker: StepContent {
     private let arrow = IntoZigzag()
     override var picture: NSView? { arrow }
-    private let list = ColorView(color: Onboard.tint.withAlphaComponent(0.07))
+    private let list = ColorView(color: .clear)
     private var rows: [BrowserRow] = []
     private var separators: [ColorView] = []
     private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
@@ -874,8 +810,7 @@ private final class BringPicker: StepContent {
         scroll.wantsLayer = true
         scroll.layer?.cornerRadius = 12
         scroll.layer?.cornerCurve = .continuous
-        scroll.layer?.borderWidth = 1
-        scroll.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
+        scroll.layer?.borderWidth = 0
         scroll.layer?.masksToBounds = true
         scroll.drawsBackground = false
         scroll.useSlimScroller()
@@ -1107,6 +1042,11 @@ private final class BringPicker: StepContent {
             let row = self.add(ImportCoordinator.fileSource(url), chosen: true)
             self.run([row])
         }
+    }
+
+    override func preferredHeight(for width: CGFloat) -> CGFloat {
+        let list = rows.isEmpty ? 40 : rows.map { $0.height(for: width) }.reduce(0, +)
+        return list + (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
     }
 
     override func layout() {
@@ -1591,7 +1531,7 @@ final class SitesPicker: StepContent {
         preview.liveFavorites = order
         onChange?()
     }
-    override var primaryTitle: String { picked.isEmpty ? "Continue" : "Pin \(picked.count)" }
+    override var primaryTitle: String { "Continue" }
 
     override func commit(_ done: @escaping () -> Void) {
         let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
@@ -1599,9 +1539,16 @@ final class SitesPicker: StepContent {
         done()
     }
 
+    private static let columns = 6
+    override func preferredHeight(for width: CGFloat) -> CGFloat {
+        let size = floor((width - CGFloat(Self.columns - 1) * 8) / CGFloat(Self.columns))
+        let lines = CGFloat((tiles.count + Self.columns - 1) / Self.columns)
+        return lines * size + (lines - 1) * 8
+    }
+
     override func layout() {
         super.layout()
-        let columns = 4, gap: CGFloat = 8
+        let columns = Self.columns, gap: CGFloat = 8
         let size = floor((bounds.width - CGFloat(columns - 1) * gap) / CGFloat(columns))
         let x0: CGFloat = 0, y0: CGFloat = 0
         for (i, (tile, _, _)) in tiles.enumerated() {
@@ -1624,7 +1571,7 @@ private final class ExtensionsPicker: StepContent {
         ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Saves pages to Notion", "https://www.notion.so", nil),
         ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", "Translates what you select", "https://translate.google.com", nil),
     ]
-    private let list = ColorView(color: Onboard.tint.withAlphaComponent(0.07))
+    private let list = ColorView(color: .clear)
     private var rows: [(ExtensionRow, String)] = []
     private var separators: [ColorView] = []
     private var installing = false
@@ -1636,8 +1583,7 @@ private final class ExtensionsPicker: StepContent {
         list.wantsLayer = true
         list.layer?.cornerRadius = 12
         list.layer?.cornerCurve = .continuous
-        list.layer?.borderWidth = 1
-        list.layer?.borderColor = Onboard.tint.withAlphaComponent(0.1).cgColor
+        list.layer?.borderWidth = 0
         addSubview(list)
         var installed: Set<String> = []
         if #available(macOS 15.4, *) { installed = Set(ExtensionHost.shared.installed.keys) }
@@ -1705,15 +1651,17 @@ private final class ExtensionsPicker: StepContent {
         }
     }
 
+    override func preferredHeight(for width: CGFloat) -> CGFloat { CGFloat(rows.count) * 50 + 12 + note.lineHeight }
+
     override func layout() {
         super.layout()
-        let width = bounds.width, rowH: CGFloat = 54
+        let width = bounds.width, rowH: CGFloat = 50
         list.frame = NSRect(x: 0, y: 0, width: width, height: CGFloat(rows.count) * rowH)
         for (i, (row, _)) in rows.enumerated() {
             row.frame = NSRect(x: 0, y: CGFloat(i) * rowH, width: width, height: rowH)
             if i > 0 { separators[i - 1].frame = NSRect(x: 62, y: CGFloat(i) * rowH, width: width - 62, height: Tokens.Metric.hairline) }
         }
-        note.frame = NSRect(x: 2, y: list.frame.maxY + 14, width: width, height: note.lineHeight)
+        note.frame = NSRect(x: 2, y: list.frame.maxY + 12, width: width, height: note.lineHeight)
     }
 
 }
@@ -1845,6 +1793,8 @@ private final class AdsPicker: StepContent {
         ContentBlocker.isEnabled = block.isChosen
         done()
     }
+
+    override func preferredHeight(for width: CGFloat) -> CGFloat { 64 + 10 + 64 }
 
     override func layout() {
         super.layout()
@@ -2160,21 +2110,24 @@ final class LiveBrowser: NSView {
 
 /// The last step: make Zigzag the browser links open in, then start.
 private final class ReadyPicker: StepContent {
-    private let card = ColorView(color: Onboard.tint.withAlphaComponent(0.08))
+    private let icon = NSImageView()
     private let title = Label("Make Zigzag your default browser", font: Tokens.Font.body(.semibold), color: Onboard.ink)
-    private let line = Label("Links from other apps open here.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
+    private let line = Label("Links from Mail, Messages and other apps open here.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
     private let button = Onboard.primary("Make Default")
-    private let done = Label("✓  Zigzag is your default browser", font: Tokens.Font.body(.medium), color: Onboard.ink)
+    private let done = Label("Default browser", font: Tokens.Font.small(.medium), color: Onboard.dim(0.65))
+    private let check = NSImageView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        card.wantsLayer = true
-        card.layer?.cornerRadius = 14
-        card.layer?.cornerCurve = .continuous
-        [card, title, line, button, done].forEach { addSubview($0) }
+        icon.image = NSApp.applicationIconImage
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        line.lineBreakMode = .byTruncatingTail
+        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 15)
+        check.contentTintColor = Onboard.accent
+        [icon, title, line, button, done, check].forEach { addSubview($0) }
         button.onClick = { [weak self] _ in
             DefaultBrowser.make()
-            // macOS asks to confirm; the card catches up once it has.
+            // macOS asks to confirm; the row catches up once it has.
             for delay in [1.0, 3.0, 6.0] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self?.refresh() } }
         }
         refresh()
@@ -2188,24 +2141,32 @@ private final class ReadyPicker: StepContent {
         let isDefault = SettingsWindowController.isDefaultBrowser
         button.isHidden = isDefault
         done.isHidden = !isDefault
-        title.isHidden = isDefault
-        line.isHidden = isDefault
+        check.isHidden = !isDefault
         needsLayout = true
     }
 
+    override func preferredHeight(for width: CGFloat) -> CGFloat { 56 }
+
     override func layout() {
         super.layout()
-        let w = bounds.width, h: CGFloat = 132
-        let r = NSRect(x: 0, y: 0, width: w, height: h)
-        card.frame = r
-        title.frame = NSRect(x: 18, y: 18, width: w - 36, height: title.lineHeight)
-        line.frame = NSRect(x: 18, y: title.frame.maxY + 3, width: w - 36, height: line.lineHeight)
-        let bw = max(button.fittingWidth, 140)
-        button.frame = NSRect(x: 18, y: line.frame.maxY + 16, width: bw, height: Tokens.Space.x8)
-        done.frame = NSRect(x: 18, y: (h - done.lineHeight) / 2, width: w - 36, height: done.lineHeight)
-        done.alignment = .left
+        let w = bounds.width, h: CGFloat = 56
+        icon.frame = NSRect(x: 0, y: 0, width: h, height: h)
+        let right: CGFloat
+        if button.isHidden {
+            let dw = ceil(done.intrinsicContentSize.width)
+            done.frame = NSRect(x: w - dw, y: (h - done.lineHeight) / 2, width: dw, height: done.lineHeight)
+            check.frame = NSRect(x: done.frame.minX - 20, y: (h - 16) / 2, width: 16, height: 16)
+            right = check.frame.minX - 12
+        } else {
+            let bw = max(button.fittingWidth + 16, 128)
+            button.frame = NSRect(x: w - bw, y: (h - Tokens.Space.x8) / 2, width: bw, height: Tokens.Space.x8)
+            right = button.frame.minX - 16
+        }
+        let tx = icon.frame.maxX + 14
+        let block = title.lineHeight + 2 + line.lineHeight
+        title.frame = NSRect(x: tx, y: (h - block) / 2, width: right - tx, height: title.lineHeight)
+        line.frame = NSRect(x: tx, y: title.frame.maxY + 2, width: right - tx, height: line.lineHeight)
     }
-
 }
 
 

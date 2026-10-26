@@ -264,7 +264,7 @@ enum DebugBridge {
             if let first = r.firstSpace { controller.tabManager.switchToSpace(first) }
         case "welcome": WelcomeWindowController.show {}
         case "onboardstep":
-            // onboardstep <0-3>: hello, bring, personalize, ready
+            // onboardstep <0-4>: hello, bring, sites, ads, ready
             WelcomeWindowController.show {}
             if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
                let step = Int(arg.prefix(1)).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: arg.hasSuffix("a")) }
