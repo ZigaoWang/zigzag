@@ -153,13 +153,31 @@ final class SpaceDotView: InteractiveView {
         stateDidChange(animated: false)
     }
 
+    /// The space you're in is a short pill in the sidebar's own text color, readable on any space's color; the
+    /// others are small, quieter dots. Switching stretches one and shrinks the other.
+    private var wasSelected: Bool?
+
     override func stateDidChange(animated: Bool) {
-        let size: CGFloat = isSelected ? Tokens.Space.x2 : Tokens.Space.x2 - 2
-        Tokens.Motion.withoutAnimation {
-            dot.bounds = CGRect(x: 0, y: 0, width: size, height: size)
-            dot.position = CGPoint(x: bounds.midX, y: bounds.midY)
-            dot.cornerRadius = size / 2
-            dot.backgroundColor = cgColor(isSelected ? color : Tokens.Color.textTertiary)
+        let height: CGFloat = 6
+        let width: CGFloat = isSelected ? 16 : 6
+        let ink = Tokens.Color.textPrimary
+        let tint = ink.withAlphaComponent(isSelected ? 0.78 : isHovered ? 0.5 : 0.28)
+        let changed = wasSelected != nil && wasSelected != isSelected
+        wasSelected = isSelected
+        let apply = {
+            self.dot.bounds = CGRect(x: 0, y: 0, width: width, height: height)
+            self.dot.position = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
+            self.dot.cornerRadius = height / 2
+            self.dot.backgroundColor = self.cgColor(tint)
+        }
+        if changed && !Tokens.Motion.reduceMotion {
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.28)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1))
+            apply()
+            CATransaction.commit()
+        } else {
+            Tokens.Motion.withoutAnimation(apply)
         }
         let fill: NSColor? = isDropTarget ? Tokens.Color.pressedFill : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
