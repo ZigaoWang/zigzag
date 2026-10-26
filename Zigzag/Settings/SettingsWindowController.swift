@@ -427,7 +427,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: "Borderless page", detail: "The page fills the window beside the sidebar. Drag the window by the sidebar.", control: borderlessToggle))
+        windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", control: borderlessToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in

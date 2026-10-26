@@ -190,16 +190,15 @@ final class BrowserRootView: ColorView {
 
     // MARK: Layout
 
-    /// Full screen with the sidebar hidden: the page is the whole screen, no frame around it (like Arc).
-    /// Borderless: no frame at all. The page fills the window beside the sidebar, or all of it with the sidebar
-    /// hidden; the sidebar, docked or slid out from the edge, is what moves and zooms the window.
+    /// With the sidebar hidden, the page is the whole window, no frame around it; the sidebar that slides out from
+    /// the edge is what moves and zooms the window. With the sidebar showing, the page floats in its frame.
     var isEdgeToEdge: Bool {
-        Self.isBorderless || (!sidebarVisible && window?.styleMask.contains(.fullScreen) == true)
+        !sidebarVisible && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
     }
 
-    /// The page runs to the window's edges, with no frame around it.
+    /// With the sidebar hidden, the page runs to the window's edges. On unless turned off in Settings.
     static var isBorderless: Bool {
-        get { UserDefaults.standard.bool(forKey: "borderlessPage") }
+        get { UserDefaults.standard.object(forKey: "borderlessPage") as? Bool ?? true }
         set {
             UserDefaults.standard.set(newValue, forKey: "borderlessPage")
             NotificationCenter.default.post(name: borderlessChanged, object: nil)
@@ -209,7 +208,6 @@ final class BrowserRootView: ColorView {
 
     var cardFrame: NSRect {
         let inset = Tokens.Metric.cardInset
-        if isEdgeToEdge, sidebarVisible { return NSRect(x: sidebarWidth, y: 0, width: max(0, bounds.width - sidebarWidth), height: bounds.height) }
         if isEdgeToEdge { return bounds }
         if sidebarVisible {
             return NSRect(x: sidebarWidth, y: inset, width: max(0, bounds.width - sidebarWidth - inset), height: max(0, bounds.height - inset * 2))
