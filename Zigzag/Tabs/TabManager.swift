@@ -107,6 +107,11 @@ final class TabManager {
         // New tabs go on top. The list never reorders itself after that.
         tabsBySpace[space, default: []].insert(tab, at: 0)
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
+        // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
+        // the page it came from waits in the list.
+        if select, let opener, opener.spaceID == space, let index = splits.firstIndex(where: { $0.left == opener.id || $0.right == opener.id }) {
+            if splits[index].left == opener.id { splits[index].left = tab.id } else { splits[index].right = tab.id }
+        }
         changed.send(.structure)
         if select {
             self.select(tab)
