@@ -521,7 +521,12 @@ final class Library {
     nonisolated static func tidied(_ bookmarks: [Bookmark], _ folders: [BookmarkFolder]) -> ([Bookmark], [BookmarkFolder]) {
         var folders = folders
         let ids = bookmarks.map(\.id)
-        for f in folders.indices { folders[f].bookmarkIDs = ids.filter { folders[f].bookmarkIDs.contains($0) } }
+        // Only pages that still exist, in the space's order, and each in one folder at most (the first that has it).
+        var claimed: Set<UUID> = []
+        for f in folders.indices {
+            folders[f].bookmarkIDs = ids.filter { folders[f].bookmarkIDs.contains($0) && !claimed.contains($0) }
+            claimed.formUnion(folders[f].bookmarkIDs)
+        }
         var result: [Bookmark] = []
         var placed: Set<UUID> = []
         let byID = Dictionary(bookmarks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
