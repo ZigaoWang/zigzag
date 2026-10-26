@@ -19,6 +19,12 @@
 - Find shows where you are, like 3 of 12.
 
 ## Fixed
+- Importing starts with the browser you actually use, and every profile of it you've used lately, already checked. If macOS needs your OK to read it, Import asks for it and carries on.
+- Passwords from Chrome and other browsers come over reliably. If some can't be opened, the import says so and offers to try again.
+- Saved passwords are offered across a site's parts, as in Safari and Chrome: one saved on www.netflix.com fills on netflix.com.
+- Saved passwords are offered as soon as a sign-in page opens with its email box ready, like Google's.
+- Imported passwords keep being offered after you add a password manager extension.
+- A sign-in with nothing saved for it says so, so you can look it up, and if you skipped importing, it offers to bring your passwords over.
 - 1Password fills sign-in pop-ups, and no longer keeps your Mac busy after it's used.
 - A tab you just left is no longer unloaded right away, so it doesn't reload when you come back.
 - Text in the sidebar stays readable on every color: Zigzag picks light or dark by what actually reads better, at both ends of a gradient.
@@ -31,7 +37,3 @@
 - A site with a certificate problem explains why, and lets you visit a site you trust anyway.
 - Export as PDF makes real pages.
 - The offline page reloads by itself when you're back online.
-- Importing starts with the browser you actually use, and every profile you've used lately, already checked.
-- Passwords from Chrome and other browsers come over reliably; if some can't be opened, the import says so and offers to try again.
-- Saved passwords are offered as soon as a sign-in page opens with its email box ready, like Google's.
-- Imported passwords keep being offered after you add a password manager extension.
