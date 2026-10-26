@@ -1,0 +1,8 @@
+## New
+- Separate Tabs puts a split view back into two tabs, from the button on each pane, the sidebar, or the View menu.
+- Show All Tabs shows a split as one card, with both pages side by side.
+- After an update, Zigzag tells you what's new. Find it again in Help › What's New in Zigzag.
+
+## Fixed
+- Tabs in Show All Tabs fill their cards, instead of sitting in black bars.
+- With the sidebar hidden, a split view's pages meet in the middle, with no gap.

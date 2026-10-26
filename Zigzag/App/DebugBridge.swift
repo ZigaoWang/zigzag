@@ -212,6 +212,7 @@ enum DebugBridge {
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "whatsnew": WhatsNew.show(in: controller)
         case "endsheet": if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet, returnCode: .cancel) }
         case "zoomin": controller.zoomIn(nil)
         case "zoomreset": controller.actualSize(nil)

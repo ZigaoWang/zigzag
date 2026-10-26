@@ -75,6 +75,24 @@ spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 if [[ "${1:-}" == "--publish" ]]; then
   # The appcast needs Sparkle's signing key from the keychain, which may ask; only publishing needs it.
   # Builds and the feed are served from zigzagbrowser.com (reachable everywhere, no GitHub needed).
+  # What's new, from the same file the app shows after updating: Sparkle's update window gets it as HTML, and the
+  # GitHub release as Markdown (build/release/notes.md, for gh release create --notes-file).
+  python3 - "$VERSION" "$OUT" <<'PY'
+import html, sys
+version, out = sys.argv[1], sys.argv[2]
+sections = []
+for raw in open("Zigzag/Resources/WhatsNew.md", encoding="utf-8"):
+    line = raw.strip()
+    if line.startswith("## "): sections.append((line[3:], []))
+    elif line.startswith("- ") and sections: sections[-1][1].append(line[2:])
+style = ("<style>:root{color-scheme:light dark}body{font:13px -apple-system,sans-serif;margin:0 4px}"
+         "h3{font-size:13px;margin:14px 0 6px}ul{margin:0;padding-left:18px}li{margin:4px 0;line-height:1.4}</style>")
+body = "".join(f"<h3>{html.escape(t)}</h3><ul>" + "".join(f"<li>{html.escape(i)}</li>" for i in items) + "</ul>" for t, items in sections)
+open(f"{out}/updates/Zigzag-{version}.html", "w", encoding="utf-8").write(style + body)
+md = "\n\n".join(f"## {t}\n" + "\n".join(f"- {i}" for i in items) for t, items in sections)
+md += "\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires macOS 15.4 or later. Updates install automatically.\n"
+open(f"{out}/notes.md", "w", encoding="utf-8").write(md)
+PY
   echo "Writing appcast…"
   GENERATE=$(find build/rd/SourcePackages build/dd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1)
   "$GENERATE" --download-url-prefix "https://$SITE_HOST/releases/" "$OUT/updates"

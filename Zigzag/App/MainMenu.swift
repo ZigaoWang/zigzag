@@ -165,6 +165,7 @@ enum MainMenu {
 
         let help = submenu("Help", [
             item("Getting Started", #selector(C.showGettingStarted(_:)), ""),
+            item("What’s New in Zigzag", #selector(C.showWhatsNew(_:)), ""),
             item("Send Feedback…", #selector(C.sendFeedback(_:)), ""),
         ])
         main.addItem(help)

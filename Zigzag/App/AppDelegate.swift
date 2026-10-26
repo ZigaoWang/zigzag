@@ -49,7 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WindowManager.shared.newWindow()
         }
         Updater.shared.start()
-        offerDefaultBrowserOnce()
+        // Just updated: what's new comes first, and the default browser offer waits for another launch.
+        if !WhatsNew.offerIfUpdated() { offerDefaultBrowserOnce() }
         DockProgress.shared.start()
         DebugBridge.start()
     }

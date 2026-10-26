@@ -297,6 +297,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     /// Help › Send Feedback: email or a GitHub issue.
     @objc func sendFeedback(_ sender: Any?) { Feedback.show(in: self) }
+    @objc func showWhatsNew(_ sender: Any?) { WhatsNew.show(in: self) }
 
     @objc func newSpace(_ sender: Any?) {
         var created: SpaceInfo?
