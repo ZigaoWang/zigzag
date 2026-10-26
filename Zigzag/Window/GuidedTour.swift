@@ -235,7 +235,8 @@ final class GuidedTour: NSView {
         case "done.split": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
         case "editor": return SpaceEditorPanel.current
-        case "done.space", "switch", "done.switch": return controller.sidebar.dotsAnchor
+        case "switch": return controller.sidebar.firstDotAnchor
+        case "done.space", "done.switch": return controller.sidebar.dotsAnchor
         default: return nil
         }
     }
