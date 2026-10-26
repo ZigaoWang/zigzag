@@ -24,8 +24,10 @@ final class DockProgress {
         }
         tile.display()
         // A finished download says so once, in the window you're using.
+        // Not when the downloads panel is open there: it already shows the file arriving.
         if let item, item.state == .finished, !announced.contains(item.id), let controller = WindowManager.shared.keyController {
             announced.insert(item.id)
+            if DownloadsPanel.isOpen(in: controller.window) { return }
             Toast.show("Downloaded \(item.filename)", symbol: "arrow.down.circle",
                        action: ("Show", { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
         }
