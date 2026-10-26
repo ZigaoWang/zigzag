@@ -65,6 +65,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return before != self.tabManager.currentSpaceID
         }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
+        // Right-click Back or Forward: the pages that way, to jump several at once.
+        sidebar.backButton.onRightClick = { [weak self] _ in self?.historyMenu(back: true) }
+        sidebar.forwardButton.onRightClick = { [weak self] _ in self?.historyMenu(back: false) }
         sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
         sidebar.address.onRightClick = { [weak self] _ in
@@ -225,6 +228,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.sidebarContainer.tint = background
         }
         sidebar.previewDotColor(swatch, for: spaceID)
+    }
+
+    private func historyMenu(back: Bool) -> NSMenu? {
+        guard let webView = selectedWebView else { return nil }
+        let list = webView.backForwardList
+        let items = back ? Array(list.backList.reversed()) : list.forwardList
+        guard !items.isEmpty else { return nil }
+        let menu = NSMenu()
+        for item in items.prefix(15) {
+            let title = item.title?.isEmpty == false ? item.title! : (item.url.host() ?? item.url.absoluteString)
+            let entry = SidebarMenus.Item(String(title.prefix(60))) { [weak webView] in webView?.go(to: item) }
+            if let icon = FaviconStore.shared.cachedIcon(for: item.url) {
+                let small = icon.copy() as! NSImage
+                small.size = NSSize(width: 16, height: 16)
+                entry.image = small
+            }
+            menu.addItem(entry)
+        }
+        return menu
     }
 
     /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space).
