@@ -70,7 +70,7 @@ final class WhatsNewSheet: NSView {
     private let done = PrimaryButton(title: "Done")
     private let all = TextButton(title: "All Release Notes", font: Tokens.Font.body(.medium))
     private var monitor: Any?
-    private let width: CGFloat = 440
+    private var width: CGFloat { min(560, bounds.width - Tokens.Space.x6 * 2) }
     private let pad = Tokens.Space.x6
     /// The notes scroll between the header and the buttons, so a long list never pushes Done out of reach.
     private let scroll = NSScrollView()
