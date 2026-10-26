@@ -23,7 +23,7 @@ enum Tutorial {
              done: "Pinned", doneNote: "It stays at the top of this space"),
         Task(id: "peek", title: "Shift-click a blue link", keys: ["⇧", "Click"], note: "Here’s an article to try it on",
              done: "That’s Peek", doneNote: "A quick look, without losing your place"),
-        Task(id: "split", title: "Drag a tab from the sidebar onto the page", keys: ["Drag"], note: "Two pages, side by side",
+        Task(id: "split", title: "Drag the lit tab onto the page", keys: ["Drag"], note: "Two pages, side by side",
              done: "That’s Split View", doneNote: "To part them, use the button at the top right of either page"),
         Task(id: "space", title: "Make a space", keys: ["+"], note: "One for work, one for fun, each with its own color",
              done: "Your new space", doneNote: "Click a dot to switch between spaces"),

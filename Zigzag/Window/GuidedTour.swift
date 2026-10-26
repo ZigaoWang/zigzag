@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 
 /// Getting started, in the window itself: one step at a time, the place to act lit up, and a small pill beside
 /// it with the keys and three words. It follows along as you do the step (the address bar, a peek), then shows
@@ -21,6 +22,12 @@ final class GuidedTour: NSView {
     private let header = BrandSurface()
     private let letter = NSTextField(wrappingLabelWithString: "")
     private let signature = Label("— Zigao, who makes Zigzag", font: .systemFont(ofSize: 13, weight: .medium), color: Tokens.Color.textSecondary)
+    /// A short real recording of the step being done, on a loop, above what to do.
+    private let video = NSView()
+    private let videoLayer = AVPlayerLayer()
+    private var player: AVQueuePlayer?
+    private var looper: AVPlayerLooper?
+    private var clipName: String?
     private var tokens: [SignalToken] = []
     private var watch: Timer?
     private var ending = false
@@ -69,7 +76,13 @@ final class GuidedTour: NSView {
         header.layer?.borderWidth = 0
         header.showsWatermark = false
         header.fixedTheme = Brand.Theme.brand
-        [header, step, check, title, note, skip, finish, wordmark, letter, signature].forEach { card.addSubview($0) }
+        [header, step, check, title, note, skip, finish, wordmark, letter, signature, video].forEach { card.addSubview($0) }
+        video.wantsLayer = true
+        video.layer?.cornerRadius = 10
+        video.layer?.cornerCurve = .continuous
+        video.layer?.masksToBounds = true
+        videoLayer.videoGravity = .resizeAspectFill
+        video.layer?.addSublayer(videoLayer)
         wordmark.color = Brand.ribbon
         finish.fixedTheme = Brand.Theme.brand
         letter.isSelectable = false
@@ -160,6 +173,8 @@ final class GuidedTour: NSView {
         var isDone: Bool
         var isFinal: Bool
         var target: String
+        /// The recording that shows it, by name in Resources/Tour.
+        var clip: String? = nil
     }
 
     private var display: Display {
@@ -179,18 +194,24 @@ final class GuidedTour: NSView {
         // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
             if controller.commandBar.isSearchingSite {
-                return Display(keys: ["↩"], title: "Type what to find, then Return", note: "Like lofi music", count: count, isDone: false, isFinal: false, target: "bar")
+                return Display(keys: ["lofi music", "↩"], title: "Now type what to find", note: "Anything works. Then press Return", count: "", isDone: false, isFinal: false, target: "bar")
             }
             if controller.commandBar.isOfferingSiteSearch {
-                return Display(keys: ["Tab"], title: "Press Tab", note: "Now you’re searching right on YouTube", count: count, isDone: false, isFinal: false, target: "bar")
+                return Display(keys: ["Tab"], title: "Press Tab", note: "To search right on YouTube", count: "", isDone: false, isFinal: false, target: "bar")
             }
-            return Display(keys: [], title: "Type youtube", note: "Then press Tab to search it", count: count, isDone: false, isFinal: false, target: "bar")
+            return Display(keys: ["youtube"], title: "Type this", note: "Just the word, then you’ll press Tab", count: "", isDone: false, isFinal: false, target: "bar")
         }
         if task.id == "peek", controller.peek.isVisible {
-            return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: count, isDone: false, isFinal: false, target: "peek")
+            return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek")
         }
-        if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article") }
-        return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id)
+        if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article", clip: "peek") }
+        // Names the very tab to drag, lit up in the sidebar, so there's nothing to work out.
+        if task.id == "split" {
+            return Display(keys: ["Drag"], title: "Drag the lit tab onto the page", note: "Like in the video",
+                           count: count, isDone: false, isFinal: false, target: "split", clip: "split")
+        }
+        let clips = ["newTab": "search", "space": "spaces"]
+        return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id, clip: clips[task.id])
     }
 
     /// Where to point.
@@ -203,7 +224,8 @@ final class GuidedTour: NSView {
         case "pin", "done.newTab", "done.pin": return row ?? controller.sidebar.list
         case "peek": return controller.peek.panelView
         case "done.peek", "article": return controller.root.card
-        case "split", "done.split": return controller.root.card
+        case "split": return splitCandidate.flatMap { controller.sidebar.list.rowView(for: $0) }
+        case "done.split": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
         case "editor": return SpaceEditorPanel.current
         case "done.space": return controller.sidebar.dotsAnchor
@@ -218,6 +240,7 @@ final class GuidedTour: NSView {
             shown = key
             if !now.isDone, !now.isFinal {
                 if Tutorial.current?.id == "peek", lastStepID != "peek" { openArticle() }
+                if Tutorial.current?.id == "split", lastStepID != "split" { openSplitPartner() }
                 lastStepID = Tutorial.current?.id
             }
             apply(now, animated: animated)
@@ -230,6 +253,35 @@ final class GuidedTour: NSView {
         guard let controller, controller.tabManager.selectedTab?.url?.host()?.hasSuffix("wikipedia.org") != true,
               let url = URL(string: "https://en.wikipedia.org/wiki/Web_browser") else { return }
         controller.open(url, disposition: .foregroundTab, allowSwitch: false)
+    }
+
+    /// A tab that can go beside this page: an ordinary one (pinned pages can't split), not the one you're on.
+    private var splitCandidate: Tab? {
+        guard let controller, let current = controller.tabManager.selectedTab else { return nil }
+        return controller.tabManager.tabs(in: controller.tabManager.currentSpaceID).first { $0 !== current && controller.tabManager.canSplit(current, with: $0) }
+    }
+
+    /// Split View needs a second ordinary tab; the earlier steps may have pinned the only one.
+    private func openSplitPartner() {
+        guard let controller, splitCandidate == nil, let url = URL(string: "https://en.wikipedia.org/wiki/Split_screen_(computer_graphics)") else { return }
+        controller.open(url, disposition: .backgroundTab, allowSwitch: false)
+    }
+
+    /// Starts the step's recording on a loop (muted), or stops it when the step has none.
+    private func playClip(_ name: String?) {
+        guard name != clipName else { return }
+        clipName = name
+        player?.pause()
+        looper = nil
+        player = nil
+        video.isHidden = name == nil
+        guard let name, let url = Bundle.main.url(forResource: "tour-\(name)", withExtension: "mp4") else { video.isHidden = true; return }
+        let queue = AVQueuePlayer()
+        queue.isMuted = true
+        looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
+        videoLayer.player = queue
+        player = queue
+        queue.play()
     }
 
     private func apply(_ d: Display, animated: Bool) {
@@ -246,12 +298,14 @@ final class GuidedTour: NSView {
             card.addSubview(cap)
             caps.append((cap, label))
         }
+        playClip(d.clip)
         title.stringValue = d.title
         note.stringValue = d.note
         step.stringValue = d.count
         check.isHidden = !d.isDone
         // Naming a new space is the middle of a step: nothing to skip there.
-        skip.isHidden = d.isDone || d.isFinal || d.target == "editor"
+        // Mid-step hints (no count) are part of a step: nothing to skip there, and the pill stays small.
+        skip.isHidden = d.isDone || d.isFinal || d.count.isEmpty
         step.isHidden = d.isDone || d.isFinal || d.count.isEmpty
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
@@ -281,20 +335,27 @@ final class GuidedTour: NSView {
         var width = Tokens.Space.x4 + (d.isDone ? 20 : keys) + Tokens.Space.x3 + text + Tokens.Space.x5
         if !skip.isHidden { width += skip.fittingWidth - Tokens.Space.x2 }
         if !step.isHidden { width += step.textWidth + Tokens.Space.x3 }
-        return NSSize(width: ceil(width), height: d.note.isEmpty ? 56 : 64)
+        let row: CGFloat = d.note.isEmpty ? 56 : 64
+        // With a recording: wide enough for it to be seen, the recording on top.
+        if d.clip != nil {
+            let w = max(ceil(width), 320)
+            return NSSize(width: w, height: row + Self.videoHeight(for: w))
+        }
+        return NSSize(width: ceil(width), height: row)
     }
 
     private func layoutTour(_ d: Display, animated: Bool) {
         let target = view(for: d.target)
         let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -5, dy: -5) : nil } ?? .zero
         // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
+        // The tab to drag keeps its ring, so you know which one.
         let open = d.target == "split" || d.target == "done.split"
         let cut = CGMutablePath()
         if !open {
             cut.addRect(bounds)
             if hole != .zero { cut.addRoundedRect(in: hole, cornerWidth: 12, cornerHeight: 12) }
         }
-        let ringPath: CGPath = hole == .zero || open ? CGMutablePath() : CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil)
+        let ringPath: CGPath = hole == .zero || d.target == "done.split" ? CGMutablePath() : CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil)
         let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {
@@ -316,7 +377,10 @@ final class GuidedTour: NSView {
         let size = pillSize(d)
         let page = controller?.root.cardFrame ?? bounds
         var frame: NSRect
-        if hole == .zero {
+        if d.clip != nil {
+            // With a recording: tucked in the page's bottom right, clear of what's lit.
+            frame = NSRect(x: page.maxX - size.width - Tokens.Space.x5, y: page.maxY - size.height - Tokens.Space.x5, width: size.width, height: size.height)
+        } else if hole == .zero {
             frame = NSRect(x: page.midX - size.width / 2, y: page.midY - size.height / 2, width: size.width, height: size.height)
         } else if d.target == "bar" || d.target == "editor" {
             // Right under the bar or the editor: next to what you're looking at.
@@ -345,8 +409,17 @@ final class GuidedTour: NSView {
         layoutPill(d, in: frame.size)
     }
 
+    /// The recordings are 1600 by 1026, inset 8 from the card's edges.
+    private static func videoHeight(for width: CGFloat) -> CGFloat { round((width - 16) * 1026 / 1600) + 8 }
+
     private func layoutPill(_ d: Display, in size: NSSize) {
-        let width = size.width, height = size.height
+        let width = size.width
+        let top = d.clip != nil ? Self.videoHeight(for: width) : 0
+        if d.clip != nil {
+            video.frame = NSRect(x: 8, y: 8, width: width - 16, height: top - 8)
+            Tokens.Motion.withoutAnimation { videoLayer.frame = video.bounds }
+        }
+        let height = size.height - top
         if d.isFinal {
             let pad: CGFloat = 32, inner = width - pad * 2
             // The brand across the top, the note beneath it.
@@ -362,27 +435,27 @@ final class GuidedTour: NSView {
         }
         var x = Tokens.Space.x4
         if d.isDone {
-            check.frame = NSRect(x: x, y: (height - 20) / 2, width: 20, height: 20)
+            check.frame = NSRect(x: x, y: top + (height - 20) / 2, width: 20, height: 20)
             x = check.frame.maxX + Tokens.Space.x3
         }
         for (cap, label) in caps {
             let w = max(34, label.inkWidth + Tokens.Space.x4)
-            cap.frame = NSRect(x: x, y: (height - 34) / 2, width: w, height: 34)
+            cap.frame = NSRect(x: x, y: top + (height - 34) / 2, width: w, height: 34)
             label.frame = NSRect(x: 0, y: (34 - label.lineHeight) / 2, width: w, height: label.lineHeight)
             x += w + 4
         }
         if !caps.isEmpty { x += Tokens.Space.x3 - 4 }
         if note.isHidden {
-            title.frame = NSRect(x: x, y: (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
+            title.frame = NSRect(x: x, y: top + (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
         } else {
             // Title, and the why beneath it, as one block in the middle.
             let block = title.lineHeight + 2 + note.lineHeight
-            title.frame = NSRect(x: x, y: (height - block) / 2, width: title.textWidth + 4, height: title.lineHeight)
+            title.frame = NSRect(x: x, y: top + (height - block) / 2, width: title.textWidth + 4, height: title.lineHeight)
             note.frame = NSRect(x: x, y: title.frame.maxY + 2, width: note.textWidth + 4, height: note.lineHeight)
         }
         let sw = skip.fittingWidth
-        skip.frame = NSRect(x: width - Tokens.Space.x2 - sw, y: (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        skip.frame = NSRect(x: width - Tokens.Space.x2 - sw, y: top + (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
         let cw = step.textWidth + 2
-        step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
+        step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: top + (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
     }
 }

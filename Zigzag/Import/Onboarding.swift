@@ -57,7 +57,7 @@ final class OnboardingView: NSView {
             case .extensions:
                 content = ExtensionsPicker()
                 title = "Add extensions"
-                body = "Chrome extensions work here too."
+                body = "Use 1Password or Bitwarden? Add its extension here, or it won’t fill anything in Zigzag."
             case .ads:
                 content = AdsPicker()
                 title = "Block ads?"
@@ -1392,8 +1392,9 @@ final class SitesPicker: StepContent {
 /// as it happens: a spinner, then Added, or what went wrong.
 private final class ExtensionsPicker: StepContent {
     private static let suggestions: [(id: String, name: String, kind: String, site: String, app: String?)] = [
-        (ExtensionStore.onePasswordID, "1Password", "Fills your passwords", "https://1password.com", "com.1password.1password"),
-        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", "Fills your passwords", "https://bitwarden.com", "com.bitwarden.desktop"),
+        // A password app on your Mac fills nothing in a browser by itself: its browser extension is what does.
+        (ExtensionStore.onePasswordID, "1Password", "Needed to fill from the 1Password app", "https://1password.com", "com.1password.1password"),
+        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", "Needed to fill from Bitwarden", "https://bitwarden.com", "com.bitwarden.desktop"),
         ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", "Checks your writing", "https://www.grammarly.com", nil),
         ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", "Dark mode for every site", "https://darkreader.org", nil),
         ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Saves pages to Notion", "https://www.notion.so", nil),
@@ -1404,7 +1405,7 @@ private final class ExtensionsPicker: StepContent {
     private var separators: [ColorView] = []
     private var installing = false
     private var finished = false
-    private let note = Label("More in the Chrome Web Store: choose Add to Zigzag.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
+    private let note = Label("Sign in to each one after it’s added.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
