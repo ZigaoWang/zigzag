@@ -343,6 +343,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let downloadPlace = MenuButton()
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
+    private let cardToggle = Toggle()
     private let translateOffer = Toggle()
     private let translateInto = MenuButton()
     private var languages: [(id: String, name: String)] = []
@@ -621,6 +622,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
         passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveToggle))
         passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillToggle))
+        cardToggle.isOn = ContactCard.isOn
+        cardToggle.onChange = { on in ContactCard.isOn = on }
+        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", control: cardToggle))
         let open = TextButton.form("Open Passwords")
         open.onClick = { _ in PasswordsWindowController.show() }
         passwordsWindowGroup.add(FormRow(title: "Your passwords", detail: "See, edit and export them. Also in Window › Passwords" + Shortcuts.hint(for: #selector(AppDelegate.showPasswords(_:))) + ".", control: open))

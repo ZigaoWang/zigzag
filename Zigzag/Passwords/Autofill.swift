@@ -44,6 +44,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let field = NSRect(x: x * zoom, y: y * zoom, width: w * zoom, height: h * zoom)
             let frame = message.frameInfo
             let current = generation
+            // A name, email, phone or address field: offer your card from Contacts. Read only once you pick it.
+            if body["isForm"] as? Bool == true {
+                guard ContactCard.isOn, !(webView.owner?.isPrivate ?? false) else { hide(); return }
+                show([.contact], under: field, in: webView, frame: frame, origin: origin)
+                return
+            }
             if body["isNew"] as? Bool == true {
                 guard !(webView.owner?.isPrivate ?? false) else { hide(); return }
                 rules = PasswordGenerator.Rules(passwordRules: body["rules"] as? String ?? "", minLength: body["minLength"] as? Int ?? -1,
@@ -122,6 +128,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         switch item {
         case .login(let login): fill(login)
         case .generate: fillGenerated()
+        case .contact: fillContact()
         }
     }
 
@@ -149,6 +156,22 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             } catch {
                 if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
             }
+        }
+    }
+
+    /// Fills the form's name, email, phone, company and address fields from your card, leaving anything typed alone.
+    private func fillContact() {
+        guard let target else { return }
+        hide()
+        Task {
+            guard let values = await ContactCard.values() else {
+                if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
+                    Toast.show("Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts.",
+                               symbol: "person.crop.circle.badge.exclamationmark", duration: 5, in: controller)
+                }
+                return
+            }
+            _ = try? await target.webView.callAsyncJavaScript(Self.formFiller, arguments: ["values": values], in: target.frame, contentWorld: .defaultClient)
         }
     }
 
@@ -202,12 +225,22 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         if (all.length === 2) return true;  // a password and its confirmation
         return all.indexOf(el) > 0;         // current, new, confirm
       };
+      // A field for your own details: says so in autocomplete, or by its name (but never a search box or a sign-in).
+      const formField = (el) => {
+        if (!el || el.tagName !== 'INPUT' || el.disabled || el.readOnly || el.value) return false;
+        if (!['text', 'email', 'tel', ''].includes(el.type) || signIn(el)) return false;
+        const auto = (el.autocomplete || '').toLowerCase();
+        if (/\\b(name|given-name|family-name|email|tel|organization|street-address|address-line1|postal-code|address-level1|address-level2|country-name)\\b/.test(auto)) return true;
+        if (auto === 'off' || /search/i.test(el.type + el.name + el.id + (el.getAttribute('role') || ''))) return false;
+        const hint = (el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '');
+        return /first.?name|last.?name|full.?name|your.?name|^name$|e-?mail|phone|mobile|address|street|city|zip|postal|postcode|company|organi[sz]ation/i.test(hint.trim());
+      };
       const report = (el) => {
         const r = el.getBoundingClientRect();
-        post({ kind: 'focus', isNew: isNew(el) && !el.value, rules: el.getAttribute('passwordrules') || '',
+        post({ kind: 'focus', isForm: formField(el), isNew: isNew(el) && !el.value, rules: el.getAttribute('passwordrules') || '',
                minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
       };
-      const wanted = (el) => signIn(el) || isNew(el);
+      const wanted = (el) => signIn(el) || isNew(el) || formField(el);
       document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('mousedown', (e) => { if (e.isTrusted && e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
@@ -268,6 +301,68 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     return { index, username: (marked || users[users.length - 1] || {}).value || '' };
     """
 
+    /// Fills the focused form's fields for your details from `values` (keyed by autocomplete token), each field found
+    /// by its autocomplete attribute or else its name; selects (country, state) pick the matching option. Fields
+    /// already filled in are left as they are.
+    private static let formFiller = """
+    const active = document.activeElement;
+    const scope = (active && active.form) || document;
+    const visible = (el) => {
+      if (el.disabled || el.readOnly || el.type === 'hidden') return false;
+      const r = el.getBoundingClientRect();
+      return r.width >= 8 && r.height >= 8 && getComputedStyle(el).visibility === 'visible';
+    };
+    const guess = (el) => {
+      const auto = (el.autocomplete || '').toLowerCase().split(/\\s+/).filter((t) => !/^(section-|shipping|billing|home|work|mobile)/.test(t)).pop();
+      if (auto && values[auto] !== undefined) return auto;
+      if (auto === 'country') return 'country';
+      const h = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+      if (/first.?name|given/.test(h)) return 'given-name';
+      if (/last.?name|family|surname/.test(h)) return 'family-name';
+      if (/e-?mail/.test(h)) return 'email';
+      if (/phone|mobile|tel/.test(h)) return 'tel';
+      if (/company|organi[sz]ation/.test(h)) return 'organization';
+      if (/address.?(line)?.?2|apartment|suite|apt/.test(h)) return 'address-line2';
+      if (/address|street/.test(h)) return 'address-line1';
+      if (/city|town|locality/.test(h)) return 'address-level2';
+      if (/state|province|region|county/.test(h)) return 'address-level1';
+      if (/zip|postal|postcode/.test(h)) return 'postal-code';
+      if (/country/.test(h)) return el.tagName === 'SELECT' ? 'country' : 'country-name';
+      if (/name/.test(h)) return 'name';
+      return null;
+    };
+    const setInput = (el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      el.focus(); setter.call(el, value);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const setSelect = (el, value, other) => {
+      const want = [value, other].filter(Boolean).map((v) => v.toLowerCase());
+      const option = [...el.options].find((o) => want.includes(o.value.toLowerCase()) || want.includes(o.text.trim().toLowerCase()));
+      if (!option) return;
+      el.value = option.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    window.__zigzagFilling = true;
+    let filled = 0;
+    try {
+      for (const el of [...scope.querySelectorAll('input, select')].filter(visible)) {
+        const key = guess(el);
+        if (!key) continue;
+        if (el.tagName === 'SELECT') {
+          if (key === 'country') setSelect(el, values['country'], values['country-name']);
+          else if (key === 'address-level1') setSelect(el, values['address-level1']);
+          continue;
+        }
+        if (el.value || !['text', 'email', 'tel', ''].includes(el.type)) continue;
+        const value = key === 'address-line1' && !values['address-line1'] ? values['street-address'] : values[key];
+        if (value) { setInput(el, value); filled++; }
+      }
+    } finally { setTimeout(() => { window.__zigzagFilling = false; }, 0); }
+    return filled;
+    """
+
     /// Fills the focused form: the username field (if there is one) and the password field, the way typing would.
     private static let filler = """
     // Checked here, at the moment of filling: only the exact site the login belongs to gets it.
@@ -312,6 +407,7 @@ final class AutofillMenu: FloatingPanelView {
     enum Item {
         case login(Credential)
         case generate
+        case contact
     }
 
     private var rows: [AutofillRow] = []
@@ -390,6 +486,11 @@ private final class AutofillRow: InteractiveView {
             detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill")
             icon.contentTintColor = Tokens.Color.textSecondary
+        case .contact:
+            name = Label("Fill from My Card", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label("Name, email, phone and address, from Contacts", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("person.crop.circle")
+            icon.contentTintColor = Tokens.Color.accent
         case .generate:
             name = Label("Use Strong Password", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
             detail = Label("Saved to your Keychain for \(origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)

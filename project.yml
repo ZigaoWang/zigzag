@@ -73,6 +73,7 @@ targets:
         NSSupportsAutomaticTermination: false
         NSSupportsSuddenTermination: false
         NSCameraUsageDescription: Websites you visit can ask to use your camera.
+        NSContactsUsageDescription: Zigzag fills your name, email, phone and address into forms from your own card in Contacts.
         NSMicrophoneUsageDescription: Websites you visit can ask to use your microphone.
         NSLocationUsageDescription: Websites you visit can ask for your location.
         NSLocationWhenInUseUsageDescription: Websites you visit can ask for your location.
@@ -106,6 +107,8 @@ targets:
         keychain-access-groups:
           - $(AppIdentifierPrefix)app.zigzag.passwords
         com.apple.security.personal-information.location: true
+        # Your own card in Contacts, to fill your name, email, phone and address into forms.
+        com.apple.security.personal-information.addressbook: true
         com.apple.security.cs.allow-unsigned-executable-memory: false
   ZigzagTests:
     type: bundle.unit-test
