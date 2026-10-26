@@ -9,6 +9,8 @@ import WebKit
 final class Autofill: NSObject, WKScriptMessageHandler {
     static let shared = Autofill()
     static let messageName = "zigzagAutofill"
+    /// Set once passwords have been imported.
+    static let importedKey = "PasswordsImported"
 
     private var menu: AutofillMenu?
     /// The frame and field the menu belongs to.
@@ -18,9 +20,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// The new-password field's own rules, for the generator.
     private var rules = PasswordGenerator.Rules()
 
-    /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them.
+    /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them
+    /// and Zigzag has no passwords brought over from another browser.
     static var isOn: Bool {
-        get { UserDefaults.standard.object(forKey: "PasswordsAutofill") as? Bool ?? !PasswordManagers.isActive }
+        get { UserDefaults.standard.object(forKey: "PasswordsAutofill") as? Bool ?? (!PasswordManagers.isActive || UserDefaults.standard.bool(forKey: importedKey)) }
         set { UserDefaults.standard.set(newValue, forKey: "PasswordsAutofill") }
     }
 

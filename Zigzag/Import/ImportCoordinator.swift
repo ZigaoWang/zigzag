@@ -324,7 +324,12 @@ enum ImportCoordinator {
                 failed += 1
             }
         }
-        if changed { await store.announceChanges() }
+        if changed {
+            await store.announceChanges()
+            // Passwords brought over are meant to be used: Zigzag keeps offering them even with a password-manager
+            // extension added (until you turn that off yourself).
+            UserDefaults.standard.set(true, forKey: Autofill.importedKey)
+        }
         if failed > 0 {
             summary.problems.append(ImportProblem(message: "\(failed) \(failed == 1 ? "password" : "passwords") couldn’t be saved. Try again.",
                                                   fix: .retry, retries: Choice.passwords.rawValue))
