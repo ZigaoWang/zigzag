@@ -45,3 +45,33 @@ struct FolderTests {
         #expect((decoded.folders ?? []).isEmpty)
     }
 }
+
+/// Arc's pinned folders come over as folders; a pinned split view is just its pages.
+struct ArcFolderTests {
+    @Test func foldersAndSplitViews() throws {
+        func tab(_ id: String, _ url: String) -> [String: Any] {
+            ["id": id, "title": id, "data": ["tab": ["savedURL": url]], "childrenIds": [String]()]
+        }
+        let items: [Any] = [
+            ["id": "pinned", "childrenIds": ["t1", "folder", "split"], "data": ["itemContainer": [:]]],
+            tab("t1", "https://example.com/1"),
+            ["id": "folder", "title": "Reading", "data": ["list": [:]], "childrenIds": ["t2", "inner"]],
+            tab("t2", "https://example.com/2"),
+            ["id": "inner", "title": "Inner", "data": ["list": [:]], "childrenIds": ["t3"]],
+            tab("t3", "https://example.com/3"),
+            ["id": "split", "data": ["splitView": [:]], "childrenIds": ["t4", "t5"]],
+            tab("t4", "https://example.com/4"),
+            tab("t5", "https://example.com/5"),
+        ]
+        let root: [String: Any] = ["sidebar": ["containers": [
+            ["global": [:]],
+            ["spaces": ["s1", ["id": "s1", "title": "Home", "containerIDs": ["unpinned", "u", "pinned", "pinned"]]], "items": items],
+        ]]]
+        let (spaces, _) = try ArcImporter.parseSidebar(JSONSerialization.data(withJSONObject: root))
+        let space = try #require(spaces.first)
+        #expect(space.bookmarks.map(\.url.lastPathComponent) == ["1", "2", "3", "4", "5"])
+        let folders = space.folders ?? []
+        #expect(folders.map(\.name) == ["Reading"])
+        #expect(folders.first?.bookmarkIDs == space.bookmarks[1...2].map(\.id))
+    }
+}

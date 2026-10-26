@@ -102,8 +102,10 @@ enum ArcImporter {
     }
 
     private static func readSidebar() throws -> (spaces: [SpaceInfo], favorites: [Bookmark]) {
-        let file = arcSupport.appendingPathComponent("StorableSidebar.json")
-        let data = try Data(contentsOf: file)
+        try parseSidebar(Data(contentsOf: arcSupport.appendingPathComponent("StorableSidebar.json")))
+    }
+
+    static func parseSidebar(_ data: Data) throws -> (spaces: [SpaceInfo], favorites: [Bookmark]) {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let sidebar = root["sidebar"] as? [String: Any],
               let containers = sidebar["containers"] as? [[String: Any]],
@@ -153,6 +155,9 @@ enum ArcImporter {
                             let title = (node["title"] as? String) ?? (tab["savedTitle"] as? String) ?? url.host() ?? urlString
                             info.bookmarks.append(Bookmark(url: url, title: TabManager.bookmarkTitle(title, url: url)))
                         }
+                    } else if (node["data"] as? [String: Any])?["splitView"] != nil {
+                        // A split view isn't a folder: its pages are pinned on their own.
+                        info.bookmarks += inside
                     } else if !inside.isEmpty {
                         let folderName = (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"
                         info.bookmarks += inside
