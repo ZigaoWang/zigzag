@@ -212,7 +212,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         panel.frame = panelFrame()
         // Attached to the address, it's simply there; over the page it arrives with the usual drop.
         // Arrives once; asked again while open (⌘T twice), it simply stays.
-        if opening { panel.present(arrival: isAnchored ? .instant : .zoom) }
+        // ⌘T is the thing you do most: the bar is simply there, no animation to wait through.
+        if opening { panel.present(arrival: .instant) }
         controller.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)

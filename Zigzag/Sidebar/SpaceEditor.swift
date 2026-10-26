@@ -937,7 +937,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))
         frame = NSRect(x: x, y: top, width: Self.width, height: height)
         overlay.addSubview(self)
-        present(arrival: .fade)
+        // From a dot it rises out of the bottom; from the space's name it hangs from the top.
+        growsFrom = anchor is SpaceDotView ? CGPoint(x: 0.1, y: 1) : CGPoint(x: 0, y: 0.1)
+        present(arrival: .pop)
         controller.window?.makeFirstResponder(nameField)
         // The cursor at the end, not the whole name selected: you came to change the color as often as the name.
         if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }

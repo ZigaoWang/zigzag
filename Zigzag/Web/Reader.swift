@@ -352,7 +352,8 @@ final class ReaderView: NSView {
         webView.navigationDelegate = self
         webView.loadHTMLString(Reader.html(for: article), baseURL: url)
         controls.preferences = .saved
-        controls.present(arrival: .fade)
+        controls.growsFrom = CGPoint(x: 1, y: 0)
+        controls.present(arrival: .pop)
     }
 
     override func keyDown(with event: NSEvent) {

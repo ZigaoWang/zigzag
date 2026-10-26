@@ -143,7 +143,8 @@ final class DownloadsPanelView: FloatingPanelView {
         self.anchor = anchor
         controller.root.overlay.addSubview(self)
         reload()
-        present(arrival: .fade)
+        growsFrom = CGPoint(x: 0.1, y: 1)
+        present(arrival: .pop)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Only its own window: keys and clicks in Settings or another window are theirs.
             guard let self, event.window === self.window else { return event }

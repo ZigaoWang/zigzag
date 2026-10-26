@@ -119,6 +119,9 @@ final class WhatsNewSheet: NSView {
         sheet.layer?.backgroundColor = sheet.cgColor(Tokens.Color.scrim)
         sheet.alphaValue = 0
         Tokens.Motion.animate(Tokens.Motion.feedback, { sheet.animator().alphaValue = 1 })
+        sheet.layoutSubtreeIfNeeded()
+        sheet.panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
+        sheet.panel.present(arrival: .pop)
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
             guard let sheet, event.window === host.window else { return event }
             if [36, 76, 53].contains(event.keyCode) { sheet.close(); return nil }

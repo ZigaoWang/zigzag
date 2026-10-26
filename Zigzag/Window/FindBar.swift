@@ -257,16 +257,49 @@ class FloatingPanelView: NSView {
     /// whatever opened it. Opacity and movement run together on the layer, so they never drift apart.
     /// How a panel arrives. Anything attached to what opened it (the address dropdown) just appears; small panels
     /// from a button fade; free-floating notices drop in slightly.
-    enum Arrival { case drop, fade, instant, zoom }
+    /// `.fade` (and `.pop`) grow out of `growsFrom`: a soft spring, so a panel opening from a button looks like it
+    /// came out of that button. ⌘T's bar alone appears at once, being the thing you do most.
+    enum Arrival { case drop, fade, instant, zoom, pop }
+
+    /// Where a panel grows from, in its own bounds from the top-left: (0, 0) its top-left corner, (0.5, 0) its top
+    /// middle. Set it to the side nearest what opened it.
+    var growsFrom = CGPoint(x: 0.5, y: 0)
+
+    /// Scaled by `k` around `growsFrom`, in layer coordinates (a view layer scales from its own corner).
+    private func scaled(_ k: CGFloat) -> CATransform3D {
+        let w = bounds.width, h = bounds.height
+        let px = growsFrom.x * w
+        let py = (layer?.isGeometryFlipped == true || isFlipped) ? growsFrom.y * h : (1 - growsFrom.y) * h
+        return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
+    }
 
     func present(always: Bool = false, arrival: Arrival = .drop) {
         layoutSubtreeIfNeeded()
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
+        dismissing = false
         // Shown from the keyboard too: a panel appearing out of nowhere reads as a glitch, and this takes 0.2s.
         guard let layer, arrival != .instant else { return }
+        if (arrival == .fade || arrival == .pop), !Tokens.Motion.reduceMotion {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.16
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            let grow = CASpringAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: scaled(0.92))
+            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            grow.mass = 1
+            grow.stiffness = 420
+            grow.damping = 32
+            grow.initialVelocity = 0
+            grow.duration = grow.settlingDuration
+            layer.add(fade, forKey: "present")
+            layer.add(grow, forKey: "present.grow")
+            return
+        }
         // With Reduce Motion on, panels only fade in; nothing moves.
-        if arrival == .fade || Tokens.Motion.reduceMotion {
+        if arrival == .fade || arrival == .pop || Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
@@ -309,15 +342,30 @@ class FloatingPanelView: NSView {
 
     private var isFlippedInSuperview: Bool { superview?.isFlipped ?? true }
 
-    /// The one way a panel leaves: a quick fade, nothing else moving.
+    private var dismissing = false
+
+    /// The one way a panel leaves: a quick fade as it eases a touch smaller, back toward where it came from.
     func dismiss(always: Bool = false, instantly: Bool = false, completion: (() -> Void)? = nil) {
         guard let layer, !instantly else { removeFromSuperview(); completion?(); return }
         layer.removeAnimation(forKey: "present")
+        layer.removeAnimation(forKey: "present.grow")
+        dismissing = true
+        if !Tokens.Motion.reduceMotion {
+            let shrink = CABasicAnimation(keyPath: "transform")
+            shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
+            shrink.toValue = NSValue(caTransform3D: scaled(0.96))
+            shrink.duration = 0.14
+            shrink.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            shrink.fillMode = .forwards
+            shrink.isRemovedOnCompletion = false
+            layer.add(shrink, forKey: "dismiss.shrink")
+        }
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
             // Shown again while fading (a repeat toast): it stays.
             guard let self, self.layer?.opacity == 0 else { completion?(); return }
             self.removeFromSuperview()
+            self.layer?.removeAnimation(forKey: "dismiss.shrink")
             self.layer?.opacity = 1
             completion?()
         }
