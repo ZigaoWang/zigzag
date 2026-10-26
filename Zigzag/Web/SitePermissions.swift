@@ -178,7 +178,8 @@ final class PermissionPrompt: FloatingPanelView {
             controller.closeFloatingPanels()
             Toast.hide(in: controller)
             controller.root.overlay.addSubview(prompt)
-            prompt.present(arrival: .drop)
+            prompt.growsFrom = CGPoint(x: 0.5, y: 0)
+            prompt.present(arrival: .pop)
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
                 guard let prompt, event.window === prompt.window else { return event }
                 // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.

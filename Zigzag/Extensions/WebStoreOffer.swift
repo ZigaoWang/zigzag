@@ -23,7 +23,8 @@ final class WebStoreOffer: FloatingPanelView {
         current = offer
         offer.place()
         controller.root.overlay.addSubview(offer)
-        offer.present(arrival: .drop)
+        offer.growsFrom = CGPoint(x: 0.5, y: 0)
+        offer.present(arrival: .pop)
     }
 
     #if DEBUG

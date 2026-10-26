@@ -183,6 +183,9 @@ final class TabManager {
         }
         let previous = selectedTab
         previous?.captureSnapshot()
+        // Idle counts from when you last saw a tab, not when you first opened it: a page you read for an hour
+        // and just left isn't unloaded the moment you look away.
+        if previous !== tab { previous?.markActivated() }
         selectedBySpace[tab.spaceID] = tab.id
         tab.markActivated()
         promote(tab)
@@ -258,6 +261,7 @@ final class TabManager {
     func switchToSpace(_ id: UUID) {
         guard id != currentSpaceID, Library.shared.space(id) != nil else { return }
         selectedTab?.captureSnapshot()
+        selectedTab?.markActivated()
         currentSpaceID = id
         changed.send(.space)
         Brand.themeChanged.send(())

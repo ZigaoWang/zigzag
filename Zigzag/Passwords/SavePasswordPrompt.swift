@@ -101,8 +101,9 @@ final class SavePasswordPrompt: FloatingPanelView {
         prompt.frame.origin = NSPoint(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x3)
         controller.root.overlay.addSubview(prompt)
         prompt.needsLayout = true
+        // Grows out of its corner, the top left of the page, beside the address it belongs to.
+        prompt.growsFrom = CGPoint(x: 0, y: 0)
         prompt.present(always: true)
-        Tokens.Motion.slideVertically(prompt, fromOffsetY: -Tokens.Space.x2)
         current = prompt
         prompt.scheduleHide()
         // The keyboard stays where you were typing: a prompt that appears mid-sign-in must never catch the rest of

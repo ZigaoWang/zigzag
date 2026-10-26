@@ -273,7 +273,7 @@ class FloatingPanelView: NSView {
         return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
     }
 
-    func present(always: Bool = false, arrival: Arrival = .drop) {
+    func present(always: Bool = false, arrival: Arrival = .pop) {
         layoutSubtreeIfNeeded()
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
@@ -504,8 +504,9 @@ enum Toast {
         toast.needsLayout = true
         if isNew {
             host.addSubview(toast)
-            toast.present(always: true)
-            Tokens.Motion.slideVertically(toast, fromOffsetY: -Tokens.Space.x2)
+            // Springs down out of the top of the page, as a notice does, and eases back up when it goes.
+            toast.growsFrom = CGPoint(x: 0.5, y: 0)
+            toast.present(always: true, arrival: .pop)
         } else {
             // A repeat (zoom 90% → 80%) gives a small pulse so the change registers.
             let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
