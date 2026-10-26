@@ -1189,7 +1189,11 @@ extension BrowserWindowController: SidebarDelegate {
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing)
         let what = closing.count == 1 ? "Closed 1 tab" : "Closed \(closing.count) tabs"
-        Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in self?.sidebarUndo.undo() }), duration: 4, in: self)
+        // Undo brings back these tabs, never whatever else was done since.
+        Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Close Tabs" else { return }
+            undo.undo()
+        }), duration: 4, in: self)
     }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         previews.hover(tab, row: row, bookmark: bookmark)
