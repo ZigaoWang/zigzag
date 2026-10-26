@@ -6,8 +6,13 @@ import AppKit
 final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
     static var shared: PasswordsWindowController?
 
-    static func show() {
-        if let shared { shared.window?.makeKeyAndOrderFront(nil); return }
+    /// Opens the window, searching for `query` when given (a site whose sign-in had no saved password).
+    static func show(searching query: String? = nil) {
+        if let shared {
+            shared.window?.makeKeyAndOrderFront(nil)
+            if let query { (shared.window?.contentView as? PasswordsView)?.search(for: query) }
+            return
+        }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 940, height: 580),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "Passwords"
@@ -28,6 +33,7 @@ final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
         if !window.setFrameUsingName("Passwords") { window.center() }
         shared = controller
         controller.showWindow(nil)
+        if let query { view.search(for: query) }
         view.unlock()
     }
 
@@ -409,6 +415,11 @@ private final class PasswordsCard: NSView {
 
 extension PasswordsView: NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) { rebuildList() }
+
+    func search(for text: String) {
+        search.stringValue = text
+        rebuildList()
+    }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         guard rows.count > 0 else { return false }

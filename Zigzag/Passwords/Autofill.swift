@@ -11,6 +11,34 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     static let messageName = "zigzagAutofill"
     /// Set once passwords have been imported.
     static let importedKey = "PasswordsImported"
+    static let importedAtKey = "PasswordsImportedAt"
+    /// Sites that already said "no saved password" this session; once is enough.
+    private var toldMissing: Set<String> = []
+    private var offeredImport = false
+
+    /// Nothing saved here and nothing ever imported, with another browser on this Mac: the first sign-in of the
+    /// session offers to bring its passwords over (once; skipping the import in onboarding is easy to regret).
+    private func browserToImport() -> String? {
+        guard !offeredImport, !UserDefaults.standard.bool(forKey: Self.importedKey) else { return nil }
+        let sources = ImportCoordinator.detectedSources().filter { if case .file = $0.kind { false } else { true } }
+        let suggested = ImportCoordinator.suggested(sources)
+        guard let source = sources.first(where: { suggested.contains($0.id) }) ?? sources.first else { return nil }
+        offeredImport = true
+        switch source.kind {
+        case .chromium(let browser): return browser.name
+        case .firefox(let browser): return browser.name
+        case .safari: return "Safari"
+        case .file: return nil
+        }
+    }
+
+    /// Soon after an import, a sign-in with nothing saved says so, instead of leaving you to think the import
+    /// failed (Chrome, for one, doesn't keep the password of the Google account you're signed in to it with).
+    private func shouldSayMissing(on origin: Origin) -> Bool {
+        guard let at = UserDefaults.standard.object(forKey: Self.importedAtKey) as? Date, Date().timeIntervalSince(at) < 14 * 24 * 3600 else { return false }
+        let site = PublicSuffix.registrableDomain(origin.host) ?? origin.host
+        return toldMissing.insert(site).inserted
+    }
 
     private var menu: AutofillMenu?
     /// The frame and field the menu belongs to.
@@ -37,6 +65,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         switch kind {
         case "focus":
             generation += 1
+            debugLog("autofill focus main=\(message.frameInfo.isMainFrame) on=\(Self.isOn) form=\(body["isForm"] ?? "-") new=\(body["isNew"] ?? "-")")
             // Fields inside frames are positioned relative to the frame, which the page can't tell us reliably.
             guard message.frameInfo.isMainFrame, Self.isOn,
                   let rect = body["rect"] as? [String: Double], let x = rect["x"], let y = rect["y"], let w = rect["w"], let h = rect["h"] else { hide(); return }
@@ -46,6 +75,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let zoom = webView.pageZoom
             let field = NSRect(x: x * zoom, y: y * zoom, width: w * zoom, height: h * zoom)
             let frame = message.frameInfo
+            #if DEBUG
+            lastFrame = frame
+            #endif
             let current = generation
             // A name, email, phone or address field: offer your card from Contacts. Read only once you pick it.
             if body["isForm"] as? Bool == true {
@@ -61,14 +93,28 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 return
             }
             Task {
-                let logins = ((try? await PasswordStore.shared.all()) ?? []).filter { $0.origin.fills(on: origin) }
+                let all: [Credential]
+                var readable = true
+                do { all = try await PasswordStore.shared.all() } catch { debugLog("autofill vault error \(error)"); all = []; readable = false }
+                let logins = all.filter { $0.origin.fills(on: origin) }
                     // Saved for this exact page first, then other parts of the site; newest used first within each.
                     .sorted { a, b in
                         let exactA = a.origin.isExact(for: origin), exactB = b.origin.isExact(for: origin)
                         if exactA != exactB { return exactA }
                         return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
                     }
-                guard current == self.generation, !logins.isEmpty else { if current == self.generation { self.hide() }; return }
+                debugLog("autofill \(origin.host): \(logins.count) of \(all.count) match")
+                guard current == self.generation else { return }
+                if logins.isEmpty {
+                    if !all.isEmpty, self.shouldSayMissing(on: origin) {
+                        self.show([.missing], under: field, in: webView, frame: frame, origin: origin)
+                    } else if readable, all.isEmpty, let browser = self.browserToImport() {
+                        self.show([.importFrom(browser)], under: field, in: webView, frame: frame, origin: origin)
+                    } else {
+                        self.hide()
+                    }
+                    return
+                }
                 self.show(logins.map { .login($0) }, under: field, in: webView, frame: frame, origin: origin)
             }
         case "blur":
@@ -114,6 +160,16 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     var isShowing: Bool { menu != nil }
 
+    #if DEBUG
+    private var lastFrame: WKFrameInfo?
+    /// For the debug bridge: one of the hint rows under a spot on the page, with no vault involved.
+    func debugShow(_ kind: String, in webView: BrowserWebView) {
+        guard let origin = Origin(webView.url), let frame = lastFrame else { return }
+        let item: AutofillMenu.Item = kind == "missing" ? .missing : .importFrom("Chrome")
+        show([item], under: NSRect(x: 40, y: 120, width: 320, height: 32), in: webView, frame: frame, origin: origin)
+    }
+    #endif
+
     func hide() {
         guard let menu else { return }
         setSuggesting(false)
@@ -139,6 +195,14 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         case .login(let login): fill(login)
         case .generate: fillGenerated()
         case .contact: fillContact()
+        case .importFrom:
+            hide()
+            ImportWindowController.show()
+        case .missing:
+            let site = target.map { PublicSuffix.registrableDomain($0.origin.host) ?? $0.origin.displayName } ?? ""
+            hide()
+            // "google.com" finds logins saved under any part of it.
+            PasswordsWindowController.show(searching: site.split(separator: ".").first.map(String.init) ?? site)
         }
     }
 
@@ -427,6 +491,10 @@ final class AutofillMenu: FloatingPanelView {
         case login(Credential)
         case generate
         case contact
+        /// Nothing saved for this site: a way to look.
+        case missing
+        /// Nothing saved at all: bring passwords over from this browser.
+        case importFrom(String)
     }
 
     private var rows: [AutofillRow] = []
@@ -504,6 +572,16 @@ private final class AutofillRow: InteractiveView {
                          color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
             detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill")
+            icon.contentTintColor = Tokens.Color.textSecondary
+        case .importFrom(let browser):
+            name = Label("Bring your passwords from \(browser)", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label("Import them, and sign in here in one click", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("square.and.arrow.down")
+            icon.contentTintColor = Tokens.Color.accent
+        case .missing:
+            name = Label("No saved password for \(PublicSuffix.registrableDomain(origin.host) ?? origin.displayName)", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label("Search your passwords", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            icon.image = Tokens.Symbol.image("key")
             icon.contentTintColor = Tokens.Color.textSecondary
         case .contact:
             name = Label("Fill from My Card", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)

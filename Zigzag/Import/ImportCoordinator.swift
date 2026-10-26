@@ -329,6 +329,7 @@ enum ImportCoordinator {
             // Passwords brought over are meant to be used: Zigzag keeps offering them even with a password-manager
             // extension added (until you turn that off yourself).
             UserDefaults.standard.set(true, forKey: Autofill.importedKey)
+            UserDefaults.standard.set(Date(), forKey: Autofill.importedAtKey)
         }
         if failed > 0 {
             summary.problems.append(ImportProblem(message: "\(failed) \(failed == 1 ? "password" : "passwords") couldn’t be saved. Try again.",
