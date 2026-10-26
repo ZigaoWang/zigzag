@@ -736,10 +736,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         case .general:
             section(nil, generalGroup)
             section(nil, behaviorGroup)
+            section(nil, windowGroup)
             section(nil, importGroup)
         case .spaces:
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
-            section(nil, windowGroup)
         case .passwords:
             section(nil, passwordsGroup)
             section(nil, passwordsWindowGroup)
@@ -749,6 +749,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, translationGroup)
             section(nil, alwaysGroup)
         case .extensions:
+            // With nothing installed, the empty row already offers Get Extensions; once said is enough.
+            getExtensionsButton.isHidden = !hasExtensions
             let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
             buttons.spacing = Tokens.Space.x2
             section("Installed", extensionsGroup, accessory: buttons)
@@ -787,6 +789,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     /// The menu: the folder downloads go to (with its own icon), Ask Each Time, and Other… to pick a folder.
+    private var hasExtensions: Bool {
+        if #available(macOS 15.4, *) { return !ExtensionHost.shared.installed.isEmpty }
+        return false
+    }
+
     private func refreshDownloadPlace() {
         let folder = DownloadManager.folder
         let icon = NSWorkspace.shared.icon(forFile: folder.path)
