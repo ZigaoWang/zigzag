@@ -565,6 +565,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             select(max(selectedIndex - 1, 0)); return true
         case #selector(NSResponder.insertNewline(_:)):
             commit(modifiers: NSApp.currentEvent?.modifierFlags ?? []); return true
+        // ⌥↩ reaches a text field as this, not as a plain newline.
+        case #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
+            commit(modifiers: (NSApp.currentEvent?.modifierFlags ?? []).union(.option)); return true
         case #selector(NSResponder.cancelOperation(_:)) where scope != nil:
             setScope(nil)
             return true
