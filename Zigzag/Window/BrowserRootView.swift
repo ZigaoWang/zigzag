@@ -161,6 +161,15 @@ final class BrowserRootView: ColorView {
         addSubview(sidebarContainer)
         addSubview(splitDropHint)
         addSubview(overlay)
+        NotificationCenter.default.addObserver(forName: Self.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Tokens.Motion.animate(Tokens.Motion.gentle) {
+                    self.needsLayout = true
+                    self.layoutSubtreeIfNeeded()
+                }
+            }
+        }
         resizeHandle.onDrag = { [weak self] x in
             guard let self else { return }
             let width = Tokens.Space.snap(min(max(x, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
@@ -182,10 +191,25 @@ final class BrowserRootView: ColorView {
     // MARK: Layout
 
     /// Full screen with the sidebar hidden: the page is the whole screen, no frame around it (like Arc).
-    var isEdgeToEdge: Bool { window?.styleMask.contains(.fullScreen) == true && !sidebarVisible }
+    /// Borderless, with the sidebar showing: the page fills the rest of the window, and the sidebar is the frame.
+    var isEdgeToEdge: Bool {
+        sidebarVisible ? Self.isBorderless : window?.styleMask.contains(.fullScreen) == true
+    }
+
+    /// The page runs to the window's edges beside the sidebar. With the sidebar hidden it keeps a thin frame, so
+    /// there's always something to drag the window by.
+    static var isBorderless: Bool {
+        get { UserDefaults.standard.bool(forKey: "borderlessPage") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "borderlessPage")
+            NotificationCenter.default.post(name: borderlessChanged, object: nil)
+        }
+    }
+    static let borderlessChanged = Notification.Name("BorderlessPageChanged")
 
     var cardFrame: NSRect {
         let inset = Tokens.Metric.cardInset
+        if isEdgeToEdge, sidebarVisible { return NSRect(x: sidebarWidth, y: 0, width: max(0, bounds.width - sidebarWidth), height: bounds.height) }
         if isEdgeToEdge { return bounds }
         if sidebarVisible {
             return NSRect(x: sidebarWidth, y: inset, width: max(0, bounds.width - sidebarWidth - inset), height: max(0, bounds.height - inset * 2))

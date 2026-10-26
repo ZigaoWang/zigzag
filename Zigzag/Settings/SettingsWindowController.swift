@@ -320,6 +320,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let behaviorGroup = FormGroup()
     private let importGroup = FormGroup()
     private let spacesGroup = FormGroup()
+    private let windowGroup = FormGroup()
     private let passwordsGroup = FormGroup()
     private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
@@ -336,6 +337,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
+    private let borderlessToggle = Toggle()
     private let askToggle = Toggle()
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
@@ -424,6 +426,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
+        borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
+        windowGroup.add(FormRow(title: "Borderless page", detail: "The page fills the window beside the sidebar. Drag the window by the sidebar.", control: borderlessToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -727,6 +731,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, importGroup)
         case .spaces:
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
+            section(nil, windowGroup)
         case .passwords:
             section(nil, passwordsGroup)
             section(nil, passwordsWindowGroup)
@@ -781,6 +786,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
         pipToggle.isOn = PictureInPicture.followsTabs
+        borderlessToggle.isOn = BrowserRootView.isBorderless
         askToggle.isOn = DownloadManager.asksWhereToSave
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave
