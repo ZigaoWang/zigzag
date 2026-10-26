@@ -545,7 +545,9 @@ private final class BrowserRow: InteractiveView {
     func height(for width: CGFloat) -> CGFloat {
         guard !problem.stringValue.isEmpty else { return Self.rowHeight }
         let h = ceil(problem.sizeThatFits(NSSize(width: width - 62 - Tokens.Space.x4, height: 200)).height)
-        return Self.rowHeight + h + Tokens.Space.x2
+        // A problem's button sits under its explanation, so the browser's summary keeps the full line.
+        let button = fixButton.isHidden ? 0 : Tokens.Space.x2 + Tokens.Space.x7Height
+        return Self.rowHeight + h + button + Tokens.Space.x2
     }
 
     private func refresh() {
@@ -618,7 +620,8 @@ private final class BrowserRow: InteractiveView {
         icon.frame = NSRect(x: box.frame.maxX + Tokens.Space.x3, y: (top - 30) / 2, width: 30, height: 30)
         let x = icon.frame.maxX + Tokens.Space.x3
         var right = bounds.width - pad
-        if !fixButton.isHidden {
+        let buttonBelow = !fixButton.isHidden && !problem.stringValue.isEmpty
+        if !fixButton.isHidden, !buttonBelow {
             let w = fixButton.fittingWidth
             right -= w
             fixButton.frame = NSRect(x: right, y: (top - Tokens.Space.x7Height) / 2, width: w, height: Tokens.Space.x7Height)
@@ -646,6 +649,10 @@ private final class BrowserRow: InteractiveView {
         problem.isHidden = problem.stringValue.isEmpty
         let ph = ceil(problem.sizeThatFits(NSSize(width: bounds.width - x - pad, height: 200)).height)
         problem.frame = NSRect(x: x, y: top - Tokens.Space.x2, width: bounds.width - x - pad, height: ph)
+        if buttonBelow {
+            let w = fixButton.fittingWidth
+            fixButton.frame = NSRect(x: x, y: problem.frame.maxY + Tokens.Space.x2, width: w, height: Tokens.Space.x7Height)
+        }
     }
 }
 
