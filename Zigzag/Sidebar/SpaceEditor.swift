@@ -999,7 +999,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             guard let self else { return event }
             if event.type == .keyDown {
                 // Esc in another window (Settings, a second browser window) is that window's.
-                if event.keyCode == 53, event.window === self.window { self.close(); return nil }
+                if event.keyCode == 53, event.window === self.window { self.cancel(); return nil }
                 return event
             }
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }
@@ -1011,11 +1011,23 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let before = Library.shared.snapshot
     private var edited = false
 
+    /// Set for a space just made with +: Esc takes the space away again instead of keeping it.
+    var onCancel: (() -> Void)?
+    private var cancelled = false
+
+    /// Esc: closes, and a space just made goes away again. Return or a click outside keeps it.
+    func cancel() {
+        guard let onCancel else { close(); return }
+        cancelled = true
+        close()
+        onCancel()
+    }
+
     func close() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        commitName()
-        if edited { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo("Edit Space", before: before) }
+        if !cancelled { commitName() }
+        if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo("Edit Space", before: before) }
         if let controller {
             controller.root.holdReveal = false
             dismiss()
@@ -1039,8 +1051,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) { commitName() }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(NSResponder.insertNewline(_:)) || selector == #selector(NSResponder.cancelOperation(_:)) {
+        if selector == #selector(NSResponder.insertNewline(_:)) {
             close()
+            return true
+        }
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            cancel()
             return true
         }
         return false

@@ -73,6 +73,16 @@ enum Tutorial {
         changed.send(())
     }
 
+    /// Takes back a step that was just done (a new space, cancelled while naming it), if it's the last one done.
+    @MainActor static func undo(_ id: String) {
+        guard done.contains(id), let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+        // Only while the guide is on the step right after it (or finished just by it).
+        let next = index + 1 < tasks.count ? tasks[index + 1].id : nil
+        guard current?.id == next else { return }
+        done.remove(id)
+        changed.send(())
+    }
+
     @MainActor static func skip() {
         guard let current else { return }
         skipped = current.id

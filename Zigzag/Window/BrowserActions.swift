@@ -360,10 +360,19 @@ extension BrowserWindowController: NSMenuItemValidation {
         var created: SpaceInfo?
         libraryChange("New Space") { created = Library.shared.addSpace() }
         guard let space = created else { return }
+        let previous = tabManager.currentSpaceID
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
         renameSpace(nil)
+        // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.
+        SpaceEditorPanel.current?.onCancel = { [weak self] in
+            guard let self, Library.shared.space(space.id) != nil else { return }
+            Tutorial.undo("space")
+            if Library.shared.space(previous) != nil { tabManager.switchToSpace(previous) }
+            // Nothing was in it yet, so there's nothing for ⌘Z to bring back.
+            Library.shared.removeSpace(space.id)
+        }
     }
     @objc func renameSpace(_ sender: Any?) {
         openSpaceEditor(tabManager.currentSpaceID)

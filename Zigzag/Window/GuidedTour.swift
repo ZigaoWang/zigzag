@@ -194,7 +194,7 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if editingNewSpace {
-            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Press Return when it looks right", count: "", isDone: false, isFinal: false, target: "editor", clip: "spaces")
+            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Return keeps it, esc cancels", count: "", isDone: false, isFinal: false, target: "editor", clip: "spaces")
         }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: done.doneNote, count: "", isDone: true, isFinal: false, target: "done." + done.id)
