@@ -150,7 +150,8 @@ final class DownloadManager: NSObject {
     /// Where a download was already told to go (Save Page As picked the place), so it isn't asked again.
     private var chosenDestinations: [ObjectIdentifier: URL] = [:]
 
-    func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil) {
+    @discardableResult
+    func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil) -> DownloadItem {
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
         download.delegate = self
         if let window { windows[ObjectIdentifier(download)] = window }
@@ -161,6 +162,7 @@ final class DownloadManager: NSObject {
         attach(download, to: item)
         items.insert(item, at: 0)
         changed.send(item)
+        return item
     }
 
     /// Follows a download's progress on its row: the first attempt, or the same row after a resume.
@@ -269,11 +271,14 @@ final class DownloadManager: NSObject {
 
     /// A web view to resume in: one from a window of the same kind, else a hidden one on the download's own data
     /// store, kept until the download ends.
-    private func webView(for item: DownloadItem) -> WKWebView? {
+    /// A page to fetch it with on its own data store: an open tab of the same kind, else a hidden one, so a private
+    /// download never uses another session's cookies.
+    func webView(for item: DownloadItem) -> WKWebView? {
         if let open = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView,
            item.dataStore == nil || open.configuration.websiteDataStore === item.dataStore {
             return open
         }
+        if let helper = helpers[item.id] { return helper }
         let configuration = WKWebViewConfiguration()
         if let store = item.dataStore { configuration.websiteDataStore = store } else if item.isPrivate { return nil }
         let hidden = WKWebView(frame: .zero, configuration: configuration)
@@ -294,29 +299,36 @@ final class DownloadManager: NSObject {
     }
 
     /// Fetches a finished file again after it was deleted or moved, in the same place in the list.
-    func downloadAgain(_ item: DownloadItem, in webView: WKWebView) {
-        guard let url = item.sourceURL, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
-        webView.startDownload(using: URLRequest(url: url)) { [weak self] download in
-            MainActor.assumeIsolated {
-                self?.items.removeAll { $0 === item }
-                self?.track(download, window: webView.window)
-            }
-        }
+    /// False when it can't be fetched again (not from the web, or a private window that's gone).
+    @discardableResult
+    func downloadAgain(_ item: DownloadItem) -> Bool {
+        guard let url = item.sourceURL, ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let webView = webView(for: item) else { return false }
+        webView.startDownload(using: URLRequest(url: url), completionHandler: replace(item, from: webView))
+        return true
     }
 
     /// Starts a failed or cancelled download again: from where it stopped when the server allows, else from the
     /// start. The new attempt takes the old row's place.
-    func retry(_ item: DownloadItem, in webView: WKWebView) {
-        let finish: (WKDownload) -> Void = { [weak self] download in
-            MainActor.assumeIsolated {
-                self?.items.removeAll { $0 === item }
-                self?.track(download, window: webView.window)
-            }
-        }
+    @discardableResult
+    func retry(_ item: DownloadItem) -> Bool {
+        guard canRetry(item), let webView = webView(for: item) else { return false }
         if let data = item.resumeData {
-            webView.resumeDownload(fromResumeData: data, completionHandler: finish)
-        } else if let url = item.sourceURL, canRetry(item) {
-            webView.startDownload(using: URLRequest(url: url), completionHandler: finish)
+            webView.resumeDownload(fromResumeData: data, completionHandler: replace(item, from: webView))
+        } else if let url = item.sourceURL {
+            webView.startDownload(using: URLRequest(url: url), completionHandler: replace(item, from: webView))
+        }
+        return true
+    }
+
+    /// The new attempt takes the old row's place, keeping the hidden page it runs on (if any) until it's done.
+    private func replace(_ item: DownloadItem, from webView: WKWebView) -> (WKDownload) -> Void {
+        { [weak self] download in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.items.removeAll { $0 === item }
+                let new = self.track(download, window: webView.window)
+                if let helper = self.helpers.removeValue(forKey: item.id) { self.helpers[new.id] = helper }
+            }
         }
     }
 

@@ -291,21 +291,11 @@ final class DownloadsPanelView: FloatingPanelView {
                 switch item.state {
                 case .downloading, .paused: DownloadManager.shared.cancel(item)
                 case .finished where item.fileIsMissing:
-                    if let webView = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView,
-                       ["http", "https"].contains(item.sourceURL?.scheme?.lowercased() ?? "") {
-                        DownloadManager.shared.downloadAgain(item, in: webView)
-                    } else {
-                        DownloadManager.shared.remove(item)
-                    }
+                    if !DownloadManager.shared.downloadAgain(item) { DownloadManager.shared.remove(item) }
                 case .finished: DownloadManager.shared.reveal(item)
                 default:
-                    // Fetched again from a window of the same kind, so a private download never uses your cookies.
-                    if DownloadManager.shared.canRetry(item),
-                       let webView = WindowManager.shared.controllers.first(where: { $0.tabManager.isPrivate == item.isPrivate })?.selectedWebView {
-                        DownloadManager.shared.retry(item, in: webView)
-                    } else {
-                        DownloadManager.shared.remove(item)
-                    }
+                    // Fetched on the download's own data store, so a private one never uses your cookies.
+                    if !DownloadManager.shared.retry(item) { DownloadManager.shared.remove(item) }
                 }
             }
             row.pauseButton.onClick = { [weak row] _ in
