@@ -141,7 +141,7 @@ final class DownloadsPanelView: FloatingPanelView {
         folderButton.showsFillAtRest = true
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
-            NSWorkspace.shared.open(FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
+            NSWorkspace.shared.open(DownloadManager.folder)
             self?.close()
         }
         token = DownloadManager.shared.changed.observe { [weak self] _ in self?.reload() }
