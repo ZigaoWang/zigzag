@@ -65,7 +65,7 @@ final class OnboardingView: NSView {
             body = "Each one stays at the top of your sidebar."
         case .ads:
             content = AdsPicker()
-            title = "Block ads?"
+            title = "Ad blocking is built in"
             body = "Pages load faster, with fewer trackers."
         default:
             content = ReadyPicker()
@@ -675,9 +675,7 @@ private final class BrowserRow: InteractiveView {
     func height(for width: CGFloat) -> CGFloat {
         guard !problem.stringValue.isEmpty else { return Self.rowHeight }
         let h = ceil(problem.sizeThatFits(NSSize(width: width - 62 - Tokens.Space.x4, height: 200)).height)
-        // A problem's button sits under its explanation, so the browser's summary keeps the full line.
-        let button = fixButton.isHidden ? 0 : Tokens.Space.x2 + Tokens.Space.x7Height
-        return Self.rowHeight + h + button + Tokens.Space.x2
+        return Self.rowHeight + h + Tokens.Space.x3
     }
 
     private func refresh() {
@@ -750,7 +748,8 @@ private final class BrowserRow: InteractiveView {
         icon.frame = NSRect(x: box.frame.maxX + Tokens.Space.x3, y: (top - 30) / 2, width: 30, height: 30)
         let x = icon.frame.maxX + Tokens.Space.x3
         var right = bounds.width - pad
-        let buttonBelow = !fixButton.isHidden && !problem.stringValue.isEmpty
+        // The fix sits on the browser's line, at the right; what went wrong reads underneath.
+        let buttonBelow = false
         if !fixButton.isHidden, !buttonBelow {
             let w = fixButton.fittingWidth
             right -= w
@@ -930,7 +929,7 @@ private final class BringPicker: StepContent {
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
         hint.stringValue = isImporting ? "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow."
-            : problems ? "Some of it didn’t come over yet. The fix is next to it." : ""
+            : problems ? "Not everything came over yet." : ""
         needsLayout = true
         onChange?()
     }
@@ -1768,38 +1767,46 @@ private final class ExtensionRow: InteractiveView {
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let block = ChoiceCard(title: "Block ads", detail: "Faster pages, less tracking", recommended: true)
-    private let allow = ChoiceCard(title: "Show ads", detail: "Sites exactly as they come", recommended: false)
+    private let badge = ColorView(color: Onboard.accent)
+    private let shield = NSImageView()
+    private let title = Label("Block ads and trackers", font: Tokens.Font.body(.semibold), color: Onboard.ink)
+    private let line = Label("Built into Zigzag, no extension needed.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
+    private let toggle = Toggle(isOn: ContentBlocker.isEnabled)
+    private let rule = ColorView(color: Onboard.tint.withAlphaComponent(0.1))
+    private let note = Label("A site that breaks can be let through from its controls.", font: Tokens.Font.small(), color: Onboard.dim(0.6))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [block, allow].forEach { addSubview($0) }
-        pick(ContentBlocker.isEnabled)
-        block.onClick = { [weak self] _ in self?.pick(true) }
-        allow.onClick = { [weak self] _ in self?.pick(false) }
+        badge.wantsLayer = true
+        badge.layer?.cornerRadius = 12
+        badge.layer?.cornerCurve = .continuous
+        shield.image = Tokens.Symbol.image("shield.lefthalf.filled", size: 22)
+        shield.contentTintColor = .white
+        badge.addSubview(shield)
+        [badge, title, line, toggle, rule, note].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The page on the right shows the choice: banners and a pop-up, or just the article.
-    private func pick(_ on: Bool) {
-        block.isChosen = on
-        allow.isChosen = !on
-        preview.page = .news(ads: !on)
-        preview.tabs = ["The Daily Field", "Recipes", "Trip ideas"]
-    }
-
     override func commit(_ done: @escaping () -> Void) {
-        ContentBlocker.isEnabled = block.isChosen
+        ContentBlocker.isEnabled = toggle.isOn
         done()
     }
 
-    override func preferredHeight(for width: CGFloat) -> CGFloat { 64 + 10 + 64 }
+    override func preferredHeight(for width: CGFloat) -> CGFloat { 52 + 33 + note.lineHeight }
 
     override func layout() {
         super.layout()
-        block.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 64)
-        allow.frame = NSRect(x: 0, y: block.frame.maxY + 10, width: bounds.width, height: 64)
+        let w = bounds.width, h: CGFloat = 52
+        badge.frame = NSRect(x: 0, y: 0, width: h, height: h)
+        shield.frame = badge.bounds
+        toggle.frame = NSRect(x: w - 34, y: (h - 20) / 2, width: 34, height: 20)
+        let tx = badge.frame.maxX + 14, tw = toggle.frame.minX - 16 - tx
+        let block = title.lineHeight + 2 + line.lineHeight
+        title.frame = NSRect(x: tx, y: (h - block) / 2, width: tw, height: title.lineHeight)
+        line.frame = NSRect(x: tx, y: title.frame.maxY + 2, width: tw, height: line.lineHeight)
+        rule.frame = NSRect(x: 0, y: h + 16, width: w, height: Tokens.Metric.hairline)
+        note.frame = NSRect(x: 0, y: rule.frame.maxY + 16, width: w, height: note.lineHeight)
     }
 }
 
