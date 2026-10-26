@@ -215,8 +215,8 @@ final class SidebarListView: NSView {
             if carried {
                 // The rest make room at the same pace as the page being carried.
                 NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.5
-                    ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0, 0.18, 1)
+                    ctx.duration = 0.3
+                    ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
                     changes.forEach { $0() }
                 }
             } else {
@@ -236,15 +236,17 @@ final class SidebarListView: NSView {
         let layer = view.layer
         layer?.shadowColor = NSColor.black.cgColor
         layer?.shadowRadius = 10
+        // Its shape given up front, so the shadow costs nothing to draw while it moves.
+        layer?.shadowPath = CGPath(roundedRect: view.bounds, cornerWidth: Tokens.Radius.control, cornerHeight: Tokens.Radius.control, transform: nil)
         layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? 4 : -4)
         let lift = CAKeyframeAnimation(keyPath: "shadowOpacity")
-        lift.values = [0, 0.18, 0.18, 0]
-        lift.keyTimes = [0, 0.2, 0.75, 1]
-        lift.duration = 0.5
+        lift.values = [0, 0.14, 0.14, 0]
+        lift.keyTimes = [0, 0.25, 0.7, 1]
+        lift.duration = 0.3
         layer?.add(lift, forKey: "lift")
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.5
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0, 0.18, 1)
+            ctx.duration = 0.3
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
             ctx.allowsImplicitAnimation = true
             view.animator().frame = frame
         }
