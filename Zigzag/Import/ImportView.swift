@@ -33,6 +33,9 @@ final class ImportView: NSView {
     private let subtitle = NSTextField(wrappingLabelWithString: "")
     private var sources: [ImportCoordinator.Source] = []
     private var rows: [SourceRow] = []
+    /// The browsers scroll when there are more than fit, so the choices and Import stay in view.
+    private let rowScroll = NSScrollView()
+    private let rowList = FlippedView()
     private let choiceLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private var choiceButtons: [(ImportCoordinator.Choice, ChoicePill)] = []
     private let chooseFile = TextButton(title: "Choose a File", font: Tokens.Font.body(.medium))
@@ -62,7 +65,14 @@ final class ImportView: NSView {
         emptyNote.font = Tokens.Font.body()
         emptyNote.textColor = Tokens.Color.textSecondary
         emptyNote.isSelectable = false
-        [title, subtitle, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
+        rowScroll.drawsBackground = false
+        rowScroll.useSlimScroller()
+        rowScroll.verticalScrollElasticity = .allowed
+        rowScroll.horizontalScrollElasticity = .none
+        rowScroll.contentView = FlippedClipView()
+        rowScroll.contentView.drawsBackground = false
+        rowScroll.documentView = rowList
+        [title, subtitle, rowScroll, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
         for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
             let box = ChoicePill(title: name)
             box.tint = Brand.Theme.brand.accent
@@ -93,7 +103,7 @@ final class ImportView: NSView {
             let row = SourceRow(source: source)
             row.isChosen = suggested.contains(source.id)
             row.onToggle = { [weak self] in self?.choicesChanged() }
-            addSubview(row)
+            rowList.addSubview(row)
             return row
         }
         if sources.isEmpty { addSubview(emptyNote) } else { emptyNote.removeFromSuperview() }
@@ -256,7 +266,7 @@ final class ImportView: NSView {
             guard response == .OK, let url = panel.url, let self else { return }
             let row = SourceRow(source: ImportCoordinator.fileSource(url))
             row.isChosen = true
-            self.addSubview(row)
+            self.rowList.addSubview(row)
             self.rows.append(row)
             self.startImport([row])
             row.exportFile = url
@@ -303,7 +313,26 @@ final class ImportView: NSView {
         if !title.stringValue.isEmpty { place(title, height: titleHeight, gap: Tokens.Space.x2) }
         if !subtitle.stringValue.isEmpty { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
         if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
-        for row in visibleRows { place(row, height: row.preferredHeight(for: width), gap: Tokens.Space.x2) }
+        // The rows get what's left once everything else fits: in their own window, as tall as the screen allows.
+        let limit: CGFloat
+        if presentation == .window {
+            let screen = window?.screen?.visibleFrame.height ?? 900
+            limit = min(780, screen - 60) - (window.map { $0.frame.height - $0.contentLayoutRect.height } ?? 28)
+        } else {
+            limit = bounds.height
+        }
+        let fixed = (presentation == .window ? 128 + Tokens.Space.x6 : Tokens.Space.x16 * 2) + heroHeight + (title.stringValue.isEmpty ? 0 : titleHeight + Tokens.Space.x2)
+            + (subtitle.stringValue.isEmpty ? 0 : subtitleHeight + Tokens.Space.x6) + emptyHeight
+            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + Tokens.Space.x8 * 2 + Tokens.Space.x6
+        let listHeight = max(120, min(rowsHeight, limit - fixed))
+        var ry: CGFloat = 0
+        for (row, height) in zip(visibleRows, rowHeights) {
+            row.frame = NSRect(x: 0, y: ry, width: width, height: height)
+            ry += height + Tokens.Space.x2
+        }
+        rowList.frame = NSRect(x: 0, y: 0, width: width, height: rowsHeight)
+        rowScroll.isHidden = visibleRows.isEmpty
+        if !visibleRows.isEmpty { place(rowScroll, height: rowsHeight > listHeight ? listHeight : rowsHeight, gap: Tokens.Space.x2) }
         if showsChoices {
             y += Tokens.Space.x4
             choiceLabel.isHidden = false
