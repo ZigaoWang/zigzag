@@ -34,59 +34,106 @@ final class OnboardingView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    private var shell: StepPage?
+
     func show(_ next: Step, animated: Bool) {
         let forward = next.rawValue >= step.rawValue
         step = next
-        let view: NSView
+        window?.makeFirstResponder(nil)
         if next == .hello {
             let hello = HelloPage()
             hello.onStart = { [weak self] in self?.show(.bring, animated: true) }
-            view = hello
-        } else {
-            let content: StepContent
-            let title: String, body: String
-            switch next {
-            case .bring:
-                content = BringPicker()
-                title = "Bring your stuff over"
-                body = "Passwords, bookmarks and history. Nothing changes in your old browser."
-            case .sites:
-                content = SitesPicker()
-                title = "Pin your favorites"
-                body = "Click the sites you use. They sit at the top of your sidebar, one click away."
-            case .extensions:
-                content = ExtensionsPicker()
-                title = "Add extensions"
-                body = "Use 1Password or Bitwarden? Add its extension here, or it won’t fill anything in Zigzag."
-            case .ads:
-                content = AdsPicker()
-                title = "Block ads?"
-                body = "Faster pages, fewer trackers. Change it for any site later."
-            default:
-                content = ReadyPicker()
-                title = "You’re all set"
-                body = "Last thing: open links from other apps in Zigzag."
-            }
-            let stepPage = StepPage(title: title, body: body, content: content, index: next.rawValue - 1,
-                                    count: Step.allCases.count - 1, showsSkip: next != .ready)
-            stepPage.onBack = { [weak self] in
-                guard let self, let back = Step(rawValue: next.rawValue - 1) else { return }
-                self.show(back, animated: true)
-            }
-            stepPage.onNext = { [weak self] in
-                guard let self else { return }
-                if let after = Step(rawValue: next.rawValue + 1) { self.show(after, animated: true) } else { self.onFinish?() }
-            }
-            view = stepPage
+            let old = page
+            page = hello
+            shell = nil
+            hello.frame = bounds
+            hello.autoresizingMask = [.width, .height]
+            addSubview(hello)
+            if animated, let old { slide(from: old, to: hello, forward: false) } else { old?.removeFromSuperview() }
+            return
         }
-        let old = page
-        page = view
-        view.frame = bounds
-        view.autoresizingMask = [.width, .height]
-        addSubview(view)
-        guard animated, let old else { old?.removeFromSuperview(); return }
-        window?.makeFirstResponder(nil)
-        slide(from: old, to: view, forward: forward)
+        let content: StepContent
+        let title: String, body: String
+        switch next {
+        case .bring:
+            content = BringPicker()
+            title = "Bring your stuff over"
+            body = "Passwords, bookmarks and history. Nothing changes in your old browser."
+        case .sites:
+            content = SitesPicker()
+            title = "Pin your favorites"
+            body = "Click the sites you use. They sit at the top of your sidebar, one click away."
+        case .extensions:
+            content = ExtensionsPicker()
+            title = "Add extensions"
+            body = "Use 1Password or Bitwarden? Add its extension here, or it won’t fill anything in Zigzag."
+        case .ads:
+            content = AdsPicker()
+            title = "Block ads?"
+            body = "Faster pages, fewer trackers. Change it for any site later."
+        default:
+            content = ReadyPicker()
+            title = "You’re all set"
+            body = "Last thing: open links from other apps in Zigzag."
+        }
+        // The steps share one frame: moving between them changes only what's on it.
+        let isNew = shell == nil
+        let stepPage = shell ?? StepPage(count: Step.allCases.count - 1)
+        shell = stepPage
+        stepPage.onBack = { [weak self] in
+            guard let self, let back = Step(rawValue: next.rawValue - 1) else { return }
+            self.show(back, animated: true)
+        }
+        stepPage.onNext = { [weak self] in
+            guard let self else { return }
+            if let after = Step(rawValue: next.rawValue + 1) { self.show(after, animated: true) } else { self.onFinish?() }
+        }
+        if isNew {
+            let old = page
+            page = stepPage
+            stepPage.frame = bounds
+            stepPage.autoresizingMask = [.width, .height]
+            addSubview(stepPage)
+            stepPage.present(title: title, body: body, content: content, index: next.rawValue - 1, showsSkip: next != .ready,
+                             forward: forward, animated: false)
+            if animated, let old { arrive(from: old, to: stepPage) } else { old?.removeFromSuperview() }
+        } else {
+            stepPage.present(title: title, body: body, content: content, index: next.rawValue - 1, showsSkip: next != .ready,
+                             forward: forward, animated: animated)
+        }
+    }
+
+    /// From the welcome into the steps: the welcome lifts away and the white side sweeps in from the left over the
+    /// blue, with the picture rising onto it.
+    private func arrive(from hello: NSView, to steps: StepPage) {
+        guard !Tokens.Motion.reduceMotion else { slide(from: hello, to: steps, forward: true); return }
+        steps.wantsLayer = true
+        hello.wantsLayer = true
+        steps.layoutSubtreeIfNeeded()
+        // The welcome stays on top while it goes, so the sweep reads as the page arriving under it.
+        addSubview(hello, positioned: .above, relativeTo: steps)
+        steps.sweepIn()
+        guard let layer = hello.layer else { hello.removeFromSuperview(); return }
+        let curve = CAMediaTimingFunction(controlPoints: 0.4, 0, 0.2, 1)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { hello.removeFromSuperview() }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = 0.3
+        fade.timingFunction = curve
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        let lift = CABasicAnimation(keyPath: "transform.translation.y")
+        lift.fromValue = 0
+        lift.toValue = 24
+        lift.duration = 0.35
+        lift.timingFunction = curve
+        lift.fillMode = .forwards
+        lift.isRemovedOnCompletion = false
+        layer.add(fade, forKey: "leave.fade")
+        layer.add(lift, forKey: "leave.lift")
+        CATransaction.commit()
     }
 
     /// Moving on: the screen you're leaving drifts a little aside as it fades, the next arrives from the other
@@ -147,32 +194,36 @@ private final class StepPage: NSView {
     private let left = ColorView(color: Onboard.paper)
     private let right = BrandSurface()
     private var bars: [ColorView] = []
-    private let title: NSTextField
-    private let body: NSTextField
+    private var fills: [ColorView] = []
+    private var title = Onboard.title("")
+    private var body = Onboard.line("")
     private let back = Onboard.quiet("Back")
     private let next = Onboard.primary("Continue")
     private let skip = Onboard.quiet("Skip")
-    private let content: StepContent
+    private var content = StepContent()
+    private var index = 0
 
-    init(title text: String, body bodyText: String, content: StepContent, index: Int, count: Int, showsSkip: Bool) {
-        self.content = content
-        title = Onboard.title(text)
-        body = Onboard.line(bodyText)
+    /// The frame of every step stays put (the white side, progress, the buttons, the blue); only what's on it changes.
+    init(count: Int) {
         super.init(frame: .zero)
         right.cornerRadius = 0
         right.layer?.borderWidth = 0
         right.showsWatermark = false
         right.fixedTheme = Brand.Theme.of(Library.shared.spaces.first)
-        skip.isHidden = !showsSkip
-        for i in 0..<count {
-            let bar = ColorView(color: i <= index ? Onboard.accent : Onboard.tint.withAlphaComponent(0.12))
+        for _ in 0..<count {
+            let bar = ColorView(color: Onboard.tint.withAlphaComponent(0.12))
             bar.wantsLayer = true
             bar.layer?.cornerRadius = 2
+            let fill = ColorView(color: Onboard.accent)
+            fill.wantsLayer = true
+            fill.layer?.cornerRadius = 2
+            fill.layer?.anchorPoint = .zero
+            bar.addSubview(fill)
             bars.append(bar)
+            fills.append(fill)
         }
         [left, right].forEach { addSubview($0) }
-        (bars + [title, body, content, back, skip, next] as [NSView]).forEach { addSubview($0) }
-        right.addSubview(content.picture ?? content.preview)
+        (bars + [back, skip, next] as [NSView]).forEach { addSubview($0) }
         back.onClick = { [weak self] _ in self?.onBack?() }
         skip.onClick = { [weak self] _ in self?.onNext?() }
         next.onClick = { [weak self] _ in
@@ -180,12 +231,155 @@ private final class StepPage: NSView {
             self.content.commit { [weak self] in self?.onNext?() }
             self.refresh()
         }
-        content.onChange = { [weak self] in self?.refresh() }
-        refresh()
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    /// Puts a step on: the first time in place, after that the old one hands over to the new one.
+    func present(title text: String, body bodyText: String, content newContent: StepContent, index newIndex: Int,
+                 showsSkip: Bool, forward: Bool, animated: Bool) {
+        let old = (title: title, body: body, content: content, picture: content.picture ?? content.preview)
+        let first = old.content.superview == nil
+        title = Onboard.title(text)
+        body = Onboard.line(bodyText)
+        content = newContent
+        index = newIndex
+        let picture = newContent.picture ?? newContent.preview
+        [title, body, newContent].forEach { addSubview($0) }
+        right.addSubview(picture)
+        newContent.onChange = { [weak self] in self?.refresh() }
+        skip.isHidden = !showsSkip
+        refresh()
+        layoutSubtreeIfNeeded()
+        let moving = animated && !first && !Tokens.Motion.reduceMotion
+        updateProgress(animated: moving)
+        guard moving else {
+            [old.title, old.body, old.content, old.picture].forEach { if $0 !== picture && $0 !== newContent { $0.removeFromSuperview() } }
+            return
+        }
+        // Words leave upward and the next ones rise into place, title first, then the line, then the choices, one
+        // after another; the picture on the blue slides across and settles, as if the next one was waiting beside it.
+        let dir: CGFloat = forward ? 1 : -1
+        for (i, view) in [old.title, old.body, old.content].enumerated() {
+            Self.animate(view, opacity: (1, 0), y: (0, -10 * dir), duration: 0.2, delay: Double(i) * 0.03, remove: true)
+        }
+        Self.animate(title, opacity: (0, 1), y: (18 * dir, 0), duration: 0.5, delay: 0.12)
+        Self.animate(body, opacity: (0, 1), y: (18 * dir, 0), duration: 0.5, delay: 0.17)
+        let pieces = Self.pieces(of: newContent)
+        if pieces.isEmpty {
+            Self.animate(newContent, opacity: (0, 1), y: (18 * dir, 0), duration: 0.5, delay: 0.22)
+        } else {
+            for (i, piece) in pieces.prefix(14).enumerated() {
+                Self.animate(piece, opacity: (0, 1), y: (14 * dir, 0), duration: 0.45, delay: 0.22 + Double(i) * 0.035)
+            }
+        }
+        Self.animate(old.picture, opacity: (1, 0), x: (0, -90 * dir), scale: (1, 0.94), duration: 0.32, delay: 0, remove: true)
+        Self.animate(picture, opacity: (0, 1), x: (140 * dir, 0), scale: (0.94, 1), duration: 0.7, delay: 0.06, spring: true)
+    }
+
+    /// What arrives one by one: a list's rows, a grid's tiles; otherwise the step's choice as one piece.
+    private static func pieces(of content: NSView) -> [NSView] {
+        let direct = content.subviews.filter { !$0.isHidden }
+        if direct.count == 1, let scroll = direct.first as? NSScrollView, let list = scroll.documentView {
+            return list.subviews.filter { !$0.isHidden }.sorted { $0.frame.minY < $1.frame.minY }
+        }
+        return direct.count > 1 ? direct.sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) } : []
+    }
+
+    private static func animate(_ view: NSView, opacity: (Float, Float), x: (CGFloat, CGFloat) = (0, 0), y: (CGFloat, CGFloat) = (0, 0),
+                                scale: (CGFloat, CGFloat) = (1, 1), duration: CFTimeInterval, delay: CFTimeInterval,
+                                spring: Bool = false, remove: Bool = false) {
+        view.wantsLayer = true
+        guard let layer = view.layer else { if remove { view.removeFromSuperview() }; return }
+        let begin = CACurrentMediaTime() + delay
+        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+        func basic(_ key: String, _ from: Any, _ to: Any) -> CABasicAnimation {
+            let a: CABasicAnimation
+            if spring {
+                let s = CASpringAnimation(keyPath: key)
+                s.stiffness = 170
+                s.damping = 22
+                s.mass = 1
+                s.duration = max(duration, s.settlingDuration)
+                a = s
+            } else {
+                a = CABasicAnimation(keyPath: key)
+                a.duration = duration
+                a.timingFunction = curve
+            }
+            a.fromValue = from
+            a.toValue = to
+            a.beginTime = begin
+            a.fillMode = .both
+            a.isRemovedOnCompletion = !remove
+            return a
+        }
+        CATransaction.begin()
+        if remove { CATransaction.setCompletionBlock { view.removeFromSuperview() } }
+        let fade = Self.plainFade(opacity, begin: begin, duration: spring ? 0.35 : duration * 0.8)
+        fade.isRemovedOnCompletion = !remove
+        layer.add(fade, forKey: "step.fade")
+        // Layers here aren't flipped: positive y on screen is down, so it's negated for the layer.
+        if x != (0, 0) || y != (0, 0) {
+            layer.add(basic("transform.translation", NSValue(size: NSSize(width: x.0, height: -y.0)),
+                            NSValue(size: NSSize(width: x.1, height: -y.1))), forKey: "step.move")
+        }
+        if scale != (1, 1) { layer.add(basic("transform.scale", scale.0, scale.1), forKey: "step.scale") }
+        CATransaction.commit()
+    }
+
+    private static func plainFade(_ opacity: (Float, Float), begin: CFTimeInterval, duration: CFTimeInterval) -> CABasicAnimation {
+        let a = CABasicAnimation(keyPath: "opacity")
+        a.fromValue = opacity.0
+        a.toValue = opacity.1
+        a.duration = duration
+        a.beginTime = begin
+        a.fillMode = .both
+        a.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+        return a
+    }
+
+    /// Arriving from the welcome: the white side slides in from the left edge, then its words and the picture settle.
+    func sweepIn() {
+        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
+        if let layer = left.layer {
+            let move = CABasicAnimation(keyPath: "transform.translation.x")
+            move.fromValue = -Self.leftWidth
+            move.toValue = 0
+            move.duration = 0.6
+            move.timingFunction = curve
+            move.fillMode = .backwards
+            move.beginTime = CACurrentMediaTime() + 0.08
+            layer.add(move, forKey: "sweep")
+        }
+        let words: [NSView] = bars + [title, body] + (Self.pieces(of: content).isEmpty ? [content] : Self.pieces(of: content).prefix(14)) + [back, skip, next]
+        for (i, view) in words.enumerated() {
+            Self.animate(view, opacity: (0, 1), x: (-24, 0), duration: 0.5, delay: 0.3 + Double(i) * 0.025)
+        }
+        Self.animate(content.picture ?? content.preview, opacity: (0, 1), y: (60, 0), scale: (0.96, 1), duration: 0.8, delay: 0.35, spring: true)
+    }
+
+    /// The progress fills along: the step you're arriving at grows across its bar.
+    private func updateProgress(animated: Bool) {
+        for (i, fill) in fills.enumerated() {
+            let on = i <= index
+            let width: CGFloat = on ? 22 : 0
+            guard let layer = fill.layer else { continue }
+            let from = layer.presentation()?.bounds.width ?? layer.bounds.width
+            Tokens.Motion.withoutAnimation { fill.frame = NSRect(x: 0, y: 0, width: width, height: 4) }
+            if animated, from != width {
+                let grow = CABasicAnimation(keyPath: "bounds.size.width")
+                grow.fromValue = from
+                grow.toValue = width
+                grow.duration = 0.45
+                grow.beginTime = CACurrentMediaTime() + (on ? 0.15 : 0)
+                grow.fillMode = .backwards
+                grow.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+                layer.add(grow, forKey: "grow")
+            }
+        }
+    }
 
     /// The right side follows your space's color as soon as you pick one.
     func retint() { right.fixedTheme = Brand.Theme.of(Library.shared.spaces.first) }
