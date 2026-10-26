@@ -65,12 +65,12 @@ final class OnboardingView: NSView {
             body = "Each one stays at the top of your sidebar."
         case .ads:
             content = AdsPicker()
-            title = "Block ads"
-            body = "Built in, no extension needed. Pages load faster, too."
+            title = "Block ads?"
+            body = "Zigzag has a blocker built in. Pages load faster, with fewer trackers."
         default:
             content = ReadyPicker()
-            title = "You’re all set"
-            body = "One more thing, if you’d like."
+            title = "Make Zigzag your default browser?"
+            body = "Links from Mail, Messages and other apps will open here."
         }
         // The steps share one frame: moving between them changes only what's on it.
         let isNew = shell == nil
@@ -155,6 +155,10 @@ class StepContent: NSView {
     func commit(_ done: @escaping () -> Void) { done() }
     /// How tall the step's choice wants to be on the card at this width; the card shrinks or scrolls past that.
     func preferredHeight(for width: CGFloat) -> CGFloat { 300 }
+    /// A yes-or-no step: its own two buttons answer it and move on, so there's no card and no Continue.
+    var isQuestion: Bool { false }
+    /// Called by a question once it's answered.
+    var onAnswer: (() -> Void)?
     override var isFlipped: Bool { true }
 }
 
@@ -222,7 +226,13 @@ private final class StepPage: NSView {
         [title, body].forEach { addSubview($0) }
         card.addSubview(newContent)
         newContent.onChange = { [weak self] in self?.refresh() }
-        skip.isHidden = !showsSkip
+        newContent.onAnswer = { [weak self] in self?.onNext?() }
+        // A question answers itself: its buttons sit on the blue, without the card or Continue.
+        let question = newContent.isQuestion
+        card.color = question ? .clear : Onboard.paper
+        card.layer?.shadowOpacity = question ? 0 : 1
+        next.isHidden = question
+        skip.isHidden = !showsSkip || question
         refresh()
         let oldDots = dots.map(\.frame)
         needsLayout = true
@@ -379,6 +389,26 @@ private enum Onboard {
         field.font = .systemFont(ofSize: 14)
         field.textColor = Tokens.Color.textSecondary
         return field
+    }
+
+    /// The second answer to a question: an outline on the blue.
+    static func outline(_ title: String) -> PrimaryButton {
+        let button = PrimaryButton(title: title)
+        button.customFill = Brand.ribbon.withAlphaComponent(0.12)
+        button.customInk = Brand.ribbon
+        return button
+    }
+
+    static let answerHeight: CGFloat = 44
+
+    /// A question's answers, side by side in the middle, the same width.
+    static func layoutAnswers(_ buttons: [NSView], in bounds: NSRect) {
+        let w: CGFloat = 200, gap: CGFloat = 12
+        var x = round((bounds.width - CGFloat(buttons.count) * w - CGFloat(buttons.count - 1) * gap) / 2)
+        for button in buttons {
+            button.frame = NSRect(x: x, y: 0, width: w, height: answerHeight)
+            x += w + gap
+        }
     }
 
     /// Back and Skip, quiet on the blue.
@@ -1767,35 +1797,24 @@ private final class ExtensionRow: InteractiveView {
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let demo = LiveBrowser()
-    private let title = Label("Block ads and trackers", font: Tokens.Font.body(.semibold), color: Onboard.ink)
-    private let toggle = Toggle(isOn: ContentBlocker.isEnabled)
+    private let yes = Onboard.light("Block Ads")
+    private let no = Onboard.outline("Show Ads")
 
-    /// The switch, and a page that shows what it does: flip it and the banners come and go.
     override init(frame: NSRect) {
         super.init(frame: frame)
-        demo.tabs = ["The Daily Field", "Recipes", "Trip ideas"]
-        demo.page = .news(ads: !toggle.isOn)
-        toggle.onChange = { [weak self] on in self?.demo.page = .news(ads: !on) }
-        [demo, title, toggle].forEach { addSubview($0) }
+        yes.onClick = { [weak self] _ in ContentBlocker.isEnabled = true; self?.onAnswer?() }
+        no.onClick = { [weak self] _ in ContentBlocker.isEnabled = false; self?.onAnswer?() }
+        [yes, no].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func commit(_ done: @escaping () -> Void) {
-        ContentBlocker.isEnabled = toggle.isOn
-        done()
-    }
-
-    override func preferredHeight(for width: CGFloat) -> CGFloat { round(width * 0.5) + 20 + 20 }
+    override var isQuestion: Bool { true }
+    override func preferredHeight(for width: CGFloat) -> CGFloat { Onboard.answerHeight }
 
     override func layout() {
         super.layout()
-        let w = bounds.width
-        demo.frame = NSRect(x: 0, y: 0, width: w, height: round(w * 0.5))
-        let y = demo.frame.maxY + 20
-        toggle.frame = NSRect(x: w - 34, y: y, width: 34, height: 20)
-        title.frame = NSRect(x: 2, y: y + (20 - title.lineHeight) / 2, width: w - 50, height: title.lineHeight)
+        Onboard.layoutAnswers([yes, no], in: bounds)
     }
 }
 
@@ -2106,62 +2125,27 @@ final class LiveBrowser: NSView {
 
 /// The last step: make Zigzag the browser links open in, then start.
 private final class ReadyPicker: StepContent {
-    private let icon = NSImageView()
-    private let title = Label("Make Zigzag your default browser", font: Tokens.Font.body(.semibold), color: Onboard.ink)
-    private let line = Label("Links from Mail, Messages and other apps open here.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
-    private let button = Onboard.primary("Make Default")
-    private let done = Label("Default browser", font: Tokens.Font.small(.medium), color: Onboard.dim(0.65))
-    private let check = NSImageView()
+    private let yes = Onboard.light("Make Default")
+    private let no = Onboard.outline("Not Now")
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        icon.image = NSApp.applicationIconImage
-        icon.imageScaling = .scaleProportionallyUpOrDown
-        line.lineBreakMode = .byTruncatingTail
-        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 15)
-        check.contentTintColor = Onboard.accent
-        [icon, title, line, button, done, check].forEach { addSubview($0) }
-        button.onClick = { [weak self] _ in
+        yes.onClick = { [weak self] _ in
             DefaultBrowser.make()
-            // macOS asks to confirm; the row catches up once it has.
-            for delay in [1.0, 3.0, 6.0] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self?.refresh() } }
+            self?.onAnswer?()
         }
-        refresh()
+        no.onClick = { [weak self] _ in self?.onAnswer?() }
+        [yes, no].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var primaryTitle: String { "Start Browsing" }
-
-    private func refresh() {
-        let isDefault = SettingsWindowController.isDefaultBrowser
-        button.isHidden = isDefault
-        done.isHidden = !isDefault
-        check.isHidden = !isDefault
-        needsLayout = true
-    }
-
-    override func preferredHeight(for width: CGFloat) -> CGFloat { 56 }
+    override var isQuestion: Bool { true }
+    override func preferredHeight(for width: CGFloat) -> CGFloat { Onboard.answerHeight }
 
     override func layout() {
         super.layout()
-        let w = bounds.width, h: CGFloat = 56
-        icon.frame = NSRect(x: 0, y: 0, width: h, height: h)
-        let right: CGFloat
-        if button.isHidden {
-            let dw = ceil(done.intrinsicContentSize.width)
-            done.frame = NSRect(x: w - dw, y: (h - done.lineHeight) / 2, width: dw, height: done.lineHeight)
-            check.frame = NSRect(x: done.frame.minX - 20, y: (h - 16) / 2, width: 16, height: 16)
-            right = check.frame.minX - 12
-        } else {
-            let bw = max(button.fittingWidth + 16, 128)
-            button.frame = NSRect(x: w - bw, y: (h - Tokens.Space.x8) / 2, width: bw, height: Tokens.Space.x8)
-            right = button.frame.minX - 16
-        }
-        let tx = icon.frame.maxX + 14
-        let block = title.lineHeight + 2 + line.lineHeight
-        title.frame = NSRect(x: tx, y: (h - block) / 2, width: right - tx, height: title.lineHeight)
-        line.frame = NSRect(x: tx, y: title.frame.maxY + 2, width: right - tx, height: line.lineHeight)
+        Onboard.layoutAnswers([yes, no], in: bounds)
     }
 }
 
