@@ -13,6 +13,7 @@
 - Reopen Closed Window, Save Page As, and Share in the File menu.
 - Right-click a link to open it in a new or private window; right-click Back or Forward to jump several pages.
 - A blocked pop-up says so, with a button to open it.
+- Pause a download and resume it later, even after quitting Zigzag.
 - Choose where downloads go, drag a finished download out into Finder, and the list stays after a restart.
 - Settings › Privacy lists each site's choices, so you can forget just one.
 - Find shows where you are, like 3 of 12.
@@ -30,3 +31,7 @@
 - A site with a certificate problem explains why, and lets you visit a site you trust anyway.
 - Export as PDF makes real pages.
 - The offline page reloads by itself when you're back online.
+- Importing starts with the browser you actually use, and every profile you've used lately, already checked.
+- Passwords from Chrome and other browsers come over reliably; if some can't be opened, the import says so and offers to try again.
+- Saved passwords are offered as soon as a sign-in page opens with its email box ready, like Google's.
+- Imported passwords keep being offered after you add a password manager extension.
