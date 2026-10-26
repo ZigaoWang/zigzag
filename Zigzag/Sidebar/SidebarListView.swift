@@ -158,10 +158,12 @@ final class SidebarListView: NSView {
 
         // A page that changes kind (a tab pinned with ⌘D, or a pinned page made a tab again) keeps one row that
         // glides from where it was to where it now belongs, instead of one fading out and another fading in.
+        // Which page a row shows; for rows that are leaving, the page it showed last time, since an unpinned page has
+        // already left its pinned item by now.
         func pageID(_ item: SidebarItem) -> UUID? {
             switch item {
             case .tab(let id): id
-            case .bookmark(let id): manager?.bookmarkTab(for: id)?.id
+            case .bookmark(let id): manager?.bookmarkTab(for: id)?.id ?? shownPages[item]
             default: nil
             }
         }
@@ -223,9 +225,14 @@ final class SidebarListView: NSView {
                 Tokens.Motion.animate { changes.forEach { $0() } }
             }
         }
+        shownPages = [:]
+        for item in displayed { if let id = pageID(item) { shownPages[item] = id } }
         updateDocumentHeight()
         pinHeader()
     }
+
+    /// The page each row showed at the last update.
+    private var shownPages: [SidebarItem: UUID] = [:]
 
     /// A page moving between the tabs and the pinned section travels there for you to see: it lifts above the other
     /// rows with a soft shadow, glides to its new place, and settles back down.
