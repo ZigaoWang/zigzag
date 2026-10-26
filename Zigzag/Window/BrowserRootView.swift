@@ -219,7 +219,8 @@ final class BrowserRootView: ColorView {
     var paneFrames: (left: NSRect, right: NSRect?) {
         let area = cardFrame
         guard let ratio = splitRatio else { return (area, nil) }
-        let gap = Tokens.Metric.cardInset
+        // Borderless, the two pages meet at a hairline instead of floating apart.
+        let gap = isEdgeToEdge ? 1 : Tokens.Metric.cardInset
         if splitVertical {
             let topHeight = floor((area.height - gap) * ratio)
             let top = NSRect(x: area.minX, y: area.minY, width: area.width, height: topHeight)
@@ -234,6 +235,7 @@ final class BrowserRootView: ColorView {
     private func layoutCards() {
         let panes = paneFrames
         card.isEdgeToEdge = isEdgeToEdge
+        secondCard.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
         if let right = panes.right {
             secondCard.isHidden = false
@@ -375,6 +377,7 @@ final class BrowserRootView: ColorView {
         onSlide?(duration)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
+        secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, {
             self.card.animator().frame = self.paneFrames.left
             if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
