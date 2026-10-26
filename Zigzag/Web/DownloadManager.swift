@@ -50,6 +50,20 @@ final class DownloadManager: NSObject {
         return active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
     }
 
+    /// Where downloads go: Downloads unless you picked another folder in Settings (and it's still there).
+    static var folder: URL {
+        get {
+            if let path = UserDefaults.standard.string(forKey: "DownloadFolder"), FileManager.default.fileExists(atPath: path) {
+                return URL(fileURLWithPath: path, isDirectory: true)
+            }
+            return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        }
+        set {
+            let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+            UserDefaults.standard.set(newValue.standardizedFileURL == downloads.standardizedFileURL ? nil : newValue.path, forKey: "DownloadFolder")
+        }
+    }
+
     /// Ask with a save sheet each time instead of saving straight to Downloads.
     static var asksWhereToSave: Bool {
         get { UserDefaults.standard.bool(forKey: "DownloadsAskWhere") }
@@ -148,7 +162,7 @@ final class DownloadManager: NSObject {
     /// A free name in Downloads, also avoiding names given to downloads still in progress (their files don't
     /// exist yet), so two "report.pdf"s started together don't collide.
     static func uniqueDestination(for filename: String, avoiding taken: Set<String> = []) -> URL {
-        let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        let folder = Self.folder
         let safe = filename.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
         let base = (safe as NSString).deletingPathExtension
         let ext = (safe as NSString).pathExtension
@@ -196,7 +210,7 @@ extension DownloadManager: WKDownloadDelegate {
     private func askWhere(name: String, in window: NSWindow?) async -> URL? {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = name
-        panel.directoryURL = lastFolder ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        panel.directoryURL = lastFolder ?? Self.folder
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         let response: NSApplication.ModalResponse

@@ -339,7 +339,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let pipToggle = Toggle()
     private let borderlessToggle = Toggle()
     private let quitToggle = Toggle()
-    private let askToggle = Toggle()
+    /// Where downloads go: Downloads, another folder, or ask each time.
+    private let downloadPlace = MenuButton()
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
     private let translateOffer = Toggle()
@@ -413,13 +414,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
-        askToggle.onChange = { on in DownloadManager.asksWhereToSave = on }
+        downloadPlace.onSelect = { [weak self] index in self?.pickDownloadPlace(index) }
         archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
         behaviorGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
         behaviorGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
-        behaviorGroup.add(FormRow(title: "Ask where to save each download", detail: "Off: downloads go straight to your Downloads folder.", control: askToggle))
+        behaviorGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", control: downloadPlace))
         behaviorGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         behaviorGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
@@ -781,6 +782,36 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: height)
     }
 
+    /// The menu: the folder downloads go to (with its own icon), Ask Each Time, and Other… to pick a folder.
+    private func refreshDownloadPlace() {
+        let folder = DownloadManager.folder
+        let icon = NSWorkspace.shared.icon(forFile: folder.path)
+        icon.size = NSSize(width: 16, height: 16)
+        downloadPlace.options = [MenuButton.Option(title: FileManager.default.displayName(atPath: folder.path), image: icon),
+                                 MenuButton.Option(title: "Ask Each Time", image: nil),
+                                 MenuButton.Option(title: "Other…", image: nil)]
+        downloadPlace.selectedIndex = DownloadManager.asksWhereToSave ? 1 : 0
+    }
+
+    private func pickDownloadPlace(_ index: Int) {
+        switch index {
+        case 0: DownloadManager.asksWhereToSave = false
+        case 1: DownloadManager.asksWhereToSave = true
+        default:
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.canCreateDirectories = true
+            panel.prompt = "Choose"
+            panel.directoryURL = DownloadManager.folder
+            if panel.runModal() == .OK, let url = panel.url {
+                DownloadManager.folder = url
+                DownloadManager.asksWhereToSave = false
+            }
+        }
+        refreshDownloadPlace()
+    }
+
     private func refresh() {
         engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
         engine.selectedIndex = SearchEngine.allCases.firstIndex(of: Library.shared.searchEngine) ?? 0
@@ -791,7 +822,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         pipToggle.isOn = PictureInPicture.followsTabs
         borderlessToggle.isOn = BrowserRootView.isBorderless
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
-        askToggle.isOn = DownloadManager.asksWhereToSave
+        refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
