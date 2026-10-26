@@ -155,7 +155,7 @@ class StepContent: NSView {
     func commit(_ done: @escaping () -> Void) { done() }
     /// How tall the step's choice wants to be on the card at this width; the card shrinks or scrolls past that.
     func preferredHeight(for width: CGFloat) -> CGFloat { 300 }
-    /// A yes-or-no step: its own two buttons answer it and move on, so there's no card and no Continue.
+    /// A yes-or-no step: two answers on the blue, without the card; Continue goes with the one picked.
     var isQuestion: Bool { false }
     /// Called by a question once it's answered.
     var onAnswer: (() -> Void)?
@@ -231,8 +231,7 @@ private final class StepPage: NSView {
         let question = newContent.isQuestion
         card.color = question ? .clear : Onboard.paper
         card.layer?.shadowOpacity = question ? 0 : 1
-        next.isHidden = question
-        skip.isHidden = !showsSkip || question
+        skip.isHidden = !showsSkip
         refresh()
         let oldDots = dots.map(\.frame)
         needsLayout = true
@@ -400,6 +399,18 @@ private enum Onboard {
     }
 
     static let answerHeight: CGFloat = 44
+
+    /// The picked answer is the light one; the other goes quiet.
+    /// The picked answer is outlined and lit; the other stays quiet. Neither looks like Continue, which is solid.
+    static func mark(chosen: PrimaryButton, other: PrimaryButton) {
+        chosen.customFill = Brand.ribbon.withAlphaComponent(0.2)
+        chosen.customInk = Brand.ribbon
+        chosen.layer?.borderWidth = 2
+        chosen.layer?.borderColor = Brand.ribbon.cgColor
+        other.customFill = Brand.ribbon.withAlphaComponent(0.07)
+        other.customInk = Brand.ribbon.withAlphaComponent(0.7)
+        other.layer?.borderWidth = 0
+    }
 
     /// A question's answers, side by side in the middle, the same width.
     static func layoutAnswers(_ buttons: [NSView], in bounds: NSRect) {
@@ -1797,20 +1808,27 @@ private final class ExtensionRow: InteractiveView {
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let yes = Onboard.light("Block Ads")
+    private let yes = Onboard.outline("Block Ads")
     private let no = Onboard.outline("Show Ads")
+    private var block = true { didSet { Onboard.mark(chosen: block ? yes : no, other: block ? no : yes) } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        yes.onClick = { [weak self] _ in ContentBlocker.isEnabled = true; self?.onAnswer?() }
-        no.onClick = { [weak self] _ in ContentBlocker.isEnabled = false; self?.onAnswer?() }
+        yes.onClick = { [weak self] _ in self?.block = true }
+        no.onClick = { [weak self] _ in self?.block = false }
         [yes, no].forEach { addSubview($0) }
+        Onboard.mark(chosen: block ? yes : no, other: block ? no : yes)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isQuestion: Bool { true }
     override func preferredHeight(for width: CGFloat) -> CGFloat { Onboard.answerHeight }
+
+    override func commit(_ done: @escaping () -> Void) {
+        ContentBlocker.isEnabled = block
+        done()
+    }
 
     override func layout() {
         super.layout()
@@ -2125,23 +2143,28 @@ final class LiveBrowser: NSView {
 
 /// The last step: make Zigzag the browser links open in, then start.
 private final class ReadyPicker: StepContent {
-    private let yes = Onboard.light("Make Default")
+    private let yes = Onboard.outline("Make Default")
     private let no = Onboard.outline("Not Now")
+    private var makeDefault = true { didSet { Onboard.mark(chosen: makeDefault ? yes : no, other: makeDefault ? no : yes) } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        yes.onClick = { [weak self] _ in
-            DefaultBrowser.make()
-            self?.onAnswer?()
-        }
-        no.onClick = { [weak self] _ in self?.onAnswer?() }
+        yes.onClick = { [weak self] _ in self?.makeDefault = true }
+        no.onClick = { [weak self] _ in self?.makeDefault = false }
         [yes, no].forEach { addSubview($0) }
+        Onboard.mark(chosen: yes, other: no)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isQuestion: Bool { true }
+    override var primaryTitle: String { "Start Browsing" }
     override func preferredHeight(for width: CGFloat) -> CGFloat { Onboard.answerHeight }
+
+    override func commit(_ done: @escaping () -> Void) {
+        if makeDefault, !SettingsWindowController.isDefaultBrowser { DefaultBrowser.make() }
+        done()
+    }
 
     override func layout() {
         super.layout()

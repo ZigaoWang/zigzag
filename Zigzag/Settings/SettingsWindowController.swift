@@ -719,12 +719,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 let accessoryWidth = accessory?.fittingSize.width ?? 0
                 label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth - accessoryWidth - Tokens.Space.x4, height: label.lineHeight)
                 documentView.addSubview(label)
+                var bottom = label.frame.maxY
                 if let accessory {
+                    // A button beside the heading lines up with the group's edge and keeps clear of it.
                     let size = accessory.fittingSize
-                    accessory.frame = NSRect(x: width - pad - size.width, y: y + (label.frame.height - size.height) / 2, width: size.width, height: size.height)
+                    accessory.frame = NSRect(x: pad + contentWidth - size.width, y: y + (label.frame.height - size.height) / 2,
+                                             width: size.width, height: size.height)
                     documentView.addSubview(accessory)
+                    bottom = max(bottom, accessory.frame.maxY)
                 }
-                y = label.frame.maxY + Tokens.Space.x2
+                y = bottom + Tokens.Space.x2
             }
             group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))
             group.needsLayout = true
