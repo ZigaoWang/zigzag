@@ -92,6 +92,12 @@ enum ImportCoordinator {
     }
 
     /// What a source holds, counted without decrypting anything: "6 passwords, 57 bookmarks and history".
+    /// "Spaces, 6 passwords, history": what a browser holds, in one short line.
+    nonisolated private static func sentence(_ parts: [String]) -> String {
+        let line = parts.joined(separator: ", ")
+        return line.prefix(1).uppercased() + line.dropFirst()
+    }
+
     static func preview(_ source: Source) async -> String {
         let kind = source.kind
         return await Task.detached(priority: .utility) { () -> String in
@@ -104,13 +110,14 @@ enum ImportCoordinator {
                     return "macOS will need your permission to read it"
                 }
                 let counts = ChromiumImporter.counts(browser)
-                let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"),
-                             counts.history > 0 ? "history" : nil, browser.name == "Arc" ? "spaces and pinned tabs" : nil].compactMap { $0 }
-                return parts.isEmpty ? "Nothing to bring over" : ListFormatter.localizedString(byJoining: parts)
+                // Short enough for one line in the list: Arc's spaces first, then what's counted.
+                let parts = [browser.name == "Arc" ? "spaces" : nil, phrase(counts.passwords, "password", "passwords"),
+                             phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
+                return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
             case .firefox(let browser):
                 let counts = FirefoxImporter.counts(browser)
                 let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
-                return parts.isEmpty ? "Nothing to bring over" : ListFormatter.localizedString(byJoining: parts)
+                return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
             case .safari:
                 return SafariImporter.hasAccess ? "Bookmarks and history. Passwords come from the Passwords app." : "Bookmarks and history need your permission. Passwords come from the Passwords app."
             case .file(let url):

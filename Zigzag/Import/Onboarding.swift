@@ -52,7 +52,7 @@ final class OnboardingView: NSView {
             case .sites:
                 content = SitesPicker()
                 title = "Pin your favorites"
-                body = "One click away, at the top of your sidebar."
+                body = "Click the sites you use. They sit at the top of your sidebar, one click away."
             case .extensions:
                 content = ExtensionsPicker()
                 title = "Add extensions"
@@ -476,12 +476,11 @@ private final class BrowserRow: InteractiveView {
                 // Found before starting, so it's fixed first instead of failing midway.
                 self.needsAccess = true
                 self.isChosen = false
-                self.detail.stringValue = "macOS asks you to allow this once"
+                self.detail.stringValue = "Needs your OK once"
                 self.fixKind = .fullDiskAccess
                 self.onChange?()
             } else {
                 self.detail.stringValue = text.replacingOccurrences(of: " Passwords come from the Passwords app.", with: "")
-                    .replacingOccurrences(of: "spaces and pinned tabs", with: "spaces and pinned tabs")
             }
             self.refresh()
         }
