@@ -33,6 +33,7 @@ enum MainMenu {
             item("Check for Updates…", #selector(AppDelegate.checkForUpdates(_:)), ""),
             .separator(),
             item("Settings…", #selector(AppDelegate.showSettings(_:)), ","),
+            item("Passwords", #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
             item("Set as Default Browser", #selector(AppDelegate.makeDefaultBrowser(_:)), ""),
             .separator(),
             servicesItem(),
@@ -178,7 +179,6 @@ enum MainMenu {
             item("Zoom", #selector(NSWindow.performZoom(_:)), ""),
             .separator(),
             item("Downloads", #selector(C.showDownloads(_:)), "l", [.command, .option]),
-            item("Passwords", #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
             .separator(),
             item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:)), ""),
         ])
