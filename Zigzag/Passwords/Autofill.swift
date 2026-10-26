@@ -104,6 +104,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         setSuggesting(true)
     }
 
+    var isShowing: Bool { menu != nil }
+
     func hide() {
         guard let menu else { return }
         setSuggesting(false)
@@ -244,6 +246,15 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       document.addEventListener('focusin', (e) => { if (!window.__zigzagFilling && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('mousedown', (e) => { if (e.isTrusted && e.target === document.activeElement && wanted(e.target)) report(e.target); }, true);
       document.addEventListener('focusout', (e) => { if (wanted(e.target)) post({ kind: 'blur' }); }, true);
+      // A field already focused when the page opened (Google's sign-in puts the cursor in the email box at once)
+      // never sends focusin to this script: offer for it too, once the page shows. Only sign-in fields, never forms.
+      const offerFocused = () => {
+        const el = document.activeElement;
+        if (!window.__zigzagFilling && !window.__zigzagSuggesting && document.visibilityState === 'visible' && (signIn(el) || isNew(el))) report(el);
+      };
+      offerFocused();
+      window.addEventListener('load', () => setTimeout(offerFocused, 50), { once: true });
+      document.addEventListener('visibilitychange', offerFocused);
       document.addEventListener('input', (e) => { if (window.__zigzagSuggesting && wanted(e.target)) post({ kind: 'blur' }); }, true);
       window.addEventListener('scroll', () => { if (window.__zigzagSuggesting) post({ kind: 'blur' }); }, true);
       document.addEventListener('keydown', (e) => {

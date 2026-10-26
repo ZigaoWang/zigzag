@@ -170,6 +170,8 @@ enum DebugBridge {
             let sources = ImportCoordinator.detectedSources()
             let picked = ImportCoordinator.suggested(sources)
             debugLog("importsuggest => " + sources.map { (picked.contains($0.id) ? "[x] " : "[ ] ") + $0.id + " " + (ImportCoordinator.lastUsed($0).map { "\($0)" } ?? "?") }.joined(separator: " | "))
+        case "autofillmenu":
+            debugLog("autofillmenu => \(Autofill.shared.isShowing)")
         case "importprobe":
             // Lists the browsers found and how many bookmarks and history pages each has; imports nothing.
             Task {
