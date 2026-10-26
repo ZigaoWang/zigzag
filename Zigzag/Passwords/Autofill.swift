@@ -62,7 +62,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             }
             Task {
                 let logins = ((try? await PasswordStore.shared.all()) ?? []).filter { $0.origin.fills(on: origin) }
-                    .sorted { ($0.lastUsed ?? $0.modified) > ($1.lastUsed ?? $1.modified) }
+                    // Saved for this exact page first, then other parts of the site; newest used first within each.
+                    .sorted { a, b in
+                        let exactA = a.origin.isExact(for: origin), exactB = b.origin.isExact(for: origin)
+                        if exactA != exactB { return exactA }
+                        return (a.lastUsed ?? a.modified) > (b.lastUsed ?? b.modified)
+                    }
                 guard current == self.generation, !logins.isEmpty else { if current == self.generation { self.hide() }; return }
                 self.show(logins.map { .login($0) }, under: field, in: webView, frame: frame, origin: origin)
             }

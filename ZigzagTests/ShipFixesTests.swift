@@ -39,3 +39,28 @@ struct ShipFixesTests {
         #expect(colours == [.sky, .graphite, .mint])
     }
 }
+
+/// Passwords across one site's parts, never across sites, by the Public Suffix List.
+struct SiteMatchingTests {
+    @Test func findsTheRegistrableDomain() {
+        #expect(PublicSuffix.registrableDomain("www.netflix.com") == "netflix.com")
+        #expect(PublicSuffix.registrableDomain("news.bbc.co.uk") == "bbc.co.uk")
+        #expect(PublicSuffix.registrableDomain("alice.github.io") == "alice.github.io")
+        #expect(PublicSuffix.registrableDomain("co.uk") == nil)
+        #expect(PublicSuffix.registrableDomain("github.io") == nil)
+        #expect(PublicSuffix.registrableDomain("192.168.1.1") == nil)
+        #expect(PublicSuffix.registrableDomain("localhost") == nil)
+    }
+
+    @Test func fillsAcrossOneSiteOnly() {
+        func origin(_ s: String) -> Origin { Origin(URL(string: s))! }
+        #expect(origin("https://www.netflix.com").fills(on: origin("https://netflix.com")))
+        #expect(origin("https://m.facebook.com").fills(on: origin("https://www.facebook.com")))
+        #expect(origin("http://www.example.com").fills(on: origin("https://login.example.com")))
+        #expect(!origin("https://login.example.com").fills(on: origin("http://www.example.com")))   // never onto an insecure page
+        #expect(!origin("https://alice.github.io").fills(on: origin("https://bob.github.io")))     // different owners
+        #expect(!origin("https://bbc.co.uk").fills(on: origin("https://evil.co.uk")))
+        #expect(!origin("https://example.com").fills(on: origin("https://example.com.evil.net")))
+        #expect(!origin("https://example.com:8443").fills(on: origin("https://www.example.com")))
+    }
+}

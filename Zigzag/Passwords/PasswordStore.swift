@@ -29,11 +29,20 @@ nonisolated struct Origin: Hashable, Sendable, CustomStringConvertible {
     /// What a person calls the site: "github.com".
     var displayName: String { host.hasPrefix("www.") ? String(host.dropFirst(4)) : host }
     var url: URL? { URL(string: description) }
-    /// Whether a login saved here may fill on `page`: the same origin, or an old http login on the same site's
-    /// secure page (never the other way round).
+    /// Whether a login saved here may fill on `page`: the same origin; an old http login on the same site's
+    /// secure page (never the other way round); or another part of the same site on a secure page, as Safari and
+    /// Chrome offer (saved on www.netflix.com, signing in on netflix.com), judged by the Public Suffix List so
+    /// alice.github.io never gets bob.github.io's password.
     func fills(on page: Origin) -> Bool {
-        self == page || (scheme == "http" && page.scheme == "https" && host == page.host && port == nil && page.port == nil)
+        if self == page { return true }
+        guard page.scheme == "https", scheme == "https" || scheme == "http", port == nil, page.port == nil else { return false }
+        if host == page.host { return true }
+        guard let site = PublicSuffix.registrableDomain(host) else { return false }
+        return site == PublicSuffix.registrableDomain(page.host)
     }
+
+    /// The exact same origin, which a menu lists before other parts of the site.
+    func isExact(for page: Origin) -> Bool { self == page }
 }
 
 /// One saved login. The password stays in the Keychain until it's needed for filling, revealing or copying.
