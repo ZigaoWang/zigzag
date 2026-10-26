@@ -145,6 +145,7 @@ enum MainMenu {
 
         main.addItem(submenu("History", [
             item("Search History…", #selector(C.searchHistory(_:)), "y"),
+            item("Show All History", #selector(AppDelegate.showHistory(_:)), "y", [.command, .shift]),
             item("Reopen Closed Tab", #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
             item("Reopen Closed Window", #selector(AppDelegate.reopenClosedWindow(_:)), ""),
             .separator(),

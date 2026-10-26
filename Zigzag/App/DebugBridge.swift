@@ -213,6 +213,7 @@ enum DebugBridge {
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
         case "quit": NSApp.terminate(nil)
+        case "history": HistoryWindowController.show()
         case "newwindow": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false)
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
         case "reopenwindow": WindowManager.shared.reopenClosedWindow()

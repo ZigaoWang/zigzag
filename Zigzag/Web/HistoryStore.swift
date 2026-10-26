@@ -101,6 +101,29 @@ final class HistoryStore {
         exec("DELETE FROM visits")
     }
 
+    /// Everything visited since `date` (Clear Last Hour, Today…).
+    func clear(since date: Date) {
+        guard let statement = prepare("DELETE FROM visits WHERE last_visit >= ?1") else { return }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
+        sqlite3_step(statement)
+    }
+
+    func delete(_ url: URL) {
+        guard let statement = prepare("DELETE FROM visits WHERE url = ?1") else { return }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
+        sqlite3_step(statement)
+    }
+
+    /// Newest first, for the History window; `before` pages further back.
+    func page(before date: Date? = nil, limit: Int = 300) -> [HistoryEntry] {
+        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits WHERE last_visit < ?1 ORDER BY last_visit DESC LIMIT \(limit)") else { return [] }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, (date ?? .distantFuture).timeIntervalSince1970)
+        return collect(statement)
+    }
+
     static func normalizedHost(_ url: URL) -> String {
         let host = url.host()?.lowercased() ?? ""
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host

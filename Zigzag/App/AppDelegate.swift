@@ -157,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func newTab(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .newTab) }
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
+    @objc func showHistory(_ sender: Any?) { HistoryWindowController.show() }
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
 
