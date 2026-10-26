@@ -710,6 +710,13 @@ extension Tab: WKUIDelegate {
         host?.tabDidRequestClose(self)
     }
 
+    /// Right-click › Download Image or Download Linked File. WebKit hands these to the browser through this
+    /// (unpublished but long-standing) delegate method; without it they'd go nowhere.
+    @objc(_webView:contextMenuDidCreateDownload:)
+    func webView(_ webView: WKWebView, contextMenuDidCreate download: WKDownload) {
+        DownloadManager.shared.track(download, window: host?.hostWindow)
+    }
+
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?) {
         host?.tab(self, hoveringLink: url)

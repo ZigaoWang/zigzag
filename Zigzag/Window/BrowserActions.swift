@@ -93,10 +93,55 @@ extension BrowserWindowController: NSMenuItemValidation {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
         panel.nameFieldStringValue = tab.displayTitle.replacingOccurrences(of: "/", with: "-") + ".pdf"
-        panel.beginSheetModal(for: window) { response in
-            guard response == .OK, let url = panel.url else { return }
-            webView.createPDF { result in
-                if case .success(let data) = result { try? data.write(to: url) }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            // Paged like a printout (Letter or A4, whichever this Mac uses), not one endless strip.
+            let info = NSPrintInfo.shared.copy() as! NSPrintInfo
+            info.jobDisposition = .save
+            info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = url
+            info.horizontalPagination = .fit
+            info.verticalPagination = .automatic
+            info.isHorizontallyCentered = false
+            let operation = webView.printOperation(with: info)
+            operation.view?.frame = webView.bounds
+            operation.showsPrintPanel = false
+            operation.showsProgressPanel = false
+            operation.runModal(for: window, delegate: self, didRun: #selector(self.exported(_:success:contextInfo:)), contextInfo: nil)
+        }
+    }
+
+    @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
+        Toast.show(success ? "Saved as PDF" : "Couldn’t save the PDF", symbol: success ? "doc.richtext" : "exclamationmark.triangle", in: self)
+    }
+
+    /// File › Save Page As…: the page as a web archive, pictures and all, that opens offline; a PDF or picture open in
+    /// the tab is saved as itself.
+    @objc func savePageAs(_ sender: Any?) {
+        guard let webView = selectedWebView, let window, let tab = selectedTab, let url = tab.url else { return }
+        let ext = url.pathExtension.lowercased()
+        let isFile = ["pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "mov", "txt"].contains(ext)
+        let panel = NSSavePanel()
+        let name = tab.displayTitle.replacingOccurrences(of: "/", with: "-")
+        if isFile {
+            panel.nameFieldStringValue = url.lastPathComponent
+        } else {
+            panel.allowedContentTypes = [.webArchive]
+            panel.nameFieldStringValue = name + ".webarchive"
+        }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK, let destination = panel.url else { return }
+            if isFile {
+                // Downloaded again with the page's own cookies, so a signed-in PDF saves too.
+                webView.startDownload(using: URLRequest(url: url)) { download in
+                    DownloadManager.shared.track(download, window: window, saveTo: destination)
+                }
+                return
+            }
+            webView.createWebArchiveData { result in
+                MainActor.assumeIsolated {
+                    let saved = (try? result.get().write(to: destination)) != nil
+                    Toast.show(saved ? "Page saved" : "Couldn’t save the page", symbol: saved ? "square.and.arrow.down" : "exclamationmark.triangle", in: self)
+                }
             }
         }
     }

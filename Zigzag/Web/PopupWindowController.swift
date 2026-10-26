@@ -143,6 +143,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         DownloadManager.shared.track(download, window: window)
     }
 
+    @objc(_webView:contextMenuDidCreateDownload:)
+    func webView(_ webView: WKWebView, contextMenuDidCreate download: WKDownload) {
+        DownloadManager.shared.track(download, window: window)
+    }
+
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         await AuthenticationPrompt.respond(to: challenge, window: window)
     }

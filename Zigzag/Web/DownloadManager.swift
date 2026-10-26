@@ -62,7 +62,11 @@ final class DownloadManager: NSObject {
     /// The folder the last save sheet was pointed at, to start there next time.
     private var lastFolder: URL?
 
-    func track(_ download: WKDownload, window: NSWindow?) {
+    /// Where a download was already told to go (Save Page As picked the place), so it isn't asked again.
+    private var chosenDestinations: [ObjectIdentifier: URL] = [:]
+
+    func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil) {
+        if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
         download.delegate = self
         if let window { windows[ObjectIdentifier(download)] = window }
         let isPrivate = download.webView.map { !$0.configuration.websiteDataStore.isPersistent } ?? false
@@ -165,7 +169,10 @@ extension DownloadManager: WKDownloadDelegate {
         let name = suggestedFilename.isEmpty ? "Download" : suggestedFilename
         var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
         let window = windows.removeValue(forKey: ObjectIdentifier(download))
-        if Self.asksWhereToSave {
+        if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
+            try? FileManager.default.removeItem(at: chosen)
+            destination = chosen
+        } else if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
                 items.removeAll { $0.download === download }
