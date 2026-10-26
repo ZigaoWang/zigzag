@@ -105,19 +105,25 @@ final class DownloadsPanelView: FloatingPanelView {
     private var rows: [DownloadRowView] = []
     private let title = Label("Downloads", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let clearButton = TextButton(title: "Clear", font: Tokens.Font.body(.medium))
-    private let folderButton = TextButton(title: "Downloads Folder", font: Tokens.Font.body(.medium))
-    private let emptyNote = Label("No downloads yet", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let folderButton = TextButton(title: "Open Downloads Folder", font: Tokens.Font.body(.medium))
+    /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
+    private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: 24))
+    private let emptyNote = Label("Files you download show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
-    private let footer = Tokens.Space.x10
+    private let footer = Tokens.Space.x12
+    private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
     private let width: CGFloat = 320
 
     init(controller: BrowserWindowController) {
         self.controller = controller
         super.init(frame: .zero)
-        [title, clearButton, folderButton, emptyNote].forEach { addSubview($0) }
+        [title, clearButton, folderButton, emptyIcon, emptyNote].forEach { addSubview($0) }
+        emptyIcon.contentTintColor = Tokens.Color.textTertiary
+        emptyNote.alignment = .center
+        folderButton.showsFillAtRest = true
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             NSWorkspace.shared.open(FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
@@ -186,6 +192,7 @@ final class DownloadsPanelView: FloatingPanelView {
         clearButton.isEnabled = all.contains { $0.state != .downloading }
         clearButton.isHidden = items.isEmpty
         emptyNote.isHidden = !items.isEmpty
+        emptyIcon.isHidden = !items.isEmpty
         reposition()
         needsLayout = true
     }
@@ -193,7 +200,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private func reposition() {
         guard let controller, let anchor else { return }
         let header = Tokens.Space.x10
-        let body = rows.isEmpty ? Tokens.Space.x10 : CGFloat(rows.count) * rowHeight
+        let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * rowHeight
         let height = header + body + footer
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         let x = max(Tokens.Metric.cardInset, anchorFrame.minX)
@@ -209,15 +216,17 @@ final class DownloadsPanelView: FloatingPanelView {
         title.frame = NSRect(x: pad + Tokens.Space.x2, y: (header - h) / 2, width: clearButton.frame.minX - pad * 2 - Tokens.Space.x2, height: h)
         var y = header
         if rows.isEmpty {
-            emptyNote.frame = NSRect(x: pad + Tokens.Space.x2, y: y + (Tokens.Space.x10 - emptyNote.lineHeight) / 2 - Tokens.Space.x1, width: bounds.width - pad * 2 - Tokens.Space.x4, height: emptyNote.lineHeight)
-            y += Tokens.Space.x10
+            let icon: CGFloat = 28
+            emptyIcon.frame = NSRect(x: (bounds.width - icon) / 2, y: y + Tokens.Space.x3, width: icon, height: icon)
+            emptyNote.frame = NSRect(x: pad, y: emptyIcon.frame.maxY + Tokens.Space.x2, width: bounds.width - pad * 2, height: emptyNote.lineHeight)
+            y += emptyHeight
         }
         for row in rows {
             row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: rowHeight)
             y += rowHeight
         }
-        let fw = folderButton.fittingWidth
-        folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x6) / 2 - 2, width: fw, height: Tokens.Space.x6)
+        // A real button across the bottom, not a line of text.
+        folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
     }
 }
 
