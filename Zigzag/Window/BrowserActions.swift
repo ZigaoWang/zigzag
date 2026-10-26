@@ -360,8 +360,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         var created: SpaceInfo?
         libraryChange("New Space") { created = Library.shared.addSpace() }
         guard let space = created else { return }
-        Tutorial.complete("space")
+        // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
+        Tutorial.complete("space")
         renameSpace(nil)
     }
     @objc func renameSpace(_ sender: Any?) {

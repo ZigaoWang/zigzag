@@ -217,7 +217,7 @@ final class GuidedTour: NSView {
             return Display(keys: ["Drag"], title: "Drag the lit tab onto the page", note: "Like in the video",
                            count: count, isDone: false, isFinal: false, target: "split", clip: "split")
         }
-        let clips = ["newTab": "search", "pin": "pin", "space": "spaces"]
+        let clips = ["newTab": "search", "pin": "pin", "space": "spaces", "switch": "switch"]
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id, clip: clips[task.id])
     }
 
@@ -235,7 +235,7 @@ final class GuidedTour: NSView {
         case "done.split": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
         case "editor": return SpaceEditorPanel.current
-        case "done.space": return controller.sidebar.dotsAnchor
+        case "done.space", "switch", "done.switch": return controller.sidebar.dotsAnchor
         default: return nil
         }
     }

@@ -1,6 +1,6 @@
 import AppKit
 
-/// Getting started: five things to do once, in order, each building on the last, on real pages. The guide in the window
+/// Getting started: six things to do once, in order, each building on the last, on real pages. The guide in the window
 /// (GuidedTour) shows them one at a time; each ticks off when you actually do it.
 enum Tutorial {
     struct Task {
@@ -26,7 +26,9 @@ enum Tutorial {
         Task(id: "split", title: "Drag the lit tab onto the page", keys: ["Drag"], note: "Two pages, side by side",
              done: "That’s Split View", doneNote: "To part them, use the button at the top right of either page"),
         Task(id: "space", title: "Make a space", keys: ["+"], note: "One for work, one for fun, each with its own color",
-             done: "Your new space", doneNote: "Click a dot to switch between spaces"),
+             done: "Your new space", doneNote: "Its own tabs and pins, in its own color"),
+        Task(id: "switch", title: "Go back to your first space", keys: ["Swipe"], note: "Two fingers across the sidebar, or click its dot",
+             done: "That’s switching spaces", doneNote: "Swipe or click a dot anytime, or press ⌥⌘← and ⌥⌘→"),
     ]
 
     /// The step that was just skipped, so the guide moves on without saying it was done.

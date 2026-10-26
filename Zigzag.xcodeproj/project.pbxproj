@@ -42,6 +42,7 @@
 		3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */; };
 		3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */; };
 		407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */; };
+		42203BB399B74F33790E1519 /* tour-switch.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 77F1ABEE017B46B497A8AD20 /* tour-switch.mp4 */; };
 		44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */; };
 		477BB8ED8D0C8DC49A0AFC15 /* PopupNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */; };
 		4927062255CE94309C7E277F /* tlds.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5795B0D3216D1BBB137286B3 /* tlds.txt */; };
@@ -205,6 +206,7 @@
 		765C1F36BCEE463F8B5316BE /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Paths.swift; sourceTree = "<group>"; };
 		76DB536661E9E732536910C2 /* Readability-LICENSE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Readability-LICENSE.md"; sourceTree = "<group>"; };
 		77478845778FB285ADD29C14 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
+		77F1ABEE017B46B497A8AD20 /* tour-switch.mp4 */ = {isa = PBXFileReference; path = "tour-switch.mp4"; sourceTree = "<group>"; };
 		79F70CA73E1EF5C8460E9286 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		7A6A928496FC897893B22DF7 /* BrowserWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWebView.swift; sourceTree = "<group>"; };
 		804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStoreTests.swift; sourceTree = "<group>"; };
@@ -353,6 +355,7 @@
 				8E140656BC38916127639671 /* tour-search.mp4 */,
 				360663BDF4F29E3C8F627827 /* tour-spaces.mp4 */,
 				FBE5D581AAECE4A02481AF87 /* tour-split.mp4 */,
+				77F1ABEE017B46B497A8AD20 /* tour-switch.mp4 */,
 			);
 			path = Tour;
 			sourceTree = "<group>";
@@ -753,6 +756,7 @@
 				061DD3B546BFB40FB5813679 /* tour-search.mp4 in Resources */,
 				8A721F7A4AA29F53E93086A1 /* tour-spaces.mp4 in Resources */,
 				6A40F1B6C44683319AB1B0F5 /* tour-split.mp4 in Resources */,
+				42203BB399B74F33790E1519 /* tour-switch.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

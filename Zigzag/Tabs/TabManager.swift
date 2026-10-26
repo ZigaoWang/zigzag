@@ -260,6 +260,8 @@ final class TabManager {
 
     func switchToSpace(_ id: UUID) {
         guard id != currentSpaceID, Library.shared.space(id) != nil else { return }
+        // Making a space switches to it on its own; going somewhere after that is the guide's last step.
+        if !isPrivate, Tutorial.done.contains("space") { Tutorial.complete("switch") }
         selectedTab?.captureSnapshot()
         selectedTab?.markActivated()
         currentSpaceID = id
