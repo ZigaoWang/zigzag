@@ -845,10 +845,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A throw, like a ball: it slows as it rises, hangs at the top for a beat, and speeds up as it drops into
         // the button. Sampled from a real parabola in time, so the speed comes from the arc itself.
         // High enough to read as a throw, never off the top of the page.
-        let topY = max(card.minY + 40, min(start.y, end.y) - max(170, min(280, abs(end.x - start.x) * 0.35 + 110)))
+        // Started right at the page's top, it still rises a little, so the arc stays an arc.
+        let topY = min(min(start.y, end.y) - 24, max(card.minY + 40, min(start.y, end.y) - max(170, min(280, abs(end.x - start.x) * 0.35 + 110))))
         let drop = end.y - start.y, rise = start.y - topY
         // y(t) = a·t² + b·t + y0 through both ends, with its highest point at topY (y grows downward).
-        let a = ((2 * drop + 4 * rise) + ((2 * drop + 4 * rise) * (2 * drop + 4 * rise) - 4 * drop * drop).squareRoot()) / 2
+        let a = ((2 * drop + 4 * rise) + max(0, (2 * drop + 4 * rise) * (2 * drop + 4 * rise) - 4 * drop * drop).squareRoot()) / 2
         let b = drop - a
         let samples = 36
         var points: [NSValue] = []
