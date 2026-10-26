@@ -540,8 +540,33 @@ extension Tab: WKNavigationDelegate {
             if flags.contains(.option) {
                 return (.download, preferences)
             }
+            // A pinned tab or favorite keeps its site: a link that leaves it opens beside it, in a new tab, so the
+            // pinned Gmail is still Gmail when you come back. Signing in still happens right here.
+            if bookmarkID != nil || isFavorite, let here = self.url, Self.site(of: here) != Self.site(of: url), !Self.isSignIn(url) {
+                host?.tab(self, openURL: url, disposition: .foregroundTab)
+                return (.cancel, preferences)
+            }
         }
         return (.allow, preferences)
+    }
+
+    /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: the last two parts of
+    /// the host, or three under a country's own second level (bbc.co.uk).
+    static func site(of url: URL) -> String? {
+        guard let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
+        let parts = host.split(separator: ".")
+        guard parts.count > 2 else { return host }
+        let secondLevel: Set<Substring> = ["co", "com", "org", "net", "ac", "gov", "edu", "ne", "or", "go"]
+        let keep = parts.last!.count == 2 && secondLevel.contains(parts[parts.count - 2]) ? 3 : 2
+        return parts.suffix(keep).joined(separator: ".")
+    }
+
+    /// Pages that sign you in to the site you're on, which have to stay in its tab to work.
+    private static func isSignIn(_ url: URL) -> Bool {
+        let host = url.host()?.lowercased() ?? ""
+        let path = url.path.lowercased()
+        return ["accounts.", "login.", "auth.", "signin.", "sso.", "id.", "appleid."].contains { host.hasPrefix($0) }
+            || ["/login", "/signin", "/sign-in", "/oauth", "/sso"].contains { path.hasPrefix($0) }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {

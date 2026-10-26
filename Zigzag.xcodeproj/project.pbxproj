@@ -31,6 +31,7 @@
 		2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64A4FFBD5B64DD888870043 /* Brand.swift */; };
 		2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9102393493293F365ECD5D6 /* WindowManager.swift */; };
 		3690704E0C2C6021A3E511D7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16FC91D0E7086B1EC211FD6F /* AppDelegate.swift */; };
+		3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */; };
 		36BC4DAF8C508734F781BA47 /* TabPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66958B9657E4B52FE56AA408 /* TabPreview.swift */; };
 		37872776DAE6F6D005D98E10 /* SidebarUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */; };
 		3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A868C3F6FC798AA3459ACF /* DownloadsPanel.swift */; };
@@ -137,6 +138,7 @@
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
 		014C509EA75D15344BB68028 /* ShipFixesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShipFixesTests.swift; sourceTree = "<group>"; };
 		016FF1BFB8B47B23AE450117 /* ads.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = ads.html; sourceTree = "<group>"; };
+		05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkSiteTests.swift; sourceTree = "<group>"; };
 		06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindow.swift; sourceTree = "<group>"; };
 		0737418196BB38BD7D36DDC5 /* WebSocketBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketBridge.swift; sourceTree = "<group>"; };
 		0C6B64529E363AA584C30979 /* PasswordHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealth.swift; sourceTree = "<group>"; };
@@ -531,6 +533,7 @@
 				E4C5CC6B99DC222FF742570A /* BrandContrastTests.swift */,
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */,
+				05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */,
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
 				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
@@ -810,6 +813,7 @@
 				2E6B0BE7362F9BFA6D652A71 /* BrandContrastTests.swift in Sources */,
 				247132AF897197093E229872 /* CRXPackageTests.swift in Sources */,
 				3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */,
+				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */,

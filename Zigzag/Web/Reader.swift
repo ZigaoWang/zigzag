@@ -281,6 +281,7 @@ final class ReaderView: NSView {
     /// Shift-click: a look at the link in Peek, over the article. ⌘-click: a tab in the background.
     var onPeekLink: ((URL) -> Void)?
     var onBackgroundLink: ((URL) -> Void)?
+    var onForegroundLink: ((URL) -> Void)?
     private let controls = ReaderControls()
 
     override init(frame: NSRect) {
@@ -661,8 +662,10 @@ extension ReaderView: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
             let flags = navigationAction.modifierFlags
-            if flags.contains(.shift) { onPeekLink?(url) }
-            else if flags.contains(.command) || navigationAction.buttonNumber == 4 { onBackgroundLink?(url) }
+            // The same as on any page: ⌘ for a tab behind, ⌘⇧ for one in front, ⇧ alone to peek.
+            if flags.contains(.command) || navigationAction.buttonNumber == 4 {
+                if flags.contains(.shift) { onForegroundLink?(url) } else { onBackgroundLink?(url) }
+            } else if flags.contains(.shift) { onPeekLink?(url) }
             else { onOpenLink?(url) }
             return .cancel
         }

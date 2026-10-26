@@ -687,6 +687,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link) }
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab) }
+            view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false) }
             view.show(article, from: url)
             self.reader = view
             self.readerTab = tab
