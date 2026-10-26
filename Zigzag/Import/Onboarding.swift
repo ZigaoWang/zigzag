@@ -692,7 +692,12 @@ private final class BringPicker: StepContent {
         scroll.documentView = list
         hint.alignment = .center
         [scroll, bringLabel, fileLink, hint].forEach { addSubview($0) }
-        for (i, source) in ImportCoordinator.detectedSources().enumerated() { add(source, chosen: i == 0) }
+        let sources = ImportCoordinator.detectedSources()
+        let suggested = ImportCoordinator.suggested(sources)
+        // The browser you use comes first, already checked.
+        for source in sources.filter({ suggested.contains($0.id) }) + sources.filter({ !suggested.contains($0.id) }) {
+            add(source, chosen: suggested.contains(source.id))
+        }
         if rows.isEmpty { addSubview(empty) }
         for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
             let pill = DataToggle(name)
@@ -750,6 +755,11 @@ private final class BringPicker: StepContent {
               let index = rows.firstIndex(where: { $0 === row }) else { return }
         let profiles = ChromiumImporter.profileNames(of: browser)
         guard profiles.count > 1 else { return }
+        let split = profiles.map { folder, name in
+            ImportCoordinator.Source(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) (\(name))", bundleID: browser.bundleID)
+        }
+        // The profiles in use stay checked; an old, empty one doesn't come along.
+        let wanted = row.isChosen ? ImportCoordinator.suggested(split) : []
         row.removeFromSuperview()
         rows.remove(at: index)
         separators.forEach { $0.removeFromSuperview() }
@@ -757,13 +767,13 @@ private final class BringPicker: StepContent {
         let all = rows
         rows = []
         for (k, old) in all.enumerated() {
-            if k == index { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) (\(name))", bundleID: browser.bundleID), chosen: true) } }
+            if k == index { for source in split { add(source, chosen: wanted.contains(source.id)) } }
             old.removeFromSuperview()
             rows.append(old)
             list.addSubview(old)
             if rows.count > 1 { let line = ColorView(color: Onboard.tint.withAlphaComponent(0.09)); list.addSubview(line); separators.append(line) }
         }
-        if index >= all.count { for (folder, name) in profiles { add(.init(kind: .chromium(browser.only(folder, named: name)), name: "\(browser.name) (\(name))", bundleID: browser.bundleID), chosen: true) } }
+        if index >= all.count { for source in split { add(source, chosen: wanted.contains(source.id)) } }
         refresh()
     }
 

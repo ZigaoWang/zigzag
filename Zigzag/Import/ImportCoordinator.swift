@@ -90,6 +90,57 @@ enum ImportCoordinator {
         return sources
     }
 
+    /// The sources to start with checked: the browser this person really uses (their default browser, or else
+    /// the one used most recently), and every profile of it used in the last three months. Never just whichever
+    /// happens to be listed first, which brought over an empty "Default" profile while the real one stayed behind.
+    static func suggested(_ sources: [Source]) -> Set<String> {
+        let browsers = sources.filter { if case .file = $0.kind { false } else { true } }
+        guard !browsers.isEmpty else { return [] }
+        let used = Dictionary(browsers.map { ($0.id, lastUsed($0)) }, uniquingKeysWith: { a, _ in a })
+        let defaultBrowser = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
+            .flatMap { Bundle(url: $0)?.bundleIdentifier }
+        let main: String? = {
+            if let defaultBrowser, browsers.contains(where: { $0.bundleID == defaultBrowser }) { return defaultBrowser }
+            // Zigzag (or something else) is the default: the browser touched most recently.
+            return browsers.max { ((used[$0.id] ?? nil) ?? .distantPast) < ((used[$1.id] ?? nil) ?? .distantPast) }?.bundleID
+        }()
+        let candidates = browsers.filter { $0.bundleID == main }
+        guard !candidates.isEmpty else { return [browsers[0].id] }
+        let newest = candidates.compactMap { used[$0.id] ?? nil }.max()
+        let picked = candidates.filter { source in
+            guard let newest, let date = used[source.id] ?? nil else { return newest == nil }
+            return newest.timeIntervalSince(date) < 90 * 24 * 3600
+        }
+        return Set((picked.isEmpty ? candidates : picked).map(\.id))
+    }
+
+    /// When a browser (or one of its profiles) was last used, as far as can be told without reading its data.
+    static func lastUsed(_ source: Source) -> Date? {
+        let fm = FileManager.default
+        func modified(_ url: URL) -> Date? { (try? fm.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date }
+        switch source.kind {
+        case .chromium(let browser):
+            let root = ChromiumImporter.rootURL(of: browser)
+            // Chromium notes each profile's last use in Local State.
+            if let data = try? Data(contentsOf: root.appendingPathComponent("Local State")),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let profile = json["profile"] as? [String: Any], let cache = profile["info_cache"] as? [String: Any] {
+                let folders = browser.profile.map { [$0] } ?? Array(cache.keys)
+                let times = folders.compactMap { ((cache[$0] as? [String: Any])?["active_time"] as? Double).map { Date(timeIntervalSince1970: $0) } }
+                if let latest = times.max() { return latest }
+                if let last = profile["last_used"] as? String, folders.contains(last) { return modified(root.appendingPathComponent("Local State")) }
+            }
+            return ChromiumImporter.profiles(of: browser).compactMap { modified($0.appendingPathComponent("History")) }.max()
+                ?? modified(root.appendingPathComponent("Local State"))
+        case .firefox(let browser):
+            return FirefoxImporter.profiles(of: browser).compactMap { modified($0.appendingPathComponent("places.sqlite")) }.max()
+        case .safari:
+            return modified(fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari/History.db"))
+        case .file:
+            return nil
+        }
+    }
+
     nonisolated static func shortProfileName(_ display: String) -> String {
         guard let open = display.firstIndex(of: "("), display.hasSuffix(")") else { return display }
         let name = display[..<open].trimmingCharacters(in: .whitespaces)

@@ -85,11 +85,13 @@ final class ImportView: NSView {
 
     private func reloadSources() {
         rows.forEach { $0.removeFromSuperview() }
-        sources = ImportCoordinator.detectedSources()
-        rows = sources.enumerated().map { index, source in
+        let found = ImportCoordinator.detectedSources()
+        let suggested = ImportCoordinator.suggested(found)
+        // The browser you use first and on; the rest start off so nothing comes over by surprise.
+        sources = found.filter { suggested.contains($0.id) } + found.filter { !suggested.contains($0.id) }
+        rows = sources.map { source in
             let row = SourceRow(source: source)
-            // Arc first and on; the rest start off so nothing comes over by surprise.
-            row.isChosen = index == 0
+            row.isChosen = suggested.contains(source.id)
             row.onToggle = { [weak self] in self?.choicesChanged() }
             addSubview(row)
             return row
