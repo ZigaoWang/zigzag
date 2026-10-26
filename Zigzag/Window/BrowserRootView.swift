@@ -32,6 +32,13 @@ final class SidebarContainer: NSView {
         backdrop.addSublayer(grainLayer)
         sidebar.layer?.insertSublayer(backdrop, at: 0)
         self.backdrop = backdrop
+        // Links and files dropped on the sidebar open as tabs.
+        registerForDraggedTypes([.URL, .fileURL, .string])
+        dropRing.isHidden = true
+        dropRing.borderWidth = 2
+        dropRing.cornerCurve = .continuous
+        dropRing.zPosition = 50
+        layer?.addSublayer(dropRing)
         refresh()
     }
 
@@ -40,6 +47,56 @@ final class SidebarContainer: NSView {
     override var isFlipped: Bool { true }
 
     private var backdrop: CALayer?
+    private let dropRing = CALayer()
+
+    // MARK: Dropping links and files
+
+    private func droppedURLs(_ info: NSDraggingInfo) -> [URL] {
+        let board = info.draggingPasteboard
+        // A tab being moved inside Zigzag is its own kind of drag, handled by the list.
+        if let source = info.draggingSource as? NSView, source.window?.windowController is BrowserWindowController { return [] }
+        if let urls = board.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !urls.isEmpty {
+            return urls.filter { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }
+        }
+        if let text = board.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil {
+            return [url]
+        }
+        return []
+    }
+
+    private func showDropRing(_ on: Bool) {
+        Tokens.Motion.withoutAnimation {
+            dropRing.frame = bounds.insetBy(dx: 4, dy: 4)
+            dropRing.cornerRadius = Tokens.Radius.card
+            dropRing.borderColor = cgColor(Tokens.Color.accent)
+        }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = on ? 0 : 1
+        fade.toValue = on ? 1 : 0
+        fade.duration = 0.15
+        dropRing.add(fade, forKey: "fade")
+        dropRing.isHidden = !on
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !droppedURLs(sender).isEmpty else { return [] }
+        showDropRing(true)
+        return .copy
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) { showDropRing(false) }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        showDropRing(false)
+        let urls = droppedURLs(sender)
+        guard !urls.isEmpty, let controller = window?.windowController as? BrowserWindowController else { return false }
+        // The first opens in front; any others wait behind it.
+        for (i, url) in urls.prefix(20).enumerated() {
+            controller.open(url, disposition: i == 0 ? .foregroundTab : .backgroundTab, allowSwitch: false)
+        }
+        return true
+    }
 
     /// The window-sized gradient, placed so this slice matches the window around it, wherever the sidebar is.
     private func placeGradient() {
