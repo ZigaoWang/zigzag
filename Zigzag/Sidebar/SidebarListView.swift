@@ -336,18 +336,11 @@ final class SidebarListView: NSView {
     /// The row showing a tab, for pointing at it (the Getting started guide).
     func rowView(for tab: Tab) -> NSView? { tab.bookmarkID.flatMap { rows[.bookmark($0)] } ?? rows[.tab(tab.id)] }
 
-    /// The space's name stays at the top while the list scrolls, so you can always fold its bookmarks. It gets the
-    /// sidebar's own color behind it once rows pass under it.
+    /// The space's name scrolls with the list like any row: a block of flat color pinned over the grain and
+    /// gradient read as a smudge, and the line under the favorites already marks where the list begins.
     func pinHeader() {
-        guard let header = rows[.header] as? SpaceHeaderView, header !== drag?.view else { return }
-        let top = max(0, visibleRect.minY)
-        let stuck = top > 0.5
-        Tokens.Motion.withoutAnimation {
-            header.frame.origin.y = top
-            header.layer?.zPosition = 10
-            let tint = (window?.windowController as? BrowserWindowController)?.root.sidebarContainer.tint
-            header.layer?.backgroundColor = stuck ? tint.map { cgColor($0) } : nil
-        }
+        guard let header = rows[.header] as? SpaceHeaderView else { return }
+        Tokens.Motion.withoutAnimation { header.layer?.backgroundColor = nil }
     }
 
     // MARK: Folding bookmarks

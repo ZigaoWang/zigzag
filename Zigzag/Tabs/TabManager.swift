@@ -616,6 +616,7 @@ final class TabManager {
             tabsBySpace[tab.spaceID, default: []].insert(other, at: 0)
         }
         splits.append(otherOnRight ? SplitPair(left: tab.id, right: other.id) : SplitPair(left: other.id, right: tab.id))
+        Tutorial.complete("split")
         other.ensureWebView()
         changed.send(.structure)
         select(other)

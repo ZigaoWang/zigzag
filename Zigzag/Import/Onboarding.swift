@@ -5,7 +5,8 @@ import AppKit
 final class OnboardingView: NSView {
     var onFinish: (() -> Void)?
 
-    enum Step: Int, CaseIterable { case hello, bring, sites, extensions, ads, color, ready }
+    /// The space's color comes later, in the browser itself, where you can see it on the real thing.
+    enum Step: Int, CaseIterable { case hello, bring, sites, extensions, ads, ready }
     private(set) var step = Step.hello
 
     private let surface = BrandSurface()
@@ -61,11 +62,6 @@ final class OnboardingView: NSView {
                 content = AdsPicker()
                 title = "Block ads?"
                 body = "Faster pages, fewer trackers. Change it for any site later."
-            case .color:
-                content = ColorPicker()
-                (content as? ColorPicker)?.onColor = { [weak self] in self?.applySpaceColor() }
-                title = "Pick a color"
-                body = "Your space wears it. Every space can have its own."
             default:
                 content = ReadyPicker()
                 title = "You’re all set"
@@ -73,10 +69,6 @@ final class OnboardingView: NSView {
             }
             let stepPage = StepPage(title: title, body: body, content: content, index: next.rawValue - 1,
                                     count: Step.allCases.count - 1, showsSkip: next != .ready)
-            (content as? ColorPicker)?.onColor = { [weak stepPage, weak self] in
-                stepPage?.retint()
-                self?.applySpaceColor()
-            }
             stepPage.onBack = { [weak self] in
                 guard let self, let back = Step(rawValue: next.rawValue - 1) else { return }
                 self.show(back, animated: true)
@@ -121,11 +113,6 @@ final class OnboardingView: NSView {
         newLayer.add(animation("opacity", 0, 1, 0.34), forKey: "arrive.fade")
         newLayer.add(animation("transform.translation.x", distance, 0, 0.42), forKey: "arrive.move")
         CATransaction.commit()
-    }
-
-    /// Picking a color tints the whole window, so you see it before you start browsing.
-    private func applySpaceColor() {
-        surface.fixedTheme = Brand.Theme.of(Library.shared.spaces.first)
     }
 
     override func layout() {
@@ -1698,51 +1685,6 @@ private final class ChoiceCard: InteractiveView {
         // Top right, clear of the title however narrow the card.
         badgeFill.frame = NSRect(x: bounds.width - bw - 10, y: 10, width: bw, height: 20)
         badge.frame = NSRect(x: 0, y: (20 - badge.lineHeight) / 2, width: bw, height: badge.lineHeight)
-    }
-}
-
-// MARK: - Color
-
-/// The space editor's own look controls, the very same ones, with the window on the right wearing whatever you pick.
-private final class ColorPicker: StepContent {
-    var onColor: (() -> Void)?
-    private var editor: SpaceLookEditor?
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        // A colorless space starts on Zigzag's blue, so the knob, the swatch and the window all agree from the start.
-        if var space = self.space, space.brightness == nil {
-            SpaceLook.colors[4].apply(to: &space)
-            space.appearance = "light"
-            Library.shared.setLook(space)
-        }
-        guard let space else { return }
-        let editor = SpaceLookEditor(space: space, dark: false)
-        editor.wheelHeight = 176
-        // Live as you drag: the window on the right follows your finger.
-        editor.onPreview = { [weak self] look in self?.show(look) }
-        editor.onCommit = { [weak self] look in self?.show(look) }
-        editor.onResize = { [weak self] in self?.needsLayout = true }
-        addSubview(editor)
-        self.editor = editor
-        preview.page = .wikipedia
-        preview.refreshColors()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private var space: SpaceInfo? { Library.shared.spaces.first }
-
-    private func show(_ look: SpaceInfo) {
-        Library.shared.setLook(look)
-        preview.refreshColors()
-        onColor?()
-    }
-
-    override func layout() {
-        super.layout()
-        guard let editor else { return }
-        editor.frame = NSRect(x: 0, y: 0, width: bounds.width, height: editor.preferredHeight)
     }
 }
 

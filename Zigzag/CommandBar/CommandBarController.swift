@@ -113,6 +113,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private let hint = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
     private let hintKey = KeyHint("Tab")
     private var hinted: SiteSearch?
+    /// For the guide: searching inside a site, or about to be (its name typed, Tab not yet pressed).
+    var isSearchingSite: Bool { scope != nil }
+    var isOfferingSiteSearch: Bool { hinted != nil }
 
     init(window: BrowserWindowController) {
         controller = window

@@ -71,8 +71,11 @@ enum ImportCoordinator {
             // Several profiles: each is its own choice ("Chrome (Work)"), as other browsers' importers do.
             let profiles = browser.name == "Arc" ? [] : ChromiumImporter.profileNames(of: browser)
             if profiles.count > 1 {
-                for (folder, display) in profiles {
-                    sources.append(Source(kind: .chromium(browser.only(folder, named: display)), name: "\(browser.name) (\(display))", bundleID: browser.bundleID))
+                // "Wang (a@zigao.xyz)" reads as just "Wang"; the email only when two profiles share a name.
+                let short = profiles.map { Self.shortProfileName($0.1) }
+                for ((folder, display), name) in zip(profiles, short) {
+                    let label = short.filter { $0 == name }.count > 1 ? Self.profileEmail(display) ?? display : name
+                    sources.append(Source(kind: .chromium(browser.only(folder, named: display)), name: "\(browser.name) (\(label))", bundleID: browser.bundleID))
                 }
             } else {
                 sources.append(Source(kind: .chromium(browser), name: browser.name, bundleID: browser.bundleID))
@@ -85,6 +88,17 @@ enum ImportCoordinator {
             sources.append(Source(kind: .firefox(browser), name: browser.name, bundleID: browser.bundleID))
         }
         return sources
+    }
+
+    nonisolated static func shortProfileName(_ display: String) -> String {
+        guard let open = display.firstIndex(of: "("), display.hasSuffix(")") else { return display }
+        let name = display[..<open].trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? display : name
+    }
+
+    nonisolated static func profileEmail(_ display: String) -> String? {
+        guard let open = display.firstIndex(of: "("), display.hasSuffix(")") else { return nil }
+        return String(display[display.index(after: open)..<display.index(before: display.endIndex)])
     }
 
     static func fileSource(_ url: URL) -> Source {

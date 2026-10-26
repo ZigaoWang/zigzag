@@ -166,7 +166,7 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if SpaceEditorPanel.current != nil, Tutorial.current == nil || Tutorial.current?.id == "space" {
-            return Display(keys: ["↩"], title: "Name it, like Work", note: "Pick a color, then press Return", count: "", isDone: false, isFinal: false, target: "editor")
+            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Press Return when it looks right", count: "", isDone: false, isFinal: false, target: "editor")
         }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: done.doneNote, count: "", isDone: true, isFinal: false, target: "done." + done.id)
@@ -176,12 +176,20 @@ final class GuidedTour: NSView {
         }
         let count = "\(index + 1)/\(Tutorial.tasks.count)"
         // Mid-step hints, where you are, for the moment you'd otherwise stall.
+        // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
-            return Display(keys: ["↩"], title: "Type wikipedia.org, then Return", note: "Any site or search works", count: count, isDone: false, isFinal: false, target: "bar")
+            if controller.commandBar.isSearchingSite {
+                return Display(keys: ["↩"], title: "Type what to find, then Return", note: "Like lofi music", count: count, isDone: false, isFinal: false, target: "bar")
+            }
+            if controller.commandBar.isOfferingSiteSearch {
+                return Display(keys: ["Tab"], title: "Press Tab", note: "Now you’re searching right on YouTube", count: count, isDone: false, isFinal: false, target: "bar")
+            }
+            return Display(keys: [], title: "Type youtube", note: "Then press Tab to search it", count: count, isDone: false, isFinal: false, target: "bar")
         }
         if task.id == "peek", controller.peek.isVisible {
             return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: count, isDone: false, isFinal: false, target: "peek")
         }
+        if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article") }
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id)
     }
 
@@ -194,7 +202,8 @@ final class GuidedTour: NSView {
         case "bar": return controller.commandBar.panelView
         case "pin", "done.newTab", "done.pin": return row ?? controller.sidebar.list
         case "peek": return controller.peek.panelView
-        case "done.peek": return controller.root.card
+        case "done.peek", "article": return controller.root.card
+        case "split", "done.split": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
         case "editor": return SpaceEditorPanel.current
         case "done.space": return controller.sidebar.dotsAnchor
@@ -207,10 +216,20 @@ final class GuidedTour: NSView {
         let key = "\(now)"
         if key != shown {
             shown = key
-            if !now.isDone, !now.isFinal { lastStepID = Tutorial.current?.id }
+            if !now.isDone, !now.isFinal {
+                if Tutorial.current?.id == "peek", lastStepID != "peek" { openArticle() }
+                lastStepID = Tutorial.current?.id
+            }
             apply(now, animated: animated)
         }
         layoutTour(now, animated: animated)
+    }
+
+    /// Peek needs a page full of links: an article, opened for you, rather than asking you to find one.
+    private func openArticle() {
+        guard let controller, controller.tabManager.selectedTab?.url?.host()?.hasSuffix("wikipedia.org") != true,
+              let url = URL(string: "https://en.wikipedia.org/wiki/Web_browser") else { return }
+        controller.open(url, disposition: .foregroundTab, allowSwitch: false)
     }
 
     private func apply(_ d: Display, animated: Bool) {
@@ -268,10 +287,14 @@ final class GuidedTour: NSView {
     private func layoutTour(_ d: Display, animated: Bool) {
         let target = view(for: d.target)
         let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -5, dy: -5) : nil } ?? .zero
+        // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
+        let open = d.target == "split" || d.target == "done.split"
         let cut = CGMutablePath()
-        cut.addRect(bounds)
-        if hole != .zero { cut.addRoundedRect(in: hole, cornerWidth: 12, cornerHeight: 12) }
-        let ringPath: CGPath = hole == .zero ? CGMutablePath() : CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil)
+        if !open {
+            cut.addRect(bounds)
+            if hole != .zero { cut.addRoundedRect(in: hole, cornerWidth: 12, cornerHeight: 12) }
+        }
+        let ringPath: CGPath = hole == .zero || open ? CGMutablePath() : CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil)
         let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {

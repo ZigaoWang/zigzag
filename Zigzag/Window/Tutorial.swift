@@ -1,6 +1,6 @@
 import AppKit
 
-/// Getting started: four things to do once, in order, each building on the last. The guide in the window
+/// Getting started: five things to do once, in order, each building on the last, on real pages. The guide in the window
 /// (GuidedTour) shows them one at a time; each ticks off when you actually do it.
 enum Tutorial {
     struct Task {
@@ -17,13 +17,15 @@ enum Tutorial {
 
     /// Each step is the keys, a few words, and one short line on why: a glance, nothing to read.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Open a new tab", keys: ["⌘", "T"], note: "Type a site or a search",
-             done: "It opened as a tab", doneNote: "Your tabs live here, in the sidebar"),
+        Task(id: "newTab", title: "Search YouTube", keys: ["⌘", "T"], note: "Open a new tab to start",
+             done: "You searched YouTube from here", doneNote: "Type any site’s name, then Tab, to search it"),
         Task(id: "pin", title: "Pin this page", keys: ["⌘", "D"], note: "Pinned pages stay, even after you quit",
              done: "Pinned", doneNote: "It stays at the top of this space"),
-        Task(id: "peek", title: "Shift-click any link", keys: ["⇧", "Click"], note: "It opens on top, so you keep your place",
-             done: "That’s Peek", doneNote: "A quick look without leaving the page"),
-        Task(id: "space", title: "Make a space", keys: ["+"], note: "Keep work, school and play apart",
+        Task(id: "peek", title: "Shift-click a blue link", keys: ["⇧", "Click"], note: "Here’s an article to try it on",
+             done: "That’s Peek", doneNote: "A quick look, without losing your place"),
+        Task(id: "split", title: "Drag a tab from the sidebar onto the page", keys: ["Drag"], note: "Two pages, side by side",
+             done: "That’s Split View", doneNote: "To part them, use the button at the top right of either page"),
+        Task(id: "space", title: "Make a space", keys: ["+"], note: "One for work, one for fun, each with its own color",
              done: "Your new space", doneNote: "Click a dot to switch between spaces"),
     ]
 
@@ -32,7 +34,12 @@ enum Tutorial {
 
     private static let key = "TutorialDone"
     static var done: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: key) ?? []) }
+        get {
+            var done = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+            // Finished before Split View was a step: it doesn't come back to teach just that.
+            if done.contains("space") { done.insert("split") }
+            return done
+        }
         set { UserDefaults.standard.set(Array(newValue), forKey: key) }
     }
 
