@@ -93,6 +93,24 @@ enum MainMenu {
                 item("Check Grammar With Spelling", #selector(NSTextView.toggleGrammarChecking(_:)), ""),
                 item("Correct Spelling Automatically", #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), ""),
             ]),
+            submenu("Substitutions", [
+                item("Show Substitutions", #selector(NSTextView.orderFrontSubstitutionsPanel(_:)), ""),
+                .separator(),
+                item("Smart Copy/Paste", #selector(NSTextView.toggleSmartInsertDelete(_:)), ""),
+                item("Smart Quotes", #selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)), ""),
+                item("Smart Dashes", #selector(NSTextView.toggleAutomaticDashSubstitution(_:)), ""),
+                item("Smart Links", #selector(NSTextView.toggleAutomaticLinkDetection(_:)), ""),
+                item("Text Replacement", #selector(NSTextView.toggleAutomaticTextReplacement(_:)), ""),
+            ]),
+            submenu("Transformations", [
+                item("Make Upper Case", #selector(NSResponder.uppercaseWord(_:)), ""),
+                item("Make Lower Case", #selector(NSResponder.lowercaseWord(_:)), ""),
+                item("Capitalize", #selector(NSResponder.capitalizeWord(_:)), ""),
+            ]),
+            submenu("Speech", [
+                item("Start Speaking", #selector(NSTextView.startSpeaking(_:)), ""),
+                item("Stop Speaking", #selector(NSTextView.stopSpeaking(_:)), ""),
+            ]),
         ]))
 
         var viewItems: [NSMenuItem] = [
