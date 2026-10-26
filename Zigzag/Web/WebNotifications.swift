@@ -230,6 +230,13 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     /// `window.Notification`, the standard shape. Pages call it as they would in Safari or Chrome.
     private static let shim = """
     (() => {
+      // Push (notifications while a site is closed) needs a push service Zigzag doesn't have. Saying so up front,
+      // as Safari did before it had one, lets a site use ordinary notifications or hide its switch, instead of
+      // offering push and then failing ("Couldn't turn on notifications").
+      try { delete window.PushManager; } catch (e) {}
+      try {
+        if (window.ServiceWorkerRegistration) Object.defineProperty(ServiceWorkerRegistration.prototype, 'pushManager', { get() { return undefined; }, configurable: true });
+      } catch (e) {}
       const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(messageName);
       if (!handler || !window.isSecureContext) return;
       const decisions = __DECISIONS__;
