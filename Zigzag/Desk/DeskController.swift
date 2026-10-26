@@ -93,6 +93,8 @@ final class DeskController {
         isVisible = true
         selection = []
         controller.previews.hide()
+        // The page's link preview would float over the cards.
+        controller.linkStatus.show(nil, in: controller.root.cardFrame)
         controller.commandBar.dismiss(restoringFocus: false)
         controller.tabManager.selectedTab?.captureSnapshot { [weak self] in self?.cards.values.forEach { $0.refreshImage() } }
         let root = controller.root
@@ -237,7 +239,7 @@ final class DeskController {
         var headerFrames: [UUID: NSRect] = [:]
         var cardFrames: [UUID: NSRect] = [:]
         for space in Library.shared.spaces {
-            var ids = manager.tabs(in: space.id).map(\.id)
+            var ids = cardTabs(in: space.id).map(\.id)
             if let dragging {
                 ids.removeAll { $0 == dragging.id }
                 if dragging.space == space.id { ids.insert(dragging.id, at: min(dragging.index, ids.count)) }
@@ -255,12 +257,27 @@ final class DeskController {
         return (headerFrames, cardFrames, y + margin)
     }
 
+    /// The tabs that get a card: a split's second page shares the first one's card, as it shares its sidebar row.
+    private func cardTabs(in space: UUID) -> [Tab] {
+        guard let manager else { return [] }
+        let tabs = manager.tabs(in: space)
+        return tabs.filter { tab in
+            guard let pair = manager.split(for: tab), pair.right == tab.id else { return true }
+            return !tabs.contains { $0.id == pair.left }
+        }
+    }
+
+    private func partner(of tab: Tab) -> Tab? {
+        guard let manager, let pair = manager.split(for: tab), pair.left == tab.id else { return nil }
+        return manager.tab(with: pair.right)
+    }
+
     /// Tabs opened or closed while the desk is up (⌘W, a link opening a tab): the cards follow.
     func tabsChanged() { if isVisible { reload(animated: true) } }
 
     private func reload(animated: Bool = false) {
         guard let manager else { return }
-        let allTabs = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }
+        let allTabs = Library.shared.spaces.flatMap { cardTabs(in: $0.id) }
         let ids = Set(allTabs.map(\.id))
         for (id, view) in cards where !ids.contains(id) {
             cards[id] = nil
@@ -270,15 +287,15 @@ final class DeskController {
         }
         selection = selection.intersection(ids)
         // Cards kept from last time show what each tab is now.
-        for tab in allTabs { cards[tab.id]?.configure(tab) }
+        for tab in allTabs { cards[tab.id]?.configure(tab, partner: partner(of: tab)) }
         for tab in allTabs where cards[tab.id] == nil {
             let card = TabThumbnailView()
             card.inset = Tokens.Space.x1
             card.showsRing = true
-            card.configure(tab)
-            card.onClick = { [weak self, weak tab] event in
+            card.configure(tab, partner: partner(of: tab))
+            card.onClick = { [weak self, weak tab, weak card] event in
                 guard let self, let tab else { return }
-                self.cardClicked(tab, event: event)
+                self.cardClicked(card?.tab(at: event) ?? tab, event: event)
             }
             card.onDragStart = { [weak self, weak tab] event in
                 guard let self, let tab else { return false }
@@ -427,7 +444,7 @@ final class DeskController {
         card.layer?.shadowOpacity = 1
         card.layer?.shadowRadius = Tokens.Space.x3
         card.layer?.shadowColor = canvas.cgColor(Tokens.Color.panelShadow)
-        var target = (id: tab.id, space: tab.spaceID, index: manager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0)
+        var target = (id: tab.id, space: tab.spaceID, index: cardTabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0)
         let origin = target
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
@@ -442,17 +459,26 @@ final class DeskController {
         }
         card.layer?.shadowOpacity = 0
         // Through the window, so the selection moves on with it and ⌘Z puts it back.
-        if target != origin { controller?.moveWithUndo(tab, to: target.index, in: target.space) }
+        if target != origin { controller?.moveWithUndo(tab, to: listIndex(ofCard: target.index, in: target.space, moving: tab), in: target.space) }
         applyLayout(animated: true)
         return true
+    }
+
+    /// Where a card's position puts the tab in the space's list, which also holds a split's second pages.
+    private func listIndex(ofCard index: Int, in space: UUID, moving tab: Tab) -> Int {
+        guard let manager else { return index }
+        let list = manager.tabs(in: space).filter { $0 !== tab }
+        let cards = cardTabs(in: space).filter { $0 !== tab }
+        guard index < cards.count else { return list.count }
+        return list.firstIndex { $0 === cards[index] } ?? index
     }
 
     /// The space and position a dragged card would land in.
     private func slot(at point: NSPoint, excluding id: UUID) -> (space: UUID, index: Int)? {
         let layout = layoutFrames()
         let ordered = layout.headers.sorted { $0.value.minY < $1.value.minY }
-        guard let space = ordered.last(where: { $0.value.minY <= point.y })?.key ?? ordered.first?.key, let manager else { return nil }
-        let ids = manager.tabs(in: space).map(\.id).filter { $0 != id }
+        guard let space = ordered.last(where: { $0.value.minY <= point.y })?.key ?? ordered.first?.key else { return nil }
+        let ids = cardTabs(in: space).map(\.id).filter { $0 != id }
         var index = 0
         for (i, cardID) in ids.enumerated() {
             guard let frame = layout.cards[cardID] else { continue }

@@ -1020,7 +1020,7 @@ extension BrowserWindowController: TabHost {
 
     /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
     /// others when they open, and previews and the link bubble stay away while any of them is up.
-    var hasFloatingPanel: Bool { commandBar.isVisible || SitePanel.isOpen || DownloadsPanel.isOpen || SpaceEditorPanel.current != nil }
+    var hasFloatingPanel: Bool { commandBar.isVisible || SitePanel.isOpen || DownloadsPanel.isOpen || SpaceEditorPanel.current != nil || desk.isVisible }
 
     func closeFloatingPanels() {
         if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }

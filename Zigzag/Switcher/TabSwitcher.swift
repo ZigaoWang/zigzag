@@ -3,10 +3,17 @@ import AppKit
 /// A page thumbnail with its site and title underneath, used by the switcher and desk view.
 final class TabThumbnailView: InteractiveView {
     let imageClip = NSView()
-    private let imageView = NSImageView()
+    /// The page, filling its card and cropped from the bottom, never letterboxed. A split shows both pages, side
+    /// by side, as it does on screen.
+    private let halves = [CALayer(), CALayer()]
+    private let images = [CALayer(), CALayer()]
+    private let divider = CALayer()
     private let placeholder = FaviconView()
     let icon = FaviconView()
     let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    /// With a split: the other page's icon and title, under its half.
+    private let icon2 = FaviconView()
+    private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let ring = CALayer()
     var showsTitle = true { didSet { needsLayout = true } }
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
@@ -14,6 +21,8 @@ final class TabThumbnailView: InteractiveView {
     var showsHover = true
     static let titleHeight = Tokens.Space.x8
     private(set) weak var tab: Tab?
+    /// The page beside it in split view, if any.
+    private(set) weak var partner: Tab?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -24,39 +33,62 @@ final class TabThumbnailView: InteractiveView {
         imageClip.layer?.cornerCurve = .continuous
         imageClip.layer?.masksToBounds = true
         imageClip.layer?.borderWidth = Tokens.Metric.hairline
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.imageAlignment = .alignTop
-        imageClip.addSubview(imageView)
+        for (half, image) in zip(halves, images) {
+            half.masksToBounds = true
+            half.addSublayer(image)
+            imageClip.layer?.addSublayer(half)
+        }
+        imageClip.layer?.addSublayer(divider)
         imageClip.addSubview(placeholder)
         ring.borderWidth = 2.5
         ring.cornerRadius = Tokens.Radius.thumbnail + 3
         ring.cornerCurve = .continuous
         ring.isHidden = true
         ring.zPosition = 10
-        [imageClip, icon, title].forEach { addSubview($0) }
+        [imageClip, icon, title, icon2, title2].forEach { addSubview($0) }
         layer?.addSublayer(ring)
         setAccessibilityRole(.button)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(_ tab: Tab) {
+    func configure(_ tab: Tab, partner: Tab? = nil) {
         self.tab = tab
-        imageView.image = tab.snapshot
-        imageView.isHidden = tab.snapshot == nil
-        placeholder.isHidden = tab.snapshot != nil
+        self.partner = partner
         placeholder.image = tab.favicon
         icon.image = tab.favicon
         title.stringValue = tab.displayTitle
-        setAccessibilityLabel(tab.displayTitle)
+        icon2.image = partner?.favicon
+        title2.stringValue = partner?.displayTitle ?? ""
+        setAccessibilityLabel(partner.map { "\(tab.displayTitle) and \($0.displayTitle)" } ?? tab.displayTitle)
+        refreshImage()
         needsLayout = true
     }
 
     func refreshImage() {
         guard let tab else { return }
-        imageView.image = tab.snapshot
-        imageView.isHidden = tab.snapshot == nil
-        placeholder.isHidden = tab.snapshot != nil
+        Tokens.Motion.withoutAnimation {
+            images[0].contents = tab.snapshot
+            images[1].contents = partner?.snapshot
+        }
+        placeholder.isHidden = tab.snapshot != nil || partner != nil
+        needsLayout = true
+    }
+
+    /// Which page a click landed on: with a split, the half under the pointer.
+    func tab(at event: NSEvent) -> Tab? {
+        guard let partner else { return tab }
+        return imageClip.convert(event.locationInWindow, from: nil).x > imageClip.bounds.midX ? partner : tab
+    }
+
+    /// Fills `rect` with the snapshot, scaled to cover it and pinned to its top, as a page is read.
+    private func fill(_ index: Int, snapshot: NSImage?, in rect: CGRect) {
+        halves[index].frame = rect
+        guard let size = snapshot?.size, size.width > 0, size.height > 0 else { return }
+        let scale = max(rect.width / size.width, rect.height / size.height)
+        let w = size.width * scale, h = size.height * scale
+        // The clip isn't flipped: its top is the highest y.
+        images[index].frame = CGRect(x: (rect.width - w) / 2, y: rect.height - h, width: w, height: h)
     }
 
     /// Space around the image so the selection highlight can surround it, like Command+Tab.
@@ -66,23 +98,48 @@ final class TabThumbnailView: InteractiveView {
         super.layout()
         let titleArea = showsTitle ? Self.titleHeight : 0
         imageClip.frame = NSRect(x: inset, y: inset, width: bounds.width - inset * 2, height: bounds.height - titleArea - inset * (showsTitle ? 1 : 2))
-        imageView.frame = imageClip.bounds
+        Tokens.Motion.withoutAnimation {
+            let b = imageClip.bounds
+            if partner != nil {
+                let half = floor((b.width - 1) / 2)
+                fill(0, snapshot: tab?.snapshot, in: CGRect(x: 0, y: 0, width: half, height: b.height))
+                fill(1, snapshot: partner?.snapshot, in: CGRect(x: half + 1, y: 0, width: b.width - half - 1, height: b.height))
+                divider.frame = CGRect(x: half, y: 0, width: 1, height: b.height)
+            } else {
+                fill(0, snapshot: tab?.snapshot, in: b)
+            }
+            halves[1].isHidden = partner == nil
+            divider.isHidden = partner == nil
+        }
         let p = Tokens.Space.x8
         placeholder.frame = NSRect(x: (imageClip.bounds.width - p) / 2, y: (imageClip.bounds.height - p) / 2, width: p, height: p)
-        let iconSize = Tokens.Metric.favicon
         icon.isHidden = !showsTitle
         title.isHidden = !showsTitle
-        let textWidth = min(title.textWidth, bounds.width - iconSize - Tokens.Space.x2 - inset * 2)
-        let total = iconSize + Tokens.Space.x2 + textWidth
-        let x = max(inset, (bounds.width - total) / 2)
-        let y = imageClip.frame.maxY + (titleArea - iconSize) / 2
-        icon.frame = NSRect(x: x, y: y, width: iconSize, height: iconSize)
-        let h = title.lineHeight
-        title.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x2, y: imageClip.frame.maxY + (titleArea - h) / 2, width: textWidth, height: h)
+        icon2.isHidden = !showsTitle || partner == nil
+        title2.isHidden = !showsTitle || partner == nil
+        // One title under the card, or with a split, each page's under its own half.
+        if partner != nil {
+            let half = imageClip.frame.width / 2
+            place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: half, height: titleArea))
+            place(icon2, title2, in: NSRect(x: imageClip.frame.minX + half, y: imageClip.frame.maxY, width: half, height: titleArea))
+        } else {
+            place(icon, title, in: NSRect(x: inset, y: imageClip.frame.maxY, width: bounds.width - inset * 2, height: titleArea))
+        }
         Tokens.Motion.withoutAnimation {
             ring.frame = imageClip.frame.insetBy(dx: -4, dy: -4)
         }
         refreshColors()
+    }
+
+    /// An icon and title, centered together in `area`.
+    private func place(_ icon: FaviconView, _ title: Label, in area: NSRect) {
+        let iconSize = Tokens.Metric.favicon
+        let textWidth = max(0, min(title.textWidth, area.width - iconSize - Tokens.Space.x2 - Tokens.Space.x2))
+        let total = iconSize + Tokens.Space.x2 + textWidth
+        let x = area.minX + max(Tokens.Space.x1, (area.width - total) / 2)
+        icon.frame = NSRect(x: x, y: area.minY + (area.height - iconSize) / 2, width: iconSize, height: iconSize)
+        let h = title.lineHeight
+        title.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x2, y: area.minY + (area.height - h) / 2, width: textWidth, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -93,6 +150,7 @@ final class TabThumbnailView: InteractiveView {
         Tokens.Motion.withoutAnimation {
             imageClip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
             imageClip.layer?.borderColor = cgColor(Tokens.Color.cardEdge)
+            divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
             ring.borderColor = cgColor(Tokens.Color.accent)
             ring.isHidden = !(isSelected && showsRing)
         }
