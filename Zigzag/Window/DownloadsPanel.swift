@@ -121,6 +121,14 @@ enum DownloadsPanel {
     static func isOpen(in window: NSWindow?) -> Bool { isOpen && current?.window === window }
     static func closeCurrent() { current?.close() }
 
+    /// Opened by a download landing in the button: closes by itself a few seconds after that download is done,
+    /// unless you've moved the pointer onto it.
+    static func reveal(from anchor: NSView, in controller: BrowserWindowController, closingAfter item: DownloadItem) {
+        guard current == nil else { return }
+        show(from: anchor, in: controller)
+        current?.closeWhenDone(item)
+    }
+
     static func show(from anchor: NSView, in controller: BrowserWindowController) {
         if let current { current.close(); return }
         controller.closeFloatingPanels()
@@ -159,7 +167,10 @@ final class DownloadsPanelView: FloatingPanelView {
             NSWorkspace.shared.open(DownloadManager.folder)
             self?.close()
         }
-        token = DownloadManager.shared.changed.observe { [weak self] _ in self?.reload() }
+        token = DownloadManager.shared.changed.observe { [weak self] _ in
+            self?.reload()
+            self?.checkWatched()
+        }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -182,10 +193,34 @@ final class DownloadsPanelView: FloatingPanelView {
                 return event
             }
             let point = self.convert(event.locationInWindow, from: nil)
+            if self.bounds.contains(point) { self.touched = true }
             let onAnchor = self.anchor.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
             if !self.bounds.contains(point) && !onAnchor { self.close() }
             return event
         }
+    }
+
+    private weak var watched: DownloadItem?
+    private var touched = false
+
+    fileprivate func closeWhenDone(_ item: DownloadItem) {
+        watched = item
+        checkWatched()
+    }
+
+    /// The download it opened for is over: close a moment later, if nobody has reached for the panel.
+    private func checkWatched() {
+        guard let item = watched, item.state != .downloading else { return }
+        watched = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, self.superview != nil, !self.touched, !self.isPointerInside else { return }
+            self.close()
+        }
+    }
+
+    private var isPointerInside: Bool {
+        guard let window else { return false }
+        return bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
     }
 
     func close() {

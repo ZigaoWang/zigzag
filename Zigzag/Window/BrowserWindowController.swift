@@ -842,28 +842,50 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         CATransaction.setDisableActions(true)
         host.addSublayer(flyer)
         CATransaction.commit()
-        // An arc: up a little first, then down into the button.
-        let path = CGMutablePath()
-        path.move(to: start)
-        let lift = max(80, abs(end.x - start.x) * 0.35)
-        path.addQuadCurve(to: end, control: NSPoint(x: (start.x + end.x) / 2, y: min(start.y, end.y) - lift))
-        let duration = 0.62 * Tokens.Motion.debugSlowdown
+        // A throw, like a ball: it slows as it rises, hangs at the top for a beat, and speeds up as it drops into
+        // the button. Sampled from a real parabola in time, so the speed comes from the arc itself.
+        // High enough to read as a throw, never off the top of the page.
+        let topY = max(card.minY + 40, min(start.y, end.y) - max(170, min(280, abs(end.x - start.x) * 0.35 + 110)))
+        let drop = end.y - start.y, rise = start.y - topY
+        // y(t) = a·t² + b·t + y0 through both ends, with its highest point at topY (y grows downward).
+        let a = ((2 * drop + 4 * rise) + ((2 * drop + 4 * rise) * (2 * drop + 4 * rise) - 4 * drop * drop).squareRoot()) / 2
+        let b = drop - a
+        let samples = 36
+        var points: [NSValue] = []
+        for i in 0...samples {
+            let t = CGFloat(i) / CGFloat(samples)
+            // Sideways it eases a little, so the throw leaves quickly and settles straight down into the button.
+            let side = 1 - pow(1 - t, 1.6)
+            points.append(NSValue(point: NSPoint(x: start.x + (end.x - start.x) * side, y: start.y + b * t + a * t * t)))
+        }
+        let duration = 1.3 * Tokens.Motion.debugSlowdown
         let move = CAKeyframeAnimation(keyPath: "position")
-        move.path = path
-        move.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0, 0.25, 1)
+        move.values = points
+        move.calculationMode = .linear
         let scale = CAKeyframeAnimation(keyPath: "transform.scale")
-        scale.values = [0.6, 1.08, 1, 0.32]
-        scale.keyTimes = [0, 0.18, 0.4, 1]
+        scale.values = [0.55, 1.12, 1.0, 0.95, 0.3]
+        scale.keyTimes = [0, 0.22, 0.42, 0.7, 1]
+        scale.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeInEaseOut),
+                                 CAMediaTimingFunction(name: .linear), CAMediaTimingFunction(name: .easeIn)]
+        // A small tip as it leaves and lands, so it reads as thrown, not slid.
+        let tilt = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+        tilt.values = [0, 0.12, 0, -0.1]
+        tilt.keyTimes = [0, 0.3, 0.6, 1]
         let fade = CAKeyframeAnimation(keyPath: "opacity")
-        fade.values = [0, 1, 1, 0.85]
-        fade.keyTimes = [0, 0.12, 0.85, 1]
+        fade.values = [0, 1, 1, 0.9]
+        fade.keyTimes = [0, 0.1, 0.88, 1]
         let group = CAAnimationGroup()
-        group.animations = [move, scale, fade]
+        group.animations = [move, scale, tilt, fade]
         group.duration = duration
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
             flyer.removeFromSuperlayer()
-            if sidebarShown { self?.sidebar.pulseDownloads() }
+            guard let self, sidebarShown else { return }
+            self.sidebar.pulseDownloads()
+            // Where it landed opens, showing it come in; it tidies itself away once the file is done.
+            if refresh, !self.hasFloatingPanel, self.window?.isKeyWindow == true {
+                DownloadsPanel.reveal(from: self.sidebar.downloadsAnchor, in: self, closingAfter: item)
+            }
         }
         flyer.add(group, forKey: "fly")
         CATransaction.commit()
