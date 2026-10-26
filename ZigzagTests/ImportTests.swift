@@ -25,6 +25,31 @@ struct ChromiumDecryptionTests {
         #expect(ChromiumImporter.decrypt(Data("v11".utf8) + Data(hex: Self.ciphertext), key: ChromiumImporter.deriveKey(Self.secret)) == nil)
     }
 
+    /// A password file with one login that opens, one that won't, and a sign-in with no password: the one that
+    /// won't is counted, so the import can say so instead of quietly bringing fewer.
+    @Test func countsPasswordsThatWontOpen() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("Login Data")
+        let good = "76313" + "0" + Self.ciphertext  // "v10" + the known ciphertext
+        let bad = "763130" + String(repeating: "ab", count: 32)
+        let sql = """
+        CREATE TABLE logins (origin_url TEXT, username_value TEXT, password_value BLOB, date_created INTEGER, date_password_modified INTEGER, blacklisted_by_user INTEGER);
+        INSERT INTO logins VALUES ('https://example.com/login', 'a', X'\(good)', 0, 0, 0);
+        INSERT INTO logins VALUES ('https://example.com/login', 'b', X'\(bad)', 0, 0, 0);
+        INSERT INTO logins VALUES ('https://example.com/login', 'c', X'', 0, 0, 0);
+        """
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        process.arguments = [file.path, sql]
+        try process.run()
+        process.waitUntilExit()
+        let read = ChromiumImporter.logins(at: file, key: ChromiumImporter.deriveKey(Self.secret))
+        #expect(read.logins.map(\.username) == ["a"])
+        #expect(read.unreadable == 1)
+    }
+
     @Test func convertsChromiumTime() {
         // 2026-01-01 00:00:00 UTC in microseconds since 1601.
         let date = ChromiumImporter.date(13_411_699_200_000_000)

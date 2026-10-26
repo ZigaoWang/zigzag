@@ -105,10 +105,20 @@ nonisolated enum ChromiumImporter {
         if choice.contains(.passwords) {
             switch safeStorageKey(browser) {
             case .success(let key):
+                var unreadable = 0
                 for profile in profiles {
                     for file in ["Login Data", "Login Data For Account"] {
-                        batch.logins += logins(at: profile.appendingPathComponent(file), key: key)
+                        let read = logins(at: profile.appendingPathComponent(file), key: key)
+                        batch.logins += read.logins
+                        unreadable += read.unreadable
                     }
+                }
+                // Never a quiet zero: passwords that are there but wouldn't open are said, with a way to try again.
+                if unreadable > 0 {
+                    let message = batch.logins.isEmpty
+                        ? "Zigzag couldn’t open \(browser.name)’s passwords. Quit \(browser.name), then try again."
+                        : "\(unreadable) \(unreadable == 1 ? "password" : "passwords") from \(browser.name) couldn’t be opened. Quit \(browser.name), then try again."
+                    batch.problems.append(ImportProblem(message: message, fix: .retry, retries: 1))
                 }
             case .failure(.denied):
                 batch.problems.append(ImportProblem(message: "\(browser.name)'s passwords stayed locked. When macOS asks, choose Allow (or Always Allow).", fix: .retry, retries: 1))
@@ -214,7 +224,23 @@ nonisolated enum ChromiumImporter {
         }
         defer { output.resetBytes(in: 0..<output.count) }
         guard status == kCCSuccess else { return nil }
-        return SecretString(data: output.prefix(moved))
+        // The wrong key can still end in valid padding, giving bytes that aren't a password; a real one is text.
+        let plain = output.prefix(moved)
+        guard isText(plain) else { return nil }
+        return SecretString(data: plain)
+    }
+
+    /// Valid UTF-8 with no control characters, checked byte by byte so the password never becomes a String.
+    static func isText(_ bytes: Data) -> Bool {
+        var iterator = bytes.makeIterator()
+        var decoder = UTF8()
+        while true {
+            switch decoder.decode(&iterator) {
+            case .scalarValue(let scalar): if scalar.value < 0x20 || scalar.value == 0x7F { return false }
+            case .emptyInput: return true
+            case .error: return false
+            }
+        }
     }
 
     /// Chromium time: microseconds since 1601-01-01.
@@ -222,9 +248,17 @@ nonisolated enum ChromiumImporter {
         micros > 0 ? Date(timeIntervalSince1970: Double(micros) / 1_000_000 - 11_644_473_600) : nil
     }
 
-    private static func logins(at file: URL, key: Data) -> [ImportBatch.Login] {
-        guard FileManager.default.fileExists(atPath: file.path), let db = SQLiteReader(file) else { return [] }
+    /// The logins in one password file, and how many have a password that wouldn't decrypt.
+    static func logins(at file: URL, key: Data) -> (logins: [ImportBatch.Login], unreadable: Int) {
+        guard FileManager.default.fileExists(atPath: file.path) else { return ([], 0) }
+        guard let db = SQLiteReader(file) else {
+            // There, but couldn't be copied or opened: every password in it counts as not brought over.
+            return ([], 1)
+        }
         var result: [ImportBatch.Login] = []
+        var withPassword = 0
+        // Sign-ins with no password of their own (passkeys, "Sign in with Google") have an empty value.
+        db.rows("SELECT count(*) FROM logins WHERE blacklisted_by_user = 0 AND length(password_value) > 0") { withPassword = Int($0.int(0)) }
         // Rows marked "never save" are choices, not logins. Newer Chrome also says when each password changed;
         // older builds don't have that column, so those are read without it.
         func read(_ withChanged: Bool) {
@@ -238,7 +272,7 @@ nonisolated enum ChromiumImporter {
         }
         read(true)
         if result.isEmpty { read(false) }
-        return result
+        return (result, max(0, withPassword - result.count))
     }
 
     private static func bookmarks(at file: URL) -> [ImportBatch.Bookmark] {
