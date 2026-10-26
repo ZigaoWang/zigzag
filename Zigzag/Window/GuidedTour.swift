@@ -210,7 +210,7 @@ final class GuidedTour: NSView {
             return Display(keys: ["Drag"], title: "Drag the lit tab onto the page", note: "Like in the video",
                            count: count, isDone: false, isFinal: false, target: "split", clip: "split")
         }
-        let clips = ["newTab": "search", "space": "spaces"]
+        let clips = ["newTab": "search", "pin": "pin", "space": "spaces"]
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id, clip: clips[task.id])
     }
 
@@ -338,7 +338,7 @@ final class GuidedTour: NSView {
         let row: CGFloat = d.note.isEmpty ? 56 : 64
         // With a recording: wide enough for it to be seen, the recording on top.
         if d.clip != nil {
-            let w = max(ceil(width), 320)
+            let w = max(ceil(width), 520)
             return NSSize(width: w, height: row + Self.videoHeight(for: w))
         }
         return NSSize(width: ceil(width), height: row)
@@ -409,8 +409,8 @@ final class GuidedTour: NSView {
         layoutPill(d, in: frame.size)
     }
 
-    /// The recordings are 1600 by 1026, inset 8 from the card's edges.
-    private static func videoHeight(for width: CGFloat) -> CGFloat { round((width - 16) * 1026 / 1600) + 8 }
+    /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.
+    private static func videoHeight(for width: CGFloat) -> CGFloat { round((width - 16) * 720 / 1120) + 8 }
 
     private func layoutPill(_ d: Display, in size: NSSize) {
         let width = size.width
