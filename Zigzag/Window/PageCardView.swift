@@ -14,19 +14,28 @@ final class PageCardView: NSView {
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
 
-    /// No corners, edge or shadow: the page fills the screen.
-    var isEdgeToEdge = false {
-        didSet {
-            guard oldValue != isEdgeToEdge else { return }
-            Tokens.Motion.withoutAnimation {
-                let radius = isEdgeToEdge ? 0 : Tokens.Radius.card
-                clip.layer?.cornerRadius = radius
-                edge.cornerRadius = radius
-                edge.isHidden = isEdgeToEdge
-                layer?.shadowOpacity = isEdgeToEdge ? 0 : 1
-            }
-            needsLayout = true
-        }
+    /// No corners, edge or shadow: the page fills the window.
+    var isEdgeToEdge: Bool {
+        get { edgeToEdge }
+        set { setEdgeToEdge(newValue, duration: 0) }
+    }
+    private var edgeToEdge = false
+
+    /// Squares the corners off (or rounds them back) over `duration`, in step with the sidebar sliding away or back.
+    func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
+        guard on != edgeToEdge else { return }
+        edgeToEdge = on
+        let radius = on ? 0 : Tokens.Radius.card
+        CATransaction.begin()
+        CATransaction.setDisableActions(duration == 0)
+        CATransaction.setAnimationDuration(duration)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1))
+        clip.layer?.cornerRadius = radius
+        edge.cornerRadius = radius
+        edge.opacity = on ? 0 : 1
+        layer?.shadowOpacity = on ? 0 : 1
+        CATransaction.commit()
+        needsLayout = true
     }
 
     /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades when done.
