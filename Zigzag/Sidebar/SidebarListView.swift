@@ -185,6 +185,7 @@ final class SidebarListView: NSView {
         }
 
         var changes: [() -> Void] = []
+        var carried = false
         for (item, frame) in layout {
             if let view = rows[item] {
                 configure(view, for: item)
@@ -199,7 +200,8 @@ final class SidebarListView: NSView {
                 addSubview(view, positioned: .below, relativeTo: drag?.view)
                 if animated, let id = pageID(item), let from = departing[id] {
                     view.frame = from
-                    changes.append { view.animator().frame = frame }
+                    carried = true
+                    carry(view, to: frame)
                 } else {
                     view.frame = frame
                     if animated {
@@ -210,10 +212,42 @@ final class SidebarListView: NSView {
             }
         }
         if !changes.isEmpty {
-            Tokens.Motion.animate { changes.forEach { $0() } }
+            if carried {
+                // The rest make room at the same pace as the page being carried.
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.5
+                    ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0, 0.18, 1)
+                    changes.forEach { $0() }
+                }
+            } else {
+                Tokens.Motion.animate { changes.forEach { $0() } }
+            }
         }
         updateDocumentHeight()
         pinHeader()
+    }
+
+    /// A page moving between the tabs and the pinned section travels there for you to see: it lifts above the other
+    /// rows with a soft shadow, glides to its new place, and settles back down.
+    private func carry(_ view: NSView, to frame: NSRect) {
+        guard !Tokens.Motion.reduceMotion else { view.frame = frame; return }
+        view.wantsLayer = true
+        addSubview(view)
+        let layer = view.layer
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowRadius = 10
+        layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? 4 : -4)
+        let lift = CAKeyframeAnimation(keyPath: "shadowOpacity")
+        lift.values = [0, 0.18, 0.18, 0]
+        lift.keyTimes = [0, 0.2, 0.75, 1]
+        lift.duration = 0.5
+        layer?.add(lift, forKey: "lift")
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.5
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0, 0.18, 1)
+            ctx.allowsImplicitAnimation = true
+            view.animator().frame = frame
+        }
     }
 
     private func updateDocumentHeight() {
