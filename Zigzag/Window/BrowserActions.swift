@@ -419,6 +419,15 @@ enum ZoomLevels {
 
     static func resetAll() { UserDefaults.standard.removeObject(forKey: key) }
 
+    /// Every site with its own zoom, by host.
+    static var all: [String: Double] { UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:] }
+
+    static func forget(host: String) {
+        var levels = all
+        levels[host] = nil
+        UserDefaults.standard.set(levels, forKey: key)
+    }
+
     static func set(_ zoom: CGFloat, for url: URL) {
         var levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
         let host = HistoryStore.normalizedHost(url)

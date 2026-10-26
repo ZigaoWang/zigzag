@@ -907,7 +907,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 history?.flash("Cleared")
             }
         }
-        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: history))
+        let showHistory = TextButton.form("Show History")
+        showHistory.onClick = { _ in HistoryWindowController.show() }
+        let historyButtons = NSStackView(views: [showHistory, history])
+        historyButtons.spacing = Tokens.Space.x2
+        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: historyButtons))
 
         let cache = TextButton.form("Clear Cache")
         cache.onClick = { [weak cache] _ in
@@ -950,6 +954,35 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads, a camera or notifications, show up here."
             : ListFormatter.localizedString(byJoining: parts).prefix(1).uppercased() + ListFormatter.localizedString(byJoining: parts).dropFirst() + "."
         privacyGroup.add(FormRow(title: "Site choices", detail: summary, control: reset))
+
+        // Then each site, with what was chosen for it, and a way to forget just that one.
+        let sites = SitePermissions.sites.union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
+        for site in sites.sorted().prefix(40) {
+            var said: [String] = []
+            let choices = SitePermissions.choices(host: site)
+            for (kind, name) in [("camera", "camera"), ("microphone", "microphone"), ("cameraAndMicrophone", "camera and microphone"),
+                                 ("location", "location"), ("notifications", "notifications")] {
+                if let allowed = choices[kind] { said.append("\(name) \(allowed ? "allowed" : "blocked")") }
+            }
+            if ContentBlocker.allowedSites.contains(site) { said.append("ads allowed") }
+            if ExtensionStore.extensionsOffSites.contains(site) { said.append("extensions off") }
+            if let zoom = ZoomLevels.all[site] { said.append("zoom \(Int((zoom * 100).rounded()))%") }
+            guard !said.isEmpty else { continue }
+            let forget = TextButton.form("Forget")
+            forget.onClick = { [weak self] _ in
+                SitePermissions.forgetEverything(host: site)
+                WebNotifications.shared.removeAll(host: site)
+                ContentBlocker.allowedSites.remove(site)
+                var off = ExtensionStore.extensionsOffSites
+                off.remove(site)
+                ExtensionStore.extensionsOffSites = off
+                ZoomLevels.forget(host: site)
+                self?.reloadPrivacy()
+                self?.layoutDocument()
+            }
+            let line = said.joined(separator: ", ")
+            privacyGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", control: forget))
+        }
     }
 
     private func confirm(title: String, message: String, action: String, then run: @escaping () -> Void) {

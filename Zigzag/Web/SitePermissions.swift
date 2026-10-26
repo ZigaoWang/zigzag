@@ -27,6 +27,21 @@ enum SitePermissions {
         UserDefaults.standard.set(all, forKey: key)
     }
 
+    /// Every remembered answer for one site: kind ("camera", "location", "notifications"…) to allowed or not.
+    static func choices(host: String) -> [String: Bool] {
+        let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        var found: [String: Bool] = [:]
+        for (k, v) in all where k.hasPrefix(host + "|") { found[String(k.dropFirst(host.count + 1))] = v }
+        return found
+    }
+
+    /// Forgets everything about a site, notifications included.
+    static func forgetEverything(host: String) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        for k in all.keys where k.hasPrefix(host + "|") { all[k] = nil }
+        UserDefaults.standard.set(all, forKey: key)
+    }
+
     /// Sites with a remembered choice of any kind.
     static var sites: Set<String> {
         let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
