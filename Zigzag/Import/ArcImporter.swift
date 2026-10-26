@@ -140,7 +140,27 @@ enum ArcImporter {
                 pinnedID = containerIDs[i + 1] as? String
             }
             var info = SpaceInfo(name: name, color: color(of: space))
-            if let pinnedID { info.bookmarks = bookmarks(under: pinnedID) }
+            if let pinnedID, let pinned = items[pinnedID] {
+                // Arc's pinned folders come over as folders (anything nested deeper goes into the outer one).
+                var folders: [BookmarkFolder] = []
+                for child in pinned["childrenIds"] as? [String] ?? [] {
+                    guard let node = items[child] else { continue }
+                    let isTab = (node["data"] as? [String: Any])?["tab"] != nil
+                    let inside = isTab ? [] : bookmarks(under: child)
+                    if isTab {
+                        if let data = node["data"] as? [String: Any], let tab = data["tab"] as? [String: Any],
+                           let urlString = tab["savedURL"] as? String, let url = URL(string: urlString), url.scheme == "http" || url.scheme == "https" {
+                            let title = (node["title"] as? String) ?? (tab["savedTitle"] as? String) ?? url.host() ?? urlString
+                            info.bookmarks.append(Bookmark(url: url, title: TabManager.bookmarkTitle(title, url: url)))
+                        }
+                    } else if !inside.isEmpty {
+                        let folderName = (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"
+                        info.bookmarks += inside
+                        folders.append(BookmarkFolder(name: folderName, bookmarkIDs: inside.map(\.id)))
+                    }
+                }
+                if !folders.isEmpty { info.folders = folders }
+            }
             spaces.append(info)
         }
 
