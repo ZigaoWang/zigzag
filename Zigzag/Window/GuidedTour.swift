@@ -12,8 +12,8 @@ final class GuidedTour: NSView {
     private let card = FloatingPanelView()
     private let step = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
     private let check = NSImageView()
-    private let title = Label("", font: .systemFont(ofSize: 15, weight: .semibold), color: Tokens.Color.textPrimary)
-    private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let title = Label("", font: .systemFont(ofSize: 17, weight: .semibold), color: Tokens.Color.textPrimary)
+    private let note = Label("", font: .systemFont(ofSize: 14), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
     private let finish = PrimaryButton(title: "Start Browsing")
@@ -181,7 +181,7 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if SpaceEditorPanel.current != nil, Tutorial.current == nil || Tutorial.current?.id == "space" {
-            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Press Return when it looks right", count: "", isDone: false, isFinal: false, target: "editor")
+            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Press Return when it looks right", count: "", isDone: false, isFinal: false, target: "editor", clip: "spaces")
         }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: done.doneNote, count: "", isDone: true, isFinal: false, target: "done." + done.id)
@@ -194,15 +194,15 @@ final class GuidedTour: NSView {
         // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
             if controller.commandBar.isSearchingSite {
-                return Display(keys: ["lofi music", "↩"], title: "Now type what to find", note: "Anything works. Then press Return", count: "", isDone: false, isFinal: false, target: "bar")
+                return Display(keys: ["lofi music", "↩"], title: "Now type what to find", note: "Anything works. Then press Return", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
             }
             if controller.commandBar.isOfferingSiteSearch {
-                return Display(keys: ["Tab"], title: "Press Tab", note: "To search right on YouTube", count: "", isDone: false, isFinal: false, target: "bar")
+                return Display(keys: ["Tab"], title: "Press Tab", note: "To search right on YouTube", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
             }
-            return Display(keys: ["youtube"], title: "Type this", note: "Just the word, then you’ll press Tab", count: "", isDone: false, isFinal: false, target: "bar")
+            return Display(keys: ["youtube"], title: "Type this", note: "Just the word, then you’ll press Tab", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
         }
         if task.id == "peek", controller.peek.isVisible {
-            return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek")
+            return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek", clip: "peek")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article", clip: "peek") }
         // Names the very tab to drag, lit up in the sidebar, so there's nothing to work out.
@@ -243,10 +243,38 @@ final class GuidedTour: NSView {
                 if Tutorial.current?.id == "split", lastStepID != "split" { openSplitPartner() }
                 lastStepID = Tutorial.current?.id
             }
+            // A different card (another step, a recording appearing or going): the old one leaves first, the new one
+            // arrives in its own place. Only small changes within a card, like the bar's typing hints, move in place.
+            let swap = animated && (now.clip != shownClip || now.isDone != shownDone || now.isFinal || (!now.count.isEmpty && now.count != shownCount))
+            shownClip = now.clip
+            shownDone = now.isDone
+            shownCount = now.count.isEmpty ? shownCount : now.count
+            if swap {
+                swapping = true
+                NSAnimationContext.runAnimationGroup({ ctx in
+                    ctx.duration = 0.12
+                    self.card.animator().alphaValue = 0
+                }, completionHandler: { [weak self] in
+                    guard let self else { return }
+                    self.swapping = false
+                    let latest = self.display
+                    self.apply(latest, animated: false)
+                    self.layoutTour(latest, animated: false)
+                    self.card.alphaValue = 1
+                    self.card.present(arrival: .pop)
+                })
+                return
+            }
             apply(now, animated: animated)
         }
+        if swapping { return }
         layoutTour(now, animated: animated)
     }
+
+    private var shownClip: String?
+    private var shownDone = false
+    private var shownCount = ""
+    private var swapping = false
 
     /// Peek needs a page full of links: an article, opened for you, rather than asking you to find one.
     private func openArticle() {
@@ -310,11 +338,11 @@ final class GuidedTour: NSView {
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
-        title.font = d.isFinal ? Brand.displayFont(24) : .systemFont(ofSize: 15, weight: .semibold)
+        title.font = d.isFinal ? Brand.displayFont(24) : .systemFont(ofSize: 17, weight: .semibold)
         if animated {
             let fade = CATransition()
             fade.type = .fade
-            fade.duration = 0.2
+            fade.duration = 0.15
             card.layer?.add(fade, forKey: "step")
         }
     }
@@ -335,13 +363,10 @@ final class GuidedTour: NSView {
         var width = Tokens.Space.x4 + (d.isDone ? 20 : keys) + Tokens.Space.x3 + text + Tokens.Space.x5
         if !skip.isHidden { width += skip.fittingWidth - Tokens.Space.x2 }
         if !step.isHidden { width += step.textWidth + Tokens.Space.x3 }
-        let row: CGFloat = d.note.isEmpty ? 56 : 64
-        // With a recording: wide enough for it to be seen, the recording on top.
-        if d.clip != nil {
-            let w = max(ceil(width), 520)
-            return NSSize(width: w, height: row + Self.videoHeight(for: w))
-        }
-        return NSSize(width: ceil(width), height: row)
+        let row: CGFloat = d.note.isEmpty ? 64 : 76
+        // One width for every step, so the card never jumps; the recording on top when there is one.
+        let w = max(ceil(width), Self.cardWidth)
+        return NSSize(width: w, height: row + (showsVideo(d) ? Self.videoHeight(for: w) : 0))
     }
 
     private func layoutTour(_ d: Display, animated: Bool) {
@@ -349,13 +374,12 @@ final class GuidedTour: NSView {
         let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -5, dy: -5) : nil } ?? .zero
         // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
         // The tab to drag keeps its ring, so you know which one.
-        let open = d.target == "split" || d.target == "done.split"
+        // Nothing is dimmed: the window stays as it is, and a soft ring marks only small things to click.
         let cut = CGMutablePath()
-        if !open {
-            cut.addRect(bounds)
-            if hole != .zero { cut.addRoundedRect(in: hole, cornerWidth: 12, cornerHeight: 12) }
-        }
-        let ringPath: CGPath = hole == .zero || d.target == "done.split" ? CGMutablePath() : CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil)
+        let page = controller?.root.cardFrame ?? bounds
+        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek"].contains(d.target)
+        let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: 12, cornerHeight: 12, transform: nil) : CGMutablePath()
+        pulse(ringed)
         let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {
@@ -375,11 +399,21 @@ final class GuidedTour: NSView {
         }
 
         let size = pillSize(d)
-        let page = controller?.root.cardFrame ?? bounds
         var frame: NSRect
-        if d.clip != nil {
+        if !d.isFinal {
+            // Always the same place: the page's bottom right corner, growing upward. It never moves around.
+            frame = NSRect(x: page.maxX - size.width - Tokens.Space.x5, y: page.maxY - size.height - Tokens.Space.x5, width: size.width, height: size.height)
+        } else if d.clip != nil {
             // With a recording: tucked in the page's bottom right, clear of what's lit.
             frame = NSRect(x: page.maxX - size.width - Tokens.Space.x5, y: page.maxY - size.height - Tokens.Space.x5, width: size.width, height: size.height)
+            // Below the bar or editor when it reaches down that far, and to its right when it doesn't fit under.
+            if hole != .zero, frame.intersects(hole) {
+                if page.maxY - hole.maxY - Tokens.Space.x3 >= size.height {
+                    frame.origin.y = hole.maxY + Tokens.Space.x3
+                } else if page.maxX - hole.maxX - Tokens.Space.x3 >= size.width {
+                    frame.origin.x = hole.maxX + Tokens.Space.x3
+                }
+            }
         } else if hole == .zero {
             frame = NSRect(x: page.midX - size.width / 2, y: page.midY - size.height / 2, width: size.width, height: size.height)
         } else if d.target == "bar" || d.target == "editor" {
@@ -409,13 +443,33 @@ final class GuidedTour: NSView {
         layoutPill(d, in: frame.size)
     }
 
+    static let cardWidth: CGFloat = 400
+
+    /// The recording shows unless a peek covers the page (the card would sit on it).
+    private func showsVideo(_ d: Display) -> Bool { d.clip != nil && d.target != "peek" }
+
+    /// The ring breathes gently, so the eye finds it without anything flashing.
+    private func pulse(_ on: Bool) {
+        guard on, !Tokens.Motion.reduceMotion else { ring.removeAnimation(forKey: "pulse"); ring.opacity = 1; return }
+        guard ring.animation(forKey: "pulse") == nil else { return }
+        let breathe = CABasicAnimation(keyPath: "opacity")
+        breathe.fromValue = 1
+        breathe.toValue = 0.35
+        breathe.duration = 0.9
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        ring.add(breathe, forKey: "pulse")
+    }
+
     /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.
     private static func videoHeight(for width: CGFloat) -> CGFloat { round((width - 16) * 720 / 1120) + 8 }
 
     private func layoutPill(_ d: Display, in size: NSSize) {
         let width = size.width
-        let top = d.clip != nil ? Self.videoHeight(for: width) : 0
-        if d.clip != nil {
+        let top = showsVideo(d) ? Self.videoHeight(for: width) : 0
+        video.isHidden = !showsVideo(d)
+        if showsVideo(d) {
             video.frame = NSRect(x: 8, y: 8, width: width - 16, height: top - 8)
             Tokens.Motion.withoutAnimation { videoLayer.frame = video.bounds }
         }
