@@ -248,6 +248,18 @@ final class SidebarView: NSView {
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
 
+    /// The sidebar is the window's title bar: drag it to move the window, and double-click it to zoom (or
+    /// whatever the Mac's title bar double-click is set to do).
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        guard event.clickCount == 2 else { window.performDrag(with: event); return }
+        switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize": window.miniaturize(nil)
+        case "None": break
+        default: window.zoom(nil)
+        }
+    }
+
     @objc private func listScrolled() {
         list.pinHeader()
         let scrolled = scrollView.contentView.bounds.minY > 1

@@ -191,13 +191,13 @@ final class BrowserRootView: ColorView {
     // MARK: Layout
 
     /// Full screen with the sidebar hidden: the page is the whole screen, no frame around it (like Arc).
-    /// Borderless, with the sidebar showing: the page fills the rest of the window, and the sidebar is the frame.
+    /// Borderless: no frame at all. The page fills the window beside the sidebar, or all of it with the sidebar
+    /// hidden; the sidebar, docked or slid out from the edge, is what moves and zooms the window.
     var isEdgeToEdge: Bool {
-        sidebarVisible ? Self.isBorderless : window?.styleMask.contains(.fullScreen) == true
+        Self.isBorderless || (!sidebarVisible && window?.styleMask.contains(.fullScreen) == true)
     }
 
-    /// The page runs to the window's edges beside the sidebar. With the sidebar hidden it keeps a thin frame, so
-    /// there's always something to drag the window by.
+    /// The page runs to the window's edges, with no frame around it.
     static var isBorderless: Bool {
         get { UserDefaults.standard.bool(forKey: "borderlessPage") }
         set {
