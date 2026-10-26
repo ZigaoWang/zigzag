@@ -62,6 +62,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// Set once quitting is decided (confirmed, or restarting for an update), so it isn't asked twice.
+    static var quitConfirmed = false
+
+    /// Asks before quitting, in the window, like Zigzag's other confirmations. Never when the Mac is logging out,
+    /// restarting or shutting down, or when an update restarts Zigzag. ⌘Q again, or Return, quits.
+    static var asksBeforeQuitting: Bool {
+        get { UserDefaults.standard.object(forKey: "AskBeforeQuitting") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "AskBeforeQuitting") }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !Self.quitConfirmed, !Self.isHostingTests, Self.asksBeforeQuitting else { return .terminateNow }
+        // Logging out, restarting or shutting down: the system's own reason is on the quit event.
+        if let event = NSAppleEventManager.shared().currentAppleEvent,
+           event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return .terminateNow }
+        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first,
+              let window = controller.window, window.isVisible, let host = window.contentView else { return .terminateNow }
+        // Already asking: ⌘Q a second time means yes.
+        if host.subviews.contains(where: { $0 is ConfirmSheet }) { return .terminateNow }
+        window.makeKeyAndOrderFront(nil)
+        var answered = false
+        var monitor: Any?
+        func answer(_ quit: Bool) {
+            guard !answered else { return }
+            answered = true
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            if quit { Self.quitConfirmed = true }
+            NSApp.reply(toApplicationShouldTerminate: quit)
+        }
+        ConfirmSheet.show(in: host, title: "Quit Zigzag?", message: "Your tabs and spaces will be right here when you open it again.",
+                          confirmTitle: "Quit") { answer($0) }
+        // While it asks, ⌘Q again means yes (macOS doesn't ask the app a second time on its own).
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  event.charactersIgnoringModifiers?.lowercased() == "q" else { return event }
+            host.subviews.compactMap { $0 as? ConfirmSheet }.forEach { $0.removeFromSuperview() }
+            answer(true)
+            return nil
+        }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
         WindowManager.shared.prepareForTermination()

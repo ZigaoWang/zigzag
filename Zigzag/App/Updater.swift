@@ -5,6 +5,7 @@ import Sparkle
 final class Updater {
     static let shared = Updater()
     private var controller: SPUStandardUpdaterController?
+    private let relaunch = RelaunchDelegate()
 
     /// Only signed release builds with a feed key can update; debug builds stay put.
     private var isConfigured: Bool {
@@ -14,7 +15,7 @@ final class Updater {
 
     func start() {
         guard isConfigured else { return }
-        controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: relaunch, userDriverDelegate: nil)
     }
 
     func checkForUpdates() {
@@ -26,5 +27,12 @@ final class Updater {
                 Toast.show("This build doesn’t update itself. Release builds of Zigzag update automatically.", symbol: "arrow.down.circle", duration: 3, in: window)
             }
         }
+    }
+}
+
+/// Restarting to finish an update isn't a quit to ask about.
+private final class RelaunchDelegate: NSObject, SPUUpdaterDelegate {
+    func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
+        MainActor.assumeIsolated { AppDelegate.quitConfirmed = true }
     }
 }

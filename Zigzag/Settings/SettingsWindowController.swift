@@ -338,6 +338,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
     private let borderlessToggle = Toggle()
+    private let quitToggle = Toggle()
     private let askToggle = Toggle()
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
@@ -420,6 +421,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         behaviorGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
         behaviorGroup.add(FormRow(title: "Ask where to save each download", detail: "Off: downloads go straight to your Downloads folder.", control: askToggle))
         behaviorGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
+        quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
+        behaviorGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
         let importButton = TextButton.form("Import")
         importButton.onClick = { _ in ImportWindowController.show() }
         importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
@@ -787,6 +790,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         blockingToggle.isOn = ContentBlocker.isEnabled
         pipToggle.isOn = PictureInPicture.followsTabs
         borderlessToggle.isOn = BrowserRootView.isBorderless
+        quitToggle.isOn = AppDelegate.asksBeforeQuitting
         askToggle.isOn = DownloadManager.asksWhereToSave
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave

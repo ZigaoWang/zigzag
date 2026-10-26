@@ -4,7 +4,10 @@
 - In Reader, ⌘+ and ⌘− make the text bigger or smaller, and the column is wider, with Narrow, Medium and Wide in the text settings.
 - After an update, Zigzag tells you what's new. Find it again in Help › What's New in Zigzag.
 
+- Zigzag asks before quitting, so ⌘Q never closes everything by accident. Press ⌘Q again to quit, or turn it off in Settings.
+
 ## Fixed
+- 1Password fills sign-in pop-ups, and no longer keeps your Mac busy after it's used.
 - Text in the sidebar stays readable on every color: Zigzag picks light or dark by what actually reads better, at both ends of a gradient.
 - Tabs in Show All Tabs fill their cards, instead of sitting in black bars.
 - With the sidebar hidden, a split view's pages meet in the middle, with no gap.
