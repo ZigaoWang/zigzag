@@ -121,7 +121,7 @@ nonisolated enum ChromiumImporter {
                     batch.problems.append(ImportProblem(message: message, fix: .retry, retries: 1))
                 }
             case .failure(.denied):
-                batch.problems.append(ImportProblem(message: "\(browser.name)'s passwords stayed locked. When macOS asks, choose Allow (or Always Allow).", fix: .retry, retries: 1))
+                batch.problems.append(ImportProblem(message: "\(browser.name)’s passwords stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.", fix: .retry, retries: 1))
             case .failure(.missing):
                 break  // No passwords saved there: nothing to say.
             }

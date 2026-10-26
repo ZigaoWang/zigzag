@@ -127,7 +127,7 @@ final class ImportView: NSView {
         let data = chosenData
         stage = .importing
         title.stringValue = "Bringing it over…"
-        subtitle.stringValue = "macOS may ask to let Zigzag open a browser’s saved passwords. Choose Allow, and it carries on."
+        subtitle.stringValue = "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow."
         primary.title = "Importing…"
         primary.isEnabled = false
         secondary.isHidden = true
