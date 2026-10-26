@@ -6,22 +6,42 @@
 <title>Download Zigzag</title>
 <meta name="description" content="Download Zigzag, the lightweight browser for Mac.">
 <link rel="icon" type="image/png" href="/assets/favicon-64.png">
-<link rel="stylesheet" href="/assets/site.css?v=4">
+<link rel="stylesheet" href="/assets/site.css?v=1793020670">
 </head>
 <body>
 <header class="dl-bar"><a href="/" aria-label="Zigzag home"><span class="wm" role="img" aria-label="Zigzag"></span></a></header>
 <main class="dl">
-  <img class="dl-icon" src="/assets/icon-256.png" width="104" height="104" alt="">
-  <h1>Thanks for downloading <span class="wm" role="img" aria-label="Zigzag"></span></h1>
-  <p class="lede">Your download should start on its own. If it doesn’t, <a href="/releases/latest" id="get">download it directly</a>.</p>
+  <h1>Zigzag is downloading</h1>
+  <p class="lede">For Macs with macOS 15.4 or later. Didn’t start? <a href="/releases/latest" id="get">Download again</a>.</p>
 
-  <ol class="dl-steps">
-    <li><span class="n">1</span><b>Open Zigzag.dmg</b><span>You’ll find it in your Downloads.</span></li>
-    <li><span class="n">2</span><b>Drag Zigzag to Applications</b><span>Then open it from your Applications folder.</span></li>
-    <li><span class="n">3</span><b>Bring your things over</b><span>Zigzag offers to import from the browser you use now.</span></li>
-  </ol>
+  <figure class="dl-move" aria-hidden="true">
+    <svg viewBox="0 0 520 220" role="presentation">
+      <path class="dl-arc" id="dl-arc" d="M128 128 C 200 18, 320 18, 392 120" />
+      <g class="dl-folder" transform="translate(342 92)">
+        <path class="back" d="M4 18 a10 10 0 0 1 10 -10 h26 l10 10 h40 a10 10 0 0 1 10 10 v52 a10 10 0 0 1 -10 10 h-76 a10 10 0 0 1 -10 -10z" />
+      </g>
+      <text class="dl-label" x="128" y="194">Zigzag</text>
+      <!-- Zigzag stays put, as in the disk image's window; a copy is what moves. -->
+      <image class="dl-rest" href="/assets/icon-256.png" x="86" y="86" width="84" height="84" />
+      <!-- The app glides along the arc into the folder, getting smaller as it goes in, then starts again. -->
+      <g class="dl-app">
+        <animateMotion dur="3.6s" repeatCount="indefinite" calcMode="spline" keyPoints="0;0;1;1;0;0" keyTimes="0;0.12;0.62;0.72;0.73;1"
+                       keySplines="0 0 1 1; .45 .05 .35 1; 0 0 1 1; 0 0 1 1; 0 0 1 1"><mpath href="#dl-arc" /></animateMotion>
+        <g>
+          <animateTransform attributeName="transform" type="scale" dur="3.6s" repeatCount="indefinite" values="1;1;.6;.5;.92;1" keyTimes="0;0.12;0.62;0.7;0.86;1" />
+          <animate attributeName="opacity" dur="3.6s" repeatCount="indefinite" values="1;1;1;0;0;1" keyTimes="0;0.12;0.62;0.7;0.86;1" />
+          <image href="/assets/icon-256.png" x="-42" y="-42" width="84" height="84" />
+        </g>
+      </g>
+      <!-- The folder's front goes over the app, so it drops in rather than across. -->
+      <g class="dl-folder" transform="translate(342 92)">
+        <path class="front" d="M0 36 a10 10 0 0 1 10 -10 h80 a10 10 0 0 1 10 10 v44 a10 10 0 0 1 -10 10 h-80 a10 10 0 0 1 -10 -10z" />
+        <text x="50" y="118">Applications</text>
+      </g>
+    </svg>
+  </figure>
 
-  <figure class="dl-shot"><img src="/assets/install.png" width="1100" alt="The Zigzag install window: the app on the left, an arrow, and the Applications folder on the right."></figure>
+  <p class="dl-next"><b>Open Zigzag.dmg and drag Zigzag into Applications.</b> Then open it from there: it offers to bring over your passwords, bookmarks and history from the browser you use now.</p>
 </main>
 <footer class="end"><p class="fine">Made in Shanghai by <a href="https://zigao.wang">Zigao Wang</a></p></footer>
 <script>

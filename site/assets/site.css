@@ -88,18 +88,17 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 /* Download page */
 .dl-bar { max-width: 1040px; margin: 0 auto; padding: 28px 24px; }
 .dl-bar .wm { height: 18px; color: var(--ink); }
-.dl { max-width: 760px; margin: 0 auto; padding: 56px 24px 40px; text-align: center; }
-.dl-icon { display: block; margin: 0 auto 28px; width: 104px; height: 104px; }
-.dl h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.025em; }
-.dl h1 .wm { height: .72em; }
+.dl { max-width: 680px; margin: 0 auto; padding: 72px 24px 64px; text-align: center; }
+.dl h1 { margin: 0; font-size: 40px; font-weight: 700; letter-spacing: -0.03em; }
 .dl .lede { margin: 14px 0 0; font-size: 18px; color: var(--soft); }
 .dl .lede a { color: var(--ink); text-underline-offset: 3px; }
-.dl-steps { list-style: none; padding: 0; margin: 64px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; text-align: left; }
-.dl-steps li { display: flex; flex-direction: column; gap: 6px; }
-.dl-steps .n { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%;
-  border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-.dl-steps b { font-weight: 600; font-size: 16px; }
-.dl-steps span:not(.n) { color: var(--soft); font-size: 15px; }
-.dl-shot { margin: 56px 0 0; }
-.dl-shot img { display: block; width: 100%; max-width: 560px; height: auto; margin: 0 auto; }
-@media (max-width: 640px) { .dl-steps { grid-template-columns: 1fr; gap: 24px; } .dl h1 { font-size: 28px; } }
+/* The install, shown rather than told: the app glides along an arc into Applications, then again. */
+.dl-move { margin: 56px auto 0; max-width: 520px; }
+.dl-move svg { display: block; width: 100%; height: auto; overflow: visible; }
+.dl-arc { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 2 9; stroke-linecap: round; }
+.dl-folder .back { fill: #7FB2E5; } .dl-folder .front { fill: #9CC8F2; }
+.dl-folder text, .dl-label { font: 600 13px -apple-system, BlinkMacSystemFont, "Inter", sans-serif; fill: var(--soft); text-anchor: middle; }
+.dl-app { filter: drop-shadow(0 10px 18px rgba(0,0,0,.2)); } .dl-rest { opacity: .35; }
+.dl-next { margin: 44px auto 0; max-width: 520px; font-size: 17px; line-height: 1.6; color: var(--soft); text-wrap: pretty; }
+.dl-next b { color: var(--ink); font-weight: 600; }
+@media (max-width: 640px) { .dl h1 { font-size: 30px; } .dl { padding-top: 40px; } }
