@@ -759,4 +759,20 @@ extension Tab: WKUIDelegate {
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
         Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate)) }
     }
+
+    /// Screen sharing (Meet, Zoom, Teams). WebKit asks the browser through this unpublished method; the answer
+    /// 1 hands over to macOS's own picker, where you choose a screen or window, 0 says no. Asked every time.
+    @objc(_webView:requestDisplayCapturePermissionForOrigin:initiatedByFrame:withSystemAudio:decisionHandler:)
+    func webView(_ webView: WKWebView, requestDisplayCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
+                 withSystemAudio: Bool, decisionHandler: @escaping (Int) -> Void) {
+        Task { @MainActor in
+            guard let window = host?.hostWindow, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else {
+                decisionHandler(0)
+                return
+            }
+            let answer = await PermissionPrompt.ask(host: origin.host, what: "your screen", symbol: "rectangle.on.rectangle", isPrivate: isPrivate,
+                                                    in: controller, answered: { nil })
+            decisionHandler(answer == .allow ? 1 : 0)
+        }
+    }
 }
