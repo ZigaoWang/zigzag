@@ -881,10 +881,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let x: CGFloat
         var top: CGFloat
         if let anchor, anchor.window != nil, anchor is SpaceDotView {
-            // From a space dot: just above the dot you clicked, its left edge near it, like a menu from that dot.
+            // From a space dot: beside the sidebar, its bottom level with the dots, so it covers neither the dots
+            // nor the tabs and the sidebar shows the new look in full.
             let dot = anchor.convert(anchor.bounds, to: overlay)
-            top = dot.minY - Tokens.Space.x2 - height
-            x = min(max(Tokens.Space.x2, dot.midX - Tokens.Space.x8), overlay.bounds.width - Self.width - Tokens.Space.x2)
+            top = dot.maxY - height
+            x = min(sidebar.maxX + Tokens.Space.x2, overlay.bounds.width - Self.width - Tokens.Space.x2)
         } else {
             // From the space's name: beside the sidebar, level with that header.
             top = controller.root.cardFrame.minY + Tokens.Space.x2
@@ -892,6 +893,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
                 top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
             }
             x = sidebar.maxX + Tokens.Space.x2
+            // Hanging from the header, it grows downward when a gradient adds its row.
+            anchoredBelow = true
         }
         top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))
         frame = NSRect(x: x, y: top, width: Self.width, height: height)
