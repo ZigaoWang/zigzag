@@ -1199,6 +1199,30 @@ extension BrowserWindowController: SidebarDelegate {
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
         libraryChange("Move Bookmark") { Library.shared.moveBookmark(id, to: index, in: spaceID) }
     }
+    /// A pinned page dropped at a place in the list, landing in a folder or out of one.
+    func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
+        libraryChange("Move Bookmark") { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
+    }
+    func listSetFolderOpen(_ id: UUID, _ open: Bool) {
+        // Opening and closing isn't an edit to undo.
+        Library.shared.setFolderOpen(id, open)
+    }
+    func listRenameFolder(_ id: UUID, to name: String) {
+        libraryChange("Rename Folder") { Library.shared.renameFolder(id, to: name) }
+    }
+    func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {
+        libraryChange(folderID == nil ? "Remove from Folder" : "Add to Folder") { Library.shared.setFolder(of: bookmarkID, to: folderID) }
+    }
+
+    /// A new folder in the current space, holding these pinned pages (or none), named right away in the sidebar.
+    func newFolder(with bookmarkIDs: [UUID] = []) {
+        var made: BookmarkFolder?
+        libraryChange("New Folder") { made = Library.shared.addFolder(named: "New Folder", with: bookmarkIDs, in: tabManager.currentSpaceID) }
+        guard let made else { return }
+        if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
+        sidebar.list.reload(animated: true)
+        DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(made.id) }
+    }
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
@@ -1275,6 +1299,7 @@ extension BrowserWindowController: SidebarDelegate {
         case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID)
         case .tab(let id): return tabManager.tab(with: id).map { SidebarMenus.tabMenu(for: $0, controller: self) }
         case .bookmark(let id): return Library.shared.bookmark(id).map { SidebarMenus.bookmarkMenu(for: $0, controller: self) }
+        case .folder(let id): return Library.shared.folder(id).map { SidebarMenus.folderMenu(for: $0, controller: self) }
         default: return nil
         }
     }

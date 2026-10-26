@@ -64,3 +64,45 @@ struct SiteMatchingTests {
         #expect(!origin("https://example.com:8443").fills(on: origin("https://www.example.com")))
     }
 }
+
+/// Folders of pinned pages: kept together, in order, never holding pages that are gone.
+struct BookmarkFolderTests {
+    private func pages(_ names: String...) -> [Bookmark] { names.map { Bookmark(url: URL(string: "https://\($0).com")!, title: $0) } }
+
+    @Test func gathersAFoldersPagesWhereTheFirstIs() {
+        let b = pages("a", "b", "c", "d", "e")
+        let folder = BookmarkFolder(name: "Work", bookmarkIDs: [b[3].id, b[1].id])
+        let (list, folders) = Library.tidied(b, [folder])
+        #expect(list.map(\.title) == ["a", "b", "d", "c", "e"])
+        #expect(folders[0].bookmarkIDs == [b[1].id, b[3].id])   // the list's order
+    }
+
+    @Test func forgetsPagesThatAreGone() {
+        let b = pages("a", "b")
+        let gone = UUID()
+        let (list, folders) = Library.tidied(b, [BookmarkFolder(name: "F", bookmarkIDs: [gone, b[1].id])])
+        #expect(list.map(\.title) == ["a", "b"])
+        #expect(folders[0].bookmarkIDs == [b[1].id])
+    }
+
+    @Test func leavesLoosePagesAndEmptyFoldersAlone() {
+        let b = pages("a", "b", "c")
+        let (list, folders) = Library.tidied(b, [BookmarkFolder(name: "Empty")])
+        #expect(list.map(\.title) == ["a", "b", "c"])
+        #expect(folders.count == 1 && folders[0].bookmarkIDs.isEmpty)
+    }
+
+    @Test func keepsTwoFoldersApart() {
+        let b = pages("a", "b", "c", "d")
+        let one = BookmarkFolder(name: "1", bookmarkIDs: [b[0].id, b[2].id])
+        let two = BookmarkFolder(name: "2", bookmarkIDs: [b[1].id, b[3].id])
+        let (list, _) = Library.tidied(b, [one, two])
+        #expect(list.map(\.title) == ["a", "c", "b", "d"])
+    }
+
+    @Test func olderLibrariesWithoutFoldersStillLoad() throws {
+        let json = Data(#"{"id":"6B1E4C1E-0000-4000-8000-000000000002","name":"Home","color":"sky","bookmarks":[]}"#.utf8)
+        let space = try JSONDecoder().decode(SpaceInfo.self, from: json)
+        #expect(space.folders == nil)
+    }
+}

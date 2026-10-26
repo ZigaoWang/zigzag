@@ -171,6 +171,12 @@ enum DebugBridge {
             let picked = ImportCoordinator.suggested(sources)
             debugLog("importsuggest => " + sources.map { (picked.contains($0.id) ? "[x] " : "[ ] ") + $0.id + " " + (ImportCoordinator.lastUsed($0).map { "\($0)" } ?? "?") }.joined(separator: " | "))
         case "cleartabs": controller.listClearTabs()
+        case "newfolder":
+            // newfolder <n>: a folder holding the space's first n pinned pages.
+            let ids = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).prefix(Int(arg) ?? 0).map(\.id)
+            controller.newFolder(with: Array(ids))
+        case "togglefolder":
+            if let folder = Library.shared.folders(in: controller.tabManager.currentSpaceID).first { controller.listSetFolderOpen(folder.id, !folder.isOpen) }
         case "listhover": controller.sidebar.list.debugHover(arg != "off")
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }

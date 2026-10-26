@@ -78,6 +78,24 @@ enum SidebarMenus {
             controller.libraryChange("Add to Favorites") { Library.shared.makeFavorite(bookmark.id) }
             live?.isFavorite = true
         })
+        // Folders of this space's pinned pages.
+        let current = Library.shared.folderID(containing: bookmark.id)
+        let spaceFolders = Library.shared.spaceID(ofBookmark: bookmark.id).map { Library.shared.folders(in: $0) } ?? []
+        menu.addItem(.separator())
+        menu.addItem(Item("Add to New Folder") { controller.newFolder(with: [bookmark.id]) })
+        let others = spaceFolders.filter { $0.id != current }
+        if !others.isEmpty {
+            let add = NSMenuItem(title: "Add to Folder", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for folder in others {
+                sub.addItem(Item(folder.name) { controller.listSetFolder(of: bookmark.id, to: folder.id) })
+            }
+            add.submenu = sub
+            menu.addItem(add)
+        }
+        if current != nil {
+            menu.addItem(Item("Remove from Folder") { controller.listSetFolder(of: bookmark.id, to: nil) })
+        }
         if Library.shared.spaces.count > 1 {
             let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
             let sub = NSMenu()
@@ -95,6 +113,19 @@ enum SidebarMenus {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
         menu.addItem(Item("Remove Bookmark") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+        return menu
+    }
+
+    static func folderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(Item("Rename…") { controller.sidebar.list.renameFolder(folder.id) })
+        menu.addItem(Item(folder.isOpen ? "Close Folder" : "Open Folder") { controller.listSetFolderOpen(folder.id, !folder.isOpen) })
+        menu.addItem(.separator())
+        // The folder goes; what was in it stays pinned, where it was.
+        menu.addItem(Item("Remove Folder") {
+            controller.libraryChange("Remove Folder") { Library.shared.removeFolder(folder.id) }
+        })
         return menu
     }
 
@@ -128,6 +159,9 @@ enum SidebarMenus {
             controller.openSpaceEditor(id, anchor: anchor)
         })
         _ = space
+        if id == controller.tabManager.currentSpaceID {
+            menu.addItem(Item("New Folder") { controller.newFolder() })
+        }
         menu.addItem(.separator())
         menu.addItem(Item("New Space") { controller.newSpace(nil) })
         menu.addItem(Item("Delete Space", enabled: Library.shared.spaces.count > 1) {

@@ -371,6 +371,113 @@ final class NewTabRowView: SidebarRowView {
     }
 }
 
+/// A folder of pinned pages: a chevron that turns as it opens, a folder, and its name. Click to open or close it;
+/// double-click to rename it. Pinned pages dropped on it go in.
+final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
+    private let chevron = NSImageView()
+    private let folderIcon = NSImageView()
+    var isOpen = true { didSet { if oldValue != isOpen { turnChevron(animated: true) } } }
+    /// While a pinned page or tab is dragged over it: it lights up to say it will take it.
+    var isDropTarget = false { didSet { stateDidChange(animated: true) } }
+    var onRename: ((String) -> Void)?
+    private var renameField: PlainTextField?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.TypeSize.small - 1)
+        chevron.contentTintColor = Tokens.Color.textTertiary
+        chevron.imageScaling = .scaleNone
+        chevron.wantsLayer = true
+        addSubview(chevron)
+        icon.isHidden = true
+        folderIcon.imageScaling = .scaleNone
+        folderIcon.contentTintColor = Tokens.Color.textSecondary
+        addSubview(folderIcon)
+        title.font = Tokens.Font.body(.medium)
+        setAccessibilityRole(.disclosureTriangle)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(name: String, open: Bool, count: Int) {
+        title.stringValue = name
+        folderIcon.image = Tokens.Symbol.image(open ? "folder" : "folder.fill", size: Tokens.TypeSize.body)
+        isOpen = open
+        setAccessibilityLabel("\(name), folder, \(count) pinned")
+        setAccessibilityValue(open ? 1 : 0)
+        needsLayout = true
+    }
+
+    private func turnChevron(animated: Bool) {
+        guard let layer = chevron.layer else { return }
+        let size = chevron.bounds.size
+        let angle: CGFloat = isOpen ? .pi / 2 : 0
+        let turn = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-size.width / 2, -size.height / 2, 0),
+                                                           CATransform3DMakeRotation(angle, 0, 0, 1)),
+                                       CATransform3DMakeTranslation(size.width / 2, size.height / 2, 0))
+        if animated && !Tokens.Motion.reduceMotion {
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.2)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1))
+            layer.transform = turn
+            CATransaction.commit()
+        } else {
+            Tokens.Motion.withoutAnimation { layer.transform = turn }
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Space.x3
+        chevron.frame = NSRect(x: bounds.width - Tokens.Space.x2 - side, y: (bounds.height - side) / 2, width: side, height: side)
+        folderIcon.frame = icon.frame
+        turnChevron(animated: false)
+        title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
+        if let field = renameField {
+            let height = ceil(field.intrinsicContentSize.height)
+            field.frame = NSRect(x: title.frame.minX, y: (bounds.height - height) / 2, width: max(0, bounds.width - title.frame.minX - Tokens.Space.x2), height: height)
+        }
+    }
+
+    override func stateDidChange(animated: Bool) {
+        super.stateDidChange(animated: animated)
+        if isDropTarget { layer?.set(backgroundColor: cgColor(Tokens.Color.selectedFill), animated: animated) }
+        chevron.alphaValue = isHovered || !isOpen || isDropTarget ? 1 : 0.6
+    }
+
+    func beginRename() {
+        guard renameField == nil, let window else { return }
+        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: "Folder name")
+        field.stringValue = title.stringValue
+        field.delegate = self
+        field.onCancel = { [weak self] in self?.endRename(commit: false) }
+        title.isHidden = true
+        addSubview(field)
+        renameField = field
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        window.makeFirstResponder(field)
+        field.currentEditor()?.selectAll(nil)
+    }
+
+    private func endRename(commit: Bool) {
+        guard let field = renameField else { return }
+        renameField = nil
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        field.removeFromSuperview()
+        title.isHidden = false
+        if commit, !name.isEmpty { onRename?(name) }
+        window?.makeFirstResponder(window?.contentView)
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.cancelOperation(_:)) { endRename(commit: false); return true }
+        return false
+    }
+}
+
 /// The space name above its bookmarks. Click it to fold the bookmarks away; a chevron says so.
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
