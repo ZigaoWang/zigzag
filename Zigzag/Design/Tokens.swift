@@ -314,8 +314,8 @@ enum Tokens {
         static let destructive = NSColor.systemRed
         /// Status: something to fix (a weak password, an import problem).
         static let warning = NSColor.systemOrange
-        /// Status: worth knowing (a reused password).
-        static let caution = NSColor.systemYellow
+        /// Status: worth knowing (a reused password). A deep amber on light backgrounds, where yellow can't be read.
+        static let caution = dynamic(light: hex(0x9A5B00), dark: hex(0xF2C14E))
         /// Status: done and fine.
         static let success = NSColor.systemGreen
     }
