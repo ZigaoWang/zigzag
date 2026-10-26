@@ -406,7 +406,7 @@ private final class BrowserRow: InteractiveView {
     var onFix: ((ImportProblem.Fix) -> Void)?
     var state = State.idle { didSet { refresh() } }
     /// macOS keeps this browser's files private until you allow Zigzag (macOS 27 does this for Chrome and others).
-    private var needsAccess = false
+    private(set) var needsAccess = false
 
     var isFinished: Bool { if case .done(let s) = state { s.problems.isEmpty } else { false } }
     var hasProblem: Bool { if case .done(let s) = state { !s.problems.isEmpty } else { needsAccess } }
@@ -450,7 +450,7 @@ private final class BrowserRow: InteractiveView {
         doneMark.isHidden = true
         [box, icon, name, detail, status, spinner, fixButton, problem, doneMark].forEach { addSubview($0) }
         onClick = { [weak self] _ in
-            guard let self, !self.isLocked, !self.needsAccess, !self.isFinished else { return }
+            guard let self, !self.isLocked, !self.isFinished else { return }
             self.isChosen.toggle()
             self.onChange?()
         }
@@ -460,9 +460,9 @@ private final class BrowserRow: InteractiveView {
             let text = await ImportCoordinator.preview(source)
             guard let self, case .idle = self.state else { return }
             if text.contains("permission") {
-                // Found before starting, so it's fixed first instead of failing midway.
+                // Found before starting, so it's fixed first instead of failing midway. A browser you use stays
+                // checked: Import asks for the OK, then carries on, rather than quietly leaving it behind.
                 self.needsAccess = true
-                self.isChosen = false
                 self.detail.stringValue = "Needs your OK once"
                 self.fixKind = .fullDiskAccess
                 self.onChange?()
@@ -593,7 +593,7 @@ private final class BrowserRow: InteractiveView {
         box.layer?.backgroundColor = on ? Onboard.accent.cgColor : nil
         box.layer?.borderColor = Onboard.tint.withAlphaComponent(on ? 1 : 0.45).cgColor
         tick.isHidden = !on
-        box.alphaValue = needsAccess || (isLocked && !isChosen) ? 0.35 : 1
+        box.alphaValue = (needsAccess || isLocked) && !isChosen ? 0.35 : 1
         stateDidChange(animated: false)
         needsLayout = true
     }
@@ -607,7 +607,7 @@ private final class BrowserRow: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let interactive = !isLocked && !needsAccess && !isFinished
+        let interactive = !isLocked && !isFinished
         layer?.backgroundColor = interactive && isHovered ? Onboard.tint.withAlphaComponent(isPressed ? 0.1 : 0.05).cgColor : nil
     }
 
@@ -722,6 +722,12 @@ private final class BringPicker: StepContent {
     override func commit(_ done: @escaping () -> Void) {
         let toDo = waiting
         if toDo.isEmpty { done(); return }
+        // A checked browser macOS still keeps private: ask for the OK first, and import once it's given.
+        if let locked = toDo.first(where: \.needsAccess) {
+            importAfterAccess = true
+            allow(locked)
+            return
+        }
         // Importing stays on this step, so you see what came over; Next then moves on.
         run(toDo)
     }
@@ -738,6 +744,10 @@ private final class BringPicker: StepContent {
         row.onGranted = { [weak self, weak row] in
             guard let self, let row else { return }
             self.splitIntoProfiles(row)
+            if self.importAfterAccess, !self.waiting.contains(where: \.needsAccess) {
+                self.importAfterAccess = false
+                if !self.waiting.isEmpty { self.run(self.waiting) }
+            }
         }
         list.addSubview(row)
         rows.append(row)
@@ -777,6 +787,9 @@ private final class BringPicker: StepContent {
         refresh()
     }
 
+    /// Import was pressed while a checked browser still needed macOS's OK: it goes ahead once that's given.
+    private var importAfterAccess = false
+
     /// Chosen and not yet imported. A row that came over with a problem is retried from its own fix, never by
     /// importing everything from it again.
     private var waiting: [BrowserRow] { rows.filter { row in if case .done = row.state { false } else { row.isChosen } } }
@@ -787,7 +800,7 @@ private final class BringPicker: StepContent {
         arrow.show(rows.filter(\.isChosen).map(\.source.icon))
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
-        hint.stringValue = isImporting ? "If macOS asks to let Zigzag open a browser’s passwords, choose Allow."
+        hint.stringValue = isImporting ? "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow."
             : problems ? "Some of it didn’t come over yet. The fix is next to it." : ""
         needsLayout = true
         onChange?()
