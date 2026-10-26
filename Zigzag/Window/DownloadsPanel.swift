@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookThumbnailing
 
 /// One download: file icon, name, progress or size, and a reveal button.
 final class DownloadRowView: InteractiveView, NSDraggingSource {
@@ -17,6 +18,10 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.wantsLayer = true
+        icon.layer?.cornerRadius = 4
+        icon.layer?.masksToBounds = true
+        name.lineBreakMode = .byTruncatingMiddle
         bar.wantsLayer = true
         bar.layer?.cornerRadius = 1.5
         fill.wantsLayer = true
@@ -41,6 +46,35 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Previews made for finished files, by path, so reopening the panel doesn't make them again.
+    private static var thumbnails: [String: NSImage] = [:]
+
+    private static func timeLeft(_ seconds: Double) -> String {
+        if seconds < 5 { return "a few seconds left" }
+        if seconds < 60 { return "\(Int(seconds.rounded())) seconds left" }
+        let minutes = Int((seconds / 60).rounded())
+        if minutes < 60 { return minutes == 1 ? "a minute left" : "\(minutes) minutes left" }
+        let hours = Int((seconds / 3600).rounded())
+        return hours == 1 ? "about an hour left" : "about \(hours) hours left"
+    }
+
+    /// The real picture for images, PDFs and videos once they're here; the file type's icon before that.
+    private func showIcon(for item: DownloadItem) {
+        let path = item.destination?.path ?? item.filename
+        icon.image = NSWorkspace.shared.icon(for: .init(filenameExtension: (path as NSString).pathExtension) ?? .data)
+        guard item.state == .finished, let url = item.destination else { return }
+        if let cached = Self.thumbnails[url.path] { icon.image = cached; return }
+        let scale = window?.backingScaleFactor ?? 2
+        let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 64, height: 64), scale: scale, representationTypes: .thumbnail)
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { [weak self] thumbnail, _ in
+            guard let image = thumbnail?.nsImage else { return }
+            DispatchQueue.main.async {
+                Self.thumbnails[url.path] = image
+                if self?.item === item { self?.icon.image = image }
+            }
+        }
+    }
+
     func configure(_ item: DownloadItem) {
         self.item = item
         name.stringValue = item.filename
@@ -49,7 +83,8 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         switch item.state {
         case .downloading:
             let done = formatter.string(fromByteCount: item.completedBytes)
-            status.stringValue = item.totalBytes > 0 ? "\(done) of \(formatter.string(fromByteCount: item.totalBytes))" : done
+            let amount = item.totalBytes > 0 ? "\(done) of \(formatter.string(fromByteCount: item.totalBytes))" : done
+            status.stringValue = item.secondsLeft.map { "\(amount), \(Self.timeLeft($0))" } ?? amount
             actionButton.symbol = "xmark"
             actionButton.toolTip = "Cancel"
             pauseButton.symbol = "pause.fill"
@@ -62,7 +97,10 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             pauseButton.symbol = "play.fill"
             pauseButton.toolTip = "Resume"
         case .finished:
-            status.stringValue = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
+            let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
+            let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
+                .map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
+            status.stringValue = site.map { "\(size) from \($0)" } ?? size
             actionButton.symbol = "magnifyingglass"
             actionButton.toolTip = "Show in Finder"
         case .failed, .cancelled:
@@ -76,8 +114,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         pauseButton.isHidden = !(item.state == .paused || DownloadManager.shared.canPause(item))
         // A paused bar is quiet, so it reads as stopped.
         fill.color = item.state == .paused ? Tokens.Color.textTertiary : Tokens.Color.accent
-        let path = item.destination?.path ?? item.filename
-        icon.image = NSWorkspace.shared.icon(for: .init(filenameExtension: (path as NSString).pathExtension) ?? .data)
+        showIcon(for: item)
         isEnabled = true
         alphaValue = [.finished, .downloading, .paused].contains(item.state) ? 1 : 0.6
         setAccessibilityRole(.button)
@@ -153,7 +190,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
     private let footer = Tokens.Space.x12
     private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
-    private let width: CGFloat = 320
+    private let width: CGFloat = 340
 
     init(controller: BrowserWindowController) {
         self.controller = controller

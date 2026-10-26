@@ -15,7 +15,16 @@ final class DownloadItem {
     fileprivate weak var download: WKDownload?
     fileprivate var progressObservation: NSKeyValueObservation?
     fileprivate var resumeData: Data?
-    fileprivate let sourceURL: URL?
+    let sourceURL: URL?
+    /// Bytes a second, smoothed over the last few seconds, for "time left".
+    fileprivate(set) var speed: Double = 0
+    fileprivate var lastSample: (at: Date, bytes: Int64)?
+
+    /// Seconds until done at the current speed, once there's enough to tell.
+    var secondsLeft: Double? {
+        guard state == .downloading, speed > 1, totalBytes > completedBytes else { return nil }
+        return Double(totalBytes - completedBytes) / speed
+    }
     /// The data store it came from, so a paused download resumes with the same cookies (a private one's own).
     fileprivate weak var dataStore: WKWebsiteDataStore?
     /// From a private window: listed only in private windows, and forgotten when the last one closes.
@@ -155,6 +164,17 @@ final class DownloadManager: NSObject {
             let total = progress.totalUnitCount
             DispatchQueue.main.async {
                 guard let item else { return }
+                let now = Date()
+                if let last = item.lastSample {
+                    let elapsed = now.timeIntervalSince(last.at)
+                    if elapsed >= 0.5 {
+                        let instant = Double(max(0, completed - last.bytes)) / elapsed
+                        item.speed = item.speed == 0 ? instant : item.speed * 0.75 + instant * 0.25
+                        item.lastSample = (now, completed)
+                    }
+                } else {
+                    item.lastSample = (now, completed)
+                }
                 item.fractionCompleted = fraction
                 item.completedBytes = completed
                 item.totalBytes = total
@@ -200,6 +220,8 @@ final class DownloadManager: NSObject {
         guard canPause(item), let download = item.download else { return }
         item.state = .paused
         item.progressObservation = nil
+        item.speed = 0
+        item.lastSample = nil
         changed.send(item)
         download.cancel { [weak self] data in
             MainActor.assumeIsolated {
