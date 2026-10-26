@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
+        Tutorial.migrate()
         // Getting started picks up where you left off, if you'd begun and haven't ended it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             guard !Tutorial.done.isEmpty, WelcomeWindowController.shared == nil,

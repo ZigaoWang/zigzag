@@ -45,6 +45,15 @@ enum Tutorial {
         set { UserDefaults.standard.set(Array(newValue), forKey: key) }
     }
 
+    /// Finished the guide before "go back to your first space" was a step: once, on the first launch of the version
+    /// that added it, that step counts as done too, so the guide doesn't come back to teach just that.
+    static func migrate() {
+        let flag = "TutorialSwitchStepAdded"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        UserDefaults.standard.set(true, forKey: flag)
+        if done.contains("space") { done.insert("switch") }
+    }
+
     /// The step to do now: the first in order that isn't done.
     static var current: Task? { tasks.first { !done.contains($0.id) } }
 
