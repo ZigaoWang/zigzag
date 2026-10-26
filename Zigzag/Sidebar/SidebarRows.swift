@@ -375,6 +375,10 @@ final class NewTabRowView: SidebarRowView {
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
     private let chevron = NSImageView()
+    /// Tidies the space's tabs, as in Arc: shown while the pointer is over the list and there are tabs to clear.
+    let clearButton = TextButton(title: "Clear", font: Tokens.Font.small(.medium))
+    var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
+    var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
     var isCollapsed = false { didSet { stateDidChange(animated: false) } }
     /// Only spaces with bookmarks can fold.
     var canCollapse = false { didSet { stateDidChange(animated: false) } }
@@ -385,7 +389,22 @@ final class SpaceHeaderView: InteractiveView {
         chevron.contentTintColor = Tokens.Color.textTertiary
         addSubview(label)
         addSubview(chevron)
+        clearButton.alphaValue = 0
+        clearButton.isHidden = true
+        addSubview(clearButton)
         setAccessibilityRole(.button)
+    }
+
+    private func refreshClear() {
+        let show = showsClear && hasTabs
+        if show { clearButton.isHidden = false }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            clearButton.animator().alphaValue = show ? 1 : 0
+        }, completionHandler: { [weak self] in
+            guard let self, !(self.showsClear && self.hasTabs) else { return }
+            self.clearButton.isHidden = true
+        })
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -396,6 +415,8 @@ final class SpaceHeaderView: InteractiveView {
         let x = Tokens.Space.x2
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
+        let cw = clearButton.fittingWidth
+        clearButton.frame = NSRect(x: bounds.width - cw, y: (bounds.height - Tokens.Space.x6) / 2, width: cw, height: Tokens.Space.x6)
     }
 
     override func stateDidChange(animated: Bool) {

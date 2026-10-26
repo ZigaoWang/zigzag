@@ -170,6 +170,8 @@ enum DebugBridge {
             let sources = ImportCoordinator.detectedSources()
             let picked = ImportCoordinator.suggested(sources)
             debugLog("importsuggest => " + sources.map { (picked.contains($0.id) ? "[x] " : "[ ] ") + $0.id + " " + (ImportCoordinator.lastUsed($0).map { "\($0)" } ?? "?") }.joined(separator: " | "))
+        case "cleartabs": controller.listClearTabs()
+        case "listhover": controller.sidebar.list.debugHover(arg != "off")
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
         case "autofillmenu":

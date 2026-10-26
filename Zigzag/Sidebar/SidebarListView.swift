@@ -7,6 +7,8 @@ protocol SidebarListDelegate: AnyObject {
     func listRenameBookmark(_ id: UUID, to name: String)
     func listClose(_ tab: Tab)
     func listNewTab()
+    /// Clear: every tab in the space but the one you're on; with only that one left, it too.
+    func listClearTabs()
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
     func listMenu(for item: SidebarItem) -> NSMenu?
     func listRenameSpace()
@@ -274,6 +276,28 @@ final class SidebarListView: NSView {
         drag?.view.frame.size.width = bounds.width
     }
 
+    // MARK: Hover
+
+    /// Over the list: the space header offers Clear.
+    private(set) var isPointerInside = false {
+        didSet { (rows[.header] as? SpaceHeaderView)?.showsClear = isPointerInside }
+    }
+    private var hoverArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { isPointerInside = true }
+    #if DEBUG
+    func debugHover(_ on: Bool) { isPointerInside = on }
+    #endif
+    override func mouseExited(with event: NSEvent) { isPointerInside = false }
+
     // MARK: Rows
 
     private func makeView(for item: SidebarItem) -> NSView {
@@ -281,6 +305,8 @@ final class SidebarListView: NSView {
         case .header:
             let header = SpaceHeaderView()
             header.onClick = { [weak self] _ in self?.toggleCollapsed() }
+            header.clearButton.onClick = { [weak self] _ in self?.delegate?.listClearTabs() }
+            header.showsClear = isPointerInside
             header.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: .header) }
             return header
         case .separator:
@@ -355,6 +381,7 @@ final class SidebarListView: NSView {
             let spaceID = shownSpaceID ?? manager.currentSpaceID
             let spaceName = Library.shared.space(spaceID)?.name ?? ""
             (view as? SpaceHeaderView)?.canCollapse = !Library.shared.bookmarks(in: spaceID).isEmpty
+            (view as? SpaceHeaderView)?.hasTabs = !(delegate?.tabManager.currentTabs.isEmpty ?? true)
             (view as? SpaceHeaderView)?.isCollapsed = Self.isCollapsed(spaceID)
             (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "\(spaceName) (Private)" : spaceName
             view.needsLayout = true

@@ -1170,6 +1170,18 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
     func listNewTab() { commandBar.show(mode: .newTab) }
+
+    func listClearTabs() {
+        let current = tabManager.selectedTab
+        let partner = current.flatMap { tabManager.partner(of: $0) }
+        let others = tabManager.currentTabs.filter { $0 !== current && $0 !== partner }
+        // First every other tab; once only yours is left, that one (and its split partner).
+        let closing = others.isEmpty ? tabManager.currentTabs.filter { $0 === current || $0 === partner } : others
+        guard !closing.isEmpty else { return }
+        closeManyWithUndo(closing)
+        let what = closing.count == 1 ? "Closed 1 tab" : "Closed \(closing.count) tabs"
+        Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in self?.sidebarUndo.undo() }), duration: 4, in: self)
+    }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         previews.hover(tab, row: row, bookmark: bookmark)
     }
