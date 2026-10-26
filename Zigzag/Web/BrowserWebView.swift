@@ -4,6 +4,13 @@ import WebKit
 /// Our WKWebView. Only adds what the browser frame needs: context menu tweaks and Peek.
 final class BrowserWebView: WKWebView {
     weak var owner: Tab?
+    private lazy var swipe = SwipeNavigator(webView: self)
+
+    override func scrollWheel(with event: NSEvent) {
+        // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
+        if swipe.handle(event) { return }
+        super.scrollWheel(with: event)
+    }
     /// Set by a context menu item right before WebKit asks for a new web view.
     static var pendingDisposition: OpenDisposition?
 

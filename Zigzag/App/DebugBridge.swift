@@ -303,10 +303,12 @@ enum DebugBridge {
             let parts = arg.split(separator: " ")
             guard let window = controller.window, let first = parts.first, let dx = Int32(first) else { break }
             let phaseless = parts.contains("nophase")
-            let screenPoint = window.convertPoint(toScreen: NSPoint(x: 100, y: window.frame.height - 300))
+            // "page": over the middle of the page instead.
+            let onPage = parts.contains("page")
+            let screenPoint = window.convertPoint(toScreen: onPage ? NSPoint(x: window.frame.width * 0.6, y: window.frame.height / 2) : NSPoint(x: 100, y: window.frame.height - 300))
             let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
             var phases: [Int64] = [1]
-            phases += Array(repeating: 2, count: 12)
+            phases += Array(repeating: 2, count: parts.contains("slow") ? 48 : 12)
             phases.append(4)
             for (i, phase) in phases.enumerated() {
                 let d: Int32 = phase == 2 ? dx : 0
