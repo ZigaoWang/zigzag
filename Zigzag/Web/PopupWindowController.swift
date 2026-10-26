@@ -5,6 +5,12 @@ import WebKit
 /// which site you are talking to, keeps window.opener working, and closes itself when the page does.
 final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate {
     private static var open: Set<PopupWindowController> = []
+    /// Every popup window, for extensions: 1Password fills sign-in popups as it does tabs.
+    static var all: [PopupWindowController] { Array(open) }
+    /// The popup's page, as extensions see it: one tab in a popup window, as in Chrome.
+    private(set) lazy var tab = PopupTab(popup: self)
+    /// Private popups stay out of extensions' sight, like private tabs.
+    var isPrivate: Bool { !webView.configuration.websiteDataStore.isPersistent }
 
     let webView: WKWebView
     private var observations: [NSKeyValueObservation] = []
@@ -15,6 +21,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let controller = PopupWindowController(configuration: configuration, features: features, parent: parent)
         Self.open.insert(controller)
         controller.showWindow(nil)
+        if #available(macOS 15.4, *), !controller.isPrivate { ExtensionHost.shared.popupOpened(controller) }
         return controller.webView
     }
 
@@ -62,14 +69,24 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         webView.isInspectable = true
 
         observations = [
-            webView.observe(\.url) { [weak self] wv, _ in MainActor.assumeIsolated { self?.updateHeader() } },
+            webView.observe(\.url) { [weak self] wv, _ in MainActor.assumeIsolated { self?.updateHeader(); self?.tellExtensions(.URL) } },
+            webView.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.tellExtensions(.loading) } },
             webView.observe(\.hasOnlySecureContent) { [weak self] _, _ in MainActor.assumeIsolated { self?.updateHeader() } },
-            webView.observe(\.title) { [weak self] wv, _ in MainActor.assumeIsolated { self?.window?.title = wv.title ?? "" } },
+            webView.observe(\.title) { [weak self] wv, _ in MainActor.assumeIsolated { self?.window?.title = wv.title ?? ""; self?.tellExtensions(.title) } },
         ]
         updateHeader()
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private func tellExtensions(_ change: WKWebExtension.TabChangedProperties) {
+        guard #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) else { return }
+        ExtensionHost.shared.popupChanged(self, change)
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        if #available(macOS 15.4, *), !isPrivate { ExtensionHost.shared.popupFocused(self) }
+    }
 
     private func updateHeader() {
         header.show(url: webView.url, secure: webView.hasOnlySecureContent)
@@ -80,6 +97,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         webView.stopLoading()
         if let parentObserver { NotificationCenter.default.removeObserver(parentObserver) }
         parentObserver = nil
+        if #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) { ExtensionHost.shared.popupClosed(self) }
         Self.open.remove(self)
     }
 
@@ -164,5 +182,58 @@ final class PopupHeaderView: NSView {
         let h = ceil(textSize.height)
         lock.frame = NSRect(x: x, y: 0, width: lockWidth, height: bounds.height)
         label.frame = NSRect(x: lock.frame.maxX + Tokens.Space.x1, y: (bounds.height - h) / 2, width: min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4), height: h)
+    }
+}
+
+/// A sign-in popup's page, for extensions.
+@available(macOS 15.4, *)
+final class PopupTab: NSObject, WKWebExtensionTab {
+    private weak var popup: PopupWindowController?
+    init(popup: PopupWindowController) { self.popup = popup }
+
+    func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { popup }
+    func indexInWindow(for context: WKWebExtensionContext) -> Int { 0 }
+    func webView(for context: WKWebExtensionContext) -> WKWebView? { popup?.webView }
+    func title(for context: WKWebExtensionContext) -> String? { popup?.webView.title }
+    func url(for context: WKWebExtensionContext) -> URL? { popup?.webView.url }
+    func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { popup?.webView.isLoading == false }
+    func isSelected(for context: WKWebExtensionContext) -> Bool { true }
+    func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { true }
+
+    func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        popup?.webView.load(URLRequest(url: url))
+        completionHandler(nil)
+    }
+
+    func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        popup?.window?.close()
+        completionHandler(nil)
+    }
+
+    func reload(fromOrigin: Bool, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        fromOrigin ? popup?.webView.reloadFromOrigin() : popup?.webView.reload()
+        completionHandler(nil)
+    }
+}
+
+/// The popup window itself, for extensions: a popup-type window holding its one page.
+@available(macOS 15.4, *)
+extension PopupWindowController: WKWebExtensionWindow {
+    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { [tab] }
+    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tab }
+    func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .popup }
+    func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState { window?.isMiniaturized == true ? .minimized : .normal }
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
+    func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
+
+    func focus(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        window?.makeKeyAndOrderFront(nil)
+        completionHandler(nil)
+    }
+
+    func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        window?.close()
+        completionHandler(nil)
     }
 }

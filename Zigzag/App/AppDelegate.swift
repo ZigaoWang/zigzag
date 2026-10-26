@@ -65,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
         WindowManager.shared.prepareForTermination()
+        // Password managers' helpers end with Zigzag, so none are left running.
+        if #available(macOS 15.4, *) { NativeMessagingHost.terminateAll() }
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }

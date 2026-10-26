@@ -335,6 +335,22 @@ final class ExtensionHost: NSObject {
         }
     }
     func windowOpened(_ window: BrowserWindowController) { controller.didOpenWindow(window) }
+
+    // Sign-in popups: a window with one tab, opened, changed, focused and closed like any other.
+    func popupOpened(_ popup: PopupWindowController) {
+        controller.didOpenWindow(popup)
+        controller.didOpenTab(popup.tab)
+        controller.didFocusWindow(popup)
+        controller.didActivateTab(popup.tab, previousActiveTab: nil)
+    }
+    func popupChanged(_ popup: PopupWindowController, _ change: WKWebExtension.TabChangedProperties) {
+        controller.didChangeTabProperties(change, for: popup.tab)
+    }
+    func popupFocused(_ popup: PopupWindowController) { controller.didFocusWindow(popup) }
+    func popupClosed(_ popup: PopupWindowController) {
+        controller.didCloseTab(popup.tab, windowIsClosing: true)
+        controller.didCloseWindow(popup)
+    }
     func windowClosed(_ window: BrowserWindowController) { controller.didCloseWindow(window) }
     func windowFocused(_ window: BrowserWindowController?) { controller.didFocusWindow(window) }
 
@@ -350,11 +366,16 @@ final class ExtensionHost: NSObject {
 @available(macOS 15.4, *)
 extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
-        WindowManager.shared.controllers
+        // The focused window first, as extensions expect; sign-in popups count too.
+        let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter { !$0.isPrivate }
+        let windows: [any WKWebExtensionWindow] = WindowManager.shared.controllers
+        let key = PopupWindowController.all.first { !$0.isPrivate && $0.window?.isKeyWindow == true }
+        return key.map { [$0] + windows + popups.filter { $0 !== key } } ?? windows + popups
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        WindowManager.shared.keyController
+        if let popup = PopupWindowController.all.first(where: { !$0.isPrivate && $0.window?.isKeyWindow == true }) { return popup }
+        return WindowManager.shared.keyController
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
@@ -560,6 +581,12 @@ final class NativeMessagingHost {
     private let executable: URL
     private let origin: String
     private static var pointedAtApp = false
+    /// Every helper started, so quitting Zigzag ends them too instead of leaving them running.
+    private static var running: [Process] = []
+    static func terminateAll() {
+        running.forEach { if $0.isRunning { $0.terminate() } }
+        running = []
+    }
     private let extensionID: String
     private var process: Process?
     private var input: FileHandle?
@@ -603,6 +630,8 @@ final class NativeMessagingHost {
         process.standardError = FileHandle.nullDevice
         stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
+            // Closed: stop listening. Left in place, the handler fires again at once, forever, and keeps a core busy.
+            if data.isEmpty { handle.readabilityHandler = nil; return }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                 guard let self else { return }
@@ -612,9 +641,12 @@ final class NativeMessagingHost {
                 }
             }
         }
-        process.terminationHandler = { _ in DispatchQueue.main.async { MainActor.assumeIsolated { onExit() } } }
+        process.terminationHandler = { finished in
+            DispatchQueue.main.async { MainActor.assumeIsolated { Self.running.removeAll { $0 === finished }; onExit() } }
+        }
         do { try process.run() } catch { return false }
         self.process = process
+        Self.running.append(process)
         input = stdin.fileHandleForWriting
         return true
     }
