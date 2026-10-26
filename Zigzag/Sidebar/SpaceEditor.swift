@@ -224,13 +224,14 @@ struct SpaceLook {
     }
 
     /// The four you can't get from the wheel, white to black, and three colors to start from, Zigzag's navy among them.
+    /// Colors only: white, grays and black have their own tab, Mono.
     static let colors: [SpaceLook] = [
-        SpaceLook(name: "White", hue: nil, depth: 0),
-        SpaceLook(name: "Silver", hue: nil, depth: 0.22),
-        SpaceLook(name: "Graphite", hue: nil, depth: 0.74),
-        SpaceLook(name: "Black", hue: nil, depth: 1),
         SpaceLook(name: "Sky", hue: 0.57, depth: 0.22),
+        SpaceLook(name: "Mint", hue: 0.44, depth: 0.2),
+        SpaceLook(name: "Sand", hue: 0.11, depth: 0.2),
         SpaceLook(name: "Rose", hue: 0.96, depth: 0.2),
+        SpaceLook(name: "Lavender", hue: 0.75, depth: 0.22),
+        SpaceLook(name: "Forest", hue: 0.36, depth: 0.78),
         SpaceLook(name: "Navy", hue: 0.62, depth: 0.82),
     ]
 
@@ -600,7 +601,9 @@ final class DirectionKnob: NSView {
 /// dark the glass is); then grain, and for a gradient its direction. `onPreview` fires while you drag, `onCommit`
 /// when you let go or pick something.
 final class SpaceLookEditor: NSView {
-    private let kindSwitch = SlidingSwitch([.text("Color"), .text("Gradient"), .text("Glass")])
+    private let kindSwitch = SlidingSwitch([.text("Color"), .text("Gradient"), .text("Mono"), .text("Glass")])
+    /// Says what glass is, since it's the one that isn't obvious.
+    private let glassNote = Label("Your desktop shows through", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let wheel = ColorWheel()
     private let colorSwatches = SpaceLook.colors.map { LookSwatch(look: $0) }
     private let gradientSwatches = SpaceLook.gradients.map { LookSwatch(look: $0) }
@@ -624,8 +627,8 @@ final class SpaceLookEditor: NSView {
     /// A space never given a color follows the Mac, light by day and dark at night, until you choose one.
     private var colorChosen: Bool
 
-    private enum Kind: Int { case color, gradient, glass }
-    private var kind: Kind { draft.glass == true ? .glass : draft.hue2 != nil ? .gradient : .color }
+    private enum Kind: Int { case color, gradient, mono, glass }
+    private var kind: Kind { draft.glass == true ? .glass : draft.hue2 != nil ? .gradient : draft.isNeutral ? .mono : .color }
 
     /// `dark`: whether the window looks dark right now, for where a space that follows the Mac starts on the wheel.
     init(space: SpaceInfo, dark: Bool) {
@@ -634,7 +637,7 @@ final class SpaceLookEditor: NSView {
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [kindSwitch, wheel, shadeLabel, shadeSlider, grainLabel, grainSlider, directionLabel, dial]
+        let views: [NSView] = [kindSwitch, glassNote, wheel, shadeLabel, shadeSlider, grainLabel, grainSlider, directionLabel, dial]
         (views + colorSwatches + gradientSwatches).forEach { addSubview($0) }
 
         kindSwitch.selectedIndex = kind.rawValue
@@ -731,6 +734,17 @@ final class SpaceLookEditor: NSView {
             draft.glass = nil
             draft.hue2 = nil
             draft.brightness2 = nil
+            // From white, gray or black: start on Zigzag's blue, somewhere a color shows.
+            if draft.hue == nil {
+                draft.hue = 0.6
+                draft.brightness = min(max(draft.brightness ?? 0.22, 0.15), 0.85)
+            }
+        case .mono:
+            draft.glass = nil
+            draft.hue = nil
+            draft.color = .graphite
+            draft.hue2 = nil
+            draft.brightness2 = nil
         case .gradient:
             draft.glass = nil
             // A gradient needs two colors: a gray takes on Zigzag's blue, and the second starts as its neighbor.
@@ -770,12 +784,15 @@ final class SpaceLookEditor: NSView {
         grainSlider.tint2 = kind == .glass ? nil : shown.background2
         shadeSlider.grain = space.brightness ?? 0
         dial.angle = space.gradientAngle
-        let glass = kind == .glass
-        wheel.isHidden = glass
+        // Mono and glass are one slider each, white to black; glass shows the checkerboard that means see-through.
+        let slider = kind == .glass || kind == .mono
+        wheel.isHidden = slider
         colorSwatches.forEach { $0.isHidden = kind != .color }
         gradientSwatches.forEach { $0.isHidden = kind != .gradient }
-        shadeLabel.isHidden = !glass
-        shadeSlider.isHidden = !glass
+        shadeLabel.isHidden = !slider
+        shadeSlider.isHidden = !slider
+        shadeSlider.showsChecker = kind == .glass
+        glassNote.isHidden = kind != .glass
         directionLabel.isHidden = kind != .gradient
         dial.isHidden = kind != .gradient
         needsLayout = true
@@ -794,7 +811,11 @@ final class SpaceLookEditor: NSView {
     /// How tall it is for the kind it shows.
     var preferredHeight: CGFloat {
         var height = switchHeight + Tokens.Space.x4
-        height += kind == .glass ? sliderHeight + Tokens.Space.x3 : wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5
+        switch kind {
+        case .glass: height += glassNote.lineHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x4
+        case .mono: height += sliderHeight + Tokens.Space.x4
+        default: height += wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5
+        }
         height += sliderHeight
         if kind == .gradient { height += Tokens.Space.x3 + dialSize }
         return height
@@ -807,8 +828,12 @@ final class SpaceLookEditor: NSView {
         kindSwitch.frame = NSRect(x: 0, y: y, width: width, height: switchHeight)
         y += switchHeight + Tokens.Space.x4
         if kind == .glass {
+            glassNote.frame = NSRect(x: 0, y: y, width: width, height: glassNote.lineHeight)
+            y += glassNote.lineHeight + Tokens.Space.x3
+        }
+        if kind == .glass || kind == .mono {
             row(shadeLabel, shadeSlider, y: y, height: sliderHeight, width: width)
-            y += sliderHeight + Tokens.Space.x3
+            y += sliderHeight + Tokens.Space.x4
         } else {
             wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
             y += wheelHeight + Tokens.Space.x3
