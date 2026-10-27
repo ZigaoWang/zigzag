@@ -692,7 +692,15 @@ final class EmptySpaceMark: NSView {
         refresh()
     }
 
-    private func refresh() { wordmark.color = Tokens.Color.textPrimary.withAlphaComponent(0.07) }
+    /// Drawn solid and faded as one piece: the letters' strokes overlap, and a see-through color would darken where
+    /// they cross.
+    private func refresh() {
+        wordmark.color = Tokens.Color.textPrimary
+        // On the mark itself: this view's own opacity is what fades it in and out with the page.
+        wordmark.wantsLayer = true
+        wordmark.layer?.allowsGroupOpacity = true
+        wordmark.alphaValue = 0.07
+    }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
