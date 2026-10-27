@@ -3,6 +3,11 @@
 Every release of Zigzag, newest first. The app shows the notes for the version you're running, and
 [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) shows them all.
 
+## [Unreleased]
+
+### Changed
+- Zigzag's code is now open source under the Apache License 2.0, instead of the Functional Source License. The Zigzag name, icon and logo stay trademarks, so forks use their own.
+
 ## [0.1.12] - 2026-10-27
 
 ### New
@@ -169,6 +174,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.1.12...HEAD
 [0.1.12]: https://github.com/ZigaoWang/zigzag/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/ZigaoWang/zigzag/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/ZigaoWang/zigzag/compare/v0.1.9...v0.1.10
