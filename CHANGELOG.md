@@ -3,6 +3,11 @@
 Every release of Zigzag, newest first. The app shows the notes for the version you're running, and
 [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) shows them all.
 
+## [Unreleased]
+
+### New
+- Choose where downloads are saved, or have Zigzag ask each time, right in the downloads panel (it's also in Settings › General).
+
 ## [0.1.11] - 2026-10-27
 
 ### New
@@ -152,6 +157,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.1.11...HEAD
 [0.1.11]: https://github.com/ZigaoWang/zigzag/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/ZigaoWang/zigzag/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/ZigaoWang/zigzag/compare/v0.1.8...v0.1.9
