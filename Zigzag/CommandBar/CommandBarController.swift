@@ -680,6 +680,7 @@ extension CommandBarController {
             }
         case "clear-cookies": controller.confirmClearCookies()
         case "feedback": Feedback.show(in: controller)
+        case "history": HistoryWindowController.show()
         default: break
         }
     }

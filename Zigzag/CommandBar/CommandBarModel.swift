@@ -138,6 +138,11 @@ enum CommandRanker {
                                       detail: displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
                         key: TabManager.normalize(entry.url))
                 }
+                // No history yet: say what this is for rather than showing nothing.
+                if results.isEmpty {
+                    add(CommandResult(kind: .action("history"), title: "No history yet", detail: "Pages you visit show up here",
+                                      symbol: "clock"), key: "empty-history")
+                }
                 return results
             }
             // Nothing typed yet: recent tabs, so switching is one keystroke away.
@@ -209,6 +214,12 @@ enum CommandRanker {
             add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
                               detail: displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)), key: key)
             historyCount += 1
+        }
+
+        // Searching history and nothing matches: never a blank bar. Say so, with the web search one Return away.
+        if historyOnly, results.isEmpty {
+            add(CommandResult(kind: .search(query), title: "Search the web for “\(query)”", detail: "Nothing in your history matches",
+                              symbol: "magnifyingglass"), key: "search:\(query)")
         }
 
         if !historyOnly && url(from: query) == nil {
