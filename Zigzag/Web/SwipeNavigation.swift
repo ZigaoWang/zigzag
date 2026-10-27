@@ -19,6 +19,10 @@ final class SwipeNavigator {
     /// What the page can scroll sideways under the pointer, once the page has answered.
     private var pageScrolls: (left: Bool, right: Bool)?
     private var armed = false
+    /// Recent finger movement, to tell a quick flick from a slow drag.
+    private var samples: [(time: TimeInterval, dx: CGFloat)] = []
+    /// Clears the arrow if the gesture's end never arrives (macOS sometimes drops it between quick swipes).
+    private var watchdog: DispatchWorkItem?
 
     /// How far to swipe before letting go navigates.
     private static let threshold: CGFloat = 110
@@ -37,8 +41,11 @@ final class SwipeNavigator {
         }
         switch event.phase {
         case .began:
+            // A new gesture: anything left from the last one goes now.
+            if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
+            watchdog?.cancel()
             state = .deciding
-            dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil
+            dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; samples = []
             probe(at: webView.convert(event.locationInWindow, from: nil))
             return false
         case .changed:
@@ -46,6 +53,8 @@ final class SwipeNavigator {
             let fingerX = event.isDirectionInvertedFromDevice ? event.scrollingDeltaX : -event.scrollingDeltaX
             dx += fingerX
             dy += event.scrollingDeltaY
+            samples.append((event.timestamp, dx))
+            if samples.count > 8 { samples.removeFirst(samples.count - 8) }
             switch state {
             case .deciding:
                 guard abs(dx) > 8 || abs(dy) > 8 else { return false }
@@ -57,6 +66,7 @@ final class SwipeNavigator {
                     state = .tracking
                     showArrow()
                     update()
+                    armWatchdog()
                     return true
                 }
                 state = .ignoring
@@ -65,14 +75,16 @@ final class SwipeNavigator {
                 // The page answered late that it scrolls this way: hand the swipe back.
                 if pageTakes(direction) { cancel(); state = .ignoring; return false }
                 update()
+                armWatchdog()
                 return true
             default:
                 return false
             }
         case .ended, .cancelled:
             let wasTracking = state == .tracking
+            watchdog?.cancel()
             if wasTracking {
-                if event.phase == .ended, progress >= 1 { go() } else { cancel() }
+                if event.phase == .ended, progress >= 1 || isFlick { go() } else { cancel() }
                 state = .finishing
             } else {
                 state = .idle
@@ -85,6 +97,25 @@ final class SwipeNavigator {
     }
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / Self.threshold }
+
+    /// A quick flick the right way counts even if it's short, as in Safari.
+    private var isFlick: Bool {
+        guard progress > 0.3, let last = samples.last,
+              let first = samples.first(where: { last.time - $0.time < 0.1 }), last.time > first.time else { return false }
+        let speed = CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
+        return speed > 700
+    }
+
+    private func armWatchdog() {
+        watchdog?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.state == .tracking else { return }
+            self.cancel()
+            self.state = .idle
+        }
+        watchdog = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
 
     private func pageTakes(_ direction: Int) -> Bool {
         guard let pageScrolls else { return false }
@@ -130,15 +161,12 @@ final class SwipeNavigator {
     private func update() {
         guard let webView, let arrow, let overlay = arrow.superview else { return }
         let page = overlay.convert(webView.bounds, from: webView)
-        let p = min(progress, 1.25)
-        let size = SwipeArrowView.size
-        // It comes in from the edge it points away from, and stops a little in from it.
-        let travel = size + Tokens.Space.x4
-        let shown = travel * min(p, 1) + Tokens.Space.x2 * max(0, p - 1)
-        let x = direction < 0 ? page.minX - size + shown : page.maxX - shown
-        arrow.frame = NSRect(x: x, y: page.midY - size / 2, width: size, height: size)
-        arrow.progress = min(p, 1)
-        let nowArmed = p >= 1
+        // It stays put, just inside the page's edge, and only fades in: nothing slides or flies.
+        let size = SwipeArrowView.size, inset: CGFloat = 16
+        let x = direction < 0 ? page.minX + inset : page.maxX - inset - size
+        arrow.frame = NSRect(x: x, y: round(page.midY - size / 2), width: size, height: size)
+        arrow.progress = min(progress, 1)
+        let nowArmed = progress >= 1
         if nowArmed != armed {
             armed = nowArmed
             arrow.isArmed = nowArmed
@@ -147,6 +175,7 @@ final class SwipeNavigator {
     }
 
     private func go() {
+        watchdog?.cancel()
         guard let webView else { return }
         if direction < 0 { webView.goBack() } else { webView.goForward() }
         arrow?.leave(toward: direction, navigated: true)
@@ -154,6 +183,7 @@ final class SwipeNavigator {
     }
 
     private func cancel() {
+        watchdog?.cancel()
         arrow?.leave(toward: -direction, navigated: false)
         arrow = nil
     }
@@ -200,18 +230,15 @@ final class SwipeArrowView: NSView {
         }
         if animated { CATransaction.begin(); CATransaction.setAnimationDuration(0.15); apply(); CATransaction.commit() } else { Tokens.Motion.withoutAnimation(apply) }
         symbol.contentTintColor = isArmed ? .white : Tokens.Color.textSecondary
-        // Out of sight at the very start, when it's still mostly past the page's edge.
-        alphaValue = min(1, max(0, (progress - 0.12) * 2.2))
+        // Fades in as you swipe; once letting go will move, it fills.
+        alphaValue = min(1, max(0, (progress - 0.1) * 2))
     }
 
-    /// Goes: on with the swipe after navigating, back to the edge when let go too soon.
+    /// Fades where it is, whether it navigated or not.
     func leave(toward direction: Int, navigated: Bool) {
-        let shift = CGFloat(navigated ? -direction : direction) * Self.size * (navigated ? 0.3 : 1)
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = navigated ? 0.22 : 0.18
-            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+            context.duration = 0.15
             animator().alphaValue = 0
-            animator().setFrameOrigin(NSPoint(x: frame.minX + shift, y: frame.minY))
         }, completionHandler: { [weak self] in self?.removeFromSuperview() })
     }
 }

@@ -315,7 +315,7 @@ enum DebugBridge {
             let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
             var phases: [Int64] = [1]
             phases += Array(repeating: 2, count: parts.contains("slow") ? 48 : 12)
-            phases.append(4)
+            if !parts.contains("noend") { phases.append(4) }
             for (i, phase) in phases.enumerated() {
                 let d: Int32 = phase == 2 ? dx : 0
                 guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
