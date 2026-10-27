@@ -193,18 +193,29 @@ final class DownloadsPanelView: FloatingPanelView {
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: 24))
     private let emptyNote = Label("Files you download show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    /// Where new downloads go, right here where you'd look for it (the same choice as in Settings).
+    private let placeLabel = Label("Save to", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let place = MenuButton()
+    private var placeToken: SignalToken?
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
-    private let footer = Tokens.Space.x12
+    private let footer = Tokens.Space.x12 + Tokens.Space.x10
     private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
     private let width: CGFloat = 340
 
     init(controller: BrowserWindowController) {
         self.controller = controller
         super.init(frame: .zero)
-        [title, clearButton, folderButton, emptyIcon, emptyNote].forEach { addSubview($0) }
+        [title, clearButton, folderButton, emptyIcon, emptyNote, placeLabel, place].forEach { addSubview($0) }
+        DownloadPlace.configure(place)
+        place.onSelect = { index in DownloadPlace.pick(index) }
+        placeToken = DownloadPlace.changed.observe { [weak self] in
+            guard let self else { return }
+            DownloadPlace.configure(self.place)
+            self.needsLayout = true
+        }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary
         emptyNote.alignment = .center
         folderButton.showsFillAtRest = true
@@ -344,8 +355,13 @@ final class DownloadsPanelView: FloatingPanelView {
             row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: rowHeight)
             y += rowHeight
         }
-        // A real button across the bottom, not a line of text.
-        folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
+        // Where downloads go, then a real button across the bottom to the folder.
+        let row = Tokens.Space.x10
+        let pw = min(place.intrinsicContentSize.width, bounds.width * 0.6)
+        place.frame = NSRect(x: bounds.width - pad - pw, y: y + Tokens.Space.x1 + (row - Tokens.Space.x8) / 2, width: pw, height: Tokens.Space.x8)
+        placeLabel.frame = NSRect(x: pad + Tokens.Space.x2, y: place.frame.midY - placeLabel.lineHeight / 2, width: place.frame.minX - pad * 2, height: placeLabel.lineHeight)
+        y += Tokens.Space.x1 + row
+        folderButton.frame = NSRect(x: pad, y: y + (Tokens.Space.x12 - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
     }
 }
 

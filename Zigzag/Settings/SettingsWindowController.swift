@@ -341,6 +341,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let quitToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = MenuButton()
+    private var downloadPlaceToken: SignalToken?
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
     private let cardToggle = Toggle()
@@ -415,7 +416,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
-        downloadPlace.onSelect = { [weak self] index in self?.pickDownloadPlace(index) }
+        downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
+        downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
         archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
         behaviorGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
@@ -805,40 +807,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         window.setFrame(frame, display: true, animate: animated && window.isVisible && !Tokens.Motion.reduceMotion)
     }
 
-    /// The menu: the folder downloads go to (with its own icon), Ask Each Time, and Other… to pick a folder.
     private var hasExtensions: Bool {
         if #available(macOS 15.4, *) { return !ExtensionHost.shared.installed.isEmpty }
         return false
     }
 
-    private func refreshDownloadPlace() {
-        let folder = DownloadManager.folder
-        let icon = NSWorkspace.shared.icon(forFile: folder.path)
-        icon.size = NSSize(width: 16, height: 16)
-        downloadPlace.options = [MenuButton.Option(title: FileManager.default.displayName(atPath: folder.path), image: icon),
-                                 MenuButton.Option(title: "Ask Each Time", image: nil),
-                                 MenuButton.Option(title: "Other…", image: nil)]
-        downloadPlace.selectedIndex = DownloadManager.asksWhereToSave ? 1 : 0
-    }
-
-    private func pickDownloadPlace(_ index: Int) {
-        switch index {
-        case 0: DownloadManager.asksWhereToSave = false
-        case 1: DownloadManager.asksWhereToSave = true
-        default:
-            let panel = NSOpenPanel()
-            panel.canChooseDirectories = true
-            panel.canChooseFiles = false
-            panel.canCreateDirectories = true
-            panel.prompt = "Choose"
-            panel.directoryURL = DownloadManager.folder
-            if panel.runModal() == .OK, let url = panel.url {
-                DownloadManager.folder = url
-                DownloadManager.asksWhereToSave = false
-            }
-        }
-        refreshDownloadPlace()
-    }
+    private func refreshDownloadPlace() { DownloadPlace.configure(downloadPlace) }
 
     private func refresh() {
         engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
