@@ -255,7 +255,7 @@ enum SettingsPane: Int, CaseIterable {
     var subtitle: String {
         switch self {
         case .general: "Search, your default browser, and how pages behave."
-        case .spaces: "Each space keeps its own tabs, pins and color. Drag a space to reorder."
+        case .spaces: "Each space keeps its own tabs, pinned tabs and color. Drag a space to reorder."
         case .passwords: "Saved in your Keychain and synced with iCloud Keychain."
         case .privacy: "What sites keep on this Mac, and the choices you’ve made for them."
         case .translation: "Pages in other languages, translated on this Mac by Apple."
@@ -348,7 +348,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let translateOffer = Toggle()
     private let translateInto = MenuButton()
     private var languages: [(id: String, name: String)] = []
-    private let addSpaceButton = TextButton.form("Add Space")
+    private let addSpaceButton = TextButton.form("New Space")
     private let getExtensionsButton = TextButton.form("Get Extensions")
     private let loadUnpackedButton = TextButton.form("Load Unpacked")
     private var spaceRows: [SpaceSettingsRow] = []
@@ -903,7 +903,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         privacyGroup.removeAllRows()
         let history = TextButton.form("Clear History")
         history.onClick = { [weak self, weak history] _ in
-            self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, bookmarks and passwords stay.",
+            self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.",
                           action: "Clear History") {
                 HistoryStore.shared.clearAll()
                 history?.flash("Cleared")
@@ -924,7 +924,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         let cookies = TextButton.form("Clear Cookies")
         cookies.onClick = { [weak self, weak cookies] _ in
-            self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, bookmarks and history stay.", action: "Clear Cookies") {
+            self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, pinned tabs and history stay.", action: "Clear Cookies") {
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies)
                     cookies?.flash("Cleared")

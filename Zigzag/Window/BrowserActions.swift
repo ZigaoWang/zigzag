@@ -54,7 +54,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// History can't come back once it's gone, so it asks first.
     @objc func clearHistory(_ sender: Any?) {
         ConfirmSheet.show(in: root.overlay, title: "Clear all history?",
-                          message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, bookmarks and passwords stay.",
+                          message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.",
                           confirmTitle: "Clear History", destructive: true) { [weak self] confirmed in
             guard confirmed, let self else { return }
             HistoryStore.shared.clearAll()

@@ -371,7 +371,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Signing out of every site is a big step, so it asks first.
     func confirmClearCookies() {
         ConfirmSheet.show(in: root.overlay, title: "Clear cookies for every site?",
-                          message: "You’ll be signed out of every website. Your passwords, bookmarks and history stay.",
+                          message: "You’ll be signed out of every website. Your passwords, pinned tabs and history stay.",
                           confirmTitle: "Clear Cookies", destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
@@ -1116,7 +1116,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listClose(_ tab: Tab) { closeWithUndo(tab) }
 
     func listRenameBookmark(_ id: UUID, to name: String) {
-        libraryChange("Rename") { Library.shared.updateBookmark(id, title: name) }
+        libraryChange("Rename Pinned Tab") { Library.shared.updateBookmark(id, title: name) }
     }
 
     // MARK: Undo (⌘Z) for sidebar actions
@@ -1167,7 +1167,7 @@ extension BrowserWindowController: SidebarDelegate {
         // Undoing an unpin puts it back in the folder it was in.
         if let folder { Library.shared.moveBookmark(bookmarkID, to: index ?? 0, in: spaceID, folder: .some(folder)) }
         sidebarUndo.registerUndo(withTarget: self) { $0.unbookmarkWithUndo(bookmarkID, to: oldIndex) }
-        sidebarUndo.setActionName("Bookmark")
+        sidebarUndo.setActionName("Pin Tab")
     }
 
     /// Turns a bookmark back into a tab, undoably.
@@ -1178,7 +1178,7 @@ extension BrowserWindowController: SidebarDelegate {
         // Unloaded, it comes back as a new tab: ⌘Z pins that one again.
         if let tab = tabManager.unbookmark(bookmarkID, toIndex: index) {
             sidebarUndo.registerUndo(withTarget: self) { $0.bookmarkWithUndo(tab, at: oldIndex, in: spaceID, folder: folder) }
-            sidebarUndo.setActionName("Remove Bookmark")
+            sidebarUndo.setActionName("Unpin Tab")
         }
     }
     func listNewTab() { commandBar.show(mode: .newTab) }
@@ -1213,11 +1213,11 @@ extension BrowserWindowController: SidebarDelegate {
     }
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
-        libraryChange("Move Bookmark") { Library.shared.moveBookmark(id, to: index, in: spaceID) }
+        libraryChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID) }
     }
     /// A pinned page dropped at a place in the list, landing in a folder or out of one.
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
-        libraryChange("Move Bookmark") { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
+        libraryChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
     }
     func listSetFolderOpen(_ id: UUID, _ open: Bool) {
         // Opening and closing isn't an edit to undo.
