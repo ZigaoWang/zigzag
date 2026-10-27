@@ -60,7 +60,7 @@ enum SidebarMenus {
         menu.addItem(Item("Copy Link", enabled: tab.url != nil) {
             if let url = tab.url { controller.copyLink(url) }
         })
-        menu.addItem(Item("Bookmark", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
+        menu.addItem(Item("Pin Tab", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
         menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
         if manager.split(for: tab) != nil {
             menu.addItem(Item("Separate Tabs") { controller.unsplitWithUndo(tab) })
@@ -68,6 +68,9 @@ enum SidebarMenus {
             menu.addItem(Item("Open in Split View") { controller.splitWithUndo(current, with: tab) })
         }
         menu.addItem(Item("Duplicate Tab") { controller.duplicate(tab) })
+        if !controller.tabManager.isPrivate, tab.bookmarkID == nil {
+            menu.addItem(Item("Move to New Window") { controller.moveToNewWindow(tab) })
+        }
         menu.addItem(.separator())
         menu.addItem(Item("Reload") { tab.reload() })
         if tab.isPlayingAudio || tab.isMuted {
@@ -146,7 +149,7 @@ enum SidebarMenus {
         if let live {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
-        menu.addItem(Item("Remove Bookmark") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+        menu.addItem(Item("Unpin") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
         return menu
     }
 
@@ -232,7 +235,7 @@ enum BookmarkEditor {
         if controller.sidebar.list.beginRenaming(bookmark: id) { return }
         guard let bookmark = Library.shared.bookmark(id) else { return }
         RenamePanel.show(title: bookmark.title, in: controller) { title in
-            controller.libraryChange("Rename Bookmark") { Library.shared.updateBookmark(id, title: title) }
+            controller.libraryChange("Rename Pinned Tab") { Library.shared.updateBookmark(id, title: title) }
         }
     }
 }

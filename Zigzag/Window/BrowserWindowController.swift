@@ -1241,6 +1241,16 @@ extension BrowserWindowController: SidebarDelegate {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
+    /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
+    func moveToNewWindow(_ tab: Tab) {
+        guard !tabManager.isPrivate, let frame = window?.frame else { return }
+        let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
+        target.window?.setFrame(frame.offsetBy(dx: 30, dy: -30), display: true)
+        tabManager.detach(tab)
+        target.tabManager.insert(tab)
+        target.window?.makeKeyAndOrderFront(nil)
+    }
+
     func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool {
         guard !tabManager.isPrivate else { return false }
         let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
