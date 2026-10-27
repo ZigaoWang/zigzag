@@ -16,7 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The back and forward arrow never gets left on screen, and a quick flick counts.
 - The downloads button is always at the bottom of the sidebar, even before your first download.
 - Settings opens straight to each pane, and the window fits what's in it.
-- About Zigzag is simpler, with links to the website, the source and the license.
+- About Zigzag is the standard Mac About window, with links to the website, the release notes and the license.
 
 ## [0.1.10] - 2026-10-27
 
