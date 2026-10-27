@@ -158,13 +158,22 @@ final class SwipeNavigator {
         self.arrow = arrow
     }
 
+    /// How far the page has moved with the fingers, at most `maxShift`, with resistance so it slows as it goes.
+    private var shift: CGFloat {
+        let pulled = max(0, CGFloat(-direction) * dx)
+        return Self.maxShift * (1 - exp(-pulled / (Self.maxShift * 1.6)))
+    }
+    private static let maxShift: CGFloat = 72
+
     private func update() {
         guard let webView, let arrow, let overlay = arrow.superview else { return }
+        // The page follows the fingers a little, and the arrow waits in the gap that opens at its edge.
+        let offset = shift * CGFloat(-direction)
+        Tokens.Motion.withoutAnimation { webView.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0)) }
         let page = overlay.convert(webView.bounds, from: webView)
-        // It stays put, just inside the page's edge, and only fades in: nothing slides or flies.
-        let size = SwipeArrowView.size, inset: CGFloat = 16
-        let x = direction < 0 ? page.minX + inset : page.maxX - inset - size
-        arrow.frame = NSRect(x: x, y: round(page.midY - size / 2), width: size, height: size)
+        let size = SwipeArrowView.size
+        let gapMid = (direction < 0 ? page.minX : page.maxX) + offset / 2
+        arrow.frame = NSRect(x: round(gapMid - size / 2), y: round(page.midY - size / 2), width: size, height: size)
         arrow.progress = min(progress, 1)
         let nowArmed = progress >= 1
         if nowArmed != armed {
@@ -174,16 +183,33 @@ final class SwipeNavigator {
         }
     }
 
+    /// The page settles back into place: with the page it went to, or without, if let go too soon.
+    private func settlePage() {
+        guard let layer = webView?.layer else { return }
+        let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
+        Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
+        guard from != .identity, !Tokens.Motion.reduceMotion else { return }
+        let back = CASpringAnimation(keyPath: "transform")
+        back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
+        back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        back.stiffness = 320
+        back.damping = 30
+        back.duration = back.settlingDuration
+        layer.add(back, forKey: "swipe.settle")
+    }
+
     private func go() {
         watchdog?.cancel()
         guard let webView else { return }
         if direction < 0 { webView.goBack() } else { webView.goForward() }
+        settlePage()
         arrow?.leave(toward: direction, navigated: true)
         arrow = nil
     }
 
     private func cancel() {
         watchdog?.cancel()
+        settlePage()
         arrow?.leave(toward: -direction, navigated: false)
         arrow = nil
     }
@@ -192,7 +218,7 @@ final class SwipeNavigator {
 /// The round arrow at the page's edge during a swipe: quiet while you swipe, filled in the accent once letting go
 /// will navigate.
 final class SwipeArrowView: NSView {
-    static let size: CGFloat = 44
+    static let size: CGFloat = 36
     private let circle = CALayer()
     private let symbol = NSImageView()
     var progress: CGFloat = 0 { didSet { refresh() } }
@@ -234,19 +260,15 @@ final class SwipeArrowView: NSView {
         alphaValue = min(1, max(0, (progress - 0.1) * 2))
     }
 
-    /// Navigated: however fast the swipe was, it shows filled for a beat, so the move reads as an answer rather
-    /// than a flicker, then fades. Let go too soon: it just fades.
+    /// Fades as the page settles back. Navigated, it shows filled first, however fast the swipe was.
     func leave(toward direction: Int, navigated: Bool) {
         if navigated {
             progress = 1
             isArmed = true
         }
-        let fade = {
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = navigated ? 0.35 : 0.15
-                self.animator().alphaValue = 0
-            }, completionHandler: { [weak self] in self?.removeFromSuperview() })
-        }
-        if navigated { DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: fade) } else { fade() }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = navigated ? 0.3 : 0.18
+            self.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in self?.removeFromSuperview() })
     }
 }
