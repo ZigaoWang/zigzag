@@ -9,6 +9,7 @@
 #        scripts/release.sh --publish  also upload the build and appcast to zigzagbrowser.com
 #        scripts/release.sh --local    build and sign with Developer ID only, to use on this Mac
 #        (plain run: build, sign, notarize and staple; --publish also writes the appcast and uploads both)
+# Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,6 +21,10 @@ OUT=build/release
 # Tidier build output when xcbeautify is installed; otherwise just the lines that matter.
 pretty() { if command -v xcbeautify >/dev/null; then xcbeautify; else grep -E "error:|ARCHIVE|EXPORT|BUILD" || true; fi; }
 rm -rf "$OUT" && mkdir -p "$OUT/updates"
+
+# The notes come first: CHANGELOG.md needs a section for the version being released, or nothing is built.
+PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
+grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
 
 xcodegen generate -q
 xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release -allowProvisioningUpdates \
@@ -75,16 +80,20 @@ spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 if [[ "${1:-}" == "--publish" ]]; then
   # The appcast needs Sparkle's signing key from the keychain, which may ask; only publishing needs it.
   # Builds and the feed are served from zigzagbrowser.com (reachable everywhere, no GitHub needed).
-  # What's new, from the same file the app shows after updating: Sparkle's update window gets it as HTML, and the
-  # GitHub release as Markdown (build/release/notes.md, for gh release create --notes-file).
+  # What's new, this version's section of CHANGELOG.md, the same notes the app shows after updating: Sparkle's
+  # update window gets it as HTML, and the GitHub release as Markdown (build/release/notes.md, for --notes-file).
   python3 - "$VERSION" "$OUT" <<'PY'
 import html, sys
 version, out = sys.argv[1], sys.argv[2]
-sections = []
-for raw in open("Zigzag/Resources/WhatsNew.md", encoding="utf-8"):
+sections, inside = [], False
+for raw in open("CHANGELOG.md", encoding="utf-8"):
     line = raw.strip()
-    if line.startswith("## "): sections.append((line[3:], []))
-    elif line.startswith("- ") and sections: sections[-1][1].append(line[2:])
+    if line.startswith("## "):
+        if inside: break
+        inside = line.startswith(f"## [{version}]")
+    elif inside and line.startswith("### "): sections.append((line[4:], []))
+    elif inside and line.startswith("- ") and sections: sections[-1][1].append(line[2:])
+if not sections: sys.exit(f"CHANGELOG.md has no notes for {version}")
 style = ("<style>:root{color-scheme:light dark}body{font:13px -apple-system,sans-serif;margin:0 4px}"
          "h3{font-size:13px;margin:14px 0 6px}ul{margin:0;padding-left:18px}li{margin:4px 0;line-height:1.4}</style>")
 body = "".join(f"<h3>{html.escape(t)}</h3><ul>" + "".join(f"<li>{html.escape(i)}</li>" for i in items) + "</ul>" for t, items in sections)
@@ -101,5 +110,7 @@ PY
   ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
   # The feed goes last, so no Mac is offered an update before its zip is there.
   rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
+  # The website's changelog page, with this version on top.
+  zsh site/deploy.sh
 fi
 echo "Done: $ZIP and $DMG"

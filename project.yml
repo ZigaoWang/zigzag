@@ -51,6 +51,9 @@ targets:
     platform: macOS
     sources:
       - path: Zigzag
+      # The release notes the app shows after an update: this version's section of the changelog.
+      - path: CHANGELOG.md
+        buildPhase: resources
     dependencies:
       - package: Sparkle
     info:

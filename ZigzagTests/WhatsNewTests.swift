@@ -5,12 +5,33 @@ import Testing
 /// The notes the app shows after an update, read from the same file the release uses.
 @MainActor
 struct WhatsNewTests {
-    @Test func parsesSections() {
-        let sections = WhatsNew.parse("## New\n- One\n- Two\n\n## Fixed\n- Three\n\nA closing line.\n")
+    @Test func parsesThisVersionOnly() {
+        let log = """
+        # Changelog
+
+        ## [1.1.0] - 2026-11-01
+
+        ### New
+        - One
+        - Two
+
+        ### Fixed
+        - Three
+
+        ## [1.0.0] - 2026-10-01
+
+        ### New
+        - Old
+        """
+        let sections = WhatsNew.parse(log, version: "1.1.0")
         #expect(sections.map(\.title) == ["New", "Fixed"])
         #expect(sections.map(\.items) == [["One", "Two"], ["Three"]])
+        #expect(WhatsNew.parse(log, version: "1.0.0").map(\.items) == [["Old"]])
+        // A version with no notes shows none, rather than another version's.
+        #expect(WhatsNew.parse(log, version: "1.1").isEmpty)
     }
 
+    /// Every build carries notes for its own version: a release without them can't go out.
     @Test func shippedNotesAreThere() {
         #expect(!WhatsNew.sections.isEmpty)
     }

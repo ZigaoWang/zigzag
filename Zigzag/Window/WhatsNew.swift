@@ -1,7 +1,7 @@
 import AppKit
 
-/// After an update: a quiet note that Zigzag updated, and this version's notes on a sheet. The notes are
-/// Resources/WhatsNew.md, the same file the update window and the GitHub release show.
+/// After an update: a quiet note that Zigzag updated, and this version's notes on a sheet. The notes are this
+/// version's section of CHANGELOG.md, the same section the update window, the GitHub release and the website show.
 enum WhatsNew {
     struct Section {
         let title: String
@@ -11,19 +11,25 @@ enum WhatsNew {
     static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
     static var sections: [Section] {
-        guard let url = Bundle.main.url(forResource: "WhatsNew", withExtension: "md"),
+        guard let url = Bundle.main.url(forResource: "CHANGELOG", withExtension: "md"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        return parse(text)
+        return parse(text, version: version)
     }
 
-    /// "## New" starts a section; "- " lines are its items.
-    static func parse(_ text: String) -> [Section] {
+    /// One version's notes from a Keep a Changelog file: under "## [1.2.3] - date", each "### New" starts a section
+    /// and its "- " lines are the items, up to the next version.
+    static func parse(_ text: String, version: String) -> [Section] {
         var sections: [Section] = []
+        var inVersion = false
         for raw in text.components(separatedBy: .newlines) {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("## ") {
-                sections.append(Section(title: String(line.dropFirst(3)), items: []))
-            } else if line.hasPrefix("- "), !sections.isEmpty {
+                if inVersion { break }
+                let heading = line.dropFirst(3)
+                inVersion = heading.hasPrefix("[\(version)]") || heading.hasPrefix("\(version) ") || heading == version
+            } else if inVersion, line.hasPrefix("### ") {
+                sections.append(Section(title: String(line.dropFirst(4)), items: []))
+            } else if inVersion, line.hasPrefix("- "), !sections.isEmpty {
                 sections[sections.count - 1].items.append(String(line.dropFirst(2)))
             }
         }
@@ -55,7 +61,7 @@ enum WhatsNew {
         WhatsNewSheet.present(in: host)
     }
 
-    static let allNotes = URL(string: "https://github.com/ZigaoWang/zigzag/releases")!
+    static let allNotes = URL(string: "https://zigzagbrowser.com/changelog")!
 }
 
 /// The notes for this version: the app icon and version on top, each section's points below, and a way to every
