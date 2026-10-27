@@ -193,29 +193,21 @@ final class DownloadsPanelView: FloatingPanelView {
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: 24))
     private let emptyNote = Label("Files you download show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-    /// Where new downloads go, right here where you'd look for it (the same choice as in Settings).
-    private let placeLabel = Label("Save to", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-    private let place = MenuButton()
-    private var placeToken: SignalToken?
+    /// More: where new downloads are saved (the same choice as in Settings), in a menu rather than on the panel.
+    private let more = IconButton(symbol: "ellipsis", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "More")
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
-    private let footer = Tokens.Space.x12 + Tokens.Space.x10
+    private let footer = Tokens.Space.x12
     private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
     private let width: CGFloat = 340
 
     init(controller: BrowserWindowController) {
         self.controller = controller
         super.init(frame: .zero)
-        [title, clearButton, folderButton, emptyIcon, emptyNote, placeLabel, place].forEach { addSubview($0) }
-        DownloadPlace.configure(place)
-        place.onSelect = { index in DownloadPlace.pick(index) }
-        placeToken = DownloadPlace.changed.observe { [weak self] in
-            guard let self else { return }
-            DownloadPlace.configure(self.place)
-            self.needsLayout = true
-        }
+        [title, clearButton, more, folderButton, emptyIcon, emptyNote].forEach { addSubview($0) }
+        more.onClick = { [weak self] _ in self?.showMoreMenu() }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary
         emptyNote.alignment = .center
         folderButton.showsFillAtRest = true
@@ -234,6 +226,29 @@ final class DownloadsPanelView: FloatingPanelView {
     required init?(coder: NSCoder) { fatalError() }
 
     private var isPrivate: Bool { controller?.tabManager.isPrivate ?? false }
+
+    /// "Save Downloads To ›" with the folder, Ask Each Time and Choose Folder…, checked as they are now.
+    private func showMoreMenu() {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let save = NSMenuItem(title: "Save Downloads To", action: nil, keyEquivalent: "")
+        let places = NSMenu()
+        let folder = DownloadManager.folder
+        let folderItem = SidebarMenus.Item(FileManager.default.displayName(atPath: folder.path)) { DownloadPlace.pick(0) }
+        let icon = NSWorkspace.shared.icon(forFile: folder.path)
+        icon.size = NSSize(width: 16, height: 16)
+        folderItem.image = icon
+        folderItem.state = DownloadManager.asksWhereToSave ? .off : .on
+        let ask = SidebarMenus.Item("Ask Each Time") { DownloadPlace.pick(1) }
+        ask.state = DownloadManager.asksWhereToSave ? .on : .off
+        places.addItem(folderItem)
+        places.addItem(ask)
+        places.addItem(.separator())
+        places.addItem(SidebarMenus.Item("Choose Folder…") { DownloadPlace.pick(2) })
+        save.submenu = places
+        menu.addItem(save)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: more.isFlipped ? more.bounds.maxY + 4 : -4), in: more)
+    }
 
     func show(from anchor: NSView, arrival: Arrival = .pop) {
         guard let controller else { return }
@@ -341,8 +356,10 @@ final class DownloadsPanelView: FloatingPanelView {
         let pad = Tokens.Space.x2
         let header = Tokens.Space.x10
         let h = title.lineHeight
+        let side = Tokens.Space.x6
+        more.frame = NSRect(x: bounds.width - pad - side, y: (header - side) / 2, width: side, height: side)
         let cw = clearButton.fittingWidth
-        clearButton.frame = NSRect(x: bounds.width - pad - cw, y: (header - Tokens.Space.x6) / 2, width: cw, height: Tokens.Space.x6)
+        clearButton.frame = NSRect(x: more.frame.minX - Tokens.Space.x1 - cw, y: (header - Tokens.Space.x6) / 2, width: cw, height: Tokens.Space.x6)
         title.frame = NSRect(x: pad + Tokens.Space.x2, y: (header - h) / 2, width: clearButton.frame.minX - pad * 2 - Tokens.Space.x2, height: h)
         var y = header
         if rows.isEmpty {
@@ -355,13 +372,8 @@ final class DownloadsPanelView: FloatingPanelView {
             row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: rowHeight)
             y += rowHeight
         }
-        // Where downloads go, then a real button across the bottom to the folder.
-        let row = Tokens.Space.x10
-        let pw = min(place.intrinsicContentSize.width, bounds.width * 0.6)
-        place.frame = NSRect(x: bounds.width - pad - pw, y: y + Tokens.Space.x1 + (row - Tokens.Space.x8) / 2, width: pw, height: Tokens.Space.x8)
-        placeLabel.frame = NSRect(x: pad + Tokens.Space.x2, y: place.frame.midY - placeLabel.lineHeight / 2, width: place.frame.minX - pad * 2, height: placeLabel.lineHeight)
-        y += Tokens.Space.x1 + row
-        folderButton.frame = NSRect(x: pad, y: y + (Tokens.Space.x12 - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
+        // A real button across the bottom, not a line of text.
+        folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
     }
 }
 
