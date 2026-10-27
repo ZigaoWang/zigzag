@@ -7,14 +7,17 @@ import datetime, html, pathlib, re
 
 root = pathlib.Path(__file__).resolve().parent.parent
 versions = []
+current = None  # None under a heading that isn't a released version, like [Unreleased]
 for raw in (root / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
     line = raw.strip()
-    if m := re.match(r"## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})", line):
-        versions.append({"version": m[1], "date": m[2], "sections": []})
-    elif line.startswith("### ") and versions:
-        versions[-1]["sections"].append((line[4:], []))
-    elif line.startswith("- ") and versions and versions[-1]["sections"]:
-        versions[-1]["sections"][-1][1].append(line[2:])
+    if line.startswith("## "):
+        m = re.match(r"## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})", line)
+        current = {"version": m[1], "date": m[2], "sections": []} if m else None
+        if current: versions.append(current)
+    elif current and line.startswith("### "):
+        current["sections"].append((line[4:], []))
+    elif current and line.startswith("- ") and current["sections"]:
+        current["sections"][-1][1].append(line[2:])
 
 # The same footer as the rest of the site.
 FOOTER = """<footer class="end">
