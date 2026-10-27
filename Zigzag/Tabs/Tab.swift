@@ -677,8 +677,9 @@ extension Tab: WKNavigationDelegate {
 
     private func handle(_ error: Error, in webView: WKWebView) {
         let nsError = error as NSError
-        // Cancelled loads, frame-load-interrupted (downloads, policy changes) are not failures.
-        if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && nsError.code == 102) { return }
+        // Cancelled loads, frame-load-interrupted (downloads, policy changes) and media WebKit plays itself (a direct
+        // .mp4 or .mp3 link, reported as "plug-in handled load") are not failures.
+        if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
         ErrorPage.show(error: nsError, url: failingURL, in: webView)
     }
