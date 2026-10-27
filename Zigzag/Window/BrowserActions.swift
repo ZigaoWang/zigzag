@@ -295,10 +295,10 @@ extension BrowserWindowController: NSMenuItemValidation {
             Toast.show("Removed from Favorites", symbol: "star.slash", in: self)
         } else if let bookmarkID = tab.bookmarkID {
             unbookmarkWithUndo(bookmarkID, to: 0)
-            Toast.show("Bookmark removed", symbol: "bookmark.slash", in: self)
+            Toast.show("Unpinned", symbol: "pin.slash", in: self)
         } else {
             bookmarkWithUndo(tab, at: nil, in: tab.spaceID)
-            Toast.show("Bookmarked", symbol: "bookmark.fill", in: self)
+            Toast.show("Pinned", symbol: "pin.fill", in: self)
         }
     }
 
@@ -399,7 +399,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
             return true
         case #selector(toggleBookmark(_:)):
-            item.title = tab?.bookmarkID != nil ? "Remove Bookmark" : "Bookmark This Page"
+            item.title = tab?.bookmarkID != nil ? "Unpin Tab" : "Pin Tab"
             return tab?.url != nil
         case #selector(toggleMute(_:)):
             item.title = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"

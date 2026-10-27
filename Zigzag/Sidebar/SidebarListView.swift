@@ -419,7 +419,7 @@ final class SidebarListView: NSView {
         case .placeholder:
             return InsertionLineView()
         case .bookmarkDropZone:
-            return DropZoneView(text: "Drop here to bookmark")
+            return DropZoneView(text: "Drop here to pin")
         case .newTab:
             let row = NewTabRowView()
             row.onClick = { [weak self] _ in self?.delegate?.listNewTab() }

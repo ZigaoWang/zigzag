@@ -55,7 +55,7 @@ enum MainMenu {
             item("Import from Another Browser…", #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
             .separator(),
             item("Duplicate Tab", #selector(C.duplicateTab(_:)), "d", [.command, .option]),
-            item("Bookmark This Page", #selector(C.toggleBookmark(_:)), "d"),
+            item("Pin Tab", #selector(C.toggleBookmark(_:)), "d"),
             .separator(),
             item("Close Tab", #selector(C.closeTab(_:)), "w"),
             item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),

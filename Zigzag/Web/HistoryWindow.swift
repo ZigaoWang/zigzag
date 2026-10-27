@@ -161,7 +161,7 @@ private final class HistoryView: NSView, NSTextFieldDelegate {
         guard let host = window?.contentView else { return }
         let what = since == nil ? "all of your history" : "your history from \(title.lowercased())"
         ConfirmSheet.show(in: host, title: "Clear \(title.lowercased())?",
-                          message: "This removes \(what) from Zigzag. Pinned pages, bookmarks and open tabs stay.",
+                          message: "This removes \(what) from Zigzag. Pinned tabs and open tabs stay.",
                           confirmTitle: "Clear", destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             if let since { HistoryStore.shared.clear(since: since) } else { HistoryStore.shared.clearAll() }

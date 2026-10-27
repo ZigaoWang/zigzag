@@ -215,7 +215,7 @@ final class SpaceSettingsRow: InteractiveView {
         // Its tabs can come back with Undo in the browser, but it's still a big step, so it asks first.
         guard let host = window.contentView else { return }
         ConfirmSheet.show(in: host, title: "Delete “\(space.name)”?",
-                          message: "Its bookmarks and tabs close. You can bring it back with Undo in the browser window.",
+                          message: "Its tabs and pinned tabs close. You can bring it back with Undo in the browser window.",
                           confirmTitle: "Delete Space", destructive: true) { confirmed in
             if confirmed { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
         }

@@ -43,7 +43,7 @@ extension BrowserWindowController {
     /// Whether the library is still as a change left it; if not, says why ⌘Z did nothing.
     func libraryUnchanged(since snapshot: Library.Snapshot) -> Bool {
         guard Library.shared.snapshot != snapshot else { return true }
-        Toast.show("Can’t undo: spaces or bookmarks changed since", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        Toast.show("Can’t undo: spaces or pinned tabs changed since", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
         return false
     }
 

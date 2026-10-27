@@ -535,7 +535,7 @@ final class SpaceHeaderView: InteractiveView {
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small - 2)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
-        setAccessibilityLabel(label.stringValue + (isCollapsed ? ", bookmarks hidden" : ""))
+        setAccessibilityLabel(label.stringValue + (isCollapsed ? ", pinned tabs hidden" : ""))
     }
 }
 

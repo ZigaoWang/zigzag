@@ -26,7 +26,7 @@ struct CommandResult: Equatable {
         case .open, .history: "Open"
         case .search, .suggestion, .searchOn: "Search"
         case .switchTo: "Switch to Tab"
-        case .bookmark: "Open Bookmark"
+        case .bookmark: "Open Pinned Tab"
         case .action: "Run"
         }
     }
