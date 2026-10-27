@@ -49,6 +49,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.onSlide = { [weak self] duration in self?.sidebarSliding(duration) }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         root.keepsRevealed = { [weak self] in SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) }
+        root.emptyHint.onClick = { [weak self] _ in self?.commandBar.show(mode: .newTab) }
         root.onSplitRatioChange = { [weak self] ratio, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
             self.tabManager.setSplitRatio(Double(ratio), for: tab)
@@ -496,6 +497,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let tab, let pair = tabManager.split(for: tab),
            let left = tabManager.tab(with: pair.left), let right = tabManager.tab(with: pair.right) {
             root.setSplit(ratio: CGFloat(pair.ratio), vertical: pair.vertical, animated: true)
+            root.isEmpty = false
             for card in [root.card, root.secondCard] {
                 card.header.setVertical(pair.vertical)
                 card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: left) }
@@ -516,6 +518,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(right, keep: left) }
         } else {
             root.setSplit(ratio: nil, vertical: false, animated: true)
+            root.isEmpty = tab == nil
             root.card.show(tab?.ensureWebView())
             tab?.reloadIfItStopped()
             root.secondCard.show(nil)

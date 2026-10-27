@@ -194,6 +194,20 @@ final class ResizeHandle: NSView {
 final class BrowserRootView: ColorView {
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
+    /// With no tab open, the page steps away and leaves the space's color, with one way to start.
+    let emptyHint = TextButton(title: "New Tab", font: Tokens.Font.body(.medium))
+    private let emptyKeys = Label("⌘T", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    var isEmpty = false {
+        didSet {
+            guard oldValue != isEmpty else { return }
+            Tokens.Motion.animate(Tokens.Motion.feedback) {
+                self.card.animator().alphaValue = self.isEmpty ? 0 : 1
+                self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
+                self.emptyKeys.animator().alphaValue = self.isEmpty ? 1 : 0
+            }
+            emptyHint.isEnabled = isEmpty
+        }
+    }
     /// The second page in split view.
     let secondCard = PageCardView()
     private let splitHandle = ResizeHandle()
@@ -251,6 +265,12 @@ final class BrowserRootView: ColorView {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
         super.init(color: SpaceColor.sky.background)
         addSubview(card)
+        emptyHint.showsFillAtRest = true
+        emptyHint.alphaValue = 0
+        emptyHint.isEnabled = false
+        emptyKeys.alphaValue = 0
+        addSubview(emptyHint)
+        addSubview(emptyKeys)
         secondCard.isHidden = true
         addSubview(secondCard)
         splitHandle.isHidden = true
@@ -353,6 +373,11 @@ final class BrowserRootView: ColorView {
 
     private func layoutCards() {
         let panes = paneFrames
+        let hw = emptyHint.fittingWidth + Tokens.Space.x4, hh = Tokens.Space.x8
+        emptyHint.frame = NSRect(x: round(panes.left.midX - hw / 2), y: round(panes.left.midY - hh / 2), width: hw, height: hh)
+        let kw = emptyKeys.textWidth + 2
+        emptyKeys.frame = NSRect(x: round(panes.left.midX - kw / 2), y: isFlipped ? emptyHint.frame.maxY + 6 : emptyHint.frame.minY - 6 - emptyKeys.lineHeight,
+                                 width: kw, height: emptyKeys.lineHeight)
         card.isEdgeToEdge = isEdgeToEdge
         secondCard.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
