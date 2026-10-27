@@ -14,6 +14,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Animations settle without bouncing, and nothing pulses on a loop.
 - Pinned tabs are called pinned tabs everywhere, in menus, undo, notices and Settings.
 - A direct link to a video or song plays instead of showing an error page.
+- Back and forward swipes work more reliably: a swipe that's a bit diagonal or a bit short still counts, three-finger swipes work, and a carousel no longer blocks them unless it can really scroll.
+- A tab that moves to another site shows that site's icon, not the last one's.
 - Searching history (⌘Y) never shows a blank bar: with no match, it offers to search the web.
 - Menu items that need a page are off when there isn't one, and Reader and Translate say Hide Reader and Show Original when they're on.
 - VoiceOver reads buttons by their current names and knows when they're unavailable.
