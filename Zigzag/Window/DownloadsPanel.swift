@@ -204,9 +204,9 @@ final class DownloadsPanelView: FloatingPanelView {
     /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
     private var sidebarLane: (x: CGFloat, width: CGFloat)? {
         guard let controller else { return nil }
-        let sidebar = controller.sidebar.convert(controller.sidebar.bounds, to: controller.root.overlay)
-        let pad = Tokens.Metric.sidebarPadding
-        return (sidebar.minX + pad, sidebar.width - pad * 2)
+        // The address bar's edges, the same as the site panel's.
+        let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
+        return (address.minX, address.width)
     }
 
     init(controller: BrowserWindowController) {
@@ -253,6 +253,14 @@ final class DownloadsPanelView: FloatingPanelView {
     func show(from anchor: NSView, arrival: Arrival = .pop) {
         guard let controller else { return }
         self.anchor = anchor
+        // In the sidebar it's part of the sidebar, exactly like the site panel under the address bar: the address
+        // bar's width and corners, flat, in the space's color a shade lighter. Over the page it stays a card.
+        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
+            surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
+            tintStrength = 0.82
+            isElevated = false
+            radius = controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel
+        }
         controller.root.overlay.addSubview(self)
         reload()
         growsFrom = CGPoint(x: 0.1, y: 1)
