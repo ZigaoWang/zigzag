@@ -11,6 +11,13 @@ final class BrowserWebView: WKWebView {
         if swipe.handle(event) { return }
         super.scrollWheel(with: event)
     }
+
+    /// Three-finger swipes, for Macs set to swipe between pages that way: these come as swipe events, not scrolls.
+    override func swipe(with event: NSEvent) {
+        if event.deltaX > 0, canGoBack { goBack(); return }
+        if event.deltaX < 0, canGoForward { goForward(); return }
+        super.swipe(with: event)
+    }
     /// Set by a context menu item right before WebKit asks for a new web view.
     static var pendingDisposition: OpenDisposition?
 

@@ -25,7 +25,7 @@ final class SwipeNavigator {
     private var watchdog: DispatchWorkItem?
 
     /// How far to swipe before letting go navigates.
-    private static let threshold: CGFloat = 110
+    private static let threshold: CGFloat = 85
 
     init(webView: BrowserWebView) {
         self.webView = webView
@@ -57,8 +57,9 @@ final class SwipeNavigator {
             if samples.count > 8 { samples.removeFirst(samples.count - 8) }
             switch state {
             case .deciding:
-                guard abs(dx) > 8 || abs(dy) > 8 else { return false }
-                let sideways = abs(dx) > abs(dy) * 1.6
+                guard abs(dx) > 10 || abs(dy) > 10 else { return false }
+                // Mostly sideways is enough: a natural swipe is rarely dead level.
+                let sideways = abs(dx) > abs(dy) * 1.2
                 let wanted = dx > 0 ? -1 : 1
                 let canGo = wanted < 0 ? webView.canGoBack : webView.canGoForward
                 if sideways, canGo, !pageTakes(wanted) {
@@ -100,10 +101,10 @@ final class SwipeNavigator {
 
     /// A quick flick the right way counts even if it's short, as in Safari.
     private var isFlick: Bool {
-        guard progress > 0.3, let last = samples.last,
+        guard progress > 0.25, let last = samples.last,
               let first = samples.first(where: { last.time - $0.time < 0.1 }), last.time > first.time else { return false }
         let speed = CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
-        return speed > 700
+        return speed > 450
     }
 
     private func armWatchdog() {
@@ -132,7 +133,7 @@ final class SwipeNavigator {
           let left = false, right = false;
           for (let el = document.elementFromPoint(\(x), \(y)); el; el = el.parentElement) {
             const style = getComputedStyle(el);
-            const scrolls = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 4;
+            const scrolls = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 24;
             if (scrolls) { left = left || el.scrollLeft > 0; right = right || el.scrollLeft + el.clientWidth < el.scrollWidth - 1; }
           }
           // The page itself only counts when it's really wide: many are a few pixels too wide by accident.
