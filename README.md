@@ -43,7 +43,8 @@ updates arrive with macOS. There's no account and no server: your data stays on 
 ## Install
 
 Download the DMG from [zigzagbrowser.com](https://zigzagbrowser.com/download), open it, and drag Zigzag to
-Applications. Updates install automatically.
+Applications. Updates install automatically. What changed in each version is in the
+[release notes](https://zigzagbrowser.com/release-notes) ([CHANGELOG.md](CHANGELOG.md) in this repository).
 
 ## Feedback
 

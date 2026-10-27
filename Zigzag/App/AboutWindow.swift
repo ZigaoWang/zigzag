@@ -34,6 +34,7 @@ private final class AboutView: NSView {
     private let rule = ColorView(color: Tokens.Color.separator)
     private let links: [TextButton] = [
         ("Website", "https://zigzagbrowser.com"),
+        ("Release Notes", "https://zigzagbrowser.com/release-notes"),
         ("Source", "https://github.com/ZigaoWang/zigzag"),
         ("License", "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE"),
     ].map { title, address in

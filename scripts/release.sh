@@ -99,7 +99,8 @@ style = ("<style>:root{color-scheme:light dark}body{font:13px -apple-system,sans
 body = "".join(f"<h3>{html.escape(t)}</h3><ul>" + "".join(f"<li>{html.escape(i)}</li>" for i in items) + "</ul>" for t, items in sections)
 open(f"{out}/updates/Zigzag-{version}.html", "w", encoding="utf-8").write(style + body)
 md = "\n\n".join(f"## {t}\n" + "\n".join(f"- {i}" for i in items) for t, items in sections)
-md += "\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires macOS 15.4 or later. Updates install automatically.\n"
+md += ("\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires macOS 15.4 or later. Updates install automatically."
+       "\n\nEvery version's notes: https://zigzagbrowser.com/release-notes\n")
 open(f"{out}/notes.md", "w", encoding="utf-8").write(md)
 PY
   echo "Writing appcast…"

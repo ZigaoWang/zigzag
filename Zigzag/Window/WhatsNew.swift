@@ -61,7 +61,7 @@ enum WhatsNew {
         WhatsNewSheet.present(in: host)
     }
 
-    static let allNotes = URL(string: "https://zigzagbrowser.com/changelog")!
+    static let allNotes = URL(string: "https://zigzagbrowser.com/release-notes")!
 }
 
 /// The notes for this version: the app icon and version on top, each section's points below, and a way to every
