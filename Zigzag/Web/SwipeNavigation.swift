@@ -234,11 +234,19 @@ final class SwipeArrowView: NSView {
         alphaValue = min(1, max(0, (progress - 0.1) * 2))
     }
 
-    /// Fades where it is, whether it navigated or not.
+    /// Navigated: however fast the swipe was, it shows filled for a beat, so the move reads as an answer rather
+    /// than a flicker, then fades. Let go too soon: it just fades.
     func leave(toward direction: Int, navigated: Bool) {
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            animator().alphaValue = 0
-        }, completionHandler: { [weak self] in self?.removeFromSuperview() })
+        if navigated {
+            progress = 1
+            isArmed = true
+        }
+        let fade = {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = navigated ? 0.35 : 0.15
+                self.animator().alphaValue = 0
+            }, completionHandler: { [weak self] in self?.removeFromSuperview() })
+        }
+        if navigated { DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: fade) } else { fade() }
     }
 }
