@@ -252,7 +252,6 @@ final class SidebarView: NSView {
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
-        downloadsButton.isHidden = true
         downloadsButton.onClick = { [weak self] _ in
             guard let self else { return }
             self.delegate?.sidebarShowDownloads(from: self.downloadsButton)
@@ -433,15 +432,8 @@ final class SidebarView: NSView {
     private var wasDownloading = false
 
     func updateDownloads(active: Int, hasAny: Bool, progress: Double = 1) {
-        let appearing = downloadsButton.isHidden && hasAny
-        downloadsButton.isHidden = !hasAny
-        if appearing, !Tokens.Motion.reduceMotion, let layer = downloadsButton.layer {
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = 0.2
-            layer.add(fade, forKey: "appear")
-        }
+        // Always there, in the same place, so the space dots never shift; with nothing downloaded, its panel says so.
+        downloadsButton.isHidden = false
         let downloading = active > 0
         if downloadsRing.superlayer == nil, let host = downloadsButton.layer {
             downloadsRing.fillColor = nil
