@@ -102,3 +102,19 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .dl-next { margin: 44px auto 0; max-width: 520px; font-size: 17px; line-height: 1.6; color: var(--soft); text-wrap: pretty; }
 .dl-next b { color: var(--ink); font-weight: 600; }
 @media (max-width: 640px) { .dl h1 { font-size: 30px; } .dl { padding-top: 40px; } }
+
+/* Changelog: each version's number and date on the left, its notes on the right; stacked on narrow screens. */
+.log { max-width: 820px; margin: 0 auto; padding: 72px 24px 96px; }
+.log h1 { margin: 0; font-size: 40px; font-weight: 700; letter-spacing: -0.03em; }
+.log .lede { margin: 12px 0 56px; font-size: 18px; color: var(--soft); }
+.rel { display: grid; grid-template-columns: 180px 1fr; gap: 32px; padding: 40px 0; border-top: 1px solid var(--line); }
+.rel header { position: sticky; top: 24px; align-self: start; }
+.rel h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.rel h2 a { text-decoration: none; }
+.rel time { display: block; margin-top: 4px; font-size: 14px; color: var(--soft); }
+.rel h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+.rel h3:not(:first-child) { margin-top: 28px; }
+.rel ul { margin: 0; padding-left: 18px; }
+.rel li { margin: 0 0 10px; line-height: 1.6; text-wrap: pretty; }
+.rel li::marker { color: var(--soft); }
+@media (max-width: 640px) { .log { padding-top: 40px; } .log h1 { font-size: 30px; } .rel { grid-template-columns: 1fr; gap: 16px; } .rel header { position: static; } }
