@@ -1,7 +1,7 @@
 # Changelog
 
 Every release of Zigzag, newest first. The app shows the notes for the version you're running, and
-[zigzagbrowser.com/changelog](https://zigzagbrowser.com/changelog) shows them all.
+[zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) shows them all.
 
 ## [0.1.11] - 2026-10-27
 
@@ -9,8 +9,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Pick several tabs and pinned tabs with ⌘-click or ⇧-click, then drag them into a folder together, or right-click to add them to a folder, pin them or close them.
 - New folders start at the top of your pinned tabs.
 - A space with no tabs shows its own color instead of a blank white page.
+- Swiping back and forward moves the page with your fingers, with the arrow waiting at its edge.
+- A light tap on the trackpad when something you drag snaps onto a folder, a space, a split or Favorites, and when a swipe lands on the next space.
 
 ### Fixed
+- The back and forward arrow never gets left on screen, and a quick flick counts.
+- The downloads button is always at the bottom of the sidebar, even before your first download.
 - Settings opens straight to each pane, and the window fits what's in it.
 - About Zigzag is simpler, with links to the website, the source and the license.
 
