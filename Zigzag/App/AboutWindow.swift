@@ -34,7 +34,27 @@ private final class AboutView: NSView {
     private let updates = TextButton(title: "Check for Updates", font: Tokens.Font.body(.medium))
     private let beta = BetaTag()
     private let credits = NSTextField(wrappingLabelWithString: "Ad blocking uses EasyList and EasyPrivacy by the EasyList authors (CC BY-SA 3.0).")
-    private let license = Label("Source available under FSL-1.1-MIT", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    /// Where to go next: the site, what changed, the source and its license.
+    private let links: [TextButton] = [
+        ("Website", "https://zigzagbrowser.com"),
+        ("What’s New", ""),
+        ("GitHub", "https://github.com/ZigaoWang/zigzag"),
+        ("License", "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE"),
+    ].map { title, address in
+        let button = TextButton(title: title, font: Tokens.Font.small(.medium))
+        button.textColor = Brand.Theme.brand.accent
+        button.onClick = { _ in
+            if address.isEmpty {
+                if let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
+                    controller.window?.makeKeyAndOrderFront(nil)
+                    WhatsNew.show(in: controller)
+                }
+            } else if let url = URL(string: address) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        return button
+    }
     private let copyright = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
 
     override init(frame: NSRect) {
@@ -59,10 +79,10 @@ private final class AboutView: NSView {
         credits.textColor = Tokens.Color.textTertiary
         credits.alignment = .center
         credits.isSelectable = false
-        license.alignment = .center
         updates.showsFillAtRest = true
         updates.onClick = { _ in Updater.shared.checkForUpdates() }
-        [surface, wordmark, version, beta, maker, updates, credits, license, copyright].forEach { addSubview($0) }
+        [surface, wordmark, version, beta, maker, updates, credits, copyright].forEach { addSubview($0) }
+        links.forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -81,7 +101,7 @@ private final class AboutView: NSView {
 
     override func layout() {
         super.layout()
-        let surfaceHeight: CGFloat = 220
+        let surfaceHeight: CGFloat = 180
         surface.frame = NSRect(x: 0, y: 0, width: bounds.width, height: surfaceHeight)
         let markHeight: CGFloat = 44
         let markWidth = markHeight * WordmarkView.aspect
@@ -100,6 +120,15 @@ private final class AboutView: NSView {
         y = maker.frame.maxY + Tokens.Space.x5
         let w = updates.fittingWidth + Tokens.Space.x2
         updates.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Space.x8)
+        y = updates.frame.maxY + Tokens.Space.x6
+        // The links in one row, evenly apart.
+        let widths = links.map(\.fittingWidth)
+        let gap = Tokens.Space.x3
+        var lx = round((bounds.width - widths.reduce(0, +) - gap * CGFloat(links.count - 1)) / 2)
+        for (button, w) in zip(links, widths) {
+            button.frame = NSRect(x: lx, y: y, width: w, height: Tokens.Space.x7Height)
+            lx += w + gap
+        }
         // Credits sit at the foot of the window, the copyright (when there is one) last.
         let inner = bounds.width - pad * 2
         var bottom = bounds.height - Tokens.Space.x5
@@ -107,9 +136,8 @@ private final class AboutView: NSView {
             copyright.frame = NSRect(x: pad, y: bottom - copyright.lineHeight, width: inner, height: copyright.lineHeight)
             bottom = copyright.frame.minY - Tokens.Space.x1
         }
-        license.frame = NSRect(x: pad, y: bottom - license.lineHeight, width: inner, height: license.lineHeight)
         let creditsHeight = ceil(credits.sizeThatFits(NSSize(width: inner, height: 200)).height)
-        credits.frame = NSRect(x: pad, y: license.frame.minY - Tokens.Space.x1 - creditsHeight, width: inner, height: creditsHeight)
+        credits.frame = NSRect(x: pad, y: bottom - creditsHeight, width: inner, height: creditsHeight)
     }
 }
 

@@ -366,7 +366,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.backgroundColor = Tokens.Color.formBackground
-        window.contentMinSize = NSSize(width: 720, height: 460)
+        window.contentMinSize = NSSize(width: 720, height: 300)
         window.contentMaxSize = NSSize(width: 720, height: 2000)
         super.init(window: window)
         window.delegate = self
@@ -507,6 +507,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if pane == .privacy { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
         layoutRoot()
+        fitWindow(animated: true)
         documentView.scroll(.zero)
 
     }
@@ -704,14 +705,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         documentView.subviews.forEach { $0.removeFromSuperview() }
         let pad = Tokens.Space.x8
         let contentWidth = width - pad * 2
-        banner.title = pane.title
-        banner.subtitle = pane.subtitle
-        banner.titleSize = 26
-        banner.contentInset = pad + Tokens.Space.x1
-        banner.washOverhang = 0
-        banner.frame = NSRect(x: 0, y: 0, width: width, height: 92)
-        documentView.addSubview(banner, positioned: .below, relativeTo: nil)
-        var y: CGFloat = banner.frame.maxY + Tokens.Space.x2
+        // No heading: the selected tab above already says which pane this is.
+        var y: CGFloat = Tokens.Space.x6
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if title != nil || accessory != nil {
@@ -788,8 +783,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             for (title, group) in shortcutGroups { section(title, group) }
         }
 
+        contentHeight = y
         let height = max(y, scroll.contentSize.height)
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+    }
+
+    private var contentHeight: CGFloat = 0
+
+    /// Like the system's settings: the window grows or shrinks to the pane, keeping its top where it is.
+    private func fitWindow(animated: Bool) {
+        guard let window else { return }
+        let screen = window.screen?.visibleFrame.height ?? 900
+        let wanted = toolbarHeight + Tokens.Metric.hairline + contentHeight
+        let content = min(max(wanted, 300), min(720, screen - 80))
+        let chrome = window.frame.height - window.contentLayoutRect.height
+        var frame = window.frame
+        let height = content + chrome
+        guard abs(frame.height - height) > 1 else { return }
+        frame.origin.y += frame.height - height
+        frame.size.height = height
+        window.setFrame(frame, display: true, animate: animated && window.isVisible && !Tokens.Motion.reduceMotion)
     }
 
     /// The menu: the folder downloads go to (with its own icon), Ask Each Time, and Other… to pick a folder.
