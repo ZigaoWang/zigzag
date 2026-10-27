@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/wordmark-light.svg#gh-light-mode-only" width="260" alt="Zigzag">
-  <img src="docs/wordmark-dark.svg#gh-dark-mode-only" width="260" alt="Zigzag">
+  <img src="docs/brand/wordmark-light.svg#gh-light-mode-only" width="260" alt="Zigzag">
+  <img src="docs/brand/wordmark-dark.svg#gh-dark-mode-only" width="260" alt="Zigzag">
 </p>
 
 <p align="center">
@@ -84,18 +84,9 @@ styled.
 
 ## License
 
-Zigzag is source available under the [Functional Source License, Version 1.1, MIT Future License
-(FSL-1.1-MIT)](LICENSE). Each version becomes MIT licensed two years after its release. Forks and contributions
-are welcome.
+Zigzag's code is licensed under the [Apache License, Version 2.0](LICENSE). Use it, change it, fork it and ship
+it, commercially or not.
 
-| Allowed | Not allowed, until a version turns two |
-|---|---|
-| Reading, building and running the code | Offering it, or a product built from it, as a competing commercial product |
-| Forking and changing it | |
-| Contributing back | |
-
-After two years, each version is available under the [MIT license](https://opensource.org/license/mit). See
-[LICENSE](LICENSE) for the full terms and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the work of
-others included in Zigzag.
-
-<sub>Zigzag isn't affiliated with The Browser Company. © 2026 Zigao Wang.</sub>
+The name "Zigzag", the app icon and the logo are not covered by the license: they're trademarks, all rights
+reserved. A fork needs its own name and icon. See [TRADEMARKS.md](TRADEMARKS.md) and [NOTICE](NOTICE).
+Third-party work Zigzag uses is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

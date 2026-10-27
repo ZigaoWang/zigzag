@@ -1,0 +1,17 @@
+Zigzag
+Copyright 2026 Zigao Wang
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The Zigzag name, app icon and logo are not licensed under the Apache License. They are trademarks of
+Zigao Wang, all rights reserved. See TRADEMARKS.md. They include, among others:
+
+  Zigzag/Resources/Assets.xcassets/AppIcon.appiconset/   the app icon
+  scripts/make_icon.swift                                 draws the app icon
+  scripts/dmg-background.tiff                             the install window's artwork
+  docs/brand/                                             the wordmark
+  site/assets/ (icons, favicon, wordmark, og.png)         the website's icon, logo and preview image
+  Zigzag/Design/Brand.swift, WordmarkView                 the shapes of the logo and wordmark as drawn in the app
+
+Third-party works that Zigzag bundles or builds on are listed, with their own licenses, in
+THIRD_PARTY_NOTICES.md.
