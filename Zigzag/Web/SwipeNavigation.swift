@@ -193,7 +193,7 @@ final class SwipeNavigator {
         back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
         back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
         back.stiffness = 320
-        back.damping = 30
+        back.damping = 2 * sqrt(320)
         back.duration = back.settlingDuration
         layer.add(back, forKey: "swipe.settle")
     }

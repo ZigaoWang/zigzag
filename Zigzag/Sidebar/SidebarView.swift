@@ -465,18 +465,17 @@ final class SidebarView: NSView {
     /// The button answers when a download lands in it: a small press inward and back.
     func pulseDownloads() {
         guard !Tokens.Motion.reduceMotion, let layer = downloadsButton.layer else { return }
-        // Struck by the download landing: it gives under the hit, springs past its size, and settles.
+        // Struck by the download landing: a short press inward and back, like a click.
         let size = downloadsButton.bounds.size
         func scaled(_ k: CGFloat) -> NSValue {
             NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                        CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
         }
         let pulse = CAKeyframeAnimation(keyPath: "transform")
-        pulse.values = [scaled(1), scaled(0.8), scaled(1.14), scaled(0.97), scaled(1)]
-        pulse.keyTimes = [0, 0.16, 0.45, 0.75, 1]
-        pulse.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(controlPoints: 0.3, 0, 0.2, 1),
-                                 CAMediaTimingFunction(name: .easeInEaseOut), CAMediaTimingFunction(name: .easeInEaseOut)]
-        pulse.duration = 0.48
+        pulse.values = [scaled(1), scaled(0.86), scaled(1)]
+        pulse.keyTimes = [0, 0.35, 1]
+        pulse.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeOut)]
+        pulse.duration = 0.26
         layer.add(pulse, forKey: "pulse")
     }
 

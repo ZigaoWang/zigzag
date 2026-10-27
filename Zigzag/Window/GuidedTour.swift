@@ -464,18 +464,10 @@ final class GuidedTour: NSView {
     /// The recording shows unless a peek covers the page (the card would sit on it).
     private func showsVideo(_ d: Display) -> Bool { d.clip != nil && d.target != "peek" }
 
-    /// The ring breathes gently, so the eye finds it without anything flashing.
+    /// The ring holds still: its color is enough to find it, and nothing on screen loops forever.
     private func pulse(_ on: Bool) {
-        guard on, !Tokens.Motion.reduceMotion else { ring.removeAnimation(forKey: "pulse"); ring.opacity = 1; return }
-        guard ring.animation(forKey: "pulse") == nil else { return }
-        let breathe = CABasicAnimation(keyPath: "opacity")
-        breathe.fromValue = 1
-        breathe.toValue = 0.35
-        breathe.duration = 0.9
-        breathe.autoreverses = true
-        breathe.repeatCount = .infinity
-        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        ring.add(breathe, forKey: "pulse")
+        ring.removeAnimation(forKey: "pulse")
+        ring.opacity = 1
     }
 
     /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.

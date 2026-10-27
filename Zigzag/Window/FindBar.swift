@@ -269,8 +269,8 @@ class FloatingPanelView: NSView {
     /// from a button fade; free-floating notices drop in slightly.
     /// `.fade` (and `.pop`) grow out of `growsFrom`: a short, critically damped spring with no overshoot, so a panel opening from a button looks like it
     /// came out of that button. ⌘T's bar alone appears at once, being the thing you do most.
-    /// `burst`: springs out of its corner from well under its size, with a touch of overshoot, for a panel that
-    /// opens because something just landed in what it grows from (a download hitting its button).
+    /// `burst`: grows out of its corner from a little further than `pop`, for a panel that opens because something
+    /// just landed in what it grows from (a download hitting its button). No overshoot.
     enum Arrival { case drop, fade, instant, zoom, pop, burst }
 
     /// Where a panel grows from, in its own bounds from the top-left: (0, 0) its top-left corner, (0.5, 0) its top
@@ -299,11 +299,11 @@ class FloatingPanelView: NSView {
             fade.duration = 0.12
             fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
             let grow = CASpringAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: scaled(0.55))
+            grow.fromValue = NSValue(caTransform3D: scaled(0.88))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
             grow.mass = 1
             grow.stiffness = 420
-            grow.damping = 26
+            grow.damping = 2 * sqrt(420)   // critically damped: it settles, it doesn't bounce
             grow.initialVelocity = 0
             grow.duration = grow.settlingDuration
             layer.add(fade, forKey: "present")

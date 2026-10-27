@@ -643,8 +643,8 @@ final class Toggle: InteractiveView {
         stateDidChange(animated: animated)
         guard animated else { Tokens.Motion.withoutAnimation { knob.frame = knobFrame }; return }
         let move = CASpringAnimation(keyPath: "position.x")
-        move.damping = 20
         move.stiffness = 300
+        move.damping = 2 * sqrt(300)   // the knob lands, it doesn't wobble
         move.fromValue = knob.presentation()?.position.x ?? knob.position.x
         move.toValue = knobFrame.midX
         move.duration = move.settlingDuration

@@ -216,7 +216,7 @@ final class PeekController {
         spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
         spring.mass = 1
         spring.stiffness = 320
-        spring.damping = 28
+        spring.damping = 2 * sqrt(320)   // no overshoot
         spring.duration = spring.settlingDuration
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
