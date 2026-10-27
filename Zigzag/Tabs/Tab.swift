@@ -412,7 +412,12 @@ final class Tab: NSObject {
                     self.url = url
                     // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
                     if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
-                    if hostChanged { self.favicon = FaviconStore.shared.cachedIcon(for: url) ?? self.favicon; self.changed.send(.favicon) }
+                    // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
+                    if hostChanged {
+                        self.favicon = FaviconStore.shared.cachedIcon(for: url)
+                        self.changed.send(.favicon)
+                        if self.favicon == nil { self.refreshFavicon() }
+                    }
                     self.changed.send(.url)
                 }
             },
@@ -627,6 +632,8 @@ extension Tab: WKNavigationDelegate {
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
         hasLoadedOnce = true
+        // The page's own icon as soon as it's here, not only once it finishes (some sites never quite do).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.refreshFavicon() }
         // A new page under a tab that isn't showing: its picture is of the old one, and can't be retaken until it
         // shows. The card falls back to the site's icon rather than show the wrong page.
         if webView.window == nil, snapshot != nil {
