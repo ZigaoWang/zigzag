@@ -1307,6 +1307,22 @@ extension BrowserWindowController: SidebarDelegate {
         tabManager.showSpaceKeepingPage(spaceID)
     }
 
+    func listMenu(forMarked items: [SidebarItem]) -> NSMenu? { SidebarMenus.markedMenu(for: items, controller: self) }
+
+    /// Pinned pages for picked rows, pinning the tabs among them (in order) first.
+    func pinnedIDs(for items: [SidebarItem]) -> [UUID] {
+        items.compactMap { item in
+            switch item {
+            case .bookmark(let id): return id
+            case .tab(let id):
+                guard let tab = tabManager.tab(with: id), tab.url != nil else { return nil }
+                if tab.bookmarkID == nil { bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+                return tab.bookmarkID
+            default: return nil
+            }
+        }
+    }
+
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {
         case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID)

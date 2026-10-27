@@ -19,6 +19,40 @@ enum SidebarMenus {
         return item
     }
 
+    /// For several picked rows: what makes sense for all of them at once.
+    static func markedMenu(for items: [SidebarItem], controller: BrowserWindowController) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let tabs = items.compactMap { item -> Tab? in if case .tab(let id) = item { controller.tabManager.tab(with: id) } else { nil } }
+        let count = items.count
+        menu.addItem(Item("Add \(count) to New Folder") { controller.sidebar.list.clearMarks(); controller.newFolder(with: controller.pinnedIDs(for: items)) })
+        let folders = Library.shared.folders(in: controller.tabManager.currentSpaceID)
+        if !folders.isEmpty {
+            let add = NSMenuItem(title: "Add \(count) to Folder", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for folder in folders {
+                sub.addItem(Item(folder.name) {
+                    controller.sidebar.list.clearMarks()
+                    for id in controller.pinnedIDs(for: items) { controller.listSetFolder(of: id, to: folder.id) }
+                })
+            }
+            add.submenu = sub
+            menu.addItem(add)
+        }
+        if !tabs.isEmpty {
+            menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") {
+                controller.sidebar.list.clearMarks()
+                for tab in tabs where tab.bookmarkID == nil { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+            })
+            menu.addItem(.separator())
+            menu.addItem(Item(tabs.count == 1 ? "Close Tab" : "Close \(tabs.count) Tabs") {
+                controller.sidebar.list.clearMarks()
+                controller.closeManyWithUndo(tabs)
+            })
+        }
+        return menu
+    }
+
     static func tabMenu(for tab: Tab, controller: BrowserWindowController) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false

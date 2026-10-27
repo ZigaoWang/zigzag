@@ -10,6 +10,8 @@ class SidebarRowView: InteractiveView {
     var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
+    var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -40,6 +42,8 @@ class SidebarRowView: InteractiveView {
         let base: NSColor?
         if isSelected || isLifted {
             base = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
+        } else if isMarked {
+            base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
         } else if isPressed {
             base = Tokens.Color.pressedFill
         } else if isHovered {
@@ -75,7 +79,7 @@ class SidebarRowView: InteractiveView {
     }
 
     private func applyFreshness() {
-        let visible = isSelected || isHovered || isLifted ? 1 : freshness
+        let visible = isSelected || isHovered || isLifted || isMarked ? 1 : freshness
         icon.alphaValue = visible
         title.alphaValue = visible
     }

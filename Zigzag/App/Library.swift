@@ -499,6 +499,10 @@ final class Library {
         guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == bookmarkID } }) else { return }
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == bookmarkID } }
         if let folderID, let f = spaces[s].folders?.firstIndex(where: { $0.id == folderID }) {
+            // An empty folder sits at the top of the pins: its first page goes up there with it.
+            if spaces[s].folders?[f].bookmarkIDs.isEmpty == true, let from = spaces[s].bookmarks.firstIndex(where: { $0.id == bookmarkID }) {
+                spaces[s].bookmarks.insert(spaces[s].bookmarks.remove(at: from), at: 0)
+            }
             // To the end of the folder: after its last page in the list.
             spaces[s].folders?[f].bookmarkIDs.append(bookmarkID)
             if let last = spaces[s].folders?[f].bookmarkIDs.dropLast().compactMap({ id in spaces[s].bookmarks.firstIndex { $0.id == id } }).max(),

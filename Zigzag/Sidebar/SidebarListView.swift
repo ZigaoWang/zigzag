@@ -16,6 +16,8 @@ protocol SidebarListDelegate: AnyObject {
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?)
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
     func listMenu(for item: SidebarItem) -> NSMenu?
+    /// The menu for several picked rows at once.
+    func listMenu(forMarked items: [SidebarItem]) -> NSMenu?
     func listRenameSpace()
     func listEditSpace(anchor: NSView)
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
@@ -71,6 +73,8 @@ enum SidebarItem: Hashable {
         default: false
         }
     }
+    /// Can be picked along with others (⌘-click, ⇧-click).
+    var isPickable: Bool { isDraggable }
 }
 
 /// The scrolling list of bookmarks and tabs. Rows are reused by identity and animate between layouts.
@@ -85,6 +89,8 @@ final class SidebarListView: NSView {
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?
+    /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
+    private(set) var marked: [SidebarItem] = []
     private var springWork: DispatchWorkItem?
     var isDragging: Bool { drag != nil }
     private let rowGap: CGFloat = Tokens.Space.x1
@@ -105,6 +111,8 @@ final class SidebarListView: NSView {
         var folderTarget: UUID?
         /// Where the pointer is across the list: set in past a folder's last page, a drop stays in the folder.
         var pointX: CGFloat = 0
+        /// The other picked rows going along with this one.
+        var group: [SidebarItem] = []
     }
 
     /// The bookmark area (and its drop zone) opens only once a drag heads up toward it, so rows don't jump when a drag starts.
@@ -137,6 +145,8 @@ final class SidebarListView: NSView {
             var folderOf: [UUID: BookmarkFolder] = [:]
             for folder in folders { for id in folder.bookmarkIDs { folderOf[id] = folder } }
             var placed: Set<UUID> = []
+            // A new, empty folder sits at the top, where you'll see it and can drop pages in.
+            for folder in folders where folder.bookmarkIDs.isEmpty { result.append(.folder(folder.id)) }
             for bookmark in bookmarks {
                 guard let folder = folderOf[bookmark.id] else { result.append(.bookmark(bookmark.id)); continue }
                 guard placed.insert(folder.id).inserted else { continue }
@@ -144,7 +154,6 @@ final class SidebarListView: NSView {
                 let members = folder.isOpen ? folder.bookmarkIDs : folder.bookmarkIDs.filter { $0 == manager.selectedTab?.bookmarkID }
                 for id in members { result.append(.bookmark(id)); indented.insert(id) }
             }
-            for folder in folders where folder.bookmarkIDs.isEmpty { result.append(.folder(folder.id)) }
         }
         let hasPinnedRows = result.contains { if case .bookmark = $0 { true } else if case .folder = $0 { true } else { false } }
         if bookmarks.isEmpty && folders.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
@@ -179,6 +188,7 @@ final class SidebarListView: NSView {
     }
 
     func reload(animated: Bool) {
+        defer { marked = marked.filter { items.contains($0) }; if marked.count < 2 { marked = [] } }
         guard drag == nil else { return }
         items = buildItems()
         apply(items: displayItems(), animated: animated)
@@ -413,6 +423,7 @@ final class SidebarListView: NSView {
             let row = TabRowView()
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row, let tab = row.tab else { return }
+                if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page.
                 if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1, let partner = row.partner {
                     self.delegate?.listSelect(partner)
@@ -431,7 +442,7 @@ final class SidebarListView: NSView {
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
                 if let tab = row?.tab { self?.delegate?.listClose(tab) }
             }
-            row.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: item) }
+            row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
@@ -446,14 +457,15 @@ final class SidebarListView: NSView {
                 guard !name.isEmpty else { return }
                 self?.delegate?.listRenameBookmark(id, to: name)
             }
-            row.onClick = { [weak self] _ in
+            row.onClick = { [weak self] event in
                 guard let self, let bookmark = Library.shared.bookmark(id) else { return }
+                if self.mark(item, with: event) { return }
                 self.delegate?.listOpenBookmark(bookmark)
             }
             row.onClose = { [weak self, weak row] in
                 if let tab = row?.tab { self?.delegate?.listClose(tab) }
             }
-            row.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: item) }
+            row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
@@ -485,6 +497,7 @@ final class SidebarListView: NSView {
             row.isSelected = tab === selected || (partner != nil && partner === selected)
             row.focusedHalf = partner != nil && partner === selected ? 1 : 0
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
+            row.isMarked = marked.contains(item)
         case .folder(let id):
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
             row.configure(name: folder.name, open: folder.isOpen, count: folder.bookmarkIDs.count)
@@ -500,9 +513,67 @@ final class SidebarListView: NSView {
             row.isUnloaded = tab == nil
             row.configure(tab: tab)
             row.isSelected = tab != nil && tab === selected
+            row.isMarked = marked.contains(item)
         default:
             break
         }
+    }
+
+    // MARK: Picking several
+
+    /// ⌘-click adds or takes away one row, ⇧-click picks everything from the last picked (or the tab you're on) to
+    /// here. A plain click lets go of them all. Returns true when the click was a pick, not an open.
+    private func mark(_ item: SidebarItem, with event: NSEvent?) -> Bool {
+        let flags = event?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+        guard flags.contains(.command) || flags.contains(.shift) else {
+            if !marked.isEmpty { clearMarks() }
+            return false
+        }
+        let pickable = items.filter(\.isPickable)
+        // Starting a pick includes where you are, the way Finder keeps what's already selected.
+        if marked.isEmpty, let current = currentItem, current != item { marked = [current] }
+        if flags.contains(.shift), let anchor = marked.last ?? currentItem,
+           let a = pickable.firstIndex(of: anchor), let b = pickable.firstIndex(of: item) {
+            for picked in pickable[min(a, b)...max(a, b)] where !marked.contains(picked) { marked.append(picked) }
+        } else if let i = marked.firstIndex(of: item) {
+            marked.remove(at: i)
+        } else {
+            marked.append(item)
+        }
+        marked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
+        if marked.count < 2 { marked = [] }
+        refreshRows()
+        return true
+    }
+
+    #if DEBUG
+    /// For the debug bridge: a ⌘-click (or ⇧-click) on the pickable row at this position.
+    func debugMark(_ index: Int, shift: Bool) {
+        let pickable = items.filter(\.isPickable)
+        guard pickable.indices.contains(index) else { return }
+        let event = NSEvent.mouseEvent(with: .leftMouseDown, location: .zero, modifierFlags: shift ? .shift : .command, timestamp: 0,
+                                       windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+        _ = mark(pickable[index], with: event)
+    }
+    #endif
+
+    /// The row of the tab you're on, if it's in this list.
+    private var currentItem: SidebarItem? {
+        guard let tab = manager?.selectedTab else { return nil }
+        if let id = tab.bookmarkID, items.contains(.bookmark(id)) { return .bookmark(id) }
+        return items.contains(.tab(tab.id)) ? .tab(tab.id) : nil
+    }
+
+    func clearMarks() {
+        guard !marked.isEmpty else { return }
+        marked = []
+        refreshRows()
+    }
+
+    private func menu(for item: SidebarItem) -> NSMenu? {
+        if marked.count > 1, marked.contains(item) { return delegate?.listMenu(forMarked: marked) }
+        clearMarks()
+        return delegate?.listMenu(for: item)
     }
 
     /// Refreshes selection, fading and content without changing layout.
@@ -712,6 +783,13 @@ final class SidebarListView: NSView {
         let panel = makePanel(for: view, at: rowScreen)
         drag = DragState(item: item, view: view, grab: NSPoint(x: mouse.x - rowScreen.minX, y: mouse.y - rowScreen.minY),
                          targetSection: section, targetIndex: index, panel: panel)
+        // Dragging one of several picked rows carries them all; the others dim where they are until the drop.
+        if marked.count > 1, marked.contains(item) {
+            drag?.group = marked.filter { $0 != item }
+            for other in drag?.group ?? [] { rows[other]?.alphaValue = 0.35 }
+        } else {
+            clearMarks()
+        }
         view.alphaValue = 0
         panel.alphaValue = 1
         panel.orderFront(nil)
@@ -951,6 +1029,11 @@ final class SidebarListView: NSView {
             : nil
         showFolderTarget(nil)
         self.drag = nil
+        for other in drag.group { rows[other]?.alphaValue = 1 }
+        // The picked rows, in the order they were in the list; they land together, in that order.
+        let together = drag.group.isEmpty ? [drag.item]
+            : (drag.group + [drag.item]).sorted { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
+        if !drag.group.isEmpty { marked = [] }
         springWork?.cancel()
         edgeWork?.cancel()
         edgeDirection = nil
@@ -1007,10 +1090,12 @@ final class SidebarListView: NSView {
 
         if let space = drag.hoverSpace, space != manager.currentSpaceID {
             // Dropped on another space's dot.
-            switch drag.item {
-            case .tab(let id): if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: 0, in: space) }
-            case .bookmark(let id): delegate?.listMoveBookmark(id, to: Int.max, in: space)
-            default: break
+            for item in together {
+                switch item {
+                case .tab(let id): if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: together.count == 1 ? 0 : Int.max, in: space) }
+                case .bookmark(let id): delegate?.listMoveBookmark(id, to: Int.max, in: space)
+                default: break
+                }
             }
             reload(animated: true)
             return
@@ -1018,17 +1103,8 @@ final class SidebarListView: NSView {
 
         // Onto a folder row: in it goes, at its end (a tab is pinned first).
         if let folder = drag.folderTarget {
-            switch drag.item {
-            case .bookmark(let id):
-                if Library.shared.spaceID(ofBookmark: id) != manager.currentSpaceID { delegate?.listMoveBookmark(id, to: Int.max, in: manager.currentSpaceID) }
-                delegate?.listSetFolder(of: id, to: folder)
-            case .tab(let id):
-                if let tab = manager.tab(with: id) {
-                    if tab.spaceID != manager.currentSpaceID { delegate?.listMove(tab, to: 0, in: manager.currentSpaceID) }
-                    delegate?.listBookmark(tab, at: Int.max, in: manager.currentSpaceID)
-                    if let bookmarkID = tab.bookmarkID { delegate?.listSetFolder(of: bookmarkID, to: folder) }
-                }
-            default: break
+            for item in together {
+                if let id = pin(item, in: manager.currentSpaceID) { delegate?.listSetFolder(of: id, to: folder) }
             }
             if case .tab(let id) = drag.item { rows[.tab(id)] = nil; drag.view.removeFromSuperview() }
             reload(animated: true)
@@ -1057,7 +1133,84 @@ final class SidebarListView: NSView {
         default:
             break
         }
+        if together.count > 1, let section = drag.targetSection {
+            carry(together, around: drag.item, to: section, at: drag.targetIndex, folder: gapFolder)
+        }
         reload(animated: true)
+    }
+
+    /// The pinned page a picked row is, pinning a tab (at the end of this space's pins) to get one.
+    private func pin(_ item: SidebarItem, in space: UUID) -> UUID? {
+        guard let manager else { return nil }
+        switch item {
+        case .bookmark(let id):
+            if Library.shared.spaceID(ofBookmark: id) != space { delegate?.listMoveBookmark(id, to: Int.max, in: space) }
+            return id
+        case .tab(let id):
+            guard let tab = manager.tab(with: id) else { return nil }
+            if tab.spaceID != space { delegate?.listMove(tab, to: 0, in: space) }
+            if tab.bookmarkID == nil { delegate?.listBookmark(tab, at: Int.max, in: space) }
+            return tab.bookmarkID
+        default:
+            return nil
+        }
+    }
+
+    /// The rest of a dragged group, placed around the row that was dragged (which has already landed), keeping
+    /// their order: the ones above it just before it, the ones below just after.
+    private func carry(_ together: [SidebarItem], around dragged: SidebarItem, to section: Section, at index: Int, folder: UUID?) {
+        guard let manager, let p = together.firstIndex(of: dragged) else { return }
+        let space = manager.currentSpaceID
+        let below = Array(together[(p + 1)...]), above = Array(together[..<p].reversed())
+        switch section {
+        case .bookmarks:
+            let landed: UUID? = {
+                switch dragged {
+                case .bookmark(let id): return id
+                case .tab(let id): return manager.tab(with: id)?.bookmarkID
+                default: return nil
+                }
+            }()
+            guard let landed else { return }
+            for (list, after) in [(below, true), (above, false)] {
+                var neighbor = landed
+                for item in list {
+                    guard let id = pin(item, in: space) else { continue }
+                    let rest = Library.shared.bookmarks(in: space).map(\.id).filter { $0 != id }
+                    let at = rest.firstIndex(of: neighbor).map { after ? $0 + 1 : $0 } ?? rest.count
+                    delegate?.listMoveBookmark(id, to: at, in: space, folder: folder)
+                    neighbor = id
+                }
+            }
+        case .tabs:
+            let landed: Tab? = {
+                if case .tab(let id) = dragged { return manager.tab(with: id) }
+                let tabs = manager.tabs(in: space)
+                return tabs.indices.contains(index) ? tabs[index] : nil
+            }()
+            for (list, after) in [(below, true), (above, false)] {
+                var neighbor = landed
+                for item in list {
+                    let tabs = manager.tabs(in: space)
+                    switch item {
+                    case .tab(let id):
+                        guard let tab = manager.tab(with: id) else { continue }
+                        let rest = tabs.filter { $0 !== tab }
+                        let at = neighbor.flatMap { n in rest.firstIndex { $0 === n } }.map { after ? $0 + 1 : $0 } ?? rest.count
+                        delegate?.listMove(tab, to: at, in: space)
+                        neighbor = tab
+                    case .bookmark(let id):
+                        let at = neighbor.flatMap { n in tabs.firstIndex { $0 === n } }.map { after ? $0 + 1 : $0 } ?? tabs.count
+                        rows[.bookmark(id)] = nil
+                        delegate?.listUnbookmark(id, to: at)
+                        let now = manager.tabs(in: space)
+                        neighbor = now.indices.contains(at) ? now[at] : neighbor
+                    default:
+                        continue
+                    }
+                }
+            }
+        }
     }
 
     /// Redraws for a new space while a drag is in progress (the space slide is animated by the sidebar).
