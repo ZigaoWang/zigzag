@@ -49,7 +49,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.onSlide = { [weak self] duration in self?.sidebarSliding(duration) }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         root.keepsRevealed = { [weak self] in SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) }
-        root.emptyHint.onClick = { [weak self] _ in self?.commandBar.show(mode: .newTab) }
         root.onSplitRatioChange = { [weak self] ratio, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
             self.tabManager.setSplitRatio(Double(ratio), for: tab)

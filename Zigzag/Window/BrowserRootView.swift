@@ -195,7 +195,7 @@ final class BrowserRootView: ColorView {
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
     /// With no tab open, the page steps away and leaves the space's color, with one way to start.
-    let emptyHint = EmptySpaceHint()
+    let emptyHint = EmptySpaceMark()
     var isEmpty = false {
         didSet {
             guard oldValue != isEmpty else { return }
@@ -203,7 +203,6 @@ final class BrowserRootView: ColorView {
                 self.card.animator().alphaValue = self.isEmpty ? 0 : 1
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
             }
-            emptyHint.isEnabled = isEmpty
         }
     }
     /// The second page in split view.
@@ -264,7 +263,6 @@ final class BrowserRootView: ColorView {
         super.init(color: SpaceColor.sky.background)
         addSubview(card)
         emptyHint.alphaValue = 0
-        emptyHint.isEnabled = false
         addSubview(emptyHint)
         secondCard.isHidden = true
         addSubview(secondCard)
@@ -366,11 +364,14 @@ final class BrowserRootView: ColorView {
         return (left, right)
     }
 
+    private static func markFrame(in page: NSRect) -> NSRect {
+        let size = EmptySpaceMark.size
+        return NSRect(x: round(page.midX - size.width / 2), y: round(page.midY - size.height / 2), width: size.width, height: size.height)
+    }
+
     private func layoutCards() {
         let panes = paneFrames
-        let size = EmptySpaceHint.size
-        emptyHint.frame = NSRect(x: round(panes.left.midX - size.width / 2), y: round(panes.left.midY - size.height / 2),
-                                 width: size.width, height: size.height)
+        emptyHint.frame = Self.markFrame(in: panes.left)
         card.isEdgeToEdge = isEdgeToEdge
         secondCard.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
@@ -517,6 +518,7 @@ final class BrowserRootView: ColorView {
         secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, {
             self.card.animator().frame = self.paneFrames.left
+            self.emptyHint.animator().frame = Self.markFrame(in: self.paneFrames.left)
             if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
         }, completion: {
             self.needsLayout = true
@@ -670,55 +672,32 @@ final class SplitDropHint: NSView {
 }
 
 
-/// What a space with no tabs shows on its color: the two keys that open one, the way the guide draws keys, and
-/// what they do. Clicking it does the same.
-final class EmptySpaceHint: InteractiveView {
-    static let size = NSSize(width: 140, height: 84)
-    private let caps: [(ColorView, Label)] = ["⌘", "T"].map { key in
-        let cap = ColorView(color: Tokens.Color.textPrimary.withAlphaComponent(0.06))
-        cap.wantsLayer = true
-        cap.layer?.cornerRadius = 10
-        cap.layer?.cornerCurve = .continuous
-        cap.layer?.borderWidth = 1
-        let label = Label(key, font: .systemFont(ofSize: 19, weight: .medium), color: Tokens.Color.textSecondary)
-        label.alignment = .center
-        cap.addSubview(label)
-        return (cap, label)
-    }
-    private let title = Label("New Tab", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+/// What a space with no tabs shows on its color: the wordmark, faint, like a mark pressed into it. Nothing to
+/// click or dismiss; ⌘T and the sidebar's New Tab are where a tab comes from.
+final class EmptySpaceMark: NSView {
+    static let size = NSSize(width: 28 * WordmarkView.aspect, height: 28)
+    private let wordmark = WordmarkView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        caps.forEach { addSubview($0.0) }
-        title.alignment = .center
-        addSubview(title)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel("New Tab")
+        addSubview(wordmark)
+        setAccessibilityElement(false)
+        refresh()
     }
 
     required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
 
-    override func stateDidChange(animated: Bool) {
-        let strength: CGFloat = isPressed ? 0.12 : isHovered ? 0.09 : 0.06
-        for (cap, label) in caps {
-            cap.color = Tokens.Color.textPrimary.withAlphaComponent(strength)
-            cap.layer?.borderColor = cgColor(Tokens.Color.textPrimary.withAlphaComponent(0.08))
-            label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-        }
-        title.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh()
     }
+
+    private func refresh() { wordmark.color = Tokens.Color.textPrimary.withAlphaComponent(0.07) }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func layout() {
         super.layout()
-        let side: CGFloat = 44, gap: CGFloat = 8
-        var x = round((bounds.width - side * 2 - gap) / 2)
-        for (cap, label) in caps {
-            cap.frame = NSRect(x: x, y: 0, width: side, height: side)
-            label.frame = NSRect(x: 0, y: round((side - label.lineHeight) / 2), width: side, height: label.lineHeight)
-            x += side + gap
-        }
-        title.frame = NSRect(x: 0, y: side + 14, width: bounds.width, height: title.lineHeight)
-        stateDidChange(animated: false)
+        wordmark.frame = bounds
     }
 }
