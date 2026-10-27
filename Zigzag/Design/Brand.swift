@@ -1,5 +1,8 @@
 import AppKit
 
+// The logo and wordmark drawn here are trademarks of Zigao Wang and aren't covered by the Apache license;
+// see TRADEMARKS.md. A fork keeps the code and draws its own.
+
 /// Zigzag's brand: the icon's navy and pale ribbon, one warm accent (Ember) for live things only, and the ribbon
 /// Z itself, drawn from the icon's exact geometry. It appears in key moments (banners, first launch, import
 /// finished, the active tab, loading); controls stay native.

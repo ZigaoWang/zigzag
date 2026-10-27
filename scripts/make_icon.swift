@@ -1,4 +1,5 @@
 import AppKit
+// The icon this draws is a trademark of Zigao Wang and isn't covered by the Apache license; see TRADEMARKS.md.
 // Zigzag's icon: one pale sky ribbon on a night-blue tile, folding back on itself four times. It reads as
 // a Z, and it is a zigzag. The colors are the Sky space, deepened. Flat, two colors, no gradients or
 // shadows; macOS adds its own depth.

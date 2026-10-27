@@ -1,6 +1,6 @@
 # Third-party notices
 
-Zigzag is source available under the Functional Source License (FSL-1.1-MIT); see [LICENSE](LICENSE). It builds
+Zigzag's code is licensed under the Apache License, Version 2.0; see [LICENSE](LICENSE). It builds
 on, bundles, or is tested with the following works by others. Each stays under its own license, listed here
 with its attribution. None of them is covered by Zigzag's license.
 

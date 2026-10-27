@@ -52,6 +52,7 @@ profiles.
 
 ## License of contributions
 
-Zigzag is source available under the Functional Source License (FSL-1.1-MIT); see [LICENSE](LICENSE). By
-contributing, you agree that your contribution is licensed under the same terms, including its conversion to
-the MIT license two years after the release it ships in, and that you have the right to contribute it.
+Zigzag's code is licensed under the Apache License, Version 2.0; see [LICENSE](LICENSE). By contributing, you
+agree that your contribution is licensed under the same terms, as described in section 5 of the license, and that
+you have the right to contribute it. The Zigzag name, icon and logo stay outside the license; see
+[TRADEMARKS.md](TRADEMARKS.md).
