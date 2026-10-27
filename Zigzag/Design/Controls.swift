@@ -42,7 +42,13 @@ class InteractiveView: NSView {
             stateDidChange(animated: false)
         }
     }
-    var isEnabled = true { didSet { if oldValue != isEnabled { stateDidChange(animated: false) } } }
+    var isEnabled = true {
+        didSet {
+            guard oldValue != isEnabled else { return }
+            setAccessibilityEnabled(isEnabled)
+            stateDidChange(animated: false)
+        }
+    }
 
     var onClick: ((NSEvent) -> Void)?
     var onDoubleClick: (() -> Void)?
@@ -196,7 +202,11 @@ final class IconButton: InteractiveView {
         addSubview(imageView)
         self.toolTip = toolTip
         setAccessibilityRole(.button)
-        setAccessibilityLabel(toolTip)
+    }
+
+    /// The tooltip is the button's name, so VoiceOver reads whatever it says now (Reload or Stop, Mute or Unmute).
+    override var toolTip: String? {
+        didSet { setAccessibilityLabel(toolTip) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -220,11 +230,6 @@ final class IconButton: InteractiveView {
         imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 
-    override func accessibilityPerformPress() -> Bool {
-        guard isEnabled, let event = NSApp.currentEvent else { return false }
-        onClick?(event)
-        return true
-    }
 }
 
 /// A plain text label that never wraps and never accepts clicks.
@@ -389,11 +394,6 @@ final class PrimaryButton: InteractiveView {
         layer?.set(backgroundColor: cgColor(color), animated: false)
     }
 
-    override func accessibilityPerformPress() -> Bool {
-        guard isEnabled, let event = NSApp.currentEvent else { return false }
-        onClick?(event)
-        return true
-    }
 }
 
 /// A text field on a soft fill, ringed in the accent while typing: the one look for fields in panels and windows.

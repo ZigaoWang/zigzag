@@ -409,7 +409,11 @@ final class TextButton: InteractiveView {
 
     var title: String {
         get { label.stringValue }
-        set { label.stringValue = newValue; invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true }
+        set {
+            label.stringValue = newValue
+            setAccessibilityLabel(newValue)
+            invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
+        }
     }
 
     /// Says what just happened in place of the title for a moment ("Cleared"), then goes back.
