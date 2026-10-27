@@ -192,7 +192,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private let folderButton = TextButton(title: "Open Downloads Folder", font: Tokens.Font.body(.medium))
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: 24))
-    private let emptyNote = Label("Files you download show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let emptyNote = Label("Your downloads show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     /// More: where new downloads are saved (the same choice as in Settings), in a menu rather than on the panel.
     private let more = IconButton(symbol: "ellipsis", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "More")
     private var token: SignalToken?
@@ -201,7 +201,13 @@ final class DownloadsPanelView: FloatingPanelView {
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
     private let footer = Tokens.Space.x12
     private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
-    private let width: CGFloat = 340
+    /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
+    private var sidebarLane: (x: CGFloat, width: CGFloat)? {
+        guard let controller else { return nil }
+        let sidebar = controller.sidebar.convert(controller.sidebar.bounds, to: controller.root.overlay)
+        let pad = Tokens.Metric.sidebarPadding
+        return (sidebar.minX + pad, sidebar.width - pad * 2)
+    }
 
     init(controller: BrowserWindowController) {
         self.controller = controller
@@ -227,26 +233,20 @@ final class DownloadsPanelView: FloatingPanelView {
 
     private var isPrivate: Bool { controller?.tabManager.isPrivate ?? false }
 
-    /// "Save Downloads To ›" with the folder, Ask Each Time and Choose Folder…, checked as they are now.
+    /// One short menu, like the sidebar's: a "Save Downloads To" heading over the folder, Ask Each Time and
+    /// Choose Folder…, the one in use checked.
     private func showMoreMenu() {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        let save = NSMenuItem(title: "Save Downloads To", action: nil, keyEquivalent: "")
-        let places = NSMenu()
+        menu.addItem(.sectionHeader(title: "Save Downloads To"))
         let folder = DownloadManager.folder
         let folderItem = SidebarMenus.Item(FileManager.default.displayName(atPath: folder.path)) { DownloadPlace.pick(0) }
-        let icon = NSWorkspace.shared.icon(forFile: folder.path)
-        icon.size = NSSize(width: 16, height: 16)
-        folderItem.image = icon
         folderItem.state = DownloadManager.asksWhereToSave ? .off : .on
         let ask = SidebarMenus.Item("Ask Each Time") { DownloadPlace.pick(1) }
         ask.state = DownloadManager.asksWhereToSave ? .on : .off
-        places.addItem(folderItem)
-        places.addItem(ask)
-        places.addItem(.separator())
-        places.addItem(SidebarMenus.Item("Choose Folder…") { DownloadPlace.pick(2) })
-        save.submenu = places
-        menu.addItem(save)
+        menu.addItem(folderItem)
+        menu.addItem(ask)
+        menu.addItem(SidebarMenus.Item("Choose Folder…") { DownloadPlace.pick(2) })
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: more.isFlipped ? more.bounds.maxY + 4 : -4), in: more)
     }
 
@@ -348,8 +348,8 @@ final class DownloadsPanelView: FloatingPanelView {
         let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * rowHeight
         let height = header + body + footer
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
-        let x = max(Tokens.Metric.cardInset, anchorFrame.minX)
-        frame = NSRect(x: x, y: anchorFrame.minY - Tokens.Space.x2 - height, width: width, height: height)
+        let lane = sidebarLane ?? (max(Tokens.Metric.cardInset, anchorFrame.minX), 300)
+        frame = NSRect(x: lane.x, y: anchorFrame.minY - Tokens.Space.x2 - height, width: lane.width, height: height)
     }
 
     private func layoutContent() {
