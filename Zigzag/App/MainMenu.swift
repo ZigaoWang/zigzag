@@ -56,6 +56,8 @@ enum MainMenu {
             .separator(),
             item("Duplicate Tab", #selector(C.duplicateTab(_:)), "d", [.command, .option]),
             item("Pin Tab", #selector(C.toggleBookmark(_:)), "d"),
+            item("Add to Favorites", #selector(C.addToFavorites(_:)), ""),
+            item("Move Tab to New Window", #selector(C.moveTabToNewWindow(_:)), ""),
             .separator(),
             item("Close Tab", #selector(C.closeTab(_:)), "w"),
             item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),

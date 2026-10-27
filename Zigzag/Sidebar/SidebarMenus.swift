@@ -149,7 +149,7 @@ enum SidebarMenus {
         if let live {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
-        menu.addItem(Item("Unpin") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+        menu.addItem(Item("Unpin Tab") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
         return menu
     }
 

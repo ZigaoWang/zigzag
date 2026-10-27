@@ -287,6 +287,15 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: Bookmarks
 
+    @objc func addToFavorites(_ sender: Any?) {
+        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite else { return }
+        favoriteWithUndo(tab)
+    }
+    @objc func moveTabToNewWindow(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        moveToNewWindow(tab)
+    }
+
     @objc func toggleBookmark(_ sender: Any?) {
         guard let tab = selectedTab else { return }
         if let bookmarkID = tab.bookmarkID, tab.isFavorite {
@@ -399,7 +408,16 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
             return true
         case #selector(toggleBookmark(_:)):
-            item.title = tab?.bookmarkID != nil ? "Unpin Tab" : "Pin Tab"
+            item.title = tab?.isFavorite == true ? "Remove from Favorites" : tab?.bookmarkID != nil ? "Unpin Tab" : "Pin Tab"
+            return tab?.url != nil
+        case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true
+        case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
+        case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
+        case #selector(toggleReader(_:)):
+            item.title = isReaderOpen ? "Hide Reader" : "Show Reader"
+            return tab?.url != nil
+        case #selector(translatePage(_:)):
+            item.title = tab?.isTranslated == true ? "Show Original" : "Translate Page"
             return tab?.url != nil
         case #selector(toggleMute(_:)):
             item.title = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
