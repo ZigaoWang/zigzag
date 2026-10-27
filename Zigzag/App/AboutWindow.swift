@@ -6,7 +6,7 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
 
     static func show() {
         if let shared { shared.window?.makeKeyAndOrderFront(nil); return }
-        let size = NSSize(width: 300, height: 400)
+        let size = NSSize(width: 300, height: 360)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "About Zigzag"
         window.titleVisibility = .hidden
@@ -35,7 +35,6 @@ private final class AboutView: NSView {
     private let links: [TextButton] = [
         ("Website", "https://zigzagbrowser.com"),
         ("Release Notes", "https://zigzagbrowser.com/release-notes"),
-        ("Source", "https://github.com/ZigaoWang/zigzag"),
         ("License", "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE"),
     ].map { title, address in
         let button = TextButton(title: title, font: Tokens.Font.small())
@@ -98,7 +97,7 @@ private final class AboutView: NSView {
         fine.frame = NSRect(x: pad, y: bounds.height - 18 - fh, width: w - pad * 2, height: fh)
         let lh = Tokens.Space.x6
         let ly = fine.frame.minY - 8 - lh
-        let widths = links.map(\.fittingWidth), gap: CGFloat = 4
+        let widths = links.map(\.fittingWidth), gap: CGFloat = 14
         var lx = center(widths.reduce(0, +) + gap * CGFloat(links.count - 1))
         for (button, bw) in zip(links, widths) {
             button.frame = NSRect(x: lx, y: ly, width: bw, height: lh)
