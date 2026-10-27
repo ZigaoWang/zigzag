@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
-- Choose where downloads are saved, or have Zigzag ask each time, right in the downloads panel (it's also in Settings › General).
+- Choose where downloads are saved, or have Zigzag ask each time, from the ⋯ menu in the downloads panel (it's also in Settings › General).
 
 ## [0.1.11] - 2026-10-27
 
