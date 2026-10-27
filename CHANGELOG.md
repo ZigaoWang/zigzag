@@ -7,6 +7,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Choose where downloads are saved, or have Zigzag ask each time, from the ⋯ menu in the downloads panel (it's also in Settings › General).
+- Move to New Window in a tab's right-click menu.
+
+### Fixed
+- The downloads panel matches the site panel: flat, in your space's color, and as wide as the sidebar.
+- Animations settle without bouncing, and nothing pulses on a loop.
+- Pinned tabs are called pinned tabs everywhere, in menus, notices and Settings.
 
 ## [0.1.11] - 2026-10-27
 
