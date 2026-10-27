@@ -195,15 +195,13 @@ final class BrowserRootView: ColorView {
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
     /// With no tab open, the page steps away and leaves the space's color, with one way to start.
-    let emptyHint = TextButton(title: "New Tab", font: Tokens.Font.body(.medium))
-    private let emptyKeys = Label("⌘T", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    let emptyHint = EmptySpaceHint()
     var isEmpty = false {
         didSet {
             guard oldValue != isEmpty else { return }
             Tokens.Motion.animate(Tokens.Motion.feedback) {
                 self.card.animator().alphaValue = self.isEmpty ? 0 : 1
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
-                self.emptyKeys.animator().alphaValue = self.isEmpty ? 1 : 0
             }
             emptyHint.isEnabled = isEmpty
         }
@@ -265,12 +263,9 @@ final class BrowserRootView: ColorView {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
         super.init(color: SpaceColor.sky.background)
         addSubview(card)
-        emptyHint.showsFillAtRest = true
         emptyHint.alphaValue = 0
         emptyHint.isEnabled = false
-        emptyKeys.alphaValue = 0
         addSubview(emptyHint)
-        addSubview(emptyKeys)
         secondCard.isHidden = true
         addSubview(secondCard)
         splitHandle.isHidden = true
@@ -373,11 +368,9 @@ final class BrowserRootView: ColorView {
 
     private func layoutCards() {
         let panes = paneFrames
-        let hw = emptyHint.fittingWidth + Tokens.Space.x4, hh = Tokens.Space.x8
-        emptyHint.frame = NSRect(x: round(panes.left.midX - hw / 2), y: round(panes.left.midY - hh / 2), width: hw, height: hh)
-        let kw = emptyKeys.textWidth + 2
-        emptyKeys.frame = NSRect(x: round(panes.left.midX - kw / 2), y: isFlipped ? emptyHint.frame.maxY + 6 : emptyHint.frame.minY - 6 - emptyKeys.lineHeight,
-                                 width: kw, height: emptyKeys.lineHeight)
+        let size = EmptySpaceHint.size
+        emptyHint.frame = NSRect(x: round(panes.left.midX - size.width / 2), y: round(panes.left.midY - size.height / 2),
+                                 width: size.width, height: size.height)
         card.isEdgeToEdge = isEdgeToEdge
         secondCard.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
@@ -673,5 +666,59 @@ final class SplitDropHint: NSView {
         _ = superview
         guard bounds.contains(p) else { return nil }
         return p.x < bounds.midX ? .left : .right
+    }
+}
+
+
+/// What a space with no tabs shows on its color: the two keys that open one, the way the guide draws keys, and
+/// what they do. Clicking it does the same.
+final class EmptySpaceHint: InteractiveView {
+    static let size = NSSize(width: 140, height: 84)
+    private let caps: [(ColorView, Label)] = ["⌘", "T"].map { key in
+        let cap = ColorView(color: Tokens.Color.textPrimary.withAlphaComponent(0.06))
+        cap.wantsLayer = true
+        cap.layer?.cornerRadius = 10
+        cap.layer?.cornerCurve = .continuous
+        cap.layer?.borderWidth = 1
+        let label = Label(key, font: .systemFont(ofSize: 19, weight: .medium), color: Tokens.Color.textSecondary)
+        label.alignment = .center
+        cap.addSubview(label)
+        return (cap, label)
+    }
+    private let title = Label("New Tab", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        caps.forEach { addSubview($0.0) }
+        title.alignment = .center
+        addSubview(title)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("New Tab")
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func stateDidChange(animated: Bool) {
+        let strength: CGFloat = isPressed ? 0.12 : isHovered ? 0.09 : 0.06
+        for (cap, label) in caps {
+            cap.color = Tokens.Color.textPrimary.withAlphaComponent(strength)
+            cap.layer?.borderColor = cgColor(Tokens.Color.textPrimary.withAlphaComponent(0.08))
+            label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        }
+        title.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+    }
+
+    override func layout() {
+        super.layout()
+        let side: CGFloat = 44, gap: CGFloat = 8
+        var x = round((bounds.width - side * 2 - gap) / 2)
+        for (cap, label) in caps {
+            cap.frame = NSRect(x: x, y: 0, width: side, height: side)
+            label.frame = NSRect(x: 0, y: round((side - label.lineHeight) / 2), width: side, height: label.lineHeight)
+            x += side + gap
+        }
+        title.frame = NSRect(x: 0, y: side + 14, width: bounds.width, height: title.lineHeight)
+        stateDidChange(animated: false)
     }
 }
