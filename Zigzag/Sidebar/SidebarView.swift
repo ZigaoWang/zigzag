@@ -601,8 +601,8 @@ final class SidebarView: NSView {
         }
         swipeDecided = true
         swipeConsumed = true
-        // Content follows the fingers: moving them right reveals the space on the left.
-        _ = onSwipeSpace?(swipeAccumX > 0 ? -1 : 1)
+        // Content follows the fingers: moving them right reveals the space on the left. Landing on it taps.
+        if onSwipeSpace?(swipeAccumX > 0 ? -1 : 1) == true { Haptics.snap() }
         return true
     }
 

@@ -179,7 +179,7 @@ final class SwipeNavigator {
         if nowArmed != armed {
             armed = nowArmed
             arrow.isArmed = nowArmed
-            if nowArmed { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
+            if nowArmed { Haptics.snap() }
         }
     }
 

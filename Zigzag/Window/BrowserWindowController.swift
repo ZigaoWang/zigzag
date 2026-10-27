@@ -1285,7 +1285,9 @@ extension BrowserWindowController: SidebarDelegate {
     func listDragOverPage(at windowPoint: NSPoint, tab: Tab) {
         // Only another tab can open beside the current page.
         guard let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { root.splitDropHint.show(nil); return }
-        root.splitDropHint.show(root.splitDropHint.side(at: windowPoint))
+        let side = root.splitDropHint.side(at: windowPoint)
+        if let side, side != root.splitDropHint.side { Haptics.snap() }
+        root.splitDropHint.show(side)
     }
 
     func listDropOnPage(_ tab: Tab) -> Bool {

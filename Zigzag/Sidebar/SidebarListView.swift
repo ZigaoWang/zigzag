@@ -92,6 +92,9 @@ final class SidebarListView: NSView {
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
     private(set) var marked: [SidebarItem] = []
     private var springWork: DispatchWorkItem?
+    private var wasOverFavorites = false
+    private var lastFolderTarget: UUID?
+    private var lastSplitTarget: SplitDrop?
     var isDragging: Bool { drag != nil }
     private let rowGap: CGFloat = Tokens.Space.x1
 
@@ -355,6 +358,8 @@ final class SidebarListView: NSView {
     }
 
     private func showFolderTarget(_ id: UUID?) {
+        if let id, id != lastFolderTarget { Haptics.snap() }
+        lastFolderTarget = id
         for (item, view) in rows {
             guard case .folder(let folderID) = item, let row = view as? FolderRowView else { continue }
             row.isDropTarget = folderID == id
@@ -836,6 +841,8 @@ final class SidebarListView: NSView {
     private var splitWork: DispatchWorkItem?
 
     private func showSplitTarget(_ target: SplitDrop?) {
+        if let target, target != lastSplitTarget { Haptics.snap() }
+        lastSplitTarget = target
         drag?.splitTarget = target
         // One hint at a time: the gap stays, its line hides while a split is on offer.
         if let line = rows[.placeholder] {
@@ -887,6 +894,8 @@ final class SidebarListView: NSView {
         if case .tab = drag.item, Self.window(at: mouse) === window.windowController {
             overFavorites = delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse)) ?? false
         }
+        if overFavorites, !wasOverFavorites { Haptics.snap() }
+        wasOverFavorites = overFavorites
 
         // Over this window's page (not the sidebar): offer to open the tab beside it.
         if hit == nil, Self.window(at: mouse) === window.windowController, case .tab(let id) = drag.item, let tab = manager?.tab(with: id) {
@@ -986,7 +995,10 @@ final class SidebarListView: NSView {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
             }
         }
+        if hovered != nil, hovered != drag.hoverSpace { Haptics.snap() }
         drag.hoverSpace = hovered
+        // Crossing between pinned tabs and tabs is a different kind of place: a tap says so.
+        if let section, let old = drag.targetSection, section != old { Haptics.snap() }
         let changed = section != drag.targetSection || index != drag.targetIndex
         drag.targetSection = section
         drag.targetIndex = index

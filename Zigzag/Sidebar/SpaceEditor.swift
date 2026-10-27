@@ -423,7 +423,7 @@ final class GrainSlider: NSView {
         let x = convert(event.locationInWindow, from: nil).x
         let v = Double(min(max((x - inset) / (bounds.width - inset * 2), 0), 1))
         if let stop = Self.stops.first(where: { abs($0 - v) < 0.045 }) {
-            if stop != lastStop { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
+            if stop != lastStop { Haptics.snap() }
             lastStop = stop
             return stop
         }
@@ -564,7 +564,7 @@ final class DirectionKnob: NSView {
         let step = Int((angle / 45).rounded()) % 8
         guard angle.truncatingRemainder(dividingBy: 45) == 0, step != lastDetent else { return }
         lastDetent = step
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        Haptics.snap()
     }
 
     override func mouseDown(with event: NSEvent) {
