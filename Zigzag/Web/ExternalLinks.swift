@@ -44,10 +44,12 @@ enum ExternalLinks {
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
+        let tab = (webView as? BrowserWebView)?.owner
         asking.insert(key)
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: host.isEmpty ? name : host, what: name, symbol: "arrow.up.forward.app",
-                                                    isPrivate: false, in: controller, title: "Open \(name)", allowTitle: "Always Open",
+                                                    isPrivate: false, in: controller, tab: tab, title: "Open \(name)",
+                                                    allowTitle: "Always Open",
                                                     onceTitle: "Open This Time", denyTitle: "Don’t Open",
                                                     answered: { !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
             asking.remove(key)

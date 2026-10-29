@@ -100,10 +100,10 @@ enum SitePermissions {
     }
 
     /// Asked like the camera. A private window never remembers the answer, and never shows notifications anyway.
-    static func requestNotifications(host: String, window: NSWindow?, isPrivate: Bool) async -> Bool? {
+    static func requestNotifications(host: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(host: host) { return known }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return nil }
-        let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", isPrivate: isPrivate, in: controller,
+        let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", isPrivate: isPrivate, in: controller, tab: tab,
                                                 title: "Show notifications", allowTitle: "Allow", onceTitle: nil,
                                                 answered: { notifications(host: host).map { $0 ? .allow : .deny } })
         switch answer {
@@ -116,12 +116,12 @@ enum SitePermissions {
     }
 
     /// Location, asked and remembered the same way as the camera.
-    static func requestLocation(origin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool) async -> WKPermissionDecision {
+    static func requestLocation(origin: WKSecurityOrigin, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> WKPermissionDecision {
         let host = origin.host
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         if let known = all["\(host)|location"] { return known ? .grant : .deny }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return .deny }
-        let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", isPrivate: isPrivate, in: controller,
+        let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", isPrivate: isPrivate, in: controller, tab: tab,
                                                 answered: {
                                                     let now = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
                                                     return now["\(host)|location"].map { $0 ? .allow : .deny }
@@ -141,7 +141,8 @@ enum SitePermissions {
         }
     }
 
-    static func request(origin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool) async -> WKPermissionDecision {
+    static func request(origin: WKSecurityOrigin, type: WKMediaCaptureType, window: NSWindow?, isPrivate: Bool,
+                        tab: Tab? = nil) async -> WKPermissionDecision {
         let host = origin.host
         if let known = decision(host: host, type: type) { return known ? .grant : .deny }
         let what: String
@@ -155,7 +156,7 @@ enum SitePermissions {
             return .deny
         }
         let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
-                                                isPrivate: isPrivate, in: controller,
+                                                isPrivate: isPrivate, in: controller, tab: tab,
                                                 answered: { decision(host: host, type: type).map { $0 ? .allow : .deny } })
         // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
         switch answer {
@@ -176,7 +177,8 @@ enum SitePermissions {
 /// "example.com wants to / Use your camera", as Chrome asks it: hanging from the address, so it's plain which site
 /// is asking, with whole answers stacked one per line. Allow While Visiting is remembered, Allow This Time isn't,
 /// Don't Allow is. Esc puts it off; Return is left to whatever you're typing in. One question at a time per window:
-/// a second request waits for the first answer.
+/// a second request waits for the first answer. It belongs to the tab that asked: it steps aside while another tab
+/// is in front and comes back with that tab, and closing that tab is "not now".
 final class PermissionPrompt: FloatingPanelView {
     private let badge = ColorView(color: .clear)
     private let symbolView = NSImageView()
@@ -185,17 +187,31 @@ final class PermissionPrompt: FloatingPanelView {
     private var buttons: [(TextButton, Answer)] = []
     private var answer: ((Answer) -> Void)?
     private var monitor: Any?
+    /// The tab whose page asked, and the window it's in.
+    private weak var askingTab: Tab?
+    private weak var controller: BrowserWindowController?
+    private var tabsToken: SignalToken?
 
     enum Answer { case allow, allowOnce, deny, notNow }
 
     private static var queue: [ObjectIdentifier: Task<Answer, Never>] = [:]
+    /// The question on screen in each window, so it can follow the sidebar.
+    private static var shown: [ObjectIdentifier: PermissionPrompt] = [:]
+
+    /// Puts the window's question back under the address after the sidebar or the window changed.
+    static func reposition(in controller: BrowserWindowController) {
+        guard let prompt = shown[ObjectIdentifier(controller)], prompt.superview != nil, !prompt.isHidden else { return }
+        prompt.place(in: controller)
+    }
 
     /// `title` is the request ("Use your camera" by default); `onceTitle` nil leaves out Allow This Time, for things
     /// that only make sense kept (notifications) or are asked every time anyway (sharing your screen).
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
+    /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController,
-                    title: String? = nil, allowTitle: String = "Allow While Visiting", onceTitle: String? = "Allow This Time",
-                    denyTitle: String = "Don’t Allow", answered: @escaping () -> Answer? = { nil }) async -> Answer {
+                    tab: Tab? = nil, title: String? = nil, allowTitle: String = "Allow While Visiting",
+                    onceTitle: String? = "Allow This Time", denyTitle: String = "Don’t Allow",
+                    answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
         let task = Task { @MainActor in
@@ -204,7 +220,7 @@ final class PermissionPrompt: FloatingPanelView {
             var choices: [(String, Answer)] = [(allowTitle, .allow)]
             if let onceTitle { choices.append((onceTitle, .allowOnce)) }
             choices.append((denyTitle, .deny))
-            return await show(host: host, request: title ?? "Use \(what)", symbol: symbol, choices: choices, in: controller)
+            return await show(host: host, request: title ?? "Use \(what)", symbol: symbol, choices: choices, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
@@ -213,8 +229,11 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, choices: [(String, Answer)],
-                             in controller: BrowserWindowController) async -> Answer {
+                             in controller: BrowserWindowController, tab: Tab?) async -> Answer {
         guard controller.window?.isVisible == true else { return .notNow }
+        // The asking tab closed while an earlier question waited.
+        if let tab, tab.isClosed { return .notNow }
+        let asking = tab ?? controller.tabManager.selectedTab
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
             prompt.asker.stringValue = "\(host) wants to"
@@ -228,18 +247,42 @@ final class PermissionPrompt: FloatingPanelView {
             }
             prompt.setAccessibilityLabel("\(host) wants to \(request.lowercased())")
             prompt.answer = { continuation.resume(returning: $0) }
-            controller.closeFloatingPanels()
-            Toast.hide(in: controller)
-            prompt.place(in: controller)
+            prompt.askingTab = asking
+            prompt.controller = controller
+            shown[ObjectIdentifier(controller)] = prompt
             controller.root.overlay.addSubview(prompt)
             prompt.growsFrom = CGPoint(x: 0.2, y: 0)
-            prompt.present(arrival: .pop)
+            prompt.isHidden = true
+            prompt.followTab()
+            prompt.tabsToken = controller.tabManager.changed.observe { [weak prompt] change in
+                guard change == .selection || change == .structure || change == .space else { return }
+                prompt?.followTab()
+            }
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
-                guard let prompt, event.window === prompt.window else { return event }
+                guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
                 // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.
                 if event.keyCode == 53 { prompt.finish(.notNow); return nil }
                 return event
             }
+        }
+    }
+
+    /// Shown while the asking tab is in front (either side of a split counts), set aside while another tab is,
+    /// and "not now" once it's closed or has gone to another window.
+    private func followTab() {
+        guard answer != nil, let controller else { return }
+        let manager = controller.tabManager
+        guard let tab = askingTab, !tab.isClosed, manager.allTabs.contains(where: { $0 === tab }) else { finish(.notNow); return }
+        let front = manager.selectedTab
+        let inFront = front === tab || front.map { manager.partner(of: $0) === tab } == true
+        if inFront, isHidden {
+            controller.closeFloatingPanels()
+            Toast.hide(in: controller)
+            place(in: controller)
+            isHidden = false
+            present(arrival: .pop)
+        } else if !inFront, !isHidden {
+            isHidden = true
         }
     }
 
@@ -278,8 +321,7 @@ final class PermissionPrompt: FloatingPanelView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func finish(_ choice: Answer) {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
+        stopListening()
         let answer = self.answer
         self.answer = nil
         answer?(choice)
@@ -290,12 +332,18 @@ final class PermissionPrompt: FloatingPanelView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil, answer != nil {
-            if let monitor { NSEvent.removeMonitor(monitor) }
-            monitor = nil
+            stopListening()
             let answer = self.answer
             self.answer = nil
             answer?(.notNow)
         }
+    }
+
+    private func stopListening() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        tabsToken = nil
+        if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
     }
 
     private static let pad: CGFloat = 14

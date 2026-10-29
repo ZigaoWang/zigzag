@@ -803,13 +803,13 @@ extension Tab: WKUIDelegate {
     @objc(_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:)
     func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin, initiatedBy frame: WKFrameInfo,
                  decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        Task { decisionHandler(await SitePermissions.requestLocation(origin: origin, window: host?.hostWindow, isPrivate: isPrivate)) }
+        Task { decisionHandler(await SitePermissions.requestLocation(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
     }
 
     // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate)) }
+        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
     }
 
     /// Screen sharing (Meet, Zoom, Teams). WebKit asks the browser through this unpublished method; the answer
@@ -823,7 +823,7 @@ extension Tab: WKUIDelegate {
                 return
             }
             let answer = await PermissionPrompt.ask(host: origin.host, what: "your screen", symbol: "rectangle.on.rectangle", isPrivate: isPrivate,
-                                                    in: controller, title: "Share your screen", allowTitle: "Allow", onceTitle: nil, answered: { nil })
+                                                    in: controller, tab: self, title: "Share your screen", allowTitle: "Allow", onceTitle: nil, answered: { nil })
             decisionHandler(answer == .allow ? 1 : 0)
         }
     }

@@ -56,7 +56,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         case "request":
             let state = permission(host: host, tab: tab)
             guard state == "default", body["gesture"] as? Bool == true, !putOff.contains("\(tab.id)|\(host)") else { return (state, nil) }
-            let answer = await SitePermissions.requestNotifications(host: host, window: tab.host?.hostWindow, isPrivate: tab.isPrivate)
+            let answer = await SitePermissions.requestNotifications(host: host, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
             if answer == nil { putOff.insert("\(tab.id)|\(host)") }
             // A private window asks, so the page isn't left waiting, but it still never shows one.
             return (answer.map { $0 && !tab.isPrivate ? "granted" : "denied" } ?? "default", nil)

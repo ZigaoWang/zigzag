@@ -44,9 +44,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.commandBar.reposition()
             self.findBar.reposition()
             self.peek.reposition()
+            PermissionPrompt.reposition(in: self)
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
-        root.onSlide = { [weak self] duration in self?.sidebarSliding(duration) }
+        root.onSlide = { [weak self] duration in
+            guard let self else { return }
+            self.sidebarSliding(duration)
+            PermissionPrompt.reposition(in: self)
+        }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         root.keepsRevealed = { [weak self] in SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) }
         root.onSplitRatioChange = { [weak self] ratio, final in
