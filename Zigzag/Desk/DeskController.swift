@@ -297,6 +297,12 @@ final class DeskController {
                 guard let self, let tab else { return }
                 self.cardClicked(card?.tab(at: event) ?? tab, event: event)
             }
+            card.onClose = { [weak self, weak tab] in
+                guard let self, let tab else { return }
+                // ⌘Z brings it back, like closing it from the sidebar.
+                if let controller = self.controller { controller.closeWithUndo(tab) } else { self.manager?.close(tab) }
+                self.reload(animated: true)
+            }
             card.onDragStart = { [weak self, weak tab] event in
                 guard let self, let tab else { return false }
                 return self.beginDrag(tab, event: event)

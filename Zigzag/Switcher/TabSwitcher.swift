@@ -19,6 +19,11 @@ final class TabThumbnailView: InteractiveView {
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
     var showsRing = false
     var showsHover = true
+    /// Desk view: an × on the card while the pointer is over it.
+    var onClose: (() -> Void)? { didSet { closeButton.isHidden = true } }
+    private let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Close Tab")
+    /// A page with no picture yet, or only a blank one (asleep, or caught before it drew): its site instead.
+    private let siteName = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     static let titleHeight = Tokens.Space.x8
     private(set) weak var tab: Tab?
     /// The page beside it in split view, if any.
@@ -45,7 +50,13 @@ final class TabThumbnailView: InteractiveView {
         ring.cornerCurve = .continuous
         ring.isHidden = true
         ring.zPosition = 10
-        [imageClip, icon, title, icon2, title2].forEach { addSubview($0) }
+        siteName.alignment = .center
+        siteName.lineBreakMode = .byTruncatingMiddle
+        imageClip.addSubview(siteName)
+        closeButton.showsFillAtRest = true
+        closeButton.isHidden = true
+        closeButton.onClick = { [weak self] _ in self?.onClose?() }
+        [imageClip, icon, title, icon2, title2, closeButton].forEach { addSubview($0) }
         layer?.addSublayer(ring)
         setAccessibilityRole(.button)
     }
@@ -56,6 +67,7 @@ final class TabThumbnailView: InteractiveView {
         self.tab = tab
         self.partner = partner
         placeholder.image = tab.favicon
+        siteName.stringValue = tab.url?.host().map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 } ?? ""
         icon.image = tab.favicon
         title.stringValue = tab.displayTitle
         icon2.image = partner?.favicon
@@ -68,11 +80,39 @@ final class TabThumbnailView: InteractiveView {
     func refreshImage() {
         guard let tab else { return }
         Tokens.Motion.withoutAnimation {
-            images[0].contents = tab.snapshot
+            images[0].contents = Self.isBlank(tab.snapshot) ? nil : tab.snapshot
             images[1].contents = partner?.snapshot
         }
-        placeholder.isHidden = tab.snapshot != nil || partner != nil
+        let showsPage = !Self.isBlank(tab.snapshot) || partner != nil
+        placeholder.isHidden = showsPage
+        siteName.isHidden = showsPage
         needsLayout = true
+    }
+
+    private static var blankness: [ObjectIdentifier: Bool] = [:]
+
+    /// No picture, or one that's all one color: a page that hadn't drawn yet. Checked once per picture, on a
+    /// thumbnail a few pixels across.
+    static func isBlank(_ image: NSImage?) -> Bool {
+        guard let image else { return true }
+        let key = ObjectIdentifier(image)
+        if let known = blankness[key] { return known }
+        let side = 8
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return false }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+        NSGraphicsContext.restoreGraphicsState()
+        var low = [CGFloat](repeating: 1, count: 3), high = [CGFloat](repeating: 0, count: 3)
+        for x in 0..<side { for y in 0..<side {
+            guard let c = rep.colorAt(x: x, y: y) else { continue }
+            for (i, v) in [c.redComponent, c.greenComponent, c.blueComponent].enumerated() { low[i] = min(low[i], v); high[i] = max(high[i], v) }
+        } }
+        let blank = zip(low, high).allSatisfy { $1 - $0 < 0.03 }
+        if blankness.count > 500 { blankness.removeAll() }
+        blankness[key] = blank
+        return blank
     }
 
     /// Which page a click landed on: with a split, the half under the pointer.
@@ -112,7 +152,14 @@ final class TabThumbnailView: InteractiveView {
             divider.isHidden = partner == nil
         }
         let p = Tokens.Space.x8
-        placeholder.frame = NSRect(x: (imageClip.bounds.width - p) / 2, y: (imageClip.bounds.height - p) / 2, width: p, height: p)
+        // The clip isn't flipped: the icon sits a little above the middle, its site under it.
+        let nameHeight = siteName.lineHeight
+        let block = p + Tokens.Space.x2 + nameHeight
+        let bottom = (imageClip.bounds.height - block) / 2
+        placeholder.frame = NSRect(x: (imageClip.bounds.width - p) / 2, y: bottom + nameHeight + Tokens.Space.x2, width: p, height: p)
+        siteName.frame = NSRect(x: Tokens.Space.x2, y: bottom, width: imageClip.bounds.width - Tokens.Space.x4, height: nameHeight)
+        let cs = Tokens.Space.x6
+        closeButton.frame = NSRect(x: imageClip.frame.maxX - cs - Tokens.Space.x1, y: imageClip.frame.minY + Tokens.Space.x1, width: cs, height: cs)
         icon.isHidden = !showsTitle
         title.isHidden = !showsTitle
         icon2.isHidden = !showsTitle || partner == nil
@@ -143,6 +190,7 @@ final class TabThumbnailView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
+        closeButton.isHidden = onClose == nil || !isHovered
         refreshColors()
     }
 
