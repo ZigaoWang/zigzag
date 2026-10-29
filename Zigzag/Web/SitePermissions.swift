@@ -302,6 +302,10 @@ final class PermissionPrompt: FloatingPanelView {
             radius = address.layer?.cornerRadius ?? Tokens.Radius.panel
             frame = NSRect(x: anchor.minX, y: anchor.maxY + 4, width: anchor.width, height: height(for: anchor.width))
         } else {
+            // Placed again after the sidebar went away: it's a card over the page now, not part of the sidebar.
+            surfaceTint = nil
+            tintStrength = nil
+            isElevated = true
             radius = Tokens.Radius.panel
             let card = controller.root.cardFrame, width: CGFloat = 300
             frame = NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x3, width: width, height: height(for: width))
