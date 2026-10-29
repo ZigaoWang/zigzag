@@ -466,7 +466,8 @@ final class PanelRow: NSView {
     private init(_ title: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         self.control = control
-        self.value = value.map { Label($0, font: Tokens.Font.body(), color: Tokens.Color.textSecondary) }
+        // What was chosen sits under the name, so neither is cut short beside the button.
+        self.value = value.map { Label($0, font: Tokens.Font.small(), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
         [self.title, control].forEach { addSubview($0) }
         if let label = self.value { addSubview(label) }
@@ -491,12 +492,13 @@ final class PanelRow: NSView {
         super.layout()
         let size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
-        var right = control.frame.minX - Tokens.Space.x2
-        if let value {
-            let w = value.textWidth
-            value.frame = NSRect(x: right - w, y: (bounds.height - value.lineHeight) / 2, width: w, height: value.lineHeight)
-            right = value.frame.minX - Tokens.Space.x2
+        let right = control.frame.minX - Tokens.Space.x2
+        guard let value else {
+            title.frame = NSRect(x: 0, y: (bounds.height - title.lineHeight) / 2, width: right, height: title.lineHeight)
+            return
         }
-        title.frame = NSRect(x: 0, y: (bounds.height - title.lineHeight) / 2, width: right, height: title.lineHeight)
+        let top = (bounds.height - title.lineHeight - value.lineHeight) / 2
+        title.frame = NSRect(x: 0, y: top, width: right, height: title.lineHeight)
+        value.frame = NSRect(x: 0, y: title.frame.maxY, width: right, height: value.lineHeight)
     }
 }
