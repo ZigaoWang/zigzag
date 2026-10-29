@@ -5,6 +5,13 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Passkeys work, signed in with Touch ID or your phone, as in Safari.
+- Take a screenshot of a whole page with ⇧⌘2, or from the site panel. It's copied, ready to paste or save.
+- Pin a split view and it stays a split: both pages in one row, and clicking it opens them side by side.
+- Search in the all-tabs view (⇧⌘\\), close tabs there with ×, and see each site's icon on tabs that are asleep.
+- A cleaner site panel, and permission requests that hang from the address bar with Allow This Time.
+
 ### Changed
 - Zigzag's code is now open source under the Apache License 2.0, instead of the Functional Source License. The Zigzag name, icon and logo stay trademarks, so forks use their own.
 - Every shortcut except ⌘T now animates, so you can see what ⌘W and the others changed.
@@ -12,6 +19,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - Back on a tab a link opened closes it and takes you back to the page you came from, as in Safari and Chrome. It works with the button, a swipe and ⌘[.
 - Clicking Clear again after your tabs are gone leaves the space empty instead of opening a pinned page.
+- Clear sits at the end of the New Tab row, beside the tabs it closes.
+- Selecting the address no longer looks cut off.
+- PDFs and files are named after the file instead of New Tab.
 - A tab preview no longer stays on screen after its tab closes or you switch to another app.
 - In split view, find sits over the page it's searching, and clicking it no longer switches pages.
 - Links that open an app, like a meeting link, ask with a clear prompt, and open straight away on sites you've said yes to.
