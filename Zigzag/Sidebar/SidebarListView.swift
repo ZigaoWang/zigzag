@@ -474,7 +474,8 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             let row = TabRowView()
             row.isBookmark = true
-            row.onDoubleClick = { [weak row] in row?.beginRename() }
+            // Not a pinned split's row: it carries two pages, and a new name would only reach the left one.
+            row.onDoubleClick = { [weak row] in if Library.shared.pinnedSplit(containing: id) == nil { row?.beginRename() } }
             row.onRename = { [weak self] name in
                 guard !name.isEmpty else { return }
                 self?.delegate?.listRenameBookmark(id, to: name)

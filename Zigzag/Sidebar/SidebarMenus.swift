@@ -105,7 +105,8 @@ enum SidebarMenus {
         let manager = controller.tabManager
         let live = manager.bookmarkTab(for: bookmark.id)
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
-        menu.addItem(Item("Rename…") { BookmarkEditor.edit(bookmark.id, in: controller) })
+        // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
+        if pinned == nil { menu.addItem(Item("Rename…") { BookmarkEditor.edit(bookmark.id, in: controller) }) }
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(bookmark.id) })
             menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(bookmark.id) })
