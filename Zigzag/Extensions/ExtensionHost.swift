@@ -212,6 +212,8 @@ final class ExtensionHost: NSObject {
     }
 
     private weak var actionAnchor: NSView?
+    /// The spot on it the popup points at (a corner of the page when the sidebar is hidden).
+    private var actionAnchorRect: NSRect?
     private static var toldAboutVerification = false
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
@@ -219,14 +221,16 @@ final class ExtensionHost: NSObject {
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
         var anchor = anchor
+        var anchorRect = anchor.bounds
         // From the site panel: the panel steps aside and the popup opens from the address bar, where it stays put.
         var inPanel: NSView? = anchor.superview
         while let view = inPanel, !(view is SitePanel) { inPanel = view.superview }
         if let panel = inPanel as? SitePanel, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
             panel.close()
-            anchor = controller.sidebar.address
+            (anchor, anchorRect) = controller.addressAnchor
         }
         actionAnchor = anchor
+        actionAnchorRect = anchorRect
         // Its own popup always opens; if it still needs a step only you can do (1Password trusting Zigzag), a
         // short note says so, with the way there.
         if let attention = item.attention, let controller = WindowManager.shared.controllers.first(where: { $0.window === anchor.window }) {
@@ -446,13 +450,15 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // gone with its panel, so the popup comes from the address bar instead of not at all.
         let pressed = actionAnchor.flatMap { $0.window != nil ? $0 : nil }
         let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
-        guard let anchor = pressed ?? controller?.sidebar.address, anchor.window != nil else {
+        let fallback = controller?.addressAnchor
+        let rect = pressed != nil ? (actionAnchorRect ?? pressed!.bounds) : (fallback?.rect ?? .zero)
+        guard let anchor = pressed ?? fallback?.view, anchor.window != nil else {
             completionHandler(NSError(domain: "Zigzag", code: 2, userInfo: [NSLocalizedDescriptionKey: "No window to show the popup in"]))
             return
         }
         if pressed == nil { controller?.closeFloatingPanels() }
         popover.behavior = .semitransient
-        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+        popover.show(relativeTo: rect, of: anchor, preferredEdge: .maxY)
         completionHandler(nil)
     }
 
