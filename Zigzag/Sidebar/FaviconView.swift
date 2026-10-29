@@ -26,6 +26,9 @@ final class FaviconView: NSView {
         layer?.addSublayer(imageLayer)
 
         spinner.weight = 0.3
+        // A page that never says it's done (long polling, a hung load) would keep it flowing forever: after a
+        // while it rests as the still ribbon, which reads as loading just the same.
+        spinner.loopLimit = 10
         spinner.alphaValue = 0
         addSubview(spinner)
 

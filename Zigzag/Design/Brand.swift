@@ -227,6 +227,13 @@ class RibbonView: NSView {
 
     private let stroke = CAShapeLayer()
     private(set) var isLooping = false
+    /// How long to keep flowing before resting as the whole ribbon, for loads that may never end; nil flows on.
+    var loopLimit: TimeInterval?
+    /// True while the flow is actually running: only while it can be seen, and not past its limit.
+    private var isFlowing = false
+    private var limitReached = false
+    private var limitWork: DispatchWorkItem?
+    private var occlusionToken: NSObjectProtocol?
 
     /// Decelerating, like a pen landing: quick to start, long gentle finish.
     static let writing = CAMediaTimingFunction(controlPoints: 0.22, 0.7, 0.18, 1)
@@ -243,6 +250,11 @@ class RibbonView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    isolated deinit {
+        limitWork?.cancel()
+        if let occlusionToken { NotificationCenter.default.removeObserver(occlusionToken) }
+    }
+
     override var isFlipped: Bool { false }
 
     private var rect: CGRect {
@@ -255,8 +267,24 @@ class RibbonView: NSView {
         Tokens.Motion.withoutAnimation {
             stroke.frame = bounds
             stroke.lineWidth = rect.width * weight
-            stroke.path = isLooping ? loopPath : Brand.path(Brand.centerline(in: rect))
+            stroke.path = isFlowing ? loopPath : Brand.path(Brand.centerline(in: rect))
         }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        watchWindow()
+        refreshLoop()
+    }
+
+    override func viewDidHide() {
+        super.viewDidHide()
+        refreshLoop()
+    }
+
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        refreshLoop()
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -315,6 +343,52 @@ class RibbonView: NSView {
     func startLooping() {
         guard !isLooping else { return }
         isLooping = true
+        if let loopLimit {
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.limitReached = true
+                    self?.refreshLoop()
+                }
+            }
+            limitWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + loopLimit, execute: work)
+        }
+        watchWindow()
+        refreshLoop()
+    }
+
+    /// Stops and goes back to the whole ribbon. Callers fade it out first, while it's still moving.
+    func stopLooping() {
+        guard isLooping else { return }
+        isLooping = false
+        limitReached = false
+        limitWork?.cancel()
+        limitWork = nil
+        watchWindow()
+        refreshLoop()
+    }
+
+    /// A flow nobody can see (no window, hidden, the window covered or in the Dock) still costs a frame
+    /// every refresh, so it only runs while it shows, and picks up again when it does.
+    private func refreshLoop() {
+        let visible = window?.occlusionState.contains(.visible) ?? false
+        let flow = isLooping && !limitReached && visible && !isHiddenOrHasHiddenAncestor
+        guard flow != isFlowing else { return }
+        isFlowing = flow
+        flow ? beginFlow() : endFlow()
+    }
+
+    /// Only a looping ribbon listens for its window being covered or minimized.
+    private func watchWindow() {
+        if let occlusionToken { NotificationCenter.default.removeObserver(occlusionToken) }
+        occlusionToken = nil
+        guard isLooping, let window else { return }
+        occlusionToken = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshLoop() }
+        }
+    }
+
+    private func beginFlow() {
         layoutSubtreeIfNeeded()
         stroke.removeAllAnimations()
         // With Reduce Motion, nothing travels: the whole ribbon breathes, softly, while it waits.
@@ -345,10 +419,7 @@ class RibbonView: NSView {
         stroke.add(group, forKey: "loop")
     }
 
-    /// Stops and goes back to the whole ribbon. Callers fade it out first, while it's still moving.
-    func stopLooping() {
-        guard isLooping else { return }
-        isLooping = false
+    private func endFlow() {
         stroke.removeAnimation(forKey: "loop")
         Tokens.Motion.withoutAnimation { stroke.path = Brand.path(Brand.centerline(in: rect)) }
         resetStroke()
