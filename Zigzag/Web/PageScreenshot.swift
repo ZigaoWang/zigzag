@@ -1,4 +1,6 @@
 import AppKit
+import ImageIO
+import UniformTypeIdentifiers
 import WebKit
 
 /// A picture of the whole page, top to bottom, copied for pasting with Save… one click away.
@@ -13,8 +15,8 @@ enum PageScreenshot {
     /// Long enough for nearly any page; endless feeds stop here instead of scrolling forever.
     private static let maxViewports = 40
     /// Big pictures are drawn smaller rather than failing: the longest side and the total pixels have a ceiling.
-    private static let maxPixelHeight: CGFloat = 32_000
-    private static let maxPixels: CGFloat = 150_000_000
+    nonisolated private static let maxPixelHeight: CGFloat = 32_000
+    nonisolated private static let maxPixels: CGFloat = 150_000_000
 
     static func canTake(_ tab: Tab?) -> Bool {
         // A PDF in Zigzag's viewer isn't the page underneath: Save gives you the file itself.
@@ -114,24 +116,38 @@ enum PageScreenshot {
             let zoom = webView.pageZoom
             configuration.rect = CGRect(x: 0, y: 0, width: webView.bounds.width, height: height * zoom)
         }
-        guard let pdf = try? await webView.pdf(configuration: configuration), let rep = NSPDFImageRep(data: pdf) else { return nil }
-        let size = rep.bounds.size
-        guard size.width > 0, size.height > 0 else { return nil }
+        guard let pdf = try? await webView.pdf(configuration: configuration) else { return nil }
         let backing = webView.window?.backingScaleFactor ?? 2
-        let scale = max(0.5, min(backing, maxPixelHeight / size.height, (maxPixels / (size.width * size.height)).squareRoot()))
+        // Drawing and encoding a picture this big takes a while: off the main thread, so the window stays live.
+        return await Task.detached(priority: .userInitiated) { render(pdf, backing: backing) }.value
+    }
+
+    /// The one-page PDF drawn into a PNG, at the screen's sharpness within the ceilings.
+    nonisolated private static func render(_ pdf: Data, backing: CGFloat) -> Data? {
+        guard let provider = CGDataProvider(data: pdf as CFData), let document = CGPDFDocument(provider), let page = document.page(at: 1) else { return nil }
+        let box = page.getBoxRect(.mediaBox)
+        let size = box.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        // At least half size for a sharp enough picture, but the ceilings come last: they're what keeps it drawable.
+        let scale = min(max(0.5, backing), maxPixelHeight / size.height, (maxPixels / (size.width * size.height)).squareRoot())
         let pixelsWide = Int((size.width * scale).rounded()), pixelsHigh = Int((size.height * scale).rounded())
-        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixelsWide, pixelsHigh: pixelsHigh, bitsPerSample: 8,
-                                            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                                            bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        bitmap.size = size
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        guard pixelsWide > 0, pixelsHigh > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: pixelsWide, height: pixelsHigh, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         // Pages without a background of their own are white, as on screen.
-        NSColor.white.setFill()
-        NSRect(origin: .zero, size: size).fill()
-        rep.draw(in: NSRect(origin: .zero, size: size))
-        NSGraphicsContext.restoreGraphicsState()
-        return bitmap.representation(using: .png, properties: [:])
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: pixelsWide, height: pixelsHigh))
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -box.minX, y: -box.minY)
+        context.drawPDFPage(page)
+        guard let image = context.makeImage() else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        // Marked with its sharpness, so it opens at the page's size rather than twice it.
+        let dpi = 72 * scale
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
     }
 
     /// Back where you were reading.
