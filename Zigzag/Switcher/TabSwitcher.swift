@@ -89,14 +89,15 @@ final class TabThumbnailView: InteractiveView {
         needsLayout = true
     }
 
-    private static var blankness: [ObjectIdentifier: Bool] = [:]
+    /// Keyed by the picture itself, held weakly: a freed picture's address can be reused by a new one, which
+    /// must be checked afresh, and an entry goes when its picture does.
+    private static let blankness = NSMapTable<NSImage, NSNumber>.weakToStrongObjects()
 
     /// No picture, or one that's all one color: a page that hadn't drawn yet. Checked once per picture, on a
     /// thumbnail a few pixels across.
     static func isBlank(_ image: NSImage?) -> Bool {
         guard let image else { return true }
-        let key = ObjectIdentifier(image)
-        if let known = blankness[key] { return known }
+        if let known = blankness.object(forKey: image) { return known.boolValue }
         let side = 8
         guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
                                          hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return false }
@@ -110,8 +111,7 @@ final class TabThumbnailView: InteractiveView {
             for (i, v) in [c.redComponent, c.greenComponent, c.blueComponent].enumerated() { low[i] = min(low[i], v); high[i] = max(high[i], v) }
         } }
         let blank = zip(low, high).allSatisfy { $1 - $0 < 0.03 }
-        if blankness.count > 500 { blankness.removeAll() }
-        blankness[key] = blank
+        blankness.setObject(NSNumber(value: blank), forKey: image)
         return blank
     }
 
