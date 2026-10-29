@@ -184,7 +184,8 @@ final class PermissionPrompt: FloatingPanelView {
     private let symbolView = NSImageView()
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let request = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private var buttons: [(TextButton, Answer)] = []
+    /// The answers, in a row: the one you'd most often want filled in the accent, last, as macOS places it.
+    private var buttons: [(button: InteractiveView, width: CGFloat)] = []
     private var answer: ((Answer) -> Void)?
     private var monitor: Any?
     /// The tab whose page asked, and the window it's in.
@@ -242,11 +243,18 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.asker.stringValue = "\(host) wants to"
             prompt.request.stringValue = request
             prompt.symbolView.image = Tokens.Symbol.image(symbol, size: 14)
+            // Laid out from the right edge: Allow, filled, at the far right; Don't Allow furthest left.
             prompt.buttons = choices.map { title, answer in
+                if answer == .allow {
+                    let button = PrimaryButton(title: title)
+                    button.onClick = { [weak prompt] _ in prompt?.finish(answer) }
+                    prompt.addSubview(button)
+                    return (button, max(button.fittingWidth, 64))
+                }
                 let button = TextButton.form(title)
                 button.onClick = { [weak prompt] _ in prompt?.finish(answer) }
                 prompt.addSubview(button)
-                return (button, answer)
+                return (button, button.fittingWidth)
             }
             prompt.setAccessibilityLabel("\(host) wants to \(request.lowercased())")
             prompt.answer = { continuation.resume(returning: $0) }
@@ -296,16 +304,17 @@ final class PermissionPrompt: FloatingPanelView {
         tintStrength = nil
         isElevated = true
         radius = Tokens.Radius.panel
-        let area = controller.focusedPaneFrame, width: CGFloat = 300
+        let area = controller.focusedPaneFrame
+        let width = min(max(360, buttonsWidth + Self.pad * 2), area.width - Tokens.Space.x6)
         frame = NSRect(x: area.minX + Tokens.Space.x3, y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         badge.wantsLayer = true
-        badge.layer?.cornerRadius = 7
-        badge.color = Tokens.Color.accent.withAlphaComponent(0.14)
-        symbolView.contentTintColor = Tokens.Color.accent
+        badge.layer?.cornerRadius = 8
+        badge.color = Tokens.Color.fieldFill
+        symbolView.contentTintColor = Tokens.Color.icon
         badge.addSubview(symbolView)
         // A long host loses its middle, not its end: the part that says whose site it is stays.
         asker.lineBreakMode = .byTruncatingMiddle
@@ -343,9 +352,13 @@ final class PermissionPrompt: FloatingPanelView {
         if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
     }
 
-    private static let pad: CGFloat = 14
+    private static let pad: CGFloat = 16
     private static let buttonHeight = Tokens.Space.x8
-    private static let buttonGap: CGFloat = 6
+    private static let buttonGap: CGFloat = 8
+
+    private var buttonsWidth: CGFloat {
+        buttons.map(\.width).reduce(0, +) + CGFloat(max(buttons.count - 1, 0)) * Self.buttonGap
+    }
 
     private func requestHeight(for width: CGFloat) -> CGFloat {
         let textWidth = width - Self.pad * 2 - 28 - 10
@@ -354,8 +367,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     private func height(for width: CGFloat) -> CGFloat {
         let header = max(28, asker.lineHeight + 1 + requestHeight(for: width))
-        let stack = CGFloat(buttons.count) * Self.buttonHeight + CGFloat(max(buttons.count - 1, 0)) * Self.buttonGap
-        return Self.pad + header + Tokens.Space.x3 + stack + Self.pad
+        return Self.pad + header + Tokens.Space.x4 + Self.buttonHeight + Self.pad
     }
 
     private func layoutContent() {
@@ -368,10 +380,12 @@ final class PermissionPrompt: FloatingPanelView {
         let top = pad + (header - asker.lineHeight - 1 - rh) / 2
         asker.frame = NSRect(x: textX, y: top, width: textWidth, height: asker.lineHeight)
         request.frame = NSRect(x: textX, y: asker.frame.maxY + 1, width: textWidth, height: rh)
-        var y = pad + header + Tokens.Space.x3
-        for (button, _) in buttons {
-            button.frame = NSRect(x: pad, y: y, width: w - pad * 2, height: Self.buttonHeight)
-            y += Self.buttonHeight + Self.buttonGap
+        let y = pad + header + Tokens.Space.x4
+        var x = w - pad
+        for (button, width) in buttons {
+            x -= width
+            button.frame = NSRect(x: x, y: y, width: width, height: Self.buttonHeight)
+            x -= Self.buttonGap
         }
     }
 }
