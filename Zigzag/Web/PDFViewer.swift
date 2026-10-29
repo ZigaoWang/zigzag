@@ -111,6 +111,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         darkButton.onClick = { [weak self] _ in self?.toggleDarkPages() }
         saveButton.onClick = { [weak self] _ in self?.save() }
         pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
+        pageButton.onDone = { [weak self] in guard let self else { return }; self.window?.makeFirstResponder(self.pdfView) }
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: pdfView)
         NotificationCenter.default.addObserver(self, selector: #selector(followDarkPages), name: Self.darkPagesChanged, object: nil)
     }
@@ -471,6 +472,8 @@ private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
     private let field = PlainTextField(font: Tokens.Font.small(.medium), placeholder: "Page")
     private var page = 0, count = 0
     var onJump: ((Int) -> Void)?
+    /// Return or Esc in the field: typing goes back to the pages, not to a hidden field.
+    var onDone: (() -> Void)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -532,10 +535,12 @@ private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
         case #selector(NSResponder.insertNewline(_:)):
             let number = Int(field.stringValue.trimmingCharacters(in: .whitespaces))
             endTyping()
+            onDone?()
             if let number { onJump?(number) }
             return true
         case #selector(NSResponder.cancelOperation(_:)):
             endTyping()
+            onDone?()
             return true
         default:
             return false
