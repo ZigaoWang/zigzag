@@ -440,6 +440,8 @@ enum ExtensionStore {
         try? FileManager.default.removeItem(at: folder(for: id))
         if !unpacked { removedIDs.insert(id) }
         ExtensionHost.shared.forget(id)
+        // Only now is it gone from disk: removing a password manager brings back the passkey fallback.
+        Passkeys.refresh()
     }
 
     static func setEnabled(_ id: String, _ enabled: Bool) {

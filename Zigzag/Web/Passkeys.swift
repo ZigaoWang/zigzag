@@ -1,19 +1,27 @@
+import Security
 import WebKit
 
-/// Passkeys in a third-party Mac browser need Apple's browser passkey entitlement, which Zigzag doesn't have yet.
-/// Without it, WebKit can only offer a phone over Bluetooth, and sign-ins like Google's end on "Something went
-/// wrong". Until then, pages are told there are no passkeys here, so they go straight to a password or another way.
-/// A password manager (1Password and the like) brings its own passkeys, so with one on, pages are left alone.
+/// Passkeys in a third-party Mac browser need Apple's browser passkey entitlement. Released Zigzag has it, so passkeys
+/// work as in Safari. The dev build can't (Apple grants it per bundle id): without it, WebKit can only offer a phone
+/// over Bluetooth and sign-ins like Google's end on "Something went wrong", so there pages are told there are no
+/// passkeys and go straight to a password. A password manager (1Password and the like) brings its own passkeys, so
+/// with one on in a normal window, pages are left alone.
 enum Passkeys {
-    /// Flip on once the entitlement is granted and in Zigzag.entitlements.
-    static let available = false
+    /// Whether this copy is signed with the passkey entitlement.
+    static let available: Bool = {
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.web-browser.public-key-credential" as CFString, nil)
+        return (value as? Bool) == true
+    }()
 
     /// Every page's scripts this has been asked about, so turning a password manager on or off reaches them.
     private static let controllers = NSHashTable<WKUserContentController>.weakObjects()
 
-    static func attach(to configuration: WKWebViewConfiguration) {
+    /// `isPrivate`: private windows have no extensions, so no password manager to hand passkeys to.
+    static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
         guard !available else { return }
         let controller = configuration.userContentController
+        if isPrivate { install(in: controller); return }
         controllers.add(controller)
         if !passwordManagerOn { install(in: controller) }
     }

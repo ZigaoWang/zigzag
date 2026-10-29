@@ -147,7 +147,7 @@ final class Tab: NSObject {
         } else if !fromWebKit {
             WebKitSetup.configure(configuration)
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
-            Passkeys.attach(to: configuration)
+            Passkeys.attach(to: configuration, isPrivate: privateStore != nil)
             PopupNotice.attach(to: configuration)
             if let privateStore {
                 configuration.websiteDataStore = privateStore
