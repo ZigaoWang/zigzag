@@ -15,9 +15,6 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     private(set) var data: Data?
     private let isPrivate: Bool
     let pdfView = ZigzagPDFView()
-    /// Dark pages: a grey laid over the pages in difference blending, which the window server draws at full
-    /// sharpness (an image filter on the pages would redraw them blurry).
-    private let darkCover = PassthroughView()
     private let spinner = NSProgressIndicator()
 
     private let sidebar = NSView()
@@ -73,10 +70,6 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         pdfView.backgroundColor = Self.backdrop
         pdfView.alphaValue = 0
         addSubview(pdfView)
-        darkCover.wantsLayer = true
-        darkCover.layer?.compositingFilter = "differenceBlendMode"
-        darkCover.isHidden = true
-        addSubview(darkCover)
 
         spinner.style = .spinning
         spinner.controlSize = .small
@@ -161,7 +154,6 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         sidebar.frame = NSRect(x: side - Self.sidebarWidth, y: 0, width: Self.sidebarWidth, height: bounds.height)
         sidebarEdge.frame = NSRect(x: side - Tokens.Metric.hairline, y: 0, width: Tokens.Metric.hairline, height: bounds.height)
         pdfView.frame = NSRect(x: side, y: 0, width: bounds.width - side, height: bounds.height)
-        darkCover.frame = pdfView.frame
         let switchHeight: CGFloat = sidebarSwitch.isHidden ? 0 : 28
         let top = sidebarSwitch.isHidden ? 0 : Tokens.Space.x3 + switchHeight + Tokens.Space.x2
         sidebarSwitch.frame = NSRect(x: Tokens.Space.x3, y: sidebar.bounds.height - Tokens.Space.x3 - switchHeight,
@@ -247,7 +239,6 @@ final class PDFViewerView: NSView, PDFViewDelegate {
             self.sidebar.animator().frame.origin.x = side - Self.sidebarWidth
             self.sidebarEdge.animator().frame.origin.x = side - Tokens.Metric.hairline
             self.pdfView.animator().frame = NSRect(x: side, y: 0, width: self.bounds.width - side, height: self.bounds.height)
-            self.darkCover.animator().frame = NSRect(x: side, y: 0, width: self.bounds.width - side, height: self.bounds.height)
             var frame = self.bar.frame
             frame.origin.x = round(side + (self.bounds.width - side - frame.width) / 2)
             self.bar.animator().frame = frame
@@ -274,34 +265,48 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     private func toggleDarkPages() {
         Self.darkPages.toggle()
-        let dark = Self.darkPages
-        // A soft fade between light and dark, rather than a flash.
-        darkCover.alphaValue = dark ? 0 : 1
-        darkCover.isHidden = false
-        applyDarkPages()
-        darkCover.isHidden = false
-        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.darkCover.animator().alphaValue = dark ? 1 : 0 }, completion: {
-            guard !Self.darkPages else { return }
-            self.darkCover.isHidden = true
-            self.darkCover.alphaValue = 1
-        })
+        // A soft crossfade from the pages as they were, rather than a flash.
+        if let rep = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds) {
+            pdfView.cacheDisplay(in: pdfView.bounds, to: rep)
+            let image = NSImage(size: pdfView.bounds.size)
+            image.addRepresentation(rep)
+            let still = NSImageView(frame: pdfView.frame)
+            still.image = image
+            still.imageScaling = .scaleAxesIndependently
+            addSubview(still, positioned: .above, relativeTo: pdfView)
+            applyDarkPages()
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
+        } else {
+            applyDarkPages()
+        }
     }
 
-    /// Dark pages: the paper a soft dark grey and the ink a light one, never stark black on white, and no page
-    /// shadows (they'd glow). Differencing against this grey turns white paper into #1C1C1E and black ink into
-    /// #E3E3E3; colors come out as their opposites, the trade for text staying sharp.
-    private static let darkGrey: CGFloat = 0.89
-
+    /// Dark pages: each page drawn dark by `DarkablePage` (soft dark paper, light ink, its colors kept), and no
+    /// page shadows, which would glow.
     private func applyDarkPages() {
         let dark = Self.darkPages
         darkButton.showsFillAtRest = dark
         darkButton.symbol = dark ? "moon.fill" : "moon"
+        DarkablePage.isDark = dark
         pdfView.pageShadowsEnabled = !dark
-        darkCover.layer?.backgroundColor = CGColor(gray: Self.darkGrey, alpha: 1)
-        darkCover.isHidden = !dark
-        // Between the pages, after the difference: #2A2A2D, a shade lighter than the dark paper.
-        pdfView.backgroundColor = dark ? NSColor(srgbRed: 0.725, green: 0.725, blue: 0.713, alpha: 1) : Self.backdrop
-        layer?.backgroundColor = cgColor(dark ? Tokens.Color.hex(0x2A2A2D) : Self.backdrop)
+        // Between the pages: a shade lighter than the dark paper, so each page still reads as one.
+        let around = dark ? Tokens.Color.hex(0x2A2A2D) : Self.backdrop
+        pdfView.backgroundColor = around
+        layer?.backgroundColor = cgColor(around)
+        // PDFKit keeps pages it has drawn: the document goes back in, on the same spot at the same zoom, so
+        // every page and thumbnail draws again in its new colors.
+        guard let document = pdfView.document, let clip = pdfView.documentView?.enclosingScrollView?.contentView else { return }
+        let autoScales = pdfView.autoScales, scale = pdfView.scaleFactor, origin = clip.bounds.origin
+        pdfView.document = nil
+        pdfView.document = document
+        pdfView.scaleFactor = scale
+        pdfView.autoScales = autoScales
+        pdfView.layoutDocumentView()
+        if let newClip = pdfView.documentView?.enclosingScrollView?.contentView {
+            newClip.scroll(to: origin)
+            newClip.enclosingScrollView?.reflectScrolledClipView(newClip)
+        }
+        pageChanged()
     }
 
     // MARK: Remembering your place
@@ -420,7 +425,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         } else {
             data = nil
         }
-        guard let data, let document = PDFDocument(data: data), document.pageCount > 0 else { return nil }
+        // Its pages come as `DarkablePage`, so dark pages can draw them.
+        guard let data, let document = DarkableDocument(data: data), document.pageCount > 0 else { return nil }
         return (document, data)
     }
 }
@@ -610,5 +616,34 @@ private final class ContentsRow: InteractiveView {
         let fill: NSColor? = isSelected ? Tokens.Color.selectedFill : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         label.textColor = level == 0 || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+    }
+}
+
+/// A PDF page that can draw itself dark for reading at night, in vectors, so text stays as sharp as ever:
+/// the page as usual, its brightness flipped against a soft grey (white paper to #1C1C1E, black ink to #E3E3E3),
+/// then the page again in color blending, which puts back each color's own hue and strength on the new brightness.
+/// A diagram's blue box stays blue, only darker; nothing turns into its opposite.
+/// A document whose pages are `DarkablePage`.
+nonisolated final class DarkableDocument: PDFDocument {
+    override var pageClass: AnyClass { DarkablePage.self }
+}
+
+nonisolated final class DarkablePage: PDFPage {
+    nonisolated(unsafe) static var isDark = false
+
+    override func draw(with box: PDFDisplayBox, to context: CGContext) {
+        guard Self.isDark else { super.draw(with: box, to: context); return }
+        let area = context.boundingBoxOfClipPath
+        context.saveGState()
+        // Paper first, so a page with no background of its own darkens too.
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(area)
+        super.draw(with: box, to: context)
+        context.setBlendMode(.difference)
+        context.setFillColor(CGColor(gray: 0.89, alpha: 1))
+        context.fill(area)
+        context.setBlendMode(.color)
+        super.draw(with: box, to: context)
+        context.restoreGState()
     }
 }
