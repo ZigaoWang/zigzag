@@ -707,7 +707,8 @@ final class TabManager {
     /// Background tabs nobody has looked at in a while give their memory back.
     private func suspendIdleTabs() {
         // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
-        var selectedIDs = Set(selectedBySpace.values)
+        // Other spaces' pages sleep like any tab once idle; their snapshots still show while you swipe to them.
+        var selectedIDs = Set([selectedTab?.id].compactMap { $0 })
         for id in Array(selectedIDs) { if let tab = tab(with: id), let other = partner(of: tab) { selectedIDs.insert(other.id) } }
         let live = allTabs.filter { !$0.isSuspended }
         let idleLimit: TimeInterval = 15 * 60
@@ -725,7 +726,8 @@ final class TabManager {
                 liveCount -= 1
             }
         }
-        archiveStaleTabs(keeping: selectedIDs)
+        // Each space keeps the page it shows out of the archive, as before.
+        archiveStaleTabs(keeping: selectedIDs.union(selectedBySpace.values))
     }
 
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
