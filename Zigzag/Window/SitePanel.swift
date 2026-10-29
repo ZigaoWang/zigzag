@@ -1,8 +1,9 @@
 import AppKit
 import WebKit
 
-/// Everything about the page you're on, behind one button by the address: quick actions, your extensions, this
-/// site's own settings, and clearing its cache or cookies. Changes apply at once and say so.
+/// Everything about the page you're on, behind one button by the address: the site, a row of quick actions, your
+/// extensions in the same grid, and this site's own settings. Rarer things (copying the link, clearing the site's
+/// cache or cookies) wait in the ⋯ menu. Changes apply at once and say so.
 final class SitePanel: FloatingPanelView {
     private static weak var current: SitePanel?
     static var isOpen: Bool { current?.superview != nil }
@@ -27,16 +28,12 @@ final class SitePanel: FloatingPanelView {
     private let siteName = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let security = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let securityIcon = NSImageView()
-    private let copyButton = IconButton(symbol: "link", size: Tokens.Space.x7Height, toolTip: "Copy Link")
-    private var chips: [ActionChip] = []
+    private let moreButton = IconButton(symbol: "ellipsis", size: Tokens.Space.x7Height, toolTip: "More")
+    private var actionTiles: [PanelTile] = []
     private let extensionsLabel = Label("Extensions", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
     private var extensionTiles: [PanelTile] = []
     private let siteLabel = Label("This site", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
     private var rows: [PanelRow] = []
-    private let topDivider = ColorView(color: Tokens.Color.separator)
-    private let divider = ColorView(color: Tokens.Color.separator)
-    private let clearCache = TextButton.form("Clear Cache")
-    private let clearCookies = TextButton.form("Clear Cookies")
 
     static let width: CGFloat = 300
     static let minimumWidth: CGFloat = 256
@@ -61,28 +58,21 @@ final class SitePanel: FloatingPanelView {
         security.stringValue = page.scheme == "https" ? (secure ? "Secure connection" : "Some content isn’t secure") : (page.scheme == "http" ? "Not secure" : "")
         securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : "lock.open.fill", size: Tokens.TypeSize.small)
         securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
-        [icon, siteName, security, securityIcon, copyButton, topDivider, divider, clearCache, clearCookies].forEach { addSubview($0) }
+        [icon, siteName, security, securityIcon, moreButton].forEach { addSubview($0) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in
             guard change == .url, let self, let now = tab?.url else { return }
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite { self.close() }
         }
-        copyButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            self.controller?.copyLink(self.url)
-            self.close()
-        }
+        moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         if isBlank {
-            [security, securityIcon, copyButton, clearCache, clearCookies, divider].forEach { $0.isHidden = true }
+            [security, securityIcon, moreButton].forEach { $0.isHidden = true }
             icon.image = Tokens.Symbol.image("plus.square.on.square", size: 16)
         } else {
             buildTiles()
             buildRows()
         }
         buildExtensions()
-        clearCache.onClick = { [weak self] _ in self?.clear(.cache) }
-        clearCookies.onClick = { [weak self] _ in self?.clear(.cookies) }
-        if tab.isPrivate || isBlank { [clearCache, clearCookies, divider].forEach { $0.isHidden = true } }
         onLayout = { [weak self] in self?.layoutContent() }
         frame.size = NSSize(width: width, height: layoutContent(dryRun: true))
         setAccessibilityLabel("Site controls for \(site)")
@@ -140,35 +130,56 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Content
 
-    /// Only what this page can do right now: no greyed-out actions taking up room.
+    /// What this page can do right now, as a row of icons: sharing and a screenshot always, Reader, Translate and
+    /// Picture in Picture when the page has them. The steady ones come first, so they never move.
     private func buildTiles() {
         guard let controller else { return }
         let readerOn = controller.isShowingReader
         var specs: [(String, String, Bool, () -> Void)] = []
-        if tab.isArticle || readerOn {
-            specs.append(("doc.plaintext", readerOn ? "Close Reader" : "Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
-        }
-        let floating = tab.webView?.isPictureInPictureActive ?? false
-        if floating || tab.webView?.canTogglePictureInPicture ?? false {
-            specs.append(("pip", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
-        }
+        specs.append(("square.and.arrow.up", "Share", false, { [weak self] in self?.close(); self?.controller?.sharePage(nil) }))
         if PageScreenshot.canTake(tab), !readerOn {
-            specs.append(("camera.viewfinder", "Screenshot", false, { [weak self] in
+            specs.append(("camera.viewfinder", "Screenshot of the Whole Page", false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 PageScreenshot.take(self.tab, in: controller)
             }))
         }
+        if tab.isArticle || readerOn {
+            specs.append(("doc.plaintext", readerOn ? "Close Reader" : "Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
+        }
         if tab.foreignLanguage != nil || tab.isTranslated {
             specs.append(("translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
         }
-        chips = specs.map { symbol, title, on, run in
-            let chip = ActionChip(symbol: symbol, title: title)
-            chip.isOn = on
-            chip.onClick = { _ in run() }
-            addSubview(chip)
-            return chip
+        let floating = tab.webView?.isPictureInPictureActive ?? false
+        if floating || tab.webView?.canTogglePictureInPicture ?? false {
+            specs.append(("pip", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
+        actionTiles = specs.map { symbol, title, on, run in
+            let tile = PanelTile(symbol: symbol, caption: nil)
+            tile.toolTip = title
+            tile.setAccessibilityLabel(title)
+            tile.isOn = on
+            tile.onClick = { _ in run() }
+            addSubview(tile)
+            return tile
+        }
+    }
+
+    /// Copy Link, and clearing this site's cache or cookies: there when you need them, out of the way when you don't.
+    private func showMoreMenu() {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(SidebarMenus.Item("Copy Link") { [weak self] in
+            guard let self else { return }
+            self.controller?.copyLink(self.url)
+            self.close()
+        })
+        if !tab.isPrivate {
+            menu.addItem(.separator())
+            menu.addItem(SidebarMenus.Item("Clear Cache for This Site") { [weak self] in self?.clear(.cache) })
+            menu.addItem(SidebarMenus.Item("Clear Cookies for This Site") { [weak self] in self?.clear(.cookies) })
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: moreButton.isFlipped ? moreButton.bounds.maxY + 4 : -4), in: moreButton)
     }
 
     private func buildExtensions() {
@@ -269,11 +280,12 @@ final class SitePanel: FloatingPanelView {
     }
 
     private func clear(_ kind: WebsiteData.Kind) {
-        let button = kind == .cache ? clearCache : clearCookies
-        Task { @MainActor in
+        let site = site, tab = tab
+        close()
+        Task { @MainActor [weak controller] in
             await WebsiteData.clear(kind, site: site)
             tab.reload()
-            button.flash(kind == .cache ? "Cache Cleared" : "Cookies Cleared")
+            if let controller { Toast.show(kind == .cache ? "Cache cleared for \(site)" : "Cookies cleared for \(site)", symbol: "checkmark.circle", in: controller) }
         }
     }
 
@@ -286,49 +298,39 @@ final class SitePanel: FloatingPanelView {
         func place(_ view: NSView, _ rect: NSRect) { if !dryRun { view.frame = rect } }
         let inner = width - pad * 2
         var y = pad
-        // Header: the site, whether the connection is private, and Copy Link.
+        // Header: the site, whether the connection is private, and ⋯.
         let iconSide = Tokens.Space.x6
-        let copySide = Tokens.Space.x7Height
+        let moreSide = Tokens.Space.x7Height
         let headerHeight = siteName.lineHeight + security.lineHeight + 4
-        place(copyButton, NSRect(x: width - pad - copySide + Tokens.Space.x1, y: y + (headerHeight - copySide) / 2, width: copySide, height: copySide))
+        place(moreButton, NSRect(x: width - pad - moreSide + Tokens.Space.x1, y: y + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
-        let textWidth = width - textX - pad - copySide
+        let textWidth = width - textX - pad - moreSide
         place(siteName, NSRect(x: textX, y: y, width: textWidth, height: siteName.lineHeight))
         let lockSide: CGFloat = 10
         place(securityIcon, NSRect(x: textX, y: y + siteName.lineHeight + 3, width: lockSide, height: lockSide))
         place(security, NSRect(x: textX + lockSide + 4, y: y + siteName.lineHeight + 1, width: textWidth - lockSide - 4, height: security.lineHeight))
-        y += siteName.lineHeight + security.lineHeight + 4 + Tokens.Space.x3
+        y += headerHeight + Tokens.Space.x4
 
-        // What this page can do, as chips that wrap.
-        if !chips.isEmpty {
-            var x = pad
-            for chip in chips {
-                let w = chip.fittingWidth
-                if x > pad, x + w > width - pad { x = pad; y += Tokens.Space.x7Height + Tokens.Space.x2 }
-                place(chip, NSRect(x: x, y: y, width: w, height: Tokens.Space.x7Height))
-                x += w + Tokens.Space.x2
-            }
-            y += Tokens.Space.x7Height + Tokens.Space.x3
-        }
-        // Sections are set apart by space, not lines.
-        topDivider.isHidden = true
-        y += Tokens.Space.x1
-
-        // Extensions: plain icons, one line (two if there are many), Get Extensions at the end.
-        if !extensionTiles.isEmpty {
-            place(extensionsLabel, NSRect(x: pad, y: y, width: inner, height: extensionsLabel.lineHeight))
-            y += extensionsLabel.lineHeight + Tokens.Space.x1
-            y += Tokens.Space.x1
-            // Every icon on the same tile, the same size, lined up with the text above; + is one of them.
-            let gap: CGFloat = 6, columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
-            let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
-            for (i, tile) in extensionTiles.enumerated() {
+        // Actions and extensions share one grid: the same tiles, the same size, lined up with each other.
+        let gap: CGFloat = 6, columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
+        let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
+        func grid(_ tiles: [PanelTile]) {
+            for (i, tile) in tiles.enumerated() {
                 let column = i % columns, row = i / columns
                 place(tile, NSRect(x: pad + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (side + gap), width: side, height: side))
             }
-            let rowsCount = (extensionTiles.count + columns - 1) / columns
-            y += CGFloat(rowsCount) * (side + gap) - gap + Tokens.Space.x5
+            y += CGFloat((tiles.count + columns - 1) / columns) * (side + gap) - gap
+        }
+        if !actionTiles.isEmpty {
+            grid(actionTiles)
+            y += Tokens.Space.x5
+        }
+        if !extensionTiles.isEmpty {
+            place(extensionsLabel, NSRect(x: pad, y: y, width: inner, height: extensionsLabel.lineHeight))
+            y += extensionsLabel.lineHeight + Tokens.Space.x2
+            grid(extensionTiles)
+            y += Tokens.Space.x5
         }
 
         // This site's own settings.
@@ -339,25 +341,8 @@ final class SitePanel: FloatingPanelView {
                 place(row, NSRect(x: pad, y: y, width: inner, height: PanelRow.height))
                 y += PanelRow.height
             }
-            y += Tokens.Space.x3
-        }
-
-        // Clearing, for this site only: two equal buttons across the bottom.
-        if !clearCache.isHidden {
-            divider.isHidden = true
-            let half = (inner - Tokens.Space.x2) / 2, h = Tokens.Space.x8
-            if max(clearCache.fittingWidth, clearCookies.fittingWidth) + Tokens.Space.x2 <= half {
-                place(clearCache, NSRect(x: pad, y: y, width: half, height: h))
-                place(clearCookies, NSRect(x: pad + half + Tokens.Space.x2, y: y, width: half, height: h))
-                y += h
-            } else {
-                // Too narrow for both side by side (a slim sidebar): one above the other, whole names.
-                place(clearCache, NSRect(x: pad, y: y, width: inner, height: h))
-                place(clearCookies, NSRect(x: pad, y: y + h + Tokens.Space.x2, width: inner, height: h))
-                y += h * 2 + Tokens.Space.x2
-            }
         } else {
-            y -= Tokens.Space.x3
+            y -= Tokens.Space.x5
         }
         return y + pad
     }
