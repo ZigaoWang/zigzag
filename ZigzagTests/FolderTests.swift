@@ -46,6 +46,58 @@ struct FolderTests {
     }
 }
 
+/// Pinned splits: two pinned pages kept as one split view. These check the pair stays side by side and in one folder,
+/// ends cleanly when a page goes, and that libraries from before pinned splits still open.
+struct PinnedSplitTests {
+    private func pins(_ n: Int) -> [Bookmark] {
+        (0..<n).map { Bookmark(url: URL(string: "https://example.com/\($0)")!, title: "\($0)") }
+    }
+
+    @Test func rightPageFollowsLeftIntoItsFolder() {
+        let b = pins(4)
+        let folder = BookmarkFolder(name: "F", bookmarkIDs: [b[1].id])
+        let split = PinnedSplit(left: b[1].id, right: b[3].id)
+        let (bookmarks, folders, splits) = Library.tidied(b, [folder], [split])
+        #expect(bookmarks.map(\.id) == [b[0], b[1], b[3], b[2]].map(\.id))
+        #expect(folders[0].bookmarkIDs == [b[1].id, b[3].id])
+        #expect(splits == [split])
+    }
+
+    @Test func splitEndsWhenAPageGoes() {
+        let b = pins(3)
+        let gone = PinnedSplit(left: b[0].id, right: UUID())
+        let (bookmarks, _, splits) = Library.tidied(b, [], [gone])
+        #expect(bookmarks.map(\.id) == b.map(\.id))
+        #expect(splits.isEmpty)
+    }
+
+    @Test func aPageIsInOneSplitAtMost() {
+        let b = pins(3)
+        let first = PinnedSplit(left: b[0].id, right: b[1].id)
+        let (_, _, splits) = Library.tidied(b, [], [first, PinnedSplit(left: b[1].id, right: b[2].id), PinnedSplit(left: b[2].id, right: b[2].id)])
+        #expect(splits == [first])
+    }
+
+    @Test func layoutIsSavedButNotAChange() throws {
+        var split = PinnedSplit(left: UUID(), right: UUID())
+        split.ratio = 0.3
+        split.vertical = true
+        let decoded = try JSONDecoder().decode(PinnedSplit.self, from: JSONEncoder().encode(split))
+        #expect(decoded.ratio == 0.3 && decoded.vertical)
+        // A resize alone doesn't make the library look changed to ⌘Z.
+        #expect(decoded == PinnedSplit(left: split.left, right: split.right))
+        #expect(split != PinnedSplit(left: split.right, right: split.left))
+    }
+
+    @Test func spaceFromBeforePinnedSplitsOpens() throws {
+        let space = SpaceInfo(name: "Old", color: .sage)
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(space)) as! [String: Any]
+        json.removeValue(forKey: "pinnedSplits")
+        let decoded = try JSONDecoder().decode(SpaceInfo.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect((decoded.pinnedSplits ?? []).isEmpty)
+    }
+}
+
 /// Arc's pinned folders come over as folders; a pinned split view is just its pages.
 struct ArcFolderTests {
     @Test func foldersAndSplitViews() throws {

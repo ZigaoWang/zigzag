@@ -15,6 +15,25 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     var isOpen = true
 }
 
+/// Two pinned pages that open side by side, as the split view they were pinned from. Its pages stay in the space's
+/// own list, the right one just after the left, in the same folder.
+struct PinnedSplit: Codable {
+    var left: UUID
+    var right: UUID
+    /// Share of the width (or height, when vertical) the left page gets.
+    var ratio = 0.5
+    /// Stacked top and bottom instead of side by side.
+    var vertical = false
+
+    func contains(_ id: UUID) -> Bool { left == id || right == id }
+}
+
+/// The same pinned split pairs the same pages in the same order. Its size and direction are left out, so resizing it
+/// doesn't count as changing the library, and ⌘Z for what came before still works.
+extension PinnedSplit: Equatable {
+    static func == (a: PinnedSplit, b: PinnedSplit) -> Bool { a.left == b.left && a.right == b.right }
+}
+
 struct SpaceInfo: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
@@ -22,6 +41,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var bookmarks: [Bookmark] = []
     /// Folders of pinned pages. Nil: none yet (older libraries).
     var folders: [BookmarkFolder]? = nil
+    /// Pinned pages kept together as split views. Nil: none (older libraries too).
+    var pinnedSplits: [PinnedSplit]? = nil
     /// A custom tint picked on the hue slider (0…1). Overrides `color` when set.
     var hue: Double? = nil
     /// How strong a custom tint is (0 = barely there, 1 = rich). Only used with `hue`.
@@ -404,9 +425,12 @@ final class Library {
         return bookmark
     }
 
-    func removeBookmark(_ id: UUID) {
-        favorites.removeAll { $0.id == id }
-        for s in spaces.indices { spaces[s].bookmarks.removeAll { $0.id == id }; tidyFolders(s) }
+    func removeBookmark(_ id: UUID) { removeBookmarks([id]) }
+
+    /// Several at once, in one change (both pages of a pinned split).
+    func removeBookmarks(_ ids: [UUID]) {
+        favorites.removeAll { ids.contains($0.id) }
+        for s in spaces.indices { spaces[s].bookmarks.removeAll { ids.contains($0.id) }; tidyFolders(s) }
         commit()
     }
 
@@ -425,21 +449,29 @@ final class Library {
     }
 
     /// Moves a pinned page to a place in a space's list. `folder`: the folder it lands in (nil: none); when left
-    /// out, it keeps the folder it's in if it stays in the same space.
+    /// out, it keeps the folder it's in if it stays in the same space. Half of a pinned split moves the pair.
     func moveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?? = .none) {
-        guard let bookmark = bookmark(id), let target = self.index(of: spaceID) else { return }
+        guard bookmark(id) != nil, let target = self.index(of: spaceID) else { return }
         let from = self.spaceID(ofBookmark: id)
-        for s in spaces.indices { spaces[s].bookmarks.removeAll { $0.id == id } }
+        let pinned = pinnedSplit(containing: id)
+        let ids = pinned.map { [$0.left, $0.right] } ?? [id]
+        let moving = ids.compactMap(bookmark)
+        for s in spaces.indices { spaces[s].bookmarks.removeAll { ids.contains($0.id) } }
         let at = max(0, min(index, spaces[target].bookmarks.count))
-        spaces[target].bookmarks.insert(bookmark, at: at)
+        spaces[target].bookmarks.insert(contentsOf: moving, at: at)
         let keep: UUID? = from == spaceID ? folderID(containing: id) : nil
         let landsIn: UUID? = switch folder { case .some(let chosen): chosen; case .none: keep }
         for s in spaces.indices {
-            for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == id } }
+            for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { ids.contains($0) } }
         }
         if let landsIn, let f = spaces[target].folders?.firstIndex(where: { $0.id == landsIn }) {
             // In the folder at the place it was dropped, by the list's order.
-            spaces[target].folders?[f].bookmarkIDs.append(id)
+            spaces[target].folders?[f].bookmarkIDs.append(contentsOf: ids)
+        }
+        // Into another space, the pair stays a pair there.
+        if let pinned, let from, let s = self.index(of: from), s != target {
+            spaces[s].pinnedSplits?.removeAll { $0 == pinned }
+            spaces[target].pinnedSplits = (spaces[target].pinnedSplits ?? []) + [pinned]
         }
         tidyFolders(target, keepingPlaceOf: id)
         if let from, let s = self.index(of: from), s != target { tidyFolders(s) }
@@ -496,6 +528,8 @@ final class Library {
 
     /// Puts a pinned page in a folder of its space (at the end of it), or takes it out of any folder (nil).
     func setFolder(of bookmarkID: UUID, to folderID: UUID?) {
+        // A pinned split goes in as one: its left page leads, and its right one follows it there.
+        let bookmarkID = pinnedSplit(containing: bookmarkID)?.left ?? bookmarkID
         guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == bookmarkID } }) else { return }
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == bookmarkID } }
         if let folderID, let f = spaces[s].folders?.firstIndex(where: { $0.id == folderID }) {
@@ -517,9 +551,89 @@ final class Library {
 
     /// Keeps folders honest: only pages still in the space, and each folder's pages side by side in the list, where
     /// its first page is (or, for `keeping`, around the page just moved, so a drop lands where it was dropped).
+    /// Pinned splits too: each keeps both its pages, side by side, or ends.
     private func tidyFolders(_ s: Int, keepingPlaceOf moved: UUID? = nil) {
-        guard let folders = spaces[s].folders, !folders.isEmpty else { return }
-        (spaces[s].bookmarks, spaces[s].folders) = Self.tidied(spaces[s].bookmarks, folders)
+        let folders = spaces[s].folders ?? [], splits = spaces[s].pinnedSplits ?? []
+        guard !folders.isEmpty || !splits.isEmpty else { return }
+        let tidy = Self.tidied(spaces[s].bookmarks, folders, splits)
+        spaces[s].bookmarks = tidy.bookmarks
+        if spaces[s].folders != nil { spaces[s].folders = tidy.folders }
+        spaces[s].pinnedSplits = tidy.splits.isEmpty ? nil : tidy.splits
+    }
+
+    /// The rule behind pinned splits, on its own so it can be checked: a split keeps two different pages that are in
+    /// the list and in no other split, and its right page sits just after its left one, in the same folder.
+    nonisolated static func tidied(_ bookmarks: [Bookmark], _ folders: [BookmarkFolder], _ splits: [PinnedSplit])
+        -> (bookmarks: [Bookmark], folders: [BookmarkFolder], splits: [PinnedSplit]) {
+        let ids = Set(bookmarks.map(\.id))
+        var paired: Set<UUID> = []
+        let kept = splits.filter { split in
+            guard split.left != split.right, ids.contains(split.left), ids.contains(split.right),
+                  !paired.contains(split.left), !paired.contains(split.right) else { return false }
+            paired.formUnion([split.left, split.right])
+            return true
+        }
+        var list = bookmarks
+        var folders = folders
+        for split in kept {
+            guard let from = list.firstIndex(where: { $0.id == split.right }) else { continue }
+            let right = list.remove(at: from)
+            list.insert(right, at: (list.firstIndex { $0.id == split.left } ?? list.count - 1) + 1)
+            for f in folders.indices {
+                folders[f].bookmarkIDs.removeAll { $0 == split.right }
+                if folders[f].bookmarkIDs.contains(split.left) { folders[f].bookmarkIDs.append(split.right) }
+            }
+        }
+        let (tidyList, tidyFolders) = tidied(list, folders)
+        return (tidyList, tidyFolders, kept)
+    }
+
+    // MARK: Pinned splits
+
+    func pinnedSplits(in spaceID: UUID) -> [PinnedSplit] { space(spaceID)?.pinnedSplits ?? [] }
+
+    /// The pinned split a pinned page is half of, if any.
+    func pinnedSplit(containing bookmarkID: UUID) -> PinnedSplit? {
+        for space in spaces { if let split = space.pinnedSplits?.first(where: { $0.contains(bookmarkID) }) { return split } }
+        return nil
+    }
+
+    /// Pins two pages of a split view together at a place in a space's list, the left one first, in one change.
+    func addPinnedSplit(_ left: Bookmark, _ right: Bookmark, to spaceID: UUID, at index: Int? = nil, ratio: Double = 0.5, vertical: Bool = false) {
+        guard let s = self.index(of: spaceID) else { return }
+        let at = min(index ?? spaces[s].bookmarks.count, spaces[s].bookmarks.count)
+        spaces[s].bookmarks.insert(contentsOf: [left, right], at: at)
+        var split = PinnedSplit(left: left.id, right: right.id)
+        split.ratio = ratio
+        split.vertical = vertical
+        spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [split]
+        tidyFolders(s)
+        commit()
+    }
+
+    /// Ends a pinned split; both pages stay pinned where they are.
+    func removePinnedSplit(containing bookmarkID: UUID) {
+        guard let s = spaces.firstIndex(where: { $0.pinnedSplits?.contains { $0.contains(bookmarkID) } == true }) else { return }
+        spaces[s].pinnedSplits?.removeAll { $0.contains(bookmarkID) }
+        if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
+        commit()
+    }
+
+    /// How an open pinned split was last laid out, so it opens that way again. A swap trades its pages' places in the
+    /// list too; a new size or direction is only saved.
+    func setPinnedSplitLayout(_ layout: PinnedSplit) {
+        for s in spaces.indices {
+            guard let i = spaces[s].pinnedSplits?.firstIndex(where: { $0.contains(layout.left) && $0.contains(layout.right) }) else { continue }
+            let swapped = spaces[s].pinnedSplits?[i].left != layout.left
+            spaces[s].pinnedSplits?[i] = layout
+            if swapped {
+                tidyFolders(s)
+                commit()
+            } else {
+                save()
+            }
+            return
+        }
     }
 
     /// The rule behind folders, on its own so it can be checked: each folder keeps only pages that are in the list, in
