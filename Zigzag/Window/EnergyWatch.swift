@@ -16,6 +16,8 @@ final class EnergyWatch {
     /// Each page process's CPU seconds at the last look, and how many looks in a row it's been busy.
     private var last: [Int32: Double] = [:]
     private var streak: [Int32: Int] = [:]
+    /// When the last look was, since a timer with slack doesn't fire exactly on the interval.
+    private var lastLook: Date?
     /// Pages already told about, by tab and site, so it's said once.
     private var told: Set<String> = []
 
@@ -24,18 +26,23 @@ final class EnergyWatch {
         timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { _ in
             MainActor.assumeIsolated { EnergyWatch.shared.look() }
         }
+        // It's a slow watch: let the system batch it with other wake-ups.
+        timer?.tolerance = 2.5
     }
 
     private func look() {
         var seen: Set<Int32> = []
+        let now = Date()
+        let elapsed = lastLook.map { now.timeIntervalSince($0) } ?? Self.interval
+        lastLook = now
         for controller in WindowManager.shared.controllers {
             for tab in controller.tabManager.allTabs {
                 guard let webView = tab.webView, let pid = Self.processID(of: webView), pid > 0,
                       seen.insert(pid).inserted else { continue }
-                let now = ProcessCPU.seconds(pid)
-                defer { last[pid] = now }
+                let cpu = ProcessCPU.seconds(pid)
+                defer { last[pid] = cpu }
                 guard let before = last[pid] else { continue }
-                let share = (now - before) / Self.interval
+                let share = (cpu - before) / max(elapsed, 1)
                 streak[pid] = share >= Self.busy ? (streak[pid] ?? 0) + 1 : 0
                 // Playing something is meant to work hard.
                 guard streak[pid] ?? 0 >= Self.rounds, !tab.isPlayingAudio, let url = tab.url else { continue }

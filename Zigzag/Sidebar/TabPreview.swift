@@ -153,6 +153,8 @@ final class TabPreviewController {
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak tab] _ in
                 MainActor.assumeIsolated { tab?.captureSnapshot() }
             }
+            // Roughly once a second is plenty; slack lets the system batch the wake-ups.
+            refreshTimer?.tolerance = 0.3
         }
     }
 
