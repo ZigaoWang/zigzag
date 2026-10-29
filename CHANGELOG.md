@@ -5,30 +5,33 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-30
+
 ### New
-- Passkeys work, signed in with Touch ID or your phone, as in Safari.
-- PDFs open in Zigzag's own viewer, with pages and contents down the side, jump to a page, two pages side by side, dark pages, find and save. A PDF reopens on the page you left it at.
+- Passkeys work, with Touch ID or your phone, as in Safari.
+- PDFs open in Zigzag's own viewer: pages and contents down the side, jump to a page, two pages side by side, dark pages, find and save. A PDF reopens on the page you left it at.
+- History opens as a page in a tab (⌘Y), grouped by day, with search.
 - Take a screenshot of a whole page with ⇧⌘2, or from the site panel. It's copied, ready to paste or save.
 - Pin a split view and it stays a split: both pages in one row, and clicking it opens them side by side.
-- Search in the all-tabs view (⇧⌘\), close tabs there with ×, and see each site's icon on tabs that are asleep.
-- A cleaner site panel, and permission requests that hang from the address bar with Allow This Time.
+- Search in the all-tabs view (⇧⌘\), and close tabs there with ×.
+- A cleaner site panel, with your actions and extensions in one row of buttons.
+- Permission requests show on the page that asked, with Allow This Time.
 
 ### Changed
 - Zigzag's code is now open source under the Apache License 2.0, instead of the Functional Source License. The Zigzag name, icon and logo stay trademarks, so forks use their own.
 - Every shortcut except ⌘T now animates, so you can see what ⌘W and the others changed.
+- Clear sits on its own line above your tabs, away from New Tab.
 
 ### Fixed
-- Back on a tab a link opened closes it and takes you back to the page you came from, as in Safari and Chrome. It works with the button, a swipe and ⌘[.
+- Back on a tab a link opened closes it and takes you back to the page you came from, as in Safari and Chrome.
+- With the sidebar hidden or in full screen, downloads, Downloads and extension popups show in the right place.
+- Links that open an app, like a meeting link, ask first, and open straight away on sites you've said yes to.
+- 1Password wakes up less, no longer opens its welcome page when it's slow, and works in sign-in windows.
 - Clicking Clear again after your tabs are gone leaves the space empty instead of opening a pinned page.
-- Clear sits at the end of the New Tab row, beside the tabs it closes.
-- Selecting the address no longer looks cut off.
-- PDFs and files are named after the file instead of New Tab.
-- A tab preview no longer stays on screen after its tab closes or you switch to another app.
-- In split view, find sits over the page it's searching, and clicking it no longer switches pages.
-- Links that open an app, like a meeting link, ask with a clear prompt, and open straight away on sites you've said yes to.
-- 1Password wakes up less, no longer opens its welcome page when it's slow, and its shortcut and popup work in sign-in windows.
-- With 1Password on, sites can use the passkeys it saves.
-- A sign-in window whose page crashes loads again instead of staying blank.
+- Tab previews no longer get stuck on screen.
+- In split view, find sits over the page it's searching.
+- Favorites and pinned tabs show their icon as soon as it arrives.
+- Selecting the address no longer looks cut off, and PDFs and files are named after the file.
 - Zigzag uses less energy in the background: idle pages in other spaces sleep, and animations and timers pause when you can't see them.
 
 ## [0.1.12] - 2026-10-27
@@ -197,7 +200,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ZigaoWang/zigzag/compare/v0.1.12...v0.2.0
 [0.1.12]: https://github.com/ZigaoWang/zigzag/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/ZigaoWang/zigzag/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/ZigaoWang/zigzag/compare/v0.1.9...v0.1.10
