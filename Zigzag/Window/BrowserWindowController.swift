@@ -536,6 +536,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
+    /// shows, or the top left of the page while it's hidden, so they never open off screen.
+    var addressAnchor: (view: NSView, rect: NSRect) {
+        if root.sidebarVisible || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
+        let card = root.cardFrame
+        return (root.overlay, NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x2, width: 1, height: 1))
+    }
+
     /// The page you're working in: the whole page area, or in split view the focused pane.
     var focusedPaneFrame: NSRect {
         guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.splitRatio != nil else { return root.cardFrame }
@@ -840,6 +848,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let host = overlay.layer, let window, !Tokens.Motion.reduceMotion else { return }
         let anchor = sidebar.downloadsAnchor
         let sidebarShown = root.sidebarVisible || root.isSidebarFloatingVisible
+        // Nowhere to fly to with the sidebar hidden: the panel opens over the page instead, showing it come in.
+        guard sidebarShown else {
+            if refresh, !hasFloatingPanel, window.isKeyWindow { DownloadsPanel.reveal(from: anchor, in: self, closingAfter: item) }
+            return
+        }
         let card = root.cardFrame
         // From the pointer if it's over the page, otherwise the middle of the page.
         let mouse = overlay.convert(window.mouseLocationOutsideOfEventStream, from: nil)

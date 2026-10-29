@@ -36,9 +36,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func showDownloads(_ sender: Any?) {
-        // From the sidebar's Downloads button when it's there; from the address otherwise.
+        // From the sidebar's Downloads button when it's there. With the sidebar hidden it opens over the page and
+        // the sidebar stays hidden, as you left it.
         let anchor = sidebar.downloadsAnchor.isHidden ? sidebar.address : sidebar.downloadsAnchor
-        if !root.sidebarVisible { toggleBrowserSidebar(sender) }
         DownloadsPanel.show(from: anchor, in: self)
     }
 
@@ -124,10 +124,10 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// File › Share…: the page's address and title to Messages, Mail, AirDrop, Notes and the rest, from the address bar.
     @objc func sharePage(_ sender: Any?) {
         guard let tab = selectedTab, let url = tab.url else { return }
-        if !root.sidebarVisible { root.reveal(true) }
-        let anchor = sidebar.address
+        // From the address bar, or the top of the page with the sidebar hidden, which stays hidden.
+        let anchor = addressAnchor
         let picker = NSSharingServicePicker(items: [url as NSURL])
-        picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+        picker.show(relativeTo: anchor.rect, of: anchor.view, preferredEdge: .maxY)
     }
 
     /// File › Save Page As…: the page as a web archive, pictures and all, that opens offline; a PDF or picture open in

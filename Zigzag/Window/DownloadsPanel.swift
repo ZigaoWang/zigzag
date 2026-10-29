@@ -263,7 +263,8 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         controller.root.overlay.addSubview(self)
         reload()
-        growsFrom = CGPoint(x: 0.1, y: 1)
+        let inSidebar = controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible
+        growsFrom = inSidebar ? CGPoint(x: 0.1, y: 1) : CGPoint(x: 0.1, y: 0)
         present(arrival: arrival)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Only its own window: keys and clicks in Settings or another window are theirs.
@@ -355,6 +356,12 @@ final class DownloadsPanelView: FloatingPanelView {
         let header = Tokens.Space.x10
         let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * rowHeight
         let height = header + body + footer
+        // Sidebar hidden: a card at the top left of the page, where the sidebar would be, never off screen.
+        guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else {
+            let card = controller.root.cardFrame, inset = Tokens.Space.x3
+            frame = NSRect(x: card.minX + inset, y: card.minY + inset, width: 320, height: min(height, card.height - inset * 2))
+            return
+        }
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         let lane = sidebarLane ?? (max(Tokens.Metric.cardInset, anchorFrame.minX), 300)
         frame = NSRect(x: lane.x, y: anchorFrame.minY - Tokens.Space.x2 - height, width: lane.width, height: height)
