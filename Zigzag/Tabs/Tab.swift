@@ -617,15 +617,15 @@ extension Tab: WKNavigationDelegate {
                 return (.cancel, preferences)
             }
         }
+        if isMainFrame {
+            pdfFreshLoad = navigationAction.navigationType != .backForward
+            pageIsGet = (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
+        }
         return (.allow, preferences)
     }
 
     /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: the last two parts of
     /// the host, or three under a country's own second level (bbc.co.uk).
-        if isMainFrame {
-            pdfFreshLoad = navigationAction.navigationType != .backForward
-            pageIsGet = (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
-        }
     static func site(of url: URL) -> String? {
         guard let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
         let parts = host.split(separator: ".")
@@ -868,12 +868,12 @@ extension Tab {
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
+                let showing = self.pdfViewer?.url == url
                 // A PDF has no page title, so the last page's would linger: it's named by its file until it says more.
                 if !showing {
                     let file = url.lastPathComponent
                     self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
                     self.changed.send(.title)
-                let showing = self.pdfViewer?.url == url
                 }
                 // In peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
                 guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
@@ -901,21 +901,21 @@ extension Tab {
                     // The PDF's own title, when it has one, rather than its file name.
                     if let name = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String,
                        !name.trimmingCharacters(in: .whitespaces).isEmpty {
+                        viewer.documentTitle = name
                         self.title = name
                         self.changed.send(.title)
                     }
                 }
             }
-                        viewer.documentTitle = name
         }
     }
 
     fileprivate func setPDFViewer(_ viewer: PDFViewerView?) {
         guard viewer !== pdfViewer else { return }
+        // The old viewer's fetch has nowhere to go.
+        pdfTask?.cancel()
+        pdfTask = nil
         pdfViewer = viewer
         changed.send(.pdf)
     }
 }
-        // The old viewer's fetch has nowhere to go.
-        pdfTask?.cancel()
-        pdfTask = nil
