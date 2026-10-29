@@ -243,23 +243,22 @@ final class ExtensionHost: NSObject {
             ExtensionStore.setSiteAccess(item.id, .click, sites: ExtensionStore.accessSites(item.id) + [site])
             tab?.reload()
         }
-        // A click always does something: if the extension shows no popup and opens no page, its own options
-        // (or, for 1Password, its setup) page opens instead.
+        // A click always does something: if the extension has no popup at all and opens no page, its options page
+        // opens instead. One with a popup is left alone, however long it takes: a locked 1Password is slow, not broken.
         popupShownAt = nil
         let tabsBefore = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
         let context = item.context
-        ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(context.action(for: tab)?.presentsPopup ?? false)")
+        let hasPopup = context.action(for: tab)?.presentsPopup ?? false
+        ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(hasPopup)")
         context.performAction(for: tab)
+        guard !hasPopup else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self, self.popupShownAt == nil else { return }
             let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
-            guard tabsNow == tabsBefore else { return }
-            let fallback = context.uniqueIdentifier == ExtensionStore.onePasswordID || context.webExtension.displayName == "1Password"
-                ? URL(string: "\(context.baseURL.absoluteString)app/app.html#/page/welcome")
-                : context.optionsPageURL
-            ExtensionLog.write("click did nothing; opening \(fallback?.absoluteString ?? "nothing")")
-            guard let fallback, let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
-            controller.tabManager.newTab(url: fallback)
+            guard tabsNow == tabsBefore, let options = context.optionsPageURL,
+                  let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            ExtensionLog.write("click did nothing; opening its options")
+            controller.tabManager.newTab(url: options)
         }
     }
 
