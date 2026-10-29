@@ -341,7 +341,8 @@ class RibbonView: NSView {
     /// A stretch of stroke flows along the ribbon at an even pace for as long as something loads: as it leaves
     /// the end it is already coming back in at the start, so there's no pause, no restart and no easing seam.
     func startLooping() {
-        guard !isLooping else { return }
+        // A new load before the last one's fade finished: the time limit starts over, and it moves again.
+        if isLooping { limitWork?.cancel(); limitReached = false }
         isLooping = true
         if let loopLimit {
             let work = DispatchWorkItem { [weak self] in
