@@ -152,6 +152,13 @@ final class SitePanel: FloatingPanelView {
         if floating || tab.webView?.canTogglePictureInPicture ?? false {
             specs.append(("pip", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
+        if PageScreenshot.canTake(tab), !readerOn {
+            specs.append(("camera.viewfinder", "Screenshot", false, { [weak self] in
+                guard let self, let controller = self.controller else { return }
+                self.close()
+                PageScreenshot.take(self.tab, in: controller)
+            }))
+        }
         if tab.foreignLanguage != nil || tab.isTranslated {
             specs.append(("translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
         }
