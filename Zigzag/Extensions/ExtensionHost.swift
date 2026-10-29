@@ -541,7 +541,8 @@ extension Tab: WKWebExtensionTab {
     }
 
     func goBack(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        goBack(); completionHandler(nil)
+        // The page's own history only: an extension going back never closes the tab, as in Chrome.
+        webView?.goBack(); completionHandler(nil)
     }
 
     func goForward(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
