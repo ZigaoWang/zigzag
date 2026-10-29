@@ -376,7 +376,9 @@ final class DeskController {
                 self.reload(animated: true)
             }
             card.onDragStart = { [weak self, weak tab] event in
-                guard let self, let tab else { return false }
+                // While searching, the cards in between are hidden, so where a drop lands in the list is a guess:
+                // no reordering until the search is cleared.
+                guard let self, let tab, self.query.isEmpty else { return false }
                 return self.beginDrag(tab, event: event)
             }
             card.onRightClick = { [weak self, weak tab] _ in
