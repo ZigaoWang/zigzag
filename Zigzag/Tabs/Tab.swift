@@ -27,6 +27,8 @@ enum OpenDisposition {
 final class Tab: NSObject {
     enum Change {
         case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language
+        /// You renamed it (it also sends `.title`).
+        case renamed
     }
 
     let id: UUID
@@ -121,7 +123,7 @@ final class Tab: NSObject {
     /// calendar.google.com) counts as the pinned page, so it's never "moved on" before you've done anything.
     var landingUntil: Date?
     var pinnedLanding: URL?
-    var customTitle: String? { didSet { if oldValue != customTitle { changed.send(.title) } } }
+    var customTitle: String? { didSet { if oldValue != customTitle { changed.send(.title); changed.send(.renamed) } } }
 
     var displayTitle: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }

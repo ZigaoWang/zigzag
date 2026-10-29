@@ -28,12 +28,22 @@ final class TabManager {
     private var libraryToken: SignalToken?
     private var tabTokens: [UUID: SignalToken] = [:]
 
-    /// Watches a tab so navigation inside it gets saved for crash recovery. Not every title change: pages that
-    /// count down or flash "(1) New message" would otherwise save the whole session every second or two.
+    /// Watches a tab so navigation inside it gets saved for crash recovery. A page's own title saves at most every
+    /// half minute: pages that count down or flash "(1) New message" would otherwise save the whole session every
+    /// second or two. A name you give a tab saves at once.
     private func watch(_ tab: Tab) {
         tab.privateStore = privateStore
+        var lastTitleSave = Date.distantPast
         tabTokens[tab.id] = tab.changed.observe { [weak self] change in
-            if change == .url || change == .audio { self?.changed.send(.content) }
+            switch change {
+            case .url, .audio, .renamed:
+                self?.changed.send(.content)
+            case .title where Date().timeIntervalSince(lastTitleSave) > 30:
+                lastTitleSave = Date()
+                self?.changed.send(.content)
+            default:
+                break
+            }
         }
     }
     private var suspendTimer: Timer?
