@@ -197,6 +197,8 @@ h1 { font-size: 20px; font-weight: 600; margin: 0; flex: 1; }
 .row:hover { background: var(--hover); }
 .row img, .row .dot { width: 16px; height: 16px; flex: none; border-radius: 3px; }
 .row .dot { background: var(--field); }
+/* Dark: icons drawn in black (GitHub, Wikipedia) sit on a light tile, as in the sidebar. */
+@media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; border-radius: 4px; } }
 .row .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .host { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 40px; }
 .row time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
