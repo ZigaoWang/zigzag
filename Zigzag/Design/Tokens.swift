@@ -133,11 +133,12 @@ enum Tokens {
         static let gentle = Curve(duration: large)
         static let feedback = Curve(duration: quick)
 
-        /// True while handling a keypress. Keyboard actions take effect instantly; only pointer actions animate
-        /// (the Raycast rule: the keyboard is for speed).
+        /// True while handling ⌘T: a new tab is for typing at once, so it appears instantly. Every other shortcut
+        /// (⌘W, switching tabs and spaces) animates like the same action done with the pointer, so you see what changed.
         static var isKeyboardDriven: Bool {
-            guard let type = NSApp.currentEvent?.type else { return false }
-            return type == .keyDown || type == .keyUp || type == .flagsChanged
+            guard let event = NSApp.currentEvent, event.type == .keyDown else { return false }
+            return event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+                && event.charactersIgnoringModifiers?.lowercased() == "t"
         }
 
         /// Runs AppKit animator() changes. Frames jump to their final values right away (so layout and
