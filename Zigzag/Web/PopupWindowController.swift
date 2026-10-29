@@ -118,6 +118,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         await PageDialogs.confirm(message: message, frame: frame, window: window)
     }
 
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo) async -> String? {
+        await PageDialogs.prompt(message: prompt, defaultText: defaultText, frame: frame, window: window)
+    }
+
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo) async -> [URL]? {
         await PageDialogs.openPanel(parameters: parameters, window: window)
     }
