@@ -9,7 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Passkeys work, signed in with Touch ID or your phone, as in Safari.
 - Take a screenshot of a whole page with ⇧⌘2, or from the site panel. It's copied, ready to paste or save.
 - Pin a split view and it stays a split: both pages in one row, and clicking it opens them side by side.
-- Search in the all-tabs view (⇧⌘\\), close tabs there with ×, and see each site's icon on tabs that are asleep.
+- Search in the all-tabs view (⇧⌘\), close tabs there with ×, and see each site's icon on tabs that are asleep.
 - A cleaner site panel, and permission requests that hang from the address bar with Allow This Time.
 
 ### Changed
