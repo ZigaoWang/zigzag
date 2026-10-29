@@ -141,8 +141,11 @@ final class SidebarListView: NSView {
         // Collapsed, the section still shows the pinned page you're on, so where you are never disappears.
         let folders = Library.shared.folders(in: spaceID)
         indented = []
+        // The right page of a pinned split rides in its left page's row, as a split among tabs does.
+        let riders = Set(Library.shared.pinnedSplits(in: spaceID).map(\.right))
+        let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
         if collapsed {
-            result += bookmarks.filter { $0.id == manager.selectedTab?.bookmarkID }.map { .bookmark($0.id) }
+            result += bookmarks.filter { $0.id == current }.map { .bookmark($0.id) }
         } else {
             // A folder sits where its first page is, its pages after it; a closed one still shows the page you're on.
             var folderOf: [UUID: BookmarkFolder] = [:]
@@ -150,11 +153,11 @@ final class SidebarListView: NSView {
             var placed: Set<UUID> = []
             // A new, empty folder sits at the top, where you'll see it and can drop pages in.
             for folder in folders where folder.bookmarkIDs.isEmpty { result.append(.folder(folder.id)) }
-            for bookmark in bookmarks {
+            for bookmark in bookmarks where !riders.contains(bookmark.id) {
                 guard let folder = folderOf[bookmark.id] else { result.append(.bookmark(bookmark.id)); continue }
                 guard placed.insert(folder.id).inserted else { continue }
                 result.append(.folder(folder.id))
-                let members = folder.isOpen ? folder.bookmarkIDs : folder.bookmarkIDs.filter { $0 == manager.selectedTab?.bookmarkID }
+                let members = folder.isOpen ? folder.bookmarkIDs.filter { !riders.contains($0) } : folder.bookmarkIDs.filter { $0 == current }
                 for id in members { result.append(.bookmark(id)); indented.insert(id) }
             }
         }
@@ -168,6 +171,17 @@ final class SidebarListView: NSView {
         let rightHalves = Set(manager.splits.filter { rowIDs.contains($0.left) }.map(\.right))
         result += tabs.filter { !rightHalves.contains($0.id) }.map { .tab($0.id) }
         return result
+    }
+
+    /// The pinned page whose row shows this one: itself, or for the right half of a pinned split, its left half.
+    static func rowID(_ bookmarkID: UUID) -> UUID {
+        Library.shared.pinnedSplit(containing: bookmarkID)?.left ?? bookmarkID
+    }
+
+    /// How many pinned pages a row holds, for working out where a drop lands: two for a pinned split.
+    private static func pageCount(_ item: SidebarItem) -> Int {
+        guard case .bookmark(let id) = item else { return 0 }
+        return Library.shared.pinnedSplit(containing: id)?.left == id ? 2 : 1
     }
 
     // MARK: Layout
@@ -330,7 +344,8 @@ final class SidebarListView: NSView {
     private func hiddenCount(_ folderID: UUID, shown items: [SidebarItem]) -> Int {
         guard let folder = Library.shared.folder(folderID), !folder.isOpen else { return 0 }
         let dragged: UUID? = { if case .bookmark(let id)? = drag?.item { id } else { nil } }()
-        return folder.bookmarkIDs.filter { $0 != dragged && !items.contains(.bookmark($0)) }.count
+        // A pinned split's right page is counted with its row.
+        return folder.bookmarkIDs.filter { Self.rowID($0) != dragged && !items.contains(.bookmark(Self.rowID($0))) }.count
     }
 
     /// The folder a drop at the gap would go into: right under an open folder, between two of its pages, or just
@@ -462,13 +477,23 @@ final class SidebarListView: NSView {
                 guard !name.isEmpty else { return }
                 self?.delegate?.listRenameBookmark(id, to: name)
             }
-            row.onClick = { [weak self] event in
-                guard let self, let bookmark = Library.shared.bookmark(id) else { return }
+            row.onClick = { [weak self, weak row] event in
+                guard let self, let row else { return }
                 if self.mark(item, with: event) { return }
-                self.delegate?.listOpenBookmark(bookmark)
+                // A pinned split row: each half opens its own page, and both open side by side.
+                var opening = id
+                if row.half(at: row.convert(event.locationInWindow, from: nil)) == 1, let pinned = Library.shared.pinnedSplit(containing: id) {
+                    opening = pinned.right
+                }
+                if let bookmark = Library.shared.bookmark(opening) { self.delegate?.listOpenBookmark(bookmark) }
             }
             row.onClose = { [weak self, weak row] in
-                if let tab = row?.tab { self?.delegate?.listClose(tab) }
+                guard let self, let row else { return }
+                // A pinned split row unloads both its pages, the one you're not on first.
+                let selected = self.manager?.selectedTab
+                for tab in [row.partner, row.tab].compactMap({ $0 }).sorted(by: { $1 === selected && $0 !== selected }) {
+                    self.delegate?.listClose(tab)
+                }
             }
             row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
@@ -517,9 +542,21 @@ final class SidebarListView: NSView {
             let away = manager.isAway(id)
             row.isAway = away
             row.fixedTitle = away ? nil : bookmark.title
-            row.isUnloaded = tab == nil
             row.configure(tab: tab)
-            row.isSelected = tab != nil && tab === selected
+            // A pinned split shows both its pages, open or not, the way a split among tabs does.
+            let pinned = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? Library.shared.bookmark($0.right) : nil }
+            let partner = pinned.flatMap { manager.bookmarkTab(for: $0.id) }
+            if let pinned {
+                let icon = FaviconStore.shared.cachedIcon(for: pinned.url)
+                if icon == nil { FaviconStore.shared.prefetch(for: pinned.url) }
+                row.configure(pinnedPartner: pinned.title, icon: icon, unloaded: partner == nil)
+            } else {
+                row.configure(pinnedPartner: nil, icon: nil, unloaded: false)
+            }
+            row.configure(partner: partner)
+            row.isUnloaded = tab == nil && partner == nil
+            row.isSelected = (tab != nil && tab === selected) || (partner != nil && partner === selected)
+            row.focusedHalf = partner != nil && partner === selected ? 1 : 0
             row.isMarked = marked.contains(item)
         default:
             break
@@ -567,7 +604,7 @@ final class SidebarListView: NSView {
     /// The row of the tab you're on, if it's in this list.
     private var currentItem: SidebarItem? {
         guard let tab = manager?.selectedTab else { return nil }
-        if let id = tab.bookmarkID, items.contains(.bookmark(id)) { return .bookmark(id) }
+        if let id = tab.bookmarkID.map(Self.rowID), items.contains(.bookmark(id)) { return .bookmark(id) }
         return items.contains(.tab(tab.id)) ? .tab(tab.id) : nil
     }
 
@@ -598,7 +635,7 @@ final class SidebarListView: NSView {
     }
 
     /// The row showing a tab, for pointing at it (the Getting started guide).
-    func rowView(for tab: Tab) -> NSView? { tab.bookmarkID.flatMap { rows[.bookmark($0)] } ?? rows[.tab(tab.id)] }
+    func rowView(for tab: Tab) -> NSView? { tab.bookmarkID.flatMap { rows[.bookmark(Self.rowID($0))] } ?? rows[.tab(tab.id)] }
 
     /// The space's name scrolls with the list like any row: a block of flat color pinned over the grain and
     /// gradient read as a smudge, and the line under the favorites already marks where the list begins.
@@ -632,7 +669,7 @@ final class SidebarListView: NSView {
     }
 
     func row(for tab: Tab) -> NSView? {
-        if let bookmarkID = tab.bookmarkID { return rows[.bookmark(bookmarkID)] }
+        if let bookmarkID = tab.bookmarkID { return rows[.bookmark(Self.rowID(bookmarkID))] }
         return rows[.tab(tab.id)]
     }
 
@@ -675,7 +712,7 @@ final class SidebarListView: NSView {
                 var count = 0
                 while at < base.count, count < index {
                     switch base[at] {
-                    case .bookmark: count += 1
+                    case .bookmark: count += Self.pageCount(base[at])
                     case .folder(let id): count += hiddenCount(id, shown: base)
                     default: break
                     }
@@ -701,7 +738,7 @@ final class SidebarListView: NSView {
         if item != nil, y < separatorMid {
             var count = 0
             for (row, frame) in layout where frame.midY < y {
-                if case .bookmark = row { count += 1 }
+                count += Self.pageCount(row)
                 if case .folder(let id) = row { count += hiddenCount(id, shown: base) }
             }
             return (.bookmarks, count)

@@ -152,6 +152,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var isUnloaded = false { didSet { refreshTitleColor() } }
     /// The other half of a split: shown in the same row, to the right.
     private(set) var partner: Tab?
+    /// A pinned split's other page, by its pinned name and icon: there whether or not its page is open.
+    private var pinnedPartner: (title: String, icon: NSImage?, unloaded: Bool)?
+    /// Two pages in one row: a split of tabs, or a pinned split.
+    var isSplit: Bool { partner != nil || pinnedPartner != nil }
     /// Which half you're working in, when split (0 = left, 1 = right).
     var focusedHalf = 0 { didSet { refreshTitleColor() } }
     private var partnerToken: SignalToken?
@@ -207,13 +211,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerToken = partner?.changed.observe { [weak self] change in
             if change == .title || change == .favicon || change == .loading || change == .url { self?.refreshPartner() }
         }
-        [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = partner == nil }
+        [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
+        refreshPartner()
+    }
+
+    func configure(pinnedPartner title: String?, icon: NSImage?, unloaded: Bool) {
+        pinnedPartner = title.map { ($0, icon, unloaded) }
+        [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
     }
 
     private func refreshPartner() {
-        partnerTitle.stringValue = partner?.displayTitle ?? ""
-        partnerIcon.image = partner?.favicon
+        partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
+        partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
         refreshAccessibilityLabel()
         refreshTitleColor()
@@ -222,7 +232,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
-        setAccessibilityLabel(partner == nil ? title.stringValue : "\(title.stringValue), split with \(partnerTitle.stringValue)")
+        setAccessibilityLabel(!isSplit ? title.stringValue : "\(title.stringValue), split with \(partnerTitle.stringValue)")
         // What VoiceOver says after the name: the tab you're on, and whether it's playing or muted.
         let state = [isSelected ? "current tab" : nil, tab?.isMuted == true ? "muted" : tab?.isPlayingAudio == true ? "playing audio" : nil]
             .compactMap { $0 }.joined(separator: ", ")
@@ -232,7 +242,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// Which half of a split row a point (in this view) falls in.
     func half(at point: NSPoint) -> Int {
-        partner != nil && point.x > bounds.midX ? 1 : 0
+        isSplit && point.x > bounds.midX ? 1 : 0
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -275,9 +285,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func refreshTitleColor() {
         title.textColor = isUnloaded && !isSelected ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
-        let split = partner != nil
+        let split = isSplit
         title.font = Tokens.Font.body(isSelected && (!split || focusedHalf == 0) ? .medium : .regular)
-        partnerTitle.textColor = Tokens.Color.textPrimary
+        partnerTitle.textColor = pinnedPartner?.unloaded == true && !isSelected ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
         partnerTitle.font = Tokens.Font.body(isSelected && focusedHalf == 1 ? .medium : .regular)
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))
@@ -340,7 +350,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         layoutDropHalf()
 
         // A split shows both pages in one row: left half, a hairline, right half.
-        guard partner != nil else { return }
+        guard isSplit else { return }
         let mid = bounds.midX
         title.frame.size.width = max(0, mid - Tokens.Space.x1 - title.frame.minX)
         divider.frame = NSRect(x: mid, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
