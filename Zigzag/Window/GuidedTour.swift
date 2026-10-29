@@ -31,6 +31,10 @@ final class GuidedTour: NSView {
     private var tokens: [SignalToken] = []
     private var watch: Timer?
     private var ending = false
+    /// The app, the window, its being covered or in the Dock: whatever decides whether anyone can see the guide.
+    private var observers: [NSObjectProtocol] = []
+    /// The card has stepped aside for another panel, so its recording has no one to play to.
+    private var isAside = false
 
     /// Showing what a step just did, before the next one.
     private var confirming: Tutorial.Task?
@@ -97,13 +101,64 @@ final class GuidedTour: NSView {
         tokens.append(controller.tabManager.changed.observe { [weak self] _ in
             DispatchQueue.main.async { self?.refresh(animated: true) }
         })
-        // Follows what you're doing: the address bar opening, a peek opening and closing.
-        watch = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    isolated deinit {
+        watch?.invalidate()
+        observers.forEach(NotificationCenter.default.removeObserver)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        if let window {
+            let app: [Notification.Name] = [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification]
+            let own: [Notification.Name] = [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification]
+            for (names, object) in [(app, nil as NSWindow?), (own, window)] {
+                for name in names {
+                    observers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.pace() }
+                    })
+                }
+            }
+        }
+        pace()
+    }
+
+    /// Whether you could be looking at the guide: Zigzag in front, and this window on screen and not covered.
+    private var canBeSeen: Bool {
+        guard let window, NSApp.isActive else { return false }
+        return window.isVisible && !window.isMiniaturized && window.occlusionState.contains(.visible)
+    }
+
+    /// Follows along, and plays the recording, only while it can be seen; both pick up where they were when it can again.
+    private func pace() {
+        if !ending, canBeSeen {
+            if watch == nil {
+                // Follows what you're doing: the address bar opening, a peek opening and closing.
+                let timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.tick() }
+                }
+                timer.tolerance = 0.05
+                watch = timer
+            }
+        } else {
+            watch?.invalidate()
+            watch = nil
+        }
+        updatePlayback()
+    }
+
+    /// The recording plays only while the card is up, showing it, where you can see it.
+    private func updatePlayback() {
+        guard let player else { return }
+        let play = !ending && !isAside && !video.isHidden && canBeSeen
+        if play, player.rate == 0 { player.play() }
+        if !play, player.rate != 0 { player.pause() }
+    }
     override var isFlipped: Bool { true }
 
     /// Everything outside the pill goes straight to the browser, so you can do the step while the guide is up.
@@ -116,6 +171,7 @@ final class GuidedTour: NSView {
         watch?.invalidate()
         watch = nil
         tokens = []
+        updatePlayback()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.2
             self.animator().alphaValue = 0
@@ -142,6 +198,10 @@ final class GuidedTour: NSView {
             let onTop = peek && Tutorial.current?.id == "peek"
             if onTop, overlay.subviews.last !== self { overlay.addSubview(self) }
             if !onTop, overlay.subviews.first !== self { overlay.addSubview(self, positioned: .below, relativeTo: nil) }
+        }
+        if isAside != aside {
+            isAside = aside
+            updatePlayback()
         }
         let alpha: CGFloat = aside ? 0 : 1
         if alphaValue != alpha {
@@ -323,7 +383,7 @@ final class GuidedTour: NSView {
         looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
         videoLayer.player = queue
         player = queue
-        queue.play()
+        updatePlayback()
     }
 
     private func apply(_ d: Display, animated: Bool) {
@@ -407,11 +467,13 @@ final class GuidedTour: NSView {
                 layer.add(move, forKey: "move")
             }
         }
+        // This runs on every look at what you're doing; touching the layers only when something moved keeps
+        // the window from redrawing several times a second while nothing changes.
         Tokens.Motion.withoutAnimation {
-            dim.frame = bounds
-            ring.frame = bounds
-            dim.path = cut
-            ring.path = ringPath
+            if dim.frame != bounds { dim.frame = bounds }
+            if ring.frame != bounds { ring.frame = bounds }
+            if dim.path.map({ $0 != cut }) ?? true { dim.path = cut }
+            if ring.path.map({ $0 != ringPath }) ?? true { ring.path = ringPath }
         }
 
         let size = pillSize(d)
@@ -453,7 +515,7 @@ final class GuidedTour: NSView {
                 ctx.timingFunction = ease
                 card.animator().frame = frame
             }
-        } else {
+        } else if card.frame != frame {
             card.frame = frame
         }
         layoutPill(d, in: frame.size)
@@ -466,8 +528,8 @@ final class GuidedTour: NSView {
 
     /// The ring holds still: its color is enough to find it, and nothing on screen loops forever.
     private func pulse(_ on: Bool) {
-        ring.removeAnimation(forKey: "pulse")
-        ring.opacity = 1
+        if ring.animation(forKey: "pulse") != nil { ring.removeAnimation(forKey: "pulse") }
+        if ring.opacity != 1 { ring.opacity = 1 }
     }
 
     /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.
@@ -477,9 +539,11 @@ final class GuidedTour: NSView {
         let width = size.width
         let top = showsVideo(d) ? Self.videoHeight(for: width) : 0
         video.isHidden = !showsVideo(d)
+        updatePlayback()
         if showsVideo(d) {
-            video.frame = NSRect(x: 8, y: 8, width: width - 16, height: top - 8)
-            Tokens.Motion.withoutAnimation { videoLayer.frame = video.bounds }
+            let videoFrame = NSRect(x: 8, y: 8, width: width - 16, height: top - 8)
+            if video.frame != videoFrame { video.frame = videoFrame }
+            if videoLayer.frame != video.bounds { Tokens.Motion.withoutAnimation { videoLayer.frame = video.bounds } }
         }
         let height = size.height - top
         if d.isFinal {
