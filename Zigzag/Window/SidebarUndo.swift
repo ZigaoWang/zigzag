@@ -64,12 +64,20 @@ extension BrowserWindowController {
         sidebarUndo.setActionName("Split View")
     }
 
-    /// Ends a split, showing `keep` (or the tab itself) on its own.
+    /// Ends a split, showing `keep` (or the tab itself) on its own. A pinned split ends too: both pages stay pinned,
+    /// no longer a pair.
     func unsplitWithUndo(_ tab: Tab, keep: Tab? = nil) {
         guard let pair = tabManager.split(for: tab) else { return }
         let selected = tabManager.selectedTab
+        let before = Library.shared.snapshot
         if let keep { tabManager.unsplit(tab, keep: keep) } else { tabManager.unsplit(tab) }
+        if let id = tab.bookmarkID { Library.shared.removePinnedSplit(containing: id) }
+        let after = Library.shared.snapshot
         sidebarUndo.registerUndo(withTarget: self) { controller in
+            if before != after {
+                guard controller.libraryUnchanged(since: after) else { return }
+                Library.shared.restore(before)
+            }
             controller.tabManager.restoreSplit(pair)
             if let selected { controller.tabManager.select(selected) }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.unsplitWithUndo(tab, keep: keep) }

@@ -60,7 +60,9 @@ enum SidebarMenus {
         menu.addItem(Item("Copy Link", enabled: tab.url != nil) {
             if let url = tab.url { controller.copyLink(url) }
         })
-        menu.addItem(Item("Pin Tab", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
+        // Half of a split pins with its other half, as a split.
+        let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
+        menu.addItem(Item(pinsPair ? "Pin Split View" : "Pin Tab", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
         menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
         if manager.split(for: tab) != nil {
             menu.addItem(Item("Separate Tabs") { controller.unsplitWithUndo(tab) })
@@ -102,6 +104,7 @@ enum SidebarMenus {
         menu.autoenablesItems = false
         let manager = controller.tabManager
         let live = manager.bookmarkTab(for: bookmark.id)
+        let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
         menu.addItem(Item("Rename…") { BookmarkEditor.edit(bookmark.id, in: controller) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(bookmark.id) })
@@ -146,6 +149,23 @@ enum SidebarMenus {
             menu.addItem(move)
         }
         menu.addItem(.separator())
+        if let pinned {
+            // Both stay pinned, each in a row of its own.
+            menu.addItem(Item("Separate Tabs") {
+                let open = [pinned.left, pinned.right].compactMap(manager.bookmarkTab(for:)).first { manager.split(for: $0) != nil }
+                if let open {
+                    controller.unsplitWithUndo(open)
+                } else {
+                    controller.libraryChange("Separate Tabs") { Library.shared.removePinnedSplit(containing: bookmark.id) }
+                }
+            })
+            let pages = [pinned.left, pinned.right].compactMap(manager.bookmarkTab(for:))
+            if !pages.isEmpty {
+                menu.addItem(Item("Unload Pages") { manager.close(pages) })
+            }
+            menu.addItem(Item("Unpin Split View") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+            return menu
+        }
         if let live {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }

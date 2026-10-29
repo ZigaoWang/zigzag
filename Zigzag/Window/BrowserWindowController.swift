@@ -1180,7 +1180,9 @@ extension BrowserWindowController: SidebarDelegate {
     /// Turns a tab into a bookmark, undoably.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, folder: UUID? = nil) {
         Tutorial.complete("pin")
-        let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
+        // Half of a split pins the pair; ⌘Z puts the two back where the first of them was.
+        let partner = tabManager.partner(of: tab)
+        let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab || $0 === partner } ?? 0
         tabManager.bookmarkTab(tab, at: index, in: spaceID)
         guard let bookmarkID = tab.bookmarkID else { return }
         // Undoing an unpin puts it back in the folder it was in.
@@ -1192,7 +1194,9 @@ extension BrowserWindowController: SidebarDelegate {
     /// Turns a bookmark back into a tab, undoably.
     func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
         let spaceID = Library.shared.spaceID(ofBookmark: bookmarkID) ?? tabManager.currentSpaceID
-        let oldIndex = Library.shared.bookmarks(in: spaceID).firstIndex { $0.id == bookmarkID }
+        // Half of a pinned split unpins the pair, from where the first of them was.
+        let pinned = Library.shared.pinnedSplit(containing: bookmarkID)
+        let oldIndex = Library.shared.bookmarks(in: spaceID).firstIndex { $0.id == bookmarkID || pinned?.contains($0.id) == true }
         let folder = Library.shared.folderID(containing: bookmarkID)
         // Unloaded, it comes back as a new tab: ⌘Z pins that one again.
         if let tab = tabManager.unbookmark(bookmarkID, toIndex: index) {
