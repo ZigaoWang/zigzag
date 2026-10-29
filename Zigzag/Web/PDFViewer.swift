@@ -458,8 +458,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         } else {
             data = nil
         }
-        // Its pages come as `DarkablePage`, so dark pages can draw them.
-        guard let data, let document = DarkableDocument(data: data), document.pageCount > 0 else { return nil }
+        // Its pages come as `DarkablePage`, so dark pages can draw them. One behind a password is left to WebKit,
+        // which asks for it.
+        guard let data, let document = DarkableDocument(data: data), !document.isLocked, document.pageCount > 0 else { return nil }
         return (document, data)
     }
 }
