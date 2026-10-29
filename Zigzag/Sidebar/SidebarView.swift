@@ -203,6 +203,8 @@ final class SidebarView: NSView {
     let favorites = FavoritesView()
     let list = SidebarListView()
     private let scrollView = NSScrollView()
+    /// Tabs running on below the bottom of the list fade out there, rather than being sliced off by the footer.
+    private let bottomFade = CAGradientLayer()
 
     private let bottomBar = NSView()
     let nowPlaying = NowPlayingView()
@@ -242,6 +244,8 @@ final class SidebarView: NSView {
         // Like Arc, the sidebar scrolls without showing a scroll bar.
         scrollView.hasVerticalScroller = false
         addSubview(scrollView)
+        scrollView.wantsLayer = true
+        scrollView.layer?.mask = bottomFade
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
@@ -279,6 +283,7 @@ final class SidebarView: NSView {
 
     @objc private func listScrolled() {
         list.pinHeader()
+        updateBottomFade()
         let scrolled = scrollView.contentView.bounds.minY > 1
         if (topSeparator.alphaValue > 0) != scrolled {
             Tokens.Motion.animate(Tokens.Motion.feedback) { self.topSeparator.animator().alphaValue = scrolled ? 1 : 0 }
@@ -325,6 +330,23 @@ final class SidebarView: NSView {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
         }
         layoutBottomBar()
+        updateBottomFade()
+    }
+
+    private func updateBottomFade() {
+        let bounds = scrollView.bounds
+        let clip = scrollView.contentView.bounds
+        let more = list.frame.height - clip.maxY > 1
+        let fade = bounds.height > 0 ? min(Tokens.Space.x6 / bounds.height, 0.5) : 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        bottomFade.frame = bounds
+        // The mask's y runs up from the bottom: clear there while there's more below, solid everywhere else.
+        bottomFade.colors = [more ? NSColor.clear.cgColor : NSColor.black.cgColor, NSColor.black.cgColor, NSColor.black.cgColor]
+        bottomFade.locations = [0, NSNumber(value: Double(fade)), 1]
+        bottomFade.startPoint = CGPoint(x: 0.5, y: 0)
+        bottomFade.endPoint = CGPoint(x: 0.5, y: 1)
+        CATransaction.commit()
     }
 
     private func layoutBottomBar() {
