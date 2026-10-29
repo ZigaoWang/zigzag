@@ -36,7 +36,7 @@ enum PageScreenshot {
             NSPasteboard.general.setData(data, forType: .png)
             let name = fileName(for: tab)
             let note = page?.scrollsInside == true ? "Copied what’s on screen: this page scrolls inside itself" : "Screenshot of the whole page copied"
-            Toast.show(note, symbol: "camera.viewfinder", action: ("Save…", { [weak controller] in
+            Toast.show(note, symbol: "camera.viewfinder", action: ("Save", { [weak controller] in
                 guard let controller else { return }
                 save(data, name: name, in: controller)
             }), duration: 8, in: controller)
