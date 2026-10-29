@@ -486,10 +486,6 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
     private let chevron = NSImageView()
-    /// Tidies the space's tabs, as in Arc: shown while the pointer is over the list and there are tabs to clear.
-    let clearButton = TextButton(title: "Clear", font: Tokens.Font.small(.medium))
-    var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
-    var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
     var isCollapsed = false { didSet { stateDidChange(animated: false) } }
     /// Only spaces with bookmarks can fold.
     var canCollapse = false { didSet { stateDidChange(animated: false) } }
@@ -500,22 +496,7 @@ final class SpaceHeaderView: InteractiveView {
         chevron.contentTintColor = Tokens.Color.textTertiary
         addSubview(label)
         addSubview(chevron)
-        clearButton.alphaValue = 0
-        clearButton.isHidden = true
-        addSubview(clearButton)
         setAccessibilityRole(.button)
-    }
-
-    private func refreshClear() {
-        let show = showsClear && hasTabs
-        if show { clearButton.isHidden = false }
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            clearButton.animator().alphaValue = show ? 1 : 0
-        }, completionHandler: { [weak self] in
-            guard let self, !(self.showsClear && self.hasTabs) else { return }
-            self.clearButton.isHidden = true
-        })
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -526,8 +507,6 @@ final class SpaceHeaderView: InteractiveView {
         let x = Tokens.Space.x2
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
-        let cw = clearButton.fittingWidth
-        clearButton.frame = NSRect(x: bounds.width - cw, y: (bounds.height - Tokens.Space.x6) / 2, width: cw, height: Tokens.Space.x6)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -540,21 +519,51 @@ final class SpaceHeaderView: InteractiveView {
 }
 
 /// Thin line between bookmarks and tabs.
+/// The line between pinned tabs and today's tabs. Clear sits at its end, as in Arc, beside the tabs it closes and
+/// away from the pinned ones it leaves alone: shown while the pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
     private let line = ColorView(color: Tokens.Color.separator)
+    let clearButton = TextButton(title: "Clear", font: Tokens.Font.small(.medium))
+    var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
+    var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
+    private var clearShown: Bool { showsClear && hasTabs }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         addSubview(line)
+        clearButton.alphaValue = 0
+        clearButton.isHidden = true
+        clearButton.toolTip = "Close the tabs below"
+        addSubview(clearButton)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
 
+    private func refreshClear() {
+        let show = clearShown
+        if show { clearButton.isHidden = false }
+        needsLayout = true
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            context.allowsImplicitAnimation = true
+            clearButton.animator().alphaValue = show ? 1 : 0
+            layoutSubtreeIfNeeded()
+        }, completionHandler: { [weak self] in
+            guard let self, !self.clearShown else { return }
+            self.clearButton.isHidden = true
+        })
+    }
+
     override func layout() {
         super.layout()
-        line.frame = NSRect(x: Tokens.Space.x2, y: floor(bounds.height / 2), width: bounds.width - Tokens.Space.x4, height: Tokens.Metric.hairline)
+        let cw = clearButton.fittingWidth
+        let h = bounds.height
+        clearButton.frame = NSRect(x: bounds.width - cw, y: 0, width: cw, height: h)
+        // The line stops short of Clear while it shows.
+        let end = clearShown ? clearButton.frame.minX - Tokens.Space.x2 : bounds.width - Tokens.Space.x2
+        line.frame = NSRect(x: Tokens.Space.x2, y: floor(h / 2), width: max(0, end - Tokens.Space.x2), height: Tokens.Metric.hairline)
     }
 }
 
