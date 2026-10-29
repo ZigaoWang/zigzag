@@ -14,6 +14,8 @@ import os
 final class PDFViewerView: NSView, PDFViewDelegate {
     let url: URL
     private(set) var data: Data?
+    /// The title the PDF gives itself, once it's loaded and if it has one.
+    var documentTitle: String?
     private let isPrivate: Bool
     let pdfView = ZigzagPDFView()
     private let spinner = NSProgressIndicator()

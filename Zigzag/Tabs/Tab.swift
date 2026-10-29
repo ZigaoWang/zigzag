@@ -52,7 +52,15 @@ final class Tab: NSObject {
     private(set) var isClosed = false
     /// A PDF shows in Zigzag's own viewer, over WebKit's; nil for any other page.
     private(set) var pdfViewer: PDFViewerView?
-    private var pdfLoading: URL?
+    /// The viewer's fetch, cancelled when the viewer goes.
+    private var pdfTask: Task<Void, Never>?
+    /// PDFs ours couldn't open on this page (a failed fetch, a password): WebKit's viewer stays for them, rather
+    /// than ours trying again and flashing its blank over it.
+    private var pdfFailed: Set<URL> = []
+    /// The main frame's last navigation: anything but Back or Forward builds the viewer again, even for the same
+    /// address (Reload); and a form's reply, sent by POST, is never fetched a second time, so WebKit's viewer shows it.
+    private var pdfFreshLoad = false
+    private var pageIsGet = true
     private(set) var isPlayingAudio = false
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
@@ -232,7 +240,6 @@ final class Tab: NSObject {
 
     private func tearDown(_ webView: BrowserWebView) {
         setPDFViewer(nil)
-        pdfLoading = nil
         PageDialogSheet.cancel(for: webView)
         observations.forEach { $0.invalidate() }
         observations = []
@@ -610,6 +617,10 @@ extension Tab: WKNavigationDelegate {
 
     /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: the last two parts of
     /// the host, or three under a country's own second level (bbc.co.uk).
+        if isMainFrame {
+            pdfFreshLoad = navigationAction.navigationType != .backForward
+            pageIsGet = (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
+        }
     static func site(of url: URL) -> String? {
         guard let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
         let parts = host.split(separator: ".")
@@ -674,7 +685,11 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
-        checkForPDF(webView)
+        let fresh = pdfFreshLoad
+        pdfFreshLoad = false
+        // A new page: a PDF that couldn't open before gets another try.
+        pdfFailed = []
+        checkForPDF(webView, fresh: fresh)
         hasLoadedOnce = true
         // The page's own icon as soon as it's here, not only once it finishes (some sites never quite do).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.refreshFavicon() }
@@ -836,40 +851,47 @@ extension Tab: WKUIDelegate {
 
 extension Tab {
     /// Whether the page is a PDF, asked of the document itself so Back, Forward and restored tabs are caught too.
-    /// A PDF gets Zigzag's viewer; anything else drops it.
-    func checkForPDF(_ webView: WKWebView) {
+    /// A PDF gets Zigzag's viewer; anything else drops it. `fresh`: a new load of the page (Reload, or going to the
+    /// same address again), which fetches the PDF again even if it's showing.
+    func checkForPDF(_ webView: WKWebView, fresh: Bool = false) {
         guard let url = webView.url, !url.absoluteString.hasPrefix("blob:"), url.scheme != "data" else { setPDFViewer(nil); return }
         webView.evaluateJavaScript("[document.contentType, navigator.userAgent]") { [weak self, weak webView] result, _ in
             MainActor.assumeIsolated {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
                 let values = result as? [String]
                 guard values?.first == "application/pdf" else {
-                    self.pdfLoading = nil
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
                 // A PDF has no page title, so the last page's would linger: it's named by its file until it says more.
-                if self.pdfViewer?.url != url, self.pdfLoading != url {
+                if !showing {
                     let file = url.lastPathComponent
                     self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
                     self.changed.send(.title)
+                let showing = self.pdfViewer?.url == url
                 }
-                guard self.pdfViewer?.url != url, self.pdfLoading != url else { return }
-                self.pdfLoading = url
+                // In peek, a form's reply, or one ours couldn't open: WebKit's own viewer shows it.
+                guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url) else {
+                    if self.pdfViewer != nil { self.setPDFViewer(nil) }
+                    return
+                }
+                guard fresh || !showing else { return }
                 // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
                 let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate)
                 viewer.onOpenLink = { [weak self] link in self?.load(link) }
                 viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
                 self.setPDFViewer(viewer)
                 let userAgent = values?.count == 2 ? values?[1] : nil
-                Task { @MainActor [weak self, weak webView, weak viewer] in
+                self.pdfTask = Task { @MainActor [weak self, weak webView, weak viewer] in
                     guard let webView else { return }
                     let loaded = await PDFViewerView.load(url, from: webView, userAgent: userAgent)
-                    // Finished either way: coming back to this PDF later loads it again.
-                    if self?.pdfLoading == url { self?.pdfLoading = nil }
-                    guard let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
-                    // Couldn't fetch it: WebKit's viewer underneath shows instead.
-                    guard let (document, data) = loaded else { self.setPDFViewer(nil); return }
+                    guard !Task.isCancelled, let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
+                    // Couldn't fetch or open it: WebKit's viewer underneath shows instead, and stays.
+                    guard let (document, data) = loaded else {
+                        self.pdfFailed.insert(url)
+                        self.setPDFViewer(nil)
+                        return
+                    }
                     viewer.show(document, data: data)
                     // The PDF's own title, when it has one, rather than its file name.
                     if let name = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String,
@@ -879,6 +901,7 @@ extension Tab {
                     }
                 }
             }
+                        viewer.documentTitle = name
         }
     }
 
@@ -888,3 +911,6 @@ extension Tab {
         changed.send(.pdf)
     }
 }
+        // The old viewer's fetch has nowhere to go.
+        pdfTask?.cancel()
+        pdfTask = nil
