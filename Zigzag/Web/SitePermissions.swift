@@ -208,10 +208,13 @@ final class PermissionPrompt: FloatingPanelView {
     /// that only make sense kept (notifications) or are asked every time anyway (sharing your screen).
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
+    /// A private window keeps nothing, so Allow While Visiting and Allow This Time would be the same: just Allow.
     static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController,
                     tab: Tab? = nil, title: String? = nil, allowTitle: String = "Allow While Visiting",
                     onceTitle: String? = "Allow This Time", denyTitle: String = "Don’t Allow",
                     answered: @escaping () -> Answer? = { nil }) async -> Answer {
+        let allowTitle = isPrivate ? "Allow" : allowTitle
+        let onceTitle = isPrivate ? nil : onceTitle
         let key = ObjectIdentifier(controller)
         let before = queue[key]
         let task = Task { @MainActor in
