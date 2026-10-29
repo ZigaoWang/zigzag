@@ -3,25 +3,37 @@ import PDFKit
 import WebKit
 
 /// PDFs in Zigzag's own viewer: Apple's PDFKit (Preview's engine) for the pages, with our controls in a pill at the
-/// bottom: the pages down the side, where you are, zoom, and saving.
+/// bottom: the pages or contents down the side, where you are (click it to jump), zoom, two pages side by side,
+/// dark pages, and saving. It reopens a PDF where you left off.
 ///
 /// WebKit still loads the PDF underneath, so Back, Forward, history and reopening after a restart work as for any
-/// page. The viewer fetches the same file with the page's cookies (PDFs behind a sign-in) and covers WebKit's own;
-/// if that fails, WebKit's viewer simply stays.
+/// page. The viewer fetches the same file with the page's cookies (PDFs behind a sign-in) and covers WebKit's own,
+/// a quiet blank while it loads; if that fails, WebKit's viewer simply shows.
 @MainActor
 final class PDFViewerView: NSView, PDFViewDelegate {
     let url: URL
     private(set) var data: Data?
+    private let isPrivate: Bool
     let pdfView = ZigzagPDFView()
+    private let spinner = NSProgressIndicator()
+
+    private let sidebar = NSView()
+    private let sidebarEdge = ColorView(color: Tokens.Color.separator)
     private let thumbnails = PDFThumbnailView()
-    private let thumbnailsEdge = ColorView(color: Tokens.Color.separator)
+    private let sidebarSwitch = SlidingSwitch([.text("Pages"), .text("Contents")])
+    private let contents = PDFContentsView()
+
     private let bar = FloatingPanelView()
-    private let sidebarButton = IconButton(symbol: "sidebar.left", size: Tokens.Space.x7Height, toolTip: "Pages")
-    private let pageLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+    private let sidebarButton = IconButton(symbol: "sidebar.left", size: Tokens.Space.x7Height, toolTip: "Pages and Contents")
+    private let pageButton = PageNumberButton()
     private let zoomOutButton = IconButton(symbol: "minus.magnifyingglass", size: Tokens.Space.x7Height, toolTip: "Zoom Out")
     private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", size: Tokens.Space.x7Height, toolTip: "Zoom In")
+    private let twoPagesButton = IconButton(symbol: "book", size: Tokens.Space.x7Height, toolTip: "Two Pages")
+    private let darkButton = IconButton(symbol: "moon", size: Tokens.Space.x7Height, toolTip: "Dark Pages")
     private let saveButton = IconButton(symbol: "arrow.down.circle", size: Tokens.Space.x7Height, toolTip: "Save PDF")
-    private var showsThumbnails = false
+    private var showsSidebar = false
+    private var saveWork: DispatchWorkItem?
+
     /// Links in the PDF open like links on a page.
     var onOpenLink: ((URL) -> Void)?
     /// Swipes to go back or forward, handed to the page underneath.
@@ -30,102 +42,297 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         set { pdfView.onSwipe = newValue }
     }
 
-    private static let thumbnailsWidth: CGFloat = 132
+    private static let sidebarWidth: CGFloat = 196
+    /// Behind the pages: a shade off the card, so each page stands out as paper.
+    private static let backdrop = Tokens.Color.dynamic(light: Tokens.Color.hex(0xEDEDF0), dark: Tokens.Color.hex(0x161618))
 
-    init(url: URL, document: PDFDocument, data: Data) {
+    private static var twoPages: Bool {
+        get { UserDefaults.standard.bool(forKey: "pdfTwoPages") }
+        set { UserDefaults.standard.set(newValue, forKey: "pdfTwoPages") }
+    }
+    private static var darkPages: Bool {
+        get { UserDefaults.standard.bool(forKey: "pdfDarkPages") }
+        set { UserDefaults.standard.set(newValue, forKey: "pdfDarkPages") }
+    }
+
+    /// Shown at once, blank while the PDF loads; `show(_:data:)` puts the pages in.
+    init(url: URL, isPrivate: Bool) {
         self.url = url
-        self.data = data
+        self.isPrivate = isPrivate
         super.init(frame: .zero)
         wantsLayer = true
-        pdfView.document = document
+        layer?.backgroundColor = cgColor(Self.backdrop)
+
         pdfView.autoScales = true
-        pdfView.displayMode = .singlePageContinuous
         pdfView.displaysPageBreaks = true
         pdfView.pageShadowsEnabled = true
         pdfView.delegate = self
         pdfView.backgroundColor = Self.backdrop
+        pdfView.alphaValue = 0
         addSubview(pdfView)
 
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        addSubview(spinner)
+        // Most PDFs are here before a spinner would mean anything.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.pdfView.document == nil else { return }
+            self.spinner.startAnimation(nil)
+        }
+
+        sidebar.wantsLayer = true
+        sidebar.layer?.backgroundColor = cgColor(Self.backdrop)
         thumbnails.pdfView = pdfView
-        thumbnails.thumbnailSize = NSSize(width: Self.thumbnailsWidth - 40, height: (Self.thumbnailsWidth - 40) * 1.3)
+        thumbnails.thumbnailSize = NSSize(width: Self.sidebarWidth - 64, height: (Self.sidebarWidth - 64) * 1.3)
         thumbnails.backgroundColor = Self.backdrop
-        thumbnails.isHidden = true
-        thumbnailsEdge.isHidden = true
-        addSubview(thumbnails)
-        addSubview(thumbnailsEdge)
+        contents.isHidden = true
+        contents.onPick = { [weak self] destination in self?.glide(to: destination) }
+        sidebarSwitch.onChange = { [weak self] index in
+            self?.thumbnails.isHidden = index != 0
+            self?.contents.isHidden = index != 1
+        }
+        [thumbnails, contents, sidebarSwitch].forEach { sidebar.addSubview($0) }
+        sidebar.isHidden = true
+        sidebarEdge.isHidden = true
+        addSubview(sidebar)
+        addSubview(sidebarEdge)
 
         bar.radius = Tokens.Space.x5
-        [sidebarButton, pageLabel, zoomOutButton, zoomInButton, saveButton].forEach { bar.addSubview($0) }
-        pageLabel.alignment = .center
+        [sidebarButton, pageButton, zoomOutButton, zoomInButton, twoPagesButton, darkButton, saveButton].forEach { bar.addSubview($0) }
+        bar.isHidden = true
         addSubview(bar)
         bar.onLayout = { [weak self] in self?.layoutBar() }
-        sidebarButton.onClick = { [weak self] _ in self?.toggleThumbnails() }
+        sidebarButton.onClick = { [weak self] _ in self?.toggleSidebar() }
         zoomOutButton.onClick = { [weak self] _ in self?.zoomOut() }
         zoomInButton.onClick = { [weak self] _ in self?.zoomIn() }
+        twoPagesButton.onClick = { [weak self] _ in self?.toggleTwoPages() }
+        darkButton.onClick = { [weak self] _ in self?.toggleDarkPages() }
         saveButton.onClick = { [weak self] _ in self?.save() }
+        pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: pdfView)
-        pageChanged()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Behind the pages: a shade off the card, so each page stands out as paper.
-    private static let backdrop = Tokens.Color.dynamic(light: Tokens.Color.hex(0xEDEDF0), dark: Tokens.Color.hex(0x161618))
+    /// The pages are here: on the page you left off at, faded in over the blank.
+    func show(_ document: PDFDocument, data: Data) {
+        self.data = data
+        spinner.stopAnimation(nil)
+        // Sized first, so the pages are scaled for the window they're in and open at their top.
+        layoutSubtreeIfNeeded()
+        applyTwoPages()
+        pdfView.document = document
+        contents.outline = document.outlineRoot
+        // The Pages and Contents switch only when there are contents to show.
+        sidebarSwitch.isHidden = !contents.hasEntries
+        pdfView.layoutDocumentView()
+        let saved = Self.place(for: url).flatMap { $0 < document.pageCount ? $0 : nil } ?? 0
+        if let page = document.page(at: saved) { pdfView.go(to: page) }
+        applyDarkPages()
+        pageChanged()
+        bar.isHidden = false
+        needsLayout = true
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) {
+            self.pdfView.animator().alphaValue = 1
+        }
+        bar.present(arrival: .pop)
+    }
 
     override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()
-        let side = showsThumbnails ? Self.thumbnailsWidth : 0
-        thumbnails.frame = NSRect(x: 0, y: 0, width: Self.thumbnailsWidth, height: bounds.height)
-        thumbnailsEdge.frame = NSRect(x: Self.thumbnailsWidth - Tokens.Metric.hairline, y: 0, width: Tokens.Metric.hairline, height: bounds.height)
+        layoutPanes()
+        let s = NSSize(width: 16, height: 16)
+        spinner.frame = NSRect(x: (bounds.width - s.width) / 2, y: (bounds.height - s.height) / 2, width: s.width, height: s.height)
+    }
+
+    private func layoutPanes() {
+        let side = showsSidebar ? Self.sidebarWidth : 0
+        // The sidebar slides in from the left edge; it waits just off it while closed.
+        sidebar.frame = NSRect(x: side - Self.sidebarWidth, y: 0, width: Self.sidebarWidth, height: bounds.height)
+        sidebarEdge.frame = NSRect(x: side - Tokens.Metric.hairline, y: 0, width: Tokens.Metric.hairline, height: bounds.height)
         pdfView.frame = NSRect(x: side, y: 0, width: bounds.width - side, height: bounds.height)
+        let switchHeight: CGFloat = sidebarSwitch.isHidden ? 0 : 28
+        let top = sidebarSwitch.isHidden ? 0 : Tokens.Space.x3 + switchHeight + Tokens.Space.x2
+        sidebarSwitch.frame = NSRect(x: Tokens.Space.x3, y: sidebar.bounds.height - Tokens.Space.x3 - switchHeight,
+                                     width: Self.sidebarWidth - Tokens.Space.x6, height: switchHeight)
+        let below = NSRect(x: 0, y: 0, width: Self.sidebarWidth, height: sidebar.bounds.height - top)
+        thumbnails.frame = below
+        contents.frame = below
         let width = barWidth
         let h = Tokens.Space.x10
         bar.frame = NSRect(x: round(side + (bounds.width - side - width) / 2), y: bounds.height - h - Tokens.Space.x4, width: width, height: h)
     }
 
     private var barWidth: CGFloat {
-        let b = Tokens.Space.x7Height
-        return Tokens.Space.x2 * 2 + b * 4 + pageLabelWidth + Tokens.Space.x2 * 2
-    }
-
-    private var pageLabelWidth: CGFloat {
-        let count = pdfView.document?.pageCount ?? 0
-        let widest = Label("\(count) of \(count)", font: Tokens.Font.small(.medium), color: .clear)
-        return ceil(widest.textWidth) + Tokens.Space.x3
+        Tokens.Space.x2 * 2 + Tokens.Space.x7Height * 6 + pageButton.fittingWidth(pages: pdfView.document?.pageCount ?? 0) + Tokens.Space.x1 * 2
     }
 
     private func layoutBar() {
         let b = Tokens.Space.x7Height, h = bar.bounds.height, y = (h - b) / 2
         var x = Tokens.Space.x2
-        sidebarButton.frame = NSRect(x: x, y: y, width: b, height: b)
-        x += b + Tokens.Space.x1
-        let lw = pageLabelWidth
-        pageLabel.frame = NSRect(x: x, y: (h - pageLabel.lineHeight) / 2, width: lw, height: pageLabel.lineHeight)
-        x += lw + Tokens.Space.x1
-        zoomOutButton.frame = NSRect(x: x, y: y, width: b, height: b)
-        x += b
-        zoomInButton.frame = NSRect(x: x, y: y, width: b, height: b)
-        x += b
-        saveButton.frame = NSRect(x: x, y: y, width: b, height: b)
+        func place(_ view: NSView, _ width: CGFloat) { view.frame = NSRect(x: x, y: y, width: width, height: b); x += width }
+        place(sidebarButton, b)
+        x += Tokens.Space.x1
+        place(pageButton, pageButton.fittingWidth(pages: pdfView.document?.pageCount ?? 0))
+        x += Tokens.Space.x1
+        [zoomOutButton, zoomInButton, twoPagesButton, darkButton, saveButton].forEach { place($0, b) }
     }
 
     @objc private func pageChanged() {
-        guard let document = pdfView.document, let page = pdfView.currentPage else { return }
-        let index = document.index(for: page) + 1
-        pageLabel.stringValue = "\(index) of \(document.pageCount)"
+        // The page at the top of the view: PDFKit's own idea of it lags behind a smooth scroll.
+        let top = NSPoint(x: pdfView.bounds.midX, y: pdfView.isFlipped ? 40 : pdfView.bounds.maxY - 40)
+        guard let document = pdfView.document, let page = pdfView.page(for: top, nearest: true) ?? pdfView.currentPage else { return }
+        let index = document.index(for: page)
+        pageButton.set(page: index + 1, of: document.pageCount)
+        contents.markCurrent(page)
+        rememberPlace(index)
+    }
+
+    // MARK: Moving around
+
+    /// Scrolls to a page or a heading in one smooth move, rather than a cut.
+    private func glide(to destination: PDFDestination) {
+        guard let page = destination.page else { return }
+        guard !Tokens.Motion.reduceMotion, let documentView = pdfView.documentView, let clip = documentView.enclosingScrollView?.contentView else {
+            pdfView.go(to: destination)
+            return
+        }
+        // Where the heading sits on its page, or the page's top, in the scrolling view's own terms.
+        let box = page.bounds(for: pdfView.displayBox)
+        var point = destination.point
+        if point.y == kPDFDestinationUnspecifiedValue || point.y > box.maxY { point.y = box.maxY }
+        if point.x == kPDFDestinationUnspecifiedValue { point.x = box.minX }
+        let inView = pdfView.convert(point, from: page)
+        let inDocument = documentView.convert(inView, from: pdfView)
+        let margin: CGFloat = 12
+        var origin = clip.bounds.origin
+        origin.y = documentView.isFlipped ? inDocument.y - margin : inDocument.y - clip.bounds.height + margin
+        let maxY = max(0, documentView.frame.height - clip.bounds.height)
+        origin.y = min(max(origin.y, 0), maxY)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Tokens.Motion.snappy.duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            clip.animator().setBoundsOrigin(origin)
+        } completionHandler: { [weak self, weak clip] in
+            guard let self, let clip else { return }
+            clip.enclosingScrollView?.reflectScrolledClipView(clip)
+            // Landed: the page count follows what's now at the top.
+            MainActor.assumeIsolated { self.pageChanged() }
+        }
+    }
+
+    private func jump(toPage number: Int) {
+        guard let document = pdfView.document, let page = document.page(at: min(max(number, 1), document.pageCount) - 1) else { return }
+        glide(to: PDFDestination(page: page, at: NSPoint(x: kPDFDestinationUnspecifiedValue, y: kPDFDestinationUnspecifiedValue)))
+        window?.makeFirstResponder(pdfView)
+    }
+
+    private func toggleSidebar() {
+        showsSidebar.toggle()
+        sidebarButton.showsFillAtRest = showsSidebar
+        if showsSidebar { sidebar.isHidden = false; sidebarEdge.isHidden = false }
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, {
+            let side = self.showsSidebar ? Self.sidebarWidth : 0
+            self.sidebar.animator().frame.origin.x = side - Self.sidebarWidth
+            self.sidebarEdge.animator().frame.origin.x = side - Tokens.Metric.hairline
+            self.pdfView.animator().frame = NSRect(x: side, y: 0, width: self.bounds.width - side, height: self.bounds.height)
+            var frame = self.bar.frame
+            frame.origin.x = round(side + (self.bounds.width - side - frame.width) / 2)
+            self.bar.animator().frame = frame
+        }, completion: { [weak self] in
+            guard let self, !self.showsSidebar else { return }
+            self.sidebar.isHidden = true
+            self.sidebarEdge.isHidden = true
+        })
+    }
+
+    private func toggleTwoPages() {
+        Self.twoPages.toggle()
+        applyTwoPages()
+    }
+
+    private func applyTwoPages() {
+        let page = pdfView.currentPage
+        pdfView.displayMode = Self.twoPages ? .twoUpContinuous : .singlePageContinuous
+        pdfView.displaysAsBook = Self.twoPages
+        pdfView.autoScales = true
+        twoPagesButton.showsFillAtRest = Self.twoPages
+        if let page { pdfView.go(to: page) }
+    }
+
+    private func toggleDarkPages() {
+        Self.darkPages.toggle()
+        // A soft crossfade rather than a flash from white to black.
+        let snapshot = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds)
+        if let snapshot {
+            pdfView.cacheDisplay(in: pdfView.bounds, to: snapshot)
+            let image = NSImage(size: pdfView.bounds.size)
+            image.addRepresentation(snapshot)
+            let still = NSImageView(frame: pdfView.frame)
+            still.image = image
+            addSubview(still, positioned: .above, relativeTo: pdfView)
+            applyDarkPages()
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
+        } else {
+            applyDarkPages()
+        }
+    }
+
+    /// Dark pages turn the paper dark and the ink light, and turn colors back round so red stays red.
+    private func applyDarkPages() {
+        darkButton.showsFillAtRest = Self.darkPages
+        darkButton.symbol = Self.darkPages ? "moon.fill" : "moon"
+        // Around the pages goes dark with them, whatever the Mac's own appearance.
+        let around = Self.darkPages ? Tokens.Color.hex(0x161618) : Self.backdrop
+        pdfView.backgroundColor = around
+        layer?.backgroundColor = cgColor(around)
+        guard let documentView = pdfView.documentView else { return }
+        documentView.wantsLayer = true
+        documentView.layerUsesCoreImageFilters = true
+        if Self.darkPages, let invert = CIFilter(name: "CIColorInvert"), let hue = CIFilter(name: "CIHueAdjust") {
+            hue.setValue(Float.pi, forKey: kCIInputAngleKey)
+            documentView.layer?.filters = [invert, hue]
+        } else {
+            documentView.layer?.filters = nil
+        }
+    }
+
+    // MARK: Remembering your place
+
+    private static let placesKey = "pdfPlaces"
+
+    private static func key(for url: URL) -> String {
+        var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        parts?.fragment = nil
+        return parts?.string ?? url.absoluteString
+    }
+
+    private static func place(for url: URL) -> Int? {
+        (UserDefaults.standard.dictionary(forKey: placesKey)?[key(for: url)] as? [Any])?.first as? Int
+    }
+
+    /// The page you're on, kept a moment after you stop (not while scrolling past), for the last 200 PDFs.
+    private func rememberPlace(_ index: Int) {
+        guard !isPrivate, pdfView.document != nil else { return }
+        saveWork?.cancel()
+        let key = Self.key(for: url)
+        let work = DispatchWorkItem {
+            var all = UserDefaults.standard.dictionary(forKey: Self.placesKey) ?? [:]
+            all[key] = [index, Date().timeIntervalSince1970]
+            if all.count > 200 {
+                let oldest = all.min { (($0.value as? [Any])?.last as? Double ?? 0) < (($1.value as? [Any])?.last as? Double ?? 0) }
+                if let oldest { all[oldest.key] = nil }
+            }
+            UserDefaults.standard.set(all, forKey: Self.placesKey)
+        }
+        saveWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
 
     // MARK: Actions
-
-    private func toggleThumbnails() {
-        showsThumbnails.toggle()
-        thumbnails.isHidden = !showsThumbnails
-        thumbnailsEdge.isHidden = !showsThumbnails
-        sidebarButton.showsFillAtRest = showsThumbnails
-        needsLayout = true
-    }
 
     func zoomIn() { pdfView.zoomIn(nil) }
     func zoomOut() { pdfView.zoomOut(nil) }
@@ -188,7 +395,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     // MARK: Loading
 
     /// Fetches the PDF the way the page did: its cookies and the browser's user agent, so a PDF behind a sign-in
-    /// comes too. Nil when it can't (WebKit's own viewer stays then).
+    /// comes too. Nil when it can't (WebKit's own viewer shows then).
     static func load(_ url: URL, from webView: WKWebView, userAgent: String?) async -> (PDFDocument, Data)? {
         let data: Data?
         if url.isFileURL {
@@ -221,5 +428,183 @@ final class ZigzagPDFView: PDFView {
     override func scrollWheel(with event: NSEvent) {
         if onSwipe?(event) == true { return }
         super.scrollWheel(with: event)
+    }
+}
+
+/// "3 of 42" in the bar. Click it and type a page number to go there.
+private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
+    private let label = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+    private let field = PlainTextField(font: Tokens.Font.small(.medium), placeholder: "Page")
+    private var page = 0, count = 0
+    var onJump: ((Int) -> Void)?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        layer?.cornerRadius = Tokens.Radius.control
+        label.alignment = .center
+        field.alignment = .center
+        field.isHidden = true
+        field.delegate = self
+        [label, field].forEach { addSubview($0) }
+        toolTip = "Go to Page"
+        setAccessibilityRole(.button)
+        onClick = { [weak self] _ in self?.beginTyping() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func set(page: Int, of count: Int) {
+        self.page = page
+        self.count = count
+        label.stringValue = "\(page) of \(count)"
+        setAccessibilityLabel("Page \(page) of \(count)")
+    }
+
+    func fittingWidth(pages: Int) -> CGFloat {
+        let widest = Label("\(pages) of \(pages)", font: Tokens.Font.small(.medium), color: .clear)
+        return ceil(widest.textWidth) + Tokens.Space.x4
+    }
+
+    override func layout() {
+        super.layout()
+        let h = label.lineHeight
+        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
+        let fh = ceil(field.intrinsicContentSize.height)
+        field.frame = NSRect(x: Tokens.Space.x1, y: (bounds.height - fh) / 2, width: bounds.width - Tokens.Space.x2, height: fh)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let fill: NSColor? = !field.isHidden ? Tokens.Color.fieldFill : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
+    }
+
+    private func beginTyping() {
+        field.stringValue = ""
+        field.placeholderString = "\(page)"
+        field.isHidden = false
+        label.isHidden = true
+        stateDidChange(animated: false)
+        window?.makeFirstResponder(field)
+    }
+
+    private func endTyping() {
+        field.isHidden = true
+        label.isHidden = false
+        stateDidChange(animated: false)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        switch selector {
+        case #selector(NSResponder.insertNewline(_:)):
+            let number = Int(field.stringValue.trimmingCharacters(in: .whitespaces))
+            endTyping()
+            if let number { onJump?(number) }
+            return true
+        case #selector(NSResponder.cancelOperation(_:)):
+            endTyping()
+            return true
+        default:
+            return false
+        }
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) { endTyping() }
+}
+
+/// The PDF's own table of contents, indented by level. Click a heading to go there; the one you're reading is marked.
+private final class PDFContentsView: NSView {
+    private let scroll = NSScrollView()
+    private let stack = FlippedView()
+    private var rows: [(row: ContentsRow, page: PDFPage?)] = []
+    var onPick: ((PDFDestination) -> Void)?
+    var hasEntries: Bool { !rows.isEmpty }
+
+    var outline: PDFOutline? {
+        didSet { rebuild() }
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.scrollerStyle = .overlay
+        scroll.autohidesScrollers = true
+        scroll.documentView = stack
+        addSubview(scroll)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    private func rebuild() {
+        rows.forEach { $0.row.removeFromSuperview() }
+        rows = []
+        func add(_ item: PDFOutline, level: Int) {
+            for i in 0..<item.numberOfChildren {
+                guard let child = item.child(at: i) else { continue }
+                let destination = child.destination
+                let row = ContentsRow(title: child.label ?? "", level: level)
+                row.onClick = { [weak self] _ in if let destination { self?.onPick?(destination) } }
+                stack.addSubview(row)
+                rows.append((row, destination?.page))
+                add(child, level: level + 1)
+            }
+        }
+        if let outline { add(outline, level: 0) }
+        needsLayout = true
+    }
+
+    /// The section you're reading: the first heading on this page, or the last one before it.
+    func markCurrent(_ page: PDFPage) {
+        guard let document = page.document else { return }
+        let index = document.index(for: page)
+        let placed = rows.compactMap { row, rowPage in rowPage.map { (row, document.index(for: $0)) } }
+        let current = placed.first { $0.1 == index }?.0 ?? placed.last { $0.1 < index }?.0
+        rows.forEach { $0.row.isSelected = $0.row === current }
+    }
+
+    override func layout() {
+        super.layout()
+        scroll.frame = bounds
+        var y = Tokens.Space.x1
+        let width = bounds.width - Tokens.Space.x4
+        for (row, _) in rows {
+            row.frame = NSRect(x: Tokens.Space.x2, y: y, width: width, height: Tokens.Metric.rowHeight - 4)
+            y += Tokens.Metric.rowHeight - 4
+        }
+        stack.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(y + Tokens.Space.x2, bounds.height))
+    }
+}
+
+private final class ContentsRow: InteractiveView {
+    private let label: Label
+    private let level: Int
+
+    init(title: String, level: Int) {
+        self.level = level
+        label = Label(title, font: level == 0 ? Tokens.Font.body(.medium) : Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.control
+        label.lineBreakMode = .byTruncatingTail
+        addSubview(label)
+        toolTip = title
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(title)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        let x = Tokens.Space.x2 + CGFloat(min(level, 4)) * Tokens.Space.x3
+        let h = label.lineHeight
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: bounds.width - x - Tokens.Space.x2, height: h)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let fill: NSColor? = isSelected ? Tokens.Color.selectedFill : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        label.textColor = level == 0 || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
     }
 }
