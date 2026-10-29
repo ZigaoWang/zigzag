@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import PDFKit
 
 /// What a tab asks of the window that shows it.
 protocol TabHost: AnyObject {
@@ -29,6 +30,8 @@ final class Tab: NSObject {
         case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language
         /// You renamed it (it also sends `.title`).
         case renamed
+        /// Its PDF viewer came or went.
+        case pdf
     }
 
     let id: UUID
@@ -47,6 +50,9 @@ final class Tab: NSObject {
     private(set) var canGoBack = false
     private(set) var canGoForward = false
     private(set) var isClosed = false
+    /// A PDF shows in Zigzag's own viewer, over WebKit's; nil for any other page.
+    private(set) var pdfViewer: PDFViewerView?
+    private var pdfLoading: URL?
     private(set) var isPlayingAudio = false
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
@@ -224,6 +230,8 @@ final class Tab: NSObject {
     }
 
     private func tearDown(_ webView: BrowserWebView) {
+        setPDFViewer(nil)
+        pdfLoading = nil
         PageDialogSheet.cancel(for: webView)
         observations.forEach { $0.invalidate() }
         observations = []
@@ -449,6 +457,8 @@ final class Tab: NSObject {
                     guard let self else { return }
                     self.isLoading = wv.isLoading
                     self.changed.send(.loading)
+                    // Back and Forward can bring a PDF back from memory without a finished load: check here too.
+                    if !wv.isLoading { self.checkForPDF(wv) }
                 }
             },
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] wv, _ in
@@ -654,6 +664,7 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
+        checkForPDF(webView)
         hasLoadedOnce = true
         // The page's own icon as soon as it's here, not only once it finishes (some sites never quite do).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.refreshFavicon() }
@@ -674,6 +685,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
+        checkForPDF(webView)
         refreshFavicon()
         // A tab without a picture yet gets one once its page has drawn.
         if snapshot == nil {
@@ -806,5 +818,56 @@ extension Tab: WKUIDelegate {
                                                     in: controller, title: "Share your screen", allowTitle: "Allow", onceTitle: nil, answered: { nil })
             decisionHandler(answer == .allow ? 1 : 0)
         }
+    }
+}
+
+
+// MARK: - PDFs
+
+extension Tab {
+    /// Whether the page is a PDF, asked of the document itself so Back, Forward and restored tabs are caught too.
+    /// A PDF gets Zigzag's viewer; anything else drops it.
+    func checkForPDF(_ webView: WKWebView) {
+        guard let url = webView.url, !url.absoluteString.hasPrefix("blob:"), url.scheme != "data" else { setPDFViewer(nil); return }
+        webView.evaluateJavaScript("[document.contentType, navigator.userAgent]") { [weak self, weak webView] result, _ in
+            MainActor.assumeIsolated {
+                guard let self, let webView, webView === self.webView, webView.url == url else { return }
+                let values = result as? [String]
+                guard values?.first == "application/pdf" else {
+                    if self.pdfViewer != nil { self.setPDFViewer(nil) }
+                    return
+                }
+                // A PDF has no page title, so the last page's would linger: it's named by its file until it says more.
+                if self.pdfViewer?.url != url, self.pdfLoading != url {
+                    let file = url.lastPathComponent
+                    self.title = file.isEmpty || file == "/" ? (url.host() ?? "") : (file.removingPercentEncoding ?? file)
+                    self.changed.send(.title)
+                }
+                guard self.pdfViewer?.url != url, self.pdfLoading != url else { return }
+                self.pdfLoading = url
+                let userAgent = values?.count == 2 ? values?[1] : nil
+                Task { @MainActor [weak self, weak webView] in
+                    guard let webView, let (document, data) = await PDFViewerView.load(url, from: webView, userAgent: userAgent),
+                          let self, self.pdfLoading == url, self.webView === webView, webView.url == url else { return }
+                    self.pdfLoading = nil
+                    let viewer = PDFViewerView(url: url, document: document, data: data)
+                    viewer.onOpenLink = { [weak self] link in self?.load(link) }
+                    viewer.onSwipe = { [weak webView] event in (webView as? BrowserWebView)?.handleSwipe(event) ?? false }
+                    self.setPDFViewer(viewer)
+                    // The PDF's own title, when it has one, rather than its file name.
+                    if let name = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String,
+                       !name.trimmingCharacters(in: .whitespaces).isEmpty {
+                        self.title = name
+                        self.changed.send(.title)
+                    }
+                }
+            }
+        }
+    }
+
+    fileprivate func setPDFViewer(_ viewer: PDFViewerView?) {
+        guard viewer !== pdfViewer else { return }
+        pdfViewer = viewer
+        changed.send(.pdf)
     }
 }

@@ -13,6 +13,9 @@ final class PageCardView: NSView {
     var showsHeader = false { didSet { header.isHidden = !showsHeader; needsLayout = true } }
     /// Reader, over the page, which stays loaded underneath.
     private(set) var overlay: NSView?
+    /// The tab's PDF viewer, over WebKit's own, while the page is a PDF.
+    private weak var document: PDFViewerView?
+    private var documentToken: SignalToken?
 
     /// No corners, edge or shadow: the page fills the window.
     var isEdgeToEdge: Bool {
@@ -138,6 +141,7 @@ final class PageCardView: NSView {
             header.frame = NSRect(x: 0, y: clip.bounds.height - PaneHeaderView.height, width: clip.bounds.width, height: PaneHeaderView.height)
             let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
             webView?.frame = content
+            document?.frame = content
             placeholder.frame = content
             overlay?.frame = content
             edge.frame = clip.bounds
@@ -174,10 +178,26 @@ final class PageCardView: NSView {
         }
         webView = newWebView
         if let old, old.superview === clip { old.removeFromSuperview() }
+        let owner = (newWebView as? BrowserWebView)?.owner
+        documentToken = owner?.changed.observe { [weak self] change in if change == .pdf { self?.refreshDocument() } }
+        refreshDocument()
         placeholder.image = placeholderImage
         placeholder.isHidden = placeholderImage == nil
         edge.removeFromSuperlayer()
         clip.layer?.addSublayer(edge)
+    }
+
+    /// Puts the shown tab's PDF viewer over its page, or takes it away. Typing goes to it, as it did to the page.
+    private func refreshDocument() {
+        let viewer = (webView as? BrowserWebView)?.owner?.pdfViewer
+        guard viewer !== document else { return }
+        if let document, document.superview === clip { document.removeFromSuperview() }
+        document = viewer
+        guard let viewer, let webView else { return }
+        viewer.frame = webView.frame
+        viewer.autoresizingMask = [.width, .height]
+        clip.addSubview(viewer, positioned: .above, relativeTo: webView)
+        if let window, window.firstResponder === webView { window.makeFirstResponder(viewer.pdfView) }
     }
 
     func hidePlaceholder() {
