@@ -312,6 +312,8 @@ final class PermissionPrompt: FloatingPanelView {
         badge.color = Tokens.Color.accent.withAlphaComponent(0.14)
         symbolView.contentTintColor = Tokens.Color.accent
         badge.addSubview(symbolView)
+        // A long host loses its middle, not its end: the part that says whose site it is stays.
+        asker.lineBreakMode = .byTruncatingMiddle
         request.lineBreakMode = .byWordWrapping
         request.maximumNumberOfLines = 2
         [badge, asker, request].forEach { addSubview($0) }
