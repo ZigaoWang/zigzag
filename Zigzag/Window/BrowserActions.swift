@@ -74,6 +74,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func printPage(_ sender: Any?) {
+        // A PDF prints as itself, page for page.
+        if let pdf = selectedTab?.pdfViewer { pdf.print(); return }
         guard let webView = selectedWebView, let window else { return }
         let info = NSPrintInfo.shared.copy() as! NSPrintInfo
         info.horizontalPagination = .fit
@@ -131,6 +133,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// File › Save Page As…: the page as a web archive, pictures and all, that opens offline; a PDF or picture open in
     /// the tab is saved as itself.
     @objc func savePageAs(_ sender: Any?) {
+        if let pdf = selectedTab?.pdfViewer { pdf.save(); return }
         guard let webView = selectedWebView, let window, let tab = selectedTab, let url = tab.url else { return }
         let ext = url.pathExtension.lowercased()
         let isFile = ["pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "mp4", "mov", "txt"].contains(ext)
@@ -203,6 +206,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func zoomIn(_ sender: Any?) {
         if zoomReader(1) { return }
+        if let pdf = selectedTab?.pdfViewer { pdf.zoomIn(); return }
         guard let webView = selectedWebView else { return }
         let next = Self.zoomSteps.first { $0 > webView.pageZoom + 0.001 } ?? Self.zoomSteps.last!
         setZoom(next)
@@ -210,6 +214,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func zoomOut(_ sender: Any?) {
         if zoomReader(-1) { return }
+        if let pdf = selectedTab?.pdfViewer { pdf.zoomOut(); return }
         guard let webView = selectedWebView else { return }
         let next = Self.zoomSteps.last { $0 < webView.pageZoom - 0.001 } ?? Self.zoomSteps.first!
         setZoom(next)
@@ -217,6 +222,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func actualSize(_ sender: Any?) {
         if zoomReader(0) { return }
+        if let pdf = selectedTab?.pdfViewer { pdf.actualSize(); return }
         setZoom(1)
         selectedWebView?.magnification = 1
     }

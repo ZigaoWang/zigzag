@@ -176,6 +176,14 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func search(backwards: Bool, fromStart: Bool = false) {
+        // A PDF is searched in its own viewer, which knows its pages and counts the matches itself.
+        if let pdf = window?.selectedTab?.pdfViewer {
+            let found = pdf.find(query, backwards: backwards, fromStart: fromStart)
+            countLabel.stringValue = query.isEmpty ? "" : found.count == 0 ? "No matches" : found.count == 1 ? "1 match" : "\(found.place) of \(found.count)"
+            countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+            layoutPanel()
+            return
+        }
         guard let webView = window?.selectedWebView, !query.isEmpty else { return }
         searched = webView
         let config = WKFindConfiguration()
@@ -218,6 +226,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func clearHighlights() {
+        window?.selectedTab?.pdfViewer?.clearFind()
         (searched ?? window?.selectedWebView)?.evaluateJavaScript("window.getSelection().removeAllRanges()")
         searched = nil
     }
