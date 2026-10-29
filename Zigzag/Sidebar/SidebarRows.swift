@@ -533,7 +533,7 @@ final class SpaceHeaderView: InteractiveView {
 /// pinned tabs it leaves alone, and only while the pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
     private let line = ColorView(color: Tokens.Color.separator)
-    let clearButton = TextButton(title: "Clear", font: Tokens.Font.small(.medium))
+    let clearButton = ClearTabsButton()
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
     private var clearShown: Bool { showsClear && hasTabs }
@@ -543,7 +543,6 @@ final class SeparatorRowView: NSView {
         addSubview(line)
         clearButton.alphaValue = 0
         clearButton.isHidden = true
-        clearButton.setAccessibilityLabel("Clear Tabs")
         addSubview(clearButton)
     }
 
@@ -568,10 +567,11 @@ final class SeparatorRowView: NSView {
 
     override func layout() {
         super.layout()
-        let cw = clearButton.fittingWidth
-        clearButton.frame = NSRect(x: bounds.width - cw - Tokens.Space.x1, y: 0, width: cw, height: bounds.height)
-        // The line stops short of Clear while it shows.
-        let end = clearShown ? clearButton.frame.minX - Tokens.Space.x2 : bounds.width - Tokens.Space.x2
+        let cw = clearButton.fittingWidth, ch: CGFloat = 20
+        clearButton.frame = NSRect(x: bounds.width - Tokens.Space.x2 - cw + 4, y: floor((bounds.height - ch) / 2), width: cw, height: ch)
+        clearButton.layoutSubtreeIfNeeded()
+        // The line runs up to Clear while it shows, so the two read as one.
+        let end = clearShown ? clearButton.frame.minX - Tokens.Space.x1 : bounds.width - Tokens.Space.x2
         line.frame = NSRect(x: Tokens.Space.x2, y: floor(bounds.height / 2), width: max(0, end - Tokens.Space.x2), height: Tokens.Metric.hairline)
     }
 }
@@ -659,5 +659,49 @@ final class InsertionLineView: NSView {
     override func layout() {
         super.layout()
         line.frame = NSRect(x: Tokens.Space.x2, y: floor((bounds.height - 2) / 2), width: bounds.width - Tokens.Space.x4, height: 2)
+    }
+}
+
+/// Clear, on the line above the tabs: small, quiet text with a downward arrow (it clears what's below), the same
+/// grey as the line until the pointer is on it.
+final class ClearTabsButton: InteractiveView {
+    private let arrow = NSImageView()
+    private let label = Label("Clear", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        layer?.cornerRadius = 6
+        layer?.cornerCurve = .continuous
+        arrow.image = Tokens.Symbol.image("arrow.down", size: Tokens.TypeSize.small - 2)
+        arrow.imageScaling = .scaleNone
+        [arrow, label].forEach { addSubview($0) }
+        toolTip = "Close Tabs Below"
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("Clear tabs")
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    var fittingWidth: CGFloat { ceil(4 + 10 + 3 + label.inkWidth + 4) }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        arrow.frame = NSRect(x: 4, y: (bounds.height - 10) / 2, width: 10, height: 10)
+        let h = label.lineHeight
+        label.frame = NSRect(x: arrow.frame.maxX + 3 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let active = isHovered || isPressed
+        label.textColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
+        arrow.contentTintColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
     }
 }
