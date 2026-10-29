@@ -99,6 +99,7 @@ final class HistoryStore {
 
     func clearAll() {
         exec("DELETE FROM visits")
+        PDFViewerView.forgetPlaces()
     }
 
     /// Everything visited since `date` (Clear Last Hour, Today…).
@@ -107,6 +108,7 @@ final class HistoryStore {
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
         sqlite3_step(statement)
+        PDFViewerView.forgetPlaces(since: date)
     }
 
     func delete(_ url: URL) {

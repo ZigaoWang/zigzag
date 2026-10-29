@@ -337,10 +337,21 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     private static let placesKey = "pdfPlaces"
 
+    /// The PDF's address without what follows `?` or `#`: a web PDF's query often carries a sign-in token, which
+    /// has no business sitting in your settings.
     private static func key(for url: URL) -> String {
         var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
         parts?.fragment = nil
+        if !url.isFileURL { parts?.query = nil }
         return parts?.string ?? url.absoluteString
+    }
+
+    /// Clearing history forgets where you were in PDFs too: all of them, or those read since `date`.
+    static func forgetPlaces(since date: Date? = nil) {
+        guard let date else { UserDefaults.standard.removeObject(forKey: placesKey); return }
+        let all = UserDefaults.standard.dictionary(forKey: placesKey) ?? [:]
+        let kept = all.filter { (($0.value as? [Any])?.last as? Double ?? 0) < date.timeIntervalSince1970 }
+        UserDefaults.standard.set(kept, forKey: placesKey)
     }
 
     private static func place(for url: URL) -> Int? {
