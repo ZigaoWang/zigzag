@@ -199,6 +199,8 @@ final class FavoriteTile: InteractiveView {
     }()
     private weak var tab: Tab?
     private var tabToken: SignalToken?
+    /// An icon that arrives later (fetched, or saved by a visit) shows at once, not only after a relaunch.
+    private var iconToken: SignalToken?
     var isPlaceholder = false { didSet { icon.isHidden = isPlaceholder; stateDidChange(animated: false) } }
 
     init(bookmark: Bookmark?) {
@@ -213,6 +215,10 @@ final class FavoriteTile: InteractiveView {
         setAccessibilityRole(.button)
         setAccessibilityLabel(bookmark?.title)
         refreshIcon()
+        iconToken = FaviconStore.shared.updated.observe { [weak self] _ in
+            guard let self, self.tab?.favicon == nil || self.tab?.isLoading != true else { return }
+            self.refreshIcon()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }

@@ -627,6 +627,17 @@ final class SidebarListView: NSView {
         for (item, view) in rows { configure(view, for: item) }
     }
 
+    /// Pinned pages show their icon as soon as one arrives, not only after a relaunch.
+    private lazy var iconToken: SignalToken = FaviconStore.shared.updated.observe { [weak self] _ in
+        guard let self, self.window != nil else { return }
+        self.refreshRows()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        _ = iconToken
+    }
+
     var headerView: NSView? { rows[.header] }
 
     /// Starts renaming a pinned page right in its row.
