@@ -66,6 +66,7 @@ enum MainMenu {
             item("Share…", #selector(C.sharePage(_:)), ""),
             item("Save Page As…", #selector(C.savePageAs(_:)), ""),
             item("Export as PDF…", #selector(C.exportAsPDF(_:)), ""),
+            item("Take Screenshot of Page", #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
             item("Print…", #selector(C.printPage(_:)), "p"),
         ]))
 

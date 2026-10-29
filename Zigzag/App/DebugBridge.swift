@@ -81,6 +81,7 @@ enum DebugBridge {
         case "bookmark": if let tab = controller.tabManager.selectedTab { controller.tabManager.bookmarkTab(tab) }
         case "hover": controller.debugHover(index: Int(arg) ?? 0)
         case "desk": controller.toggleDeskView(nil)
+        case "pageshot": if let webView = controller.selectedWebView { PageScreenshot.debugCapture(webView, to: URL(fileURLWithPath: arg)) }
         case "reader": controller.toggleReader()
         case "split":
             // Splits the shown tab with the one at this sidebar position.
