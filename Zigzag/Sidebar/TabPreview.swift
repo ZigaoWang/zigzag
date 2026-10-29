@@ -70,7 +70,11 @@ final class TabPreviewController {
     private var hideWork: DispatchWorkItem?
     private var refreshTimer: Timer?
     private weak var tab: Tab?
+    private weak var row: NSView?
     private var snapshotToken: SignalToken?
+    /// Hover can end without a word: the row closes under the pointer, or you switch apps. This checks while a
+    /// preview is up and takes it away once the pointer has really left.
+    private var watchTimer: Timer?
 
     init(controller: BrowserWindowController) { self.controller = controller }
 
@@ -96,7 +100,7 @@ final class TabPreviewController {
             let work = DispatchWorkItem { [weak self, weak row] in
                 MainActor.assumeIsolated {
                     // Pressed meanwhile (a click or the start of a drag): no preview.
-                    guard let self, let row, row.window != nil, NSEvent.pressedMouseButtons == 0 else { return }
+                    guard let self, let row, self.isPointer(over: row), NSEvent.pressedMouseButtons == 0 else { return }
                     self.present(tab, bookmark: bookmark, row: row)
                 }
             }
@@ -112,7 +116,14 @@ final class TabPreviewController {
         let panel = self.panel ?? TabPreviewView()
         self.panel = panel
         self.tab = tab
+        self.row = row
         panel.show(tab: tab, bookmark: bookmark)
+        if watchTimer == nil {
+            watchTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.checkStillHovering() }
+            }
+            watchTimer?.tolerance = 0.1
+        }
         snapshotToken = tab?.changed.observe { [weak self, weak tab] change in
             guard change == .snapshot, let tab, tab === self?.tab else { return }
             self?.panel?.image = tab.snapshot
@@ -153,8 +164,22 @@ final class TabPreviewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + (immediately ? 0 : 0.12), execute: work)
     }
 
+    /// The pointer is over this row, in the front window of the active app.
+    private func isPointer(over row: NSView) -> Bool {
+        guard NSApp.isActive, let window = row.window, window.isVisible, !row.isHiddenOrHasHiddenAncestor else { return false }
+        return row.bounds.contains(row.convert(window.mouseLocationOutsideOfEventStream, from: nil))
+    }
+
+    private func checkStillHovering() {
+        guard let row, tab?.isClosed != true, controller?.hasFloatingPanel != true else { hide(); return }
+        // Moving on to the next row cancels this, so only really leaving ends the preview.
+        if !isPointer(over: row) { scheduleHide() }
+    }
+
     func hide() {
         showWork?.cancel()
+        watchTimer?.invalidate()
+        watchTimer = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
         snapshotToken = nil
