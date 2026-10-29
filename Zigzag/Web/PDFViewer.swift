@@ -1,6 +1,7 @@
 import AppKit
 import PDFKit
 import WebKit
+import os
 
 /// PDFs in Zigzag's own viewer: Apple's PDFKit (Preview's engine) for the pages, with our controls in a pill at the
 /// bottom: the pages or contents down the side, where you are (click it to jump), zoom, two pages side by side,
@@ -111,6 +112,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         saveButton.onClick = { [weak self] _ in self?.save() }
         pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: pdfView)
+        NotificationCenter.default.addObserver(self, selector: #selector(followDarkPages), name: Self.darkPagesChanged, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -122,6 +124,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         // Sized first, so the pages are scaled for the window they're in and open at their top.
         layoutSubtreeIfNeeded()
         applyTwoPages()
+        // Dark from its first draw, if that's how you read PDFs.
+        (document as? DarkableDocument)?.isDark = Self.darkPages
         pdfView.document = document
         contents.outline = document.outlineRoot
         // The Pages and Contents switch only when there are contents to show.
@@ -272,22 +276,29 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         if let page { pdfView.go(to: page) }
     }
 
+    /// Dark pages are one setting: every open PDF, in any window, follows it.
+    private static let darkPagesChanged = Notification.Name("ZigzagPDFDarkPagesChanged")
+
     private func toggleDarkPages() {
         Self.darkPages.toggle()
-        // A soft crossfade from the pages as they were, rather than a flash.
-        if let rep = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds) {
-            pdfView.cacheDisplay(in: pdfView.bounds, to: rep)
-            let image = NSImage(size: pdfView.bounds.size)
-            image.addRepresentation(rep)
-            let still = NSImageView(frame: pdfView.frame)
-            still.image = image
-            still.imageScaling = .scaleAxesIndependently
-            addSubview(still, positioned: .above, relativeTo: pdfView)
+        NotificationCenter.default.post(name: Self.darkPagesChanged, object: nil)
+    }
+
+    @objc private func followDarkPages() {
+        // A soft crossfade from the pages as they were, rather than a flash, where you can see it.
+        guard window != nil, pdfView.document != nil, let rep = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds) else {
             applyDarkPages()
-            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
-        } else {
-            applyDarkPages()
+            return
         }
+        pdfView.cacheDisplay(in: pdfView.bounds, to: rep)
+        let image = NSImage(size: pdfView.bounds.size)
+        image.addRepresentation(rep)
+        let still = NSImageView(frame: pdfView.frame)
+        still.image = image
+        still.imageScaling = .scaleAxesIndependently
+        addSubview(still, positioned: .above, relativeTo: pdfView)
+        applyDarkPages()
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
     }
 
     /// Dark pages: each page drawn dark by `DarkablePage` (soft dark paper, light ink, its colors kept), and no
@@ -296,7 +307,10 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         let dark = Self.darkPages
         darkButton.showsFillAtRest = dark
         darkButton.symbol = dark ? "moon.fill" : "moon"
-        DarkablePage.isDark = dark
+        // Set on this document alone: its pages read it while PDFKit draws them, off the main thread too.
+        let darkable = pdfView.document as? DarkableDocument
+        let changed = darkable.map { $0.isDark != dark } ?? false
+        darkable?.isDark = dark
         pdfView.pageShadowsEnabled = !dark
         // Between the pages: a shade lighter than the dark paper, so each page still reads as one.
         let around = dark ? Tokens.Color.hex(0x2A2A2D) : Self.backdrop
@@ -304,7 +318,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         layer?.backgroundColor = cgColor(around)
         // PDFKit keeps pages it has drawn: the document goes back in, on the same spot at the same zoom, so
         // every page and thumbnail draws again in its new colors.
-        guard let document = pdfView.document, let clip = pdfView.documentView?.enclosingScrollView?.contentView else { return }
+        guard changed, let document = pdfView.document, let clip = pdfView.documentView?.enclosingScrollView?.contentView else { return }
         let autoScales = pdfView.autoScales, scale = pdfView.scaleFactor, origin = clip.bounds.origin
         pdfView.document = nil
         pdfView.document = document
@@ -368,8 +382,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         }
     }
 
+    /// Printed from the file itself: paper is never dark.
     func print() {
-        guard let window, let operation = pdfView.document?.printOperation(for: NSPrintInfo.shared, scalingMode: .pageScaleDownToFit, autoRotate: true) else { return }
+        guard let window, let data, let operation = PDFDocument(data: data)?.printOperation(for: NSPrintInfo.shared, scalingMode: .pageScaleDownToFit, autoRotate: true) else { return }
         operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
     }
 
@@ -632,16 +647,21 @@ private final class ContentsRow: InteractiveView {
 /// the page as usual, its brightness flipped against a soft grey (white paper to #1C1C1E, black ink to #E3E3E3),
 /// then the page again in color blending, which puts back each color's own hue and strength on the new brightness.
 /// A diagram's blue box stays blue, only darker; nothing turns into its opposite.
-/// A document whose pages are `DarkablePage`.
+/// A document whose pages are `DarkablePage`, and whether they draw dark. Locked, since PDFKit draws pages on
+/// its own threads while the setting changes on the main one.
 nonisolated final class DarkableDocument: PDFDocument {
+    private let dark = OSAllocatedUnfairLock(initialState: false)
+    var isDark: Bool {
+        get { dark.withLock { $0 } }
+        set { dark.withLock { $0 = newValue } }
+    }
+
     override var pageClass: AnyClass { DarkablePage.self }
 }
 
 nonisolated final class DarkablePage: PDFPage {
-    nonisolated(unsafe) static var isDark = false
-
     override func draw(with box: PDFDisplayBox, to context: CGContext) {
-        guard Self.isDark else { super.draw(with: box, to: context); return }
+        guard (document as? DarkableDocument)?.isDark == true else { super.draw(with: box, to: context); return }
         let area = context.boundingBoxOfClipPath
         context.saveGState()
         // Paper first, so a page with no background of its own darkens too.
