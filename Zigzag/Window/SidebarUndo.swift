@@ -133,9 +133,10 @@ extension BrowserWindowController {
     // MARK: Tabs
 
     /// Closes several tabs; ⌘Z reopens them all, each where it was, with the tab you were on selected again.
-    func closeManyWithUndo(_ tabs: [Tab]) {
+    /// `leavingSpaceEmpty`: if no tabs are left, the space shows empty instead of a pinned page from earlier.
+    func closeManyWithUndo(_ tabs: [Tab], leavingSpaceEmpty: Bool = false) {
         let selectedID = tabManager.selectedTab?.id
-        let ids = tabManager.close(tabs)
+        let ids = leavingSpaceEmpty ? tabManager.closeLeavingSpaceEmpty(tabs) : tabManager.close(tabs)
         guard !ids.isEmpty else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in
             // By id, so a tab reopened meanwhile with ⇧⌘T doesn't make this bring back an unrelated one.

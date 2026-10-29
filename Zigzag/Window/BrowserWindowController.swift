@@ -1197,7 +1197,7 @@ extension BrowserWindowController: SidebarDelegate {
         // First every other tab; once only yours is left, that one (and its split partner).
         let closing = others.isEmpty ? tabManager.currentTabs.filter { $0 === current || $0 === partner } : others
         guard !closing.isEmpty else { return }
-        closeManyWithUndo(closing)
+        closeManyWithUndo(closing, leavingSpaceEmpty: true)
         let what = closing.count == 1 ? "Closed 1 tab" : "Closed \(closing.count) tabs"
         // Undo brings back these tabs, never whatever else was done since.
         Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in

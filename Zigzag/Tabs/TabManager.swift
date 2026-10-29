@@ -487,13 +487,25 @@ final class TabManager {
         return ids
     }
 
+    /// Set while Clear closes the last tabs: the space is left empty rather than opening a pinned page you
+    /// visited earlier, which would look like a tab from nowhere.
+    private var leavesSpaceEmpty = false
+
+    /// Closes tabs; if that empties the space, nothing else gets picked to show.
+    @discardableResult
+    func closeLeavingSpaceEmpty(_ tabs: [Tab]) -> [UUID] {
+        leavesSpaceEmpty = true
+        defer { leavesSpaceEmpty = false }
+        return close(tabs)
+    }
+
     private func selectAfterClosing(_ closed: Tab, index: Int) {
         let list = tabs(in: closed.spaceID)
         if let opener = closed.opener, list.contains(where: { $0 === opener }) {
             select(opener)
         } else if !list.isEmpty {
             select(list[min(index, list.count - 1)])
-        } else if let recent = recentTabs.first(where: { $0.spaceID == closed.spaceID }) {
+        } else if !leavesSpaceEmpty, let recent = recentTabs.first(where: { $0.spaceID == closed.spaceID }) {
             select(recent)
         } else {
             selectedBySpace[closed.spaceID] = nil
