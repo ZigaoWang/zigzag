@@ -444,6 +444,8 @@ final class Tab: NSObject {
             webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
                 MainActor.assumeIsolated {
                     guard let self, let title = wv.title, !title.isEmpty else { return }
+                    // A PDF that names itself keeps that name over WebKit's (its file name, or nothing).
+                    if let viewer = self.pdfViewer, viewer.documentTitle != nil, viewer.url == wv.url { return }
                     self.title = title
                     self.changed.send(.title)
                     if let url = self.url, !self.isPrivate { HistoryStore.shared.updateTitle(title, for: url) }
