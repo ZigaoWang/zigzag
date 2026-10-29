@@ -380,6 +380,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     // MARK: Actions
 
+    /// Bigger than fitting the window: a pinch out zooms the pages back out rather than opening all tabs.
+    var isZoomedIn: Bool { pdfView.document != nil && pdfView.scaleFactor > pdfView.scaleFactorForSizeToFit + 0.01 }
+
     func zoomIn() { pdfView.zoomIn(nil) }
     func zoomOut() { pdfView.zoomOut(nil) }
     /// The pages at their printed size, as in Preview (it still opens fitting the window).

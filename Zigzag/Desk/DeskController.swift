@@ -629,7 +629,8 @@ final class DeskController {
             if event.phase == .ended || event.phase == .cancelled { gestureClaimed = false }
             return true
         }
-        let pageZoomed = (controller.selectedWebView?.magnification ?? 1) > 1.01
+        // Zoomed in, a pinch out zooms back out first. A PDF zooms itself, so it counts while it's bigger than fitting.
+        let pageZoomed = (controller.selectedTab?.pdfViewer?.isZoomedIn ?? false) || (controller.selectedWebView?.magnification ?? 1) > 1.01
         guard !pageZoomed, magnifyTotal < -0.15 else { return false }
         gestureClaimed = true
         show()
