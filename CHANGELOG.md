@@ -7,6 +7,18 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Changed
 - Zigzag's code is now open source under the Apache License 2.0, instead of the Functional Source License. The Zigzag name, icon and logo stay trademarks, so forks use their own.
+- Every shortcut except ⌘T now animates, so you can see what ⌘W and the others changed.
+
+### Fixed
+- Back on a tab a link opened closes it and takes you back to the page you came from, as in Safari and Chrome. It works with the button, a swipe and ⌘[.
+- Clicking Clear again after your tabs are gone leaves the space empty instead of opening a pinned page.
+- A tab preview no longer stays on screen after its tab closes or you switch to another app.
+- In split view, find sits over the page it's searching, and clicking it no longer switches pages.
+- Links that open an app, like a meeting link, ask with a clear prompt, and open straight away on sites you've said yes to.
+- 1Password wakes up less, no longer opens its welcome page when it's slow, and its shortcut and popup work in sign-in windows.
+- With 1Password on, sites can use the passkeys it saves.
+- A sign-in window whose page crashes loads again instead of staying blank.
+- Zigzag uses less energy in the background: idle pages in other spaces sleep, and animations and timers pause when you can't see them.
 
 ## [0.1.12] - 2026-10-27
 
