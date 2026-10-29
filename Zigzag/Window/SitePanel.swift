@@ -174,7 +174,8 @@ final class SitePanel: FloatingPanelView {
             self.controller?.copyLink(self.url)
             self.close()
         })
-        if !tab.isPrivate {
+        // Only a web site has a cache and cookies of its own to clear: not a file, an extension's page or a new tab.
+        if !tab.isPrivate, url.scheme == "http" || url.scheme == "https" {
             menu.addItem(.separator())
             menu.addItem(SidebarMenus.Item("Clear Cache for This Site") { [weak self] in self?.clear(.cache) })
             menu.addItem(SidebarMenus.Item("Clear Cookies for This Site") { [weak self] in self?.clear(.cookies) })
