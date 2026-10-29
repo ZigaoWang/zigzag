@@ -100,19 +100,14 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [com.adobe.pdf]
-    entitlements:
-      path: Zigzag/Zigzag.entitlements
-      properties:
-        com.apple.security.device.camera: true
-        com.apple.security.device.audio-input: true
-        # Saved passwords live in this group of the data protection keychain, which also syncs through iCloud Keychain.
-        # It keeps its first name: renaming it would hide every password already saved.
-        keychain-access-groups:
-          - $(AppIdentifierPrefix)app.zigzag.passwords
-        com.apple.security.personal-information.location: true
-        # Your own card in Contacts, to fill your name, email, phone and address into forms.
-        com.apple.security.personal-information.addressbook: true
-        com.apple.security.cs.allow-unsigned-executable-memory: false
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Zigzag/Zigzag.entitlements
+      configs:
+        # Releases add passkeys: Apple granted the browser passkey entitlement to wang.zigao.zigzag only, so the dev
+        # build (its own bundle id) can't carry it. The two files are the same apart from that key.
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Zigzag/ZigzagRelease.entitlements
   ZigzagTests:
     type: bundle.unit-test
     platform: macOS
