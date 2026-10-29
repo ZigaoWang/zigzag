@@ -102,6 +102,7 @@ final class ExtensionHost: NSObject {
             try controller.load(context)
             contexts.append(context)
             announceExistingWindows(to: context)
+            Passkeys.refresh()
             changed.send()
             context.loadBackgroundContent { _ in }
             return context
