@@ -305,6 +305,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func showSelectedTab() {
         previews.hide()
         let tab = tabManager.selectedTab
+        // The site panel describes one page; another tab coming forward takes it away.
+        if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
         if tab !== shownTab {
             closeReader()
             floatVideoOnSwitch(from: shownTab, to: tab)

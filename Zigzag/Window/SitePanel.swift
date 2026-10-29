@@ -18,6 +18,10 @@ final class SitePanel: FloatingPanelView {
     private let url: URL
     private let site: String
     private let isBlank: Bool
+    /// The panel is about one page: when it goes to another site (a sign-in redirect), the panel goes too.
+    private var pageToken: SignalToken?
+    /// Whether this panel describes the page in this tab.
+    func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
@@ -58,6 +62,11 @@ final class SitePanel: FloatingPanelView {
         securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : "lock.open.fill", size: Tokens.TypeSize.small)
         securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
         [icon, siteName, security, securityIcon, copyButton, topDivider, divider, clearCache, clearCookies].forEach { addSubview($0) }
+        let shownSite = site
+        pageToken = tab.changed.observe { [weak self, weak tab] change in
+            guard change == .url, let self, let now = tab?.url else { return }
+            if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite { self.close() }
+        }
         copyButton.onClick = { [weak self] _ in
             guard let self else { return }
             self.controller?.copyLink(self.url)
@@ -122,6 +131,7 @@ final class SitePanel: FloatingPanelView {
     }
 
     func close() {
+        pageToken = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if Self.current === self { Self.current = nil }
