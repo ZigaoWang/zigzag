@@ -309,7 +309,9 @@ final class SidebarView: NSView {
         address.frame = NSRect(x: pad, y: topRowBottom, width: width - pad * 2, height: Tokens.Metric.addressHeight)
 
         let bottomHeight = Tokens.Metric.bottomBarHeight
-        bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight - pad, width: width, height: bottomHeight)
+        // Its buttons sit as far from the bottom edge as from the side.
+        let buttonInset = (bottomHeight - Tokens.Metric.iconButton) / 2
+        bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
         let favoritesHeight = favorites.preferredHeight
         favorites.isHidden = favoritesHeight == 0
         favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: favoritesHeight)
