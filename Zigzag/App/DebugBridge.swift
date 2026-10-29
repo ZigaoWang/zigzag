@@ -163,7 +163,7 @@ enum DebugBridge {
                 if let v = view as? InteractiveView { v.isHovered = true; DebugBridge.hovered = [v] } else { DebugBridge.hovered = [] }
             default: break
             }
-        case "downloads": controller.sidebarShowDownloads(from: controller.sidebar.downloadsAnchor)
+        case "downloads": controller.showDownloads(nil)
         case "dl":
             // dl pause|resume|state: acts on the newest download.
             guard let item = DownloadManager.shared.items.first else { debugLog("dl => none"); break }

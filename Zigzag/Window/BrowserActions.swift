@@ -36,8 +36,14 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func showDownloads(_ sender: Any?) {
-        // From the sidebar's Downloads button when it's there. With the sidebar hidden it opens over the page and
-        // the sidebar stays hidden, as you left it.
+        // From the sidebar's Downloads button; with the sidebar hidden, from its stand-in in the same corner, and the
+        // sidebar stays hidden, as you left it.
+        if !(root.sidebarVisible || root.isSidebarFloatingVisible) {
+            showFloatingDownloads()
+            floatingDownloads.layoutSubtreeIfNeeded()
+            DownloadsPanel.show(from: floatingDownloadsButton, in: self)
+            return
+        }
         let anchor = sidebar.downloadsAnchor.isHidden ? sidebar.address : sidebar.downloadsAnchor
         DownloadsPanel.show(from: anchor, in: self)
     }

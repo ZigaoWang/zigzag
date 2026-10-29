@@ -45,6 +45,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.findBar.reposition()
             self.peek.reposition()
             PermissionPrompt.reposition(in: self)
+            if self.floatingDownloads.superview != nil {
+                if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
+            }
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onSlide = { [weak self] duration in
@@ -536,6 +539,44 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    // MARK: Downloads with the sidebar hidden
+
+    /// With the sidebar hidden, its Downloads button stands in on its own, in the same bottom-left corner: a download
+    /// flies into it and the panel opens above it, exactly as with the sidebar out. It goes once the panel closes.
+    private(set) lazy var floatingDownloads: FloatingPanelView = {
+        let chip = FloatingPanelView()
+        chip.radius = Tokens.Metric.iconButton / 2 + 4
+        let button = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
+        button.onClick = { [weak self] _ in self?.showDownloads(nil) }
+        chip.addSubview(button)
+        chip.onLayout = { [weak chip, weak button] in
+            guard let chip, let button else { return }
+            let side = Tokens.Metric.iconButton
+            button.frame = NSRect(x: (chip.bounds.width - side) / 2, y: (chip.bounds.height - side) / 2, width: side, height: side)
+        }
+        return chip
+    }()
+
+    var floatingDownloadsButton: NSView { floatingDownloads.subviews.first ?? floatingDownloads }
+
+    /// Shows the stand-in Downloads button where the sidebar's would be, if the sidebar is hidden.
+    func showFloatingDownloads() {
+        guard !(root.sidebarVisible || root.isSidebarFloatingVisible) else { return }
+        let side = Tokens.Metric.iconButton + 8
+        let inset = Tokens.Metric.sidebarPadding
+        floatingDownloads.frame = NSRect(x: inset, y: root.overlay.bounds.height - side - inset, width: side, height: side)
+        guard floatingDownloads.superview == nil else { return }
+        root.overlay.addSubview(floatingDownloads)
+        floatingDownloads.growsFrom = CGPoint(x: 0.5, y: 0.5)
+        floatingDownloads.present(arrival: .pop)
+    }
+
+    /// The panel closed, or the sidebar came back: the stand-in steps away.
+    func hideFloatingDownloads() {
+        guard floatingDownloads.superview != nil, !DownloadsPanel.isOpen(in: window) else { return }
+        floatingDownloads.dismiss()
+    }
+
     /// Where popovers that belong to the address bar (extension popups) open from: the address bar while the sidebar
     /// shows, or the top left of the page while it's hidden, so they never open off screen.
     var addressAnchor: (view: NSView, rect: NSRect) {
@@ -848,17 +889,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let host = overlay.layer, let window, !Tokens.Motion.reduceMotion else { return }
         let anchor = sidebar.downloadsAnchor
         let sidebarShown = root.sidebarVisible || root.isSidebarFloatingVisible
-        // Nowhere to fly to with the sidebar hidden: the panel opens over the page instead, showing it come in.
-        guard sidebarShown else {
-            if refresh, !hasFloatingPanel, window.isKeyWindow { DownloadsPanel.reveal(from: anchor, in: self, closingAfter: item) }
-            return
-        }
+        // Sidebar hidden: its Downloads button stands in at the same corner, and the download flies there.
+        if !sidebarShown { showFloatingDownloads() }
+        let target = sidebarShown ? anchor : floatingDownloadsButton
         let card = root.cardFrame
         // From the pointer if it's over the page, otherwise the middle of the page.
         let mouse = overlay.convert(window.mouseLocationOutsideOfEventStream, from: nil)
         let start = card.contains(mouse) ? mouse : NSPoint(x: card.midX, y: card.midY)
-        let end: NSPoint = sidebarShown && !anchor.isHiddenOrHasHiddenAncestor
-            ? overlay.convert(NSPoint(x: anchor.bounds.midX, y: anchor.bounds.midY), from: anchor)
+        floatingDownloads.layoutSubtreeIfNeeded()
+        let end: NSPoint = !target.isHiddenOrHasHiddenAncestor
+            ? overlay.convert(NSPoint(x: target.bounds.midX, y: target.bounds.midY), from: target)
             : NSPoint(x: card.minX + 24, y: card.maxY - 24)
         let ext = (item.filename as NSString).pathExtension
         let icon = NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data)
@@ -921,10 +961,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // The landing is one moment: the file goes into the button, the button takes the hit, and the panel
             // springs open out of it, showing the file come in, and tidies itself away a while after it's done.
             Tokens.Motion.withoutAnimation { flyer.removeFromSuperlayer() }
-            guard let self, sidebarShown else { return }
-            self.sidebar.pulseDownloads()
+            guard let self else { return }
+            if sidebarShown { self.sidebar.pulseDownloads() }
             if refresh, !self.hasFloatingPanel, self.window?.isKeyWindow == true {
-                DownloadsPanel.reveal(from: self.sidebar.downloadsAnchor, in: self, closingAfter: item)
+                DownloadsPanel.reveal(from: target, in: self, closingAfter: item)
+            } else if !sidebarShown, !DownloadsPanel.isOpen(in: self.window) {
+                // Nothing opened from it: it stays a moment so you see where the file went, then goes.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.hideFloatingDownloads() }
             }
         }
         flyer.add(group, forKey: "fly")
