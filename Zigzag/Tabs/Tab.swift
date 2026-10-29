@@ -394,6 +394,14 @@ final class Tab: NSObject {
 
     func captureSnapshot(_ completion: (() -> Void)? = nil) {
         guard let webView, webView.window != nil, webView.bounds.width > 0, hasLoadedOnce else { completion?(); return }
+        // A PDF's picture is of Zigzag's viewer, as you see it (dark pages and all), not WebKit's underneath.
+        if let viewer = pdfViewer, viewer.window != nil, let image = viewer.snapshot() {
+            snapshot = image
+            if !isPrivate { SnapshotStore.save(image, for: id) }
+            changed.send(.snapshot)
+            completion?()
+            return
+        }
         let config = WKSnapshotConfiguration()
         config.afterScreenUpdates = false
         config.snapshotWidth = NSNumber(value: Double(min(webView.bounds.width, 1280)))

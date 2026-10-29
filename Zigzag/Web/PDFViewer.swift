@@ -191,6 +191,15 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         rememberPlace(index)
     }
 
+    /// What's on screen, for the tab's picture in the switcher and all-tabs view.
+    func snapshot() -> NSImage? {
+        guard pdfView.document != nil, let rep = pdfView.bitmapImageRepForCachingDisplay(in: pdfView.bounds) else { return nil }
+        pdfView.cacheDisplay(in: pdfView.bounds, to: rep)
+        let image = NSImage(size: pdfView.bounds.size)
+        image.addRepresentation(rep)
+        return image
+    }
+
     // MARK: Moving around
 
     /// Scrolls to a page or a heading in one smooth move, rather than a cut.
