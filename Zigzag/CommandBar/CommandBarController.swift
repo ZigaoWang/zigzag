@@ -135,6 +135,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         controller = window
         super.init()
         field.delegate = self
+        field.textInset = 2
         fieldIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.large)
         fieldIcon.contentTintColor = Tokens.Color.textTertiary
         fieldIcon.imageScaling = .scaleNone
@@ -312,7 +313,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             hint.frame = NSRect(x: hintKey.frame.minX - Tokens.Space.x2 - hw, y: (fieldHeight - hint.lineHeight) / 2, width: hw, height: hint.lineHeight)
             fieldRight = hint.frame.minX - Tokens.Space.x3
         }
-        field.frame = NSRect(x: fieldX, y: (fieldHeight - textHeight) / 2, width: max(40, fieldRight - fieldX), height: textHeight)
+        // A little taller and wider than the text, which the field keeps inside, so selections draw whole.
+        let inset = field.textInset, boxHeight = textHeight + inset * 4
+        field.frame = NSRect(x: fieldX - inset, y: (fieldHeight - boxHeight) / 2, width: max(40, fieldRight - fieldX) + inset * 2, height: boxHeight)
         divider.frame = NSRect(x: 0, y: fieldHeight - Tokens.Metric.hairline, width: b.width, height: Tokens.Metric.hairline)
         divider.isHidden = results.isEmpty
         var y = fieldHeight + Tokens.Space.x2

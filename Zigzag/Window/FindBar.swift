@@ -5,9 +5,16 @@ import WebKit
 final class PlainTextField: NSTextField {
     var onCancel: (() -> Void)?
     var onCommand: ((Selector) -> Bool)?
+    /// Room at the sides for a selection and the first letter to draw whole (the address); text is always centered
+    /// top to bottom. Zero for fields lined up with a label they replace, like renaming.
+    var textInset: CGFloat = 0
 
     init(font: NSFont, placeholder: String) {
         super.init(frame: .zero)
+        // A new cell starts out read-only; a text field you type in needs it editable again.
+        cell = PaddedTextFieldCell(textCell: "")
+        isEditable = true
+        isSelectable = true
         self.font = font
         isBordered = false
         isBezeled = false
@@ -24,6 +31,29 @@ final class PlainTextField: NSTextField {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+}
+
+/// Draws and edits the text a little in from the sides and centered in its height, so a selection that runs to the
+/// edge, or the first letter of a long address, isn't cut off.
+private final class PaddedTextFieldCell: NSTextFieldCell {
+    private func textRect(in rect: NSRect) -> NSRect {
+        let inset = (controlView as? PlainTextField)?.textInset ?? 0
+        var r = rect.insetBy(dx: inset, dy: 0)
+        let height = ceil(cellSize(forBounds: r).height)
+        if height < r.height { r.origin.y += floor((r.height - height) / 2); r.size.height = height }
+        return r
+    }
+
+    override func drawingRect(forBounds rect: NSRect) -> NSRect { super.drawingRect(forBounds: textRect(in: rect)) }
+
+    override func edit(withFrame rect: NSRect, in controlView: NSView, editor: NSText, delegate: Any?, event: NSEvent?) {
+        super.edit(withFrame: textRect(in: rect), in: controlView, editor: editor, delegate: delegate, event: event)
+    }
+
+    override func select(withFrame rect: NSRect, in controlView: NSView, editor: NSText, delegate: Any?, start: Int, length: Int) {
+        super.select(withFrame: textRect(in: rect), in: controlView, editor: editor, delegate: delegate, start: start, length: length)
+    }
+
 }
 
 /// Find in page. Sits at the top right of the page card.
