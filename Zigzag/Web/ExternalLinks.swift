@@ -47,15 +47,21 @@ enum ExternalLinks {
         asking.insert(key)
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: host.isEmpty ? name : host, what: name, symbol: "arrow.up.forward.app",
-                                                    isPrivate: false, in: controller, title: "Open \(name)?", allowTitle: "Open",
+                                                    isPrivate: false, in: controller, title: "Open \(name)", allowTitle: "Always Open",
+                                                    onceTitle: "Open This Time", denyTitle: "Don’t Open",
                                                     answered: { !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
             asking.remove(key)
-            guard answer == .allow else {
-                if answer == .deny { declined.insert(key) }
-                return
+            switch answer {
+            case .allow:
+                if !isPrivate, !host.isEmpty { SitePermissions.allowOpeningApp(host: host, scheme: scheme) }
+                NSWorkspace.shared.open(url)
+            case .allowOnce:
+                NSWorkspace.shared.open(url)
+            case .deny:
+                declined.insert(key)
+            case .notNow:
+                break
             }
-            if !isPrivate, !host.isEmpty { SitePermissions.allowOpeningApp(host: host, scheme: scheme) }
-            NSWorkspace.shared.open(url)
         }
     }
 

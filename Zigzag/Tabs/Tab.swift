@@ -803,7 +803,7 @@ extension Tab: WKUIDelegate {
                 return
             }
             let answer = await PermissionPrompt.ask(host: origin.host, what: "your screen", symbol: "rectangle.on.rectangle", isPrivate: isPrivate,
-                                                    in: controller, answered: { nil })
+                                                    in: controller, title: "Share your screen", allowTitle: "Allow", onceTitle: nil, answered: { nil })
             decisionHandler(answer == .allow ? 1 : 0)
         }
     }
