@@ -6,8 +6,9 @@ final class BrowserWebView: WKWebView {
     weak var owner: Tab?
     private lazy var swipe = SwipeNavigator(webView: self)
 
-    /// A swipe over something covering the page (the PDF viewer) goes back or forward like one over the page.
-    func handleSwipe(_ event: NSEvent) -> Bool { swipe.handle(event) }
+    /// A swipe over something covering the page (the PDF viewer) goes back or forward like one over the page,
+    /// unless it can still scroll that way (`room`).
+    func handleSwipe(_ event: NSEvent, room: (left: Bool, right: Bool)) -> Bool { swipe.handle(event, room: room) }
 
     /// Covered by the PDF viewer: typing (arrows, space, ⌘F's text) goes to the viewer instead.
     override func becomeFirstResponder() -> Bool {

@@ -37,8 +37,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     /// Links in the PDF open like links on a page.
     var onOpenLink: ((URL) -> Void)?
-    /// Swipes to go back or forward, handed to the page underneath.
-    var onSwipe: ((NSEvent) -> Bool)? {
+    /// Swipes to go back or forward, handed to the page underneath with which way the pages can still scroll.
+    var onSwipe: ((NSEvent, (left: Bool, right: Bool)) -> Bool)? {
         get { pdfView.onSwipe }
         set { pdfView.onSwipe = newValue }
     }
@@ -478,11 +478,20 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
 /// PDFKit's view with Zigzag's swipe to go back and forward.
 final class ZigzagPDFView: PDFView {
-    var onSwipe: ((NSEvent) -> Bool)?
+    var onSwipe: ((NSEvent, (left: Bool, right: Bool)) -> Bool)?
 
     override func scrollWheel(with event: NSEvent) {
-        if onSwipe?(event) == true { return }
+        // Every event goes to the swipe, so it sees each gesture begin and end; zoomed in, a sideways swipe pans
+        // until the pages reach their edge, and only then goes back or forward.
+        if onSwipe?(event, sidewaysRoom) == true { return }
         super.scrollWheel(with: event)
+    }
+
+    /// Whether the pages can scroll further left or right.
+    private var sidewaysRoom: (left: Bool, right: Bool) {
+        guard let documentView, let clip = documentView.enclosingScrollView?.contentView else { return (false, false) }
+        let shown = clip.bounds, all = documentView.frame
+        return (shown.minX > all.minX + 0.5, shown.maxX < all.maxX - 0.5)
     }
 }
 

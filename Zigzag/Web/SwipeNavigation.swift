@@ -31,8 +31,9 @@ final class SwipeNavigator {
         self.webView = webView
     }
 
-    /// Returns true when it took the event, so the page doesn't also scroll with it.
-    func handle(_ event: NSEvent) -> Bool {
+    /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
+    /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
+    func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
         guard let webView, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled else { return false }
         // Momentum after a swipe that navigated (or was abandoned) is part of it, not a scroll.
         if !event.momentumPhase.isEmpty {
@@ -46,9 +47,11 @@ final class SwipeNavigator {
             watchdog?.cancel()
             state = .deciding
             dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; samples = []
-            probe(at: webView.convert(event.locationInWindow, from: nil))
+            if let room { pageScrolls = room } else { probe(at: webView.convert(event.locationInWindow, from: nil)) }
             return false
         case .changed:
+            // What covers the page knows its room as it scrolls: it's kept up to date through the gesture.
+            if let room { pageScrolls = room }
             // Fingers to the right go back; scrolling direction settings don't change that.
             let fingerX = event.isDirectionInvertedFromDevice ? event.scrollingDeltaX : -event.scrollingDeltaX
             dx += fingerX

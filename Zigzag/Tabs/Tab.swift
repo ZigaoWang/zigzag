@@ -161,6 +161,7 @@ final class Tab: NSObject {
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil)
             PopupNotice.attach(to: configuration)
+            HistoryPage.attach(to: configuration)
             if let privateStore {
                 configuration.websiteDataStore = privateStore
                 // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.
@@ -420,7 +421,8 @@ final class Tab: NSObject {
     private var lastRecorded: URL?
 
     private func recordHistory(_ url: URL, title: String?) {
-        guard !isPrivate, url != lastRecorded else { return }
+        // History's own page isn't a visit.
+        guard !isPrivate, url != lastRecorded, !HistoryPage.isHistory(url) else { return }
         lastRecorded = url
         HistoryStore.shared.recordVisit(url: url, title: title)
     }
@@ -520,7 +522,7 @@ final class Tab: NSObject {
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
         // Private tabs only use icons already saved from normal browsing; they never fetch or save one.
-        if isPrivate || Self.isExtensionPage(pageURL) {
+        if isPrivate || Self.isExtensionPage(pageURL) || HistoryPage.isHistory(pageURL) {
             favicon = FaviconStore.shared.cachedIcon(for: pageURL)
             changed.send(.favicon)
             return
@@ -857,7 +859,7 @@ extension Tab {
                 // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
                 let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate)
                 viewer.onOpenLink = { [weak self] link in self?.load(link) }
-                viewer.onSwipe = { [weak webView] event in (webView as? BrowserWebView)?.handleSwipe(event) ?? false }
+                viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
                 self.setPDFViewer(viewer)
                 let userAgent = values?.count == 2 ? values?[1] : nil
                 Task { @MainActor [weak self, weak webView, weak viewer] in
