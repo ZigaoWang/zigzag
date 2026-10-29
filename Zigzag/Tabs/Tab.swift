@@ -71,7 +71,9 @@ final class Tab: NSObject {
         return SitePermissions.notifications(host: host) == true
     }
     /// The tab that opened this one, so closing it can return there.
-    weak var opener: Tab?
+    weak var opener: Tab? { didSet { opener?.openedHere.add(self) } }
+    /// Tabs opened from this one: when it closes, their Back stops offering to return here.
+    private let openedHere = NSHashTable<Tab>.weakObjects()
     /// Opened from a link, with nothing earlier in this tab: Back closes it and goes back to the page that opened
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
@@ -212,6 +214,7 @@ final class Tab: NSObject {
     /// thumbnail stays until the next save prunes what isn't kept.
     func close(keepingSnapshot: Bool = false) {
         isClosed = true
+        for tab in openedHere.allObjects where !tab.canGoBack { tab.changed.send(.navigation) }
         if let webView { tearDown(webView) }
         if !keepingSnapshot { SnapshotStore.remove(id) }
     }
