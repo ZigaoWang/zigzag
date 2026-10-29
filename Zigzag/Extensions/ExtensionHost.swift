@@ -755,11 +755,12 @@ final class NativeMessagingHost {
     }
 
     /// A connection that keeps reconnecting (a restarting background, an app that keeps hanging up) waits a little
-    /// longer each time, instead of starting helper after helper.
+    /// longer each time, instead of starting helper after helper. Only helpers that really started count, and one
+    /// that answers clears the slate, so an extension retrying while it waits is never locked out.
     private static func delayBeforeStarting(for id: String) -> TimeInterval {
         let now = Date()
         let recent = (recentStarts[id] ?? []).filter { now.timeIntervalSince($0) < 30 }
-        recentStarts[id] = recent + [now]
+        recentStarts[id] = recent
         return recent.count < 3 ? 0 : min(Double(recent.count - 2) * 2, 15)
     }
 
@@ -771,6 +772,7 @@ final class NativeMessagingHost {
         var waiting: [Any] = []
         onMessage = { message in
             received += 1
+            if received == 1 { Self.recentStarts[id] = nil }
             ExtensionHost.shared.nativeHostReplied(message, for: id)
             port.sendMessage(message, completionHandler: nil)
         }
@@ -790,6 +792,7 @@ final class NativeMessagingHost {
         let begin = { [weak self] in
             guard let self, !self.finished else { return }
             let started = self.start()
+            if started { Self.recentStarts[id, default: []].append(Date()) }
             ExtensionLog.write("native host for \(id) started=\(started)")
             guard started else { self.finish(); return }
             waiting.forEach { self.write($0) }
