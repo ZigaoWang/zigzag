@@ -47,6 +47,8 @@ final class FaviconStore {
            let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
             return context.webExtension.icon(for: NSSize(width: 32, height: 32))
         }
+        // Zigzag's own pages wear a symbol.
+        if url.scheme == HistoryPage.scheme { return Tokens.Symbol.image("clock.arrow.circlepath", size: 14) }
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }
         if let image = NSImage(contentsOf: file(for: key)) {

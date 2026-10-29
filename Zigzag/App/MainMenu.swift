@@ -167,8 +167,8 @@ enum MainMenu {
         main.addItem(submenu("View", viewItems))
 
         main.addItem(submenu("History", [
-            item("Search History…", #selector(C.searchHistory(_:)), "y"),
-            item("Show All History", #selector(AppDelegate.showHistory(_:)), "y", [.command, .shift]),
+            // One History, as in Chrome: the window, with its own search.
+            item("Show History", #selector(AppDelegate.showHistory(_:)), "y"),
             item("Reopen Closed Tab", #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
             item("Reopen Closed Window", #selector(AppDelegate.reopenClosedWindow(_:)), ""),
             .separator(),

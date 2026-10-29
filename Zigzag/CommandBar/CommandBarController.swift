@@ -136,6 +136,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         super.init()
         field.delegate = self
         field.textInset = 2
+        field.centersText = true
         fieldIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.large)
         fieldIcon.contentTintColor = Tokens.Color.textTertiary
         fieldIcon.imageScaling = .scaleNone
@@ -683,7 +684,7 @@ extension CommandBarController {
             }
         case "clear-cookies": controller.confirmClearCookies()
         case "feedback": Feedback.show(in: controller)
-        case "history": HistoryWindowController.show()
+        case "history": HistoryPage.open(in: controller)
         default: break
         }
     }

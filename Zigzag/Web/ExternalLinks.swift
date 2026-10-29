@@ -7,7 +7,7 @@ import WebKit
 @MainActor
 enum ExternalLinks {
     /// What the web view handles itself; everything else is for another app.
-    static let webSchemes: Set<String> = ["http", "https", "about", "data", "blob", "file", "javascript", "webkit-extension"]
+    static let webSchemes: Set<String> = ["http", "https", "about", "data", "blob", "file", "javascript", "webkit-extension", "zigzag"]
     private static let everyday: Set<String> = ["mailto", "tel", "facetime", "facetime-audio", "sms"]
     /// One question at a time: meeting pages fire the same link a few times while they wait.
     private static var asking: Set<String> = []

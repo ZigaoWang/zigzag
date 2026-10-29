@@ -88,6 +88,8 @@ final class AddressView: InteractiveView {
            let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
             // An extension's own page (its settings) is named after the extension, not its random address.
             label.stringValue = context.webExtension.displayName ?? "Extension"
+        } else if HistoryPage.isHistory(url) {
+            label.stringValue = "History"
         } else if let url, let host = url.host() {
             label.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         } else if let url, url.isFileURL {

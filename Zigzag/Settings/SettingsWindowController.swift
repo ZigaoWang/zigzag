@@ -910,7 +910,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             }
         }
         let showHistory = TextButton.form("Show History")
-        showHistory.onClick = { _ in HistoryWindowController.show() }
+        showHistory.onClick = { _ in
+            guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            HistoryPage.open(in: controller)
+        }
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: historyButtons))
