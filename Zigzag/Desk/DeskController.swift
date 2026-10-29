@@ -284,7 +284,9 @@ final class DeskController {
                 ids.removeAll { $0 == dragging.id }
                 if dragging.space == space.id { ids.insert(dragging.id, at: min(dragging.index, ids.count)) }
             }
-            if ids.isEmpty && dragging == nil && Library.shared.spaces.count > 1 { continue }
+            // A space with nothing to show has no heading, except the only one when not searching. While searching
+            // the headings of empty spaces would stand over "No tabs match".
+            if ids.isEmpty && dragging == nil && (Library.shared.spaces.count > 1 || !query.isEmpty) { continue }
             headerFrames[space.id] = NSRect(x: left - Tokens.Space.x2, y: y, width: 320, height: Tokens.Space.x8)
             y += Tokens.Space.x8 + Tokens.Space.x3
             for (i, id) in ids.enumerated() {
@@ -419,8 +421,10 @@ final class DeskController {
         }
         noMatches.isHidden = query.isEmpty || !layout.cards.isEmpty
         if !noMatches.isHidden {
-            let w = noMatches.textWidth + 4
-            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: margin, width: w, height: noMatches.lineHeight)
+            // In the middle of what you can see, not at the top of the canvas.
+            let w = noMatches.textWidth + 4, visible = scrollView.documentVisibleRect
+            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: round(visible.midY - noMatches.lineHeight / 2),
+                                     width: w, height: noMatches.lineHeight)
         }
         for (id, card) in cards {
             guard let frame = layout.cards[id], id != dragging?.id else { continue }
