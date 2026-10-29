@@ -369,8 +369,11 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     func zoomIn() { pdfView.zoomIn(nil) }
     func zoomOut() { pdfView.zoomOut(nil) }
-    /// Back to fitting the window, as when it opened.
-    func actualSize() { pdfView.autoScales = true }
+    /// The pages at their printed size, as in Preview (it still opens fitting the window).
+    func actualSize() {
+        pdfView.autoScales = false
+        pdfView.scaleFactor = 1
+    }
 
     func save() {
         guard let data, let window else { return }
