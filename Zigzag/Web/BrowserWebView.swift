@@ -13,7 +13,11 @@ final class BrowserWebView: WKWebView {
     /// Covered by the PDF viewer: typing (arrows, space, ⌘F's text) goes to the viewer instead.
     override func becomeFirstResponder() -> Bool {
         if let viewer = owner?.pdfViewer, viewer.superview != nil {
-            DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(viewer.pdfView) }
+            // Only if the page still has the keyboard by then: a click elsewhere in between keeps it there.
+            DispatchQueue.main.async { [weak self, weak viewer] in
+                guard let self, let viewer, viewer.superview != nil, let window = self.window, window.firstResponder === self else { return }
+                window.makeFirstResponder(viewer.pdfView)
+            }
         }
         return super.becomeFirstResponder()
     }
