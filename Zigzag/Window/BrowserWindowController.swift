@@ -327,6 +327,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         updateNowPlaying()
         offerWebStoreExtension()
         updateReaderButton()
+        findBar.pageChanged()
     }
 
     /// Where an extension may read and change pages, Chrome's three choices.
@@ -528,11 +529,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// The page you're working in: the whole page area, or in split view the focused pane.
+    var focusedPaneFrame: NSRect {
+        guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.splitRatio != nil else { return root.cardFrame }
+        let panes = root.paneFrames
+        return pair.left == tab.id ? panes.left : (panes.right ?? panes.left)
+    }
+
     /// In split view, clicking a pane makes its tab the one you're working in.
     func focusPane(at windowPoint: NSPoint) {
         guard let tab = tabManager.selectedTab, let partner = tabManager.partner(of: tab), let pair = tabManager.split(for: tab) else { return }
         let panes = root.paneFrames
         let point = root.convert(windowPoint, from: nil)
+        // Clicks on what floats over the page (find, the command bar, a prompt) are for it, not the pane below.
+        if let base = root.overlay.superview, root.overlay.hitTest(base.convert(windowPoint, from: nil)) != nil { return }
         let clickedLeft = panes.left.contains(point)
         let clickedRight = panes.right?.contains(point) ?? false
         guard clickedLeft || clickedRight else { return }

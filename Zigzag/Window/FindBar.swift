@@ -54,9 +54,13 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         panel.onLayout = { [weak self] in self?.layoutPanel() }
     }
 
+    /// The page the last search ran in, so its highlight goes when you move to the other pane.
+    private weak var searched: WKWebView?
+
+    /// Over the page it searches: in split view, the pane you're working in.
     private var frame: NSRect {
         guard let window else { return .zero }
-        let card = window.root.cardFrame
+        let card = window.focusedPaneFrame
         let height = Tokens.Space.x10
         let width = Tokens.Metric.findBarWidth
         return NSRect(x: card.maxX - width - Tokens.Space.x3, y: card.minY + Tokens.Space.x3, width: width, height: height)
@@ -97,6 +101,17 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         panel.frame = frame
     }
 
+    /// Another pane (or tab) came to the front: the bar moves over it and searches there instead.
+    func pageChanged() {
+        guard isVisible else { return }
+        let current = window?.selectedWebView
+        guard current !== searched else { return }
+        clearHighlights()
+        let target = frame
+        Tokens.Motion.animate(Tokens.Motion.snappy) { [panel] in panel.animator().frame = target }
+        if query.isEmpty { countLabel.stringValue = ""; layoutPanel() } else { search(backwards: false, fromStart: true) }
+    }
+
     func hide() {
         guard isVisible else { return }
         isVisible = false
@@ -132,6 +147,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     private func search(backwards: Bool, fromStart: Bool = false) {
         guard let webView = window?.selectedWebView, !query.isEmpty else { return }
+        searched = webView
         let config = WKFindConfiguration()
         config.backwards = backwards
         config.caseSensitive = false
@@ -172,7 +188,8 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func clearHighlights() {
-        window?.selectedWebView?.evaluateJavaScript("window.getSelection().removeAllRanges()")
+        (searched ?? window?.selectedWebView)?.evaluateJavaScript("window.getSelection().removeAllRanges()")
+        searched = nil
     }
 }
 
