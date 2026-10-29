@@ -69,8 +69,11 @@ final class Tab: NSObject {
     let createdAt: Date
     /// True for a tab opened by a search from the command bar, until the user leaves the results page.
     var isSearchTab = false
-    /// True while the page lives in the peek card rather than the tab list.
-    var isPeek = false
+    /// True while the page lives in the peek card rather than the tab list. A PDF in peek is WebKit's; it gets
+    /// Zigzag's viewer once it's a tab.
+    var isPeek = false {
+        didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
+    }
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
