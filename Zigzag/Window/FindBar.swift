@@ -90,6 +90,10 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     /// The page the last search ran in, so its highlight goes when you move to the other pane.
     private weak var searched: WKWebView?
+    /// The PDF the last search ran in, for the same reason.
+    private weak var searchedPDF: PDFViewerView?
+    /// A PDF is searched a moment after you stop typing: a long one takes a while, and each letter shouldn't wait.
+    private var pdfSearch: DispatchWorkItem?
 
     /// Over the page it searches: in split view, the pane you're working in.
     private var frame: NSRect {
@@ -182,10 +186,20 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private func search(backwards: Bool, fromStart: Bool = false) {
         // A PDF is searched in its own viewer, which knows its pages and counts the matches itself.
         if let pdf = window?.selectedTab?.pdfViewer {
-            let found = pdf.find(query, backwards: backwards, fromStart: fromStart)
-            countLabel.stringValue = query.isEmpty ? "" : found.count == 0 ? "No matches" : found.count == 1 ? "1 match" : "\(found.place) of \(found.count)"
-            countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
-            layoutPanel()
+            searched = window?.selectedWebView
+            searchedPDF = pdf
+            pdfSearch?.cancel()
+            let query = query
+            let work = DispatchWorkItem { [weak self, weak pdf] in
+                guard let self, let pdf else { return }
+                let found = pdf.find(query, backwards: backwards, fromStart: fromStart)
+                self.countLabel.stringValue = query.isEmpty ? "" : found.count == 0 ? "No matches" : found.count == 1 ? "1 match" : "\(found.place) of \(found.count)"
+                self.countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
+                self.layoutPanel()
+            }
+            pdfSearch = work
+            // Typing waits; Return and the arrows move at once.
+            if fromStart { DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work) } else { work.perform() }
             return
         }
         guard let webView = window?.selectedWebView, !query.isEmpty else { return }
@@ -230,7 +244,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func clearHighlights() {
-        window?.selectedTab?.pdfViewer?.clearFind()
+        pdfSearch?.cancel()
+        (searchedPDF ?? window?.selectedTab?.pdfViewer)?.clearFind()
+        searchedPDF = nil
         (searched ?? window?.selectedWebView)?.evaluateJavaScript("window.getSelection().removeAllRanges()")
         searched = nil
     }
