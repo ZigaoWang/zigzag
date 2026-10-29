@@ -371,8 +371,11 @@ final class DeskController {
             }
             card.onClose = { [weak self, weak tab] in
                 guard let self, let tab else { return }
-                // ⌘Z brings it back, like closing it from the sidebar.
-                if let controller = self.controller { controller.closeWithUndo(tab) } else { self.manager?.close(tab) }
+                // ⌘Z brings it back, like closing it from the sidebar. A split's card is both pages, so both close,
+                // and come back, together.
+                if let partner = self.partner(of: tab) {
+                    if let controller = self.controller { controller.closeManyWithUndo([tab, partner]) } else { self.manager?.close([tab, partner]) }
+                } else if let controller = self.controller { controller.closeWithUndo(tab) } else { self.manager?.close(tab) }
                 self.reload(animated: true)
             }
             card.onDragStart = { [weak self, weak tab] event in
