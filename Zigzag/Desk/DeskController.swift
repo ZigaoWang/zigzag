@@ -60,6 +60,15 @@ final class DeskController {
     private var marquee: CAShapeLayer?
     private var magnifyTotal: CGFloat = 0
     private var gestureClaimed = false
+    /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
+    private let searchBox = ColorView()
+    private let searchIcon = NSImageView()
+    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: "Search Tabs")
+    private let searchDelegate = DeskSearchDelegate()
+    private let noMatches = Label("No tabs match", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private var query = ""
+    private static let searchHeight = Tokens.Space.x8
+    private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
 
     private let cardWidth = Tokens.Metric.deskCardWidth
     private let gap = Tokens.Space.x4
@@ -80,6 +89,35 @@ final class DeskController {
         actionBar.addSubview(doneButton)
         closeButton.onClick = { [weak self] _ in self?.closeSelected() }
         doneButton.onClick = { [weak self] _ in self?.hide(openingTab: nil) }
+
+        searchBox.wantsLayer = true
+        searchBox.layer?.cornerRadius = Self.searchHeight / 2
+        searchBox.layer?.cornerCurve = .continuous
+        searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body)
+        searchIcon.contentTintColor = Tokens.Color.textSecondary
+        searchBox.addSubview(searchIcon)
+        searchBox.addSubview(searchField)
+        backdrop.addSubview(searchBox)
+        noMatches.isHidden = true
+        canvas.addSubview(noMatches)
+        searchField.delegate = searchDelegate
+        searchDelegate.changed = { [weak self] text in self?.search(text) }
+        searchDelegate.command = { [weak self] selector in
+            guard let self else { return false }
+            switch selector {
+            case #selector(NSResponder.insertNewline(_:)):
+                // Return opens the first match.
+                let first = Library.shared.spaces.lazy.flatMap { self.cardTabs(in: $0.id) }.first
+                if let first { self.hide(openingTab: first) }
+                return true
+            case #selector(NSResponder.cancelOperation(_:)):
+                // Esc clears the search first, then leaves the desk.
+                if self.query.isEmpty { self.hide(openingTab: nil) } else { self.searchField.stringValue = ""; self.search("") }
+                return true
+            default:
+                return false
+            }
+        }
     }
 
     private var manager: TabManager? { controller?.tabManager }
@@ -101,9 +139,11 @@ final class DeskController {
         backdrop.color = controller.tabManager.currentSpace.background
         backdrop.frame = root.bounds
         backdrop.autoresizingMask = [.width, .height]
-        scrollView.frame = backdrop.bounds.insetBy(dx: 0, dy: 0)
         scrollView.autoresizingMask = [.width, .height]
         root.overlay.addSubview(backdrop)
+        query = ""
+        searchField.stringValue = ""
+        layoutSearch()
         reload()
         // The window's own controls would sit on top of the desk; tuck them away.
         (controller.window as? BrowserWindow)?.trafficLightsHidden = false
@@ -258,13 +298,43 @@ final class DeskController {
     }
 
     /// The tabs that get a card: a split's second page shares the first one's card, as it shares its sidebar row.
+    /// While searching, only the ones whose title or address match (either page, for a split).
     private func cardTabs(in space: UUID) -> [Tab] {
         guard let manager else { return [] }
         let tabs = manager.tabs(in: space)
-        return tabs.filter { tab in
+        let cards = tabs.filter { tab in
             guard let pair = manager.split(for: tab), pair.right == tab.id else { return true }
             return !tabs.contains { $0.id == pair.left }
         }
+        guard !query.isEmpty else { return cards }
+        return cards.filter { matches($0) || partner(of: $0).map(matches) == true }
+    }
+
+    private func matches(_ tab: Tab) -> Bool {
+        tab.displayTitle.localizedCaseInsensitiveContains(query) || (tab.url?.absoluteString.localizedCaseInsensitiveContains(query) ?? false)
+    }
+
+    private func search(_ text: String) {
+        query = text.trimmingCharacters(in: .whitespaces)
+        selection = []
+        reload(animated: true)
+    }
+
+    /// The search field, centered at the top, clear of the window's buttons.
+    private func layoutSearch() {
+        let b = backdrop.bounds
+        let width = min(360, b.width - Tokens.Space.x10 * 4)
+        let h = Self.searchHeight
+        let top = backdrop.isFlipped ? Tokens.Space.x6 : b.height - Tokens.Space.x6 - h
+        searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
+        searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
+        searchBox.color = Tokens.Color.fieldFill
+        let icon: CGFloat = 16
+        searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
+        let textHeight = ceil(searchField.intrinsicContentSize.height)
+        let x = searchIcon.frame.maxX + Tokens.Space.x2
+        searchField.frame = NSRect(x: x, y: (h - textHeight) / 2, width: width - x - Tokens.Space.x3, height: textHeight)
+        scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
     }
 
     private func partner(of tab: Tab) -> Tab? {
@@ -346,6 +416,11 @@ final class DeskController {
             } else {
                 header.isHidden = true
             }
+        }
+        noMatches.isHidden = query.isEmpty || !layout.cards.isEmpty
+        if !noMatches.isHidden {
+            let w = noMatches.textWidth + 4
+            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: margin, width: w, height: noMatches.lineHeight)
         }
         for (id, card) in cards {
             guard let frame = layout.cards[id], id != dragging?.id else { continue }
@@ -508,7 +583,15 @@ final class DeskController {
             updateSelection()
             return true
         default:
-            return false
+            // Typing anywhere searches.
+            guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty, let chars = event.characters,
+                  let scalar = chars.unicodeScalars.first, !CharacterSet.controlCharacters.contains(scalar),
+                  scalar.value < 0xF700 else { return false }
+            canvas.window?.makeFirstResponder(searchField)
+            searchField.stringValue += chars
+            searchField.currentEditor()?.selectedRange = NSRange(location: (searchField.stringValue as NSString).length, length: 0)
+            search(searchField.stringValue)
+            return true
         }
     }
 
@@ -542,5 +625,21 @@ final class DeskController {
         gestureClaimed = true
         show()
         return true
+    }
+}
+
+
+/// The desk's search field reports here: each change, and Return and Esc.
+private final class DeskSearchDelegate: NSObject, NSTextFieldDelegate {
+    var changed: ((String) -> Void)?
+    var command: ((Selector) -> Bool)?
+
+    func controlTextDidChange(_ obj: Notification) {
+        guard let field = obj.object as? NSTextField else { return }
+        changed?(field.stringValue)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        command?(selector) ?? false
     }
 }
