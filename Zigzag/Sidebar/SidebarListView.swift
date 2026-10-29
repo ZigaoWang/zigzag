@@ -61,7 +61,7 @@ enum SidebarItem: Hashable {
     var height: CGFloat {
         switch self {
         case .header: Tokens.Space.x6 + Tokens.Space.x1
-        case .separator: Tokens.Space.x5
+        case .separator: Tokens.Space.x3
         case .placeholder: Tokens.Space.x2
         case .bookmark, .folder, .newTab, .tab, .bookmarkDropZone: Tokens.Metric.rowHeight
         }
@@ -160,10 +160,9 @@ final class SidebarListView: NSView {
         }
         let hasPinnedRows = result.contains { if case .bookmark = $0 { true } else if case .folder = $0 { true } else { false } }
         if bookmarks.isEmpty && folders.isEmpty && includeEmptyBookmarkSection { result.append(.bookmarkDropZone) }
-        // The line between pinned tabs and today's tabs, which carries Clear: there whenever either side has something.
-        let tabs = manager.tabs(in: spaceID)
-        if hasPinnedRows || includeEmptyBookmarkSection || !tabs.isEmpty { result.append(.separator) }
+        if hasPinnedRows || includeEmptyBookmarkSection { result.append(.separator) }
         result.append(.newTab)
+        let tabs = manager.tabs(in: spaceID)
         // The right half of a split rides in its left half's row, when that row is here to carry it.
         let rowIDs = Set(tabs.map(\.id))
         let rightHalves = Set(manager.splits.filter { rowIDs.contains($0.left) }.map(\.right))
@@ -377,7 +376,7 @@ final class SidebarListView: NSView {
 
     /// Over the list: the space header offers Clear.
     private(set) var isPointerInside = false {
-        didSet { (rows[.separator] as? SeparatorRowView)?.showsClear = isPointerInside }
+        didSet { (rows[.newTab] as? NewTabRowView)?.showsClear = isPointerInside }
     }
     private var hoverArea: NSTrackingArea?
 
@@ -414,10 +413,7 @@ final class SidebarListView: NSView {
             row.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: item) }
             return row
         case .separator:
-            let separator = SeparatorRowView()
-            separator.clearButton.onClick = { [weak self] _ in self?.delegate?.listClearTabs() }
-            separator.showsClear = isPointerInside
-            return separator
+            return SeparatorRowView()
         case .placeholder:
             return InsertionLineView()
         case .bookmarkDropZone:
@@ -425,6 +421,8 @@ final class SidebarListView: NSView {
         case .newTab:
             let row = NewTabRowView()
             row.onClick = { [weak self] _ in self?.delegate?.listNewTab() }
+            row.clearButton.onClick = { [weak self] _ in self?.delegate?.listClearTabs() }
+            row.showsClear = isPointerInside
             return row
         case .tab(let id):
             let row = TabRowView()
@@ -494,8 +492,8 @@ final class SidebarListView: NSView {
             (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "\(spaceName) (Private)" : spaceName
             view.needsLayout = true
 
-        case .separator:
-            (view as? SeparatorRowView)?.hasTabs = !(delegate?.tabManager.currentTabs.isEmpty ?? true)
+        case .newTab:
+            (view as? NewTabRowView)?.hasTabs = !(delegate?.tabManager.currentTabs.isEmpty ?? true)
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
