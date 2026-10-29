@@ -369,13 +369,12 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // The focused window first, as extensions expect; sign-in popups count too.
         let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter { !$0.isPrivate }
         let windows: [any WKWebExtensionWindow] = WindowManager.shared.controllers
-        let key = PopupWindowController.all.first { !$0.isPrivate && $0.window?.isKeyWindow == true }
+        let key = PopupWindowController.key
         return key.map { [$0] + windows + popups.filter { $0 !== key } } ?? windows + popups
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        if let popup = PopupWindowController.all.first(where: { !$0.isPrivate && $0.window?.isKeyWindow == true }) { return popup }
-        return WindowManager.shared.keyController
+        PopupWindowController.key ?? WindowManager.shared.keyController
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
@@ -433,6 +432,13 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         popupShownAt = Date()
         ExtensionLog.write("popup \(context.webExtension.displayName ?? "?") has=\(action.popupPopover != nil)")
         guard let popover = action.popupPopover else { completionHandler(nil); return }
+        // Asked for from a sign-in popup (1Password's "Unlock" in a field there, or its shortcut): it opens over that
+        // popup. From the window behind, it would be out of sight and close at the first click back in the popup.
+        if let popup = (action.associatedTab as? PopupTab)?.popup ?? PopupWindowController.key, popup.window?.isVisible == true {
+            popup.showExtensionPopover(popover)
+            completionHandler(nil)
+            return
+        }
         // Asked by the page (1Password's "Unlock" button) rather than a click: the button pressed last may be
         // gone with its panel, so the popup comes from the address bar instead of not at all.
         let pressed = actionAnchor.flatMap { $0.window != nil ? $0 : nil }

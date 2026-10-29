@@ -7,6 +7,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     private static var open: Set<PopupWindowController> = []
     /// Every popup window, for extensions: 1Password fills sign-in popups as it does tabs.
     static var all: [PopupWindowController] { Array(open) }
+    /// The popup you're in, if it's one extensions may see.
+    static var key: PopupWindowController? { open.first { !$0.isPrivate && $0.window?.isKeyWindow == true } }
     /// The popup's page, as extensions see it: one tab in a popup window, as in Chrome.
     private(set) lazy var tab = PopupTab(popup: self)
     /// Private popups stay out of extensions' sight, like private tabs.
@@ -40,7 +42,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             origin = NSPoint(x: parent.frame.midX - size.width / 2, y: parent.frame.midY - size.height / 2)
         }
 
-        let window = NSWindow(contentRect: NSRect(origin: origin, size: size),
+        let window = PopupWindow(contentRect: NSRect(origin: origin, size: size),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true
@@ -50,6 +52,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.setFrameOrigin(origin)
         super.init(window: window)
         window.delegate = self
+        // Extensions' shortcuts (1Password's fill) work here too, before the page gets the keys.
+        window.commandHandler = { [weak self] event in
+            guard #available(macOS 15.4, *), let self, !self.isPrivate,
+                  !event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
+            return ExtensionHost.shared.performCommand(for: event)
+        }
         // A private window's popup shares its private session: it ends with that window, never outliving it.
         if !configuration.websiteDataStore.isPersistent, let parent {
             parentObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: parent, queue: .main) { [weak self] _ in
@@ -91,6 +99,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     private func updateHeader() {
         header.show(url: webView.url, secure: webView.hasOnlySecureContent)
+    }
+
+    /// Shows an extension's popup over this window, from the right end of its header, so it isn't hidden behind it.
+    func showExtensionPopover(_ popover: NSPopover) {
+        window?.makeKeyAndOrderFront(nil)
+        let spot = NSRect(x: header.bounds.maxX - Tokens.Space.x8, y: 0, width: Tokens.Space.x4, height: header.bounds.height)
+        popover.behavior = .semitransient
+        popover.show(relativeTo: spot, of: header, preferredEdge: .maxY)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -166,6 +182,16 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 }
 
+/// The popup's window: it lets extensions' shortcuts have the keys first, as the browser window does.
+private final class PopupWindow: NSWindow {
+    var commandHandler: ((NSEvent) -> Bool)?
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, commandHandler?(event) == true { return }
+        super.sendEvent(event)
+    }
+}
+
 /// The popup's top strip: traffic lights on the left, the site's full host in the middle.
 final class PopupHeaderView: NSView {
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
@@ -206,7 +232,7 @@ final class PopupHeaderView: NSView {
 /// A sign-in popup's page, for extensions.
 @available(macOS 15.4, *)
 final class PopupTab: NSObject, WKWebExtensionTab {
-    private weak var popup: PopupWindowController?
+    private(set) weak var popup: PopupWindowController?
     init(popup: PopupWindowController) { self.popup = popup }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { popup }
