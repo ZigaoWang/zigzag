@@ -1086,6 +1086,13 @@ extension BrowserWindowController: TabHost {
         tabManager.close(tab)
     }
 
+    func tabWantsToReturnToOpener(_ tab: Tab) {
+        guard let opener = tab.opener else { return }
+        tabManager.returnPane(of: tab, to: opener)
+        closeWithUndo(tab)
+        if !opener.isClosed { tabManager.select(opener) }
+    }
+
     func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool) {}
 
     func tab(_ tab: Tab, hoveringLink url: URL?) {

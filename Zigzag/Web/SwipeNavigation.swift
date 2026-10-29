@@ -61,7 +61,7 @@ final class SwipeNavigator {
                 // Mostly sideways is enough: a natural swipe is rarely dead level.
                 let sideways = abs(dx) > abs(dy) * 1.2
                 let wanted = dx > 0 ? -1 : 1
-                let canGo = wanted < 0 ? webView.canGoBack : webView.canGoForward
+                let canGo = wanted < 0 ? (webView.owner?.canGoBackOrReturn ?? webView.canGoBack) : webView.canGoForward
                 if sideways, canGo, !pageTakes(wanted) {
                     direction = wanted
                     state = .tracking
@@ -202,7 +202,7 @@ final class SwipeNavigator {
     private func go() {
         watchdog?.cancel()
         guard let webView else { return }
-        if direction < 0 { webView.goBack() } else { webView.goForward() }
+        if direction < 0 { if let owner = webView.owner { owner.goBack() } else { webView.goBack() } } else { webView.goForward() }
         settlePage()
         arrow?.leave(toward: direction, navigated: true)
         arrow = nil

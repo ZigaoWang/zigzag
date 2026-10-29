@@ -7,6 +7,8 @@ protocol TabHost: AnyObject {
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition)
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView?
     func tabDidRequestClose(_ tab: Tab)
+    /// Back from a tab a link opened, with no page before this one in it.
+    func tabWantsToReturnToOpener(_ tab: Tab)
     func tabDidChangeFullscreen(_ tab: Tab, isFullscreen: Bool)
     func tab(_ tab: Tab, hoveringLink url: URL?)
 }
@@ -42,6 +44,7 @@ final class Tab: NSObject {
     private(set) var progress: Double = 0
     private(set) var canGoBack = false
     private(set) var canGoForward = false
+    private(set) var isClosed = false
     private(set) var isPlayingAudio = false
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
@@ -67,6 +70,13 @@ final class Tab: NSObject {
     }
     /// The tab that opened this one, so closing it can return there.
     weak var opener: Tab?
+    /// Opened from a link, with nothing earlier in this tab: Back closes it and goes back to the page that opened
+    /// it, as Safari and Chrome do.
+    var returnsToOpener: Bool {
+        guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
+        return opener.spaceID == spaceID
+    }
+    var canGoBackOrReturn: Bool { canGoBack || returnsToOpener }
 
     weak var host: TabHost?
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
@@ -198,6 +208,7 @@ final class Tab: NSObject {
     /// `keepingSnapshot`: its window closed but the tab may come back (reopening the last window), so its
     /// thumbnail stays until the next save prunes what isn't kept.
     func close(keepingSnapshot: Bool = false) {
+        isClosed = true
         if let webView { tearDown(webView) }
         if !keepingSnapshot { SnapshotStore.remove(id) }
     }
@@ -309,7 +320,9 @@ final class Tab: NSObject {
         }
     }
 
-    func goBack() { webView?.goBack() }
+    func goBack() {
+        if canGoBack { webView?.goBack() } else if returnsToOpener { host?.tabWantsToReturnToOpener(self) }
+    }
     func goForward() { webView?.goForward() }
     func reload() {
         guard let webView else { ensureWebView(); return }

@@ -353,7 +353,7 @@ final class SidebarView: NSView {
     // MARK: Updating
 
     func update(tab: Tab?) {
-        backButton.isEnabled = tab?.canGoBack ?? false
+        backButton.isEnabled = tab?.canGoBackOrReturn ?? false
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"

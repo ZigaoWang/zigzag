@@ -628,6 +628,14 @@ final class TabManager {
         select(other)
     }
 
+    /// A tab a link opened in a split took its opener's pane; going back from it puts the opener back there.
+    func returnPane(of tab: Tab, to opener: Tab) {
+        guard let index = splits.firstIndex(where: { $0.left == tab.id || $0.right == tab.id }), split(for: opener) == nil,
+              canSplit(tab, with: opener), opener.spaceID == tab.spaceID else { return }
+        if splits[index].left == tab.id { splits[index].left = opener.id } else { splits[index].right = opener.id }
+        opener.ensureWebView()
+    }
+
     func unsplit(_ tab: Tab, notify: Bool = true) {
         let before = splits.count
         splits.removeAll { $0.left == tab.id || $0.right == tab.id }

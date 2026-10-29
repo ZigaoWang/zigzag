@@ -392,7 +392,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let tab = selectedTab
         switch item.action {
-        case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBack ?? false)
+        case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),

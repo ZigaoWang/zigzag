@@ -47,7 +47,7 @@ final class PaneHeaderView: NSView {
     }
 
     private func refresh() {
-        back.isEnabled = tab?.canGoBack ?? false
+        back.isEnabled = tab?.canGoBackOrReturn ?? false
         forward.isEnabled = tab?.canGoForward ?? false
         reload.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         address.stringValue = tab?.url.map(CommandRanker.displayURL) ?? ""
