@@ -74,7 +74,8 @@ final class Tab: NSObject {
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
         guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
-        return opener.spaceID == spaceID
+        // Dragged into another window, the page it came from is no longer beside it.
+        return opener.spaceID == spaceID && opener.host === host
     }
     var canGoBackOrReturn: Bool { canGoBack || returnsToOpener }
 
