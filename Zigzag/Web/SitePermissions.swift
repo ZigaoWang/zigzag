@@ -174,8 +174,8 @@ enum SitePermissions {
     }
 }
 
-/// "example.com wants to / Use your camera", as Chrome asks it: hanging from the address, so it's plain which site
-/// is asking, with whole answers stacked one per line. Allow While Visiting is remembered, Allow This Time isn't,
+/// "example.com wants to / Use your camera", as Chrome asks it: on the page that asked, naming the site that
+/// asks, with whole answers stacked one per line. Allow While Visiting is remembered, Allow This Time isn't,
 /// Don't Allow is. Esc puts it off; Return is left to whatever you're typing in. One question at a time per window:
 /// a second request waits for the first answer. It belongs to the tab that asked: it steps aside while another tab
 /// is in front and comes back with that tab, and closing that tab is "not now".
@@ -289,27 +289,15 @@ final class PermissionPrompt: FloatingPanelView {
         }
     }
 
-    /// Under the address in the sidebar, in its color, like the site panel; at the top left of the page when the
-    /// sidebar is hidden.
+    /// A raised card at the top left of the page that asked, where you're looking, not in the sidebar's color
+    /// beside it. In split view, over the pane that asked.
     private func place(in controller: BrowserWindowController) {
-        let overlay = controller.root.overlay
-        let address = controller.sidebar.address
-        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
-            let anchor = address.convert(address.bounds, to: overlay)
-            surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
-            tintStrength = 0.82
-            isElevated = false
-            radius = address.layer?.cornerRadius ?? Tokens.Radius.panel
-            frame = NSRect(x: anchor.minX, y: anchor.maxY + 4, width: anchor.width, height: height(for: anchor.width))
-        } else {
-            // Placed again after the sidebar went away: it's a card over the page now, not part of the sidebar.
-            surfaceTint = nil
-            tintStrength = nil
-            isElevated = true
-            radius = Tokens.Radius.panel
-            let card = controller.root.cardFrame, width: CGFloat = 300
-            frame = NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x3, width: width, height: height(for: width))
-        }
+        surfaceTint = nil
+        tintStrength = nil
+        isElevated = true
+        radius = Tokens.Radius.panel
+        let area = controller.focusedPaneFrame, width: CGFloat = 300
+        frame = NSRect(x: area.minX + Tokens.Space.x3, y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
     override init(frame: NSRect) {
