@@ -17,7 +17,8 @@ enum PageScreenshot {
     private static let maxPixels: CGFloat = 150_000_000
 
     static func canTake(_ tab: Tab?) -> Bool {
-        guard let tab, tab.webView != nil, let scheme = tab.url?.scheme?.lowercased() else { return false }
+        // A PDF in Zigzag's viewer isn't the page underneath: Save gives you the file itself.
+        guard let tab, tab.webView != nil, tab.pdfViewer == nil, let scheme = tab.url?.scheme?.lowercased() else { return false }
         return scheme == "http" || scheme == "https" || scheme == "file"
     }
 
@@ -48,10 +49,11 @@ enum PageScreenshot {
     /// The picture as PNG data, and what was learned about the page on the way.
     private static func capture(_ webView: WKWebView) async -> (Data?, Page?) {
         let cover = await coverPage(webView)
+        // However it ends, the still comes off.
+        defer { cover?.removeFromSuperview() }
         let page = await prepare(webView)
         let data = await draw(webView, height: page?.height)
         restore(webView, page: page)
-        cover?.removeFromSuperview()
         return (data, page)
     }
 
@@ -62,14 +64,15 @@ enum PageScreenshot {
     }
     #endif
 
-    /// A still of the page over it while it scrolls underneath, so the page doesn't race past your eyes.
+    /// A still of the page over it while it scrolls underneath, so the page doesn't race past your eyes. It sits
+    /// inside the web view, so switching tabs meanwhile takes it away with its page, not over the next one.
     private static func coverPage(_ webView: WKWebView) async -> NSView? {
-        guard let superview = webView.superview, let image = try? await webView.takeSnapshot(configuration: nil) else { return nil }
-        let still = NSImageView(frame: webView.frame)
+        guard webView.window != nil, let image = try? await webView.takeSnapshot(configuration: nil) else { return nil }
+        let still = NSImageView(frame: webView.bounds)
         still.image = image
         still.imageScaling = .scaleAxesIndependently
         still.autoresizingMask = [.width, .height]
-        superview.addSubview(still, positioned: .above, relativeTo: webView)
+        webView.addSubview(still)
         return still
     }
 
