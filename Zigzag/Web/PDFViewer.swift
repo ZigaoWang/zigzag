@@ -382,7 +382,12 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         panel.nameFieldStringValue = url.lastPathComponent.lowercased().hasSuffix(".pdf") ? url.lastPathComponent : "Document.pdf"
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let target = panel.url else { return }
-            try? data.write(to: target)
+            MainActor.assumeIsolated {
+                // A save that didn't happen says so, rather than leave you looking for a file that isn't there.
+                guard (try? data.write(to: target)) == nil,
+                      let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return }
+                Toast.show("Couldn’t save the PDF", symbol: "exclamationmark.triangle", in: controller)
+            }
         }
     }
 
