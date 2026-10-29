@@ -5,9 +5,12 @@ import WebKit
 final class PlainTextField: NSTextField {
     var onCancel: (() -> Void)?
     var onCommand: ((Selector) -> Bool)?
-    /// Room at the sides for a selection and the first letter to draw whole (the address); text is always centered
-    /// top to bottom. Zero for fields lined up with a label they replace, like renaming.
+    /// Room at the sides for a selection and the first letter to draw whole (the address). Zero for fields lined up
+    /// with a label they replace, like renaming.
     var textInset: CGFloat = 0
+    /// Text centered top to bottom in a field taller than its line (the address). Off, the text sits where AppKit
+    /// puts it, as every other field always has.
+    var centersText = false
 
     init(font: NSFont, placeholder: String) {
         super.init(frame: .zero)
@@ -33,12 +36,13 @@ final class PlainTextField: NSTextField {
     required init?(coder: NSCoder) { fatalError() }
 }
 
-/// Draws and edits the text a little in from the sides and centered in its height, so a selection that runs to the
-/// edge, or the first letter of a long address, isn't cut off.
+/// Draws and edits the text a little in from the sides, and centered in its height if the field asks, so a selection
+/// that runs to the edge, or the first letter of a long address, isn't cut off.
 private final class PaddedTextFieldCell: NSTextFieldCell {
     private func textRect(in rect: NSRect) -> NSRect {
-        let inset = (controlView as? PlainTextField)?.textInset ?? 0
-        var r = rect.insetBy(dx: inset, dy: 0)
+        let field = controlView as? PlainTextField
+        var r = rect.insetBy(dx: field?.textInset ?? 0, dy: 0)
+        guard field?.centersText == true else { return r }
         let height = ceil(cellSize(forBounds: r).height)
         if height < r.height { r.origin.y += floor((r.height - height) / 2); r.size.height = height }
         return r
