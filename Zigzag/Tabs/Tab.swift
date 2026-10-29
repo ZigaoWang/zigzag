@@ -834,6 +834,7 @@ extension Tab {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
                 let values = result as? [String]
                 guard values?.first == "application/pdf" else {
+                    self.pdfLoading = nil
                     if self.pdfViewer != nil { self.setPDFViewer(nil) }
                     return
                 }
@@ -845,15 +846,21 @@ extension Tab {
                 }
                 guard self.pdfViewer?.url != url, self.pdfLoading != url else { return }
                 self.pdfLoading = url
+                // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
+                let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate)
+                viewer.onOpenLink = { [weak self] link in self?.load(link) }
+                viewer.onSwipe = { [weak webView] event in (webView as? BrowserWebView)?.handleSwipe(event) ?? false }
+                self.setPDFViewer(viewer)
                 let userAgent = values?.count == 2 ? values?[1] : nil
-                Task { @MainActor [weak self, weak webView] in
-                    guard let webView, let (document, data) = await PDFViewerView.load(url, from: webView, userAgent: userAgent),
-                          let self, self.pdfLoading == url, self.webView === webView, webView.url == url else { return }
-                    self.pdfLoading = nil
-                    let viewer = PDFViewerView(url: url, document: document, data: data)
-                    viewer.onOpenLink = { [weak self] link in self?.load(link) }
-                    viewer.onSwipe = { [weak webView] event in (webView as? BrowserWebView)?.handleSwipe(event) ?? false }
-                    self.setPDFViewer(viewer)
+                Task { @MainActor [weak self, weak webView, weak viewer] in
+                    guard let webView else { return }
+                    let loaded = await PDFViewerView.load(url, from: webView, userAgent: userAgent)
+                    // Finished either way: coming back to this PDF later loads it again.
+                    if self?.pdfLoading == url { self?.pdfLoading = nil }
+                    guard let self, let viewer, self.pdfViewer === viewer, self.webView === webView, webView.url == url else { return }
+                    // Couldn't fetch it: WebKit's viewer underneath shows instead.
+                    guard let (document, data) = loaded else { self.setPDFViewer(nil); return }
+                    viewer.show(document, data: data)
                     // The PDF's own title, when it has one, rather than its file name.
                     if let name = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String,
                        !name.trimmingCharacters(in: .whitespaces).isEmpty {
