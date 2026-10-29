@@ -137,8 +137,8 @@ enum Tokens {
         /// (⌘W, switching tabs and spaces) animates like the same action done with the pointer, so you see what changed.
         static var isKeyboardDriven: Bool {
             guard let event = NSApp.currentEvent, event.type == .keyDown else { return false }
-            return event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
-                && event.charactersIgnoringModifiers?.lowercased() == "t"
+            // The T key wherever it is, in any keyboard layout, with Caps Lock on or off.
+            return event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command && event.keyCode == 17
         }
 
         /// Runs AppKit animator() changes. Frames jump to their final values right away (so layout and
