@@ -63,6 +63,9 @@ final class ExtensionHost: NSObject {
         guard let context = context(for: id) else { return }
         try? controller.unload(context)
         contexts.removeAll { $0 === context }
+        // Its companion-app helpers end with it, whether or not WebKit closed their ports.
+        NativeMessagingHost.terminateAll(for: id)
+        Passkeys.refresh()
         changed.send()
     }
 
@@ -582,21 +585,37 @@ extension BrowserWindowController: WKWebExtensionWindow {
 
 /// Speaks Chrome's native messaging protocol (length-prefixed JSON over stdio) with a helper app,
 /// using the same host manifests Chrome uses. This is how the 1Password extension reaches the 1Password app.
+/// One helper per connection or one-off message, as in Chrome, and each one ends with it: a helper left running
+/// keeps the app awake and can bring up its unlock window for no reason you can see.
 @available(macOS 15.4, *)
 final class NativeMessagingHost {
     private let executable: URL
     private let origin: String
+    let extensionID: String
     private static var pointedAtApp = false
-    /// Every helper started, so quitting Zigzag ends them too instead of leaving them running.
-    private static var running: [Process] = []
+    /// Every helper running, kept alive here until it ends, so quitting Zigzag or turning the extension off
+    /// ends them too instead of leaving them running.
+    private static var running: [ObjectIdentifier: NativeMessagingHost] = [:]
+    /// When each extension last started helpers for a connection, to slow down one that keeps reconnecting.
+    private static var recentStarts: [String: [Date]] = [:]
+    /// A one-off message gets this long for its answer; a locked app waiting on you can take a while.
+    private static let replyTimeout: TimeInterval = 60
+
     static func terminateAll() {
-        running.forEach { if $0.isRunning { $0.terminate() } }
-        running = []
+        for host in Array(running.values) { host.finish() }
     }
-    private let extensionID: String
+
+    static func terminateAll(for id: String) {
+        for host in Array(running.values) where host.extensionID == id { host.finish() }
+    }
+
     private var process: Process?
     private var input: FileHandle?
+    private var output: FileHandle?
     private var buffer = Data()
+    private var finished = false
+    private var onMessage: ((Any) -> Void)?
+    private var onExit: (() -> Void)?
 
     init?(name: String?, context: WKWebExtensionContext) {
         guard let name, let manifest = Self.manifest(named: name),
@@ -626,7 +645,8 @@ final class NativeMessagingHost {
         return nil
     }
 
-    private func start(onMessage: @escaping @MainActor (Any) -> Void, onExit: @escaping @MainActor () -> Void) -> Bool {
+    /// Starts the helper; `onMessage` and `onExit` are set first. Until it ends, `running` keeps this alive.
+    private func start() -> Bool {
         let process = Process()
         process.executableURL = executable
         process.arguments = [origin]
@@ -634,27 +654,47 @@ final class NativeMessagingHost {
         process.standardInput = stdin
         process.standardOutput = stdout
         process.standardError = FileHandle.nullDevice
+        // Writing to a helper that already quit fails quietly instead of killing Zigzag with SIGPIPE.
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             // Closed: stop listening. Left in place, the handler fires again at once, forever, and keeps a core busy.
-            if data.isEmpty { handle.readabilityHandler = nil; return }
+            if data.isEmpty { handle.readabilityHandler = nil }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                guard let self else { return }
-                if data.isEmpty { return }
-                self.buffer.append(data)
-                for message in self.drainMessages() { onMessage(message) }
+                    guard let self, !self.finished else { return }
+                    // Its output closing comes after its last message, so no answer is lost to the ending.
+                    if data.isEmpty { self.finish(); return }
+                    self.buffer.append(data)
+                    for message in self.drainMessages() where !self.finished { self.onMessage?(message) }
                 }
             }
         }
-        process.terminationHandler = { finished in
-            DispatchQueue.main.async { MainActor.assumeIsolated { Self.running.removeAll { $0 === finished }; onExit() } }
+        // Normally its output closing ends it; this covers a helper whose output outlives it.
+        process.terminationHandler = { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { MainActor.assumeIsolated { self?.finish() } }
         }
         do { try process.run() } catch { return false }
         self.process = process
-        Self.running.append(process)
         input = stdin.fileHandleForWriting
+        output = stdout.fileHandleForReading
+        Self.running[ObjectIdentifier(self)] = self
         return true
+    }
+
+    /// Ends the helper and says so, once.
+    private func finish() {
+        guard !finished else { return }
+        finished = true
+        output?.readabilityHandler = nil
+        try? input?.close()
+        input = nil
+        if process?.isRunning == true { process?.terminate() }
+        Self.running[ObjectIdentifier(self)] = nil
+        let exit = onExit
+        onMessage = nil
+        onExit = nil
+        exit?()
     }
 
     private func drainMessages() -> [Any] {
@@ -678,40 +718,101 @@ final class NativeMessagingHost {
         try? input.write(contentsOf: frame)
     }
 
+    private static func failure(_ text: String) -> NSError {
+        NSError(domain: "Zigzag", code: 2, userInfo: [NSLocalizedDescriptionKey: text])
+    }
+
+    /// One message, one answer, as Chrome's sendNativeMessage: the helper ends after its first reply, or when it
+    /// gives up, or after a while with no answer. The extension always hears back exactly once.
     func sendOnce(_ message: Any, reply: @escaping (Any?, (any Error)?) -> Void) {
         let id = extensionID
         var replied = false
-        let started = start(onMessage: { [weak self] response in
+        let answer: (Any?, (any Error)?) -> Void = { response, error in
             guard !replied else { return }
             replied = true
+            reply(response, error)
+        }
+        onMessage = { [weak self] response in
             ExtensionHost.shared.nativeHostReplied(response, for: id)
-            reply(response, nil)
-            self?.process?.terminate()
-        }, onExit: {
-            if !replied { replied = true; reply(nil, nil) }
-        })
-        if started { write(message) } else { reply(nil, NSError(domain: "Zigzag", code: 2)) }
+            answer(response, nil)
+            self?.finish()
+        }
+        onExit = { answer(nil, Self.failure("Native host has exited.")) }
+        guard start() else {
+            onMessage = nil
+            onExit = nil
+            answer(nil, Self.failure("Failed to start native messaging host."))
+            return
+        }
+        write(message)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.replyTimeout) { [weak self] in
+            guard let self, !self.finished else { return }
+            ExtensionLog.write("native host for \(id) gave no answer to a one-off message")
+            answer(nil, Self.failure("Native host did not reply."))
+            self.finish()
+        }
+    }
+
+    /// A connection that keeps reconnecting (a restarting background, an app that keeps hanging up) waits a little
+    /// longer each time, instead of starting helper after helper.
+    private static func delayBeforeStarting(for id: String) -> TimeInterval {
+        let now = Date()
+        let recent = (recentStarts[id] ?? []).filter { now.timeIntervalSince($0) < 30 }
+        recentStarts[id] = recent + [now]
+        return recent.count < 3 ? 0 : min(Double(recent.count - 2) * 2, 15)
     }
 
     func connect(_ port: WKWebExtension.MessagePort, onClose: @escaping () -> Void) {
         let id = extensionID
         var received = 0
         var sent = 0
-        let started = start(onMessage: { message in
+        // What the extension says before the helper is up waits for it.
+        var waiting: [Any] = []
+        onMessage = { message in
             received += 1
             ExtensionHost.shared.nativeHostReplied(message, for: id)
             port.sendMessage(message, completionHandler: nil)
-        }, onExit: {
-            ExtensionLog.write("native host for \(id) exited after \(sent) sent, \(received) received")
+        }
+        onExit = {
+            ExtensionLog.write("native host for \(id) ended after \(sent) sent, \(received) received")
             port.disconnect()
             onClose()
-        })
-        ExtensionLog.write("native host for \(id) started=\(started)")
-        // No answer yet usually means the app is waiting on you in its own window (unlock, or allow Zigzag the
-        // first time). Keep the connection open, never cut it, and point at that window once.
+        }
+        port.messageHandler = { [weak self] message, _ in
+            guard let self, let message, !self.finished else { return }
+            sent += 1
+            if self.process == nil { waiting.append(message) } else { self.write(message) }
+        }
+        // The extension hung up: its helper ends with it, as in Chrome.
+        port.disconnectHandler = { [weak self] _ in self?.finish() }
+
+        let begin = { [weak self] in
+            guard let self, !self.finished else { return }
+            let started = self.start()
+            ExtensionLog.write("native host for \(id) started=\(started)")
+            guard started else { self.finish(); return }
+            waiting.forEach { self.write($0) }
+            waiting = []
+            self.pointAtAppIfWaiting(received: { received }, sent: { sent })
+        }
+        let delay = Self.delayBeforeStarting(for: id)
+        if delay > 0 {
+            ExtensionLog.write("native host for \(id) reconnecting quickly; starting in \(Int(delay))s")
+            // Kept alive while it waits; the extension hanging up meanwhile ends it before a helper starts.
+            Self.running[ObjectIdentifier(self)] = self
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { begin() }
+        } else {
+            begin()
+        }
+    }
+
+    /// No answer yet usually means the app is waiting on you in its own window (unlock, or allow Zigzag the
+    /// first time). Keep the connection open, never cut it, and point at that window once.
+    private func pointAtAppIfWaiting(received: @escaping () -> Int, sent: @escaping () -> Int) {
+        let id = extensionID
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
-            guard let self, received == 0, self.process?.isRunning == true else { return }
-            ExtensionLog.write("native host for \(id) waiting on the app after \(sent) sent")
+            guard let self, !self.finished, received() == 0, self.process?.isRunning == true else { return }
+            ExtensionLog.write("native host for \(id) waiting on the app after \(sent()) sent")
             guard id == ExtensionStore.onePasswordID, !Self.pointedAtApp,
                   let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
             Self.pointedAtApp = true
@@ -721,15 +822,6 @@ final class NativeMessagingHost {
                                NSWorkspace.shared.openApplication(at: app, configuration: .init())
                            }
                        }), duration: 10, in: controller)
-        }
-        guard started else { port.disconnect(); onClose(); return }
-        port.messageHandler = { [weak self] message, _ in
-            sent += 1
-            self?.write(message)
-        }
-        port.disconnectHandler = { [weak self] _ in
-            self?.process?.terminate()
-            onClose()
         }
     }
 }
