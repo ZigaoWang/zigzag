@@ -74,6 +74,17 @@ enum SitePermissions {
         return all["\(host)|notifications"]
     }
 
+    /// Whether a site may open links for another app (zoommtg:, wemeet:) without asking: yes once you've said Open.
+    static func opensApp(host: String, scheme: String) -> Bool {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: Bool])?["\(host)|app:\(scheme)"] == true
+    }
+
+    static func allowOpeningApp(host: String, scheme: String) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        all["\(host)|app:\(scheme)"] = true
+        UserDefaults.standard.set(all, forKey: key)
+    }
+
     static func setNotifications(_ allowed: Bool?, host: String) {
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         all["\(host)|notifications"] = allowed
@@ -176,13 +187,13 @@ final class PermissionPrompt: FloatingPanelView {
 
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController,
-                    answered: @escaping () -> Answer? = { nil }) async -> Answer {
+                    title: String? = nil, allowTitle: String = "Allow", answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
         let task = Task { @MainActor in
             _ = await before?.value
             if let known = answered() { return known }
-            return await show(host: host, what: what, symbol: symbol, isPrivate: isPrivate, in: controller)
+            return await show(host: host, what: what, symbol: symbol, isPrivate: isPrivate, in: controller, title: title, allowTitle: allowTitle)
         }
         queue[key] = task
         let answer = await task.value
@@ -190,12 +201,14 @@ final class PermissionPrompt: FloatingPanelView {
         return answer
     }
 
-    private static func show(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController) async -> Answer {
+    private static func show(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController,
+                             title: String?, allowTitle: String) async -> Answer {
         guard controller.window?.isVisible == true else { return .notNow }
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: NSRect(x: 0, y: 0, width: 420, height: 72))
             // The question in big words, the site under it: short enough to never cut off.
-            prompt.title.stringValue = "Use \(what)?"
+            prompt.title.stringValue = title ?? "Use \(what)?"
+            prompt.allow.title = allowTitle
             prompt.line.stringValue = isPrivate ? "\(host), for this private window only" : host
             prompt.symbolView.image = Tokens.Symbol.image(symbol, size: 16)
             prompt.answer = { continuation.resume(returning: $0) }
