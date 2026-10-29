@@ -191,7 +191,13 @@ final class PageCardView: NSView {
     private func refreshDocument() {
         let viewer = (webView as? BrowserWebView)?.owner?.pdfViewer
         guard viewer !== document else { return }
-        if let document, document.superview === clip { document.removeFromSuperview() }
+        if let document, document.superview === clip {
+            // Typing was in the viewer going away: it goes back to the page rather than nowhere.
+            if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: document) {
+                window.makeFirstResponder(webView)
+            }
+            document.removeFromSuperview()
+        }
         document = viewer
         guard let viewer, let webView else { return }
         viewer.frame = webView.frame
