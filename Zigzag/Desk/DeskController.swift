@@ -583,14 +583,14 @@ final class DeskController {
             updateSelection()
             return true
         default:
-            // Typing anywhere searches.
+            // Typing anywhere searches. The key goes to the field itself rather than being appended, so input
+            // methods (Chinese, Japanese) compose there as usual.
             guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty, let chars = event.characters,
                   let scalar = chars.unicodeScalars.first, !CharacterSet.controlCharacters.contains(scalar),
-                  scalar.value < 0xF700 else { return false }
-            canvas.window?.makeFirstResponder(searchField)
-            searchField.stringValue += chars
-            searchField.currentEditor()?.selectedRange = NSRange(location: (searchField.stringValue as NSString).length, length: 0)
-            search(searchField.stringValue)
+                  scalar.value < 0xF700, canvas.window?.makeFirstResponder(searchField) == true,
+                  let editor = searchField.currentEditor() as? NSTextView else { return false }
+            editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
+            editor.keyDown(with: event)
             return true
         }
     }
