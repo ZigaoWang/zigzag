@@ -16,6 +16,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     private var observations: [NSKeyValueObservation] = []
     private let header = PopupHeaderView()
     private var parentObserver: Any?
+    private var lastCrash: Date?
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
         let controller = PopupWindowController(configuration: configuration, features: features, parent: parent)
@@ -129,6 +130,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             return .cancel
         }
         return .allow
+    }
+
+    /// The page's process crashed: load it again rather than leave a blank window, unless it just did the same.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        let again = lastCrash.map { Date().timeIntervalSince($0) < 10 } ?? false
+        lastCrash = Date()
+        guard !again else { return }
+        if webView.url != nil { webView.reload() }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
