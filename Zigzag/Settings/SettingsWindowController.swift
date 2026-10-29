@@ -966,6 +966,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                                  ("location", "location"), ("notifications", "notifications")] {
                 if let allowed = choices[kind] { said.append("\(name) \(allowed ? "allowed" : "blocked")") }
             }
+            for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
+                said.append("opens \(ExternalLinks.appName(forScheme: String(kind.dropFirst(4))))")
+            }
             if ContentBlocker.allowedSites.contains(site) { said.append("ads allowed") }
             if ExtensionStore.extensionsOffSites.contains(site) { said.append("extensions off") }
             if let zoom = ZoomLevels.all[site] { said.append("zoom \(Int((zoom * 100).rounded()))%") }
