@@ -557,6 +557,7 @@ final class BrowserRootView: ColorView {
 
     private var pointerTimer: Timer?
     private var pointerLeftAt: Date?
+    private var pointerObservers: [NSObjectProtocol] = []
 
     /// While the sidebar floats, follow the pointer itself: web views swallow mouse-moved events,
     /// and nothing arrives at all once the pointer is outside the window.
@@ -564,17 +565,43 @@ final class BrowserRootView: ColorView {
         pointerTimer?.invalidate()
         pointerTimer = nil
         pointerLeftAt = nil
-        guard on else { return }
-        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+        pointerObservers.forEach(NotificationCenter.default.removeObserver)
+        pointerObservers = []
+        guard on, let window else { return }
+        // How closely to follow depends on whether you're using this window, so it's rechecked whenever that changes.
+        let app: [Notification.Name] = [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification]
+        let own: [Notification.Name] = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didChangeOcclusionStateNotification]
+        for (names, object) in [(app, nil as NSWindow?), (own, window)] {
+            for name in names {
+                pointerObservers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.pacePointer() }
+                })
+            }
+        }
+        pacePointer()
+    }
+
+    /// Every frame while you're using the window, so the sidebar hides the moment you leave it. Otherwise a
+    /// look twice a second is plenty to tuck it away, and none at all while the window can't be seen.
+    private func pacePointer() {
+        pointerTimer?.invalidate()
+        pointerTimer = nil
+        guard let window, !sidebarVisible, sidebarRevealed, window.occlusionState.contains(.visible) else { return }
+        let attentive = NSApp.isActive && window.isKeyWindow
+        let timer = Timer(timeInterval: attentive ? 1.0 / 60 : 0.5, repeats: true) { [weak self] timer in
             // The view went away while the sidebar floated: nothing left to follow for.
             guard let self else { timer.invalidate(); return }
             MainActor.assumeIsolated { self.followPointer() }
         }
+        timer.tolerance = attentive ? 0.004 : 0.25
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
     }
 
-    isolated deinit { pointerTimer?.invalidate() }
+    isolated deinit {
+        pointerTimer?.invalidate()
+        pointerObservers.forEach(NotificationCenter.default.removeObserver)
+    }
 
     private func followPointer() {
         guard let window, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
