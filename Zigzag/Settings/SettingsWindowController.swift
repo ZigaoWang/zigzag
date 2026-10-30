@@ -545,7 +545,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         show(.general)
     }
 
-    @objc private func rootResized() { layoutRoot() }
+    /// The window grows and shrinks in height between panes, a step at a time. The pane's rows depend only on the
+    /// width, so a resize that keeps it just stretches the page under them instead of rebuilding every row each step
+    /// (Shortcuts has about a hundred).
+    @objc private func rootResized() {
+        guard root.bounds.width != laidOutWidth else {
+            placeScroll()
+            documentView.frame.size.height = max(contentHeight, scroll.contentSize.height)
+            return
+        }
+        layoutRoot()
+    }
+    private var laidOutWidth: CGFloat = -1
 
     private func layoutRoot() {
         let size = PaneTab.size
@@ -557,8 +568,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             x += size.width + gap
         }
         toolbarEdge.frame = NSRect(x: 0, y: toolbarHeight, width: root.bounds.width, height: Tokens.Metric.hairline)
-        scroll.frame = NSRect(x: 0, y: toolbarHeight + Tokens.Metric.hairline, width: root.bounds.width, height: max(0, root.bounds.height - toolbarHeight - Tokens.Metric.hairline))
+        placeScroll()
+        laidOutWidth = root.bounds.width
         layoutDocument()
+    }
+
+    private func placeScroll() {
+        scroll.frame = NSRect(x: 0, y: toolbarHeight + Tokens.Metric.hairline, width: root.bounds.width, height: max(0, root.bounds.height - toolbarHeight - Tokens.Metric.hairline))
     }
 
     /// Opens a pane.
