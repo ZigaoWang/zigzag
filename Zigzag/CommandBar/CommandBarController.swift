@@ -247,6 +247,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     func reposition() {
         guard isVisible, let controller else { return }
         scrim.frame = isAnchored ? controller.root.bounds : controller.root.cardFrame
+        // The window got shorter than the list: drop the rows that no longer fit.
+        if results.count > rowsThatFit { refreshResults(animated: false) }
         panel.frame = panelFrame()
     }
 
@@ -279,10 +281,28 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let margin = Tokens.Space.x8
         let width = min(Tokens.Metric.commandBarWidth, card.width - margin * 2)
         let height = Tokens.Metric.commandBarFieldHeight + listHeight
-        let top = card.minY + max(Tokens.Space.x12, floor(card.height * 0.18))
+        let top = panelTop(in: card)
         // Centered on the whole window, not just the page beside the sidebar, but never tight against either edge.
         let x = min(max(card.minX + margin, floor(controller.root.bounds.midX - width / 2)), card.maxX - width - margin)
         return NSRect(x: x, y: top, width: width, height: height)
+    }
+
+    private func panelTop(in card: NSRect) -> CGFloat { card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)) }
+
+    /// How many rows fit under the field before the bar would run off the bottom of the window.
+    private var rowsThatFit: Int {
+        guard let controller else { return Tokens.Metric.commandBarMaxRows }
+        let top: CGFloat, bottom: CGFloat
+        if isAnchored {
+            top = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay).minY
+            bottom = controller.root.bounds.maxY
+        } else {
+            let card = controller.root.cardFrame
+            top = panelTop(in: card)
+            bottom = card.maxY
+        }
+        let room = bottom - Tokens.Space.x4 - top - fieldHeight - Tokens.Space.x2 * 2
+        return max(1, min(Tokens.Metric.commandBarMaxRows, Int(room / Tokens.Metric.commandBarRowHeight)))
     }
 
     /// Anchored to the address it's a little smaller, close to the address bar's own size.
@@ -368,8 +388,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
             results.removeAll { $0.kind == .open(completionURL) || $0.kind == top.kind || ($0.title == top.title) }
             results.insert(top, at: 0)
-            results = Array(results.prefix(Tokens.Metric.commandBarMaxRows))
         }
+        // A short window shows fewer rows rather than letting the list run off its bottom edge.
+        results = Array(results.prefix(rowsThatFit))
         while rows.count < results.count {
             let row = CommandRowView()
             row.onClick = { [weak self, weak row] event in
