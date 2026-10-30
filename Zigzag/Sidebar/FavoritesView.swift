@@ -138,13 +138,12 @@ final class FavoritesView: NSView {
         super.layout()
         let all = tiles + (isDropTarget ? [dropTile] : [])
         let gap = Tokens.Space.x2
+        // One tile size for all: a full row sets it (fewer favorites than that share the width), and a shorter row
+        // after it starts at the left in tiles of the same size, like any grid.
+        let columns = max(1, min(Self.maxColumns, all.count))
+        let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
         for (i, tile) in all.enumerated() {
-            let row = i / Self.maxColumns
-            let rowStart = row * Self.maxColumns
-            // Each row spreads its tiles across the full width, like Arc's.
-            let inRow = min(Self.maxColumns, all.count - rowStart)
-            let width = (bounds.width - gap * CGFloat(inRow - 1)) / CGFloat(inRow)
-            let column = i - rowStart
+            let row = i / columns, column = i % columns
             tile.frame = NSRect(x: (width + gap) * CGFloat(column), y: (Self.tileHeight + gap) * CGFloat(row),
                                 width: width, height: Self.tileHeight).integral
         }
