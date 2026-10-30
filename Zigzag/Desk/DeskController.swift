@@ -103,7 +103,8 @@ final class DeskFlightView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// Desk view: zoom out to see every tab at once and tidy up. Not for everyday switching.
+/// Desk view: zoom out to see every tab in every space at once, go to one by typing or with the arrow keys, and
+/// tidy up.
 final class DeskController {
     private weak var controller: BrowserWindowController?
     private let backdrop = ColorView()
