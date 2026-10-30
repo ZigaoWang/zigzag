@@ -5,6 +5,37 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
+### New
+- The all-tabs view (⇧⌘\) shows every space at once. Your page zooms into its card, typing filters, arrow keys and Return open a tab, and you can drag a tab into another space.
+- Clear closes faded tabs first and keeps today's. Point at it to see which tabs it will close.
+- Full keyboard access: with it turned on in System Settings, Tab reaches Zigzag's own buttons and switches.
+
+### Changed
+- Buttons, prompts and highlights keep your space's own color in light and dark, whatever the color.
+- Permission and app questions use your space's color.
+- Favorites keep one tile size, four to a row. Ones that aren't loaded are faded instead of marked.
+- Full-page screenshots of pages that scroll inside themselves include the site's bar.
+- Error pages explain what went wrong in plain words.
+- Settings: Spaces rows match the rest, and wording, icons, corners and text sizes are consistent across the app.
+- VoiceOver reads buttons and switches by their names, and announces notices and find results.
+
+### Fixed
+- Dropping a folder or tab into another space keeps you in that space.
+- A web page can no longer turn off certificate warnings for another site.
+- The traffic lights stay in the corner when the window is resized.
+- Closing find clears the highlight on the page.
+- ⌘W and ⇧⌘W work in Settings, Passwords and Import.
+- A camera or app question never hides behind What's New.
+- A page you're reading isn't replaced by an error page when something fails later.
+- Private windows keep to themselves: no space switcher, and they can't change your spaces.
+- History search no longer sends what you type to your search engine.
+- The command bar fits short windows, and its arrow keys wrap around.
+- Clearing the last hour of history keeps the place you were at in older PDFs.
+- Downloads still show up with Reduce Motion on.
+- Typing a name in Chinese or Japanese no longer finishes it early.
+
 ## [0.2.1] - 2026-10-30
 
 ### New
@@ -217,7 +248,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ZigaoWang/zigzag/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ZigaoWang/zigzag/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ZigaoWang/zigzag/compare/v0.1.12...v0.2.0
 [0.1.12]: https://github.com/ZigaoWang/zigzag/compare/v0.1.11...v0.1.12
