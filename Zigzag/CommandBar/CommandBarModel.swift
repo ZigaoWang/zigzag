@@ -239,16 +239,21 @@ enum CommandRanker {
 /// Fetches search suggestions from the chosen engine. Only what you type in the command bar is sent.
 final class SuggestionFetcher {
     private var task: Task<Void, Never>?
+    /// In a private window: suggestions go through a session of their own that keeps no cookies or cache,
+    /// so the search engine can't tie them to your other browsing.
+    var isPrivate = false
+    private lazy var privateSession = URLSession(configuration: .ephemeral)
 
     func fetch(_ query: String, completion: @escaping ([String]) -> Void) {
         task?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2, CommandRanker.url(from: trimmed) == nil,
               let url = Library.shared.searchEngine.suggestionsURL(trimmed) else { completion([]); return }
+        let session = isPrivate ? privateSession : URLSession.shared
         task = Task {
             try? await Task.sleep(for: .milliseconds(90))
             guard !Task.isCancelled else { return }
-            guard let (data, _) = try? await URLSession.shared.data(from: url), !Task.isCancelled else { return }
+            guard let (data, _) = try? await session.data(from: url), !Task.isCancelled else { return }
             completion(Self.parse(data))
         }
     }

@@ -196,6 +196,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             setScope(nil)
         }
         self.mode = mode
+        fetcher.isPrivate = controller.tabManager.isPrivate
         mouseAtOpen = NSEvent.mouseLocation
         let card = controller.root.cardFrame
         let opening = !isVisible
