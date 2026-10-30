@@ -189,4 +189,10 @@ struct BookmarkFolderTests {
         let plainLink = try #require(CertificateExceptions.proceedLink(for: plain, nonce: "abc"))
         #expect(CertificateExceptions.destination(of: plainLink, warnedHost: "router.local", nonce: "abc") == plain)
     }
+
+    @Test func buttonNamesLeaveOutTheirShortcut() {
+        #expect(IconButton.withoutShortcut("Back (⌘[)") == "Back")
+        #expect(IconButton.withoutShortcut("Hide Sidebar (⌥⌘S)") == "Hide Sidebar")
+        #expect(IconButton.withoutShortcut("Downloads") == "Downloads")
+    }
 }

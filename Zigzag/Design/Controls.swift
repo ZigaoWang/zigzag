@@ -205,8 +205,14 @@ final class IconButton: InteractiveView {
     }
 
     /// The tooltip is the button's name, so VoiceOver reads whatever it says now (Reload or Stop, Mute or Unmute).
+    /// The shortcut the tooltip ends with stays out of it: "Back", not "Back (⌘[)".
     override var toolTip: String? {
-        didSet { setAccessibilityLabel(toolTip) }
+        didSet { setAccessibilityLabel(toolTip.map(Self.withoutShortcut)) }
+    }
+
+    /// "Back (⌘[)" → "Back".
+    static func withoutShortcut(_ tip: String) -> String {
+        tip.replacingOccurrences(of: #"\s*\([⌃⌥⇧⌘][^()]*\)\s*$"#, with: "", options: .regularExpression)
     }
 
     required init?(coder: NSCoder) { fatalError() }
