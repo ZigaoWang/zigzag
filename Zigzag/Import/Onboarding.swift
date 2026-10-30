@@ -111,24 +111,25 @@ final class OnboardingView: NSView {
     private func slide(from old: NSView, to new: NSView, forward: Bool) {
         [old, new].forEach { $0.wantsLayer = true }
         guard let oldLayer = old.layer, let newLayer = new.layer else { old.removeFromSuperview(); return }
-        // With Reduce Motion, a cross-fade in place.
-        let distance: CGFloat = 0
-        let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
+        // Going on, the next screen comes in from the right; going back, from the left. With Reduce Motion, a
+        // cross-fade in place.
+        let distance: CGFloat = Tokens.Motion.reduceMotion ? 0 : forward ? 24 : -24
+        let curve = Tokens.Motion.gentle
         func animation(_ key: String, _ from: Any, _ to: Any, _ duration: CFTimeInterval) -> CABasicAnimation {
             let a = CABasicAnimation(keyPath: key)
             a.fromValue = from
             a.toValue = to
             a.duration = duration
-            a.timingFunction = curve
+            a.timingFunction = curve.timing
             return a
         }
         CATransaction.begin()
         CATransaction.setCompletionBlock { old.removeFromSuperview() }
         oldLayer.opacity = 0
-        oldLayer.add(animation("opacity", 1, 0, 0.22), forKey: "leave.fade")
-        oldLayer.add(animation("transform.translation.x", 0, -distance, 0.38), forKey: "leave.move")
-        newLayer.add(animation("opacity", 0, 1, 0.34), forKey: "arrive.fade")
-        newLayer.add(animation("transform.translation.x", distance, 0, 0.42), forKey: "arrive.move")
+        oldLayer.add(animation("opacity", 1, 0, Tokens.Motion.snappy.duration), forKey: "leave.fade")
+        oldLayer.add(animation("transform.translation.x", 0, -distance, curve.duration), forKey: "leave.move")
+        newLayer.add(animation("opacity", 0, 1, curve.duration), forKey: "arrive.fade")
+        newLayer.add(animation("transform.translation.x", distance, 0, curve.duration), forKey: "arrive.move")
         CATransaction.commit()
     }
 
