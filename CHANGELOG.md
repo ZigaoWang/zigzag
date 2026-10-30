@@ -5,6 +5,23 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-30
+
+### New
+- Drag a folder in the sidebar to move it with its pages, or hold it over a space's dot to move it to that space.
+- Full-page screenshots also capture pages that scroll inside themselves, like web apps and pages shown in a frame.
+
+### Changed
+- Swiping between spaces follows your fingers: swipe a little and come back, or let go past a third of the way, or flick, to switch.
+- Permission and app questions are simpler: the app's own icon, Allow, and a box to always allow on that site.
+- Settings is easier to find your way around: each setting has an icon, General is in sections, and ad blocking is under Privacy.
+- Clear has more room above New Tab.
+
+### Fixed
+- A button that opens a page in a new tab no longer also says a pop-up was blocked.
+- The energy note no longer blames an extension like 1Password for a busy page, and only shows for tabs in the background.
+- Settings no longer stutters as it grows for the Shortcuts pane.
+
 ## [0.2.0] - 2026-10-30
 
 ### New
@@ -200,7 +217,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ZigaoWang/zigzag/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ZigaoWang/zigzag/compare/v0.1.12...v0.2.0
 [0.1.12]: https://github.com/ZigaoWang/zigzag/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/ZigaoWang/zigzag/compare/v0.1.10...v0.1.11
