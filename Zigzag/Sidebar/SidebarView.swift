@@ -456,7 +456,8 @@ final class SidebarView: NSView {
             dot.toolTip = space.name
             dot.setAccessibilityLabel("Space \(space.name)")
         }
-        dots.forEach { $0.isHidden = isPrivate }
+        // A single space needs no switcher, and a private window switches nothing.
+        dots.forEach { $0.isHidden = isPrivate || dots.count < 2 }
         layoutBottomBar()
     }
 
