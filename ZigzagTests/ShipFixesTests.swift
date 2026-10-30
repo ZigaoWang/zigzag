@@ -146,6 +146,22 @@ struct BookmarkFolderTests {
         #expect(SpaceSwipe.velocity(samples, at: 2) == 0)
     }
 
+    @Test func errorPagesSayItPlainly() throws {
+        let url = try #require(URL(string: "https://example.com:25/"))
+        let errors = [NSError(domain: "WebKitErrorDomain", code: 103, userInfo: [NSLocalizedDescriptionKey: "Not allowed to use restricted network port"]),
+                      NSError(domain: NSURLErrorDomain, code: NSURLErrorDNSLookupFailed),
+                      NSError(domain: NSURLErrorDomain, code: -99999, userInfo: [NSLocalizedDescriptionKey: "raw system text"])]
+        for error in errors {
+            let (title, message) = ErrorPage.describe(error, url: url)
+            #expect(!title.isEmpty)
+            #expect(message.hasSuffix("."))
+            #expect(message != error.localizedDescription)
+        }
+        // A lookup failure names both likely causes.
+        let dns = ErrorPage.describe(NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotFindHost), url: url).1
+        #expect(dns.contains("internet") && dns.contains("typo"))
+    }
+
     @Test func clearingTheLastHourKeepsOlderPDFPlaces() {
         let now = Date()
         let all: [String: Any] = [

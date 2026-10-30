@@ -192,7 +192,8 @@ enum ErrorPage {
         }
     }
 
-    private static func describe(_ error: NSError, url: URL) -> (String, String) {
+    /// The title and message for an error, in plain words. Never the system's own text, which reads like a log.
+    static func describe(_ error: NSError, url: URL) -> (String, String) {
         let host = url.host() ?? url.absoluteString
         // An extension's own page, from an extension that's been removed or turned off.
         if url.scheme == "webkit-extension" {
@@ -201,22 +202,51 @@ enum ErrorPage {
         if error.domain == crashDomain {
             return ("This page keeps stopping", "It may need more memory than your Mac can spare right now. Close some tabs, then try again.")
         }
+        // WebKit's own errors.
+        if error.domain == "WebKitErrorDomain" {
+            switch error.code {
+            // A port browsers keep closed, because other services (like email) use it.
+            case 103: return ("Zigzag won’t open this port", "\(host) is on a port kept for other things, like email, so browsers don’t open it.")
+            case 101: return ("Zigzag can’t open this address", "Check the address for typos.")
+            default: return generic
+            }
+        }
+        guard error.domain == NSURLErrorDomain else { return generic }
         switch error.code {
-        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed, NSURLErrorInternationalRoamingOff:
             return ("You’re offline", "Check your internet connection, then try again.")
+        // Most often the internet is down, or the address has a typo; the site itself rarely vanishes.
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-            return ("Can’t find \(host)", "Check the address for typos.")
+            return ("Can’t find \(host)", "Your Mac may not be connected to the internet, or the address may have a typo. Check both, then try again.")
         case NSURLErrorTimedOut:
-            return ("\(host) took too long", "The site didn’t respond in time.")
+            return ("\(host) took too long", "The site didn’t respond in time. Try again in a moment.")
         case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateNotYetValid, NSURLErrorServerCertificateHasUnknownRoot:
             return ("This connection isn’t private", "\(host) can’t prove it is who it says it is, so Zigzag didn’t open it.")
+        case NSURLErrorClientCertificateRequired, NSURLErrorClientCertificateRejected:
+            return ("\(host) wants a certificate", "The site only opens for Macs with a certificate it trusts, often one from work or school.")
         case NSURLErrorCannotConnectToHost:
-            return ("Can’t connect to \(host)", "The site may be down right now.")
+            return ("Can’t connect to \(host)", "The site may be down right now. Try again in a moment.")
+        case NSURLErrorHTTPTooManyRedirects:
+            return ("\(host) keeps sending you around", "It redirected the page in a loop. Clearing this site’s cookies often fixes it.")
+        case NSURLErrorBadServerResponse, NSURLErrorZeroByteResource, NSURLErrorCannotDecodeRawData, NSURLErrorCannotDecodeContentData,
+             NSURLErrorCannotParseResponse:
+            return ("\(host) sent a broken page", "Something went wrong on the site’s side. Try again in a moment.")
+        case NSURLErrorBadURL, NSURLErrorUnsupportedURL:
+            return ("Zigzag can’t open this address", "Check the address for typos.")
+        case NSURLErrorFileDoesNotExist:
+            return ("This file isn’t there", "It may have been moved, renamed or deleted.")
+        case NSURLErrorNoPermissionsToReadFile:
+            return ("Zigzag can’t read this file", "Your Mac doesn’t let Zigzag open it.")
+        case NSURLErrorResourceUnavailable:
+            return ("This page isn’t available", "Try again in a moment.")
         default:
-            return ("Can’t open this page", error.localizedDescription)
+            return generic
         }
     }
+
+    /// For anything not described above.
+    private static let generic = ("Can’t open this page", "Something went wrong while loading it. Try again in a moment.")
 
     private static func certificateReason(_ code: Int) -> String {
         switch code {
