@@ -162,6 +162,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
 
+    /// ⌘W in a window without tabs (Settings, Passwords, Import) closes that window, as on any Mac.
+    @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
+
     private func frontBrowserWindow() -> BrowserWindowController? {
         if WindowManager.shared.controllers.isEmpty { WindowManager.shared.reopen() }
         // Onboarding still showing: the window waits behind it.
@@ -187,6 +190,7 @@ extension AppDelegate: NSMenuItemValidation {
     /// Reopen Closed Window is dimmed when there's nothing to bring back.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        if menuItem.action == #selector(closeTab(_:)) { return NSApp.keyWindow?.styleMask.contains(.closable) ?? false }
         return true
     }
 }

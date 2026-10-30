@@ -28,7 +28,6 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
         closeWithUndo(tab)
     }
-    @objc func closeWindow(_ sender: Any?) { window?.performClose(sender) }
 
     /// Copies a link and says so, wherever the copy came from.
     func copyLink(_ url: URL) {

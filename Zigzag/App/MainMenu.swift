@@ -61,7 +61,7 @@ enum MainMenu {
             .separator(),
             item("Close Tab", #selector(C.closeTab(_:)), "w"),
             item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),
-            item("Close Window", #selector(C.closeWindow(_:)), "w", [.command, .shift]),
+            item("Close Window", #selector(NSWindow.performClose(_:)), "w", [.command, .shift]),
             .separator(),
             item("Share…", #selector(C.sharePage(_:)), ""),
             item("Save Page As…", #selector(C.savePageAs(_:)), ""),
