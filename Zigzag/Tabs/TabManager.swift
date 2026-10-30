@@ -286,6 +286,18 @@ final class TabManager {
         changed.send(.selection)
     }
 
+    /// Ends a drag that opened another space and was dropped there: it becomes the space you're in, its colors and
+    /// its own page with it, the rest of what a switch does.
+    func settleInShownSpace() {
+        Brand.themeChanged.send(())
+        if let tab = selectedTab {
+            tab.markActivated()
+            promote(tab)
+            tab.ensureWebView()
+        }
+        changed.send(.selection)
+    }
+
     /// Shows another space's list without leaving the page you're on (used while dragging a tab).
     func showSpaceKeepingPage(_ id: UUID) {
         guard id != currentSpaceID, Library.shared.space(id) != nil else { return }

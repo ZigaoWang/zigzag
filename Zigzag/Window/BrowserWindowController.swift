@@ -1289,11 +1289,17 @@ extension BrowserWindowController: SidebarDelegate {
     func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() { sidebar.clearDropTargets() }
-    /// A drag that opened another space kept the page on screen. However it ended, the selection matches what's
-    /// showing again, so ⌘W closes the page you see.
+    /// A drag that opened another space kept the page on screen. Dropped in that space, you stay there, with its
+    /// own page, as if you'd switched to it; dropped back home, the page you were on stays in front. Either way the
+    /// selection matches what's showing, so ⌘W closes the page you see.
     func listDropFinished() {
         guard shownTab !== tabManager.selectedTab else { return }
-        if let shown = shownTab, tabManager.tab(with: shown.id) != nil { tabManager.select(shown) } else { showSelectedTab() }
+        if let shown = shownTab, tabManager.tab(with: shown.id) != nil, shown.spaceID == tabManager.currentSpaceID {
+            tabManager.select(shown)
+        } else {
+            tabManager.settleInShownSpace()
+            showSelectedTab()
+        }
     }
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
