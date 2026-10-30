@@ -380,14 +380,15 @@ enum PageScreenshot {
       try { origin = new URL(f.src || 'about:blank', location.href).origin; } catch (e) {}
       inner.push({ origin, rect: [r.left + f.clientLeft + left, r.top + f.clientTop + above, w, h] });
     }
-    window.__zigzagShot = best;
+    // Held weakly: every frame surveyed keeps its pick, and only one is used, so the rest mustn't keep it alive.
+    window.__zigzagShot = best ? new WeakRef(best) : null;
     return JSON.stringify({ origin: location.origin, width: innerWidth, height: innerHeight,
                             scrolls: scrolls(2), best: bestBox, frames: inner });
     """
 
     /// The page's scroll-through, for the box: everything that loads on sight loads, then back to its top.
     private static let prepareScrollerScript = """
-    const el = window.__zigzagShot;
+    const el = window.__zigzagShot && window.__zigzagShot.deref();
     if (!el || !el.isConnected) return null;
     const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
     const go = (y) => el.scrollTo({ top: y, behavior: 'instant' });
@@ -412,7 +413,7 @@ enum PageScreenshot {
     /// Scrolls the box to `y` and waits for it to be drawn, then says where it really went and how much at its top
     /// and bottom stays put (sticky or fixed) as it scrolls.
     private static let stepScript = """
-    const el = window.__zigzagShot;
+    const el = window.__zigzagShot && window.__zigzagShot.deref();
     if (!el || !el.isConnected) return null;
     el.scrollTo({ top: y, behavior: 'instant' });
     await Promise.race([new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))), new Promise((done) => setTimeout(done, 200))]);
@@ -438,7 +439,7 @@ enum PageScreenshot {
     """
 
     private static let restoreScrollerScript = """
-    const el = window.__zigzagShot;
+    const el = window.__zigzagShot && window.__zigzagShot.deref();
     window.__zigzagShot = null;
     if (el && el.isConnected) el.scrollTo({ top: y, behavior: 'instant' });
     """
@@ -495,10 +496,11 @@ final class PageFrames: NSObject, WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == Self.messageName, let webView = message.webView else { return }
         let key = ObjectIdentifier(webView)
+        // Closed pages (a private window's too) are let go of here, not kept until some other page loads.
+        seen = seen.filter { $0.value.webView != nil }
         if message.frameInfo.isMainFrame {
             // A new page starts with no frames; one back from the cache keeps the ones it had.
             guard (message.body as? Bool) != true else { return }
-            seen = seen.filter { $0.value.webView != nil }
             seen[key] = Seen(webView: webView, frames: [])
             return
         }
