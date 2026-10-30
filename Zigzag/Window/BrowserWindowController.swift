@@ -871,7 +871,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The file's own icon lifts off where you clicked and arcs into the Downloads button, which answers with a
-    /// small pulse: you see where it went without a word. With the sidebar hidden, just the pulse is skipped.
+    /// small pulse: you see where it went without a word. With the sidebar hidden, just the pulse is skipped; with
+    /// Reduce Motion, just the flight.
     #if DEBUG
     func debugFlyDownload(_ name: String) {
         sidebar.updateDownloads(active: 1, hasAny: true, progress: 0.35)
@@ -886,12 +887,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if refresh { downloadsChanged() }
         sidebar.layoutSubtreeIfNeeded()
         let overlay = root.overlay
-        guard let host = overlay.layer, let window, !Tokens.Motion.reduceMotion else { return }
+        guard let host = overlay.layer, let window else { return }
         let anchor = sidebar.downloadsAnchor
         let sidebarShown = root.sidebarVisible || root.isSidebarFloatingVisible
         // Sidebar hidden: its Downloads button stands in at the same corner, and the download flies there.
         if !sidebarShown { showFloatingDownloads() }
         let target = sidebarShown ? anchor : floatingDownloadsButton
+        // The landing is one moment: the file goes into the button, the button takes the hit, and the panel
+        // springs open out of it, showing the file come in, and tidies itself away a while after it's done.
+        let land = { [weak self] in
+            guard let self else { return }
+            if sidebarShown { self.sidebar.pulseDownloads() }
+            if refresh, !self.hasFloatingPanel, self.window?.isKeyWindow == true {
+                DownloadsPanel.reveal(from: target, in: self, closingAfter: item)
+            } else if !sidebarShown, !DownloadsPanel.isOpen(in: self.window) {
+                // Nothing opened from it: it stays a moment so you see where the file went, then goes.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.hideFloatingDownloads() }
+            }
+        }
+        // With Reduce Motion nothing flies: it lands at once.
+        guard !Tokens.Motion.reduceMotion else { land(); return }
         let card = root.cardFrame
         // From the pointer if it's over the page, otherwise the middle of the page.
         let mouse = overlay.convert(window.mouseLocationOutsideOfEventStream, from: nil)
@@ -958,17 +973,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
             self?.flyingDownloads.remove(item.id)
-            // The landing is one moment: the file goes into the button, the button takes the hit, and the panel
-            // springs open out of it, showing the file come in, and tidies itself away a while after it's done.
             Tokens.Motion.withoutAnimation { flyer.removeFromSuperlayer() }
-            guard let self else { return }
-            if sidebarShown { self.sidebar.pulseDownloads() }
-            if refresh, !self.hasFloatingPanel, self.window?.isKeyWindow == true {
-                DownloadsPanel.reveal(from: target, in: self, closingAfter: item)
-            } else if !sidebarShown, !DownloadsPanel.isOpen(in: self.window) {
-                // Nothing opened from it: it stays a moment so you see where the file went, then goes.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.hideFloatingDownloads() }
-            }
+            land()
         }
         flyer.add(group, forKey: "fly")
         CATransaction.commit()
