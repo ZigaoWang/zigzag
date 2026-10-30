@@ -70,8 +70,13 @@ final class DeskController {
     private static let searchHeight = Tokens.Space.x8
     private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
 
-    private let cardWidth = Tokens.Metric.deskCardWidth
-    private let gap = Tokens.Space.x4
+    /// Cards shrink with more tabs down to this, where a title still reads, and grow with fewer up to the largest.
+    private let minCardWidth = Tokens.Metric.deskCardWidth
+    private let maxCardWidth = Tokens.Metric.deskCardMaxWidth
+    /// Room around a card's picture for its hover and current-tab fill.
+    private let cardInset = Tokens.Space.x1
+    private let gap = Tokens.Space.x6
+    private let spaceGap = Tokens.Space.x8
     private let margin = Tokens.Space.x10
 
     init(window: BrowserWindowController) {
@@ -84,6 +89,14 @@ final class DeskController {
         scrollView.documentView = canvas
         scrollView.useSlimScroller()
         backdrop.addSubview(scrollView)
+        // The window resized, went full screen or the sidebar moved: the cards take the page area's new shape.
+        scrollView.contentView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isVisible else { return }
+                self.applyLayout(animated: false)
+            }
+        }
         actionBar.radius = Tokens.Radius.row + Tokens.Space.x1
         actionBar.addSubview(closeButton)
         actionBar.addSubview(doneButton)
@@ -261,23 +274,25 @@ final class DeskController {
 
     // MARK: Layout
 
-    private var cardHeight: CGFloat {
-        guard let controller else { return 200 }
-        let card = controller.root.cardFrame
-        let aspect = min(max(card.height / max(card.width, 1), 0.5), 0.8)
-        return round((cardWidth - Tokens.Space.x2) * aspect) + TabThumbnailView.titleHeight + Tokens.Space.x1
+    /// The page area's shape. Every card is the page area in small, so the page can fly into its card and back
+    /// without stretching.
+    var pageAspect: CGFloat {
+        guard let card = controller?.root.cardFrame, card.width > 0, card.height > 0 else { return 0.625 }
+        return min(max(card.height / card.width, 0.3), 1.5)
+    }
+
+    private func cardHeight(width: CGFloat) -> CGFloat {
+        round((width - cardInset * 2) * pageAspect) + TabThumbnailView.titleHeight + cardInset
     }
 
     /// Lays out every space and its cards. Positions follow sidebar order, so they never move on their own.
+    /// Cards are as big as they can be while every tab still fits on screen: a few tabs get big cards, many get
+    /// smaller ones, down to a size whose titles still read, and then the desk scrolls.
     private func layoutFrames(dragging: (id: UUID, space: UUID, index: Int)? = nil) -> (headers: [UUID: NSRect], cards: [UUID: NSRect], height: CGFloat) {
-        guard let manager else { return ([:], [:], 0) }
-        let width = max(scrollView.contentSize.width, cardWidth + margin * 2)
-        let columns = max(1, Int((width - margin * 2 + gap) / (cardWidth + gap)))
-        let rowWidth = CGFloat(columns) * cardWidth + CGFloat(columns - 1) * gap
-        let left = floor((width - rowWidth) / 2)
-        var y = margin
-        var headerFrames: [UUID: NSRect] = [:]
-        var cardFrames: [UUID: NSRect] = [:]
+        guard manager != nil else { return ([:], [:], 0) }
+        let width = max(scrollView.contentSize.width, minCardWidth + margin * 2)
+        let visible = scrollView.contentSize.height
+        var groups: [(space: UUID, ids: [UUID])] = []
         for space in Library.shared.spaces {
             var ids = cardTabs(in: space.id).map(\.id)
             if let dragging {
@@ -287,16 +302,45 @@ final class DeskController {
             // A space with nothing to show has no heading, except the only one when not searching. While searching
             // the headings of empty spaces would stand over "No tabs match".
             if ids.isEmpty && dragging == nil && (Library.shared.spaces.count > 1 || !query.isEmpty) { continue }
-            headerFrames[space.id] = NSRect(x: left - Tokens.Space.x2, y: y, width: 320, height: Tokens.Space.x8)
-            y += Tokens.Space.x8 + Tokens.Space.x3
-            for (i, id) in ids.enumerated() {
+            groups.append((space.id, ids))
+        }
+        let heading = Tokens.Space.x8 + Tokens.Space.x3
+        func widthOfCards(_ columns: Int) -> CGFloat {
+            let fit = floor((width - margin * 2 - CGFloat(columns - 1) * gap) / CGFloat(columns))
+            // One card on its own is never taller than the desk.
+            let tallest = (visible - margin * 2 - heading - TabThumbnailView.titleHeight - cardInset) / pageAspect + cardInset * 2
+            return max(minCardWidth, min(fit, maxCardWidth, floor(tallest)))
+        }
+        func contentHeight(columns: Int) -> CGFloat {
+            let rowHeight = self.cardHeight(width: widthOfCards(columns)) + gap
+            let spaces = groups.map { heading + CGFloat(max(1, Int(ceil(Double($0.ids.count) / Double(columns))))) * rowHeight - gap }
+            return spaces.reduce(0, +) + CGFloat(max(0, spaces.count - 1)) * spaceGap
+        }
+        // The fewest columns, so the biggest cards, that show every tab at once; with too many for that, as many
+        // columns as fit.
+        let most = max(1, Int((width - margin * 2 + gap) / (minCardWidth + gap)))
+        let widest = max(1, min(most, groups.map(\.ids.count).max() ?? 1))
+        let columns = (1...widest).first { contentHeight(columns: $0) <= visible - margin * 2 } ?? widest
+        let cardWidth = widthOfCards(columns)
+        let cardHeight = self.cardHeight(width: cardWidth)
+        let rowWidth = CGFloat(columns) * cardWidth + CGFloat(columns - 1) * gap
+        let left = floor((width - rowWidth) / 2)
+        // A desk that fits sits in the middle of the window, like Mission Control.
+        let total = contentHeight(columns: columns)
+        var y = max(margin, floor((visible - total) / 2))
+        var headerFrames: [UUID: NSRect] = [:]
+        var cardFrames: [UUID: NSRect] = [:]
+        for group in groups {
+            headerFrames[group.space] = NSRect(x: left - Tokens.Space.x2, y: y, width: 320, height: Tokens.Space.x8)
+            y += heading
+            for (i, id) in group.ids.enumerated() {
                 let col = i % columns, row = i / columns
                 cardFrames[id] = NSRect(x: left + CGFloat(col) * (cardWidth + gap), y: y + CGFloat(row) * (cardHeight + gap), width: cardWidth, height: cardHeight)
             }
-            let rows = max(1, Int(ceil(Double(ids.count) / Double(columns))))
-            y += CGFloat(rows) * (cardHeight + gap) + Tokens.Space.x6
+            let rows = max(1, Int(ceil(Double(group.ids.count) / Double(columns))))
+            y += CGFloat(rows) * (cardHeight + gap) - gap + spaceGap
         }
-        return (headerFrames, cardFrames, y + margin)
+        return (headerFrames, cardFrames, y - spaceGap + margin)
     }
 
     /// The tabs that get a card: a split's second page shares the first one's card, as it shares its sidebar row.
@@ -344,6 +388,18 @@ final class DeskController {
         return manager.tab(with: pair.right)
     }
 
+    /// How a split card's two pages share it, as they share the page area.
+    private func splitShape(of tab: Tab) -> (ratio: CGFloat, vertical: Bool)? {
+        guard let pair = manager?.split(for: tab) else { return nil }
+        return (CGFloat(pair.ratio), pair.vertical)
+    }
+
+    /// The card for the tab you're on, which with a split is the one both pages share.
+    private var currentCard: TabThumbnailView? {
+        guard let manager, let tab = manager.selectedTab else { return nil }
+        return cards[manager.split(for: tab)?.left ?? tab.id] ?? cards[tab.id]
+    }
+
     /// Tabs opened or closed while the desk is up (⌘W, a link opening a tab): the cards follow.
     func tabsChanged() { if isVisible { reload(animated: true) } }
 
@@ -359,12 +415,12 @@ final class DeskController {
         }
         selection = selection.intersection(ids)
         // Cards kept from last time show what each tab is now.
-        for tab in allTabs { cards[tab.id]?.configure(tab, partner: partner(of: tab)) }
+        for tab in allTabs { cards[tab.id]?.configure(tab, partner: partner(of: tab), split: splitShape(of: tab)) }
         for tab in allTabs where cards[tab.id] == nil {
             let card = TabThumbnailView()
-            card.inset = Tokens.Space.x1
+            card.inset = cardInset
             card.showsRing = true
-            card.configure(tab, partner: partner(of: tab))
+            card.configure(tab, partner: partner(of: tab), split: splitShape(of: tab))
             card.onClick = { [weak self, weak tab, weak card] event in
                 guard let self, let tab else { return }
                 self.cardClicked(card?.tab(at: event) ?? tab, event: event)
@@ -401,6 +457,8 @@ final class DeskController {
             canvas.addSubview(header)
         }
         for (id, header) in headers where Library.shared.space(id) == nil { header.removeFromSuperview(); headers[id] = nil }
+        let current = currentCard
+        for card in cards.values { card.isCurrent = card === current }
         applyLayout(animated: animated)
         updateSelection()
     }

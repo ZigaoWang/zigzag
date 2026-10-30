@@ -1,13 +1,70 @@
 import AppKit
 
+/// A page as a picture: its snapshot filling the frame, scaled to cover it and pinned to its top left, as a page is
+/// read, never letterboxed. A split shows both pages where they sit on screen, side by side or stacked, at the
+/// split's own ratio. Cards draw one, and so does the page flying into or out of its card in desk view.
+final class PagePicture {
+    /// What goes on screen. Its owner places it and sizes it with `layout(size:)`.
+    let layer = CALayer()
+    private let panes = [CALayer(), CALayer()]
+    private let images = [CALayer(), CALayer()]
+    /// The hairline between a split's pages.
+    let divider = CALayer()
+    private var split: (ratio: CGFloat, vertical: Bool)?
+
+    init() {
+        for (pane, image) in zip(panes, images) {
+            pane.masksToBounds = true
+            pane.addSublayer(image)
+            layer.addSublayer(pane)
+        }
+        layer.addSublayer(divider)
+    }
+
+    /// The first page's picture, and with a split, the second's and how the two share the frame.
+    func show(_ first: NSImage?, _ second: NSImage?, split: (ratio: CGFloat, vertical: Bool)?) {
+        self.split = split
+        Tokens.Motion.withoutAnimation {
+            images[0].contents = first
+            images[1].contents = split == nil ? nil : second
+        }
+        layout(size: layer.bounds.size)
+    }
+
+    /// Sizes the picture and places the pages in it.
+    func layout(size: CGSize) {
+        Tokens.Motion.withoutAnimation {
+            layer.bounds.size = size
+            let b = layer.bounds
+            let panes = BrowserRootView.paneFrames(in: b, ratio: split?.ratio, vertical: split?.vertical ?? false, gap: 1)
+            // Worked out top-down, as the window lays its panes out; a layer's y runs up.
+            func up(_ r: CGRect) -> CGRect { CGRect(x: r.minX, y: b.height - r.maxY, width: r.width, height: r.height) }
+            fill(0, in: up(panes.left))
+            if let right = panes.right {
+                fill(1, in: up(right))
+                divider.frame = up(split?.vertical == true
+                    ? CGRect(x: b.minX, y: panes.left.maxY, width: b.width, height: right.minY - panes.left.maxY)
+                    : CGRect(x: panes.left.maxX, y: b.minY, width: right.minX - panes.left.maxX, height: b.height))
+            }
+            self.panes[1].isHidden = panes.right == nil
+            divider.isHidden = panes.right == nil
+        }
+    }
+
+    private func fill(_ index: Int, in rect: CGRect) {
+        panes[index].frame = rect
+        guard let size = (images[index].contents as? NSImage)?.size, size.width > 0, size.height > 0 else { return }
+        let scale = max(rect.width / size.width, rect.height / size.height)
+        let w = size.width * scale, h = size.height * scale
+        images[index].frame = CGRect(x: 0, y: rect.height - h, width: w, height: h)
+    }
+}
+
 /// A page thumbnail with its site and title underneath, used by the switcher and desk view.
 final class TabThumbnailView: InteractiveView {
     let imageClip = NSView()
-    /// The page, filling its card and cropped from the bottom, never letterboxed. A split shows both pages, side
-    /// by side, as it does on screen.
-    private let halves = [CALayer(), CALayer()]
-    private let images = [CALayer(), CALayer()]
-    private let divider = CALayer()
+    /// The page, or a split's two, as they are on screen.
+    let picture = PagePicture()
     private let placeholder = FaviconView()
     let icon = FaviconView()
     let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -19,6 +76,8 @@ final class TabThumbnailView: InteractiveView {
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
     var showsRing = false
     var showsHover = true
+    /// Desk view: the tab you were on, held in the same quiet fill as its row in the sidebar.
+    var isCurrent = false { didSet { if oldValue != isCurrent { refreshColors() } } }
     /// Desk view: an × on the card while the pointer is over it.
     var onClose: (() -> Void)? { didSet { closeButton.isHidden = true } }
     private let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Close Tab")
@@ -28,6 +87,8 @@ final class TabThumbnailView: InteractiveView {
     private(set) weak var tab: Tab?
     /// The page beside it in split view, if any.
     private(set) weak var partner: Tab?
+    /// How a split shares the page area: the first page's share, and whether the two are stacked.
+    private(set) var split: (ratio: CGFloat, vertical: Bool)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -38,12 +99,7 @@ final class TabThumbnailView: InteractiveView {
         imageClip.layer?.cornerCurve = .continuous
         imageClip.layer?.masksToBounds = true
         imageClip.layer?.borderWidth = Tokens.Metric.hairline
-        for (half, image) in zip(halves, images) {
-            half.masksToBounds = true
-            half.addSublayer(image)
-            imageClip.layer?.addSublayer(half)
-        }
-        imageClip.layer?.addSublayer(divider)
+        imageClip.layer?.addSublayer(picture.layer)
         imageClip.addSubview(placeholder)
         ring.borderWidth = 2.5
         ring.cornerRadius = Tokens.Radius.thumbnail + 3
@@ -63,9 +119,10 @@ final class TabThumbnailView: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(_ tab: Tab, partner: Tab? = nil) {
+    func configure(_ tab: Tab, partner: Tab? = nil, split: (ratio: CGFloat, vertical: Bool)? = nil) {
         self.tab = tab
         self.partner = partner
+        self.split = partner == nil ? nil : split ?? (0.5, false)
         placeholder.image = tab.favicon
         siteName.stringValue = tab.url?.host().map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 } ?? ""
         icon.image = tab.favicon
@@ -79,10 +136,7 @@ final class TabThumbnailView: InteractiveView {
 
     func refreshImage() {
         guard let tab else { return }
-        Tokens.Motion.withoutAnimation {
-            images[0].contents = Self.isBlank(tab.snapshot) ? nil : tab.snapshot
-            images[1].contents = partner?.snapshot
-        }
+        picture.show(Self.isBlank(tab.snapshot) ? nil : tab.snapshot, partner?.snapshot, split: split)
         let showsPage = !Self.isBlank(tab.snapshot) || partner != nil
         placeholder.isHidden = showsPage
         siteName.isHidden = showsPage
@@ -115,20 +169,13 @@ final class TabThumbnailView: InteractiveView {
         return blank
     }
 
-    /// Which page a click landed on: with a split, the half under the pointer.
+    /// Which page a click landed on: with a split, the pane under the pointer.
     func tab(at event: NSEvent) -> Tab? {
-        guard let partner else { return tab }
-        return imageClip.convert(event.locationInWindow, from: nil).x > imageClip.bounds.midX ? partner : tab
-    }
-
-    /// Fills `rect` with the snapshot, scaled to cover it and pinned to its top, as a page is read.
-    private func fill(_ index: Int, snapshot: NSImage?, in rect: CGRect) {
-        halves[index].frame = rect
-        guard let size = snapshot?.size, size.width > 0, size.height > 0 else { return }
-        let scale = max(rect.width / size.width, rect.height / size.height)
-        let w = size.width * scale, h = size.height * scale
-        // The clip isn't flipped: its top is the highest y.
-        images[index].frame = CGRect(x: (rect.width - w) / 2, y: rect.height - h, width: w, height: h)
+        guard let partner, let split else { return tab }
+        let point = imageClip.convert(event.locationInWindow, from: nil)
+        // The clip isn't flipped: the top pane is the higher one.
+        let second = split.vertical ? point.y < imageClip.bounds.height * (1 - split.ratio) : point.x > imageClip.bounds.width * split.ratio
+        return second ? partner : tab
     }
 
     /// Space around the image so the selection highlight can surround it, like Command+Tab.
@@ -138,19 +185,8 @@ final class TabThumbnailView: InteractiveView {
         super.layout()
         let titleArea = showsTitle ? Self.titleHeight : 0
         imageClip.frame = NSRect(x: inset, y: inset, width: bounds.width - inset * 2, height: bounds.height - titleArea - inset * (showsTitle ? 1 : 2))
-        Tokens.Motion.withoutAnimation {
-            let b = imageClip.bounds
-            if partner != nil {
-                let half = floor((b.width - 1) / 2)
-                fill(0, snapshot: tab?.snapshot, in: CGRect(x: 0, y: 0, width: half, height: b.height))
-                fill(1, snapshot: partner?.snapshot, in: CGRect(x: half + 1, y: 0, width: b.width - half - 1, height: b.height))
-                divider.frame = CGRect(x: half, y: 0, width: 1, height: b.height)
-            } else {
-                fill(0, snapshot: tab?.snapshot, in: b)
-            }
-            halves[1].isHidden = partner == nil
-            divider.isHidden = partner == nil
-        }
+        picture.layout(size: imageClip.bounds.size)
+        Tokens.Motion.withoutAnimation { picture.layer.position = CGPoint(x: imageClip.bounds.midX, y: imageClip.bounds.midY) }
         let p = Tokens.Space.x8
         // The clip isn't flipped: the icon sits a little above the middle, its site under it.
         let nameHeight = siteName.lineHeight
@@ -164,11 +200,12 @@ final class TabThumbnailView: InteractiveView {
         title.isHidden = !showsTitle
         icon2.isHidden = !showsTitle || partner == nil
         title2.isHidden = !showsTitle || partner == nil
-        // One title under the card, or with a split, each page's under its own half.
+        // One title under the card, or with a split, each page's under its own side; stacked pages share the row.
         if partner != nil {
-            let half = imageClip.frame.width / 2
-            place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: half, height: titleArea))
-            place(icon2, title2, in: NSRect(x: imageClip.frame.minX + half, y: imageClip.frame.maxY, width: half, height: titleArea))
+            let share = split?.vertical == false ? split?.ratio ?? 0.5 : 0.5
+            let first = round(imageClip.frame.width * share)
+            place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: first, height: titleArea))
+            place(icon2, title2, in: NSRect(x: imageClip.frame.minX + first, y: imageClip.frame.maxY, width: imageClip.frame.width - first, height: titleArea))
         } else {
             place(icon, title, in: NSRect(x: inset, y: imageClip.frame.maxY, width: bounds.width - inset * 2, height: titleArea))
         }
@@ -198,11 +235,16 @@ final class TabThumbnailView: InteractiveView {
         Tokens.Motion.withoutAnimation {
             imageClip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
             imageClip.layer?.borderColor = cgColor(Tokens.Color.cardEdge)
-            divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
+            picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
             ring.borderColor = cgColor(Tokens.Color.accent)
             ring.isHidden = !(isSelected && showsRing)
+            layer?.borderWidth = isCurrent ? Tokens.Metric.hairline : 0
+            layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
         }
-        let fill: NSColor? = isSelected && !showsRing ? Tokens.Color.pressedFill : (isHovered && showsHover) ? Tokens.Color.hoverFill : nil
+        let hovered = isHovered && showsHover
+        let fill: NSColor? = isSelected && !showsRing ? Tokens.Color.pressedFill
+            : isCurrent ? (hovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
+            : hovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
     }
 }

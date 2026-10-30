@@ -349,11 +349,15 @@ final class BrowserRootView: ColorView {
 
     /// The left (or only) pane and the right pane, inside the page area.
     var paneFrames: (left: NSRect, right: NSRect?) {
-        let area = cardFrame
-        guard let ratio = splitRatio else { return (area, nil) }
         // Borderless, the two pages meet at a hairline instead of floating apart.
-        let gap = isEdgeToEdge ? 1 : Tokens.Metric.cardInset
-        if splitVertical {
+        Self.paneFrames(in: cardFrame, ratio: splitRatio, vertical: splitVertical, gap: isEdgeToEdge ? 1 : Tokens.Metric.cardInset)
+    }
+
+    /// Splits `area` (top-down) into a split's two panes, `gap` apart; the whole of it when there's no split. Desk
+    /// cards draw a split the same way, so a card is the page area in small.
+    static func paneFrames(in area: NSRect, ratio: CGFloat?, vertical: Bool, gap: CGFloat) -> (left: NSRect, right: NSRect?) {
+        guard let ratio else { return (area, nil) }
+        if vertical {
             let topHeight = floor((area.height - gap) * ratio)
             let top = NSRect(x: area.minX, y: area.minY, width: area.width, height: topHeight)
             return (top, NSRect(x: area.minX, y: top.maxY + gap, width: area.width, height: area.maxY - top.maxY - gap))

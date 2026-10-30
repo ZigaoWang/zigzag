@@ -68,7 +68,8 @@ enum Tokens {
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         static let windowDefaultSize = NSSize(width: 1280, height: 820)
         static let windowMinSize = NSSize(width: 560, height: 400)
-        static let deskCardWidth: CGFloat = 256
+        static let deskCardWidth: CGFloat = 208
+        static let deskCardMaxWidth: CGFloat = 440
     }
 
     // MARK: - Type (SF Pro, three sizes only)
