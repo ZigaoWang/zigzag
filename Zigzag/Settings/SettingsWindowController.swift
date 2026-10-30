@@ -229,6 +229,7 @@ final class SpaceSettingsRow: InteractiveView {
             guard let self, let window = self.window else { return }
             SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
         }
+        deleteButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
         toolTip = "Click to edit, drag to reorder"
         setAccessibilityRole(.row)
         setAccessibilityLabel(space.name)
@@ -297,7 +298,11 @@ final class SpaceSettingsRow: InteractiveView {
     override func resetCursorRects() { addCursorRect(bounds, cursor: isLifted ? .closedHand : .pointingHand) }
 
     override func stateDidChange(animated: Bool) {
-        deleteButton.isHidden = !isHovered || isLifted
+        // Delete shows on hover, or once Tab brings keyboard focus to it. With Full Keyboard Access on it stays in
+        // the Tab order, see-through until then.
+        let showsDelete = (isHovered || deleteButton.hasKeyboardFocus) && !isLifted
+        deleteButton.isHidden = !showsDelete && !(NSApp.isFullKeyboardAccessEnabled && !isLifted)
+        deleteButton.alphaValue = showsDelete ? 1 : 0
         let fill: NSColor? = isLifted ? Tokens.Color.formGroup : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
