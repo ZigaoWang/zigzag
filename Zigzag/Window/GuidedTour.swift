@@ -55,10 +55,7 @@ final class GuidedTour: NSView {
         controller.root.overlay.addSubview(tour, positioned: .below, relativeTo: nil)
         tour.refresh(animated: false)
         tour.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            tour.animator().alphaValue = 1
-        }
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) { tour.animator().alphaValue = 1 }
     }
 
     private init(controller: BrowserWindowController) {
@@ -172,10 +169,8 @@ final class GuidedTour: NSView {
         watch = nil
         tokens = []
         updatePlayback()
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.2
-            self.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in self?.removeFromSuperview() })
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.animator().alphaValue = 0 },
+                              completion: { [weak self] in self?.removeFromSuperview() })
     }
 
     // MARK: Following along
@@ -205,10 +200,7 @@ final class GuidedTour: NSView {
         }
         let alpha: CGFloat = aside ? 0 : 1
         if alphaValue != alpha {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.15
-                self.animator().alphaValue = alpha
-            }
+            Tokens.Motion.animate(Tokens.Motion.snap, evenFromKeyboard: true) { self.animator().alphaValue = alpha }
         }
         refresh(animated: true)
     }
@@ -325,10 +317,7 @@ final class GuidedTour: NSView {
             shownCount = now.count.isEmpty ? shownCount : now.count
             if swap {
                 swapping = true
-                NSAnimationContext.runAnimationGroup({ ctx in
-                    ctx.duration = 0.12
-                    self.card.animator().alphaValue = 0
-                }, completionHandler: { [weak self] in
+                Tokens.Motion.animate(Tokens.Motion.snap, evenFromKeyboard: true, { self.card.animator().alphaValue = 0 }, completion: { [weak self] in
                     guard let self else { return }
                     self.swapping = false
                     let latest = self.display
@@ -416,7 +405,8 @@ final class GuidedTour: NSView {
         if animated {
             let fade = CATransition()
             fade.type = .fade
-            fade.duration = 0.15
+            fade.duration = Tokens.Motion.snap.duration
+            fade.timingFunction = Tokens.Motion.snap.timing
             card.layer?.add(fade, forKey: "step")
         }
     }
@@ -456,14 +446,14 @@ final class GuidedTour: NSView {
         let radius = max(hole.width, hole.height) < 44 ? min(hole.width, hole.height) / 2 : 12
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
         pulse(ringed)
-        let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
+        let curve = Tokens.Motion.gentle
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {
                 let move = CABasicAnimation(keyPath: "path")
                 move.fromValue = layer.presentation()?.path ?? layer.path
                 move.toValue = path
-                move.duration = 0.35
-                move.timingFunction = ease
+                move.duration = curve.duration
+                move.timingFunction = curve.timing
                 layer.add(move, forKey: "move")
             }
         }
@@ -509,12 +499,9 @@ final class GuidedTour: NSView {
         }
         frame.origin.x = min(max(Tokens.Space.x4, frame.origin.x), bounds.width - size.width - Tokens.Space.x4)
         frame.origin.y = min(max(Tokens.Space.x2, frame.origin.y), bounds.height - size.height - Tokens.Space.x4)
-        if animated, card.frame != frame {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.35
-                ctx.timingFunction = ease
-                card.animator().frame = frame
-            }
+        // With Reduce Motion the card simply appears in its new place.
+        if animated, card.frame != frame, !Tokens.Motion.reduceMotion {
+            Tokens.Motion.animate(curve, evenFromKeyboard: true) { self.card.animator().frame = frame }
         } else if card.frame != frame {
             card.frame = frame
         }
