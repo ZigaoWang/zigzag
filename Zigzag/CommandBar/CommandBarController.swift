@@ -441,6 +441,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         updateSelection()
     }
 
+    /// Moves the selection by one row, wrapping around at either end.
+    private func step(_ delta: Int) {
+        guard !results.isEmpty else { return }
+        select((selectedIndex + delta + results.count) % results.count)
+    }
+
     private func updateSelection() {
         // A note is never highlighted: there's nothing for Return to do on it.
         for (i, row) in rows.enumerated() { row.isSelected = i == selectedIndex && results[i].isActionable }
@@ -587,9 +593,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         switch selector {
         case #selector(NSResponder.moveDown(_:)):
-            select(min(selectedIndex + 1, results.count - 1)); return true
+            step(1); return true
         case #selector(NSResponder.moveUp(_:)):
-            select(max(selectedIndex - 1, 0)); return true
+            step(-1); return true
         case #selector(NSResponder.insertNewline(_:)):
             commit(modifiers: NSApp.currentEvent?.modifierFlags ?? []); return true
         // ⌥↩ reaches a text field as this, not as a plain newline.
@@ -615,7 +621,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                 textView.selectedRange = NSRange(location: (field.stringValue as NSString).length, length: 0)
                 typed = field.stringValue
             } else {
-                select(min(selectedIndex + 1, results.count - 1))
+                step(1)
             }
             return true
         case #selector(NSResponder.deleteBackward(_:)) where scope != nil && field.stringValue.isEmpty:
