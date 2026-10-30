@@ -133,7 +133,7 @@ final class DeskController {
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
     private let searchBox = ColorView()
     private let searchIcon = NSImageView()
-    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: "Search Tabs")
+    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: "Search tabs")
     private let searchDelegate = DeskSearchDelegate()
     private let noMatches = Label("No tabs match", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
