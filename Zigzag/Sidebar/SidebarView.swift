@@ -231,6 +231,13 @@ final class SidebarView: NSView {
     private let downloadsButton = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
     private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
     private var dots: [SpaceDotView] = []
+    /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
+    var isPrivate = false {
+        didSet {
+            newSpaceButton.isHidden = isPrivate
+            dots.forEach { $0.isHidden = isPrivate }
+        }
+    }
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
@@ -441,8 +448,7 @@ final class SidebarView: NSView {
             dot.toolTip = space.name
             dot.setAccessibilityLabel("Space \(space.name)")
         }
-        // A single space needs no switcher.
-        dots.forEach { $0.isHidden = false }
+        dots.forEach { $0.isHidden = isPrivate }
         layoutBottomBar()
     }
 

@@ -129,6 +129,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Private windows are always dark and say so, so you never wonder which one you're in.
             window.appearance = NSAppearance(named: .darkAqua)
             sidebar.list.privateLabel = true
+            sidebar.isPrivate = true
         }
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
