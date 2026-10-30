@@ -117,11 +117,11 @@ struct BookmarkFolderTests {
         #expect(SpaceSwipe.offset(forTravel: 900, width: 300, hasLeft: true, hasRight: true) == 300)
     }
 
-    @Test func swipeLandsOnTheNearerSpaceOrOnAFlick() {
+    @Test func swipeLandsPastAThirdOrOnAFlick() {
         // Moving right brings in the space on the left.
-        #expect(SpaceSwipe.landing(offset: 151, velocity: 0, width: 300) == -1)
-        #expect(SpaceSwipe.landing(offset: -151, velocity: 0, width: 300) == 1)
-        #expect(SpaceSwipe.landing(offset: 149, velocity: 0, width: 300) == 0)
+        #expect(SpaceSwipe.landing(offset: 106, velocity: 0, width: 300) == -1)
+        #expect(SpaceSwipe.landing(offset: -106, velocity: 0, width: 300) == 1)
+        #expect(SpaceSwipe.landing(offset: 104, velocity: 0, width: 300) == 0)
         // A short flick that way lands; flicking back home doesn't, however far it went.
         #expect(SpaceSwipe.landing(offset: -30, velocity: -900, width: 300) == 1)
         #expect(SpaceSwipe.landing(offset: 200, velocity: -900, width: 300) == 0)

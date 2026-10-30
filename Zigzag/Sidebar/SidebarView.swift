@@ -867,10 +867,10 @@ final class SidebarView: NSView {
 enum SpaceSwipe {
     /// How far the fingers move before a gesture counts as sideways or up and down, for the rest of it.
     static let axisLock: CGFloat = 4
-    /// Letting go past this share of the width lands on the next space: whichever space is nearer wins.
-    static let landingShare: CGFloat = 0.5
-    /// A flick at least this fast (points per second) lands, however short.
-    static let flickSpeed: CGFloat = 500
+    /// Letting go past this share of the width lands on the next space: a third of the way is enough to mean it.
+    static let landingShare: CGFloat = 0.35
+    /// A flick at least this fast (points per second) lands, however short: an easy flick, not a hard one.
+    static let flickSpeed: CGFloat = 300
     /// How much recent movement counts toward the speed at letting go.
     static let velocityWindow: TimeInterval = 0.08
     /// Past the first or last space the list gives less the further it's pulled, up to this share of the width.
