@@ -1450,7 +1450,10 @@ extension BrowserWindowController: SidebarDelegate {
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
     func sidebarNewSpace() { newSpace(nil) }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
-    func sidebarSpaceMenu(for id: UUID) -> NSMenu? { SidebarMenus.spaceMenu(for: id, controller: self) }
+    func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
+        let menu = SidebarMenus.spaceMenu(for: id, controller: self)
+        return menu.items.isEmpty ? nil : menu
+    }
 }
 
 // MARK: - Debug hooks

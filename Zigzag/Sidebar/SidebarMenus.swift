@@ -211,7 +211,8 @@ enum SidebarMenus {
     static func spaceMenu(for id: UUID, controller: BrowserWindowController) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        guard let space = Library.shared.space(id) else { return menu }
+        // A private window borrows a space's look but keeps nothing: it can't change the spaces you keep.
+        guard let space = Library.shared.space(id), !controller.tabManager.isPrivate else { return menu }
         menu.addItem(Item("Edit Space…") {
             let anchor = controller.sidebar.dot(for: id) ?? controller.sidebar.list.headerView
             controller.openSpaceEditor(id, anchor: anchor)
@@ -221,7 +222,7 @@ enum SidebarMenus {
             menu.addItem(Item("New Folder") { controller.newFolder() })
         }
         menu.addItem(.separator())
-        if !controller.tabManager.isPrivate { menu.addItem(Item("New Space") { controller.newSpace(nil) }) }
+        menu.addItem(Item("New Space") { controller.newSpace(nil) })
         menu.addItem(Item("Delete Space", enabled: Library.shared.spaces.count > 1) {
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })
