@@ -72,6 +72,8 @@ final class TabThumbnailView: InteractiveView {
     private let icon2 = FaviconView()
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let ring = CALayer()
+    /// A page playing sound: a speaker after its title, as in the sidebar. Clicking it mutes the page, or unmutes it.
+    private let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: Tokens.Space.x5, symbolSize: Tokens.TypeSize.small, toolTip: "Mute Tab")
     var showsTitle = true { didSet { needsLayout = true } }
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
     var showsRing = false
@@ -114,7 +116,13 @@ final class TabThumbnailView: InteractiveView {
         closeButton.showsFillAtRest = true
         closeButton.isHidden = true
         closeButton.onClick = { [weak self] _ in self?.onClose?() }
-        [imageClip, icon, title, icon2, title2, closeButton].forEach { addSubview($0) }
+        audioButton.isHidden = true
+        audioButton.onClick = { [weak self] _ in
+            guard let self, let page = self.audioTab else { return }
+            page.setMuted(!page.isMuted)
+            self.refreshAudio()
+        }
+        [imageClip, icon, title, icon2, title2, audioButton, closeButton].forEach { addSubview($0) }
         layer?.addSublayer(ring)
         setAccessibilityRole(.button)
     }
@@ -133,6 +141,19 @@ final class TabThumbnailView: InteractiveView {
         title2.stringValue = partner?.displayTitle ?? ""
         setAccessibilityLabel(partner.map { "\(tab.displayTitle) and \($0.displayTitle)" } ?? tab.displayTitle)
         refreshImage()
+        refreshAudio()
+        needsLayout = true
+    }
+
+    /// The page with sound on (or muted), the first one's before its split partner's.
+    private var audioTab: Tab? {
+        [tab, partner].compactMap { $0 }.first { $0.isPlayingAudio || $0.isMuted }
+    }
+
+    private func refreshAudio() {
+        let page = audioTab
+        audioButton.symbol = page?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        audioButton.toolTip = page?.isMuted == true ? "Unmute Tab" : "Mute Tab"
         needsLayout = true
     }
 
@@ -203,13 +224,16 @@ final class TabThumbnailView: InteractiveView {
         icon2.isHidden = !showsTitle || partner == nil
         title2.isHidden = !showsTitle || partner == nil
         // One title under the card, or with a split, each page's under its own side; stacked pages share the row.
+        let audio = showsTitle ? audioTab : nil
+        audioButton.isHidden = audio == nil
         if partner != nil {
             let share = split?.vertical == false ? split?.ratio ?? 0.5 : 0.5
             let first = round(imageClip.frame.width * share)
-            place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: first, height: titleArea))
-            place(icon2, title2, in: NSRect(x: imageClip.frame.minX + first, y: imageClip.frame.maxY, width: imageClip.frame.width - first, height: titleArea))
+            place(icon, title, in: NSRect(x: imageClip.frame.minX, y: imageClip.frame.maxY, width: first, height: titleArea), audio: audio === tab)
+            place(icon2, title2, in: NSRect(x: imageClip.frame.minX + first, y: imageClip.frame.maxY, width: imageClip.frame.width - first, height: titleArea),
+                  audio: audio != nil && audio === partner)
         } else {
-            place(icon, title, in: NSRect(x: inset, y: imageClip.frame.maxY, width: bounds.width - inset * 2, height: titleArea))
+            place(icon, title, in: NSRect(x: inset, y: imageClip.frame.maxY, width: bounds.width - inset * 2, height: titleArea), audio: audio != nil)
         }
         Tokens.Motion.withoutAnimation {
             ring.frame = imageClip.frame.insetBy(dx: -4, dy: -4)
@@ -217,15 +241,20 @@ final class TabThumbnailView: InteractiveView {
         refreshColors()
     }
 
-    /// An icon and title, centered together in `area`.
-    private func place(_ icon: FaviconView, _ title: Label, in area: NSRect) {
+    /// An icon and title, centered together in `area`, with the speaker after them when `audio`.
+    private func place(_ icon: FaviconView, _ title: Label, in area: NSRect, audio: Bool = false) {
         let iconSize = Tokens.Metric.favicon
-        let textWidth = max(0, min(title.textWidth, area.width - iconSize - Tokens.Space.x2 - Tokens.Space.x2))
-        let total = iconSize + Tokens.Space.x2 + textWidth
+        let speaker = audio ? Tokens.Space.x1 + Tokens.Space.x5 : 0
+        let textWidth = max(0, min(title.textWidth, area.width - iconSize - Tokens.Space.x2 - Tokens.Space.x2 - speaker))
+        let total = iconSize + Tokens.Space.x2 + textWidth + speaker
         let x = area.minX + max(Tokens.Space.x1, (area.width - total) / 2)
         icon.frame = NSRect(x: x, y: area.minY + (area.height - iconSize) / 2, width: iconSize, height: iconSize)
         let h = title.lineHeight
         title.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x2, y: area.minY + (area.height - h) / 2, width: textWidth, height: h)
+        if audio {
+            let size = Tokens.Space.x5
+            audioButton.frame = NSRect(x: title.frame.maxX + Tokens.Space.x1, y: area.minY + (area.height - size) / 2, width: size, height: size)
+        }
     }
 
     override func stateDidChange(animated: Bool) {

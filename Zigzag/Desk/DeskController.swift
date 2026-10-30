@@ -584,15 +584,12 @@ final class DeskController {
                 guard let self, let tab else { return }
                 self.cardClicked(card?.tab(at: event) ?? tab, event: event)
             }
+            // The ×, or a middle-click anywhere on the card, as on a tab in the sidebar.
             card.onClose = { [weak self, weak tab] in
                 guard let self, let tab else { return }
-                // ⌘Z brings it back, like closing it from the sidebar. A split's card is both pages, so both close,
-                // and come back, together.
-                if let partner = self.partner(of: tab) {
-                    if let controller = self.controller { controller.closeManyWithUndo([tab, partner]) } else { self.manager?.close([tab, partner]) }
-                } else if let controller = self.controller { controller.closeWithUndo(tab) } else { self.manager?.close(tab) }
-                self.reload(animated: true)
+                self.close([tab.id])
             }
+            card.onMiddleClick = card.onClose
             card.onDragStart = { [weak self, weak tab] event in
                 // While searching, the cards in between are hidden, so where a drop lands in the list is a guess:
                 // no reordering until the search is cleared.
