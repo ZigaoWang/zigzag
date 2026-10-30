@@ -36,6 +36,9 @@ final class SitePanel: FloatingPanelView {
     private var rows: [PanelRow] = []
 
     static let width: CGFloat = 300
+    /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
+    static let notSecure = "Not secure"
+    static let notSecureSymbol = "lock.open.fill"
     static let minimumWidth: CGFloat = 256
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
@@ -55,9 +58,16 @@ final class SitePanel: FloatingPanelView {
         siteName.stringValue = site
         let page = self.url
         let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
-        security.stringValue = page.scheme == "https" ? (secure ? "Secure connection" : "Some content isn’t secure") : (page.scheme == "http" ? "Not secure" : "")
-        securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : "lock.open.fill", size: Tokens.TypeSize.small)
-        securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
+        if page.scheme == "webkit-extension" {
+            // An extension's own page never crosses the network: there's no connection to judge.
+            security.stringValue = "Extension page"
+            securityIcon.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.TypeSize.small)
+            securityIcon.contentTintColor = Tokens.Color.textSecondary
+        } else {
+            security.stringValue = secure ? "Secure connection" : page.scheme == "https" ? "Some content isn’t secure" : Self.notSecure
+            securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : Self.notSecureSymbol, size: Tokens.TypeSize.small)
+            securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
+        }
         [icon, siteName, security, securityIcon, moreButton].forEach { addSubview($0) }
         let shownSite = site
         pageToken = tab.changed.observe { [weak self, weak tab] change in

@@ -100,9 +100,10 @@ final class AddressView: InteractiveView {
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textSecondary
         if label.stringValue.isEmpty { label.stringValue = "Search or enter address" }
         let insecure = url?.scheme == "http"
-        lock.image = insecure ? Tokens.Symbol.image("exclamationmark.triangle", size: Tokens.TypeSize.small) : nil
+        lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.TypeSize.small) : nil
         lock.isHidden = !insecure
-        setAccessibilityLabel(label.stringValue)
+        lock.toolTip = insecure ? SitePanel.notSecure : nil
+        setAccessibilityLabel(insecure ? "\(label.stringValue), \(SitePanel.notSecure)" : label.stringValue)
         needsLayout = true
     }
 
