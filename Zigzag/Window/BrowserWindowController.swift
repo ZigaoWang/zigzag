@@ -1016,7 +1016,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.sidebarButton.toolTip = (docked ? "Hide Sidebar" : "Show Sidebar") + Shortcuts.hint(for: #selector(toggleBrowserSidebar(_:)))
         sidebar.backButton.toolTip = "Back" + Shortcuts.hint(for: #selector(goBack(_:)))
         sidebar.forwardButton.toolTip = "Forward" + Shortcuts.hint(for: #selector(goForward(_:)))
-        sidebar.reloadButton.toolTip = "Reload" + Shortcuts.hint(for: #selector(reloadPage(_:)))
+        sidebar.reloadButton.toolTip = SidebarView.reloadTip(loading: selectedTab?.isLoading ?? false)
         sidebar.sidebarButton.isSelected = false
     }
 

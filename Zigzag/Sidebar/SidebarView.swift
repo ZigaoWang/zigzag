@@ -420,8 +420,14 @@ final class SidebarView: NSView {
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
-        reloadButton.toolTip = (tab?.isLoading ?? false) ? "Stop" : "Reload"
+        reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, isSecure: tab?.url?.scheme == "https")
+    }
+
+    /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.
+    static func reloadTip(loading: Bool) -> String {
+        loading ? "Stop" + Shortcuts.hint(for: #selector(BrowserWindowController.stopLoading(_:)))
+                : "Reload" + Shortcuts.hint(for: #selector(BrowserWindowController.reloadPage(_:)))
     }
 
     func reloadSpaces(current: UUID) {
