@@ -50,6 +50,7 @@ final class PaneHeaderView: NSView {
         back.isEnabled = tab?.canGoBackOrReturn ?? false
         forward.isEnabled = tab?.canGoForward ?? false
         reload.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
+        reload.toolTip = (tab?.isLoading ?? false) ? "Stop" : "Reload"
         address.stringValue = tab?.url.map(CommandRanker.displayURL) ?? ""
         needsLayout = true
     }
