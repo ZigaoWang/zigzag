@@ -107,12 +107,12 @@ final class SitePanel: FloatingPanelView {
         panel.present(arrival: .pop)
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
-            guard let panel else { return event }
+            // Only its own window: keys and clicks in Settings or another window are theirs.
+            guard let panel, event.window === panel.window else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { panel.close(); return nil }
                 return event
             }
-            guard event.window === panel.window else { return event }
             let inside = panel.bounds.contains(panel.convert(event.locationInWindow, from: nil))
             let onAnchor = panel.anchor.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
             if !inside && !onAnchor { panel.close() }
