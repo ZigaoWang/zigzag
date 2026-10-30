@@ -55,7 +55,7 @@ final class FormGroup: NSView {
             y += h
             if i < lines.count {
                 // The divider starts where the text does, past the icons, as the system's settings draw it.
-                let x = (rows[i] as? FormRow)?.textInset ?? Tokens.Space.x3
+                let x = (rows[i] as? FormRow)?.textInset ?? (rows[i] as? SpaceSettingsRow)?.textInset ?? Tokens.Space.x3
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
             }
         }
@@ -200,8 +200,10 @@ final class FormRow: NSView {
 /// A space in Settings: its color (click to change), its name (edit in place), delete on hover, drag to reorder.
 final class SpaceSettingsRow: InteractiveView {
     let spaceID: UUID
-    private let dot = ColorView(color: .clear)
+    /// Its color as a tile with its first letter, the same size and shape as the icons on every other row.
+    private let tile = NSImageView()
     private let name: Label
+    private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let editButton = TextButton.form("Edit")
     private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
     /// True while the row is being dragged; it draws as lifted.
@@ -209,15 +211,15 @@ final class SpaceSettingsRow: InteractiveView {
 
     init(space: SpaceInfo) {
         spaceID = space.id
-        name = Label(space.name, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Space.x12))
+        name = Label(space.name, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: 52))
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        dot.wantsLayer = true
-        dot.color = space.swatch
+        tile.image = Self.tile(for: space)
+        detail.stringValue = Self.summary(of: space)
         deleteButton.isHidden = true
         deleteButton.isEnabled = Library.shared.spaces.count > 1
-        [dot, name, deleteButton, editButton].forEach { addSubview($0) }
+        [tile, name, detail, deleteButton, editButton].forEach { addSubview($0) }
         // The row and its Edit button both open the same editor the sidebar uses.
         onClick = { [weak self] _ in self?.openEditor() }
         editButton.onClick = { [weak self] _ in self?.openEditor() }
@@ -235,15 +237,59 @@ final class SpaceSettingsRow: InteractiveView {
     override func layout() {
         super.layout()
         let pad = Tokens.Space.x3
-        let d = Tokens.Space.x5
-        dot.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
-        dot.layer?.cornerRadius = d / 2
+        let d = Tokens.Space.x6
+        tile.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
         let ew = editButton.fittingWidth
         editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - Tokens.Space.x7Height) / 2, width: ew, height: Tokens.Space.x7Height)
         let b = deleteButton.frame.width
         deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
-        let x = dot.frame.maxX + Tokens.Space.x3
-        name.frame = NSRect(x: x, y: (bounds.height - name.lineHeight) / 2, width: max(0, deleteButton.frame.minX - x - Tokens.Space.x2), height: name.lineHeight)
+        let x = tile.frame.maxX + Tokens.Space.x3 - Label.inset
+        let width = max(0, deleteButton.frame.minX - x - Tokens.Space.x2)
+        let top = round((bounds.height - name.lineHeight - 2 - detail.lineHeight) / 2)
+        name.frame = NSRect(x: x, y: top, width: width, height: name.lineHeight)
+        detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: detail.lineHeight)
+    }
+
+    /// Where the row's text starts, for the divider under it.
+    var textInset: CGFloat { Tokens.Space.x3 + Tokens.Space.x6 + Tokens.Space.x3 }
+
+    private static func tile(for space: SpaceInfo) -> NSImage {
+        let side: CGFloat = 24
+        let letter = space.name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? ""
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
+            let base = space.swatch.usingColorSpace(.sRGB) ?? space.swatch
+            NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
+            let text = NSAttributedString(string: letter, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white])
+            let size = text.size()
+            text.draw(at: NSPoint(x: (side - size.width) / 2, y: (side - size.height) / 2))
+            return true
+        }
+    }
+
+    /// What's in it, said plainly.
+    private static func summary(of space: SpaceInfo) -> String {
+        let pinned = space.bookmarks.count
+        let open = BrowserWindowController.undoTarget?.tabManager.tabs(in: space.id).count ?? 0
+        func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
+        switch (pinned, open) {
+        case (0, 0): return "Empty"
+        case (_, 0): return count(pinned, "pinned tab", "pinned tabs")
+        case (0, _): return count(open, "open tab", "open tabs")
+        default: return count(pinned, "pinned tab", "pinned tabs") + " and " + count(open, "open tab", "open tabs")
+        }
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu()
+        menu.addItem(SidebarMenus.Item("Edit…") { [weak self] in self?.openEditor() })
+        if Library.shared.spaces.count > 1 {
+            menu.addItem(SidebarMenus.Item("Delete Space…") { [weak self] in
+                guard let self, let window = self.window else { return }
+                SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
+            })
+        }
+        return menu
     }
 
     override func resetCursorRects() { addCursorRect(bounds, cursor: isLifted ? .closedHand : .pointingHand) }
@@ -826,6 +872,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, importGroup)
         case .spaces:
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
+            // Under the list, how to do the one thing it doesn't show.
+            let note = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            note.frame = NSRect(x: pad + Tokens.Space.x1, y: y - Tokens.Space.x6 + Tokens.Space.x2, width: contentWidth, height: note.lineHeight)
+            documentView.addSubview(note)
+            y = note.frame.maxY + Tokens.Space.x6
         case .passwords:
             section(nil, passwordsGroup)
             section(nil, passwordsWindowGroup)
