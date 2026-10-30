@@ -391,6 +391,16 @@ final class SidebarListView: NSView {
         }
     }
 
+    /// With the pointer on Clear, the rows it would close sink back; off it, they come back up.
+    private func previewClear(_ on: Bool) {
+        guard let manager else { return }
+        let closing = on ? manager.tabsToClear(in: shownSpaceID ?? manager.currentSpaceID).tabs : []
+        for view in rows.values {
+            guard let row = view as? TabRowView, !row.isBookmark else { continue }
+            row.isAboutToClear = closing.contains { $0 === row.tab || (row.partner != nil && $0 === row.partner) }
+        }
+    }
+
     /// Starts renaming a folder's row (a new folder, or Rename… in its menu).
     func renameFolder(_ id: UUID) {
         layoutSubtreeIfNeeded()
@@ -445,8 +455,10 @@ final class SidebarListView: NSView {
             let separator = SeparatorRowView()
             separator.clearButton.onClick = { [weak self, weak separator] _ in
                 guard separator?.clearIsArmed == true else { return }
+                self?.previewClear(false)
                 self?.delegate?.listClearTabs()
             }
+            separator.clearButton.hoverChanged = { [weak self] on in self?.previewClear(on) }
             separator.showsClear = isPointerInside
             return separator
         case .placeholder:
@@ -541,9 +553,9 @@ final class SidebarListView: NSView {
             let space = shownSpaceID ?? manager.currentSpaceID
             let tabs = manager.tabs(in: space)
             (view as? SeparatorRowView)?.hasTabs = !tabs.isEmpty
+            let (closing, faded) = manager.tabsToClear(in: space)
             let current = manager.selectedTab(in: space)
-            let partner = current.flatMap { manager.partner(of: $0) }
-            (view as? SeparatorRowView)?.clearButton.keepsCurrent = tabs.contains { $0 !== current && $0 !== partner }
+            (view as? SeparatorRowView)?.clearButton.step = faded ? .faded : closing.contains { $0 === current } ? .current : .others
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }

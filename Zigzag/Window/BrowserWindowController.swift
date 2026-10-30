@@ -1268,14 +1268,12 @@ extension BrowserWindowController: SidebarDelegate {
     func listNewTab() { commandBar.show(mode: .newTab) }
 
     func listClearTabs() {
-        let current = tabManager.selectedTab
-        let partner = current.flatMap { tabManager.partner(of: $0) }
-        let others = tabManager.currentTabs.filter { $0 !== current && $0 !== partner }
-        // First every other tab; once only yours is left, that one (and its split partner).
-        let closing = others.isEmpty ? tabManager.currentTabs.filter { $0 === current || $0 === partner } : others
+        // Faded tabs first, then the rest but yours, then yours (TabManager.tabsToClear).
+        let (closing, faded) = tabManager.tabsToClear(in: tabManager.currentSpaceID)
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing, leavingSpaceEmpty: true)
-        let what = closing.count == 1 ? "Closed 1 tab" : "Closed \(closing.count) tabs"
+        let kind = faded ? "faded tab" : "tab"
+        let what = closing.count == 1 ? "Closed 1 \(kind)" : "Closed \(closing.count) \(kind)s"
         // Undo brings back these tabs, never whatever else was done since.
         Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Close Tabs" else { return }

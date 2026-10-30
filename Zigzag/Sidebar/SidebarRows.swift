@@ -78,10 +78,18 @@ class SidebarRowView: InteractiveView {
         return result
     }
 
-    private func applyFreshness() {
-        let visible = isSelected || isHovered || isLifted || isMarked ? 1 : freshness
-        icon.alphaValue = visible
-        title.alphaValue = visible
+    /// While the pointer is on Clear, the rows it would close sink back, so you see what goes before you click.
+    var isAboutToClear = false {
+        didSet {
+            guard oldValue != isAboutToClear else { return }
+            Tokens.Motion.animate(Tokens.Motion.feedback) { self.applyFreshness(animated: true) }
+        }
+    }
+
+    private func applyFreshness(animated: Bool = false) {
+        let visible = isAboutToClear ? 0.18 : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
+        (animated ? icon.animator() : icon).alphaValue = visible
+        (animated ? title.animator() : title).alphaValue = visible
     }
 }
 
@@ -682,14 +690,19 @@ final class ClearTabsButton: InteractiveView {
         arrow.imageScaling = .scaleNone
         [arrow, label].forEach { addSubview($0) }
         setAccessibilityRole(.button)
-        keepsCurrent = true
+        step = .others
         stateDidChange(animated: false)
     }
 
-    /// Clear closes the other tabs first, and the one you're on only once it's the last.
-    var keepsCurrent = false {
+    /// What a click does now: faded tabs first, then every tab but yours, then yours.
+    enum Step { case faded, others, current }
+    var step: Step = .others {
         didSet {
-            toolTip = keepsCurrent ? "Close All Tabs but This One" : "Close This Tab"
+            toolTip = switch step {
+            case .faded: "Close Faded Tabs"
+            case .others: "Close All Tabs but This One"
+            case .current: "Close This Tab"
+            }
             setAccessibilityLabel(toolTip)
         }
     }
