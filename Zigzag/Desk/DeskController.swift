@@ -70,6 +70,9 @@ final class DeskController {
     private var headers: [UUID: DeskHeaderView] = [:]
     private var cards: [UUID: TabThumbnailView] = [:]
     private var selection: Set<UUID> = []
+    /// The card the arrow keys are on, and what Return opens: the tab you were on when the desk opens, the best
+    /// match while searching.
+    private var focused: UUID?
     private(set) var isVisible = false
     private var marquee: CAShapeLayer?
     /// The page's picture while it flies between the page area and its card, over the desk.
@@ -138,9 +141,15 @@ final class DeskController {
             guard let self else { return false }
             switch selector {
             case #selector(NSResponder.insertNewline(_:)):
-                // Return opens the first match.
-                let first = Library.shared.spaces.lazy.flatMap { self.cardTabs(in: $0.id) }.first
-                if let first { self.hide(openingTab: first) }
+                self.openFocused()
+                return true
+            case #selector(NSResponder.moveLeft(_:)): self.moveFocus(.left); return true
+            case #selector(NSResponder.moveRight(_:)): self.moveFocus(.right); return true
+            case #selector(NSResponder.moveUp(_:)): self.moveFocus(.up); return true
+            case #selector(NSResponder.moveDown(_:)): self.moveFocus(.down); return true
+            case #selector(NSResponder.deleteBackward(_:)) where self.searchField.stringValue.isEmpty:
+                // With nothing typed, ⌫ closes the card, as it does in the sidebar.
+                self.closeFocused()
                 return true
             case #selector(NSResponder.cancelOperation(_:)):
                 // Esc clears the search first, then leaves the desk.
@@ -184,8 +193,10 @@ final class DeskController {
         reload()
         // The window's own controls would sit on top of the desk; tuck them away.
         (controller.window as? BrowserWindow)?.trafficLightsHidden = false
-        controller.window?.makeFirstResponder(canvas)
+        // Typing filters straight away, and the arrow keys move between cards from the field too.
+        controller.window?.makeFirstResponder(searchField)
         backdrop.layoutSubtreeIfNeeded()
+        setFocus(currentCardID, scroll: false)
         if !reopening, let card = currentCard { canvas.scrollToVisible(card.frame.insetBy(dx: 0, dy: -margin)) }
 
         guard !Tokens.Motion.reduceMotion else {
@@ -508,6 +519,8 @@ final class DeskController {
         query = text.trimmingCharacters(in: .whitespaces)
         selection = []
         reload(animated: true)
+        // Return opens the best match; with the search cleared, it's back on the tab you were on.
+        setFocus(query.isEmpty ? currentCardID : orderedCardIDs.first)
     }
 
     /// The search field, centered at the top, clear of the window's buttons.
@@ -543,6 +556,8 @@ final class DeskController {
         guard let manager, let tab = manager.selectedTab else { return nil }
         return cards[manager.split(for: tab)?.left ?? tab.id] ?? cards[tab.id]
     }
+
+    private var currentCardID: UUID? { cards.first { $0.value === currentCard }?.key }
 
     /// Tabs opened or closed while the desk is up (⌘W, a link opening a tab): the cards follow.
     func tabsChanged() { if isVisible { reload(animated: true) } }
@@ -605,6 +620,8 @@ final class DeskController {
         for card in cards.values { card.isCurrent = card === current }
         applyLayout(animated: animated)
         updateSelection()
+        if let focused, cards[focused] == nil { self.focused = nil }
+        for (id, card) in cards { card.isFocused = id == focused }
     }
 
     private func applyLayout(animated: Bool, dragging: (id: UUID, space: UUID, index: Int)? = nil) {
@@ -643,6 +660,7 @@ final class DeskController {
     // MARK: Selection
 
     private func cardClicked(_ tab: Tab, event: NSEvent) {
+        if let id = cards.first(where: { $0.value.tab === tab || $0.value.partner === tab })?.key { setFocus(id, scroll: false) }
         if event.modifierFlags.contains(.command) || event.modifierFlags.contains(.shift) {
             if selection.contains(tab.id) { selection.remove(tab.id) } else { selection.insert(tab.id) }
             updateSelection()
@@ -685,12 +703,73 @@ final class DeskController {
     }
 
     private func closeSelected() {
-        guard let manager, !selection.isEmpty else { return }
-        let tabs = manager.allTabs.filter { selection.contains($0.id) }
+        guard !selection.isEmpty else { return }
+        let ids = selection
         selection = []
-        // ⌘Z brings them back, like closing them from the sidebar.
-        if let controller { controller.closeManyWithUndo(tabs) } else { manager.close(tabs) }
+        close(ids)
+    }
+
+    /// ⌫ or ⌘W on the desk: the selected cards if there are any, otherwise the one the arrow keys are on.
+    func closeFocused() {
+        if !selection.isEmpty { closeSelected() } else if let focused { close([focused]) }
+    }
+
+    /// Closes the tabs behind these cards, a split's two pages together. ⌘Z brings them back, like closing them
+    /// from the sidebar. The arrow keys move on to the next card, or the one before at the end.
+    private func close(_ ids: Set<UUID>) {
+        guard let manager else { return }
+        let tabs = ids.compactMap { id in cards[id]?.tab ?? manager.tab(with: id) }
+        let pages = tabs + tabs.compactMap { partner(of: $0) }
+        guard !pages.isEmpty else { return }
+        if let focused, ids.contains(focused) {
+            let order = orderedCardIDs
+            let index = order.firstIndex(of: focused) ?? 0
+            let after = order[index...].first { !ids.contains($0) } ?? order[..<index].last { !ids.contains($0) }
+            setFocus(after, scroll: false)
+        }
+        if let controller { controller.closeManyWithUndo(pages) } else { manager.close(pages) }
         reload(animated: true)
+    }
+
+    // MARK: Keyboard focus
+
+    /// Every card, space by space, in the order they read.
+    private var orderedCardIDs: [UUID] {
+        Library.shared.spaces.flatMap { cardTabs(in: $0.id).map(\.id) }.filter { cards[$0] != nil }
+    }
+
+    private func setFocus(_ id: UUID?, scroll: Bool = true) {
+        focused = id
+        for (key, card) in cards { card.isFocused = key == id }
+        if scroll, let id, let card = cards[id] { canvas.scrollToVisible(card.frame.insetBy(dx: 0, dy: -gap)) }
+    }
+
+    private enum Direction { case left, right, up, down }
+
+    /// Left and right step through the cards in reading order, on from one space into the next. Up and down go to
+    /// the row above or below, to the card most nearly in line.
+    private func moveFocus(_ direction: Direction) {
+        let order = orderedCardIDs
+        guard let focused, let from = cards[focused]?.frame, let index = order.firstIndex(of: focused) else {
+            setFocus(order.first)
+            return
+        }
+        switch direction {
+        case .left: setFocus(order[max(0, index - 1)])
+        case .right: setFocus(order[min(order.count - 1, index + 1)])
+        case .up, .down:
+            let frames = order.compactMap { id in cards[id].map { (id: id, frame: $0.frame) } }
+            let rows = frames.filter { direction == .down ? $0.frame.minY > from.minY + 1 : $0.frame.minY < from.minY - 1 }
+            guard let row = direction == .down ? rows.map(\.frame.minY).min() : rows.map(\.frame.minY).max() else { return }
+            let next = rows.filter { abs($0.frame.minY - row) < 1 }.min { abs($0.frame.midX - from.midX) < abs($1.frame.midX - from.midX) }
+            setFocus(next?.id)
+        }
+    }
+
+    /// Return: the card the arrow keys are on, or the first match.
+    private func openFocused() {
+        guard let id = focused ?? orderedCardIDs.first, let tab = cards[id]?.tab else { return }
+        hide(openingTab: tab)
     }
 
     // MARK: Marquee selection
@@ -787,8 +866,15 @@ final class DeskController {
             if !selection.isEmpty { selection = []; updateSelection() } else { hide(openingTab: nil) }
             return true
         case 51, 117: // delete, forward delete
-            closeSelected()
+            closeFocused()
             return true
+        case 36, 76: // return, enter
+            openFocused()
+            return true
+        case 123: moveFocus(.left); return true
+        case 124: moveFocus(.right); return true
+        case 125: moveFocus(.down); return true
+        case 126: moveFocus(.up); return true
         case 0 where event.modifierFlags.contains(.command): // cmd-A
             selection = Set(cards.keys)
             updateSelection()
@@ -805,6 +891,22 @@ final class DeskController {
             return true
         }
     }
+
+    #if DEBUG
+    /// Debug bridge: a key as the search field gets it (left, right, up, down, return, delete, esc), or text typed.
+    func debugKey(_ name: String) {
+        let selectors = ["left": #selector(NSResponder.moveLeft(_:)), "right": #selector(NSResponder.moveRight(_:)),
+                         "up": #selector(NSResponder.moveUp(_:)), "down": #selector(NSResponder.moveDown(_:)),
+                         "return": #selector(NSResponder.insertNewline(_:)), "delete": #selector(NSResponder.deleteBackward(_:)),
+                         "esc": #selector(NSResponder.cancelOperation(_:))]
+        if let selector = selectors[name] {
+            _ = searchDelegate.command?(selector)
+        } else {
+            searchField.stringValue = name == "-" ? "" : name
+            search(searchField.stringValue)
+        }
+    }
+    #endif
 
     // MARK: Pinch
 

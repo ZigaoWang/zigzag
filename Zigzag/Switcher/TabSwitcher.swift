@@ -78,6 +78,8 @@ final class TabThumbnailView: InteractiveView {
     var showsHover = true
     /// Desk view: the tab you were on, held in the same quiet fill as its row in the sidebar.
     var isCurrent = false { didSet { if oldValue != isCurrent { refreshColors() } } }
+    /// Desk view: where the arrow keys are, and what Return opens. A softer ring than a selection's.
+    var isFocused = false { didSet { if oldValue != isFocused { refreshColors() } } }
     /// Desk view: an × on the card while the pointer is over it.
     var onClose: (() -> Void)? { didSet { closeButton.isHidden = true } }
     private let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Close Tab")
@@ -236,8 +238,10 @@ final class TabThumbnailView: InteractiveView {
             imageClip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
             imageClip.layer?.borderColor = cgColor(Tokens.Color.cardEdge)
             picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
-            ring.borderColor = cgColor(Tokens.Color.accent)
-            ring.isHidden = !(isSelected && showsRing)
+            let selected = isSelected && showsRing
+            ring.borderColor = cgColor(selected ? Tokens.Color.accent : Tokens.Color.accent.withAlphaComponent(0.6))
+            ring.borderWidth = selected ? 2.5 : 2
+            ring.isHidden = !(selected || isFocused)
             layer?.borderWidth = isCurrent ? Tokens.Metric.hairline : 0
             layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
         }

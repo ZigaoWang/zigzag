@@ -19,6 +19,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func closeTab(_ sender: Any?) {
         if commandBar.isVisible { commandBar.dismiss(); return }
+        // On the desk, the card you're on.
+        if desk.isVisible { desk.closeFocused(); return }
         if dismissFloatingContent() { return }
         guard let tab = selectedTab else {
             window?.performClose(sender)
