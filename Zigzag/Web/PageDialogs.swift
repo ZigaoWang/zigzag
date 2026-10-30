@@ -128,7 +128,7 @@ enum AuthenticationPrompt {
         guard let window else { return (.cancelAuthenticationChallenge, nil) }
         let message = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
         let result = await PageDialogSheet.ask(in: window, title: "Sign in to \(challenge.protectionSpace.host)", message: message,
-                                               fields: [.init(placeholder: "Name"), .init(placeholder: "Password", secure: true)],
+                                               fields: [.init(placeholder: "Username"), .init(placeholder: "Password", secure: true)],
                                                confirmTitle: "Sign In", showsCancel: true, offersBlock: false)
         guard case .confirmed(let values) = result, values.count == 2 else { return (.cancelAuthenticationChallenge, nil) }
         return (.useCredential, URLCredential(user: values[0], password: values[1], persistence: .forSession))
