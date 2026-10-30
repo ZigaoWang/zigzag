@@ -90,6 +90,8 @@ enum DebugBridge {
         case "bookmark": if let tab = controller.tabManager.selectedTab { controller.tabManager.bookmarkTab(tab) }
         case "hover": controller.debugHover(index: Int(arg) ?? 0)
         case "desk": controller.toggleDeskView(nil)
+        case "deskkey": controller.desk.debugKey(arg)
+        case "private": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false, isPrivate: true)
         case "pageshot": if let webView = controller.selectedWebView { PageScreenshot.debugCapture(webView, to: URL(fileURLWithPath: arg)) }
         case "reader": controller.toggleReader()
         case "split":
