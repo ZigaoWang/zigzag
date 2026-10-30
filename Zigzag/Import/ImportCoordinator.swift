@@ -256,7 +256,7 @@ enum ImportCoordinator {
                 if url.pathExtension.lowercased() == "zip" { return SafariImporter.readExport(url) }
                 switch CSVImporter.read(url) {
                 case .success(let (_, batch)): return batch
-                case .failure: return ImportBatch(problems: [ImportProblem(message: "\(url.lastPathComponent) isn't a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it.", fix: .none)])
+                case .failure: return ImportBatch(problems: [ImportProblem(message: "\(url.lastPathComponent) isn’t a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it.", fix: .none)])
                 }
             }
         }.value

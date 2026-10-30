@@ -30,12 +30,12 @@ enum PageScreenshot {
     static func take(_ tab: Tab, in controller: BrowserWindowController) {
         guard !isTaking, canTake(tab), let webView = tab.webView else { return }
         isTaking = true
-        Toast.show("Taking a picture of the whole page…", symbol: "camera.viewfinder", duration: 30, in: controller)
+        Toast.show("Taking a screenshot of the whole page…", symbol: "camera.viewfinder", duration: 30, in: controller)
         Task { @MainActor in
             defer { isTaking = false }
             let (data, onScreenOnly) = await capture(webView)
             guard let data else {
-                Toast.show("Couldn’t take a picture of this page", symbol: "exclamationmark.triangle", in: controller)
+                Toast.show("Couldn’t take a screenshot of this page", symbol: "exclamationmark.triangle", in: controller)
                 return
             }
             NSPasteboard.general.clearContents()

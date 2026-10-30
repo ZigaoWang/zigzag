@@ -258,7 +258,7 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if editingNewSpace {
-            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Return keeps it, esc cancels", count: "", isDone: false, isFinal: false, target: "editor", clip: "spaces")
+            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Return keeps it, Esc cancels", count: "", isDone: false, isFinal: false, target: "editor", clip: "spaces")
         }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: done.doneNote, count: "", isDone: true, isFinal: false, target: "done." + done.id)
@@ -279,7 +279,7 @@ final class GuidedTour: NSView {
             return Display(keys: ["youtube"], title: "Type this", note: "Just the word, then you’ll press Tab", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
         }
         if task.id == "peek", controller.peek.isVisible {
-            return Display(keys: ["esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek", clip: "peek")
+            return Display(keys: ["Esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek", clip: "peek")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article", clip: "peek") }
         // Names the very tab to drag, lit up in the sidebar, so there's nothing to work out.

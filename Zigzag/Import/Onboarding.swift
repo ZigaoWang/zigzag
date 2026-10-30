@@ -734,7 +734,7 @@ private final class BrowserRow: InteractiveView {
         switch state {
         case .idle:
             if needsAccess {
-                fixButton.title = waitingForSettings ? "Check Again" : triedPicker && !isSafari ? "Settings" : "Allow"
+                fixButton.title = waitingForSettings ? "Check Again" : triedPicker && !isSafari ? "Open System Settings" : "Allow"
                 fixButton.isHidden = false
             }
         case .waiting:
@@ -902,7 +902,7 @@ private final class BringPicker: StepContent {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var primaryTitle: String { isImporting ? "Importing…" : waiting.isEmpty ? "Next" : "Import" }
+    override var primaryTitle: String { isImporting ? "Importing…" : waiting.isEmpty ? "Continue" : "Import" }
     override var primaryEnabled: Bool { waiting.isEmpty || !choice.isEmpty }
     override var isBusy: Bool { isImporting }
 

@@ -262,7 +262,7 @@ final class ImportView: NSView {
     private func pickFile() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = "Choose a password export (a .csv file) or Safari's browsing data export (a .zip file)."
+        panel.message = "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file)."
         panel.prompt = "Import"
         let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
@@ -481,13 +481,13 @@ private final class SourceRow: InteractiveView {
             check.contentTintColor = clean ? Tokens.Color.success : Tokens.Color.warning
             for problem in summary.problems { addFix(problem.fix) }
             if let exportFile, summary.passwords + summary.updatedPasswords > 0, FileManager.default.fileExists(atPath: exportFile.path) {
-                detail.stringValue += "\nThe file still holds your passwords unprotected. It's safer to move it to the Trash."
+                detail.stringValue += "\nThe file still holds your passwords unprotected. It’s safer to move it to the Trash."
                 let button = TextButton(title: "Move to Trash", font: Tokens.Font.body(.medium))
                 button.showsFillAtRest = true
                 button.onClick = { [weak self, weak button] _ in
                     NSWorkspace.shared.recycle([exportFile]) { _, error in
                         DispatchQueue.main.async {
-                            button?.title = error == nil ? "Moved to Trash" : "Couldn't Move It"
+                            button?.title = error == nil ? "Moved to Trash" : "Couldn’t Move It"
                             button?.isEnabled = false
                             self?.needsLayout = true
                         }
@@ -505,7 +505,7 @@ private final class SourceRow: InteractiveView {
         let title: String
         switch fix {
         case .retry: title = "Try Again"
-        case .fullDiskAccess: title = "Open Settings"
+        case .fullDiskAccess: title = "Open System Settings"
         case .exportFromApplePasswords: title = "Show Me How"
         case .primaryPassword: title = "Unlock"
         case .none: return

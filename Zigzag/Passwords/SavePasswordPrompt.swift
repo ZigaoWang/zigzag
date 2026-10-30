@@ -1,7 +1,7 @@
 import AppKit
 
 /// "Save password for github.com?" A calm panel at the top of the page, under the address. The username can be
-/// corrected before saving; Never for This Site is remembered (and synced) so it never asks there again.
+/// corrected before saving; Never is remembered (and synced) so it never asks there again.
 final class SavePasswordPrompt: FloatingPanelView {
     enum Kind {
         case save(username: String)

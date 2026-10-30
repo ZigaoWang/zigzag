@@ -14,7 +14,7 @@ nonisolated enum SafariImporter {
     static func read(_ choice: ChromiumImporter.Choice) -> ImportBatch {
         var batch = ImportBatch()
         if choice.contains(.passwords) {
-            batch.problems.append(ImportProblem(message: "Safari's passwords are kept by the Passwords app. Export them there (File › Export All Passwords), then choose the file here.", fix: .exportFromApplePasswords))
+            batch.problems.append(ImportProblem(message: "Safari’s passwords are kept by the Passwords app. Export them there (File › Export All Passwords), then choose the file here.", fix: .exportFromApplePasswords))
         }
         guard choice.contains(.bookmarks) || choice.contains(.history) else { return batch }
         guard hasAccess else {

@@ -22,13 +22,15 @@ struct CommandResult: Equatable {
     let detail: String
     var icon: NSImage?
     var symbol: String?
+    /// A bookmark that's a favorite rather than a pinned tab, so the bar says which it opens.
+    var isFavorite = false
 
     var actionLabel: String {
         switch kind {
         case .open, .history: "Open"
         case .search, .suggestion, .searchOn: "Search"
         case .switchTo: "Switch to Tab"
-        case .bookmark: "Open Pinned Tab"
+        case .bookmark: isFavorite ? "Open Favorite" : "Open Pinned Tab"
         case .action: "Run"
         case .note: ""
         }
@@ -189,12 +191,13 @@ enum CommandRanker {
             }
             var bookmarkCount = 0
             // Favorites first: they're the sites you go to most.
+            let favorites = Set(Library.shared.favorites.map(\.id))
             for bookmark in Library.shared.favorites + Library.shared.allBookmarks.map(\.0) where bookmarkCount < 3 {
                 guard matches(words, bookmark.title, bookmark.url.absoluteString) else { continue }
                 let key = TabManager.normalize(bookmark.url)
                 guard !seen.contains(key) else { continue }
                 add(CommandResult(kind: .bookmark(bookmark.id), title: bookmark.title, detail: displayURL(bookmark.url),
-                                  icon: FaviconStore.shared.cachedIcon(for: bookmark.url)), key: key)
+                                  icon: FaviconStore.shared.cachedIcon(for: bookmark.url), isFavorite: favorites.contains(bookmark.id)), key: key)
                 bookmarkCount += 1
             }
         }

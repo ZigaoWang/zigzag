@@ -305,7 +305,7 @@ final class PasswordsView: NSView {
         case .all: empty.set(symbol: "key.fill", title: "No passwords yet", body: "Passwords you save while signing in, or bring over from another browser, appear here.", showsImport: true)
         case .weak: empty.set(symbol: "checkmark.shield.fill", title: "No weak passwords", body: "Every saved password is long and varied enough to stand up to guessing.", showsImport: false)
         case .reused: empty.set(symbol: "checkmark.shield.fill", title: "No reused passwords", body: "Each site has a password of its own.", showsImport: false)
-        case .never: empty.set(symbol: "nosign", title: "No sites here", body: "Sites where you choose Never for This Site appear here, so you can change your mind.", showsImport: false)
+        case .never: empty.set(symbol: "nosign", title: "No sites here", body: "Sites where you choose Never when Zigzag offers to save appear here, so you can change your mind.", showsImport: false)
         }
     }
 

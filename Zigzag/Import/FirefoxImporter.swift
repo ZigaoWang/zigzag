@@ -90,7 +90,7 @@ nonisolated enum FirefoxImporter {
                     batch.problems.append(ImportProblem(message: message, fix: .primaryPassword))
                 }
             case .failure(.unreadable):
-                batch.problems.append(ImportProblem(message: "\(browser.name)'s passwords are in a format Zigzag can't read. Export them from \(browser.name)'s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
+                batch.problems.append(ImportProblem(message: "\(browser.name)’s passwords are in a format Zigzag can’t read. Export them from \(browser.name)’s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
             case .success(let key):
                 for login in logins {
                     guard let host = login["hostname"] as? String, let url = URL(string: host),
@@ -110,7 +110,7 @@ nonisolated enum FirefoxImporter {
             var count: Int64 = 0
             reader.rows("SELECT (SELECT count(*) FROM loginsL WHERE is_deleted = 0) + (SELECT count(*) FROM loginsM WHERE is_deleted = 0)") { count = $0.int(0) }
             if count > 0 {
-                batch.problems.append(ImportProblem(message: "\(browser.name) keeps its \(count) passwords in a newer format Zigzag can't read yet. Export them from \(browser.name)'s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
+                batch.problems.append(ImportProblem(message: "\(browser.name) keeps its \(count) passwords in a newer format Zigzag can’t read yet. Export them from \(browser.name)’s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
             }
         }
     }

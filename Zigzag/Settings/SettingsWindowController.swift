@@ -73,7 +73,7 @@ final class FormGroup: NSView {
 final class SettingsBrandRow: NSView {
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let update = TextButton.form("Check for Updates")
+    private let update = TextButton.form("Check for Updates…")
 
     override init(frame: NSRect) {
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 76))
@@ -824,7 +824,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             }
             walk(menu, prefix: "")
             if top.title == "View" {
-                for (title, keys) in [("Go to tab 1 to 8, or the last tab", ["⌘", "1–9"]), ("Go to space 1 to 9", ["⌃", "1–9"])] where query.isEmpty || title.lowercased().contains(query) {
+                for (title, keys) in [("Go to Tab 1 to 8 or the Last Tab", ["⌘", "1–9"]), ("Go to Space 1 to 9", ["⌃", "1–9"])] where query.isEmpty || title.lowercased().contains(query) {
                     group.add(ShortcutRow(title: title, keys: keys))
                 }
             }
@@ -1048,7 +1048,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private func reloadPrivacy() {
         privacyGroup.removeAllRows()
         sitesGroup.removeAllRows()
-        let history = TextButton.form("Clear History")
+        let history = TextButton.form("Clear History…")
         history.onClick = { [weak self, weak history] _ in
             self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.",
                           action: "Clear History") {

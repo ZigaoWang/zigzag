@@ -69,7 +69,7 @@ enum WhatsNew {
 final class WhatsNewSheet: NSView {
     private let panel = FloatingPanelView()
     private let icon = NSImageView(image: NSApp.applicationIconImage)
-    private let titleLabel = Label("What’s new in Zigzag", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let titleLabel = Label("What’s New in Zigzag", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let versionLabel = Label("Version \(WhatsNew.version)", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var headings: [Label] = []
     private var points: [(dot: ColorView, text: NSTextField)] = []
@@ -117,7 +117,7 @@ final class WhatsNewSheet: NSView {
         }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         setAccessibilityRole(.sheet)
-        setAccessibilityLabel("What’s new in Zigzag")
+        setAccessibilityLabel("What’s New in Zigzag")
     }
 
     required init?(coder: NSCoder) { fatalError() }
