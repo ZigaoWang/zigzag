@@ -751,10 +751,12 @@ private final class DetailView: NSView {
             passwordRow.value = revealed.withUnsafeString { $0 }
             passwordRow.isMonospaced = true
             passwordRow.actions[0].symbol = "eye.slash"
+            passwordRow.actions[0].tip = "Hide Password"
         } else {
             passwordRow.value = String(repeating: "•", count: 12)
             passwordRow.isMonospaced = false
             passwordRow.actions[0].symbol = "eye"
+            passwordRow.actions[0].tip = "Show Password"
         }
     }
 
