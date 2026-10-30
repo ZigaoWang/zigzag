@@ -130,6 +130,9 @@ enum Tokens {
         static let snap = Curve(duration: 0.14)
         /// Switching spaces: quick, with a small spring settle so it feels alive.
         static let spaceSwitch = Curve(duration: 0.26, bounce: 0.12)
+        /// Letting go of a swipe between spaces: a critically damped spring that carries on at the fingers' speed
+        /// and never overshoots, whether it lands on the next space or springs back.
+        static let swipeSettle = Curve(duration: 0.32, bounce: 0)
         static let gentle = Curve(duration: large)
         static let feedback = Curve(duration: quick)
 
@@ -195,8 +198,11 @@ enum Tokens {
             layer.add(animation, forKey: "slideY")
         }
 
+        /// `velocity`: how fast the view is already moving, in points per second (positive is rightward), so a slide
+        /// that takes over from the fingers doesn't stall or lurch. Springs only.
         @discardableResult
-        static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy, fromKeyboard: Bool = false) -> TimeInterval {
+        static func slide(_ view: NSView, fromOffsetX offset: CGFloat, curve: Curve = snappy, fromKeyboard: Bool = false,
+                          velocity: CGFloat = 0) -> TimeInterval {
             guard let layer = view.layer, fromKeyboard || !isKeyboardDriven, !reduceMotion else { return 0 }
             // Interrupting a slide carries on from where it is on screen, not from where it was headed.
             var offset = offset
@@ -208,6 +214,12 @@ enum Tokens {
             let animation: CABasicAnimation
             if let bounce = curve.bounce {
                 let spring = CASpringAnimation(perceptualDuration: curve.duration, bounce: bounce)
+                if velocity != 0 {
+                    // The spring counts speed in whole distances per second, toward where it's going. Without bounce,
+                    // starting faster than its natural frequency would carry it past the end, so it's capped there.
+                    let natural = sqrt(spring.stiffness / spring.mass)
+                    spring.initialVelocity = min(-velocity / offset, bounce == 0 ? natural : .greatestFiniteMagnitude)
+                }
                 spring.duration = spring.settlingDuration
                 animation = spring
             } else {
