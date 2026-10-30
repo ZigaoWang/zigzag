@@ -439,12 +439,12 @@ private final class ReaderOptions: FloatingPanelView {
     var onChange: ((Reader.Preferences) -> Void)?
     var preferences = Reader.Preferences.saved { didSet { refresh() } }
 
-    private let size = ReaderSegments([.text("A", .systemFont(ofSize: 13, weight: .semibold)), .text("A", .systemFont(ofSize: 19, weight: .semibold))],
+    private let size = ReaderSegments([.text("A", Tokens.Font.body(.semibold)), .text("A", Tokens.Font.large(.semibold))],
                                       toggles: false, accessibilityNames: ["Smaller Text", "Larger Text"])
-    private let face = ReaderSegments([.text("Serif", NSFont(descriptor: NSFont.systemFont(ofSize: 14, weight: .medium).fontDescriptor.withDesign(.serif)!, size: 14)!),
-                                       .text("Sans", .systemFont(ofSize: 14, weight: .medium))], toggles: true, accessibilityNames: ["Serif", "Sans Serif"])
-    private let measure = ReaderSegments([.text("Narrow", .systemFont(ofSize: 13, weight: .medium)), .text("Medium", .systemFont(ofSize: 13, weight: .medium)),
-                                          .text("Wide", .systemFont(ofSize: 13, weight: .medium))], toggles: true,
+    private let face = ReaderSegments([.text("Serif", NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
+                                       .text("Sans", Tokens.Font.body(.medium))], toggles: true, accessibilityNames: ["Serif", "Sans Serif"])
+    private let measure = ReaderSegments([.text("Narrow", Tokens.Font.body(.medium)), .text("Medium", Tokens.Font.body(.medium)),
+                                          .text("Wide", Tokens.Font.body(.medium))], toggles: true,
                                          accessibilityNames: ["Narrow Column", "Medium Column", "Wide Column"])
     private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
 
@@ -635,8 +635,8 @@ private final class ThemeTile: InteractiveView {
         }
         for (text, color) in [(lightInk, ink), (darkInk, Tokens.Color.hex(0xE6E4E0))] {
             text.string = "Aa"
-            text.font = NSFont(descriptor: NSFont.systemFont(ofSize: 14, weight: .semibold).fontDescriptor.withDesign(.serif)!, size: 14)
-            text.fontSize = 14
+            text.font = NSFont(descriptor: Tokens.Font.body(.semibold).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)
+            text.fontSize = Tokens.TypeSize.body
             text.alignmentMode = .center
             text.foregroundColor = color.cgColor
             text.contentsScale = 2

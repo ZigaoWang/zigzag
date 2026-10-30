@@ -456,7 +456,7 @@ private final class LockedView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         badge.color = Brand.Theme.brand.accent
-        title.attributedStringValue = Brand.display("Your passwords are locked", size: 22, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
+        title.attributedStringValue = Brand.display("Your passwords are locked", size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
         title.alignment = .center
         body.alignment = .center
         [badge, title, body, button].forEach { addSubview($0) }
@@ -610,7 +610,7 @@ private final class EmptyStateView: NSView {
         ribbon.isHidden = false
         ribbon.color = Brand.Theme.brand.accent
         ribbon.startLooping()
-        title.attributedStringValue = Brand.display("Opening your passwords…", size: 20, color: Tokens.Color.textPrimary, alignment: .center)
+        title.attributedStringValue = Brand.display("Opening your passwords…", size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, alignment: .center)
         body.stringValue = ""
         importButton.isHidden = true
         needsLayout = true
@@ -624,7 +624,7 @@ private final class EmptyStateView: NSView {
         icon.isHidden = usesRibbon
         ribbon.isHidden = !usesRibbon
         ribbon.color = Brand.Theme.brand.accent.withAlphaComponent(0.85)
-        self.title.attributedStringValue = Brand.display(title, size: 20, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
+        self.title.attributedStringValue = Brand.display(title, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
         self.title.alignment = .center
         self.body.stringValue = body
         importButton.isHidden = !showsImport
@@ -722,7 +722,7 @@ private final class DetailView: NSView {
         subviews.forEach { $0.isHidden = false }
         [neverBody, allowButton].forEach { $0.isHidden = true }
         icon.image = SiteIcon.image(for: credential.origin)
-        title.attributedStringValue = Brand.display(credential.title.isEmpty ? credential.origin.displayName : credential.title, size: 22, color: Tokens.Color.textPrimary)
+        title.attributedStringValue = Brand.display(credential.title.isEmpty ? credential.origin.displayName : credential.title, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary)
         subtitle.stringValue = "Last changed " + credential.modified.formatted(date: .abbreviated, time: .omitted)
         usernameRow.value = credential.username.isEmpty ? "No username" : credential.username
         usernameRow.isPlaceholder = credential.username.isEmpty
@@ -749,7 +749,7 @@ private final class DetailView: NSView {
         guard let origin else { return }
         [icon, title, subtitle, neverBody, allowButton].forEach { $0.isHidden = false }
         icon.image = SiteIcon.image(for: origin)
-        title.attributedStringValue = Brand.display(origin.displayName, size: 22, color: Tokens.Color.textPrimary)
+        title.attributedStringValue = Brand.display(origin.displayName, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary)
         subtitle.stringValue = origin.description
         neverBody.stringValue = "Zigzag won’t offer to save passwords on this site. Allow it, and the next time you sign in there you’ll be asked again."
         needsLayout = true

@@ -977,7 +977,7 @@ final class BadgeView: NSView {
     init(text: String, attention: Bool) {
         self.attention = attention
         // Needing attention is a small dot, not a shout: the tooltip and the click say what's needed.
-        label = Label(attention ? "" : String(text.prefix(4)), font: .systemFont(ofSize: 8, weight: .bold), color: .white)
+        label = Label(attention ? "" : String(text.prefix(4)), font: .systemFont(ofSize: Tokens.TypeSize.badge, weight: .bold), color: .white)
         super.init(frame: .zero)
         wantsLayer = true
         label.alignment = .center
@@ -1001,7 +1001,7 @@ final class BadgeView: NSView {
         // A ring in the address field's color keeps the badge apart from the icon under it.
         let ring: CGFloat = 1.5
         let height: CGFloat = (attention ? 6 : 10) + ring * 2
-        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? NSFont.systemFont(ofSize: 8)]).width
+        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? NSFont.systemFont(ofSize: Tokens.TypeSize.badge)]).width
         let width = attention ? height : max(height, ceil(text) + 6 + ring * 2)
         // A count sits bottom-right, like Safari's; the attention dot top-right, clear of the icon's artwork.
         let y = attention ? 1 : superview.bounds.height - height

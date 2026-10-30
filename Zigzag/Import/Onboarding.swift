@@ -376,7 +376,7 @@ private enum Onboard {
     static func subtitle(_ text: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.isSelectable = false
-        field.font = .systemFont(ofSize: 15)
+        field.font = Tokens.Font.body()
         field.textColor = Brand.ribbon.withAlphaComponent(0.72)
         field.alignment = .center
         return field
@@ -386,7 +386,7 @@ private enum Onboard {
     static func line(_ text: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.isSelectable = false
-        field.font = .systemFont(ofSize: 14)
+        field.font = Tokens.Font.body()
         field.textColor = Tokens.Color.textSecondary
         return field
     }
@@ -457,7 +457,7 @@ private enum Onboard {
 /// "Welcome to", then the wordmark writing itself in, then one button. Nothing else on the screen moves.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let welcome = Label("Welcome to", font: .systemFont(ofSize: 18, weight: .medium), color: Brand.ribbon.withAlphaComponent(0.78))
+    private let welcome = Label("Welcome to", font: Tokens.Font.large(.medium), color: Brand.ribbon.withAlphaComponent(0.78))
     private let wordmark = WordmarkView()
     private let start = Onboard.light("Get Started")
     private var drewIn = false
@@ -1152,7 +1152,7 @@ final class IntoZigzag: NSView {
     private let zigzag = NSImageView()
     private var dots: [CALayer] = []
     private let badge = NSImageView()
-    private let caption = Label("", font: .systemFont(ofSize: 15, weight: .semibold), color: Brand.ribbon)
+    private let caption = Label("", font: Tokens.Font.large(.semibold), color: Brand.ribbon)
     private var state = State.idle
 
     override init(frame: NSRect) {
@@ -1320,10 +1320,10 @@ final class IntoZigzag: NSView {
         if state == .done {
             let check = NSTextAttachment()
             let symbol = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?
-                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold).applying(.init(paletteColors: [.white, Tokens.Color.success])))
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: Tokens.TypeSize.large, weight: .semibold).applying(.init(paletteColors: [.white, Tokens.Color.success])))
             check.image = symbol
             let text = NSMutableAttributedString(attachment: check)
-            text.append(NSAttributedString(string: "  All in Zigzag", attributes: [.font: NSFont.systemFont(ofSize: 15, weight: .semibold), .foregroundColor: Brand.ribbon]))
+            text.append(NSAttributedString(string: "  All in Zigzag", attributes: [.font: Tokens.Font.large(.semibold), .foregroundColor: Brand.ribbon]))
             let style = NSMutableParagraphStyle(); style.alignment = .center
             text.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: text.length))
             caption.attributedStringValue = text
@@ -1861,7 +1861,7 @@ private final class ChoiceCard: InteractiveView {
     private let dot = ColorView(color: Onboard.accent)
     private let title: Label
     private let detail: Label
-    private let badge = Label("Recommended", font: .systemFont(ofSize: 11, weight: .semibold), color: NSColor.white)
+    private let badge = Label("Recommended", font: Tokens.Font.small(.semibold), color: NSColor.white)
     private let badgeFill = ColorView(color: Onboard.accent)
 
     init(title text: String, detail line: String, recommended: Bool) {

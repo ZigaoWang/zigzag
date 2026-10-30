@@ -176,7 +176,7 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.
 ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 main { max-width: 680px; margin: 0 auto; padding: 36px 20px 64px; }
 header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-h1 { font-size: 20px; font-weight: 600; margin: 0; flex: 1; }
+h1 { font-size: 18px; font-weight: 600; margin: 0; flex: 1; }
 .clear { position: relative; }
 .clear > button { appearance: none; border: 0; background: none; color: var(--muted); font: inherit; padding: 4px 8px; border-radius: 6px; cursor: default; }
 .clear > button:hover { background: var(--hover); color: var(--text); }
@@ -191,7 +191,7 @@ h1 { font-size: 20px; font-weight: 600; margin: 0; flex: 1; }
 .search input { flex: 1; border: 0; outline: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent); }
 .search input::-webkit-search-cancel-button { display: none; }
 .day { margin-bottom: 18px; }
-.day h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 8px 4px; }
+.day h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 0 8px 4px; }
 .row { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border-radius: 6px; color: inherit; text-decoration: none; }
 .row:hover { background: var(--hover); }
 .row img, .row .dot { width: 16px; height: 16px; flex: none; border-radius: 3px; }
@@ -200,9 +200,9 @@ h1 { font-size: 20px; font-weight: 600; margin: 0; flex: 1; }
 @media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; border-radius: 4px; } }
 .row .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .host { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 40px; }
-.row time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
+.row time { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; flex: none; }
 .row .remove { flex: none; width: 20px; height: 20px; border: 0; border-radius: 4px; background: none; color: var(--muted);
-               font-size: 14px; line-height: 20px; padding: 0; cursor: default; }
+               font-size: 13px; line-height: 20px; padding: 0; cursor: default; }
 /* Out of sight until the pointer or keyboard focus reaches the row, but still in the Tab order. */
 .row:not(:hover):not(:focus-within) .remove { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .row:hover time, .row:focus-within time { display: none; }

@@ -78,12 +78,16 @@ enum Tokens {
         static let deskCardMaxWidth: CGFloat = 440
     }
 
-    // MARK: - Type (SF Pro, three sizes only)
+    // MARK: - Type (SF Pro, three sizes for text, plus the display heading and the badge)
 
     enum TypeSize {
         static let small: CGFloat = 11
         static let body: CGFloat = 13
         static let large: CGFloat = 18
+        /// Display headings in heavy type (`Brand.display`): a window's or a card's one big line.
+        static let title: CGFloat = 22
+        /// The count on an extension's button: the one place text has to fit a 10pt capsule.
+        static let badge: CGFloat = 8
     }
 
     enum Font {

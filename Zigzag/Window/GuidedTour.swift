@@ -12,8 +12,8 @@ final class GuidedTour: NSView {
     private let card = FloatingPanelView()
     private let step = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
     private let check = NSImageView()
-    private let title = Label("", font: .systemFont(ofSize: 17, weight: .semibold), color: Tokens.Color.textPrimary)
-    private let note = Label("", font: .systemFont(ofSize: 14), color: Tokens.Color.textSecondary)
+    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
     private let finish = PrimaryButton(title: "Start Browsing")
@@ -21,7 +21,7 @@ final class GuidedTour: NSView {
     private let wordmark = WordmarkView()
     private let header = BrandSurface()
     private let letter = NSTextField(wrappingLabelWithString: "")
-    private let signature = Label("— Zigao, who makes Zigzag", font: .systemFont(ofSize: 13, weight: .medium), color: Tokens.Color.textSecondary)
+    private let signature = Label("— Zigao, who makes Zigzag", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
     /// A short real recording of the step being done, on a loop, above what to do.
     private let video = NSView()
     private let videoLayer = AVPlayerLayer()
@@ -83,7 +83,7 @@ final class GuidedTour: NSView {
         video.layer?.addSublayer(videoLayer)
         wordmark.color = Brand.ribbon
         letter.isSelectable = false
-        letter.font = .systemFont(ofSize: 14)
+        letter.font = Tokens.Font.body()
         letter.textColor = Tokens.Color.textPrimary
         letter.stringValue = "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way."
         
@@ -395,7 +395,7 @@ final class GuidedTour: NSView {
             cap.wantsLayer = true
             cap.layer?.cornerRadius = 6
             cap.layer?.cornerCurve = .continuous
-            let label = Label(key, font: .systemFont(ofSize: 15, weight: .semibold), color: Tokens.Color.textPrimary)
+            let label = Label(key, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
             label.alignment = .center
             cap.addSubview(label)
             card.addSubview(cap)
@@ -413,7 +413,7 @@ final class GuidedTour: NSView {
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
-        title.font = d.isFinal ? Brand.displayFont(24) : .systemFont(ofSize: 17, weight: .semibold)
+        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.title) : Tokens.Font.large(.semibold)
         if animated {
             let fade = CATransition()
             fade.type = .fade

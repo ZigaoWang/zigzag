@@ -311,7 +311,7 @@ final class ImportView: NSView {
             y = hero.frame.maxY + Tokens.Space.x6
         }
         title.alignment = .left
-        title.attributedStringValue = Brand.display(title.stringValue, size: 22, color: Tokens.Color.textPrimary)
+        title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary)
         if !title.stringValue.isEmpty { place(title, height: titleHeight, gap: Tokens.Space.x2) }
         if !subtitle.stringValue.isEmpty { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
         if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
@@ -608,7 +608,7 @@ private final class ImportHero: NSView {
     private let surface = BrandSurface()
     private let wordmark = WordmarkView()
     private let count = Label("", font: .systemFont(ofSize: 60, weight: .heavy), color: Brand.ribbon)
-    private let caption = Label("", font: .systemFont(ofSize: 17, weight: .semibold), color: Brand.ribbon)
+    private let caption = Label("", font: Tokens.Font.large(.semibold), color: Brand.ribbon)
     private let detail = Label("", font: Tokens.Font.body(), color: Brand.ribbon.withAlphaComponent(0.7))
 
     override init(frame: NSRect) {
