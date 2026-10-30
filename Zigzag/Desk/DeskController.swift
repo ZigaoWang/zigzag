@@ -568,10 +568,9 @@ final class DeskController {
         let ids = Set(allTabs.map(\.id))
         for (id, view) in cards where !ids.contains(id) {
             cards[id] = nil
-            if animated {
-                Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { view.removeFromSuperview() })
-            } else { view.removeFromSuperview() }
+            if animated { collapse(view) } else { view.removeFromSuperview() }
         }
+        var fresh: [TabThumbnailView] = []
         selection = selection.intersection(ids)
         // Cards kept from last time show what each tab is now.
         for tab in allTabs { cards[tab.id]?.configure(tab, partner: partner(of: tab), split: splitShape(of: tab)) }
@@ -605,6 +604,7 @@ final class DeskController {
             }
             cards[tab.id] = card
             canvas.addSubview(card)
+            fresh.append(card)
         }
         for space in Library.shared.spaces where headers[space.id] == nil {
             let header = DeskHeaderView()
@@ -615,6 +615,13 @@ final class DeskController {
         for (id, header) in headers where Library.shared.space(id) == nil { header.removeFromSuperview(); headers[id] = nil }
         let current = currentCard
         for card in cards.values { card.isCurrent = card === current }
+        // New cards (a search cleared, a tab opened) start where they belong and grow in there, rather than flying
+        // in from a corner.
+        if animated {
+            let frames = layoutFrames().cards
+            for card in fresh { card.frame = frames[cards.first { $0.value === card }?.key ?? UUID()] ?? .zero }
+            appear(fresh)
+        }
         applyLayout(animated: animated)
         updateSelection()
         if let focused, cards[focused] == nil { self.focused = nil }
@@ -624,7 +631,6 @@ final class DeskController {
     private func applyLayout(animated: Bool, dragging: (id: UUID, space: UUID, index: Int)? = nil) {
         let layout = layoutFrames(dragging: dragging)
         canvas.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: max(layout.height, scrollView.contentSize.height))
-        var changes: [() -> Void] = []
         for (id, header) in headers {
             guard let space = Library.shared.space(id) else { continue }
             header.label.stringValue = space.name
@@ -635,7 +641,7 @@ final class DeskController {
                 header.isHidden = false
                 var f = frame
                 f.size.width = header.fittingWidth
-                if animated { changes.append { header.animator().frame = f } } else { header.frame = f }
+                if animated && !header.isHidden && header.frame != .zero { move(header, to: f) } else { header.frame = f }
             } else {
                 header.isHidden = true
             }
@@ -649,9 +655,70 @@ final class DeskController {
         }
         for (id, card) in cards {
             guard let frame = layout.cards[id], id != dragging?.id else { continue }
-            if animated { changes.append { card.animator().frame = frame } } else { card.frame = frame }
+            if animated { move(card, to: frame) } else { card.frame = frame }
         }
-        if !changes.isEmpty { Tokens.Motion.animate(Tokens.Motion.snappy) { changes.forEach { $0() } } }
+    }
+
+    // MARK: Reflow
+
+    /// Moves a card or heading to `frame` on a spring. The view is there at once, for clicks and layout; what's
+    /// drawn slides over from wherever it is on screen, growing or shrinking to fit, so a move that's taken over
+    /// mid-way carries on from there.
+    private func move(_ view: NSView, to frame: NSRect) {
+        guard let layer = view.layer else { view.frame = frame; return }
+        let shown = layer.presentation()?.frame ?? view.frame
+        view.frame = frame
+        guard !Tokens.Motion.reduceMotion, frame.width > 0, frame.height > 0, shown.width > 0,
+              abs(shown.minX - frame.minX) + abs(shown.minY - frame.minY) + abs(shown.width - frame.width) > 0.5 else { return }
+        // A view's layer is anchored at its corner: scale from there, then move.
+        let from = CATransform3DConcat(CATransform3DMakeScale(shown.width / frame.width, shown.height / frame.height, 1),
+                                       CATransform3DMakeTranslation(shown.minX - frame.minX, shown.minY - frame.minY, 0))
+        let spring = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+        spring.fromValue = NSValue(caTransform3D: from)
+        spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        layer.add(spring, forKey: "reflow")
+    }
+
+    /// A closed (or filtered out) card folds away into its own middle while it fades, and the others close the gap.
+    private func collapse(_ view: NSView) {
+        guard let layer = view.layer, !Tokens.Motion.reduceMotion else { view.removeFromSuperview(); return }
+        let size = view.bounds.size, k: CGFloat = 0.9
+        let shrink = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+        shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
+        shrink.toValue = NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                                                    CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
+        let fade = Tokens.Motion.springAnimation(keyPath: "opacity", duration: Tokens.Motion.standard)
+        fade.fromValue = layer.presentation()?.opacity ?? 1
+        fade.toValue = 0
+        let group = CAAnimationGroup()
+        group.animations = [shrink, fade]
+        group.duration = shrink.duration
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { view.removeFromSuperview() }
+        Tokens.Motion.withoutAnimation { view.alphaValue = 0 }
+        layer.add(group, forKey: "collapse")
+        CATransaction.commit()
+    }
+
+    /// Cards that come back as a search clears grow in where they belong, as they do when the desk opens.
+    private func appear(_ cards: [TabThumbnailView]) {
+        guard !Tokens.Motion.reduceMotion else { return }
+        for card in cards {
+            guard let layer = card.layer else { continue }
+            let k: CGFloat = 0.96, size = card.bounds.size
+            let grow = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+            grow.fromValue = NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                                                        CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
+            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            let fade = Tokens.Motion.springAnimation(keyPath: "opacity", duration: Tokens.Motion.large)
+            fade.fromValue = 0
+            fade.toValue = 1
+            let group = CAAnimationGroup()
+            group.animations = [grow, fade]
+            group.duration = grow.duration
+            group.fillMode = .backwards
+            layer.add(group, forKey: "settle")
+        }
     }
 
     // MARK: Selection
