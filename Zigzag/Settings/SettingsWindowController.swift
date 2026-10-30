@@ -108,10 +108,19 @@ enum SettingsIcon {
             let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
             let base = color.usingColorSpace(.sRGB) ?? color
             NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
+            // Drawn as a white stencil of the symbol: painting each of its layers white would fill in the cut-outs
+            // (the arrow in a filled box), so the symbol is a mask and white goes where it's opaque.
             if let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold).applying(.init(paletteColors: [.white]))) {
+                .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold)) {
                 let size = glyph.size
-                glyph.draw(in: NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height))
+                let place = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
+                let white = NSImage(size: size, flipped: false) { bounds in
+                    glyph.draw(in: bounds)
+                    NSColor.white.set()
+                    bounds.fill(using: .sourceAtop)
+                    return true
+                }
+                white.draw(in: place)
             }
             return true
         }
