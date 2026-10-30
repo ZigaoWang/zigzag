@@ -12,6 +12,12 @@ final class PeekHeaderView: NSView {
         super.init(frame: frame)
         wantsLayer = true
         [icon, host, expandButton, closeButton].forEach { addSubview($0) }
+        // Out of the strip, "Close" alone doesn't say what closes.
+        expandButton.setAccessibilityLabel("Open Peek as Tab")
+        closeButton.setAccessibilityLabel("Close Peek")
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Peek")
     }
 
     /// Takes the page's own color, so the strip reads as the top of that page, with text that stands out on it.

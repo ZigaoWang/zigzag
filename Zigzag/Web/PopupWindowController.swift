@@ -214,6 +214,7 @@ final class PopupHeaderView: NSView {
         label.stringValue = url?.host() ?? ""
         lock.image = Tokens.Symbol.image(secure ? "lock.fill" : "exclamationmark.triangle", size: Tokens.TypeSize.small)
         lock.isHidden = url == nil
+        lock.setAccessibilityLabel(secure ? "Secure connection" : "Not secure")
         needsLayout = true
     }
 

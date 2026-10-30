@@ -189,6 +189,9 @@ final class SitePanel: FloatingPanelView {
         extensionTiles = items.map { item in
             let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
             tile.toolTip = item.attention != nil ? "\(item.label): needs attention" : item.label
+            // VoiceOver reads the extension's name, then what its badge says.
+            tile.setAccessibilityLabel(item.label)
+            tile.setAccessibilityValue(item.attention != nil ? "Needs attention" : item.badge.isEmpty ? nil : item.badge)
             // Attention first: the badge takes its look from it.
             tile.isAttention = item.attention != nil
             tile.badge = item.attention != nil ? "!" : item.badge
@@ -202,6 +205,7 @@ final class SitePanel: FloatingPanelView {
         }
         let add = PanelTile(symbol: "plus", caption: nil)
         add.toolTip = "Get Extensions"
+        add.setAccessibilityLabel("Get Extensions")
         add.onClick = { [weak self] _ in
             self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
             self?.close()
