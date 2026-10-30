@@ -13,6 +13,8 @@ struct CommandResult: Equatable {
         case suggestion(String)
         /// A Zigzag command ("Import from Another Browser…"), by its ID in `CommandRanker.actions`.
         case action(String)
+        /// A line that only says something ("No history yet"): nothing to run, so Return and clicks pass it by.
+        case note
     }
 
     let kind: Kind
@@ -28,8 +30,11 @@ struct CommandResult: Equatable {
         case .switchTo: "Switch to Tab"
         case .bookmark: "Open Pinned Tab"
         case .action: "Run"
+        case .note: ""
         }
     }
+
+    var isActionable: Bool { kind != .note }
 
     static func == (a: CommandResult, b: CommandResult) -> Bool { a.kind == b.kind && a.title == b.title && a.detail == b.detail }
 }
@@ -140,7 +145,7 @@ enum CommandRanker {
                 }
                 // No history yet: say what this is for rather than showing nothing.
                 if results.isEmpty {
-                    add(CommandResult(kind: .action("history"), title: "No history yet", detail: "Pages you visit show up here",
+                    add(CommandResult(kind: .note, title: "No history yet", detail: "Pages you visit show up here",
                                       symbol: "clock"), key: "empty-history")
                 }
                 return results

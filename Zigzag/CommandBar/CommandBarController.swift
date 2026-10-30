@@ -42,6 +42,7 @@ final class CommandRowView: InteractiveView {
             symbolView.isHidden = false
             symbolView.image = Tokens.Symbol.image(result.symbol ?? "globe")
         }
+        setAccessibilityRole(result.isActionable ? .button : .staticText)
         setAccessibilityLabel(result.detail.isEmpty ? result.title : "\(result.title), \(result.detail)")
         needsLayout = true
     }
@@ -441,7 +442,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func updateSelection() {
-        for (i, row) in rows.enumerated() { row.isSelected = i == selectedIndex }
+        // A note is never highlighted: there's nothing for Return to do on it.
+        for (i, row) in rows.enumerated() { row.isSelected = i == selectedIndex && results[i].isActionable }
     }
 
     // MARK: Searching one site
@@ -633,6 +635,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private func commit(modifiers: NSEvent.ModifierFlags) {
         if results.indices.contains(selectedIndex) {
+            guard results[selectedIndex].isActionable else { return }
             activate(results[selectedIndex], modifiers: modifiers)
         } else if let url = CommandRanker.url(from: field.stringValue) {
             activate(CommandResult(kind: .open(url), title: "", detail: ""), modifiers: modifiers)
@@ -643,7 +646,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     }
 
     private func activate(_ result: CommandResult, modifiers: NSEvent.ModifierFlags) {
-        guard let controller else { return }
+        guard let controller, result.isActionable else { return }
         let manager = controller.tabManager
         let inBackground = modifiers.contains(.command)
         // ⌥↩: always a new tab, even for a page that's open already (a second copy of it).
@@ -686,6 +689,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
         case .action(let id):
             runAction(id)
+            return
+        case .note:
             return
         }
         if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
