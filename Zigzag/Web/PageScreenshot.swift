@@ -300,8 +300,40 @@ enum PageScreenshot {
         }
         let height = min(pixelsHigh, Int((end * perPixel).rounded()))
         guard pieces > 0, height > 0, let whole = context.makeImage(),
-              let image = whole.cropping(to: CGRect(x: 0, y: 0, width: pixelsWide, height: height)) else { return nil }
+              let body = whole.cropping(to: CGRect(x: 0, y: 0, width: pixelsWide, height: height)) else { return nil }
+        let image = await framed(body, view: view, scale: scale, in: webView) ?? body
         return await Task.detached(priority: .userInitiated) { png(image, scale: scale) }.value
+    }
+
+    /// The page around the box, over the same width: the site's bar above it (its name, its menu) and anything
+    /// under it, once each, so the picture reads as the page and not a cut-out of it.
+    private static func framed(_ body: CGImage, view: CGRect, scale: CGFloat, in webView: WKWebView) async -> CGImage? {
+        let above = view.minY, below = webView.bounds.height - view.maxY
+        guard above > 1 || below > 1 else { return nil }
+        func band(_ rect: CGRect) async -> CGImage? {
+            guard rect.height > 1 else { return nil }
+            let configuration = WKSnapshotConfiguration()
+            configuration.rect = rect
+            let backing = webView.window?.backingScaleFactor ?? 2
+            if scale < backing { configuration.snapshotWidth = NSNumber(value: Double(rect.width * scale / backing)) }
+            return try? await webView.takeSnapshot(configuration: configuration).cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+        let top = await band(CGRect(x: view.minX, y: 0, width: view.width, height: above))
+        let bottom = await band(CGRect(x: view.minX, y: view.maxY, width: view.width, height: below))
+        guard top != nil || bottom != nil else { return nil }
+        let width = body.width
+        let topHeight = top.map { _ in Int((above * scale).rounded()) } ?? 0
+        let bottomHeight = bottom.map { _ in Int((below * scale).rounded()) } ?? 0
+        let total = topHeight + body.height + bottomHeight
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: total, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.interpolationQuality = .high
+        // Drawn bottom up: the bar under the box, the box, then the bar over it at the top.
+        if let bottom { context.draw(bottom, in: CGRect(x: 0, y: 0, width: width, height: bottomHeight)) }
+        context.draw(body, in: CGRect(x: 0, y: bottomHeight, width: width, height: body.height))
+        if let top { context.draw(top, in: CGRect(x: 0, y: bottomHeight + body.height, width: width, height: topHeight)) }
+        return context.makeImage()
     }
 
     /// A script's answer from one frame, as JSON. A frame that's gone may never answer, so it isn't waited on for long.
