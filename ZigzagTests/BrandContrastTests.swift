@@ -27,6 +27,20 @@ struct BrandContrastTests {
         check(.navy, "Navy")
     }
 
+    @Test func accentsKeepTheSpacesHue() {
+        // Whatever the space's color, its accent looks like that color in both appearances, not a neighbor's.
+        for degrees in stride(from: 0.0, to: 360, by: 10) {
+            let wanted = SpaceColor.okHue(degrees / 360)
+            for dark in [false, true] {
+                let accent = resolved(Brand.Theme(hue: degrees / 360).accent, dark: dark)
+                let lab = OKLab.lab(r: OKLab.decode(accent.redComponent), g: OKLab.decode(accent.greenComponent), b: OKLab.decode(accent.blueComponent))
+                let got = atan2(lab.b, lab.a)
+                let off = abs(remainder(got - wanted, 2 * .pi)) * 180 / .pi
+                #expect(off < 4, "\(degrees)° \(dark ? "dark" : "light"): off by \(Int(off))°")
+            }
+        }
+    }
+
     @Test func everyHue() {
         for step in 0..<72 { check(Brand.Theme(hue: Double(step) / 72), "hue \(step * 5)°") }
     }

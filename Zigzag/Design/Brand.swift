@@ -64,7 +64,7 @@ enum Brand {
         /// The ribbon on a banner.
         var tint: NSColor {
             guard let hue else { return Brand.ribbon }
-            return NSColor(hue: hue, saturation: 0.15, brightness: 0.96, alpha: 1)
+            return SpaceColor.shade(hue: hue, luminance: 0.84, chroma: 0.035)
         }
 
         /// The ribbon on an ordinary surface.
@@ -79,8 +79,8 @@ enum Brand {
         /// light mode, deep text on a light accent in dark mode. Yellow spaces get a deeper gold, blue ones stay vivid.
         var accent: NSColor {
             let h = hue ?? Brand.navyHue
-            return Tokens.Color.dynamic(light: Brand.color(hue: h, saturation: 0.6, luminance: Brand.accentLuminance.light),
-                                        dark: Brand.color(hue: h, saturation: 0.48, luminance: Brand.accentLuminance.dark))
+            return Tokens.Color.dynamic(light: SpaceColor.shade(hue: h, luminance: Brand.accentLuminance.light, chroma: 0.16),
+                                        dark: SpaceColor.shade(hue: h, luminance: Brand.accentLuminance.dark, chroma: 0.14))
         }
 
         /// Text on the accent.

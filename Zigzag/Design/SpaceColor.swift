@@ -79,8 +79,31 @@ enum SpaceColor: String, Codable, CaseIterable {
         return NSColor(srgbRed: c[0], green: c[1], blue: c[2], alpha: 1)
     }
 
+    /// A shade of a wheel hue with WCAG relative luminance `luminance`, for accents made from a space's color. Mixed
+    /// in OKLCH like the window itself, so the hue you see stays put as it gets lighter or darker: shading by HSB
+    /// numbers instead drifts it (deep blues go lavender and read as purple, oranges go brown). `chroma` is as
+    /// colorful as it gets, eased off where the screen can't show that much at the lightness needed.
+    static func shade(hue: Double, luminance target: Double, chroma: Double) -> NSColor {
+        let angle = okHue(hue)
+        var low = 0.0, high = 1.0
+        var rgb = [0.0, 0.0, 0.0]
+        for _ in 0..<28 {
+            let lightness = (low + high) / 2
+            var c = chroma
+            rgb = OKLab.rgb(l: lightness, a: c * cos(angle), b: c * sin(angle))
+            while !OKLab.inGamut(rgb), c > 0.002 {
+                c *= 0.94
+                rgb = OKLab.rgb(l: lightness, a: c * cos(angle), b: c * sin(angle))
+            }
+            let y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+            if y < target { low = lightness } else { high = lightness }
+        }
+        let c = rgb.map { OKLab.encode(min(max($0, 0), 1)) }
+        return NSColor(srgbRed: c[0], green: c[1], blue: c[2], alpha: 1)
+    }
+
     /// The OKLCH hue angle of a wheel hue, so the wheel keeps its familiar order: red, orange, yellow, green, blue.
-    private static func okHue(_ hue: Double) -> Double {
+    static func okHue(_ hue: Double) -> Double {
         let pure = NSColor(hue: CGFloat(hue.truncatingRemainder(dividingBy: 1) + (hue < 0 ? 1 : 0)), saturation: 1, brightness: 1, alpha: 1)
             .usingColorSpace(.sRGB) ?? .red
         let lab = OKLab.lab(r: OKLab.decode(pure.redComponent), g: OKLab.decode(pure.greenComponent), b: OKLab.decode(pure.blueComponent))
@@ -115,8 +138,8 @@ enum SpaceColor: String, Codable, CaseIterable {
     }
 }
 
-/// Björn Ottosson's OKLab, the perceptual space behind `SpaceColor.paint`.
-private enum OKLab {
+/// Björn Ottosson's OKLab, the perceptual space behind `SpaceColor.paint` and `SpaceColor.shade`.
+enum OKLab {
     static func rgb(l: Double, a: Double, b: Double) -> [Double] {
         let l1 = pow(l + 0.3963377774 * a + 0.2158037573 * b, 3)
         let m1 = pow(l - 0.1055613458 * a - 0.0638541728 * b, 3)
