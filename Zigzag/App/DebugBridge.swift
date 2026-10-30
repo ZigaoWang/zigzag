@@ -54,7 +54,15 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
-        case "permprompt": Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", isPrivate: false, in: controller) }
+        case "permprompt":
+            if arg == "app" {
+                Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",
+                                                      icon: NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app"), isPrivate: false,
+                                                      in: controller, title: "Open Calendar", allowTitle: "Open",
+                                                      alwaysTitle: "Always open on this site", denyTitle: "Don’t Open") }
+            } else {
+                Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", isPrivate: false, in: controller) }
+            }
         case "renamepanel": RenamePanel.show(title: "Google", in: controller) { _ in }
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)
         case "bartab": controller.commandBar.debugTab()

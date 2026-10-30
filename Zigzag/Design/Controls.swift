@@ -660,6 +660,70 @@ final class Toggle: InteractiveView {
     }
 }
 
+/// A small square box and its label, the whole of it clickable: for a yes or no that rides along with a button
+/// ("Always open on this site"), where a switch would say too much.
+final class CheckBox: InteractiveView {
+    private let box = ColorView(color: .clear)
+    private let mark = NSImageView()
+    private let label: Label
+    var onChange: ((Bool) -> Void)?
+    var isOn = false { didSet { if oldValue != isOn { stateDidChange(animated: false) } } }
+    /// The color the box fills with when on; the space's accent unless set.
+    var fixedColor: NSColor? { didSet { stateDidChange(animated: false) } }
+    private static let side: CGFloat = 14
+
+    init(title: String) {
+        label = Label(title, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        box.wantsLayer = true
+        box.layer?.cornerRadius = 4
+        box.layer?.cornerCurve = .continuous
+        box.layer?.borderWidth = 1
+        // One weight for symbols everywhere, but a tick this small needs bold to read.
+        mark.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 9, weight: .bold))
+        mark.imageScaling = .scaleNone
+        mark.contentTintColor = .white
+        box.addSubview(mark)
+        [box, label].forEach { addSubview($0) }
+        onClick = { [weak self] _ in
+            guard let self, self.isEnabled else { return }
+            self.isOn.toggle()
+            self.onChange?(self.isOn)
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(title)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
+
+    var fittingWidth: CGFloat { Self.side + Tokens.Space.x2 + label.textWidth }
+    override var intrinsicContentSize: NSSize { NSSize(width: ceil(fittingWidth), height: max(Self.side, label.lineHeight)) }
+
+    override func layout() {
+        super.layout()
+        box.frame = NSRect(x: 0, y: floor((bounds.height - Self.side) / 2), width: Self.side, height: Self.side)
+        mark.frame = box.bounds
+        let h = label.lineHeight
+        label.frame = NSRect(x: box.frame.maxX + Tokens.Space.x2 - Label.inset, y: (bounds.height - h) / 2,
+                             width: max(0, bounds.width - box.frame.maxX - Tokens.Space.x2 + Label.inset), height: h)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let accent = fixedColor ?? Brand.Theme.for(self).accent
+        let edge = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.25), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.3))
+        let fill: NSColor = isOn ? accent : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : .clear
+        box.color = fill
+        box.layer?.borderColor = cgColor(isOn ? accent : edge)
+        mark.isHidden = !isOn
+        label.textColor = isHovered || isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+    }
+}
+
 /// A choice from a list, in Zigzag's style: the current choice (with its icon) on a quiet fill and a chevron;
 /// clicking opens the native menu right over it.
 final class MenuButton: InteractiveView {

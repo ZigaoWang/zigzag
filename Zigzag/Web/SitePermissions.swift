@@ -104,7 +104,7 @@ enum SitePermissions {
         if let known = notifications(host: host) { return known }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return nil }
         let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", isPrivate: isPrivate, in: controller, tab: tab,
-                                                title: "Show notifications", allowTitle: "Allow", onceTitle: nil,
+                                                title: "Show notifications", alwaysTitle: nil,
                                                 answered: { notifications(host: host).map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .allowOnce, .deny:
@@ -174,17 +174,20 @@ enum SitePermissions {
     }
 }
 
-/// "example.com wants to / Use your camera", as Chrome asks it: on the page that asked, naming the site that
-/// asks, with whole answers stacked one per line. Allow While Visiting is remembered, Allow This Time isn't,
-/// Don't Allow is. Esc puts it off; Return is left to whatever you're typing in. One question at a time per window:
-/// a second request waits for the first answer. It belongs to the tab that asked: it steps aside while another tab
-/// is in front and comes back with that tab, and closing that tab is "not now".
+/// "Open Tencent Meeting?", asked on the page that asked, as Chrome does: what it wants as a question, the site
+/// asking under it, and two answers. Allow goes last, filled; ticking "Always allow on this site" keeps the yes
+/// for next time, and Don't Allow is kept as asked by each caller. Esc puts it off; Return is left to whatever
+/// you're typing in. One question at a time per window: a second request waits for the first answer. It belongs
+/// to the tab that asked: it steps aside while another tab is in front and comes back with that tab, and closing
+/// that tab is "not now".
 final class PermissionPrompt: FloatingPanelView {
+    /// The app's own icon when it's an app that would open, else the request's symbol on a soft circle.
+    private let picture = NSImageView()
     private let badge = ColorView(color: .clear)
-    private let symbolView = NSImageView()
-    private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let request = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    /// The answers, in a row: the one you'd most often want filled in the accent, last, as macOS places it.
+    private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private var always: CheckBox?
+    /// Don't Allow, then Allow at the far right, as macOS places them.
     private var buttons: [(button: InteractiveView, width: CGFloat)] = []
     private var answer: ((Answer) -> Void)?
     private var monitor: Any?
@@ -205,26 +208,24 @@ final class PermissionPrompt: FloatingPanelView {
         prompt.place(in: controller)
     }
 
-    /// `title` is the request ("Use your camera" by default); `onceTitle` nil leaves out Allow This Time, for things
-    /// that only make sense kept (notifications) or are asked every time anyway (sharing your screen).
+    /// `title` is the request ("Use your camera" by default). `alwaysTitle` is the box that keeps a yes: ticked,
+    /// Allow answers `.allow`, else `.allowOnce`. Nil leaves it out, for things that only make sense kept
+    /// (notifications) or are asked every time anyway (sharing your screen), and Allow is `.allow`.
+    /// A private window keeps nothing, so it has no box either. `icon` stands in for the symbol (an app's icon).
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
-    /// A private window keeps nothing, so Allow While Visiting and Allow This Time would be the same: just Allow.
-    static func ask(host: String, what: String, symbol: String, isPrivate: Bool, in controller: BrowserWindowController,
-                    tab: Tab? = nil, title: String? = nil, allowTitle: String = "Allow While Visiting",
-                    onceTitle: String? = "Allow This Time", denyTitle: String = "Don’t Allow",
+    static func ask(host: String, what: String, symbol: String, icon: NSImage? = nil, isPrivate: Bool,
+                    in controller: BrowserWindowController, tab: Tab? = nil, title: String? = nil, allowTitle: String = "Allow",
+                    alwaysTitle: String? = "Always allow on this site", denyTitle: String = "Don’t Allow",
                     answered: @escaping () -> Answer? = { nil }) async -> Answer {
-        let allowTitle = isPrivate ? "Allow" : allowTitle
-        let onceTitle = isPrivate ? nil : onceTitle
+        let alwaysTitle = isPrivate ? nil : alwaysTitle
         let key = ObjectIdentifier(controller)
         let before = queue[key]
         let task = Task { @MainActor in
             _ = await before?.value
             if let known = answered() { return known }
-            var choices: [(String, Answer)] = [(allowTitle, .allow)]
-            if let onceTitle { choices.append((onceTitle, .allowOnce)) }
-            choices.append((denyTitle, .deny))
-            return await show(host: host, request: title ?? "Use \(what)", symbol: symbol, choices: choices, in: controller, tab: tab)
+            return await show(host: host, request: title ?? "Use \(what)", symbol: symbol, icon: icon, allowTitle: allowTitle,
+                              alwaysTitle: alwaysTitle, denyTitle: denyTitle, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
@@ -232,31 +233,46 @@ final class PermissionPrompt: FloatingPanelView {
         return answer
     }
 
-    private static func show(host: String, request: String, symbol: String, choices: [(String, Answer)],
-                             in controller: BrowserWindowController, tab: Tab?) async -> Answer {
+    private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
+                             alwaysTitle: String?, denyTitle: String, in controller: BrowserWindowController, tab: Tab?) async -> Answer {
         guard controller.window?.isVisible == true else { return .notNow }
         // The asking tab closed while an earlier question waited.
         if let tab, tab.isClosed { return .notNow }
         let asking = tab ?? controller.tabManager.selectedTab
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
-            prompt.asker.stringValue = "\(host) wants to"
-            prompt.request.stringValue = request
-            prompt.symbolView.image = Tokens.Symbol.image(symbol, size: 14)
-            // Laid out from the right edge: Allow, filled, at the far right; Don't Allow furthest left.
-            prompt.buttons = choices.map { title, answer in
-                if answer == .allow {
-                    let button = PrimaryButton(title: title)
-                    button.onClick = { [weak prompt] _ in prompt?.finish(answer) }
-                    prompt.addSubview(button)
-                    return (button, max(button.fittingWidth, 64))
-                }
-                let button = TextButton.form(title)
-                button.onClick = { [weak prompt] _ in prompt?.finish(answer) }
-                prompt.addSubview(button)
-                return (button, button.fittingWidth)
+            prompt.request.stringValue = "\(request)?"
+            prompt.asker.stringValue = "Asked by \(host)"
+            if let icon {
+                prompt.picture.image = icon
+                prompt.badge.isHidden = true
+            } else {
+                prompt.picture.image = Tokens.Symbol.image(symbol, size: 15)
+                prompt.picture.imageScaling = .scaleNone
+                prompt.picture.contentTintColor = .controlAccentColor
             }
-            prompt.setAccessibilityLabel("\(host) wants to \(request.lowercased())")
+            if let alwaysTitle {
+                let box = CheckBox(title: alwaysTitle)
+                box.fixedColor = .controlAccentColor
+                prompt.addSubview(box)
+                prompt.always = box
+            }
+            let deny = TextButton.form(denyTitle)
+            deny.onClick = { [weak prompt] _ in prompt?.finish(.deny) }
+            // The Mac's own accent, as its own dialogs ask: the page is asking, not the space, and a space's tint
+            // turns muddy on a dark card.
+            let allow = PrimaryButton(title: allowTitle)
+            allow.customFill = .controlAccentColor
+            allow.customInk = .white
+            allow.onClick = { [weak prompt] _ in
+                guard let prompt else { return }
+                prompt.finish(prompt.always.map { $0.isOn ? .allow : .allowOnce } ?? .allow)
+            }
+            for button in [deny, allow] as [InteractiveView] { prompt.addSubview(button) }
+            // Side by side at one width, as a Mac dialog sets its answers.
+            let width = max(deny.fittingWidth + Tokens.Space.x3, allow.fittingWidth, 84)
+            prompt.buttons = [(deny, width), (allow, width)]
+            prompt.setAccessibilityLabel("\(host): \(request)?")
             prompt.answer = { continuation.resume(returning: $0) }
             prompt.askingTab = asking
             prompt.controller = controller
@@ -305,22 +321,21 @@ final class PermissionPrompt: FloatingPanelView {
         isElevated = true
         radius = Tokens.Radius.panel
         let area = controller.focusedPaneFrame
-        let width = min(max(360, buttonsWidth + Self.pad * 2), area.width - Tokens.Space.x6)
+        let width = min(Self.width, area.width - Tokens.Space.x6)
         frame = NSRect(x: area.minX + Tokens.Space.x3, y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         badge.wantsLayer = true
-        badge.layer?.cornerRadius = 8
-        badge.color = Tokens.Color.fieldFill
-        symbolView.contentTintColor = Tokens.Color.icon
-        badge.addSubview(symbolView)
+        badge.layer?.cornerRadius = Self.iconSide / 2
+        badge.color = NSColor.controlAccentColor.withAlphaComponent(0.14)
         // A long host loses its middle, not its end: the part that says whose site it is stays.
         asker.lineBreakMode = .byTruncatingMiddle
         request.lineBreakMode = .byWordWrapping
+        request.usesSingleLineMode = false
         request.maximumNumberOfLines = 2
-        [badge, asker, request].forEach { addSubview($0) }
+        [badge, picture, request, asker].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -352,37 +367,46 @@ final class PermissionPrompt: FloatingPanelView {
         if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
     }
 
+    private static let width: CGFloat = 340
     private static let pad: CGFloat = 16
-    private static let buttonHeight = Tokens.Space.x8
+    private static let iconSide: CGFloat = 32
+    private static let buttonHeight = Tokens.Space.x7Height
     private static let buttonGap: CGFloat = 8
 
-    private var buttonsWidth: CGFloat {
-        buttons.map(\.width).reduce(0, +) + CGFloat(max(buttons.count - 1, 0)) * Self.buttonGap
-    }
+    private var textX: CGFloat { Self.pad + Self.iconSide + Tokens.Space.x3 }
 
     private func requestHeight(for width: CGFloat) -> CGFloat {
-        let textWidth = width - Self.pad * 2 - 28 - 10
+        let textWidth = width - textX - Self.pad
         return ceil(request.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth, height: 200)).height ?? request.lineHeight)
     }
 
+    private func textHeight(for width: CGFloat) -> CGFloat { requestHeight(for: width) + 2 + asker.lineHeight }
+
     private func height(for width: CGFloat) -> CGFloat {
-        let header = max(28, asker.lineHeight + 1 + requestHeight(for: width))
-        return Self.pad + header + Tokens.Space.x4 + Self.buttonHeight + Self.pad
+        var h = Self.pad + max(Self.iconSide, textHeight(for: width))
+        if let always { h += Tokens.Space.x3 + always.intrinsicContentSize.height }
+        return h + Tokens.Space.x4 + Self.buttonHeight + Self.pad
     }
 
     private func layoutContent() {
         let pad = Self.pad, w = bounds.width
-        let textX = pad + 28 + 10, textWidth = w - textX - pad
-        let rh = requestHeight(for: w)
-        let header = max(28, asker.lineHeight + 1 + rh)
-        badge.frame = NSRect(x: pad, y: pad + (header - 28) / 2, width: 28, height: 28)
-        symbolView.frame = badge.bounds.insetBy(dx: 7, dy: 7)
-        let top = pad + (header - asker.lineHeight - 1 - rh) / 2
-        asker.frame = NSRect(x: textX, y: top, width: textWidth, height: asker.lineHeight)
-        request.frame = NSRect(x: textX, y: asker.frame.maxY + 1, width: textWidth, height: rh)
-        let y = pad + header + Tokens.Space.x4
+        let textWidth = w - textX - pad
+        let th = textHeight(for: w)
+        let header = max(Self.iconSide, th)
+        badge.frame = NSRect(x: pad, y: pad + (header - Self.iconSide) / 2, width: Self.iconSide, height: Self.iconSide)
+        picture.frame = badge.frame
+        let top = pad + (header - th) / 2
+        request.frame = NSRect(x: textX - Label.inset, y: top, width: textWidth + Label.inset * 2, height: requestHeight(for: w))
+        asker.frame = NSRect(x: textX - Label.inset, y: request.frame.maxY + 2, width: textWidth + Label.inset * 2, height: asker.lineHeight)
+        var y = pad + header
+        if let always {
+            let size = always.intrinsicContentSize
+            always.frame = NSRect(x: textX, y: y + Tokens.Space.x3, width: min(size.width, textWidth), height: size.height)
+            y = always.frame.maxY
+        }
+        y += Tokens.Space.x4
         var x = w - pad
-        for (button, width) in buttons {
+        for (button, width) in buttons.reversed() {
             x -= width
             button.frame = NSRect(x: x, y: y, width: width, height: Self.buttonHeight)
             x -= Self.buttonGap

@@ -845,7 +845,7 @@ extension Tab: WKUIDelegate {
                 return
             }
             let answer = await PermissionPrompt.ask(host: origin.host, what: "your screen", symbol: "rectangle.on.rectangle", isPrivate: isPrivate,
-                                                    in: controller, tab: self, title: "Share your screen", allowTitle: "Allow", onceTitle: nil, answered: { nil })
+                                                    in: controller, tab: self, title: "Share your screen", alwaysTitle: nil, answered: { nil })
             decisionHandler(answer == .allow ? 1 : 0)
         }
     }

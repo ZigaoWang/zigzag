@@ -50,9 +50,9 @@ enum ExternalLinks {
         asking.insert(key)
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: host.isEmpty ? "This page" : host, what: name, symbol: "arrow.up.forward.app",
-                                                    isPrivate: false, in: controller, tab: tab, title: "Open \(name)",
-                                                    allowTitle: saves ? "Always Open" : "Open", onceTitle: saves ? "Open This Time" : nil,
-                                                    denyTitle: "Don’t Open",
+                                                    icon: NSWorkspace.shared.icon(forFile: app.path), isPrivate: false, in: controller,
+                                                    tab: tab, title: "Open \(name)", allowTitle: "Open",
+                                                    alwaysTitle: saves ? "Always open on this site" : nil, denyTitle: "Don’t Open",
                                                     answered: { !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
             asking.remove(key)
             switch answer {
