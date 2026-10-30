@@ -221,7 +221,7 @@ enum SidebarMenus {
             menu.addItem(Item("New Folder") { controller.newFolder() })
         }
         menu.addItem(.separator())
-        menu.addItem(Item("New Space") { controller.newSpace(nil) })
+        if !controller.tabManager.isPrivate { menu.addItem(Item("New Space") { controller.newSpace(nil) }) }
         menu.addItem(Item("Delete Space", enabled: Library.shared.spaces.count > 1) {
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })

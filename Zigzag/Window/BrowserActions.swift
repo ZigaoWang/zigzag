@@ -384,6 +384,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func showWhatsNew(_ sender: Any?) { WhatsNew.show(in: self) }
 
     @objc func newSpace(_ sender: Any?) {
+        // Spaces are kept for good; a private window keeps nothing.
+        guard !tabManager.isPrivate else { return }
         var created: SpaceInfo?
         libraryChange("New Space") { created = Library.shared.addSpace() }
         guard let space = created else { return }
@@ -431,6 +433,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return tab?.url != nil
         case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
+        case #selector(newSpace(_:)): return !tabManager.isPrivate
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? "Hide Reader" : "Show Reader"
