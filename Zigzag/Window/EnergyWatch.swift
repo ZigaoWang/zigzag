@@ -52,9 +52,10 @@ final class EnergyWatch {
                 defer { last[pid] = cpu }
                 guard let before = last[pid] else { continue }
                 let share = (cpu - before) / max(elapsed, 1)
-                streak[pid] = share >= Self.busy ? (streak[pid] ?? 0) + 1 : 0
-                // Playing something is meant to work hard, and the page on screen is yours to judge.
-                guard streak[pid] ?? 0 >= Self.rounds, !tab.isPlayingAudio, !shown.contains(pid),
+                // Time on screen doesn't count: a page has to stay busy for a while after you've left it.
+                streak[pid] = share >= Self.busy && !shown.contains(pid) ? (streak[pid] ?? 0) + 1 : 0
+                // Playing something is meant to work hard.
+                guard streak[pid] ?? 0 >= Self.rounds, !tab.isPlayingAudio,
                       let url = tab.url else { continue }
                 warn(about: tab, url: url, in: controller)
             }
