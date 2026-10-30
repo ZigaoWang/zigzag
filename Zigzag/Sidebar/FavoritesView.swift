@@ -138,9 +138,9 @@ final class FavoritesView: NSView {
         super.layout()
         let all = tiles + (isDropTarget ? [dropTile] : [])
         let gap = Tokens.Space.x2
-        // One tile size for all: a full row sets it (fewer favorites than that share the width), and a shorter row
-        // after it starts at the left in tiles of the same size, like any grid.
-        let columns = max(1, min(Self.maxColumns, all.count))
+        // Up to four columns, every tile one size, a shorter last row from the left. A lone favorite is never
+        // wider than two would be: half the row, not a long bar around a small icon.
+        let columns = max(2, min(Self.maxColumns, all.count))
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
         for (i, tile) in all.enumerated() {
             let row = i / columns, column = i % columns
