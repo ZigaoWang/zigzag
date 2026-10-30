@@ -1184,7 +1184,7 @@ final class ShortcutRow: InteractiveView {
     private let item: NSMenuItem?
     private let title: Label
     private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private var caps: [(ColorView, Label)] = []
+    private var caps: [KeyHint] = []
     private let field = ColorView(color: .clear)
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small - 1, toolTip: "Back to Zigzag’s Shortcut")
@@ -1226,15 +1226,9 @@ final class ShortcutRow: InteractiveView {
         addSubview(note)
         note.isHidden = true
         for key in keys {
-            let cap = ColorView(color: Tokens.Color.fieldFill)
-            cap.wantsLayer = true
-            cap.layer?.cornerRadius = 5
-            cap.layer?.cornerCurve = .continuous
-            let label = Label(key, font: .systemFont(ofSize: Tokens.TypeSize.small, weight: .semibold), color: Tokens.Color.textSecondary)
-            label.alignment = .center
-            cap.addSubview(label)
+            let cap = KeyHint(key)
             addSubview(cap)
-            caps.append((cap, label))
+            caps.append(cap)
         }
         field.wantsLayer = true
         field.layer?.cornerRadius = Tokens.Radius.control
@@ -1262,7 +1256,6 @@ final class ShortcutRow: InteractiveView {
     override func layout() {
         super.layout()
         let pad = Tokens.Space.x3
-        let capHeight: CGFloat = 22
         var x = bounds.width - pad
         if isRecording {
             let w: CGFloat = 168
@@ -1272,11 +1265,9 @@ final class ShortcutRow: InteractiveView {
         } else if caps.isEmpty && item != nil {
             fieldLabel.stringValue = "None"
         } else {
-            for (cap, label) in caps.reversed() {
-                let w = max(capHeight, label.inkWidth + Tokens.Space.x3)
-                x -= w
-                cap.frame = NSRect(x: x, y: (bounds.height - capHeight) / 2, width: w, height: capHeight)
-                label.frame = NSRect(x: 0, y: (capHeight - label.lineHeight) / 2, width: w, height: label.lineHeight)
+            for cap in caps.reversed() {
+                x -= cap.width
+                cap.frame = NSRect(x: x, y: (bounds.height - KeyHint.height) / 2, width: cap.width, height: KeyHint.height)
                 x -= 4
             }
         }
@@ -1308,7 +1299,7 @@ final class ShortcutRow: InteractiveView {
         let editable = item != nil
         let fill: NSColor? = isRecording ? nil : editable && isPressed ? Tokens.Color.pressedFill : editable && isHovered ? Tokens.Color.hoverFill : nil
         layer?.backgroundColor = fill.map { cgColor($0) }
-        caps.forEach { $0.0.isHidden = isRecording }
+        caps.forEach { $0.isHidden = isRecording }
         let none = caps.isEmpty && editable
         field.isHidden = !(isRecording || none)
         let accent = Brand.Theme.brand.accent

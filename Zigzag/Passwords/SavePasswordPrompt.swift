@@ -197,14 +197,14 @@ final class SavePasswordPrompt: FloatingPanelView {
     }
 }
 
-/// A small keycap on a button, saying which key does the same thing.
+/// A small keycap: on a button, saying which key does the same thing, and in Settings' list of shortcuts.
 final class KeyHint: NSView {
     static let height: CGFloat = 20
     private let label: Label
     var onAccent = false { didSet { refresh() } }
 
     init(_ key: String) {
-        label = Label(key, font: .systemFont(ofSize: 11, weight: .semibold), color: Tokens.Color.textSecondary)
+        label = Label(key, font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 5
