@@ -751,9 +751,9 @@ extension Tab: WKNavigationDelegate {
         }
     }
 
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        handle(error, in: webView)
-    }
+    /// A failure after the page started showing (a stalled image, a dropped connection near the end) leaves the
+    /// page as it is: you may be reading it. Only a page that never arrived gets the error page.
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         handle(error, in: webView)
