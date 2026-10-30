@@ -581,6 +581,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         suppressCompletion = false
         refreshHint()
         refreshResults(animated: true)
+        // Searching history stays on this Mac: nothing you type there goes to the search engine.
+        guard mode != .history else { fetcher.cancel(); return }
         fetcher.fetch(text) { [weak self] list in
             guard let self, self.isVisible, self.typed == text else { return }
             self.suggestions = list
