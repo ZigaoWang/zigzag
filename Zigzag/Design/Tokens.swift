@@ -132,7 +132,7 @@ enum Tokens {
         static let spaceSwitch = Curve(duration: 0.26, bounce: 0.12)
         /// Letting go of a swipe between spaces: a critically damped spring that carries on at the fingers' speed
         /// and never overshoots, whether it lands on the next space or springs back.
-        static let swipeSettle = Curve(duration: 0.22, bounce: 0)
+        static let swipeSettle = Curve(duration: 0.15, bounce: 0)
         static let gentle = Curve(duration: large)
         static let feedback = Curve(duration: quick)
 
