@@ -624,6 +624,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                 step(1)
             }
             return true
+        // Shift-Tab steps back up the list; focus stays in the field while the bar is open.
+        case #selector(NSResponder.insertBacktab(_:)):
+            step(-1)
+            return true
         case #selector(NSResponder.deleteBackward(_:)) where scope != nil && field.stringValue.isEmpty:
             setScope(nil)
             return true
