@@ -537,9 +537,11 @@ final class SidebarListView: NSView {
             view.needsLayout = true
 
         case .separator:
-            let tabs = manager.currentTabs
+            // For the space this list shows: the neighbor sliding in during a swipe has its own tabs.
+            let space = shownSpaceID ?? manager.currentSpaceID
+            let tabs = manager.tabs(in: space)
             (view as? SeparatorRowView)?.hasTabs = !tabs.isEmpty
-            let current = manager.selectedTab
+            let current = manager.selectedTab(in: space)
             let partner = current.flatMap { manager.partner(of: $0) }
             (view as? SeparatorRowView)?.clearButton.keepsCurrent = tabs.contains { $0 !== current && $0 !== partner }
 
