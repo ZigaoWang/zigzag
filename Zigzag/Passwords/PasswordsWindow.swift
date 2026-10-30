@@ -148,6 +148,7 @@ final class PasswordsView: NSView {
     func unlock() {
         Task { @MainActor in
             locked.isBusy = true
+            locked.clearFailure()
             let ok = await PasswordAuthentication.authenticate("see your saved passwords", keepUnlockedFor: PasswordAuthentication.unlockDuration)
             locked.isBusy = false
             guard ok else { locked.showFailure(); return }
@@ -325,8 +326,8 @@ final class PasswordsView: NSView {
                 panel.allowedContentTypes = [.commaSeparatedText]
                 guard let window = self.window, await panel.beginSheetModal(for: window) == .OK, let url = panel.url else { return }
                 do {
-                    try await PasswordExport.write(self.credentials, to: url)
-                    Toast.show("Exported \(count) \(count == 1 ? "password" : "passwords")", symbol: "square.and.arrow.up", duration: 2, over: self, area: self.detail.frame)
+                    let written = try await PasswordExport.write(self.credentials, to: url)
+                    Toast.show("Exported \(written) \(written == 1 ? "password" : "passwords")", symbol: "square.and.arrow.up", duration: 2, over: self, area: self.detail.frame)
                 } catch {
                     Toast.show("Couldn’t write the file. Choose another folder and try again.", symbol: "exclamationmark.triangle", duration: 3, over: self, area: self.detail.frame)
                 }
@@ -447,7 +448,7 @@ extension PasswordsView: NSTextFieldDelegate {
 private final class LockedView: NSView {
     private let badge = RibbonView()
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-    private let body = Label("Unlock with Touch ID or your Mac’s password.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let body = Label(LockedView.prompt, font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private let button = PrimaryButton(title: "Unlock")
     var onUnlock: (() -> Void)?
     var isBusy = false { didSet { button.isEnabled = !isBusy } }
@@ -465,8 +466,16 @@ private final class LockedView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    private static let prompt = "Unlock with Touch ID or your Mac’s password."
+
     func showFailure() {
         body.stringValue = "Not unlocked. Try again when you’re ready."
+        needsLayout = true
+    }
+
+    /// Back to the plain prompt as soon as unlocking is tried again.
+    func clearFailure() {
+        body.stringValue = Self.prompt
         needsLayout = true
     }
 
@@ -1084,11 +1093,14 @@ enum Clipboard {
 
 enum PasswordExport {
     /// The CSV every browser and password manager imports: name, url, username, password, note.
-    static func write(_ credentials: [Credential], to url: URL) async throws {
+    /// Returns how many passwords went into the file: one that can't be read from the Keychain is left out.
+    @discardableResult
+    static func write(_ credentials: [Credential], to url: URL) async throws -> Int {
         func field(_ text: String) -> String {
             text.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) ? "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : text
         }
         var data = Data("name,url,username,password,note\n".utf8)
+        var written = 0
         defer { data.resetBytes(in: 0..<data.count) }
         for credential in credentials {
             guard let password = try? await PasswordStore.shared.password(for: credential.id) else { continue }
@@ -1097,8 +1109,10 @@ enum PasswordExport {
                     .map(field).joined(separator: ",") + "\n"
             }
             data.append(Data(line.utf8))
+            written += 1
         }
         try data.write(to: url, options: [.atomic, .completeFileProtection])
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return written
     }
 }

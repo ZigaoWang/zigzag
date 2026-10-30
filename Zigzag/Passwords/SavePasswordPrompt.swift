@@ -79,13 +79,17 @@ final class SavePasswordPrompt: FloatingPanelView {
                 let store = PasswordStore.shared
                 let username = prompt.usernameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
                 do {
+                    let done: String
                     switch kind {
-                    case .save: try await store.save(origin: origin, username: username, password: password)
+                    case .save:
+                        try await store.save(origin: origin, username: username, password: password)
+                        done = "Password saved"
                     case .update(var credential):
                         credential.modified = Date()
                         try await store.update(credential, password: password)
+                        done = "Password updated"
                     }
-                    Toast.show("Password saved", symbol: "key.fill", duration: 1.6, in: controller)
+                    Toast.show(done, symbol: "key.fill", duration: 1.6, in: controller)
                 } catch {
                     Toast.show("Couldn’t save the password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }
