@@ -296,7 +296,7 @@ final class TabSwitcher {
 
     init(controller: BrowserWindowController) {
         self.controller = controller
-        panel.radius = Tokens.Radius.panel + Tokens.Space.x1
+        panel.radius = Tokens.Radius.large
     }
 
     /// Returns true if the event was handled.

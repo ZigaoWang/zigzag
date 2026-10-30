@@ -595,7 +595,7 @@ private final class AutofillRow: InteractiveView {
             icon.contentTintColor = Tokens.Color.accent
         }
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         icon.imageScaling = .scaleProportionallyUpOrDown
         [icon, name, detail].forEach { addSubview($0) }

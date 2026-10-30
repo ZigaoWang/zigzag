@@ -145,7 +145,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         panel.addSubview(field)
         panel.addSubview(divider)
         chip.wantsLayer = true
-        chip.layer?.cornerRadius = 7
+        chip.layer?.cornerRadius = Tokens.Radius.control
         chip.layer?.cornerCurve = .continuous
         chip.addSubview(chipLabel)
         chip.isHidden = true

@@ -32,9 +32,15 @@ enum Tokens {
         static let card: CGFloat = 8
         static let row: CGFloat = 8
         static let control: CGFloat = 6
+        /// Fields, pills, menu buttons and filter segments: a step rounder than a plain control.
+        static let field: CGFloat = 8
         static let small: CGFloat = 4
-        /// Floating surfaces: command bar, peek, previews, switcher.
+        /// Grouped cards on a window's background: Settings and Passwords groups, the site panel's sections.
+        static let group: CGFloat = 10
+        /// Floating surfaces: command bar, peek, previews.
         static let panel: CGFloat = 12
+        /// Large floating surfaces that hold rounded things of their own: the tab switcher, Reader's options, the tour.
+        static let large: CGFloat = 16
         static let thumbnail: CGFloat = 8
     }
 

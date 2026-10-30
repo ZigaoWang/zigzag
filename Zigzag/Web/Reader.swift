@@ -454,7 +454,7 @@ private final class ReaderOptions: FloatingPanelView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        radius = 16
+        radius = Tokens.Radius.large
         [size, face, measure].forEach { addSubview($0) }
         for theme in Reader.Preferences.Theme.allCases {
             let tile = ThemeTile(theme: theme)

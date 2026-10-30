@@ -884,7 +884,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameField.delegate = self
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
-        nameBackground.layer?.cornerRadius = Tokens.Radius.control + 2
+        nameBackground.layer?.cornerRadius = Tokens.Radius.field
         [nameBackground, nameField, editor].forEach { addSubview($0) }
         editor.onPreview = { [weak self] look in
             guard let self else { return }

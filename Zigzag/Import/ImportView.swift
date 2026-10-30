@@ -398,7 +398,7 @@ private final class SourceRow: InteractiveView {
         self.source = source
         name = Label(source.name, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.panel - 2
+        layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
         icon.image = source.icon
         icon.imageScaling = .scaleProportionallyUpOrDown

@@ -12,7 +12,7 @@ final class FormGroup: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         background.wantsLayer = true
-        background.layer?.cornerRadius = Tokens.Radius.panel - 2
+        background.layer?.cornerRadius = Tokens.Radius.group
         background.layer?.cornerCurve = .continuous
         background.layer?.borderWidth = Tokens.Metric.hairline
         addSubview(background)
@@ -390,7 +390,7 @@ private final class PaneTab: InteractiveView {
         self.pane = pane
         label = Label(pane.title, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.panel - 2
+        layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
         icon.image = Tokens.Symbol.image(pane.symbol, size: 18)
         label.alignment = .center
@@ -1237,7 +1237,7 @@ final class ShortcutRow: InteractiveView {
             caps.append((cap, label))
         }
         field.wantsLayer = true
-        field.layer?.cornerRadius = 6
+        field.layer?.cornerRadius = Tokens.Radius.control
         field.layer?.cornerCurve = .continuous
         field.layer?.borderWidth = 1.5
         fieldLabel.alignment = .center

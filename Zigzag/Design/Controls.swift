@@ -482,7 +482,7 @@ final class FilledField: NSView {
         field.cell?.isScrollable = true
         field.cell?.wraps = false
         wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1.5
         addSubview(field)
@@ -530,7 +530,7 @@ final class ChoicePill: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         [check, label].forEach { addSubview($0) }
         onClick = { [weak self] _ in
@@ -580,7 +580,7 @@ final class SegmentedPills: NSView {
         init(_ text: String) {
             title = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
             super.init(frame: .zero)
-            layer?.cornerRadius = Tokens.Radius.control + 2
+            layer?.cornerRadius = Tokens.Radius.field
             layer?.cornerCurve = .continuous
             [title, count].forEach { addSubview($0) }
             setAccessibilityRole(.radioButton)
@@ -798,7 +798,7 @@ final class MenuButton: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)
         chevron.contentTintColor = Tokens.Color.textSecondary
@@ -947,7 +947,7 @@ final class SlidingSwitch: NSView {
     override func layout() {
         super.layout()
         track.frame = bounds
-        track.layer?.cornerRadius = min(bounds.height / 2, Tokens.Radius.control + 2 + inset)
+        track.layer?.cornerRadius = min(bounds.height / 2, Tokens.Radius.field + inset)
         // Each title spans its whole segment, centered, so bold or not it sits in the middle.
         for (i, label) in labels.enumerated() {
             let r = segment(i)

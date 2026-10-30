@@ -393,7 +393,7 @@ private final class PasswordsCard: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.panel + 2
+        layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
         layer?.borderWidth = Tokens.Metric.hairline
@@ -527,7 +527,7 @@ private final class ListRow: InteractiveView {
         self.title = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         self.subtitle = Label(subtitle, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control + 2
+        layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         icon.image = SiteIcon.image(for: origin)
         [icon, self.title, self.subtitle].forEach { addSubview($0) }
@@ -688,7 +688,7 @@ private final class DetailView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         card.wantsLayer = true
-        card.layer?.cornerRadius = Tokens.Radius.panel - 2
+        card.layer?.cornerRadius = Tokens.Radius.group
         card.layer?.cornerCurve = .continuous
         neverBody.font = Tokens.Font.body()
         neverBody.textColor = Tokens.Color.textSecondary
@@ -1026,7 +1026,7 @@ private final class WarningBanner: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.panel - 2
+        layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
         icon.image = Tokens.Symbol.image("exclamationmark.triangle.fill", size: Tokens.TypeSize.body)
         text.font = Tokens.Font.body()

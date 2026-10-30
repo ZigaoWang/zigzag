@@ -70,7 +70,7 @@ final class GuidedTour: NSView {
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 20)
         skip.textColor = Tokens.Color.textTertiary
-        card.radius = Tokens.Radius.panel + 2
+        card.radius = Tokens.Radius.large
         header.cornerRadius = 0
         header.layer?.borderWidth = 0
         header.showsWatermark = false

@@ -44,7 +44,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         let site = URL(string: "\(origin.scheme)://\(origin.host)")
         icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill", size: 14)
         usernameBox.wantsLayer = true
-        usernameBox.layer?.cornerRadius = Tokens.Radius.control + 2
+        usernameBox.layer?.cornerRadius = Tokens.Radius.field
         usernameBox.layer?.cornerCurve = .continuous
         switch kind {
         case .save(let username):
