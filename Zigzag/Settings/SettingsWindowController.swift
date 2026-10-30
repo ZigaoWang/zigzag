@@ -317,7 +317,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private(set) var pane = SettingsPane.general
 
     private let generalGroup = FormGroup()
-    private let behaviorGroup = FormGroup()
+    private let tabsGroup = FormGroup()
+    private let downloadsGroup = FormGroup()
+    private let blockingGroup = FormGroup()
     private let importGroup = FormGroup()
     private let spacesGroup = FormGroup()
     private let windowGroup = FormGroup()
@@ -410,9 +412,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
-        let search = FormRow(title: "Search a site", detail: "In the address bar, type a site’s name, then press Tab.", control: KeyHint("Tab"))
-        search.toolTip = SiteSearch.all.map(\.name).joined(separator: ", ")
-        generalGroup.add(search)
+        // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
@@ -420,13 +420,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
         archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
-        behaviorGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
+        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
+        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
+        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", control: downloadPlace))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        behaviorGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
-        behaviorGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", control: downloadPlace))
-        behaviorGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
+        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
-        behaviorGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
         let importButton = TextButton.form("Import")
         importButton.onClick = { _ in ImportWindowController.show() }
         importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
@@ -435,6 +434,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
         windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", control: borderlessToggle))
+        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -736,8 +736,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         switch pane {
         case .general:
             section(nil, generalGroup)
-            section(nil, behaviorGroup)
-            section(nil, windowGroup)
+            section("Tabs", tabsGroup)
+            section("Window", windowGroup)
+            section("Downloads", downloadsGroup)
             section(nil, importGroup)
         case .spaces:
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
@@ -745,6 +746,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, passwordsGroup)
             section(nil, passwordsWindowGroup)
         case .privacy:
+            section(nil, blockingGroup)
             section(nil, privacyGroup)
         case .translation:
             section(nil, translationGroup)
