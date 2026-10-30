@@ -36,6 +36,8 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               let webView = message.webView as? BrowserWebView, let tab = webView.owner,
               let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) else { return }
+        // It did open, the page just doesn't get it back (noopener).
+        if let opened = tab.lastOpenedWindow, Date().timeIntervalSince(opened) < 2 { return }
         Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: ("Open", { [weak controller, weak tab] in
             controller?.open(url, disposition: .foregroundTab, opener: tab, allowSwitch: false)
         }), duration: 6, in: controller)
