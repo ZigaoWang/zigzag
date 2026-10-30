@@ -247,9 +247,15 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         pdfSearch?.cancel()
         (searchedPDF ?? window?.selectedTab?.pdfViewer)?.clearFind()
         searchedPDF = nil
-        (searched ?? window?.selectedWebView)?.evaluateJavaScript("window.getSelection().removeAllRanges()")
+        if let webView = searched ?? window?.selectedWebView {
+            webView.evaluateJavaScript("window.getSelection().removeAllRanges()")
+            // WebKit draws its own highlight over the match, apart from the selection; it stays until told to go.
+            if webView.responds(to: Self.hideFindUI) { webView.perform(Self.hideFindUI) }
+        }
         searched = nil
     }
+
+    private static let hideFindUI = NSSelectorFromString("_hideFindUI")
 }
 
 /// A floating rounded surface with a real shadow (it sits above the page) and spring in/out.
