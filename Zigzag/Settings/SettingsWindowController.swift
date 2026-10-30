@@ -54,7 +54,9 @@ final class FormGroup: NSView {
             row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
             y += h
             if i < lines.count {
-                lines[i].frame = NSRect(x: Tokens.Space.x3, y: y, width: bounds.width - Tokens.Space.x3, height: Tokens.Metric.hairline)
+                // The divider starts where the text does, past the icons, as the system's settings draw it.
+                let x = (rows[i] as? FormRow)?.textInset ?? Tokens.Space.x3
+                lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
             }
         }
     }
@@ -67,6 +69,55 @@ final class FormGroup: NSView {
 
 /// A form row: a title (and optional explanation, which wraps) on the left, a control on the right. Rows grow to
 /// fit their explanation, so nothing is ever cut off.
+/// The top of General: the drawn wordmark, the version you have, and a way to get the next one.
+final class SettingsBrandRow: NSView {
+    private let wordmark = WordmarkView()
+    private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let update = TextButton.form("Check for Updates")
+
+    override init(frame: NSRect) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 76))
+        let info = Bundle.main.infoDictionary
+        version.stringValue = "Version \(info?["CFBundleShortVersionString"] as? String ?? "")"
+        update.onClick = { _ in Updater.shared.checkForUpdates() }
+        [wordmark, version, update].forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        let pad = Tokens.Space.x4, h: CGFloat = 20
+        let block = h + Tokens.Space.x2 + version.lineHeight
+        let top = round((bounds.height - block) / 2)
+        wordmark.frame = NSRect(x: pad, y: top, width: ceil(h * WordmarkView.aspect), height: h)
+        version.frame = NSRect(x: pad - Label.inset, y: wordmark.frame.maxY + Tokens.Space.x2, width: 240, height: version.lineHeight)
+        let size = update.intrinsicContentSize
+        update.frame = NSRect(x: bounds.width - Tokens.Space.x3 - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
+    }
+}
+
+/// The small colored square at the start of a settings row, as in the system's own settings: it gives each row a
+/// face to find it by at a glance. White symbol on a soft top-to-bottom shade of its color.
+enum SettingsIcon {
+    static func tile(_ symbol: String, _ color: NSColor) -> NSImage {
+        let side: CGFloat = 24
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
+            let base = color.usingColorSpace(.sRGB) ?? color
+            NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
+            if let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold).applying(.init(paletteColors: [.white]))) {
+                let size = glyph.size
+                glyph.draw(in: NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height))
+            }
+            return true
+        }
+    }
+}
+
 final class FormRow: NSView {
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
@@ -101,6 +152,8 @@ final class FormRow: NSView {
     }
 
     private func textX() -> CGFloat { icon.isHidden ? pad : pad + Tokens.Space.x6 + Tokens.Space.x3 }
+    /// Where the row's text starts.
+    var textInset: CGFloat { textX() }
 
     private func textWidth(for width: CGFloat) -> CGFloat { max(120, width - pad - controlSize.width - Tokens.Space.x4 - textX()) }
 
@@ -316,6 +369,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let banner = BrandBanner()
     private(set) var pane = SettingsPane.general
 
+    private let brandGroup = FormGroup()
     private let generalGroup = FormGroup()
     private let tabsGroup = FormGroup()
     private let downloadsGroup = FormGroup()
@@ -415,30 +469,31 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
-        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
+        brandGroup.add(SettingsBrandRow())
+        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", icon: SettingsIcon.tile("magnifyingglass", .systemBlue), control: engine))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
-        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
+        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", icon: SettingsIcon.tile("globe", .systemIndigo), control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
         downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
         archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
-        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
-        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
-        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", control: downloadPlace))
+        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", icon: SettingsIcon.tile("archivebox.fill", .systemOrange), control: archiveAfter))
+        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", icon: SettingsIcon.tile("pip", .systemPink), control: pipToggle))
+        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", icon: SettingsIcon.tile("arrow.down", .systemGreen), control: downloadPlace))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
+        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", icon: SettingsIcon.tile("hand.raised.fill", .systemRed), control: blockingToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let importButton = TextButton.form("Import")
         importButton.onClick = { _ in ImportWindowController.show() }
-        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
+        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", icon: SettingsIcon.tile("square.and.arrow.down.fill", .systemGray), control: importButton))
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", control: borderlessToggle))
-        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
+        windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", icon: SettingsIcon.tile("rectangle.inset.filled", .systemTeal), control: borderlessToggle))
+        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", icon: SettingsIcon.tile("power", .systemGray), control: quitToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -532,7 +587,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if installed.isEmpty {
             let get = TextButton.form("Get Extensions")
             get.onClick = { [weak self] _ in self?.getExtensions() }
-            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", control: get))
+            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", icon: SettingsIcon.tile("puzzlepiece.extension.fill", .systemPurple), control: get))
         }
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
         let developer = Toggle(isOn: ExtensionStore.developerMode)
@@ -540,7 +595,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             ExtensionStore.developerMode = on
             self?.reloadExtensions()
         }
-        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", control: developer))
+        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", icon: SettingsIcon.tile("hammer.fill", .systemGray), control: developer))
     }
 
     @available(macOS 15.4, *)
@@ -627,15 +682,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let manager = PasswordManagers.active
         let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
         let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
-        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveToggle))
-        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillToggle))
+        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, icon: SettingsIcon.tile("key.fill", .systemYellow), control: saveToggle))
+        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, icon: SettingsIcon.tile("rectangle.and.pencil.and.ellipsis", .systemBlue), control: fillToggle))
         cardToggle.isOn = ContactCard.isOn
         cardToggle.onChange = { on in ContactCard.isOn = on }
-        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", control: cardToggle))
+        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", icon: SettingsIcon.tile("person.fill", .systemGreen), control: cardToggle))
         let open = TextButton.form("Open Passwords")
         open.onClick = { _ in PasswordsWindowController.show() }
         // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", control: open))
+        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", icon: SettingsIcon.tile("lock.fill", .systemGray), control: open))
     }
 
     private func reloadTranslation() {
@@ -645,8 +700,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         translateInto.options = [MenuButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { MenuButton.Option(title: $0.name, image: nil) }
         translateInto.selectedIndex = PageTranslator.chosenLanguage.flatMap { chosen in languages.firstIndex { $0.id == chosen }.map { $0 + 1 } } ?? 0
         translateOffer.isOn = PageTranslator.offers
-        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
-        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", control: translateOffer))
+        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", icon: SettingsIcon.tile("character.bubble.fill", .systemBlue), control: translateInto))
+        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", icon: SettingsIcon.tile("text.bubble.fill", .systemPurple), control: translateOffer))
         let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
         // Laid out like Sites in Privacy: a heading, Reset beside it only when there's something to reset.
         let reset = TextButton.form("Reset")
@@ -738,6 +793,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         switch pane {
         case .general:
+            section(nil, brandGroup)
             section(nil, generalGroup)
             section("Tabs", tabsGroup)
             section("Window", windowGroup)
@@ -923,7 +979,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: historyButtons))
+        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", icon: SettingsIcon.tile("clock.fill", .systemIndigo), control: historyButtons))
 
         let cache = TextButton.form("Clear Cache")
         cache.onClick = { [weak cache] _ in
@@ -943,7 +999,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", control: data))
+        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", icon: SettingsIcon.tile("internaldrive.fill", .systemGray), control: data))
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
@@ -996,7 +1052,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 self?.layoutDocument()
             }
             let line = said.joined(separator: ", ")
-            sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", control: forget))
+            let siteURL = URL(string: "https://\(site)")
+            let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.tile("globe", .systemGray)
+            sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", icon: favicon, control: forget))
         }
     }
 
