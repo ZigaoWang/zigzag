@@ -544,17 +544,22 @@ final class SeparatorRowView: NSView {
     let clearButton = ClearTabsButton()
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
-    private var clearShown: Bool { showsClear && hasTabs }
+    /// Shown under the pointer, or while Tab has brought keyboard focus to it.
+    private var clearShown: Bool { (showsClear || clearButton.hasKeyboardFocus) && hasTabs }
     /// When Clear last came into view. A click right as it appears was meant for whatever was under the pointer
     /// a moment before (New Tab, just below), so it counts only once Clear has been there a beat.
     private var clearShownAt = Date.distantPast
-    var clearIsArmed: Bool { clearShown && Date().timeIntervalSince(clearShownAt) > 0.35 }
+    var clearIsArmed: Bool { clearButton.hasKeyboardFocus || (clearShown && Date().timeIntervalSince(clearShownAt) > 0.35) }
+    /// With Full Keyboard Access on, Clear stays in the Tab order while there are tabs to clear, see-through until
+    /// focus reaches it; otherwise it's hidden whenever it isn't shown.
+    private var clearInTabOrder: Bool { NSApp.isFullKeyboardAccessEnabled && hasTabs }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         addSubview(line)
         clearButton.alphaValue = 0
         clearButton.isHidden = true
+        clearButton.keyboardFocusChanged = { [weak self] _ in self?.refreshClear() }
         addSubview(clearButton)
     }
 
@@ -564,7 +569,8 @@ final class SeparatorRowView: NSView {
 
     private func refreshClear() {
         let show = clearShown
-        if show { clearButton.isHidden = false; clearShownAt = Date() }
+        if show || clearInTabOrder { clearButton.isHidden = false }
+        if show { clearShownAt = Date() }
         needsLayout = true
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.15
@@ -572,7 +578,7 @@ final class SeparatorRowView: NSView {
             clearButton.animator().alphaValue = show ? 1 : 0
             layoutSubtreeIfNeeded()
         }, completionHandler: { [weak self] in
-            guard let self, !self.clearShown else { return }
+            guard let self, !self.clearShown, !self.clearInTabOrder else { return }
             self.clearButton.isHidden = true
         })
     }
