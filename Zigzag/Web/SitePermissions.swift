@@ -235,6 +235,10 @@ final class PermissionPrompt: FloatingPanelView {
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
                              alwaysTitle: String?, denyTitle: String, in controller: BrowserWindowController, tab: Tab?) async -> Answer {
+        // Never under What's New, where it couldn't be seen: it waits until the notes close.
+        await withCheckedContinuation { continuation in
+            WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
+        }
         guard controller.window?.isVisible == true else { return .notNow }
         // The asking tab closed while an earlier question waited.
         if let tab, tab.isClosed { return .notNow }
@@ -285,6 +289,8 @@ final class PermissionPrompt: FloatingPanelView {
             }
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
+                // Under notes opened after it, Esc is theirs.
+                if WhatsNewSheet.isShowing(in: prompt.window) { return event }
                 // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.
                 if event.keyCode == 53 { prompt.finish(.notNow); return nil }
                 return event

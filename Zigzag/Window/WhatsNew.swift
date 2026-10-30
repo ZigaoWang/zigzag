@@ -142,10 +142,34 @@ final class WhatsNewSheet: NSView {
         }
     }
 
+    /// True while the notes cover `window`: anything else there waits, and leaves the keys to them.
+    static func isShowing(in window: NSWindow?) -> Bool {
+        window?.contentView?.subviews.contains(where: { $0 is WhatsNewSheet }) ?? false
+    }
+
+    /// Runs `body` once the notes are gone from `window`: at once if they aren't up.
+    static func afterClosing(in window: NSWindow?, _ body: @escaping () -> Void) {
+        guard let sheet = window?.contentView?.subviews.lazy.compactMap({ $0 as? WhatsNewSheet }).first else { body(); return }
+        sheet.waiting.append(body)
+    }
+
+    private var waiting: [() -> Void] = []
+
     private func close() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
+    }
+
+    /// Gone, closed or with its window: what was waiting goes ahead.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window == nil else { return }
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        let waiting = self.waiting
+        self.waiting = []
+        waiting.forEach { $0() }
     }
 
     // A click outside the panel closes it; nothing reaches the window underneath.
