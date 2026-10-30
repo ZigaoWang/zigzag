@@ -105,4 +105,44 @@ struct BookmarkFolderTests {
         let space = try JSONDecoder().decode(SpaceInfo.self, from: json)
         #expect(space.folders == nil)
     }
+
+    // MARK: Swiping between spaces
+
+    @Test func swipeFollowsTheFingersAndComesBack() {
+        // One to one toward a neighbor, so a small move and back leaves the list where it was.
+        #expect(SpaceSwipe.offset(forTravel: 12, width: 300, hasLeft: true, hasRight: true) == 12)
+        #expect(SpaceSwipe.offset(forTravel: -40, width: 300, hasLeft: true, hasRight: true) == -40)
+        #expect(SpaceSwipe.landing(offset: 12, velocity: 0, width: 300) == 0)
+        // Never more than a full width.
+        #expect(SpaceSwipe.offset(forTravel: 900, width: 300, hasLeft: true, hasRight: true) == 300)
+    }
+
+    @Test func swipeLandsOnTheNearerSpaceOrOnAFlick() {
+        // Moving right brings in the space on the left.
+        #expect(SpaceSwipe.landing(offset: 151, velocity: 0, width: 300) == -1)
+        #expect(SpaceSwipe.landing(offset: -151, velocity: 0, width: 300) == 1)
+        #expect(SpaceSwipe.landing(offset: 149, velocity: 0, width: 300) == 0)
+        // A short flick that way lands; flicking back home doesn't, however far it went.
+        #expect(SpaceSwipe.landing(offset: -30, velocity: -900, width: 300) == 1)
+        #expect(SpaceSwipe.landing(offset: 200, velocity: -900, width: 300) == 0)
+    }
+
+    @Test func swipeHoldsBackAtTheEnds() {
+        // No space on the left: the list gives less and less, and never past half the width.
+        let small = SpaceSwipe.offset(forTravel: 30, width: 300, hasLeft: false, hasRight: true)
+        let far = SpaceSwipe.offset(forTravel: 3000, width: 300, hasLeft: false, hasRight: true)
+        #expect(small > 0 && small < 30)
+        #expect(far > small && far < 150)
+        #expect(SpaceSwipe.offset(forTravel: -30, width: 300, hasLeft: true, hasRight: false) == -small)
+        // Picking a held-back list up again puts it where it was.
+        let travel = SpaceSwipe.travel(toOffset: small, width: 300, hasLeft: false, hasRight: true)
+        #expect(abs(travel - 30) < 0.001)
+    }
+
+    @Test func swipeSpeedComesFromTheLastMoment() {
+        let samples: [(time: TimeInterval, dx: CGFloat)] = [(0, 50), (0.95, 0), (0.96, 10), (0.97, 10), (0.98, 10)]
+        #expect(abs(SpaceSwipe.velocity(samples, at: 0.98) - 1000) < 0.001)
+        // Fingers that stopped before letting go aren't moving.
+        #expect(SpaceSwipe.velocity(samples, at: 2) == 0)
+    }
 }

@@ -139,6 +139,16 @@ final class SpaceDotView: InteractiveView {
     private let dot = CALayer()
     var color: NSColor = .gray { didSet { stateDidChange(animated: false) } }
     var isDropTarget = false { didSet { stateDidChange(animated: true) } }
+    /// While a swipe pulls toward or away from this space: how much it looks like the space you're in, 0 to 1,
+    /// following the fingers. Nil the rest of the time; clearing it eases back to what's really selected.
+    var swipeShare: CGFloat? {
+        didSet {
+            guard oldValue != swipeShare else { return }
+            settlesFromSwipe = swipeShare == nil
+            stateDidChange(animated: false)
+        }
+    }
+    private var settlesFromSwipe = false
 
     init(spaceID: UUID) {
         self.spaceID = spaceID
@@ -161,11 +171,14 @@ final class SpaceDotView: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let height: CGFloat = 6
-        let width: CGFloat = isSelected ? 16 : 6
+        let share = swipeShare ?? (isSelected ? 1 : 0)
+        let width: CGFloat = 6 + 10 * share
         let ink = Tokens.Color.textPrimary
-        let tint = ink.withAlphaComponent(isSelected ? 0.78 : isHovered ? 0.5 : 0.28)
-        let changed = wasSelected != nil && wasSelected != isSelected
+        let resting: CGFloat = isHovered ? 0.5 : 0.28
+        let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
+        let changed = (wasSelected != nil && wasSelected != isSelected && swipeShare == nil) || settlesFromSwipe
         wasSelected = isSelected
+        settlesFromSwipe = false
         let apply = {
             self.dot.bounds = CGRect(x: 0, y: 0, width: width, height: height)
             self.dot.position = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
@@ -189,7 +202,7 @@ final class SpaceDotView: InteractiveView {
 /// The sidebar: navigation, address, bookmarks, tabs and spaces. Drawn entirely by us.
 final class SidebarView: NSView {
     weak var delegate: SidebarDelegate? {
-        didSet { list.delegate = delegate }
+        didSet { list.delegate = delegate; neighborList.delegate = delegate }
     }
 
     /// The top row's buttons are a size up from the rest, level with the traffic lights, so they're easy to hit.
@@ -207,6 +220,10 @@ final class SidebarView: NSView {
     private let scrollView = NSScrollView()
     /// Tabs running on below the bottom of the list fade out there, rather than being sliced off by the footer.
     private let bottomFade = CAGradientLayer()
+    /// The space next door, which slides in beside the current one while you swipe.
+    private let neighborList = SidebarListView()
+    private let neighborScroll = NSScrollView()
+    private let neighborFade = CAGradientLayer()
 
     private let bottomBar = NSView()
     let nowPlaying = NowPlayingView()
@@ -218,8 +235,6 @@ final class SidebarView: NSView {
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
     var showsTrafficLights = true { didSet { needsLayout = true } }
-
-    private var swipeDecided: Bool?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -248,6 +263,15 @@ final class SidebarView: NSView {
         addSubview(scrollView)
         scrollView.wantsLayer = true
         scrollView.layer?.mask = bottomFade
+        neighborScroll.drawsBackground = false
+        neighborScroll.hasVerticalScroller = false
+        neighborScroll.hasHorizontalScroller = false
+        neighborScroll.automaticallyAdjustsContentInsets = false
+        neighborScroll.documentView = neighborList
+        neighborScroll.isHidden = true
+        neighborScroll.wantsLayer = true
+        neighborScroll.layer?.mask = neighborFade
+        addSubview(neighborScroll)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
@@ -326,16 +350,22 @@ final class SidebarView: NSView {
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
-        scrollView.frame = NSRect(x: pad, y: listTop, width: width - pad * 2, height: listBottom - listTop)
+        scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
         topSeparator.frame = NSRect(x: pad * 2, y: listTop - Tokens.Metric.hairline, width: width - pad * 4, height: Tokens.Metric.hairline)
         if list.frame.width != scrollView.contentSize.width {
             list.setFrameSize(NSSize(width: scrollView.contentSize.width, height: max(list.frame.height, scrollView.contentSize.height)))
         }
         layoutBottomBar()
         updateBottomFade()
+        if !neighborScroll.isHidden { placeNeighbor() }
     }
 
     private func updateBottomFade() {
+        Self.fade(bottomFade, for: scrollView, list: list)
+    }
+
+    /// Tabs running on below the bottom of a list fade out there.
+    private static func fade(_ bottomFade: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
         let more = list.frame.height - clip.maxY > 1
@@ -526,6 +556,15 @@ final class SidebarView: NSView {
     /// If a swipe is in progress, the new list continues from where the fingers left it.
     func transitionList(direction: CGFloat, from snapshot: NSImage?) {
         let fromSwipe = scrollView.frame.minX - Tokens.Metric.sidebarPadding
+        // Let go of a swipe past the line: the spring carries on at the fingers' speed. Any other switch (a click
+        // on a dot, ⌃2) ends a swipe in progress, and the new list simply slides in from where the old one was.
+        let landing = landingVelocity
+        landingVelocity = nil
+        if swipeState == .tracking { swipeState = .finished }
+        swipeEndWork?.cancel()
+        swipeOffset = 0
+        neighborScroll.isHidden = true
+        clearSwipeDots()
         var finalFrame = scrollView.frame
         finalFrame.origin.x = Tokens.Metric.sidebarPadding
         // Space switches slide even from the keyboard (⌃1, ⌃2…): the motion tells you which way you went.
@@ -541,14 +580,21 @@ final class SidebarView: NSView {
         ghost.imageAlignment = .alignTopLeft
         ghost.wantsLayer = true
         addSubview(ghost)
+        swipeGhost = ghost
         // The old list leaves from where it is; the new one arrives from the other side.
         var ghostEnd = finalFrame
         ghostEnd.origin.x -= direction * width
         Tokens.Motion.withoutAnimation { ghost.frame = ghostEnd }
-        let curve = Tokens.Motion.spaceSwitch
-        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true)
-        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true)
-        // The outgoing list fades as it leaves, so the two never compete.
+        let curve = landing == nil ? Tokens.Motion.spaceSwitch : Tokens.Motion.swipeSettle
+        let velocity = landing ?? 0
+        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true, velocity: velocity)
+        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true, velocity: velocity)
+        // A landing swipe keeps both lists solid, side by side as the fingers had them. Otherwise the outgoing list
+        // fades as it leaves, so the two never compete.
+        guard landing == nil else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) { ghost.removeFromSuperview() }
+            return
+        }
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 1
         fade.toValue = 0
@@ -572,9 +618,16 @@ final class SidebarView: NSView {
 
     var onSwipeSpace: ((Int) -> Bool)?
 
-    /// Called by the window for every scroll over the sidebar. A clearly horizontal two-finger swipe switches
-    /// space right away, like Arc: there is no halfway state. The rest of that gesture is then ignored.
-    /// Vertical scrolling passes through to the list. Returns true when it handled the event.
+    /// Where a gesture over the sidebar is: not yet known to be sideways or up and down, following the fingers
+    /// sideways, scrolling the list, or let go (its momentum still to swallow).
+    private enum SwipeState { case idle, deciding, tracking, scrolling, finished }
+    private var swipeState = SwipeState.idle
+
+    /// Called by the window for every scroll over the sidebar. From the first sideways movement the list follows
+    /// the fingers, with the next space sliding in beside it, so you can move a little and come back. Letting go
+    /// lands on whichever space is nearer, or the next one after a flick that way; otherwise the list springs home.
+    /// Up and down scrolls the list as usual: the first few points decide which way a gesture goes, for all of it.
+    /// Returns true when it handled the event.
     func handleSwipe(_ event: NSEvent) -> Bool {
         let now = event.timestamp > 0 ? event.timestamp : ProcessInfo.processInfo.systemUptime
         let gap = now - lastSwipeEventTime
@@ -590,36 +643,66 @@ final class SidebarView: NSView {
             return true
         }
 
+        let momentum = event.momentumPhase != []
+        let phaseless = event.phase == [] && !momentum
         // A new gesture starts on its first phase, or after the fingers have been still for a moment.
-        let starts = event.phase == .began || event.phase == .mayBegin || (event.phase == [] && event.momentumPhase == [] && gap > 0.2)
-        if starts {
-            swipeDecided = nil
-            swipeConsumed = false
-            swipeAccumX = 0
-            swipeAccumY = 0
+        if event.phase == .began || event.phase == .mayBegin || (phaseless && gap > 0.2) {
+            // The last one's end never came: it lets go where it is before this one starts.
+            if swipeState == .tracking { finishSwipe(velocity: 0) }
+            beginSwipe()
         }
-        if swipeConsumed {
-            // Swallow the rest of the gesture, momentum included, so one swipe is one space.
-            if event.phase == .ended || event.phase == .cancelled || event.momentumPhase == .ended { swipeConsumed = false }
+
+        switch swipeState {
+        case .idle:
+            // Momentum from a scroll that's over, or a gesture that started before the pointer came over the sidebar.
+            if momentum || phaseless { return false }
+            beginSwipe()
+        case .scrolling:
+            // Its momentum, if any, scrolls the list too (idle lets it through).
+            if event.phase == .ended || event.phase == .cancelled { swipeState = .idle }
+            return false
+        case .finished:
+            // The rest of a sideways gesture is part of it, momentum included, so the list never drifts after it.
+            if event.momentumPhase == .ended || event.momentumPhase == .cancelled { swipeState = .idle; return true }
+            // Fingers still down after the end went missing: pick the list back up.
+            guard event.phase == .changed else { return true }
+            startTracking()
+        case .deciding, .tracking:
+            break
+        }
+        if momentum { return true }
+
+        if swipeState == .deciding {
+            if event.phase == .ended || event.phase == .cancelled { swipeState = .idle; return false }
+            swipeAccumX += event.scrollingDeltaX
+            swipeAccumY += event.scrollingDeltaY
+            if abs(swipeAccumY) >= SpaceSwipe.axisLock, abs(swipeAccumY) > abs(swipeAccumX) {
+                swipeState = .scrolling
+                return false
+            }
+            guard abs(swipeAccumX) >= SpaceSwipe.axisLock, abs(swipeAccumX) > abs(swipeAccumY) else {
+                // Still deciding; hold sideways movement so the list doesn't twitch.
+                return abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+            }
+            startTracking()
+            swipeTravel += swipeAccumX
+            swipeSamples.append((now, swipeAccumX))
+            moveSwipe()
+            scheduleSwipeEnd(phaseless: phaseless)
             return true
         }
-        if event.momentumPhase != [] { return false }
-        if swipeDecided == false { return false }
 
-        swipeAccumX += event.scrollingDeltaX
-        swipeAccumY += event.scrollingDeltaY
-        if abs(swipeAccumY) > 6, abs(swipeAccumY) > abs(swipeAccumX) {
-            swipeDecided = false
-            return false
+        // Following the fingers.
+        if event.phase == .ended || event.phase == .cancelled {
+            swipeSamples.append((now, 0))
+            finishSwipe(velocity: event.phase == .ended ? SpaceSwipe.velocity(swipeSamples, at: now) : 0, cancelled: event.phase == .cancelled)
+            return true
         }
-        guard abs(swipeAccumX) > 14, abs(swipeAccumX) > abs(swipeAccumY) * 1.5 else {
-            // Still deciding; hold horizontal movement so the list doesn't twitch.
-            return abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
-        }
-        swipeDecided = true
-        swipeConsumed = true
-        // Content follows the fingers: moving them right reveals the space on the left. Landing on it taps.
-        if onSwipeSpace?(swipeAccumX > 0 ? -1 : 1) == true { Haptics.snap() }
+        swipeTravel += event.scrollingDeltaX
+        swipeSamples.append((now, event.scrollingDeltaX))
+        swipeSamples.removeAll { now - $0.time > SpaceSwipe.velocityWindow }
+        moveSwipe()
+        scheduleSwipeEnd(phaseless: phaseless)
         return true
     }
 
@@ -627,11 +710,209 @@ final class SidebarView: NSView {
     private var lastWheelSwitch: TimeInterval = 0
     private var swipeAccumX: CGFloat = 0
     private var swipeAccumY: CGFloat = 0
-    private var swipeConsumed = false
+    /// How far the fingers have moved sideways since the list started following them.
+    private var swipeTravel: CGFloat = 0
+    /// Where that puts the list: the travel, held back past the first and last space.
+    private var swipeTarget: CGFloat = 0
+    /// How far the list is drawn from home right now (stays 0 with Reduce Motion, where nothing moves until it lands).
+    private var swipeOffset: CGFloat = 0
+    private var swipeSamples: [(time: TimeInterval, dx: CGFloat)] = []
+    /// The spaces on either side of the one this gesture started in.
+    private var swipeNeighbors: (left: UUID?, right: UUID?) = (nil, nil)
+    /// -1 when the neighbor showing is the space on the left, 1 on the right.
+    private var neighborSide: CGFloat = 0
+    /// Set while a swipe lands, so the new list carries on at the fingers' speed.
+    private var landingVelocity: CGFloat?
+    private weak var swipeGhost: NSView?
+    private var swipeEndWork: DispatchWorkItem?
+    /// Counts gestures, so a spring-back finishing late doesn't hide the neighbor a newer gesture is showing.
+    private var swipeGeneration = 0
+
+    private func beginSwipe() {
+        swipeGeneration += 1
+        swipeState = .deciding
+        swipeAccumX = 0
+        swipeAccumY = 0
+        swipeEndWork?.cancel()
+        let spaces = Library.shared.spaces
+        let index = spaces.firstIndex { $0.id == currentSpaceID }
+        swipeNeighbors = (index.flatMap { $0 > 0 ? spaces[$0 - 1].id : nil },
+                          index.flatMap { $0 + 1 < spaces.count ? spaces[$0 + 1].id : nil })
+    }
+
+    /// The gesture is sideways: from here the list follows the fingers. Caught while still settling from the last
+    /// swipe, it's picked up from where it is on screen.
+    private func startTracking() {
+        swipeState = .tracking
+        swipeSamples = []
+        var shown: CGFloat = 0
+        if let layer = scrollView.layer, layer.animation(forKey: "slide") != nil,
+           let x = layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat {
+            shown = x
+        }
+        scrollView.layer?.removeAnimation(forKey: "slide")
+        neighborScroll.layer?.removeAnimation(forKey: "slide")
+        swipeGhost?.removeFromSuperview()
+        swipeTravel = SpaceSwipe.travel(toOffset: swipeOffset + shown, width: bounds.width,
+                                        hasLeft: swipeNeighbors.left != nil, hasRight: swipeNeighbors.right != nil)
+        moveSwipe()
+    }
+
+    private func moveSwipe() {
+        swipeTarget = SpaceSwipe.offset(forTravel: swipeTravel, width: bounds.width,
+                                        hasLeft: swipeNeighbors.left != nil, hasRight: swipeNeighbors.right != nil)
+        // With Reduce Motion nothing slides: the gesture still decides, and the space changes in place.
+        guard !Tokens.Motion.reduceMotion else { return }
+        swipeOffset = swipeTarget
+        Tokens.Motion.withoutAnimation {
+            scrollView.frame.origin.x = Tokens.Metric.sidebarPadding + swipeOffset
+            showNeighbor()
+        }
+        // The dots follow too: the pill shrinks on this space and grows on the one coming in.
+        let width = bounds.width
+        let share = width > 0 ? min(abs(swipeOffset) / width, 1) : 0
+        let incoming = swipeOffset > 0 ? swipeNeighbors.left : swipeOffset < 0 ? swipeNeighbors.right : nil
+        for dot in dots {
+            dot.swipeShare = dot.spaceID == currentSpaceID ? 1 - share : dot.spaceID == incoming ? share : nil
+        }
+    }
+
+    /// The dots go back to showing only the space you're in.
+    private func clearSwipeDots() { dots.forEach { $0.swipeShare = nil } }
+
+    /// Puts the space the fingers are pulling in one sidebar width beside the current list.
+    private func showNeighbor() {
+        let side: CGFloat = swipeOffset > 0 ? -1 : 1
+        guard swipeOffset != 0, let neighbor = side < 0 ? swipeNeighbors.left : swipeNeighbors.right else {
+            neighborScroll.isHidden = true
+            return
+        }
+        if neighborScroll.isHidden || neighborList.spaceOverride != neighbor {
+            neighborSide = side
+            neighborScroll.frame = scrollView.frame
+            neighborList.spaceOverride = neighbor
+            neighborList.privateLabel = list.privateLabel
+            neighborList.setFrameSize(neighborScroll.contentSize)
+            neighborList.reload(animated: false)
+            neighborScroll.contentView.scroll(to: .zero)
+            Self.fade(neighborFade, for: neighborScroll, list: neighborList)
+            neighborScroll.isHidden = false
+        }
+        placeNeighbor()
+    }
+
+    private func placeNeighbor() {
+        var frame = scrollView.frame
+        frame.origin.x += neighborSide * bounds.width
+        neighborScroll.frame = frame
+    }
+
+    /// For trackpads that don't mark a gesture's phases, the fingers going quiet is letting go. With phases, it's a
+    /// safety net for an end that never arrives (macOS sometimes drops it); still fingers send nothing, so it waits.
+    private func scheduleSwipeEnd(phaseless: Bool) {
+        swipeEndWork?.cancel()
+        let lastMove = lastSwipeEventTime
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.swipeState == .tracking else { return }
+            self.finishSwipe(velocity: phaseless ? SpaceSwipe.velocity(self.swipeSamples, at: lastMove) : 0)
+        }
+        swipeEndWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + (phaseless ? 0.12 : 0.6), execute: work)
+    }
+
+    /// Letting go: lands on the next space or springs home, carrying on at the fingers' speed either way.
+    private func finishSwipe(velocity: CGFloat, cancelled: Bool = false) {
+        swipeEndWork?.cancel()
+        guard swipeState == .tracking else { return }
+        swipeState = .finished
+        let direction = cancelled ? 0 : SpaceSwipe.landing(offset: swipeTarget, velocity: velocity, width: bounds.width)
+        let neighbor = direction < 0 ? swipeNeighbors.left : direction > 0 ? swipeNeighbors.right : nil
+        if neighbor != nil {
+            // The switch slides the new list in from where the neighbor is now (transitionList).
+            landingVelocity = velocity
+            if onSwipeSpace?(direction) == true { Haptics.snap(); return }
+            landingVelocity = nil
+        }
+        settleHome(velocity: velocity)
+    }
+
+    private func settleHome(velocity: CGFloat) {
+        let offset = swipeOffset
+        swipeOffset = 0
+        swipeTarget = 0
+        clearSwipeDots()
+        guard offset != 0 else { neighborScroll.isHidden = true; return }
+        Tokens.Motion.withoutAnimation {
+            scrollView.frame.origin.x = Tokens.Metric.sidebarPadding
+            placeNeighbor()
+        }
+        let curve = Tokens.Motion.swipeSettle
+        Tokens.Motion.slide(scrollView, fromOffsetX: offset, curve: curve, velocity: velocity)
+        guard !neighborScroll.isHidden else { return }
+        let duration = Tokens.Motion.slide(neighborScroll, fromOffsetX: offset, curve: curve, velocity: velocity)
+        let generation = swipeGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            guard let self, self.swipeGeneration == generation, self.swipeState != .tracking else { return }
+            self.neighborScroll.isHidden = true
+        }
+    }
 
     /// The space this sidebar shows; set by the window.
     var currentSpaceID: UUID?
 
+}
+
+/// The rules of a swipe between spaces, apart from the views so they can be checked on their own. Offsets and
+/// velocities are in points, positive when the list moves right (which brings in the space on the left).
+enum SpaceSwipe {
+    /// How far the fingers move before a gesture counts as sideways or up and down, for the rest of it.
+    static let axisLock: CGFloat = 4
+    /// Letting go past this share of the width lands on the next space: whichever space is nearer wins.
+    static let landingShare: CGFloat = 0.5
+    /// A flick at least this fast (points per second) lands, however short.
+    static let flickSpeed: CGFloat = 500
+    /// How much recent movement counts toward the speed at letting go.
+    static let velocityWindow: TimeInterval = 0.08
+    /// Past the first or last space the list gives less the further it's pulled, up to this share of the width.
+    static let edgeGive: CGFloat = 0.5
+    private static let edgeStiffness: CGFloat = 0.55
+
+    /// Where the fingers' travel puts the list: one to one toward a neighbor (at most a full width), held back
+    /// like a rubber band where there's none.
+    static func offset(forTravel travel: CGFloat, width: CGFloat, hasLeft: Bool, hasRight: Bool) -> CGFloat {
+        guard width > 0 else { return 0 }
+        if travel > 0 ? hasLeft : hasRight { return max(-width, min(width, travel)) }
+        let limit = width * edgeGive
+        let pulled = (1 - 1 / (abs(travel) * edgeStiffness / limit + 1)) * limit
+        return travel < 0 ? -pulled : pulled
+    }
+
+    /// The travel that puts the list at `offset`: the reverse of `offset(forTravel:)`, to pick a moving list up.
+    static func travel(toOffset offset: CGFloat, width: CGFloat, hasLeft: Bool, hasRight: Bool) -> CGFloat {
+        guard width > 0 else { return 0 }
+        if offset > 0 ? hasLeft : hasRight { return offset }
+        let limit = width * edgeGive
+        let share = min(abs(offset) / limit, 0.95)
+        let travel = (1 / (1 - share) - 1) * limit / edgeStiffness
+        return offset < 0 ? -travel : travel
+    }
+
+    /// Which way letting go goes: -1 to the space on the left, 1 to the right, 0 back home. A flick decides on its
+    /// own (the way the list is already pulled lands; back toward home doesn't); otherwise it's how far it went.
+    static func landing(offset: CGFloat, velocity: CGFloat, width: CGFloat) -> Int {
+        guard offset != 0 else { return 0 }
+        let toward = offset > 0 ? -1 : 1
+        if abs(velocity) >= flickSpeed { return (velocity > 0) == (offset > 0) ? toward : 0 }
+        return abs(offset) >= width * landingShare ? toward : 0
+    }
+
+    /// The fingers' speed at `now`, in points per second, from the movement in the last moment.
+    static func velocity(_ samples: [(time: TimeInterval, dx: CGFloat)], at now: TimeInterval) -> CGFloat {
+        let recent = samples.filter { now - $0.time <= velocityWindow }
+        guard let first = recent.first, recent.count > 1, now > first.time else { return 0 }
+        // The first sample's movement happened before its time, so it's the start of the span, not part of it.
+        return recent.dropFirst().reduce(0) { $0 + $1.dx } / CGFloat(now - first.time)
+    }
 }
 
 /// The little capsule on an extension's button: a blocked count, a word, or "!" when it needs you.
