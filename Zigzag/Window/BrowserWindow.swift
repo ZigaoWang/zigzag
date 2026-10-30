@@ -168,15 +168,14 @@ final class BrowserWindow: NSWindow {
             buttonSpacing = mini.frame.minX - close.frame.minX
         }
         let spacing = buttonSpacing ?? 20
-        // Grow the titlebar so the buttons can sit lower than AppKit's default.
+        // Grow the titlebar so the buttons can sit lower than AppKit's default. Its top is pinned every time, not only
+        // when the height changes: a resize from code moves the window's top without touching the height.
         if let container = titlebar.superview {
             let wanted = origin.y + height + Tokens.Space.x1
             var frame = container.frame
-            if frame.height != wanted {
-                frame.size.height = wanted
-                frame.origin.y = (contentView?.frame.height ?? frame.maxY) - wanted
-                container.frame = frame
-            }
+            frame.size.height = wanted
+            frame.origin.y = (contentView?.frame.height ?? frame.maxY) - wanted
+            if container.frame != frame { container.frame = frame }
         }
         for (index, button) in buttons.enumerated() {
             let x = origin.x + CGFloat(index) * spacing
