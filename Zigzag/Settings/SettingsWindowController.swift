@@ -146,6 +146,8 @@ final class FormRow: NSView {
         self.detail.isSelectable = false
         self.detail.isHidden = detail == nil
         [self.icon, self.title, self.detail, control].forEach { addSubview($0) }
+        // The row's title names its switch or menu for VoiceOver, which otherwise reads just "checkbox, 1".
+        if (control.accessibilityLabel() ?? "").isEmpty { control.setAccessibilityLabel(title) }
         frame.size.height = height(for: frame.width)
     }
 
