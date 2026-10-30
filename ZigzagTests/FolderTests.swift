@@ -126,4 +126,19 @@ struct ArcFolderTests {
         #expect(folders.map(\.name) == ["Reading"])
         #expect(folders.first?.bookmarkIDs == space.bookmarks[1...2].map(\.id))
     }
+
+    @Test func movedFolderLandsBetweenGroups() {
+        let b = (0..<6).map { _ in UUID() }
+        let folders = [BookmarkFolder(name: "F", bookmarkIDs: [b[1], b[2], b[3]])]
+        let splits = [PinnedSplit(left: b[4], right: b[5])]
+        // Outside any group: where it was dropped.
+        #expect(Library.folderDropIndex(1, in: b, folders: folders, splits: splits) == 1)
+        #expect(Library.folderDropIndex(4, in: b, folders: folders, splits: splits) == 4)
+        // Inside a folder: its nearer end.
+        #expect(Library.folderDropIndex(2, in: b, folders: folders, splits: splits) == 1)
+        #expect(Library.folderDropIndex(3, in: b, folders: folders, splits: splits) == 4)
+        // Never between a pinned split's two pages.
+        #expect(Library.folderDropIndex(5, in: b, folders: folders, splits: splits) == 4)
+        #expect(Library.folderDropIndex(99, in: b, folders: folders, splits: splits) == 6)
+    }
 }

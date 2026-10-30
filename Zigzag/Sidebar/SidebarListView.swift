@@ -14,6 +14,7 @@ protocol SidebarListDelegate: AnyObject {
     /// Puts a pinned page at the end of a folder, or takes it out of any (nil).
     func listSetFolder(of bookmarkID: UUID, to folderID: UUID?)
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?)
+    func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID)
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
     func listMenu(for item: SidebarItem) -> NSMenu?
     /// The menu for several picked rows at once.
@@ -69,12 +70,17 @@ enum SidebarItem: Hashable {
 
     var isDraggable: Bool {
         switch self {
-        case .bookmark, .tab: true
+        case .bookmark, .tab, .folder: true
         default: false
         }
     }
     /// Can be picked along with others (⌘-click, ⇧-click).
-    var isPickable: Bool { isDraggable }
+    var isPickable: Bool {
+        switch self {
+        case .bookmark, .tab: true
+        default: false
+        }
+    }
 }
 
 /// The scrolling list of bookmarks and tabs. Rows are reused by identity and animate between layouts.
@@ -144,6 +150,8 @@ final class SidebarListView: NSView {
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
         let riders = Set(Library.shared.pinnedSplits(in: spaceID).map(\.right))
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
+        // A folder being dragged travels shut: its pages go with it, not left behind in the list.
+        let lifted: UUID? = { if case .folder(let id)? = drag?.item { id } else { nil } }()
         if collapsed {
             result += bookmarks.filter { $0.id == current }.map { .bookmark($0.id) }
         } else {
@@ -157,7 +165,7 @@ final class SidebarListView: NSView {
                 guard let folder = folderOf[bookmark.id] else { result.append(.bookmark(bookmark.id)); continue }
                 guard placed.insert(folder.id).inserted else { continue }
                 result.append(.folder(folder.id))
-                let members = folder.isOpen ? folder.bookmarkIDs.filter { !riders.contains($0) } : folder.bookmarkIDs.filter { $0 == current }
+                let members = folder.id == lifted ? [] : folder.isOpen ? folder.bookmarkIDs.filter { !riders.contains($0) } : folder.bookmarkIDs.filter { $0 == current }
                 for id in members { result.append(.bookmark(id)); indented.insert(id) }
             }
         }
@@ -427,6 +435,10 @@ final class SidebarListView: NSView {
             }
             row.onRename = { [weak self] name in self?.delegate?.listRenameFolder(id, to: name) }
             row.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: item) }
+            row.onDragStart = { [weak self, weak row] event in
+                guard let self, let row else { return false }
+                return self.beginDrag(item, view: row, event: event)
+            }
             return row
         case .separator:
             let separator = SeparatorRowView()
@@ -749,11 +761,16 @@ final class SidebarListView: NSView {
         let base = buildItems(includeEmptyBookmarkSection: item != nil && bookmarkZoneOpen).filter { $0 != item }
         let layout = frames(for: base)
         let separatorMid = layout.first { $0.0 == .separator }.map { $0.1.midY } ?? 0
-        if item != nil, y < separatorMid {
+        // A folder stays among the pinned pages, and lands between groups, not inside one.
+        let folder: UUID? = { if case .folder(let id)? = item { id } else { nil } }()
+        if item != nil, y < separatorMid || folder != nil {
             var count = 0
             for (row, frame) in layout where frame.midY < y {
                 count += Self.pageCount(row)
                 if case .folder(let id) = row { count += hiddenCount(id, shown: base) }
+            }
+            if let folder, let space = shownSpaceID {
+                count = Library.shared.folderDropIndex(count, moving: folder, in: space)
             }
             return (.bookmarks, count)
         }
@@ -847,6 +864,12 @@ final class SidebarListView: NSView {
             for other in drag?.group ?? [] { rows[other]?.alphaValue = 0.35 }
         } else {
             clearMarks()
+        }
+        // A folder's pages leave the list with it, so where it lands is counted without them.
+        if case .folder = item {
+            let landing = target(at: start.y, dragging: item)
+            drag?.targetSection = landing.0
+            drag?.targetIndex = landing.1
         }
         view.alphaValue = 0
         panel.alphaValue = 1
@@ -1159,6 +1182,7 @@ final class SidebarListView: NSView {
                 switch item {
                 case .tab(let id): if let tab = manager.tab(with: id) { delegate?.listMove(tab, to: together.count == 1 ? 0 : Int.max, in: space) }
                 case .bookmark(let id): delegate?.listMoveBookmark(id, to: Int.max, in: space)
+                case .folder(let id): delegate?.listMoveFolder(id, to: Int.max, in: space)
                 default: break
                 }
             }
@@ -1190,6 +1214,8 @@ final class SidebarListView: NSView {
             }
         case (.bookmark(let id), .bookmarks?):
             delegate?.listMoveBookmark(id, to: drag.targetIndex, in: manager.currentSpaceID, folder: gapFolder)
+        case (.folder(let id), .bookmarks?):
+            delegate?.listMoveFolder(id, to: drag.targetIndex, in: manager.currentSpaceID)
         case (.bookmark(let id), .tabs?):
             // The row changes identity; the new tab row takes the placeholder's spot.
             rows[.bookmark(id)] = nil

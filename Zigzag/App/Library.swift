@@ -526,6 +526,50 @@ final class Library {
         commit()
     }
 
+    /// Moves a folder and its pages to a place in a space's list, counted in pinned pages without its own. It never
+    /// lands between another folder's pages or a pinned split's two; its own pinned splits go along.
+    func moveFolder(_ id: UUID, to index: Int, in spaceID: UUID) {
+        guard let s = spaceIndex(ofFolder: id), let target = self.index(of: spaceID),
+              let f = spaces[s].folders?.firstIndex(where: { $0.id == id }), let folder = spaces[s].folders?[f] else { return }
+        let at = folderDropIndex(index, moving: id, in: spaceID)
+        let members = Set(folder.bookmarkIDs)
+        let moving = spaces[s].bookmarks.filter { members.contains($0.id) }
+        spaces[s].bookmarks.removeAll { members.contains($0.id) }
+        spaces[target].bookmarks.insert(contentsOf: moving, at: min(at, spaces[target].bookmarks.count))
+        if s != target {
+            spaces[s].folders?.remove(at: f)
+            spaces[target].folders = (spaces[target].folders ?? []) + [folder]
+            let splits = spaces[s].pinnedSplits?.filter { members.contains($0.left) } ?? []
+            spaces[s].pinnedSplits?.removeAll { members.contains($0.left) }
+            if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
+            if !splits.isEmpty { spaces[target].pinnedSplits = (spaces[target].pinnedSplits ?? []) + splits }
+            tidyFolders(s)
+        }
+        tidyFolders(target)
+        commit()
+    }
+
+    /// Where a folder dropped at `index` in a space's list lands (see `moveFolder`).
+    func folderDropIndex(_ index: Int, moving folderID: UUID, in spaceID: UUID) -> Int {
+        guard let space = space(spaceID) else { return index }
+        let moving = Set(folder(folderID)?.bookmarkIDs ?? [])
+        return Self.folderDropIndex(index, in: space.bookmarks.map(\.id).filter { !moving.contains($0) },
+                                    folders: (space.folders ?? []).filter { $0.id != folderID }, splits: space.pinnedSplits ?? [])
+    }
+
+    /// Between pages that belong together (one folder's, or a pinned split's two), a folder goes to the nearer end.
+    nonisolated static func folderDropIndex(_ index: Int, in ids: [UUID], folders: [BookmarkFolder], splits: [PinnedSplit]) -> Int {
+        var group: [UUID: UUID] = [:]
+        for folder in folders { for id in folder.bookmarkIDs { group[id] = folder.id } }
+        for split in splits where group[split.left] == nil { group[split.left] = split.left; group[split.right] = split.left }
+        let at = max(0, min(index, ids.count))
+        guard at > 0, at < ids.count, let g = group[ids[at - 1]], group[ids[at]] == g else { return at }
+        var start = at, end = at
+        while start > 0, group[ids[start - 1]] == g { start -= 1 }
+        while end < ids.count, group[ids[end]] == g { end += 1 }
+        return at - start <= end - at ? start : end
+    }
+
     /// Puts a pinned page in a folder of its space (at the end of it), or takes it out of any folder (nil).
     func setFolder(of bookmarkID: UUID, to folderID: UUID?) {
         // A pinned split goes in as one: its left page leads, and its right one follows it there.

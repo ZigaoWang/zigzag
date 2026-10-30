@@ -1303,6 +1303,9 @@ extension BrowserWindowController: SidebarDelegate {
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
         libraryChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
     }
+    func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID) {
+        libraryChange("Move Folder") { Library.shared.moveFolder(id, to: index, in: spaceID) }
+    }
     func listSetFolderOpen(_ id: UUID, _ open: Bool) {
         // Opening and closing isn't an edit to undo.
         Library.shared.setFolderOpen(id, open)
