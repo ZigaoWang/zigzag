@@ -543,9 +543,9 @@ private final class DataToggle: InteractiveView {
     var fittingWidth: CGFloat { ceil(Tokens.Space.x3 + 10 + Tokens.Space.x1 + label.inkWidth + Tokens.Space.x3) }
 
     private func refresh() {
-        layer?.backgroundColor = Onboard.tint.withAlphaComponent(isOn ? 0.16 : 0).cgColor
+        layer?.backgroundColor = cgColor(Onboard.tint.withAlphaComponent(isOn ? 0.16 : 0))
         layer?.borderWidth = 1
-        layer?.borderColor = Onboard.tint.withAlphaComponent(isOn ? 0 : 0.25).cgColor
+        layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(isOn ? 0 : 0.25))
         label.textColor = isOn ? Onboard.ink : Onboard.dim(0.55)
         check.contentTintColor = Onboard.ink
         check.isHidden = !isOn
@@ -555,7 +555,13 @@ private final class DataToggle: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         guard !isLocked else { return }
-        if isHovered && !isOn { layer?.backgroundColor = Onboard.tint.withAlphaComponent(0.07).cgColor } else { refresh() }
+        if isHovered && !isOn { layer?.backgroundColor = cgColor(Onboard.tint.withAlphaComponent(0.07)) } else { refresh() }
+    }
+
+    /// Locked toggles skip hover, so a switch between light and dark redraws them here.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        if isLocked { refresh() }
     }
 
     override func layout() {
@@ -760,12 +766,18 @@ private final class BrowserRow: InteractiveView {
             }
         }
         let on = isChosen || isFinished
-        box.layer?.backgroundColor = on ? Onboard.accent.cgColor : nil
-        box.layer?.borderColor = Onboard.tint.withAlphaComponent(on ? 1 : 0.45).cgColor
+        tintBox()
         tick.isHidden = !on
         box.alphaValue = (needsAccess || isLocked) && !isChosen ? 0.35 : 1
         stateDidChange(animated: false)
         needsLayout = true
+    }
+
+    /// The checkbox's colors, resolved for light or dark; set again whenever that changes.
+    private func tintBox() {
+        let on = isChosen || isFinished
+        box.layer?.backgroundColor = on ? cgColor(Onboard.accent) : nil
+        box.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(on ? 1 : 0.45))
     }
 
     /// "6 passwords, 3 spaces and 58 bookmarks".
@@ -778,7 +790,12 @@ private final class BrowserRow: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let interactive = !isLocked && !isFinished
-        layer?.backgroundColor = interactive && isHovered ? Onboard.tint.withAlphaComponent(isPressed ? 0.1 : 0.05).cgColor : nil
+        layer?.backgroundColor = interactive && isHovered ? cgColor(Onboard.tint.withAlphaComponent(isPressed ? 0.1 : 0.05)) : nil
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        tintBox()
     }
 
     override func layout() {
@@ -1367,7 +1384,7 @@ private final class PickTile: InteractiveView {
     private func refresh() {
         // Quiet at rest, a soft accent wash and a check when picked: the icon does the talking.
         let fill = isPicked ? Onboard.accent.withAlphaComponent(0.12) : Onboard.tint.withAlphaComponent(isHovered && !isLocked ? 0.06 : 0)
-        layer?.backgroundColor = fill.cgColor
+        layer?.backgroundColor = cgColor(fill)
         layer?.borderWidth = 0
         check.contentTintColor = Onboard.accent
         check.isHidden = !isPicked || !spinner.isHidden
@@ -1755,11 +1772,11 @@ private final class ExtensionRow: InteractiveView {
     private func refresh() {
         let added = state == .added
         let on = isChosen || added
-        box.layer?.backgroundColor = on ? Onboard.accent.cgColor : nil
-        box.layer?.borderColor = Onboard.tint.withAlphaComponent(on ? 1 : 0.45).cgColor
+        box.layer?.backgroundColor = on ? cgColor(Onboard.accent) : nil
+        box.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(on ? 1 : 0.45))
         tick.isHidden = !on
         box.alphaValue = added ? 0.5 : 1
-        layer?.backgroundColor = isHovered && state == .idle && !isLocked ? Onboard.tint.withAlphaComponent(0.05).cgColor : nil
+        layer?.backgroundColor = isHovered && state == .idle && !isLocked ? cgColor(Onboard.tint.withAlphaComponent(0.05)) : nil
         statusIcon.isHidden = true
         status.textColor = Onboard.ink
         switch state {
@@ -1875,10 +1892,10 @@ private final class ChoiceCard: InteractiveView {
     override func stateDidChange(animated: Bool) { refresh() }
 
     private func refresh() {
-        layer?.backgroundColor = Onboard.tint.withAlphaComponent(isChosen ? 0.16 : (isHovered ? 0.09 : 0.05)).cgColor
+        layer?.backgroundColor = cgColor(Onboard.tint.withAlphaComponent(isChosen ? 0.16 : (isHovered ? 0.09 : 0.05)))
         layer?.borderWidth = isChosen ? 1.5 : 0
-        layer?.borderColor = Onboard.tint.withAlphaComponent(0.7).cgColor
-        ring.layer?.borderColor = Onboard.tint.withAlphaComponent(isChosen ? 1 : 0.45).cgColor
+        layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(0.7))
+        ring.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(isChosen ? 1 : 0.45))
         dot.isHidden = !isChosen
     }
 

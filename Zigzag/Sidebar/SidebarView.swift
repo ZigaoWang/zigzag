@@ -295,6 +295,7 @@ final class SidebarView: NSView {
         }
         newSpaceButton.onClick = { [weak self] _ in self?.delegate?.sidebarNewSpace() }
         address.onClick = { [weak self] _ in self?.delegate?.sidebarOpenCommandBar() }
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.tintDownloadsRing() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -513,6 +514,7 @@ final class SidebarView: NSView {
     /// A thin ring around the button that fills as downloads run, and a check for a moment when they're done.
     private let downloadsRing = CAShapeLayer()
     private var wasDownloading = false
+    private var themeToken: SignalToken?
 
     func updateDownloads(active: Int, hasAny: Bool, progress: Double = 1) {
         // Always there, in the same place, so the space dots never shift; with nothing downloaded, its panel says so.
@@ -532,7 +534,7 @@ final class SidebarView: NSView {
         var flip = CGAffineTransform(translationX: rect.midX, y: rect.midY).rotated(by: .pi / 2).scaledBy(x: -1, y: 1).translatedBy(x: -rect.midX, y: -rect.midY)
         downloadsRing.path = CGPath(ellipseIn: rect, transform: &flip)
         downloadsRing.frame = b
-        downloadsRing.strokeColor = cgColor(Brand.Theme.current.accent)
+        tintDownloadsRing()
         downloadsRing.opacity = downloading ? 1 : 0
         downloadsRing.strokeEnd = downloading ? CGFloat(max(0.04, min(progress, 1))) : 0
         downloadsButton.symbol = downloading ? "arrow.down" : (wasDownloading ? "checkmark.circle" : "arrow.down.circle")
@@ -543,6 +545,16 @@ final class SidebarView: NSView {
             }
         }
         wasDownloading = downloading
+    }
+
+    /// The ring is in this window's space accent, resolved for light or dark; set again when either changes.
+    private func tintDownloadsRing() {
+        downloadsRing.strokeColor = cgColor(Brand.Theme.for(self).accent)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        tintDownloadsRing()
     }
 
     /// The button answers when a download lands in it: a small press inward and back.

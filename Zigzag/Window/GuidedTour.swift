@@ -63,12 +63,11 @@ final class GuidedTour: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         dim.fillRule = .evenOdd
-        dim.fillColor = cgColor(Tokens.Color.scrim)
         layer?.addSublayer(dim)
         ring.fillColor = nil
         ring.lineWidth = 2.5
-        ring.strokeColor = Brand.Theme.brand.accent.cgColor
         layer?.addSublayer(ring)
+        applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 20)
         check.contentTintColor = Brand.Theme.brand.accent
         skip.textColor = Tokens.Color.textTertiary
@@ -101,6 +100,17 @@ final class GuidedTour: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The layers' colors, resolved for light or dark; set again whenever that changes.
+    private func applyColors() {
+        dim.fillColor = cgColor(Tokens.Color.scrim)
+        ring.strokeColor = cgColor(Brand.Theme.brand.accent)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColors()
+    }
 
     isolated deinit {
         watch?.invalidate()

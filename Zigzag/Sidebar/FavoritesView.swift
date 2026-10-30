@@ -167,8 +167,6 @@ final class FavoriteTile: InteractiveView {
         disc.wantsLayer = true
         disc.layer?.cornerRadius = side / 2
         disc.layer?.borderWidth = Tokens.Metric.hairline
-        disc.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
-        disc.layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
         disc.layer?.shadowOpacity = 1
         disc.layer?.shadowRadius = 1.5
         disc.layer?.shadowOffset = CGSize(width: 0, height: 1)
@@ -272,6 +270,9 @@ final class FavoriteTile: InteractiveView {
         let wanted = isOpen && (isHovered || badgeHovered)
         badgeLinger?.cancel()
         if wanted {
+            // Its edge and shadow are resolved here, so they follow light and dark like the tile.
+            closeDisc.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
+            closeDisc.layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
             closeDisc.isHidden = false
         } else if !closeDisc.isHidden {
             let work = DispatchWorkItem { [weak self] in
