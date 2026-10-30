@@ -326,6 +326,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let passwordsGroup = FormGroup()
     private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
+    private let sitesGroup = FormGroup()
+    /// Reset All beside the Sites heading, there only when something was chosen for a site.
+    private var sitesReset: TextButton?
+    private var alwaysReset: TextButton?
     private let translationGroup = FormGroup()
     private let alwaysGroup = FormGroup()
     private let extensionsGroup = FormGroup()
@@ -630,10 +634,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", control: cardToggle))
         let open = TextButton.form("Open Passwords")
         open.onClick = { _ in PasswordsWindowController.show() }
-        passwordsWindowGroup.add(FormRow(title: "Your passwords", detail: "See, edit and export them. Also in Window › Passwords" + Shortcuts.hint(for: #selector(AppDelegate.showPasswords(_:))) + ".", control: open))
-        let bring = TextButton.form("Import")
-        bring.onClick = { _ in ImportWindowController.show() }
-        passwordsWindowGroup.add(FormRow(title: "Import from another browser", detail: "Or from a password export file.", control: bring))
+        // Importing is in General and in the Passwords window itself; once here would be a third time.
+        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", control: open))
     }
 
     private func reloadTranslation() {
@@ -646,16 +648,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
         translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", control: translateOffer))
         let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
+        // Laid out like Sites in Privacy: a heading, Reset beside it only when there's something to reset.
         let reset = TextButton.form("Reset")
-        reset.isEnabled = !always.isEmpty
         reset.onClick = { [weak self] _ in
             PageTranslator.alwaysLanguages = []
             self?.reloadTranslation()
             self?.layoutDocument()
         }
-        alwaysGroup.add(FormRow(title: "Always translate",
-                                detail: always.isEmpty ? "None yet. Turn on Always Translate from a page’s site controls." : ListFormatter.localizedString(byJoining: always) + ".",
-                                control: reset))
+        alwaysReset = always.isEmpty ? nil : reset
+        alwaysGroup.add(always.isEmpty
+            ? FormRow(title: "None yet", detail: "Turn on Always Translate from a page’s site controls.", control: NSView())
+            : FormRow(title: ListFormatter.localizedString(byJoining: always), detail: "Translated as soon as they open.", control: NSView()))
     }
 
     // MARK: Shortcuts
@@ -747,10 +750,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, passwordsWindowGroup)
         case .privacy:
             section(nil, blockingGroup)
-            section(nil, privacyGroup)
+            section("Browsing data", privacyGroup)
+            section("Sites", sitesGroup, accessory: sitesReset)
         case .translation:
             section(nil, translationGroup)
-            section(nil, alwaysGroup)
+            section("Always translate", alwaysGroup, accessory: alwaysReset)
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
@@ -760,7 +764,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, developerGroup)
         case .shortcuts:
             let resetAll = TextButton.form("Reset All")
-            resetAll.isEnabled = Shortcuts.hasChanges
+            resetAll.isHidden = !Shortcuts.hasChanges
             resetAll.onClick = { [weak self] _ in
                 Shortcuts.resetAll()
                 ShortcutRow.lastTaken = nil
@@ -903,6 +907,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     /// did, right where you clicked.
     private func reloadPrivacy() {
         privacyGroup.removeAllRows()
+        sitesGroup.removeAllRows()
         let history = TextButton.form("Clear History")
         history.onClick = { [weak self, weak history] _ in
             self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.",
@@ -946,7 +951,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
         let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set")].compactMap { $0 }
         let reset = TextButton.form("Reset All")
-        reset.isEnabled = !parts.isEmpty
+        sitesReset = parts.isEmpty ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
                           action: "Reset All") {
@@ -958,9 +963,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 self?.layoutDocument()
             }
         }
-        let summary = parts.isEmpty ? "None yet. Choices you make for one site, like allowing ads, a camera or notifications, show up here."
-            : ListFormatter.localizedString(byJoining: parts).prefix(1).uppercased() + ListFormatter.localizedString(byJoining: parts).dropFirst() + "."
-        privacyGroup.add(FormRow(title: "Site choices", detail: summary, control: reset))
+        if parts.isEmpty {
+            sitesGroup.add(FormRow(title: "None yet", detail: "Choices you make for one site, like allowing ads, a camera or notifications, show up here.", control: NSView()))
+        }
 
         // Then each site, with what was chosen for it, and a way to forget just that one.
         let sites = SitePermissions.sites.union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
@@ -991,7 +996,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 self?.layoutDocument()
             }
             let line = said.joined(separator: ", ")
-            privacyGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", control: forget))
+            sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", control: forget))
         }
     }
 
