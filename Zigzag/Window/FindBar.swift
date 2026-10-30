@@ -193,7 +193,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             let work = DispatchWorkItem { [weak self, weak pdf] in
                 guard let self, let pdf else { return }
                 let found = pdf.find(query, backwards: backwards, fromStart: fromStart)
-                self.countLabel.stringValue = query.isEmpty ? "" : found.count == 0 ? "No matches" : found.count == 1 ? "1 match" : "\(found.place) of \(found.count)"
+                self.showCount(query.isEmpty ? "" : found.count == 0 ? "No matches" : found.count == 1 ? "1 match" : "\(found.place) of \(found.count)")
                 self.countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
                 self.layoutPanel()
             }
@@ -235,12 +235,18 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
                 guard let self else { return }
                 let pair = (result as? [Int]) ?? [0, 0]
                 let count = max(pair.count > 1 ? pair[1] : 0, 1), place = pair.first ?? 0
-                self.countLabel.stringValue = !found ? "No matches" : count == 1 ? "1 match"
-                    : (1...count).contains(place) ? "\(place) of \(count)" : "\(count) matches"
+                self.showCount(!found ? "No matches" : count == 1 ? "1 match"
+                    : (1...count).contains(place) ? "\(place) of \(count)" : "\(count) matches")
                 self.countLabel.textColor = found ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
                 self.layoutPanel()
             }
         }
+    }
+
+    /// Shows the match count, and has VoiceOver say it when it changes.
+    private func showCount(_ text: String) {
+        if text != countLabel.stringValue { Announcement.post(text) }
+        countLabel.stringValue = text
     }
 
     private func clearHighlights() {
@@ -601,6 +607,7 @@ enum Toast {
             isNew = true
         }
         toast.label.stringValue = text
+        Announcement.post(text, priority: action == nil ? .medium : .high)
         toast.icon.image = symbol.map { Tokens.Symbol.image($0) }
         toast.actionButton.isHidden = action == nil
         if let action {

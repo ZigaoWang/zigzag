@@ -446,6 +446,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private func step(_ delta: Int) {
         guard !results.isEmpty else { return }
         select((selectedIndex + delta + results.count) % results.count)
+        // Focus stays in the field, so VoiceOver hears which row the arrows landed on.
+        let result = results[selectedIndex]
+        Announcement.post([result.title, result.detail, result.actionLabel].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
     private func updateSelection() {

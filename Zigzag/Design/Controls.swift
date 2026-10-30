@@ -935,3 +935,13 @@ final class SlidingSwitch: NSView {
         onChange?(index)
     }
 }
+
+/// Speaks a short line through VoiceOver (a toast, a match count, the row you moved to) without moving focus.
+/// Nothing is posted while VoiceOver is off.
+enum Announcement {
+    static func post(_ text: String, priority: NSAccessibilityPriorityLevel = .medium) {
+        guard !text.isEmpty, NSWorkspace.shared.isVoiceOverEnabled else { return }
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: text, .priority: priority.rawValue])
+    }
+}
