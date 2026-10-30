@@ -137,7 +137,9 @@ final class ImportView: NSView {
         let data = chosenData
         stage = .importing
         title.stringValue = "Bringing it over…"
-        subtitle.stringValue = "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow."
+        // Only Chrome and its kin keep their passwords behind a Keychain item that macOS asks about.
+        let asksKeychain = data.contains(.passwords) && chosen.contains { if case .chromium = $0.source.kind { true } else { false } }
+        subtitle.stringValue = asksKeychain ? "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow." : ""
         primary.title = "Importing…"
         primary.isEnabled = false
         secondary.isHidden = true
@@ -174,7 +176,7 @@ final class ImportView: NSView {
         // In the welcome window the brand panel already says where everything went; here only the count and the
         // next step remain.
         subtitle.stringValue = presentation == .welcome ? "" : passwords > 0
-            ? "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Window › Passwords."
+            ? "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords."
             : "Everything that came over is in your sidebar. You can bring more over anytime from Settings."
         // Rows that hit a problem stay, with their fix; the ones that went fine give way to the summary.
         if presentation == .welcome {
@@ -659,7 +661,7 @@ private final class ImportHero: NSView {
         [count, caption, detail].forEach { $0.isHidden = false }
         if let lead {
             caption.stringValue = lead.1
-            detail.stringValue = rest.isEmpty ? "All in. Nothing left behind." : "Plus " + ListFormatter.localizedString(byJoining: rest) + "."
+            detail.stringValue = rest.isEmpty ? "" : "Plus " + ListFormatter.localizedString(byJoining: rest) + "."
             count.attributedStringValue = Brand.display(lead.0.formatted(), size: 60, color: theme.tint)
         } else if summaries.contains(where: { !$0.problems.isEmpty }) {
             // Never a cheerful "all set" over a failure: say nothing came, and the rows below say why.
@@ -687,7 +689,7 @@ private final class ImportHero: NSView {
         // Measured from the text itself: the label's own size can lag a change of text.
         let countHeight = ceil(count.attributedStringValue.size().height)
         let textWidth = bounds.width * 0.62
-        let total = countHeight + caption.lineHeight + 4 + detail.lineHeight
+        let total = countHeight + caption.lineHeight + (detail.stringValue.isEmpty ? 0 : 4 + detail.lineHeight)
         var y = (bounds.height - total) / 2
         count.frame = NSRect(x: pad - 3, y: y, width: textWidth, height: countHeight)
         y = count.frame.maxY
