@@ -54,10 +54,6 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .page { max-width: 640px; margin: 0 auto; padding: 120px 24px 80px; text-align: center; }
 .page h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .page .lede { margin-top: 14px; color: var(--soft); }
-.steps { list-style: none; padding: 0; margin: 56px 0 0; text-align: left; border-top: 1px solid var(--line); counter-reset: s; }
-.steps li { padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--soft); counter-increment: s; }
-.steps li::before { content: counter(s) ".  "; color: var(--ink); font-weight: 600; }
-.steps strong { color: var(--ink); font-weight: 600; }
 
 @media (max-width: 600px) { .top { padding: 80px 0 64px; } .clip { margin-bottom: 72px; } }
 @media (prefers-reduced-motion: reduce) {
@@ -101,9 +97,8 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .dl-arc { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 2 9; stroke-linecap: round; }
 .dl-folder .back { fill: #7FB2E5; } .dl-folder .front { fill: #9CC8F2; }
 .dl-folder text, .dl-label { font: 600 13px -apple-system, BlinkMacSystemFont, "Inter", sans-serif; fill: var(--soft); text-anchor: middle; }
-.dl-app { filter: drop-shadow(0 10px 18px rgba(0,0,0,.2)); } .dl-rest { opacity: .35; }
-.dl-next { margin: 44px auto 0; max-width: 520px; font-size: 17px; line-height: 1.6; color: var(--soft); text-wrap: pretty; }
-.dl-next b { color: var(--ink); font-weight: 600; }
+.dl-app { filter: drop-shadow(0 10px 18px rgba(0,0,0,.2)); } .dl-rest { opacity: 1; }
+.dl-next { margin: 40px auto 0; font-size: 17px; color: var(--soft); }
 @media (max-width: 640px) { .dl h1 { font-size: 30px; } .dl { padding-top: 40px; } }
 
 /* Changelog: each version's number and date on the left, its notes on the right; stacked on narrow screens. */
