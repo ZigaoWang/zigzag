@@ -239,6 +239,8 @@ final class PermissionPrompt: FloatingPanelView {
         // The asking tab closed while an earlier question waited.
         if let tab, tab.isClosed { return .notNow }
         let asking = tab ?? controller.tabManager.selectedTab
+        // In the space's own color, like every other button in the window.
+        let accent = Brand.Theme.of(controller.tabManager.currentSpace).accent
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
             prompt.request.stringValue = "\(request)?"
@@ -249,21 +251,17 @@ final class PermissionPrompt: FloatingPanelView {
             } else {
                 prompt.picture.image = Tokens.Symbol.image(symbol, size: 15)
                 prompt.picture.imageScaling = .scaleNone
-                prompt.picture.contentTintColor = .controlAccentColor
+                prompt.picture.contentTintColor = accent
+                prompt.badge.color = accent.withAlphaComponent(0.16)
             }
             if let alwaysTitle {
                 let box = CheckBox(title: alwaysTitle)
-                box.fixedColor = .controlAccentColor
                 prompt.addSubview(box)
                 prompt.always = box
             }
             let deny = TextButton.form(denyTitle)
             deny.onClick = { [weak prompt] _ in prompt?.finish(.deny) }
-            // The Mac's own accent, as its own dialogs ask: the page is asking, not the space, and a space's tint
-            // turns muddy on a dark card.
             let allow = PrimaryButton(title: allowTitle)
-            allow.customFill = .controlAccentColor
-            allow.customInk = .white
             allow.onClick = { [weak prompt] _ in
                 guard let prompt else { return }
                 prompt.finish(prompt.always.map { $0.isOn ? .allow : .allowOnce } ?? .allow)
@@ -329,7 +327,6 @@ final class PermissionPrompt: FloatingPanelView {
         super.init(frame: frame)
         badge.wantsLayer = true
         badge.layer?.cornerRadius = Self.iconSide / 2
-        badge.color = NSColor.controlAccentColor.withAlphaComponent(0.14)
         // A long host loses its middle, not its end: the part that says whose site it is stays.
         asker.lineBreakMode = .byTruncatingMiddle
         request.lineBreakMode = .byWordWrapping
