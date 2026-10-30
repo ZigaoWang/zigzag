@@ -666,6 +666,9 @@ final class SidebarView: NSView {
             if event.momentumPhase == .ended || event.momentumPhase == .cancelled { swipeState = .idle; return true }
             // Fingers still down after the end went missing: pick the list back up.
             guard event.phase == .changed else { return true }
+            // It may have landed on another space meanwhile: its neighbors are the ones now.
+            swipeGeneration += 1
+            findNeighbors()
             startTracking()
         case .deciding, .tracking:
             break
@@ -734,6 +737,11 @@ final class SidebarView: NSView {
         swipeAccumX = 0
         swipeAccumY = 0
         swipeEndWork?.cancel()
+        findNeighbors()
+    }
+
+    /// The spaces either side of the one in front now.
+    private func findNeighbors() {
         let spaces = Library.shared.spaces
         let index = spaces.firstIndex { $0.id == currentSpaceID }
         swipeNeighbors = (index.flatMap { $0 > 0 ? spaces[$0 - 1].id : nil },
@@ -807,17 +815,22 @@ final class SidebarView: NSView {
         neighborScroll.frame = frame
     }
 
-    /// For trackpads that don't mark a gesture's phases, the fingers going quiet is letting go. With phases, it's a
-    /// safety net for an end that never arrives (macOS sometimes drops it); still fingers send nothing, so it waits.
+    /// For trackpads that don't mark a gesture's phases, the fingers going quiet is letting go. With phases, it's
+    /// only a safety net for an end that never arrives (macOS sometimes drops it): resting fingers send nothing, so
+    /// it waits long, and then only springs home, never switching space under fingers that may still be down.
     private func scheduleSwipeEnd(phaseless: Bool) {
         swipeEndWork?.cancel()
         let lastMove = lastSwipeEventTime
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.swipeState == .tracking else { return }
-            self.finishSwipe(velocity: phaseless ? SpaceSwipe.velocity(self.swipeSamples, at: lastMove) : 0)
+            if phaseless {
+                self.finishSwipe(velocity: SpaceSwipe.velocity(self.swipeSamples, at: lastMove))
+            } else {
+                self.finishSwipe(velocity: 0, cancelled: true)
+            }
         }
         swipeEndWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + (phaseless ? 0.12 : 0.6), execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (phaseless ? 0.12 : 3), execute: work)
     }
 
     /// Letting go: lands on the next space or springs home, carrying on at the fingers' speed either way.
@@ -850,9 +863,10 @@ final class SidebarView: NSView {
         Tokens.Motion.slide(scrollView, fromOffsetX: offset, curve: curve, velocity: velocity)
         guard !neighborScroll.isHidden else { return }
         let duration = Tokens.Motion.slide(neighborScroll, fromOffsetX: offset, curve: curve, velocity: velocity)
-        let generation = swipeGeneration
+        // Hidden once home, unless a new swipe has it out again: a hidden neighbor is reloaded when it next shows,
+        // so it never comes back with old rows.
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-            guard let self, self.swipeGeneration == generation, self.swipeState != .tracking else { return }
+            guard let self, self.swipeState != .tracking else { return }
             self.neighborScroll.isHidden = true
         }
     }
