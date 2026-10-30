@@ -200,8 +200,19 @@ final class BrowserRootView: ColorView {
         didSet {
             guard oldValue != isEmpty else { return }
             Tokens.Motion.animate(Tokens.Motion.feedback) {
-                self.card.animator().alphaValue = self.isEmpty ? 0 : 1
+                self.card.animator().alphaValue = self.isEmpty || self.pagesHidden ? 0 : 1
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
+            }
+        }
+    }
+    /// Desk view hides the pages while their picture flies into or out of a card, so the two never show at once.
+    /// They stay in the window and keep drawing, so they're ready the moment they show again.
+    var pagesHidden = false {
+        didSet {
+            guard oldValue != pagesHidden else { return }
+            Tokens.Motion.withoutAnimation {
+                card.alphaValue = isEmpty || pagesHidden ? 0 : 1
+                secondCard.alphaValue = pagesHidden ? 0 : 1
             }
         }
     }
@@ -232,7 +243,7 @@ final class BrowserRootView: ColorView {
             self.card.animator().frame = panes.left
             if let right = panes.right {
                 self.secondCard.animator().frame = right
-                self.secondCard.animator().alphaValue = 1
+                self.secondCard.animator().alphaValue = self.pagesHidden ? 0 : 1
             }
         }
     }

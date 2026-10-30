@@ -107,8 +107,10 @@ enum Tokens {
         static let quick: TimeInterval = 0.1
         /// Most UI transitions: sidebar slide, command bar, row moves.
         static let standard: TimeInterval = 0.2
-        /// Large surface moves: desk view zoom.
+        /// Large surface moves: the desk fading in and out.
         static let large: TimeInterval = 0.3
+        /// The page shrinking into its card in desk view, and a card growing back into the page.
+        static let zoom: TimeInterval = 0.36
         /// Delay before a hover preview appears.
         static let previewDelay: TimeInterval = 0.6
         /// How long the pointer can stray off the floating sidebar before it slides away.
@@ -244,9 +246,11 @@ enum Tokens {
             CATransaction.commit()
         }
 
+        /// A critically damped spring: it never overshoots, and runs until it has settled.
         static func springAnimation(keyPath: String, duration: TimeInterval = standard) -> CASpringAnimation {
-            let spring = CASpringAnimation(perceptualDuration: duration, bounce: 0)
+            let spring = CASpringAnimation(perceptualDuration: duration * debugSlowdown, bounce: 0)
             spring.keyPath = keyPath
+            spring.duration = spring.settlingDuration
             return spring
         }
     }

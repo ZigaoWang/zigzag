@@ -44,6 +44,20 @@ final class DeskCanvasView: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
 }
 
+/// Holds the page's picture as it flies. Not flipped, so its layer's coordinates are a view's, and never in the
+/// way of a click.
+final class DeskFlightView: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        autoresizingMask = [.width, .height]
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 /// Desk view: zoom out to see every tab at once and tidy up. Not for everyday switching.
 final class DeskController {
     private weak var controller: BrowserWindowController?
@@ -58,6 +72,11 @@ final class DeskController {
     private var selection: Set<UUID> = []
     private(set) var isVisible = false
     private var marquee: CAShapeLayer?
+    /// The page's picture while it flies between the page area and its card, over the desk.
+    private let flightView = DeskFlightView()
+    private var flight: PagePicture?
+    /// Counts opens and closes, so one that's been taken over doesn't finish what the next one started.
+    private var transition = 0
     private var magnifyTotal: CGFloat = 0
     private var gestureClaimed = false
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
@@ -142,18 +161,23 @@ final class DeskController {
     func show() {
         guard !isVisible, let controller else { return }
         isVisible = true
+        transition += 1
         selection = []
         controller.previews.hide()
         // The page's link preview would float over the cards.
         controller.linkStatus.show(nil, in: controller.root.cardFrame)
         controller.commandBar.dismiss(restoringFocus: false)
-        controller.tabManager.selectedTab?.captureSnapshot { [weak self] in self?.cards.values.forEach { $0.refreshImage() } }
         let root = controller.root
         backdrop.color = controller.tabManager.currentSpace.background
         backdrop.frame = root.bounds
         backdrop.autoresizingMask = [.width, .height]
         scrollView.autoresizingMask = [.width, .height]
+        // Opened again while still closing: the desk is there, and carries on from where it is.
+        let reopening = backdrop.superview != nil
+        if !reopening { Tokens.Motion.withoutAnimation { backdrop.alphaValue = 0 } }
         root.overlay.addSubview(backdrop)
+        flightView.frame = root.overlay.bounds
+        root.overlay.addSubview(flightView)
         query = ""
         searchField.stringValue = ""
         layoutSearch()
@@ -161,81 +185,172 @@ final class DeskController {
         // The window's own controls would sit on top of the desk; tuck them away.
         (controller.window as? BrowserWindow)?.trafficLightsHidden = false
         controller.window?.makeFirstResponder(canvas)
+        backdrop.layoutSubtreeIfNeeded()
+        if !reopening, let card = currentCard { canvas.scrollToVisible(card.frame.insetBy(dx: 0, dy: -margin)) }
 
-        // Zoom out: the current page shrinks into its card while the others fade in.
-        let current = controller.tabManager.selectedTab.flatMap { cards[$0.id] }
-        settleIn(except: current)
-        if let current, let snapshot = current.tab?.snapshot {
-            // Where it lands is only known once the cards are laid out.
-            backdrop.layoutSubtreeIfNeeded()
-            let target = current.imageClip.convert(current.imageClip.bounds, to: root.overlay)
-            current.alphaValue = 0
-            zoom(snapshot, from: root.cardFrame, to: target, in: root.overlay) { current.alphaValue = 1 }
+        guard !Tokens.Motion.reduceMotion else {
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true) { self.backdrop.animator().alphaValue = 1 }
+            return
         }
-        backdrop.alphaValue = 0
-        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) { self.backdrop.animator().alphaValue = 1 }
+        if reopening {
+            zoomOut(settle: false)
+            return
+        }
+        // The page's picture is taken fresh, so what shrinks is exactly what was on screen. That's quick; if it
+        // isn't, the last picture will do.
+        let id = transition
+        var started = false
+        let start = { [weak self] in
+            guard let self, !started, self.isVisible, self.transition == id else { return }
+            started = true
+            self.cards.values.forEach { $0.refreshImage() }
+            self.zoomOut(settle: true)
+        }
+        capturePages(start)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { start() } }
     }
 
-    /// The page flying between full size and its card: a plain layer over everything, moved by Core Animation on
-    /// the render server, so it never stutters or hides behind the desk.
-    private func zoom(_ image: NSImage, from: NSRect, to: NSRect, in overlay: NSView, completion: @escaping () -> Void) {
-        guard let host = overlay.layer, !Tokens.Motion.reduceMotion else { completion(); return }
-        let ghost = CALayer()
-        ghost.contents = image
-        ghost.contentsGravity = .resize
-        ghost.cornerRadius = Tokens.Radius.card
-        ghost.cornerCurve = .continuous
-        ghost.masksToBounds = true
-        ghost.zPosition = 1000
-        ghost.anchorPoint = .zero
-        // A flipped view's layer is flipped with it, so view and layer coordinates agree.
-        let start = from, end = to
+    /// Takes new pictures of the page on screen, both pages with a split, then calls `completion` once.
+    private func capturePages(_ completion: @escaping () -> Void) {
+        guard let manager, let tab = manager.selectedTab else { completion(); return }
+        let pages = [tab] + (manager.partner(of: tab).map { [$0] } ?? [])
+        var waiting = pages.count
+        for page in pages {
+            page.captureSnapshot {
+                waiting -= 1
+                if waiting == 0 { completion() }
+            }
+        }
+    }
+
+    /// Opening: the page shrinks from where it is on screen into its card, in one continuous move, while the desk
+    /// fades in behind it and the other cards settle in around it. `settle` is false when a close is turned around
+    /// mid-way, with the cards still in place.
+    private func zoomOut(settle: Bool) {
+        guard let controller else { return }
+        let id = transition
+        let current = currentCard
+        fade(backdrop, to: 1, duration: Tokens.Motion.large)
+        if settle { settleIn(except: current) }
+        guard let current, let tab = current.tab else { return }
+        let target = current.imageClip.convert(current.imageClip.bounds, to: flightView)
+        let flight = self.flight ?? makeFlight(at: flightView.convert(controller.root.cardFrame, from: controller.root), radius: pageRadius)
+        // Only its picture flies; the title arrives with the other cards.
+        Tokens.Motion.withoutAnimation { current.imageClip.alphaValue = 0 }
+        flight.show(Self.picture(of: tab), current.partner?.snapshot, split: current.split)
+        fly(flight, to: target, radius: Tokens.Radius.thumbnail) { [weak self] in
+            guard let self, self.transition == id else { return }
+            // Landed: the card takes over in the same frame, so nothing moves.
+            Tokens.Motion.withoutAnimation {
+                self.cards.values.forEach { $0.imageClip.alphaValue = 1 }
+                self.endFlight()
+            }
+        }
+    }
+
+    /// The flying picture, page-sized so it stays sharp, scaled to show over `frame` (in the flight view) with
+    /// `radius` corners. The live pages under it are hidden so the two never show at once; they keep drawing, so
+    /// they're ready the moment it lands.
+    private func makeFlight(at frame: NSRect, radius: CGFloat) -> PagePicture {
+        let picture = PagePicture()
+        let layer = picture.layer
+        let page = controller?.root.cardFrame.size ?? frame.size
+        let scale = (x: frame.width / max(page.width, 1), y: frame.height / max(page.height, 1))
+        layer.anchorPoint = .zero
+        layer.masksToBounds = true
+        layer.cornerCurve = .continuous
+        Tokens.Motion.withoutAnimation {
+            layer.backgroundColor = flightView.cgColor(Tokens.Color.cardBackground)
+            picture.divider.backgroundColor = flightView.cgColor(Tokens.Color.cardEdge)
+            picture.layout(size: page)
+            layer.position = frame.origin
+            layer.transform = CATransform3DMakeScale(scale.x, scale.y, 1)
+            layer.cornerRadius = radius / max(min(scale.x, scale.y), 0.01)
+            flightView.layer?.addSublayer(layer)
+        }
+        controller?.root.pagesHidden = true
+        flight = picture
+        return picture
+    }
+
+    /// The corners of the page on screen: square when it runs to the window's edges.
+    private var pageRadius: CGFloat { controller?.root.isEdgeToEdge == true ? 0 : Tokens.Radius.card }
+
+    /// Moves the flying picture onto `target` (in the flight view), its corners ending at `radius`, on a critically
+    /// damped spring. It starts from wherever it is on screen right now, so a move taken over mid-way turns around
+    /// without a jump.
+    private func fly(_ flight: PagePicture, to target: NSRect, radius: CGFloat, completion: @escaping () -> Void) {
+        let layer = flight.layer
+        let size = layer.bounds.size
+        guard size.width > 0, size.height > 0 else { completion(); return }
+        let sx = target.width / size.width, sy = target.height / size.height
+        let shown = layer.presentation() ?? layer
+        let from: [String: Any] = ["position": shown.position, "transform": shown.transform, "cornerRadius": shown.cornerRadius]
+        let to: [String: Any] = ["position": target.origin, "transform": CATransform3DMakeScale(sx, sy, 1),
+                                 "cornerRadius": radius / max(min(sx, sy), 0.01)]
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        ghost.frame = end
-        host.addSublayer(ghost)
-        CATransaction.commit()
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { ghost.removeFromSuperlayer(); completion() }
-        let duration = Tokens.Motion.gentle.duration * Tokens.Motion.debugSlowdown
-        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
-        for (key, a, b) in [("position", NSValue(point: start.origin), NSValue(point: end.origin)),
-                            ("bounds.size", NSValue(size: start.size), NSValue(size: end.size))] {
-            let move = CABasicAnimation(keyPath: key)
-            move.fromValue = a
-            move.toValue = b
-            move.duration = duration
-            move.timingFunction = curve
-            ghost.add(move, forKey: key)
+        CATransaction.setCompletionBlock(completion)
+        for key in ["position", "transform", "cornerRadius"] {
+            let spring = Tokens.Motion.springAnimation(keyPath: key, duration: Tokens.Motion.zoom)
+            spring.fromValue = from[key]
+            spring.toValue = to[key]
+            layer.setValue(to[key], forKeyPath: key)
+            layer.add(spring, forKey: key)
         }
         CATransaction.commit()
     }
 
-    /// The other cards arrive a beat after one another, in reading order: each fades in while growing the last
-    /// few percent from its own middle. Short enough that the last one lands with the zoom.
-    private func settleIn(except skipped: NSView?) {
-        guard !Tokens.Motion.reduceMotion else { return }
-        let ordered = cards.values.filter { $0 !== skipped }.sorted {
+    /// The picture is done with: it goes, and the live pages show again.
+    private func endFlight() {
+        flight?.layer.removeFromSuperlayer()
+        flight = nil
+        controller?.root.pagesHidden = false
+    }
+
+    /// The picture a card's first page shows, or none for one that hasn't drawn.
+    private static func picture(of tab: Tab) -> NSImage? { TabThumbnailView.isBlank(tab.snapshot) ? nil : tab.snapshot }
+
+    /// Fades a view to `value` on a spring, from wherever it is now.
+    private func fade(_ view: NSView, to value: CGFloat, duration: TimeInterval, completion: (() -> Void)? = nil) {
+        guard let layer = view.layer else { completion?(); return }
+        let spring = Tokens.Motion.springAnimation(keyPath: "opacity", duration: duration)
+        spring.fromValue = layer.presentation()?.opacity ?? layer.opacity
+        spring.toValue = Float(value)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock(completion)
+        Tokens.Motion.withoutAnimation { view.alphaValue = value }
+        layer.add(spring, forKey: "deskFade")
+        CATransaction.commit()
+    }
+
+    /// The other cards come in around the page: each fades in while growing the last few percent from its own
+    /// middle, a beat after the one before it in reading order, all landing with the page.
+    private func settleIn(except current: NSView?) {
+        let ordered = cards.values.filter { $0.frame.intersects(canvas.visibleRect) }.sorted {
             $0.frame.minY != $1.frame.minY ? $0.frame.minY < $1.frame.minY : $0.frame.minX < $1.frame.minX
         }
-        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
         let now = CACurrentMediaTime()
-        for (i, card) in ordered.prefix(24).enumerated() {
+        for (i, card) in ordered.enumerated() {
             guard let layer = card.layer else { continue }
-            let k: CGFloat = 0.94, size = card.bounds.size
-            let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
-                                            CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
-            let grow = CABasicAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: small)
-            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            let fade = CABasicAnimation(keyPath: "opacity")
+            let fade = Tokens.Motion.springAnimation(keyPath: "opacity", duration: Tokens.Motion.zoom)
             fade.fromValue = 0
             fade.toValue = 1
             let group = CAAnimationGroup()
-            group.animations = [grow, fade]
-            group.duration = 0.3
-            group.timingFunction = curve
-            group.beginTime = now + min(Double(i) * 0.018, 0.16)
+            if card === current {
+                // Its picture is the page flying in; only its title fades in.
+                group.animations = [fade]
+            } else {
+                let k: CGFloat = 0.96, size = card.bounds.size
+                let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
+                                                CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
+                let grow = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.zoom)
+                grow.fromValue = NSValue(caTransform3D: small)
+                grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+                group.animations = [grow, fade]
+            }
+            group.duration = fade.duration
+            group.beginTime = now + min(Double(i) * 0.01, 0.06) * Tokens.Motion.debugSlowdown
             group.fillMode = .backwards
             layer.add(group, forKey: "settle")
         }
@@ -244,32 +359,61 @@ final class DeskController {
     func hide(openingTab tab: Tab?) {
         guard isVisible, let controller else { return }
         isVisible = false
+        transition += 1
+        let id = transition
         actionBar.removeFromSuperview()
         // The window's controls go back to how the sidebar has them.
         controller.layoutTrafficLights()
         let root = controller.root
         let target = tab ?? controller.tabManager.selectedTab
-        if let target, let card = cards[target.id], let image = target.snapshot ?? card.tab?.snapshot {
-            // Zoom into the chosen card.
-            let from = card.imageClip.convert(card.imageClip.bounds, to: root.overlay)
-            card.alphaValue = 0
-            if let tab { controller.tabManager.select(tab) }
-            zoom(image, from: from, to: root.cardFrame, in: root.overlay) { card.alphaValue = 1 }
-            Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: {
-                // Opened again before this finished: it stays.
-                guard !self.isVisible else { return }
-                self.backdrop.removeFromSuperview()
-                self.backdrop.alphaValue = 1
-            })
-        } else {
-            if let tab { controller.tabManager.select(tab) }
-            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: {
-                guard !self.isVisible else { return }
-                self.backdrop.removeFromSuperview()
-                self.backdrop.alphaValue = 1
-            })
-        }
+        let card = target.flatMap { target in cards[manager?.split(for: target)?.left ?? target.id] ?? cards[target.id] }
+        if let tab { controller.tabManager.select(tab) }
         if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+        let finish = { [weak self] in
+            // Opened again before this finished: it stays.
+            guard let self, self.transition == id else { return }
+            Tokens.Motion.withoutAnimation {
+                self.backdrop.removeFromSuperview()
+                self.backdrop.alphaValue = 1
+                self.cards.values.forEach { $0.imageClip.alphaValue = 1 }
+            }
+        }
+        // Closed before the desk ever showed (pressed twice quickly): nothing to take back.
+        let shown = backdrop.layer?.presentation()?.opacity ?? Float(backdrop.alphaValue)
+        guard !Tokens.Motion.reduceMotion, shown > 0.01 || flight != nil, let card, let page = card.tab else {
+            // Nothing to grow, or Reduce Motion: the desk simply fades away.
+            endFlight()
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 0 }, completion: finish)
+            return
+        }
+        // Closing: the chosen card grows to fill the page area, exactly where its page is, and hands over to it.
+        let flight = self.flight ?? makeFlight(at: card.imageClip.convert(card.imageClip.bounds, to: flightView), radius: Tokens.Radius.thumbnail)
+        root.pagesHidden = true
+        Tokens.Motion.withoutAnimation { card.imageClip.alphaValue = 0 }
+        flight.show(Self.picture(of: page), card.partner?.snapshot, split: card.split)
+        // The desk is gone, and out of the way of clicks, a moment before the page lands.
+        fade(backdrop, to: 0, duration: Tokens.Motion.large, completion: finish)
+        fly(flight, to: flightView.convert(root.cardFrame, from: root), radius: pageRadius) { [weak self] in
+            guard let self, self.transition == id else { return }
+            self.handOff(flight)
+        }
+    }
+
+    /// The picture has grown into the page area: the live pages show under it, and it fades off them quickly. When
+    /// the picture is current that's invisible; when the page has changed since, it reads as the page refreshing.
+    private func handOff(_ flight: PagePicture) {
+        controller?.root.pagesHidden = false
+        self.flight = nil
+        let layer = flight.layer
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { layer.removeFromSuperlayer() }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = Tokens.Motion.quick * Tokens.Motion.debugSlowdown
+        Tokens.Motion.withoutAnimation { layer.opacity = 0 }
+        layer.add(fade, forKey: "handOff")
+        CATransaction.commit()
     }
 
     // MARK: Layout
