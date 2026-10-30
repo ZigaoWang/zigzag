@@ -351,9 +351,12 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     /// Clearing history forgets where you were in PDFs too: all of them, or those read since `date`.
     static func forgetPlaces(since date: Date? = nil) {
         guard let date else { UserDefaults.standard.removeObject(forKey: placesKey); return }
-        let all = UserDefaults.standard.dictionary(forKey: placesKey) ?? [:]
-        let kept = all.filter { (($0.value as? [Any])?.last as? Double ?? 0) < date.timeIntervalSince1970 }
-        UserDefaults.standard.set(kept, forKey: placesKey)
+        UserDefaults.standard.set(places(UserDefaults.standard.dictionary(forKey: placesKey) ?? [:], readBefore: date), forKey: placesKey)
+    }
+
+    /// The saved places (page, then when) last read before `date`. One without a time is older than any, so it stays.
+    static func places(_ all: [String: Any], readBefore date: Date) -> [String: Any] {
+        all.filter { (($0.value as? [Any])?.last as? Double ?? 0) < date.timeIntervalSince1970 }
     }
 
     private static func place(for url: URL) -> Int? {

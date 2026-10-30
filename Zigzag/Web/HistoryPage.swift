@@ -117,7 +117,6 @@ enum HistoryPage {
                           confirmTitle: "Clear", destructive: true) { confirmed in
             if confirmed {
                 if let since { HistoryStore.shared.clear(since: since) } else { HistoryStore.shared.clearAll() }
-                UserDefaults.standard.removeObject(forKey: "pdfPlaces")
             }
             reply(confirmed, nil)
         }

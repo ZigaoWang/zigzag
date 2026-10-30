@@ -146,6 +146,17 @@ struct BookmarkFolderTests {
         #expect(SpaceSwipe.velocity(samples, at: 2) == 0)
     }
 
+    @Test func clearingTheLastHourKeepsOlderPDFPlaces() {
+        let now = Date()
+        let all: [String: Any] = [
+            "old.pdf": [3, now.addingTimeInterval(-7200).timeIntervalSince1970],
+            "new.pdf": [5, now.addingTimeInterval(-60).timeIntervalSince1970],
+            "untimed.pdf": [7],
+        ]
+        let kept = PDFViewerView.places(all, readBefore: now.addingTimeInterval(-3600))
+        #expect(Set(kept.keys) == ["old.pdf", "untimed.pdf"])
+    }
+
     @Test func certificateProceedNeedsTheNonceAndTheWarnedHost() throws {
         let page = try #require(URL(string: "https://router.local:8443/admin?tab=1"))
         let link = try #require(CertificateExceptions.proceedLink(for: page, nonce: "abc"))
