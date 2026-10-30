@@ -204,7 +204,7 @@ final class ImportView: NSView {
         guard abs(delta) > 1 else { return }
         frame.size.height += delta
         frame.origin.y -= delta
-        window.setFrame(frame, display: true, animate: true)
+        window.setFrame(frame, display: true, animate: window.isVisible && !Tokens.Motion.reduceMotion)
     }
 
     #if DEBUG
