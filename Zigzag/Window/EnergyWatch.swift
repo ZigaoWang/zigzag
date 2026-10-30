@@ -1,8 +1,10 @@
 import AppKit
 import WebKit
 
-/// Notices a page that keeps a CPU core busy, and says so once, with what to do: usually an extension stuck in a
-/// loop on that site, sometimes the page itself. Nothing about the page is recorded; only how busy its process is.
+/// Notices a tab you're not looking at that keeps a CPU core busy, and says so once, with a way to close it. The page
+/// in front isn't flagged: you can see what it's doing, and a busy one is usually busy on purpose (an animation, a
+/// game). Nor is an extension blamed just for being on the page: password managers are on every page, so naming one
+/// would mostly be wrong. Nothing about the page is recorded; only how busy its process is.
 @MainActor
 final class EnergyWatch {
     static let shared = EnergyWatch()
@@ -35,6 +37,13 @@ final class EnergyWatch {
         let now = Date()
         let elapsed = lastLook.map { now.timeIntervalSince($0) } ?? Self.interval
         lastLook = now
+        // Pages share processes: one that also runs a page on screen may be busy with that page, so it's left alone.
+        var shown: Set<Int32> = []
+        for controller in WindowManager.shared.controllers {
+            for tab in controller.tabManager.allTabs where Self.isOnScreen(tab, in: controller) {
+                if let webView = tab.webView, let pid = Self.processID(of: webView) { shown.insert(pid) }
+            }
+        }
         for controller in WindowManager.shared.controllers {
             for tab in controller.tabManager.allTabs {
                 guard let webView = tab.webView, let pid = Self.processID(of: webView), pid > 0,
@@ -44,14 +53,23 @@ final class EnergyWatch {
                 guard let before = last[pid] else { continue }
                 let share = (cpu - before) / max(elapsed, 1)
                 streak[pid] = share >= Self.busy ? (streak[pid] ?? 0) + 1 : 0
-                // Playing something is meant to work hard.
-                guard streak[pid] ?? 0 >= Self.rounds, !tab.isPlayingAudio, let url = tab.url else { continue }
+                // Playing something is meant to work hard, and the page on screen is yours to judge.
+                guard streak[pid] ?? 0 >= Self.rounds, !tab.isPlayingAudio, !shown.contains(pid),
+                      let url = tab.url else { continue }
                 warn(about: tab, url: url, in: controller)
             }
         }
         // Forget processes that have gone.
         last = last.filter { seen.contains($0.key) }
         streak = streak.filter { seen.contains($0.key) }
+    }
+
+    /// In front in its window, either side of a split counted.
+    private static func isOnScreen(_ tab: Tab, in controller: BrowserWindowController) -> Bool {
+        guard controller.window?.isVisible == true, controller.window?.occlusionState.contains(.visible) == true else { return false }
+        let manager = controller.tabManager
+        guard let front = manager.selectedTab else { return false }
+        return front === tab || manager.partner(of: front) === tab
     }
 
     /// The page's process, if WebKit still says (it's not public API, so asked carefully).
@@ -71,24 +89,11 @@ final class EnergyWatch {
                        action: ("Close Tab", { controller.tabManager.close(tab) }), duration: 15, in: controller)
             return
         }
-        var running: [String] = []
-        if #available(macOS 15.4, *), !ExtensionStore.extensionsOffSites.contains(site) {
-            running = ExtensionHost.shared.contexts.filter { $0.hasInjectedContent(for: url) }
-                .compactMap { $0.webExtension.displayName }
-        }
-        if running.isEmpty {
-            Toast.show("\(site) is using a lot of energy", symbol: "bolt.fill", action: ("Reload", { tab.reload() }),
-                       duration: 12, in: controller)
-        } else {
-            let who = running.count == 1 ? running[0] : "An extension"
-            Toast.show("\(who) may be slowing \(site) and using a lot of energy", symbol: "bolt.fill",
-                       action: ("Turn Off Here", {
-                           var sites = ExtensionStore.extensionsOffSites
-                           sites.insert(site)
-                           ExtensionStore.extensionsOffSites = sites
-                           tab.reload()
-                       }), duration: 15, in: controller)
-        }
+        Toast.show("A tab on \(site) is using a lot of energy in the background", symbol: "bolt.fill",
+                   action: ("Close Tab", { [weak controller, weak tab] in
+                       guard let controller, let tab else { return }
+                       controller.closeWithUndo(tab)
+                   }), duration: 12, in: controller)
     }
 }
 
