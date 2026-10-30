@@ -85,9 +85,12 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .wm { display: inline-block; height: .74em; aspect-ratio: 372 / 73; background: currentColor; vertical-align: -.02em;
   -webkit-mask: url(/assets/wordmark.svg) left center / contain no-repeat; mask: url(/assets/wordmark.svg) left center / contain no-repeat; }
 
+/* The bar on every page but the home page: the wordmark, and the way to get Zigzag. */
+.bar { max-width: 1040px; margin: 0 auto; padding: 24px 24px; display: flex; align-items: center; justify-content: space-between; min-height: 84px; }
+.bar .wm { height: 18px; color: var(--ink); display: block; }
+.button.small { height: 36px; padding: 0 16px; margin: 0; font-size: 14px; }
+
 /* Download page */
-.dl-bar { max-width: 1040px; margin: 0 auto; padding: 28px 24px; }
-.dl-bar .wm { height: 18px; color: var(--ink); }
 .dl { max-width: 680px; margin: 0 auto; padding: 72px 24px 64px; text-align: center; }
 .dl h1 { margin: 0; font-size: 40px; font-weight: 700; letter-spacing: -0.03em; }
 .dl .lede { margin: 14px 0 0; font-size: 18px; color: var(--soft); }
