@@ -579,11 +579,7 @@ private final class ReaderSegments: NSView {
         segments[selected].layer?.backgroundColor = nil
         let target = frame(of: selected)
         if animated, !Tokens.Motion.reduceMotion {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.22
-                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
-                highlight.animator().frame = target
-            }
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true) { self.highlight.animator().frame = target }
         } else {
             highlight.frame = target
         }
