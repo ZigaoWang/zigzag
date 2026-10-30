@@ -12,7 +12,7 @@
 <meta property="og:image" content="https://zigzagbrowser.com/assets/og.png">
 <meta property="og:url" content="https://zigzagbrowser.com/">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="/assets/site.css?v=1793020670">
+<link rel="stylesheet" href="/assets/site.css?v=1793110000">
 </head>
 <body>
 <main>
@@ -108,13 +108,21 @@
   </footer>
 </main>
 <script>
-  // Clips play while on screen; with Reduce Motion they stay still.
+  // Clips play while on screen; with Reduce Motion they stay still. Each one's still sits behind it, so a frame the
+  // browser drops while it starts or scrolls shows the picture, never a gap. They load and start a screen ahead and
+  // pause only once fully off screen, so you never see one restart.
   (function () {
+    var clips = document.querySelectorAll(".clip video");
+    clips.forEach(function (v) { if (v.poster) v.style.backgroundImage = "url(" + v.poster + ")"; });
     if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
     var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { var v = e.target; if (e.isIntersecting) { v.preload = "auto"; var p = v.play(); if (p) p.catch(function(){}); } else v.pause(); });
-    }, { threshold: 0.4 });
-    document.querySelectorAll(".clip video").forEach(function (v) { io.observe(v); });
+      es.forEach(function (e) {
+        var v = e.target;
+        if (e.isIntersecting) { v.preload = "auto"; if (v.paused) { var p = v.play(); if (p) p.catch(function(){}); } }
+        else v.pause();
+      });
+    }, { rootMargin: "100% 0px" });
+    clips.forEach(function (v) { io.observe(v); });
   })();
 </script>
 </body>
