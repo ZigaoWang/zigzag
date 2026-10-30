@@ -306,8 +306,16 @@ final class TabSwitcher {
             // Control was let go somewhere we didn't see (another app): the switch is over, and the key is yours.
             if isActive, !event.modifierFlags.contains(.control) { cancel(); return false }
             guard event.keyCode == 48 /* tab */, event.modifierFlags.contains(.control) else {
-                if isActive, event.keyCode == 53 /* esc */ { cancel(); return true }
-                return isActive
+                guard isActive else { return false }
+                // While it's up, the arrows step through the tabs and Return switches, as well as letting go.
+                switch event.keyCode {
+                case 53 /* esc */: cancel()
+                case 123 /* ← */: step(-1)
+                case 124 /* → */: step(1)
+                case 36, 76 /* return, enter */: commit()
+                default: break
+                }
+                return true
             }
             let backwards = event.modifierFlags.contains(.shift)
             if !isActive { begin(backwards: backwards) } else { step(backwards ? -1 : 1) }
