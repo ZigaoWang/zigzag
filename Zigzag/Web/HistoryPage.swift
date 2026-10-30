@@ -201,10 +201,11 @@ h1 { font-size: 20px; font-weight: 600; margin: 0; flex: 1; }
 .row .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .host { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 40px; }
 .row time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
-.row .remove { display: none; flex: none; width: 20px; height: 20px; border: 0; border-radius: 4px; background: none; color: var(--muted);
+.row .remove { flex: none; width: 20px; height: 20px; border: 0; border-radius: 4px; background: none; color: var(--muted);
                font-size: 14px; line-height: 20px; padding: 0; cursor: default; }
-.row:hover time { display: none; }
-.row:hover .remove { display: block; }
+/* Out of sight until the pointer or keyboard focus reaches the row, but still in the Tab order. */
+.row:not(:hover):not(:focus-within) .remove { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.row:hover time, .row:focus-within time { display: none; }
 .row .remove:hover { background: var(--field); color: var(--text); }
 .empty { text-align: center; padding: 80px 0; color: var(--muted); }
 .empty svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto 16px; }
