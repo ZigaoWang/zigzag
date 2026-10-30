@@ -230,7 +230,7 @@ final class SpaceSettingsRow: InteractiveView {
             SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
         }
         deleteButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
-        toolTip = "Click to edit, drag to reorder"
+        toolTip = "Click to edit"
         setAccessibilityRole(.row)
         setAccessibilityLabel(space.name)
     }
@@ -367,17 +367,6 @@ enum SettingsPane: Int, CaseIterable {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .general: "Search, your default browser, and how pages behave."
-        case .spaces: "Each space keeps its own tabs, pinned tabs and color. Drag a space to reorder."
-        case .passwords: "Saved in your Keychain and synced with iCloud Keychain."
-        case .privacy: "What sites keep on this Mac, and the choices you’ve made for them."
-        case .translation: "Pages in other languages, translated on this Mac by Apple."
-        case .extensions: "Extensions from the Chrome Web Store, running in Zigzag."
-        case .shortcuts: "Every keyboard shortcut in Zigzag, and yours to change."
-        }
-    }
 }
 
 /// One pane button in the toolbar: its symbol over its name, a soft fill of the space's accent when chosen.
@@ -880,11 +869,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             section(nil, importGroup)
         case .spaces:
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
-            // Under the list, how to do the one thing it doesn't show.
-            let note = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-            note.frame = NSRect(x: pad + Tokens.Space.x1, y: y - Tokens.Space.x6 + Tokens.Space.x2, width: contentWidth, height: note.lineHeight)
-            documentView.addSubview(note)
-            y = note.frame.maxY + Tokens.Space.x6
+            // Said once, under the list, and only when there's an order to change.
+            if spaceRows.count > 1 {
+                let hint = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+                hint.frame = NSRect(x: pad + Tokens.Space.x1, y: y - Tokens.Space.x6 + Tokens.Space.x2, width: contentWidth, height: hint.lineHeight)
+                documentView.addSubview(hint)
+                y = hint.frame.maxY + Tokens.Space.x6
+            }
         case .passwords:
             section(nil, passwordsGroup)
             section(nil, passwordsWindowGroup)
