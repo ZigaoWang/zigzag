@@ -669,13 +669,18 @@ final class InsertionLineView: NSView {
 /// Clear, on the line above the tabs: small, quiet text with a downward arrow (it clears what's below), the same
 /// grey as the line until the pointer is on it.
 final class ClearTabsButton: InteractiveView {
+    /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
+    private let arrow = NSImageView()
     private let label = Label("Clear", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
+    private static let arrowSide: CGFloat = 10
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = 6
         layer?.cornerCurve = .continuous
-        addSubview(label)
+        arrow.image = NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: Tokens.TypeSize.small - 2, weight: .semibold))
+        arrow.imageScaling = .scaleNone
+        [arrow, label].forEach { addSubview($0) }
         setAccessibilityRole(.button)
         keepsCurrent = true
         stateDidChange(animated: false)
@@ -691,7 +696,7 @@ final class ClearTabsButton: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + label.inkWidth + Tokens.Space.x2) }
+    var fittingWidth: CGFloat { ceil(6 + Self.arrowSide + 3 + label.inkWidth + Tokens.Space.x2) }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
@@ -700,13 +705,17 @@ final class ClearTabsButton: InteractiveView {
 
     override func layout() {
         super.layout()
+        // A capsule, so its hover fill reads as one small button on the line.
+        layer?.cornerRadius = bounds.height / 2
+        arrow.frame = NSRect(x: 6, y: (bounds.height - Self.arrowSide) / 2, width: Self.arrowSide, height: Self.arrowSide)
         let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x2 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: arrow.frame.maxX + 3 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
         let active = isHovered || isPressed
         label.textColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
+        arrow.contentTintColor = label.textColor
         let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
     }
