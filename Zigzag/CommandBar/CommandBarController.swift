@@ -507,21 +507,20 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// Tab into a site: its chip pops in where your words were, and the field slides over to make room. Leaving
     /// slides it back. Nothing jumps.
     private func animateScope(entering: Bool, fieldFrom before: NSRect) {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        guard !Tokens.Motion.reduceMotion else { return }
+        let curve = Tokens.Motion.snappy
         panel.layoutSubtreeIfNeeded()
         let after = field.frame
         if before != after, before != .zero {
             field.frame = before
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.2
-                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
-                field.animator().frame = after
-            }
+            // Tab is how you get here, so it moves even from the keyboard.
+            Tokens.Motion.animate(curve, evenFromKeyboard: true) { self.field.animator().frame = after }
         }
         // The words you typed fade as the field empties, rather than vanishing.
         let fade = CATransition()
         fade.type = .fade
-        fade.duration = 0.18
+        fade.duration = curve.duration
+        fade.timingFunction = curve.timing
         field.layer?.add(fade, forKey: "scope")
         guard entering, let layer = chip.layer else { return }
         // Grows from the chip's own middle: layers scale from their corner, so shift by half the shrink.
@@ -531,18 +530,19 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let pop = CABasicAnimation(keyPath: "transform")
         pop.fromValue = NSValue(caTransform3D: small)
         pop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        pop.duration = 0.2
-        pop.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+        pop.duration = curve.duration
+        pop.timingFunction = curve.timing
         let show = CABasicAnimation(keyPath: "opacity")
         show.fromValue = 0
         show.toValue = 1
-        show.duration = 0.16
+        show.duration = Tokens.Motion.snap.duration
+        show.timingFunction = Tokens.Motion.snap.timing
         layer.add(pop, forKey: "pop")
         layer.add(show, forKey: "show")
     }
 
     private func fadeOutChip() {
-        guard let layer = chip.layer, !chip.isHidden else { chip.isHidden = true; return }
+        guard let layer = chip.layer, !chip.isHidden, !Tokens.Motion.reduceMotion else { chip.isHidden = true; return }
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
             guard let self, self.scope == nil else { return }
@@ -553,7 +553,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let out = CABasicAnimation(keyPath: "opacity")
         out.fromValue = 1
         out.toValue = 0
-        out.duration = 0.14
+        out.duration = Tokens.Motion.snap.duration
+        out.timingFunction = Tokens.Motion.snap.timing
         layer.add(out, forKey: "hide")
         layer.opacity = 0
         CATransaction.commit()
