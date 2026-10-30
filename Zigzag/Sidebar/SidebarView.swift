@@ -476,14 +476,29 @@ final class SidebarView: NSView {
     func setNowPlaying(_ tab: Tab?, paused: Bool) {
         let show = tab != nil
         if let tab { nowPlaying.isPaused = paused; nowPlaying.show(tab) }
-        guard show == nowPlaying.isHidden else { return }
-        nowPlaying.isHidden = !show
-        needsLayout = true
+        guard show == (nowPlaying.isHidden || nowPlayingFadingOut) else { return }
+        nowPlayingFadingOut = false
         if show {
+            nowPlaying.isHidden = false
+            needsLayout = true
             nowPlaying.alphaValue = 0
             Tokens.Motion.animate(Tokens.Motion.snappy) { self.nowPlaying.animator().alphaValue = 1 }
+            return
         }
+        // Fades out where it is first; only then does the list take back its room, so nothing vanishes at once.
+        nowPlayingFadingOut = true
+        Tokens.Motion.animate(Tokens.Motion.snappy, { self.nowPlaying.animator().alphaValue = 0 }, completion: {
+            // Playing again before the fade finished: it stays.
+            guard self.nowPlayingFadingOut else { return }
+            self.nowPlayingFadingOut = false
+            self.nowPlaying.isHidden = true
+            self.nowPlaying.alphaValue = 1
+            self.needsLayout = true
+        })
     }
+
+    /// True while the now-playing control fades away, before it gives its room back to the list.
+    private var nowPlayingFadingOut = false
 
     func previewDotColor(_ color: NSColor, for spaceID: UUID) {
         dots.first { $0.spaceID == spaceID }?.color = color
