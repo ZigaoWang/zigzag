@@ -178,7 +178,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        await AuthenticationPrompt.respond(to: challenge, window: window)
+        await AuthenticationPrompt.respond(to: challenge, window: window, store: webView.configuration.websiteDataStore)
     }
 }
 

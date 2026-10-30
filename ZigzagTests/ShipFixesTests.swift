@@ -145,4 +145,21 @@ struct BookmarkFolderTests {
         // Fingers that stopped before letting go aren't moving.
         #expect(SpaceSwipe.velocity(samples, at: 2) == 0)
     }
+
+    @Test func certificateProceedNeedsTheNonceAndTheWarnedHost() throws {
+        let page = try #require(URL(string: "https://router.local:8443/admin?tab=1"))
+        let link = try #require(CertificateExceptions.proceedLink(for: page, nonce: "abc"))
+        #expect(link.scheme == CertificateExceptions.scheme)
+        // The warning's own link goes back to the page it was for, nonce stripped.
+        #expect(CertificateExceptions.destination(of: link, warnedHost: "router.local", nonce: "abc") == page)
+        // A made-up link: no nonce, the wrong one, or a host the tab never warned about.
+        let bare = try #require(URL(string: "zigzag-proceed://router.local:8443/admin"))
+        #expect(CertificateExceptions.destination(of: bare, warnedHost: "router.local", nonce: "abc") == nil)
+        #expect(CertificateExceptions.destination(of: link, warnedHost: "router.local", nonce: "xyz") == nil)
+        #expect(CertificateExceptions.destination(of: link, warnedHost: "bank.com", nonce: "abc") == nil)
+        #expect(CertificateExceptions.destination(of: link, warnedHost: nil, nonce: "abc") == nil)
+        let plain = try #require(URL(string: "https://router.local/"))
+        let plainLink = try #require(CertificateExceptions.proceedLink(for: plain, nonce: "abc"))
+        #expect(CertificateExceptions.destination(of: plainLink, warnedHost: "router.local", nonce: "abc") == plain)
+    }
 }

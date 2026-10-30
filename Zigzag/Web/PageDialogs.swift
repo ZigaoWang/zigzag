@@ -70,20 +70,53 @@ enum PageDialogs {
 
 /// HTTP authentication (basic/digest) and client certificate prompts.
 /// Sites whose certificate you chose to trust anyway, from the warning page. Only until Zigzag quits, as Safari does.
+/// Kept per website data store, so a private window's choices stay in that window and go when it does.
 @MainActor enum CertificateExceptions {
-    private static var hosts: Set<String> = []
-    static func allow(_ host: String) { hosts.insert(host.lowercased()) }
-    static func allows(_ host: String) -> Bool { hosts.contains(host.lowercased()) }
+    private static let hosts = NSMapTable<WKWebsiteDataStore, NSMutableSet>.weakToStrongObjects()
+    static func allow(_ host: String, in store: WKWebsiteDataStore) {
+        let set = hosts.object(forKey: store) ?? NSMutableSet()
+        set.add(host.lowercased())
+        hosts.setObject(set, forKey: store)
+    }
+    static func allows(_ host: String, in store: WKWebsiteDataStore) -> Bool {
+        hosts.object(forKey: store)?.contains(host.lowercased()) ?? false
+    }
+
     /// The link the warning page's "Visit anyway" goes to; the tab catches it before it loads.
     static let scheme = "zigzag-proceed"
+    /// Carries the nonce on that link, so a page can't make one up.
+    private static let nonceItem = "zigzag-nonce"
+    /// Made fresh each launch and written only into Zigzag's own warning page.
+    static let nonce = UUID().uuidString
+
+    /// The "Visit anyway" link for a page whose certificate failed.
+    static func proceedLink(for url: URL, nonce: String) -> URL? {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.host != nil else { return nil }
+        parts.scheme = scheme
+        parts.queryItems = (parts.queryItems ?? []) + [URLQueryItem(name: nonceItem, value: nonce)]
+        return parts.url
+    }
+
+    /// The page a "Visit anyway" link opens, or nil unless it carries this launch's nonce and is for the host the
+    /// tab warned about.
+    static func destination(of link: URL, warnedHost: String?, nonce: String) -> URL? {
+        guard link.scheme == scheme, var parts = URLComponents(url: link, resolvingAgainstBaseURL: false),
+              let host = parts.host?.lowercased(), !host.isEmpty, host == warnedHost?.lowercased(),
+              var items = parts.queryItems, items.last?.name == nonceItem, items.last?.value == nonce else { return nil }
+        items.removeLast()
+        parts.queryItems = items.isEmpty ? nil : items
+        parts.scheme = "https"
+        return parts.url
+    }
 }
 
 enum AuthenticationPrompt {
-    static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+    /// `store`: the asking web view's data store, whose certificate exceptions apply.
+    static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?, store: WKWebsiteDataStore) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let method = challenge.protectionSpace.authenticationMethod
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
-           await CertificateExceptions.allows(challenge.protectionSpace.host) {
+           await CertificateExceptions.allows(challenge.protectionSpace.host, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {
@@ -107,16 +140,19 @@ enum ErrorPage {
     /// A page whose process stopped twice in a row.
     static let crashDomain = "ZigzagPageStopped"
 
+    /// A certificate failure, whose page offers "Visit this site anyway".
+    static func offersProceed(_ error: NSError) -> Bool {
+        [NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateNotYetValid,
+         NSURLErrorServerCertificateHasUnknownRoot].contains(error.code) && error.domain == NSURLErrorDomain
+    }
+
     static func show(error: NSError, url: URL?, in webView: WKWebView) {
         guard let url else { return }
         let (title, message) = describe(error, url: url)
-        let certificate = [NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateNotYetValid,
-                           NSURLErrorServerCertificateHasUnknownRoot].contains(error.code) && error.domain == NSURLErrorDomain
         // For a certificate you know is fine (your router, a dev server), a quiet way through, with the reason first.
         var proceed = ""
-        if certificate, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            parts.scheme = CertificateExceptions.scheme
-            if let link = parts.url {
+        if offersProceed(error) {
+            if let link = CertificateExceptions.proceedLink(for: url, nonce: CertificateExceptions.nonce) {
                 proceed = """
                 <details><summary>Show details</summary><p class="why">\(escape(certificateReason(error.code)))</p>
                 <a class="anyway" href="\(escape(link.absoluteString))">Visit this site anyway</a></details>

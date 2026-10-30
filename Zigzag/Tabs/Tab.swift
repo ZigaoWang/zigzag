@@ -107,6 +107,8 @@ final class Tab: NSObject {
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
+    /// The host whose certificate warning this tab last showed: the only one its "Visit anyway" link may trust.
+    private var certificateWarningHost: String?
     let changed = Signal<Change>()
 
     private(set) var webView: BrowserWebView?
@@ -571,11 +573,18 @@ extension Tab: WKNavigationDelegate {
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
 
         // Schemes the web view cannot handle go to the system (mailto:, facetime:, app links). Extension pages stay here.
-        // "Visit this site anyway" on the certificate warning: trust it for this session and go.
-        if url.scheme == CertificateExceptions.scheme, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), let host = parts.host {
-            CertificateExceptions.allow(host)
-            parts.scheme = "https"
-            if let real = parts.url { DispatchQueue.main.async { [weak self] in self?.load(real) } }
+        // "Visit this site anyway" on the certificate warning: trust it for this session and go. Only from the warning
+        // this tab is showing, in its main frame, for that same host, with the launch's nonce; any other page or frame
+        // asking for it gets nothing.
+        if url.scheme == CertificateExceptions.scheme {
+            let fromWarning = navigationAction.targetFrame?.isMainFrame == true && navigationAction.sourceFrame.isMainFrame
+                && webView.url?.host()?.lowercased() == certificateWarningHost
+            if fromWarning, let real = CertificateExceptions.destination(of: url, warnedHost: certificateWarningHost, nonce: CertificateExceptions.nonce),
+               let host = real.host() {
+                CertificateExceptions.allow(host, in: webView.configuration.websiteDataStore)
+                certificateWarningHost = nil
+                DispatchQueue.main.async { [weak self] in self?.load(real) }
+            }
             return (.cancel, preferences)
         }
         if ExternalLinks.isExternal(url) {
@@ -756,6 +765,7 @@ extension Tab: WKNavigationDelegate {
         // .mp4 or .mp3 link, reported as "plug-in handled load") are not failures.
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
+        certificateWarningHost = ErrorPage.offersProceed(nsError) ? failingURL?.host()?.lowercased() : nil
         ErrorPage.show(error: nsError, url: failingURL, in: webView)
     }
 
@@ -781,7 +791,7 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        await AuthenticationPrompt.respond(to: challenge, window: host?.hostWindow)
+        await AuthenticationPrompt.respond(to: challenge, window: host?.hostWindow, store: webView.configuration.websiteDataStore)
     }
 }
 
