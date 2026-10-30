@@ -47,6 +47,8 @@ enum WebKitSetup {
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             configuration.userContentController.addUserScript(Autofill.script)
             configuration.userContentController.add(Autofill.shared, contentWorld: .defaultClient, name: Autofill.messageName)
+            configuration.userContentController.addUserScript(PageFrames.script)
+            configuration.userContentController.add(PageFrames.shared, contentWorld: .defaultClient, name: PageFrames.messageName)
             ContentBlocker.attach(to: configuration)
             // Extension pages only: their uncaught errors go to the extensions log, so a page that stalls says why.
             configuration.userContentController.addUserScript(ExtensionPageErrors.script)

@@ -180,3 +180,45 @@ enum PageScreenshot {
         }
     }
 }
+
+/// Every frame on a page says hello as it starts, so a picture can later reach into the one that scrolls, even
+/// when it's from another site. That's all: nothing more happens until a picture is taken.
+final class PageFrames: NSObject, WKScriptMessageHandler {
+    static let shared = PageFrames()
+    static let messageName = "zigzagFrame"
+
+    static let script = WKUserScript(source: """
+    (() => {
+      const hello = (again) => { try { window.webkit.messageHandlers.\(messageName).postMessage(again); } catch (e) {} };
+      hello(false);
+      window.addEventListener('pageshow', (e) => { if (e.persisted) hello(true); });
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
+
+    /// The frames each web view has seen since its page last loaded, newest last. Ones that have gone since simply
+    /// don't answer when asked.
+    private struct Seen { weak var webView: WKWebView?; var frames: [WKFrameInfo] }
+    private var seen: [ObjectIdentifier: Seen] = [:]
+
+    func frames(in webView: WKWebView) -> [WKFrameInfo] {
+        guard let entry = seen[ObjectIdentifier(webView)], entry.webView === webView else { return [] }
+        return entry.frames
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName, let webView = message.webView else { return }
+        let key = ObjectIdentifier(webView)
+        if message.frameInfo.isMainFrame {
+            // A new page starts with no frames; one back from the cache keeps the ones it had.
+            guard (message.body as? Bool) != true else { return }
+            seen = seen.filter { $0.value.webView != nil }
+            seen[key] = Seen(webView: webView, frames: [])
+            return
+        }
+        var entry = seen[key].flatMap { $0.webView === webView ? $0 : nil } ?? Seen(webView: webView, frames: [])
+        entry.frames.append(message.frameInfo)
+        // Pages full of ads make and remake frames: the newest are kept.
+        if entry.frames.count > 64 { entry.frames.removeFirst(entry.frames.count - 64) }
+        seen[key] = entry
+    }
+}
