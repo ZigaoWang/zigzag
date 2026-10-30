@@ -189,14 +189,6 @@ final class FavoriteTile: InteractiveView {
         addSubview(disc)
         return disc
     }()
-    /// Under the icon of a favorite that's open, as the Dock marks a running app.
-    private lazy var openDot: ColorView = {
-        let dot = ColorView(color: Tokens.Color.textSecondary)
-        dot.wantsLayer = true
-        dot.layer?.cornerRadius = 2
-        addSubview(dot)
-        return dot
-    }()
     private weak var tab: Tab?
     private var tabToken: SignalToken?
     /// An icon that arrives later (fetched, or saved by a visit) shows at once, not only after a relaunch.
@@ -257,7 +249,6 @@ final class FavoriteTile: InteractiveView {
         let side = Self.closeSide
         // Centered on the tile's corner, half over its edge, clear of the icon.
         closeDisc.frame = NSRect(x: bounds.width - side / 2 - 2, y: -side / 2 + 2, width: side, height: side)
-        openDot.frame = NSRect(x: bounds.midX - 2, y: bounds.height - 7, width: 4, height: 4)
     }
 
 
@@ -295,8 +286,11 @@ final class FavoriteTile: InteractiveView {
         if !closeDisc.isHidden, let superview, superview.subviews.last !== self {
             superview.addSubview(self, positioned: .above, relativeTo: nil)
         }
-        // Open but not the one you're on: the dot says it's running. On it, the tile itself says so.
-        openDot.isHidden = !isOpen || isSelected
+        // An open favorite shows its icon in full; one that isn't loaded is softly faded, with no mark to read.
+        let iconAlpha: CGFloat = isOpen || isSelected || isHovered ? 1 : 0.5
+        if icon.alphaValue != iconAlpha {
+            Tokens.Motion.animate(Tokens.Motion.feedback) { self.icon.animator().alphaValue = iconAlpha }
+        }
         let fill: NSColor
         if isSelected {
             // The favorite you're on stands clearly apart from the resting tiles beside it.
