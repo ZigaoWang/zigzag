@@ -62,7 +62,8 @@ enum SidebarItem: Hashable {
     var height: CGFloat {
         switch self {
         case .header: Tokens.Space.x6 + Tokens.Space.x1
-        case .separator: Tokens.Space.x4
+        // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
+        case .separator: Tokens.Space.x6
         case .placeholder: Tokens.Space.x2
         case .bookmark, .folder, .newTab, .tab, .bookmarkDropZone: Tokens.Metric.rowHeight
         }
@@ -442,7 +443,10 @@ final class SidebarListView: NSView {
             return row
         case .separator:
             let separator = SeparatorRowView()
-            separator.clearButton.onClick = { [weak self] _ in self?.delegate?.listClearTabs() }
+            separator.clearButton.onClick = { [weak self, weak separator] _ in
+                guard separator?.clearIsArmed == true else { return }
+                self?.delegate?.listClearTabs()
+            }
             separator.showsClear = isPointerInside
             return separator
         case .placeholder:
@@ -533,7 +537,11 @@ final class SidebarListView: NSView {
             view.needsLayout = true
 
         case .separator:
-            (view as? SeparatorRowView)?.hasTabs = !(delegate?.tabManager.currentTabs.isEmpty ?? true)
+            let tabs = manager.currentTabs
+            (view as? SeparatorRowView)?.hasTabs = !tabs.isEmpty
+            let current = manager.selectedTab
+            let partner = current.flatMap { manager.partner(of: $0) }
+            (view as? SeparatorRowView)?.clearButton.keepsCurrent = tabs.contains { $0 !== current && $0 !== partner }
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }

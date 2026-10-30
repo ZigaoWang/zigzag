@@ -537,6 +537,10 @@ final class SeparatorRowView: NSView {
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
     private var clearShown: Bool { showsClear && hasTabs }
+    /// When Clear last came into view. A click right as it appears was meant for whatever was under the pointer
+    /// a moment before (New Tab, just below), so it counts only once Clear has been there a beat.
+    private var clearShownAt = Date.distantPast
+    var clearIsArmed: Bool { clearShown && Date().timeIntervalSince(clearShownAt) > 0.35 }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -552,7 +556,7 @@ final class SeparatorRowView: NSView {
 
     private func refreshClear() {
         let show = clearShown
-        if show { clearButton.isHidden = false }
+        if show { clearButton.isHidden = false; clearShownAt = Date() }
         needsLayout = true
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.15
@@ -567,8 +571,8 @@ final class SeparatorRowView: NSView {
 
     override func layout() {
         super.layout()
-        let cw = clearButton.fittingWidth, ch: CGFloat = 20
-        clearButton.frame = NSRect(x: bounds.width - Tokens.Space.x2 - cw + 4, y: floor((bounds.height - ch) / 2), width: cw, height: ch)
+        let cw = clearButton.fittingWidth, ch: CGFloat = 18
+        clearButton.frame = NSRect(x: bounds.width - cw, y: floor((bounds.height - ch) / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()
         // The line runs up to Clear while it shows, so the two read as one.
         let end = clearShown ? clearButton.frame.minX - Tokens.Space.x1 : bounds.width - Tokens.Space.x2
@@ -665,25 +669,29 @@ final class InsertionLineView: NSView {
 /// Clear, on the line above the tabs: small, quiet text with a downward arrow (it clears what's below), the same
 /// grey as the line until the pointer is on it.
 final class ClearTabsButton: InteractiveView {
-    private let arrow = NSImageView()
     private let label = Label("Clear", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         layer?.cornerRadius = 6
         layer?.cornerCurve = .continuous
-        arrow.image = Tokens.Symbol.image("arrow.down", size: Tokens.TypeSize.small - 2)
-        arrow.imageScaling = .scaleNone
-        [arrow, label].forEach { addSubview($0) }
-        toolTip = "Close Tabs Below"
+        addSubview(label)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Clear tabs")
+        keepsCurrent = true
         stateDidChange(animated: false)
+    }
+
+    /// Clear closes the other tabs first, and the one you're on only once it's the last.
+    var keepsCurrent = false {
+        didSet {
+            toolTip = keepsCurrent ? "Close All Tabs but This One" : "Close This Tab"
+            setAccessibilityLabel(toolTip)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    var fittingWidth: CGFloat { ceil(4 + 10 + 3 + label.inkWidth + 4) }
+    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + label.inkWidth + Tokens.Space.x2) }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
@@ -692,15 +700,13 @@ final class ClearTabsButton: InteractiveView {
 
     override func layout() {
         super.layout()
-        arrow.frame = NSRect(x: 4, y: (bounds.height - 10) / 2, width: 10, height: 10)
         let h = label.lineHeight
-        label.frame = NSRect(x: arrow.frame.maxX + 3 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: Tokens.Space.x2 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
         let active = isHovered || isPressed
         label.textColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
-        arrow.contentTintColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
         let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
     }
