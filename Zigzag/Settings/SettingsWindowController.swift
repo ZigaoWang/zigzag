@@ -483,6 +483,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
+        window.autorecalculatesKeyViewLoop = true
         window.backgroundColor = Tokens.Color.formBackground
         window.contentMinSize = NSSize(width: 720, height: 300)
         window.contentMaxSize = NSSize(width: 720, height: 2000)

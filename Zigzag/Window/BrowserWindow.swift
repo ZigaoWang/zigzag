@@ -21,6 +21,8 @@ final class BrowserWindow: NSWindow {
         minSize = Tokens.Metric.windowMinSize
         animationBehavior = .documentWindow
         titlebarSeparatorStyle = .none
+        // Rows and buttons come and go; Tab (with Full Keyboard Access) follows whatever is on screen now.
+        autorecalculatesKeyViewLoop = true
         // AppKit puts the buttons back whenever it relays the title bar; we put them back where they belong.
         let views = buttons + [standardWindowButton(.closeButton)?.superview?.superview].compactMap { $0 }
         for view in views {

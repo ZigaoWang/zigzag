@@ -152,6 +152,58 @@ class InteractiveView: NSView {
         return true
     }
 
+    // MARK: Keyboard
+
+    /// True while this control has keyboard focus.
+    private(set) var hasKeyboardFocus = false
+    /// Told when keyboard focus arrives or leaves, for controls that otherwise show only on hover.
+    var keyboardFocusChanged: ((Bool) -> Void)?
+
+    /// With Full Keyboard Access on, Tab reaches these controls as it does AppKit's own: a focus ring shows where
+    /// you are, and Space or Return presses. A click never moves focus here, so the mouse works as it always has.
+    override var acceptsFirstResponder: Bool {
+        guard NSApp.isFullKeyboardAccessEnabled, isEnabled, onClick != nil else { return false }
+        if let type = NSApp.currentEvent?.type, [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(type) { return false }
+        return true
+    }
+
+    override var canBecomeKeyView: Bool { acceptsFirstResponder && !isHiddenOrHasHiddenAncestor }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        setKeyboardFocus(true)
+        scrollToVisible(bounds)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        guard super.resignFirstResponder() else { return false }
+        setKeyboardFocus(false)
+        return true
+    }
+
+    private func setKeyboardFocus(_ focused: Bool) {
+        guard hasKeyboardFocus != focused else { return }
+        hasKeyboardFocus = focused
+        keyboardFocusChanged?(focused)
+        noteFocusRingMaskChanged()
+    }
+
+    override func keyDown(with event: NSEvent) {
+        let plain = event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+        // Space, Return or Enter press the focused control.
+        if hasKeyboardFocus, plain, [49, 36, 76].contains(event.keyCode), accessibilityPerformPress() { return }
+        super.keyDown(with: event)
+    }
+
+    /// The system focus ring, in the control's own rounded shape.
+    override var focusRingMaskBounds: NSRect { bounds }
+
+    override func drawFocusRingMask() {
+        let radius = layer?.cornerRadius ?? 0
+        NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
+    }
+
     override func otherMouseUp(with event: NSEvent) {
         if event.buttonNumber == 2, bounds.contains(convert(event.locationInWindow, from: nil)) { onMiddleClick?() }
     }
