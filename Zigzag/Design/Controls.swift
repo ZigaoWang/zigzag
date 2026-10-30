@@ -400,11 +400,11 @@ extension NSScrollView {
     }
 }
 
-/// The one filled button style: the main action on a screen, in the space's accent. Use one per screen.
+/// The one filled button style: the main action on a screen, in its window's accent. Use one per screen.
 final class PrimaryButton: InteractiveView {
     private let label: Label
     private var themeToken: SignalToken?
-    /// The space's accent unless set.
+    /// Its window's accent unless set.
     var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
     /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
     var isDestructive = false { didSet { stateDidChange(animated: false) } }
@@ -415,7 +415,7 @@ final class PrimaryButton: InteractiveView {
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.current.onAccent)
+        label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.brand.onAccent)
         super.init(frame: .zero)
         themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }
         layer?.cornerRadius = Tokens.Radius.row
@@ -444,7 +444,7 @@ final class PrimaryButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The space's accent: the one primary action on a screen.
+        // Its window's accent: the one primary action on a screen.
         let theme = fixedTheme ?? Brand.Theme.for(self)
         let base = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
         label.textColor = customInk ?? (isDestructive ? .white : theme.onAccent)
@@ -461,8 +461,8 @@ final class FilledField: NSView {
         get { field.stringValue }
         set { field.stringValue = newValue }
     }
-    /// The focus ring's color: the system accent, or the space's color in brand moments.
-    var tint: NSColor = Tokens.Color.accent { didSet { updateColors() } }
+    /// The focus ring's color; nil takes its window's accent.
+    var tint: NSColor? { didSet { updateColors() } }
 
     init(placeholder: String, secure: Bool = false, font: NSFont = Tokens.Font.body()) {
         if secure {
@@ -500,7 +500,7 @@ final class FilledField: NSView {
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
-            layer?.borderColor = (isEditing ? tint.withAlphaComponent(0.6) : .clear).cgColor
+            layer?.borderColor = (isEditing ? (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(0.6) : .clear).cgColor
         }
     }
 
@@ -524,8 +524,8 @@ final class ChoicePill: InteractiveView {
     private let check = NSImageView()
     var onChange: ((Bool) -> Void)?
     var isOn = true { didSet { stateDidChange(animated: true) } }
-    /// The system accent, or the space's color in brand moments.
-    var tint: NSColor = Tokens.Color.accent { didSet { stateDidChange(animated: false) } }
+    /// Nil takes its window's accent.
+    var tint: NSColor? { didSet { stateDidChange(animated: false) } }
 
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
@@ -559,6 +559,7 @@ final class ChoicePill: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
+        let tint = tint ?? Brand.Theme.for(self).accent
         let fill = isOn ? tint.withAlphaComponent(isPressed ? 0.26 : isHovered ? 0.2 : 0.14)
             : (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.fieldFill)
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
@@ -569,12 +570,12 @@ final class ChoicePill: InteractiveView {
 }
 
 /// A row of filters where one is chosen (All · Weak · Reused…), each with an optional count. The chosen one takes
-/// a soft fill of the space's accent; the rest are plain until hovered.
+/// a soft fill of its window's accent; the rest are plain until hovered.
 final class SegmentedPills: NSView {
     private final class Segment: InteractiveView {
         let title: Label
         let count = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textTertiary)
-        var tint: NSColor = Tokens.Color.accent { didSet { stateDidChange(animated: false) } }
+        var tint: NSColor? { didSet { stateDidChange(animated: false) } }
 
         init(_ text: String) {
             title = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
@@ -606,6 +607,7 @@ final class SegmentedPills: NSView {
         }
 
         override func stateDidChange(animated: Bool) {
+            let tint = tint ?? Brand.Theme.for(self).accent
             let fill: NSColor? = isSelected ? tint.withAlphaComponent(isPressed ? 0.24 : 0.16) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
             layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
             title.font = Tokens.Font.body(isSelected ? .semibold : .medium)
@@ -617,7 +619,8 @@ final class SegmentedPills: NSView {
     private var segments: [Segment] = []
     var onChange: ((Int) -> Void)?
     var selectedIndex = 0 { didSet { segments.enumerated().forEach { $0.element.isSelected = $0.offset == selectedIndex } } }
-    var tint: NSColor = Tokens.Color.accent { didSet { segments.forEach { $0.tint = tint } } }
+    /// Nil takes its window's accent.
+    var tint: NSColor? { didSet { segments.forEach { $0.tint = tint } } }
 
     init(_ titles: [String]) {
         super.init(frame: .zero)
@@ -656,7 +659,7 @@ final class SegmentedPills: NSView {
     }
 }
 
-/// Zigzag's switch: a capsule in the space's accent when on, a knob that slides on a soft spring.
+/// Zigzag's switch: a capsule in its window's accent when on, a knob that slides on a soft spring.
 final class Toggle: InteractiveView {
     private let knob = CALayer()
     var onChange: ((Bool) -> Void)?
@@ -726,7 +729,7 @@ final class CheckBox: InteractiveView {
     private let label: Label
     var onChange: ((Bool) -> Void)?
     var isOn = false { didSet { if oldValue != isOn { stateDidChange(animated: false) } } }
-    /// The color the box fills with when on; the space's accent unless set.
+    /// The color the box fills with when on; its window's accent unless set.
     var fixedColor: NSColor? { didSet { stateDidChange(animated: false) } }
     private static let side: CGFloat = 14
 
@@ -860,7 +863,7 @@ final class MenuButton: InteractiveView {
     }
 }
 
-/// A state, said calmly: a check in the space's accent and a few words ("Zigzag is your default browser").
+/// A state, said calmly: a check in its window's accent and a few words ("Zigzag is your default browser").
 final class StatusLabel: NSView {
     private let check = NSImageView()
     private let label: Label
@@ -869,11 +872,15 @@ final class StatusLabel: NSView {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
-        check.contentTintColor = Brand.Theme.for(self).accent
         [check, label].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        check.contentTintColor = Brand.Theme.for(self).accent
+    }
 
     override var intrinsicContentSize: NSSize { NSSize(width: 16 + Tokens.Space.x2 + label.inkWidth + Label.inset, height: Tokens.Space.x7Height) }
 

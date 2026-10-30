@@ -74,7 +74,6 @@ enum Brand {
         }
 
         /// The one accent, from the space's own hue: the primary action, selection, the active tab, progress.
-        /// The one accent, from the space's own hue: the primary action, selection, the active tab, progress.
         /// Its lightness is solved per hue so text on it always passes WCAG AA (4.5:1): white on a deep accent in
         /// light mode, deep text on a light accent in dark mode. Yellow spaces get a deeper gold, blue ones stay vivid.
         var accent: NSColor {
@@ -96,9 +95,7 @@ enum Brand {
             return space.color.isNeutral || space.color == .sky ? .navy : Theme(hue: space.color.hue)
         }
 
-        /// The space in front: the key browser window's, or the first one's.
-        /// Zigzag's own blue, for windows that belong to the app rather than a space: Settings, Passwords,
-        /// Import, Welcome and About.
+        /// Zigzag's own blue, for windows that belong to the app rather than a space (see `Tokens.Color.accent`).
         static let brand = Theme(hue: Brand.navyHue)
 
         /// The theme for a view: its browser window's space, or the brand blue in any other window.
@@ -109,6 +106,7 @@ enum Brand {
             return of(controller.tabManager.currentSpace)
         }
 
+        /// The space in front: the key browser window's, or the first one's.
         @MainActor static var current: Theme {
             let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
             return of(controller?.tabManager.currentSpace)
@@ -457,7 +455,7 @@ final class Spinner: RibbonView {
     }
 }
 
-/// The surface for Zigzag's big moments (first launch, import finished): deep in the space's hue, lit from one
+/// The surface for Zigzag's big moments (first launch, import finished): deep in its window's hue, lit from one
 /// corner by its accent, with fine grain and a hairline edge, and one large ribbon written in at its right, tone on tone.
 final class BrandSurface: NSView {
     private let base = CAGradientLayer()
@@ -671,7 +669,7 @@ final class WordmarkView: NSView {
     }
 }
 
-/// The top of a branded window (Settings, Passwords, Import): a soft wash of the space's accent that fades into the
+/// The top of a branded window (Settings, Passwords, Import): a soft wash of the brand accent that fades into the
 /// window, big display type, and the ribbon, whole, at the right, written in when it appears. No band, no hard edge. Leaves the top-left free for the traffic lights.
 final class BrandBanner: NSView {
     private let wash = CAGradientLayer()

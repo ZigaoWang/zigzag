@@ -69,13 +69,11 @@ final class GuidedTour: NSView {
         layer?.addSublayer(ring)
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 20)
-        check.contentTintColor = Brand.Theme.brand.accent
         skip.textColor = Tokens.Color.textTertiary
         card.radius = Tokens.Radius.panel + 2
         header.cornerRadius = 0
         header.layer?.borderWidth = 0
         header.showsWatermark = false
-        header.fixedTheme = Brand.Theme.brand
         [header, step, check, title, note, skip, finish, wordmark, letter, signature, video].forEach { card.addSubview($0) }
         video.wantsLayer = true
         video.layer?.cornerRadius = 10
@@ -84,7 +82,6 @@ final class GuidedTour: NSView {
         videoLayer.videoGravity = .resizeAspectFill
         video.layer?.addSublayer(videoLayer)
         wordmark.color = Brand.ribbon
-        finish.fixedTheme = Brand.Theme.brand
         letter.isSelectable = false
         letter.font = .systemFont(ofSize: 14)
         letter.textColor = Tokens.Color.textPrimary
@@ -94,6 +91,7 @@ final class GuidedTour: NSView {
         skip.onClick = { _ in Tutorial.skip() }
         finish.onClick = { [weak self] _ in self?.end() }
         tokens.append(Tutorial.changed.observe { [weak self] in self?.stepDone() })
+        tokens.append(Brand.themeChanged.observe { [weak self] in self?.applyColors() })
         tokens.append(controller.tabManager.changed.observe { [weak self] _ in
             DispatchQueue.main.async { self?.refresh(animated: true) }
         })
@@ -101,10 +99,13 @@ final class GuidedTour: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The layers' colors, resolved for light or dark; set again whenever that changes.
+    /// The guide lives in a browser window, so it's in that window's space accent, resolved for light or dark;
+    /// set again whenever either changes.
     private func applyColors() {
+        let accent = Brand.Theme.for(self).accent
         dim.fillColor = cgColor(Tokens.Color.scrim)
-        ring.strokeColor = cgColor(Brand.Theme.brand.accent)
+        ring.strokeColor = cgColor(accent)
+        check.contentTintColor = accent
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -121,6 +122,7 @@ final class GuidedTour: NSView {
         super.viewDidMoveToWindow()
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
+        applyColors()
         if let window {
             let app: [Notification.Name] = [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification]
             let own: [Notification.Name] = [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification]

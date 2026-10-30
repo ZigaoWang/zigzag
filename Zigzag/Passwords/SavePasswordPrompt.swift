@@ -232,8 +232,13 @@ final class KeyHint: NSView {
         refresh()
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refresh()
+    }
+
     private func refresh() {
-        let ink = onAccent ? Brand.Theme.current.onAccent : Tokens.Color.textSecondary
+        let ink = onAccent ? Brand.Theme.for(self).onAccent : Tokens.Color.textSecondary
         label.textColor = ink
         layer?.backgroundColor = cgColor(onAccent ? ink.withAlphaComponent(0.18) : Tokens.Color.fieldFill)
     }

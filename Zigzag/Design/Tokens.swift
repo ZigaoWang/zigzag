@@ -318,8 +318,10 @@ enum Tokens {
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.13), dark: hex(0x000000, alpha: 0.42))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
-        /// Zigzag's one accent: the space's own, so progress, focus, selection and actions agree everywhere.
-        /// Native controls (switches, pop-ups) keep the system's.
+        /// Zigzag's one accent. The rule: UI in a browser window takes that window's space accent, so progress,
+        /// focus, selection and actions agree there; windows that belong to the app rather than a space (Settings,
+        /// Passwords, Import, About, the welcome) take the brand's, `Brand.Theme.brand`. This is the front browser
+        /// window's; a view that can show in either kind of window asks `Brand.Theme.for(self)` instead.
         @MainActor static var accent: NSColor { Brand.Theme.current.accent }
         /// Counts on extension buttons: quiet, never competing with the page.
         static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
