@@ -44,6 +44,51 @@ final class DeskCanvasView: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
 }
 
+/// Stands in a space with no tabs, where its first card would be: says so, with a way to start one there.
+final class DeskEmptySpaceView: NSView {
+    let newTab = TextButton.form("New Tab")
+    private let label = Label("No tabs", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    /// Room left under the box for a title, as a card has, so the two line up.
+    var titleArea: CGFloat = 0 { didSet { needsLayout = true } }
+    private let box = ColorView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        box.layer?.cornerRadius = Tokens.Radius.thumbnail
+        box.layer?.cornerCurve = .continuous
+        box.layer?.borderWidth = Tokens.Metric.hairline
+        addSubview(box)
+        box.addSubview(label)
+        box.addSubview(newTab)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        box.frame = NSRect(x: Tokens.Space.x1, y: Tokens.Space.x1, width: bounds.width - Tokens.Space.x2, height: bounds.height - titleArea - Tokens.Space.x1)
+        let b = box.bounds
+        let h = label.lineHeight, button = newTab.intrinsicContentSize
+        // The label over the button, the two centered together.
+        let top = round((b.height - h - Tokens.Space.x2 - button.height) / 2)
+        label.frame = NSRect(x: round((b.width - label.textWidth) / 2), y: top, width: label.textWidth, height: h)
+        newTab.frame = NSRect(x: round((b.width - button.width) / 2), y: label.frame.maxY + Tokens.Space.x2, width: button.width, height: button.height)
+        refreshColors()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColors()
+    }
+
+    private func refreshColors() {
+        box.color = Tokens.Color.hoverFill
+        Tokens.Motion.withoutAnimation { box.layer?.borderColor = cgColor(Tokens.Color.cardEdge) }
+    }
+}
+
 /// Holds the page's picture as it flies. Not flipped, so its layer's coordinates are a view's, and never in the
 /// way of a click.
 final class DeskFlightView: NSView {
@@ -69,6 +114,8 @@ final class DeskController {
     private let doneButton = TextButton(title: "Done", font: Tokens.Font.body(.medium))
     private var headers: [UUID: DeskHeaderView] = [:]
     private var cards: [UUID: TabThumbnailView] = [:]
+    /// Spaces with no tabs, by space.
+    private var empties: [UUID: DeskEmptySpaceView] = [:]
     private var selection: Set<UUID> = []
     /// The card the arrow keys are on, and what Return opens: the tab you were on when the desk opens, the best
     /// match while searching.
@@ -443,8 +490,9 @@ final class DeskController {
     /// Lays out every space and its cards. Positions follow sidebar order, so they never move on their own.
     /// Cards are as big as they can be while every tab still fits on screen: a few tabs get big cards, many get
     /// smaller ones, down to a size whose titles still read, and then the desk scrolls.
-    private func layoutFrames(dragging: (id: UUID, space: UUID, index: Int)? = nil) -> (headers: [UUID: NSRect], cards: [UUID: NSRect], height: CGFloat) {
-        guard manager != nil else { return ([:], [:], 0) }
+    private func layoutFrames(dragging: (id: UUID, space: UUID, index: Int)? = nil)
+        -> (headers: [UUID: NSRect], cards: [UUID: NSRect], cardSize: NSSize, height: CGFloat) {
+        guard manager != nil else { return ([:], [:], .zero, 0) }
         let width = max(scrollView.contentSize.width, minCardWidth + margin * 2)
         let visible = scrollView.contentSize.height
         var groups: [(space: UUID, ids: [UUID])] = []
@@ -454,9 +502,9 @@ final class DeskController {
                 ids.removeAll { $0 == dragging.id }
                 if dragging.space == space.id { ids.insert(dragging.id, at: min(dragging.index, ids.count)) }
             }
-            // A space with nothing to show has no heading, except the only one when not searching. While searching
-            // the headings of empty spaces would stand over "No tabs match".
-            if ids.isEmpty && dragging == nil && (Library.shared.spaces.count > 1 || !query.isEmpty) { continue }
+            // Every space shows, an empty one with a way to start a tab there. While searching, the headings of
+            // spaces with no matches would stand over "No tabs match".
+            if ids.isEmpty && dragging == nil && !query.isEmpty { continue }
             groups.append((space.id, ids))
         }
         let heading = Tokens.Space.x8 + Tokens.Space.x3
@@ -495,7 +543,7 @@ final class DeskController {
             let rows = max(1, Int(ceil(Double(group.ids.count) / Double(columns))))
             y += CGFloat(rows) * (cardHeight + gap) - gap + spaceGap
         }
-        return (headerFrames, cardFrames, y - spaceGap + margin)
+        return (headerFrames, cardFrames, NSSize(width: cardWidth, height: cardHeight), y - spaceGap + margin)
     }
 
     /// The tabs that get a card: a split's second page shares the first one's card, as it shares its sidebar row.
@@ -613,6 +661,13 @@ final class DeskController {
             canvas.addSubview(header)
         }
         for (id, header) in headers where Library.shared.space(id) == nil { header.removeFromSuperview(); headers[id] = nil }
+        for space in Library.shared.spaces where empties[space.id] == nil {
+            let empty = DeskEmptySpaceView()
+            empty.newTab.onClick = { [weak self] _ in self?.newTab(in: space.id) }
+            empties[space.id] = empty
+            canvas.addSubview(empty)
+        }
+        for (id, empty) in empties where Library.shared.space(id) == nil { empty.removeFromSuperview(); empties[id] = nil }
         let current = currentCard
         for card in cards.values { card.isCurrent = card === current }
         // New cards (a search cleared, a tab opened) start where they belong and grow in there, rather than flying
@@ -635,7 +690,16 @@ final class DeskController {
             guard let space = Library.shared.space(id) else { continue }
             header.label.stringValue = space.name
             let count = manager?.tabs(in: id).count ?? 0
-            header.count.stringValue = count == 1 ? "1 tab" : "\(count) tabs"
+            header.count.stringValue = count == 0 ? "" : count == 1 ? "1 tab" : "\(count) tabs"
+            if let empty = empties[id] {
+                // Where its first card would be, as long as there's none and nothing is being dragged in.
+                let slot = layout.headers[id].map { NSRect(x: $0.minX + Tokens.Space.x2, y: $0.maxY + Tokens.Space.x3, width: layout.cardSize.width, height: layout.cardSize.height) }
+                empty.isHidden = slot == nil || count > 0 || dragging?.space == id || !query.isEmpty
+                if let slot, !empty.isHidden {
+                    empty.titleArea = TabThumbnailView.titleHeight
+                    empty.frame = slot
+                }
+            }
             header.dot.color = space.swatch
             if let frame = layout.headers[id] {
                 header.isHidden = false
@@ -719,6 +783,14 @@ final class DeskController {
             group.fillMode = .backwards
             layer.add(group, forKey: "settle")
         }
+    }
+
+    /// An empty space's New Tab: the space comes forward, the desk steps away, and the new tab's field opens.
+    private func newTab(in space: UUID) {
+        guard let controller else { return }
+        controller.tabManager.switchToSpace(space)
+        hide(openingTab: nil)
+        controller.newTab(nil)
     }
 
     // MARK: Selection
