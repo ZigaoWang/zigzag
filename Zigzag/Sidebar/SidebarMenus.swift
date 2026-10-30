@@ -283,6 +283,8 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
             guard let panel, event.window === panel.window else { return event }
             if event.type == .keyDown {
+                // Mid-word in a Chinese or Japanese input method, Return and Esc belong to it.
+                if (panel.window?.firstResponder as? NSTextView)?.hasMarkedText() == true { return event }
                 if event.keyCode == 53 { panel.close(commit: false); return nil }
                 if event.keyCode == 36 || event.keyCode == 76 { panel.close(commit: true); return nil }
                 return event
