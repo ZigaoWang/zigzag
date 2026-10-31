@@ -115,7 +115,13 @@ final class SitePanel: FloatingPanelView {
         panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + 4)
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
-        panel.growsFrom = CGPoint(x: 0.2, y: 0)
+        // Out of the button that opened it (the site controls, at the address's right end), not a corner.
+        if let button = controller.sidebar.address.actionButtons.last, panel.frame.width > 0 {
+            let b = button.convert(button.bounds, to: controller.root.overlay)
+            panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / panel.frame.width, 0), 1), y: 0)
+        } else {
+            panel.growsFrom = CGPoint(x: 0.5, y: 0)
+        }
         panel.present(arrival: .pop)
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
