@@ -237,6 +237,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private func fillContact() {
         guard let target else { return }
         hide()
+        // As with a login: still the site the menu was offered on, in the tab you're looking at. Checked again once
+        // the card is read (asking for Contacts can take a while), and by the page script as it fills.
+        let stillThere = {
+            Origin(target.webView.url) == target.origin
+                && WindowManager.shared.controllers.first(where: { $0.window === target.webView.window })?.selectedWebView === target.webView
+        }
+        guard stillThere() else { return }
         Task {
             guard let values = await ContactCard.values() else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
@@ -245,7 +252,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 }
                 return
             }
-            _ = try? await target.webView.callAsyncJavaScript(Self.formFiller, arguments: ["values": values], in: target.frame, contentWorld: .defaultClient)
+            guard stillThere() else { return }
+            let arguments: [String: Any] = ["values": values, "expectedOrigin": target.origin.description]
+            _ = try? await target.webView.callAsyncJavaScript(Self.formFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
         }
     }
 
@@ -388,12 +397,18 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// by its autocomplete attribute or else its name; selects (country, state) pick the matching option. Fields
     /// already filled in are left as they are.
     private static let formFiller = """
+    // Checked here, at the moment of filling: only the site the card was offered on gets it.
+    if (location.origin !== expectedOrigin) return 0;
     const active = document.activeElement;
     const scope = (active && active.form) || document;
+    // The same test as for a login: only fields a person can see, so a page can't collect your details in hidden ones.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
-      return r.width >= 8 && r.height >= 8 && getComputedStyle(el).visibility === 'visible';
+      if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+      const style = getComputedStyle(el);
+      return style.visibility === 'visible' && parseFloat(style.opacity) >= 0.1;
     };
     const guess = (el) => {
       const auto = (el.autocomplete || '').toLowerCase().split(/\\s+/).filter((t) => !/^(section-|shipping|billing|home|work|mobile)/.test(t)).pop();
