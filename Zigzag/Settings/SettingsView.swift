@@ -319,6 +319,10 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         let top = round((bounds.height - name.lineHeight - 2 - detail.lineHeight) / 2)
         name.frame = NSRect(x: x, y: top, width: width, height: name.lineHeight)
         detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: detail.lineHeight)
+        // The lifted row's shadow has a set shape: without one, it's worked out from the row's contents on every frame
+        // of a drag, which is what made reordering stutter.
+        let radius = layer?.cornerRadius ?? 0
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
     }
 
     /// Where the row's text starts, for the divider under it.
