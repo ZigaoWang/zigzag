@@ -88,9 +88,24 @@ final class FavoritesView: NSView {
         } ?? tiles.count
     }
 
-    /// Lifts the tile into a see-through floating copy that follows the pointer anywhere.
+    /// The order while a tile is carried: the others make room where it would land, so you see the result before
+    /// letting go. Nil when nothing is being dragged.
+    private var liveOrder: [FavoriteTile]?
+
+    /// The slot a point (in this view) is over, by the grid's own columns and rows, for `count` tiles.
+    private func slot(at point: NSPoint, count: Int) -> Int {
+        let gap = Tokens.Space.x2
+        let columns = max(2, min(Self.maxColumns, count))
+        let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
+        let column = min(max(Int(point.x / (width + gap)), 0), columns - 1)
+        let row = max(Int(point.y / (Self.tileHeight + gap)), 0)
+        return min(row * columns + column, count - 1)
+    }
+
+    /// Picks the tile up: it follows the pointer, solid, and the others slide aside to open its new place. Let go
+    /// over the grid and it settles there; anywhere else (the tab list, another window) it's handed on.
     private func drag(_ tile: FavoriteTile, favorite: Bookmark, event: NSEvent) {
-        guard let window else { return }
+        guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
         let rect = window.convertToScreen(tile.convert(tile.bounds, to: nil))
         let panel = NSPanel(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
@@ -98,7 +113,6 @@ final class FavoritesView: NSView {
         panel.hasShadow = true
         panel.level = .floating
         panel.ignoresMouseEvents = true
-        panel.alphaValue = 0.6
         let image = NSImageView(frame: NSRect(origin: .zero, size: rect.size))
         if let rep = tile.bitmapImageRepForCachingDisplay(in: tile.bounds) {
             tile.cacheDisplay(in: tile.bounds, to: rep)
@@ -110,33 +124,68 @@ final class FavoritesView: NSView {
         let start = window.convertPoint(toScreen: event.locationInWindow)
         let grab = NSPoint(x: start.x - rect.minX, y: start.y - rect.minY)
         panel.orderFront(nil)
-        tile.alphaValue = 0.3
+        // Its place stays open (an empty slot) while it's carried.
+        tile.alphaValue = 0
+        liveOrder = tiles
 
         var last = start
+        var target = from
+        func arrange(_ to: Int) {
+            guard to != target else { return }
+            target = to
+            var order = tiles.filter { $0 !== tile }
+            order.insert(tile, at: to)
+            liveOrder = order
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = Tokens.Motion.easeInOut
+                context.allowsImplicitAnimation = true
+                self.needsLayout = true
+                self.layoutSubtreeIfNeeded()
+            }
+        }
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
             last = window.convertPoint(toScreen: event.locationInWindow)
             if event.type == .leftMouseUp { stop.pointee = true; return }
             panel.setFrameOrigin(NSPoint(x: last.x - grab.x, y: last.y - grab.y))
+            let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
+            // Over the grid the others make room; off it, everything goes back to where it was.
+            arrange(self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local) ? self.slot(at: local, count: self.tiles.count) : from)
             self.onDragMove?(favorite, last)
         }
-        panel.orderOut(nil)
-        tile.alphaValue = 1
 
         let local = convert(window.convertPoint(fromScreen: last), from: nil)
-        if bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local) {
-            let to = index(at: local)
-            let from = tiles.firstIndex { $0 === tile } ?? 0
-            if to != from && to != from + 1 { onReorder?(favorite, to > from ? to - 1 : to) }
-            _ = onDrop?(favorite, NSPoint(x: -10_000, y: -10_000))
-        } else {
-            _ = onDrop?(favorite, last)
+        let inside = bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
+        func finish() {
+            panel.orderOut(nil)
+            tile.alphaValue = 1
+            liveOrder = nil
         }
+        guard inside else {
+            arrange(from)
+            finish()
+            _ = onDrop?(favorite, last)
+            return
+        }
+        // Settles into its new place, then the grid takes on that order for good.
+        let landing = window.convertToScreen(tile.convert(tile.bounds, to: nil))
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = Tokens.Motion.reduceMotion ? 0 : 0.18
+            context.timingFunction = Tokens.Motion.easeOut
+            panel.animator().setFrame(landing, display: true)
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                finish()
+                if target != from { self?.onReorder?(favorite, target) }
+                _ = self?.onDrop?(favorite, NSPoint(x: -10_000, y: -10_000))
+            }
+        })
     }
 
     override func layout() {
         super.layout()
-        let all = tiles + (isDropTarget ? [dropTile] : [])
+        let all = (liveOrder ?? tiles) + (isDropTarget ? [dropTile] : [])
         let gap = Tokens.Space.x2
         // Up to four columns, every tile one size, a shorter last row from the left. A lone favorite is never
         // wider than two would be: half the row, not a long bar around a small icon.
