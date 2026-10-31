@@ -13,9 +13,11 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// Pause or resume, beside Cancel, while a download is under way or paused.
     let pauseButton = IconButton(symbol: "pause.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Pause")
     private(set) var item: DownloadItem?
-    /// Finished in the last few minutes: the one you're looking for, so it says so and stands out.
+    /// The newest download, finished in the last few minutes: the one you're looking for. Its status says so, in
+    /// the space's accent; nothing else about the row changes.
+    var isNewest = false
     private var isFresh: Bool {
-        guard let item, item.state == .finished, !item.fileIsMissing else { return false }
+        guard isNewest, let item, item.state == .finished, !item.fileIsMissing else { return false }
         return Date().timeIntervalSince(item.started) < 5 * 60
     }
 
@@ -124,7 +126,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
                 .map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
-            status.stringValue = isFresh ? "Just downloaded, \(size)" : site.map { "\(size) from \($0)" } ?? size
+            status.stringValue = isFresh ? "Just downloaded" : site.map { "\(size) from \($0)" } ?? size
             actionButton.symbol = "magnifyingglass"
             actionButton.toolTip = "Show in Finder"
         case .failed, .cancelled:
@@ -143,7 +145,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         isEnabled = true
         let missing = item.fileIsMissing
         // Something that needs you reads in the caution color; what's simply gone is quieter.
-        status.textColor = item.state == .failed ? Tokens.Color.caution : Tokens.Color.textSecondary
+        status.textColor = item.state == .failed ? Tokens.Color.caution : isFresh ? Brand.Theme.for(self).accent : Tokens.Color.textSecondary
         alphaValue = (item.state == .cancelled || missing) ? 0.6 : 1
         setAccessibilityRole(.button)
         setAccessibilityLabel(item.filename + ", " + status.stringValue)
@@ -182,8 +184,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fresh = Brand.Theme.for(self).accent.withAlphaComponent(0.12)
-        let color: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : isFresh ? fresh : nil
+        let color: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: color.map { cgColor($0) }, animated: animated && !isHovered)
         refreshAction()
         needsLayout = true
@@ -243,6 +244,8 @@ final class DownloadsPanelView: FloatingPanelView {
     private var monitor: Any?
     private weak var anchor: NSView?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
+    /// Between rows, so two highlighted ones never run together into one block.
+    private let rowGap: CGFloat = 2
     private let footer = Tokens.Space.x12
     private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
     /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
@@ -260,7 +263,8 @@ final class DownloadsPanelView: FloatingPanelView {
         more.onClick = { [weak self] _ in self?.showMoreMenu() }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary
         emptyNote.alignment = .center
-        folderButton.showsFillAtRest = true
+        // Quiet, like Clear: a line of text that lights up under the pointer, not a slab across the panel.
+        folderButton.showsFillAtRest = false
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             guard let self else { return }
@@ -403,7 +407,11 @@ final class DownloadsPanelView: FloatingPanelView {
             addSubview(row)
         }
         while rows.count > items.count { rows.removeLast().removeFromSuperview() }
-        for (row, item) in zip(rows, items) { row.configure(item) }
+        let newest = all.first { $0.state == .finished }
+        for (row, item) in zip(rows, items) {
+            row.isNewest = item === newest
+            row.configure(item)
+        }
         clearButton.isEnabled = all.contains { ![.downloading, .paused].contains($0.state) }
         clearButton.isHidden = items.isEmpty
         emptyNote.isHidden = !items.isEmpty
@@ -415,7 +423,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private func reposition() {
         guard let controller, let anchor else { return }
         let header = Tokens.Space.x10
-        let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * rowHeight
+        let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * (rowHeight + rowGap) - rowGap
         let height = header + body + footer
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.
         guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else {
@@ -447,9 +455,9 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         for row in rows {
             row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: rowHeight)
-            y += rowHeight
+            y += rowHeight + rowGap
         }
-        // A real button across the bottom, not a line of text.
+        if !rows.isEmpty { y -= rowGap }
         folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
     }
 }
@@ -467,6 +475,7 @@ final class TextButton: InteractiveView {
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
         label = Label(title, font: font, color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
+        pressScale = 0.96
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         addSubview(label)
