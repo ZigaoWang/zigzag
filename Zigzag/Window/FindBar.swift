@@ -405,14 +405,11 @@ class FloatingPanelView: NSView {
         }
     }
 
-    /// The one way a panel arrives: it fades in while settling down 4pt from its top edge, as if dropping from
-    /// whatever opened it. Opacity and movement run together on the layer, so they never drift apart.
-    /// How a panel arrives. Anything attached to what opened it (the address dropdown) just appears; small panels
-    /// from a button fade; free-floating notices drop in slightly.
-    /// `.fade` (and `.pop`) grow out of `growsFrom`: a short, critically damped spring with no overshoot, so a panel opening from a button looks like it
-    /// came out of that button. ⌘T's bar alone appears at once, being the thing you do most.
-    /// `burst`: grows out of its corner from a little further than `pop`, for a panel that opens because something
-    /// just landed in what it grows from (a download hitting its button). No overshoot.
+    /// How a panel arrives. Where it lives decides how it moves:
+    /// - opened by a key, or used constantly: it's simply there (`.instant`, and any arrival during a key press);
+    /// - opened from a button: it grows out of that button (`growsFrom`), from 97%, eased out in 180ms (`.pop`, `.fade`);
+    ///   `.burst` starts from 94%, for a panel something just landed in (a download hitting its button);
+    /// - living at the page's top edge (`slidesFromTop`): it slides down from above the window and leaves back up.
     enum Arrival { case drop, fade, instant, zoom, pop, burst }
 
     /// Where a panel grows from, in its own bounds from the top-left: (0, 0) its top-left corner, (0.5, 0) its top
@@ -448,6 +445,13 @@ class FloatingPanelView: NSView {
         super.viewWillMove(toSuperview: newSuperview)
     }
 
+    /// For things that live at the top edge of the page (toasts, offers, prompts): they slide down from above the
+    /// window's edge into place and leave back up the same way, instead of growing out of nothing. Where a thing
+    /// lives decides how it moves: from its edge, or out of the button that opened it (`growsFrom`).
+    var slidesFromTop = false
+    /// Above the window's top edge: where a top-edge panel comes from and goes back to.
+    private var offstage: CGFloat { frame.maxY + 12 }
+
     func present(always: Bool = false, arrival: Arrival = .pop) {
         layoutSubtreeIfNeeded()
         recede(true)
@@ -459,6 +463,21 @@ class FloatingPanelView: NSView {
         // something happening (`always`: a download landing, a prompt), it arrives with a short movement.
         let instant = arrival == .instant || (Tokens.Motion.isFromKey && !always)
         guard let layer, !instant else { return }
+        if slidesFromTop, !Tokens.Motion.reduceMotion {
+            let drop = CABasicAnimation(keyPath: "transform")
+            drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
+            drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            drop.duration = 0.32
+            drop.timingFunction = Tokens.Motion.easeOut
+            drop.fillMode = .backwards
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0
+            fade.toValue = 1
+            fade.duration = 0.12
+            layer.add(drop, forKey: "present.grow")
+            layer.add(fade, forKey: "present")
+            return
+        }
         if (arrival == .fade || arrival == .pop || arrival == .burst), !Tokens.Motion.reduceMotion {
             // Grows out of what opened it, from a little smaller (never from nothing), eased out in under 200ms. A
             // panel a download just landed in starts a touch smaller, so you see it come from the button.
@@ -532,10 +551,11 @@ class FloatingPanelView: NSView {
         dismissing = true
         recede(false)
         if !Tokens.Motion.reduceMotion {
+            // Back the way it came: up past the top edge for a top-edge panel, a touch smaller toward its origin else.
             let shrink = CABasicAnimation(keyPath: "transform")
-            shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
-            shrink.toValue = NSValue(caTransform3D: scaled(0.98))
-            shrink.duration = 0.14
+            shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
+            shrink.toValue = NSValue(caTransform3D: slidesFromTop ? CATransform3DMakeTranslation(0, -offstage, 0) : scaled(0.98))
+            shrink.duration = slidesFromTop ? 0.2 : 0.14
             shrink.timingFunction = Tokens.Motion.easeOut
             shrink.fillMode = .forwards
             shrink.isRemovedOnCompletion = false
@@ -553,7 +573,7 @@ class FloatingPanelView: NSView {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = layer.presentation()?.opacity ?? 1
         fade.toValue = 0
-        fade.duration = 0.12
+        fade.duration = slidesFromTop ? 0.2 : 0.12
         fade.timingFunction = Tokens.Motion.easeOut
         layer.add(fade, forKey: "dismiss")
         layer.opacity = 0
@@ -687,7 +707,7 @@ enum Toast {
         if isNew {
             host.addSubview(toast)
             // Springs down out of the top of the page, as a notice does, and eases back up when it goes.
-            toast.growsFrom = CGPoint(x: 0.5, y: 0)
+            toast.slidesFromTop = true
             toast.present(always: true, arrival: .pop)
         } else if !Tokens.Motion.reduceMotion {
             // A repeat (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.

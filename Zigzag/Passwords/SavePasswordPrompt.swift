@@ -102,11 +102,11 @@ final class SavePasswordPrompt: FloatingPanelView {
         prompt.notNowButton.onClick = { [weak prompt] _ in prompt?.close(saved: false) }
         prompt.saveButton.onClick = { [weak prompt] _ in prompt?.close(saved: true) }
         let card = controller.root.cardFrame
-        prompt.frame.origin = NSPoint(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x3)
+        // At the top of the page, in the middle, like every question a page asks; it slides down from the top edge.
+        prompt.frame.origin = NSPoint(x: round(card.midX - prompt.frame.width / 2), y: card.minY + Tokens.Space.x3)
         controller.root.overlay.addSubview(prompt)
         prompt.needsLayout = true
-        // Grows out of its corner, the top left of the page, beside the address it belongs to.
-        prompt.growsFrom = CGPoint(x: 0, y: 0)
+        prompt.slidesFromTop = true
         prompt.present(always: true)
         current = prompt
         prompt.scheduleHide()
