@@ -174,8 +174,8 @@ enum SitePermissions {
     }
 }
 
-/// "Use your location?", hanging from the address of the site that asked, as Arc does: the question, the site under
-/// it, and two answers, Allow last and filled. The answer is kept for that site (never in a private window), and
+/// "Use your location?", at the top of the page that asked, sliding down from its top edge: the question, the site
+/// under it, and two answers, Allow last and filled. The answer is kept for that site (never in a private window), and
 /// can be changed in the site panel. Not answering is easy: the close button, Esc, or a click anywhere else puts
 /// it off ("not now"), and so does the tab going to another site. One question at a time per window. It belongs
 /// to the tab that asked: it steps aside while another tab is in front and comes back with that tab.
@@ -291,7 +291,6 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.controller = controller
             shown[ObjectIdentifier(controller)] = prompt
             controller.root.overlay.addSubview(prompt)
-            prompt.growsFrom = CGPoint(x: 0.2, y: 0)
             prompt.isHidden = true
             prompt.followTab()
             prompt.tabsToken = controller.tabManager.changed.observe { [weak prompt] change in
@@ -336,32 +335,66 @@ final class PermissionPrompt: FloatingPanelView {
             Toast.hide(in: controller)
             place(in: controller)
             isHidden = false
-            present(arrival: .pop)
+            slideIn()
         } else if !inFront, !isHidden {
             isHidden = true
         }
     }
 
-    /// Hanging from the address in the sidebar, its width, the way the site panel does: it's the site asking. A
-    /// raised card so it's noticed. With the sidebar hidden, at the top left of the page that asked.
+    /// Always on the page that asked, at the top in the middle (over the pane that asked, in a split): the same
+    /// place whether the sidebar is out or not, so it never moves away from the page it belongs to.
     private func place(in controller: BrowserWindowController) {
         surfaceTint = nil
         tintStrength = nil
         isElevated = true
         radius = Tokens.Radius.panel
-        // Wherever the address is on screen (the sidebar docked, or slid in from the edge), it hangs from it.
-        if controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible {
-            let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
-            growsFrom = CGPoint(x: 0.5, y: 0)
-            frame = NSRect(x: address.minX, y: address.maxY + Tokens.Space.x1, width: address.width, height: height(for: address.width))
-            return
-        }
-        // No sidebar: at the top of the page, in the middle, where the bar for a new tab appears; clear of the
-        // window's corner and of the site's own controls at its edges.
-        growsFrom = CGPoint(x: 0.5, y: 0)
         let area = controller.focusedPaneFrame
         let width = min(Self.width, area.width - Tokens.Space.x6)
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
+    }
+
+    /// How far above its place it starts and leaves to: fully above the window's top edge, so it comes in from
+    /// outside and goes back out, never fading up out of the page.
+    private var offstage: CGFloat { frame.maxY + 12 }
+
+    /// In from above the page's top edge, eased to a stop: something new arriving, seen now and then, not a key.
+    private func slideIn() {
+        guard let layer, !Tokens.Motion.reduceMotion else { present(arrival: .fade); return }
+        let drop = CABasicAnimation(keyPath: "transform")
+        drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
+        drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        drop.duration = 0.32
+        drop.timingFunction = Tokens.Motion.easeOut
+        drop.fillMode = .backwards
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = 0.12
+        layer.add(drop, forKey: "slideIn")
+        layer.add(fade, forKey: "fadeIn")
+    }
+
+    /// Back up the way it came, then gone.
+    private func slideOut() {
+        guard let layer, !Tokens.Motion.reduceMotion else { dismiss(); return }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in self?.removeFromSuperview() }
+        let rise = CABasicAnimation(keyPath: "transform")
+        rise.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
+        rise.toValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
+        rise.duration = 0.2
+        rise.timingFunction = Tokens.Motion.easeOut
+        rise.fillMode = .forwards
+        rise.isRemovedOnCompletion = false
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.toValue = 0
+        fade.beginTime = CACurrentMediaTime() + 0.08
+        fade.duration = 0.12
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        layer.add(rise, forKey: "slideOut")
+        layer.add(fade, forKey: "fadeOut")
+        CATransaction.commit()
     }
 
     override init(frame: NSRect) {
@@ -385,7 +418,7 @@ final class PermissionPrompt: FloatingPanelView {
         let answer = self.answer
         self.answer = nil
         answer?(choice)
-        dismiss()
+        slideOut()
     }
 
     /// Taken away without an answer (its window closed): the page hears "not now" rather than waiting forever.
