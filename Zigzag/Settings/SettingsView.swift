@@ -174,31 +174,13 @@ final class BannerButton: InteractiveView {
     }
 }
 
-/// The small colored square at the start of a settings row, as in the system's own settings: it gives each row a
-/// face to find it by at a glance. White symbol on a soft top-to-bottom shade of its color.
+/// The icon at the start of a settings row: a plain line symbol, tinted with the space's accent by its row, so
+/// Settings has one color, the same as everywhere else in Zigzag.
 enum SettingsIcon {
-    static func tile(_ symbol: String, _ color: NSColor) -> NSImage {
-        let side: CGFloat = 24
-        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
-            let base = color.usingColorSpace(.sRGB) ?? color
-            NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
-            // Drawn as a white stencil of the symbol: painting each of its layers white would fill in the cut-outs
-            // (the arrow in a filled box), so the symbol is a mask and white goes where it's opaque.
-            if let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold)) {
-                let size = glyph.size
-                let place = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
-                let white = NSImage(size: size, flipped: false) { bounds in
-                    glyph.draw(in: bounds)
-                    NSColor.white.set()
-                    bounds.fill(using: .sourceAtop)
-                    return true
-                }
-                white.draw(in: place)
-            }
-            return true
-        }
+    static func symbol(_ name: String) -> NSImage {
+        let image = Tokens.Symbol.image(name, size: 15) ?? NSImage()
+        image.isTemplate = true
+        return image
     }
 }
 
@@ -214,7 +196,7 @@ final class FormRow: NSView, SettingsSearchable {
     init(title: String, detail: String? = nil, icon: NSImage? = nil, control: NSView) {
         self.control = control
         self.icon.image = icon
-        self.icon.imageScaling = .scaleProportionallyUpOrDown
+        self.icon.imageScaling = icon?.isTemplate == true ? .scaleNone : .scaleProportionallyUpOrDown
         self.icon.isHidden = icon == nil
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 44))
         self.title.stringValue = title
@@ -232,6 +214,11 @@ final class FormRow: NSView, SettingsSearchable {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        icon.contentTintColor = Brand.Theme.for(self).accent
+    }
 
     private let pad = Tokens.Space.x3
 
@@ -453,34 +440,6 @@ enum SettingsPane: Int, CaseIterable {
         }
     }
 
-    /// Its tile's color: one per section, so each is found by color as much as by name.
-    var color: NSColor {
-        switch self {
-        case .general: .systemGray
-        case .spaces: .systemPurple
-        case .passwords: .systemYellow
-        case .privacy: .systemBlue
-        case .translation: .systemIndigo
-        case .extensions: .systemGreen
-        case .shortcuts: .systemPink
-        }
-    }
-
-    /// The filled symbol on its tile.
-    var tileSymbol: String {
-        switch self {
-        case .general: "gearshape.fill"
-        case .spaces: "square.stack.fill"
-        case .passwords: "key.fill"
-        case .privacy: "hand.raised.fill"
-        case .translation: "translate"
-        case .extensions: "puzzlepiece.extension.fill"
-        case .shortcuts: "command"
-        }
-    }
-
-    var tile: NSImage { SettingsIcon.tile(tileSymbol, color) }
-
     /// Its name in the page's address: zigzag://settings/privacy.
     var path: String { "\(self)" }
 }
@@ -505,8 +464,8 @@ private final class SectionItem: InteractiveView {
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        icon.image = pane.tile
-        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.image = Tokens.Symbol.image(pane.symbol, size: 15)
+        icon.imageScaling = .scaleNone
         [icon, label].forEach { addSubview($0) }
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(pane.title)
@@ -516,7 +475,7 @@ private final class SectionItem: InteractiveView {
 
     override func layout() {
         super.layout()
-        let side: CGFloat = 22
+        let side: CGFloat = 20
         if isCompact {
             icon.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
         } else {
@@ -530,6 +489,7 @@ private final class SectionItem: InteractiveView {
         let accent = Brand.Theme.for(self).accent
         let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : 0.14) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
         label.font = Tokens.Font.body(isSelected ? .medium : .regular)
     }
 }
@@ -648,32 +608,32 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         brandGroup.add(SettingsBrandRow())
-        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", icon: SettingsIcon.tile("magnifyingglass", .systemBlue), control: engine))
+        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", icon: SettingsIcon.symbol("magnifyingglass"), control: engine))
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
-        generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", icon: SettingsIcon.tile("text.magnifyingglass", .systemCyan), control: suggestionsToggle))
+        generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", icon: SettingsIcon.symbol("text.magnifyingglass"), control: suggestionsToggle))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
-        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", icon: SettingsIcon.tile("globe", .systemIndigo), control: defaultControl))
+        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", icon: SettingsIcon.symbol("globe"), control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
         downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
         archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
-        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", icon: SettingsIcon.tile("archivebox.fill", .systemOrange), control: archiveAfter))
-        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", icon: SettingsIcon.tile("pip", .systemPink), control: pipToggle))
-        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", icon: SettingsIcon.tile("arrow.down", .systemGreen), control: downloadPlace))
+        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", icon: SettingsIcon.symbol("archivebox.fill"), control: archiveAfter))
+        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", icon: SettingsIcon.symbol("pip"), control: pipToggle))
+        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", icon: SettingsIcon.symbol("arrow.down"), control: downloadPlace))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", icon: SettingsIcon.tile("hand.raised.fill", .systemRed), control: blockingToggle))
+        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", icon: SettingsIcon.symbol("hand.raised.fill"), control: blockingToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let importButton = TextButton.form("Import")
         importButton.onClick = { _ in ImportWindowController.show() }
-        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", icon: SettingsIcon.tile("square.and.arrow.down.fill", .systemGray), control: importButton))
+        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", icon: SettingsIcon.symbol("square.and.arrow.down.fill"), control: importButton))
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", icon: SettingsIcon.tile("rectangle.inset.filled", .systemTeal), control: borderlessToggle))
-        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", icon: SettingsIcon.tile("power", .systemGray), control: quitToggle))
+        windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", icon: SettingsIcon.symbol("rectangle.inset.filled"), control: borderlessToggle))
+        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", icon: SettingsIcon.symbol("power"), control: quitToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -859,7 +819,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if installed.isEmpty {
             let get = TextButton.form("Get Extensions")
             get.onClick = { [weak self] _ in self?.getExtensions() }
-            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", icon: SettingsIcon.tile("puzzlepiece.extension.fill", .systemPurple), control: get))
+            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", icon: SettingsIcon.symbol("puzzlepiece.extension.fill"), control: get))
         }
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
         let developer = Toggle(isOn: ExtensionStore.developerMode)
@@ -867,7 +827,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ExtensionStore.developerMode = on
             self?.reloadExtensions()
         }
-        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", icon: SettingsIcon.tile("hammer.fill", .systemGray), control: developer))
+        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", icon: SettingsIcon.symbol("hammer.fill"), control: developer))
     }
 
     @available(macOS 15.4, *)
@@ -954,15 +914,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let manager = PasswordManagers.active
         let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
         let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
-        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, icon: SettingsIcon.tile("key.fill", .systemYellow), control: saveToggle))
-        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, icon: SettingsIcon.tile("rectangle.and.pencil.and.ellipsis", .systemBlue), control: fillToggle))
+        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, icon: SettingsIcon.symbol("key.fill"), control: saveToggle))
+        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, icon: SettingsIcon.symbol("rectangle.and.pencil.and.ellipsis"), control: fillToggle))
         cardToggle.isOn = ContactCard.isOn
         cardToggle.onChange = { on in ContactCard.isOn = on }
-        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", icon: SettingsIcon.tile("person.fill", .systemGreen), control: cardToggle))
+        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", icon: SettingsIcon.symbol("person.fill"), control: cardToggle))
         let open = TextButton.form("Open Passwords")
         open.onClick = { _ in PasswordsWindowController.show() }
         // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", icon: SettingsIcon.tile("lock.fill", .systemGray), control: open))
+        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", icon: SettingsIcon.symbol("lock.fill"), control: open))
     }
 
     private func reloadTranslation() {
@@ -972,8 +932,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         translateInto.options = [MenuButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { MenuButton.Option(title: $0.name, image: nil) }
         translateInto.selectedIndex = PageTranslator.chosenLanguage.flatMap { chosen in languages.firstIndex { $0.id == chosen }.map { $0 + 1 } } ?? 0
         translateOffer.isOn = PageTranslator.offers
-        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", icon: SettingsIcon.tile("character.bubble.fill", .systemBlue), control: translateInto))
-        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", icon: SettingsIcon.tile("text.bubble.fill", .systemPurple), control: translateOffer))
+        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", icon: SettingsIcon.symbol("character.bubble.fill"), control: translateInto))
+        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", icon: SettingsIcon.symbol("text.bubble.fill"), control: translateOffer))
         let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
         // Laid out like Sites in Privacy: a heading, Reset beside it only when there's something to reset.
         let reset = TextButton.form("Reset")
@@ -1093,17 +1053,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
 
         if !isSearching {
-            // The section's own tile, larger, beside its name: where you are, at a glance.
-            let side: CGFloat = 36
-            let tile = NSImageView(image: pane.tile)
-            tile.imageScaling = .scaleProportionallyUpOrDown
             let title = Label(pane.title, font: .systemFont(ofSize: Tokens.TypeSize.title, weight: .bold), color: Tokens.Color.textPrimary)
-            tile.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: side, height: side)
-            title.frame = NSRect(x: tile.frame.maxX + Tokens.Space.x3 - Label.inset, y: y + (side - title.lineHeight) / 2,
-                                 width: contentWidth - side - Tokens.Space.x3, height: title.lineHeight)
-            documentView.addSubview(tile)
+            title.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: title.lineHeight)
             documentView.addSubview(title)
-            y = tile.frame.maxY + Tokens.Space.x5
+            y = title.frame.maxY + Tokens.Space.x5
         }
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
@@ -1315,7 +1268,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", icon: SettingsIcon.tile("clock.fill", .systemIndigo), control: historyButtons))
+        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", icon: SettingsIcon.symbol("clock.fill"), control: historyButtons))
 
         let cache = TextButton.form("Clear Cache")
         cache.onClick = { [weak cache] _ in
@@ -1335,7 +1288,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", icon: SettingsIcon.tile("internaldrive.fill", .systemGray), control: data))
+        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", icon: SettingsIcon.symbol("internaldrive.fill"), control: data))
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
@@ -1389,7 +1342,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             let line = said.joined(separator: ", ")
             let siteURL = URL(string: "https://\(site)")
-            let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.tile("globe", .systemGray)
+            let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", icon: favicon, control: forget))
         }
     }
