@@ -1265,10 +1265,10 @@ final class IntoZigzag: NSView {
                     self.layoutSubtreeIfNeeded()
                 }
                 guard !Tokens.Motion.reduceMotion else { self.needsLayout = true; return }
-                let pop = CASpringAnimation(keyPath: "transform.scale")
+                let pop = CASpringAnimation(perceptualDuration: 0.4, bounce: 0.15)
+                pop.keyPath = "transform.scale"
                 pop.fromValue = 0.9
                 pop.toValue = 1
-                pop.damping = 10
                 pop.duration = pop.settlingDuration
                 layer.add(pop, forKey: "pop")
                 self.needsLayout = true
@@ -1278,11 +1278,10 @@ final class IntoZigzag: NSView {
         if new == .done, let layer = badge.layer {
             // The check lands with a little give, once.
             layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            let pop = CASpringAnimation(keyPath: "transform.scale")
-            pop.fromValue = 0.3
+            let pop = CASpringAnimation(perceptualDuration: 0.4, bounce: 0.15)
+            pop.keyPath = "transform.scale"
+            pop.fromValue = 0.6
             pop.toValue = 1
-            pop.damping = 11
-            pop.initialVelocity = 6
             pop.duration = pop.settlingDuration
             layer.add(pop, forKey: "pop")
         }
