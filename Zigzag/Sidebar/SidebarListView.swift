@@ -563,6 +563,7 @@ final class SidebarListView: NSView {
             // Both halves of a split show as open.
             let partner = manager.partner(of: tab)
             row.configure(partner: partner)
+            row.partnerLeads = partner != nil && manager.split(for: tab)?.left == partner?.id
             row.isSelected = tab === selected || (partner != nil && partner === selected)
             row.focusedHalf = partner != nil && partner === selected ? 1 : 0
             row.freshness = SiteTint.freshness(lastActivated: tab.lastActivated)
@@ -592,7 +593,9 @@ final class SidebarListView: NSView {
             }
             row.configure(partner: partner)
             row.isUnloaded = tab == nil && partner == nil
-            row.isSelected = (tab != nil && tab === selected) || (partner != nil && partner === selected)
+            // Beside a tab, it's on screen while that tab is: the tab's row carries the pair, and this one stays lit.
+            let beside = tab.flatMap(manager.partner(of:))
+            row.isSelected = (tab != nil && tab === selected) || (partner != nil && partner === selected) || (beside != nil && beside === selected)
             row.focusedHalf = partner != nil && partner === selected ? 1 : 0
             row.isMarked = marked.contains(item)
         default:

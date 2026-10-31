@@ -164,8 +164,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var pinnedPartner: (title: String, icon: NSImage?, unloaded: Bool)?
     /// Two pages in one row: a split of tabs, or a pinned split.
     var isSplit: Bool { partner != nil || pinnedPartner != nil }
-    /// Which half you're working in, when split (0 = left, 1 = right).
+    /// Which page you're working in, when split (0 = this row's own, 1 = its partner).
     var focusedHalf = 0 { didSet { refreshTitleColor() } }
+    /// The partner is on the left of the page, so it's on the left of the row too (a pinned page beside a tab).
+    var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
     private let partnerTitle = Label()
@@ -249,8 +251,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     /// Which half of a split row a point (in this view) falls in.
+    /// Which page the point is over: 0 for this row's own, 1 for its partner.
     func half(at point: NSPoint) -> Int {
-        isSplit && point.x > bounds.midX ? 1 : 0
+        isSplit && (point.x > bounds.midX) != partnerLeads ? 1 : 0
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -366,6 +369,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let titleX = partnerIcon.frame.maxX + Tokens.Space.x2
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : Tokens.Space.x2
         partnerTitle.frame = NSRect(x: titleX, y: title.frame.minY, width: max(0, bounds.width - titleX - trailing), height: title.frame.height)
+        guard partnerLeads else { return }
+        // Same two halves, the pages trading places.
+        let ownIcon = icon.frame, ownTitle = title.frame
+        icon.frame.origin.x = partnerIcon.frame.minX
+        title.frame = NSRect(x: titleX, y: ownTitle.minY, width: partnerTitle.frame.width, height: ownTitle.height)
+        partnerIcon.frame = ownIcon
+        partnerTitle.frame = NSRect(x: ownTitle.minX, y: partnerTitle.frame.minY, width: ownTitle.width, height: partnerTitle.frame.height)
     }
 }
 

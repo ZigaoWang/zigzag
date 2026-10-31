@@ -355,7 +355,7 @@ final class TabManager {
         let splitCount = splits.count
         splits.removeAll { pair in
             guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }
-            return !canSplit(left, with: right)
+            return !canSplit(left, with: right) || left.spaceID != right.spaceID
         }
         if !spaceIDs.contains(currentSpaceID) {
             currentSpaceID = Library.shared.spaces[0].id
@@ -727,17 +727,23 @@ final class TabManager {
         return self.tab(with: pair.left == tab.id ? pair.right : pair.left)
     }
 
-    /// Ordinary tabs split, and the two pinned pages of a pinned split; a pinned page and a tab, or a favorite, have
-    /// no one row to carry the pair.
+    /// Ordinary tabs split, the two pinned pages of a pinned split, and a pinned page with a tab: the tab's row
+    /// carries that pair. A favorite belongs to every space, and two pinned pages to rows of their own, so neither
+    /// has one row to carry it.
     func canSplit(_ tab: Tab, with other: Tab) -> Bool {
         guard tab !== other else { return false }
-        guard let a = tab.bookmarkID, let b = other.bookmarkID else { return tab.bookmarkID == nil && other.bookmarkID == nil }
-        return Library.shared.pinnedSplit(containing: a)?.contains(b) == true
+        switch (tab.bookmarkID, other.bookmarkID) {
+        case (nil, nil): return true
+        case let (a?, b?): return Library.shared.pinnedSplit(containing: a)?.contains(b) == true
+        case let (pinned?, nil), let (nil, pinned?):
+            return !Library.shared.isFavorite(pinned) && Library.shared.pinnedSplit(containing: pinned) == nil
+        }
     }
 
     /// Puts `other` beside `tab` (on the right or left), ending any splits either was in.
     func makeSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
-        guard canSplit(tab, with: other) else { return }
+        // A pinned page stays in its space; only a tab moves to join the other.
+        guard canSplit(tab, with: other), other.spaceID == tab.spaceID || other.bookmarkID == nil else { return }
         unsplit(tab, notify: false)
         unsplit(other, notify: false)
         if other.spaceID != tab.spaceID {
