@@ -26,10 +26,12 @@ extension CALayer {
 
 /// Base for everything clickable we draw ourselves: tracks hover, press, selection and enabled state.
 class InteractiveView: NSView {
+    /// Hover shows and goes at once, both ways: a fade on something you sweep past a hundred times a day only reads
+    /// as lag (https://emilkowal.ski/ui/you-dont-need-animations#frequency-of-use).
     var isHovered = false {
         didSet {
             guard oldValue != isHovered else { return }
-            stateDidChange(animated: true)
+            stateDidChange(animated: false)
             hoverChanged?(isHovered)
         }
     }
