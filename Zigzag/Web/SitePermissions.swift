@@ -61,10 +61,11 @@ enum SitePermissions {
         UserDefaults.standard.set(all, forKey: key)
     }
 
-    /// "Ask again" for the camera, microphone and location. Notifications have their own switch and stay as they are.
+    /// "Ask again" for the camera and microphone only: location, notifications and apps to open each have their own
+    /// row, and stay as they are.
     static func forget(host: String) {
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
-        for k in all.keys where k.hasPrefix(host + "|") && k != "\(host)|notifications" { all[k] = nil }
+        for kind in ["camera", "microphone", "cameraAndMicrophone"] { all["\(host)|\(kind)"] = nil }
         UserDefaults.standard.set(all, forKey: key)
     }
 

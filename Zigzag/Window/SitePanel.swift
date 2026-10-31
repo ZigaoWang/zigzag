@@ -263,9 +263,10 @@ final class SitePanel: FloatingPanelView {
             })
         }
         let host = url.host() ?? site
-        let camera = SitePermissions.decision(host: host, type: .camera), microphone = SitePermissions.decision(host: host, type: .microphone)
-        if camera != nil || microphone != nil {
-            let allowed = [camera, microphone].compactMap { $0 }.allSatisfy { $0 }
+        // Calls (Meet, Zoom, Teams) ask for both at once and are kept as one answer; that counts here too.
+        let media = [WKMediaCaptureType.camera, .microphone, .cameraAndMicrophone].compactMap { SitePermissions.decision(host: host, type: $0) }
+        if !media.isEmpty {
+            let allowed = media.allSatisfy { $0 }
             rows.append(.value("Camera and microphone", symbol: "video", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
                 SitePermissions.forget(host: host)
                 self?.rebuildRows()
