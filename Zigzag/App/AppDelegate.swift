@@ -167,8 +167,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func frontBrowserWindow() -> BrowserWindowController? {
         if WindowManager.shared.controllers.isEmpty { WindowManager.shared.reopen() }
-        // Onboarding still showing: the window waits behind it.
-        guard WelcomeWindowController.shared == nil, let controller = WindowManager.shared.keyController else { return nil }
+        // Onboarding in front: the window waits behind it. Left open behind a browser window, it doesn't stop ⌘Y or ⌘,.
+        if WelcomeWindowController.shared?.window?.isKeyWindow == true { return nil }
+        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return nil }
         controller.window?.makeKeyAndOrderFront(nil)
         return controller
     }
