@@ -163,14 +163,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         refreshAnchorLook()
     }
 
-    /// Editing the address with nothing to suggest is the address bar itself: its corners, no shadow, and a soft
-    /// accent outline to say it's being edited. With suggestions it lifts into a proper panel.
+    /// Editing the address with nothing to suggest is the address bar itself, lit the way a selected tab is: its
+    /// corners and place, no shadow, no outline. With suggestions it lifts into a proper panel under your pointer.
     private func refreshAnchorLook() {
         guard let controller else { return }
         let inPlace = isAnchored && results.isEmpty
-        let accent = Brand.Theme.of(controller.tabManager.isPrivate ? nil : controller.tabManager.currentSpace).accent
+        let sidebar = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
+        panel.liftedFrom = inPlace ? sidebar : nil
         panel.isElevated = !inPlace
-        panel.edgeColor = inPlace ? accent.withAlphaComponent(0.5) : nil
+        panel.edgeColor = nil
         panel.radius = inPlace ? controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel : Tokens.Radius.panel
     }
 
@@ -308,8 +309,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let textHeight = ceil(field.intrinsicContentSize.height)
         var fieldX = isAnchored ? Tokens.Space.x3 - 2 : fieldIcon.frame.maxX + Tokens.Space.x2
         if scope != nil {
-            let cw = chipLabel.textWidth + Tokens.Space.x5
-            let ch: CGFloat = 26
+            // In the sidebar's address it's sized to the sidebar's text, not the big bar's.
+            chipLabel.font = isAnchored ? Tokens.Font.small(.semibold) : Tokens.Font.body(.semibold)
+            let cw = chipLabel.textWidth + (isAnchored ? Tokens.Space.x3 : Tokens.Space.x5)
+            let ch: CGFloat = isAnchored ? 20 : 26
             chip.frame = NSRect(x: fieldX, y: (fieldHeight - ch) / 2, width: cw, height: ch)
             chipLabel.frame = NSRect(x: 0, y: (ch - chipLabel.lineHeight) / 2, width: cw, height: chipLabel.lineHeight)
             chipLabel.alignment = .center
