@@ -247,11 +247,22 @@ final class SuggestionFetcher {
     var isPrivate = false
     private lazy var privateSession = URLSession(configuration: .ephemeral)
 
+    /// On by default. Off, nothing you type in the command bar leaves the Mac for suggestions.
+    static var isOn: Bool {
+        get { UserDefaults.standard.object(forKey: "SearchSuggestions") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "SearchSuggestions") }
+    }
+
+    /// Where a query would be sent for suggestions, or nil when it stays on the Mac.
+    static func url(for query: String, engine: SearchEngine, isOn: Bool) -> URL? {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard isOn, trimmed.count >= 2, CommandRanker.url(from: trimmed) == nil else { return nil }
+        return engine.suggestionsURL(trimmed)
+    }
+
     func fetch(_ query: String, completion: @escaping ([String]) -> Void) {
         task?.cancel()
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 2, CommandRanker.url(from: trimmed) == nil,
-              let url = Library.shared.searchEngine.suggestionsURL(trimmed) else { completion([]); return }
+        guard let url = Self.url(for: query, engine: Library.shared.searchEngine, isOn: Self.isOn) else { completion([]); return }
         let session = isPrivate ? privateSession : URLSession.shared
         task = Task {
             try? await Task.sleep(for: .milliseconds(90))

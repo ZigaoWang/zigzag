@@ -206,4 +206,16 @@ struct BookmarkFolderTests {
         #expect(FaviconStore.speaksForSite(try #require(URL(string: "https://claude.ai/new")), hasIcon: true))
         #expect(FaviconStore.speaksForSite(try #require(URL(string: "https://github.com")), hasIcon: true))
     }
+
+    @Test func suggestionsStayOnTheMacWhenOff() throws {
+        // On: a search is sent to the engine for suggestions.
+        #expect(SuggestionFetcher.url(for: "shanghai metro", engine: .google, isOn: true) != nil)
+        // Off: nothing is sent, for any engine.
+        for engine in SearchEngine.allCases {
+            #expect(SuggestionFetcher.url(for: "shanghai metro", engine: engine, isOn: false) == nil)
+        }
+        // Addresses and single letters never were.
+        #expect(SuggestionFetcher.url(for: "github.com", engine: .google, isOn: true) == nil)
+        #expect(SuggestionFetcher.url(for: "s", engine: .google, isOn: true) == nil)
+    }
 }

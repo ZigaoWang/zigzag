@@ -448,6 +448,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
+    private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
     private let quitToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
@@ -523,6 +524,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         defaultControl.spacing = Tokens.Space.x2
         brandGroup.add(SettingsBrandRow())
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", icon: SettingsIcon.tile("magnifyingglass", .systemBlue), control: engine))
+        suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
+        generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", icon: SettingsIcon.tile("text.magnifyingglass", .systemCyan), control: suggestionsToggle))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
         generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", icon: SettingsIcon.tile("globe", .systemIndigo), control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
@@ -959,6 +962,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
         pipToggle.isOn = PictureInPicture.followsTabs
+        suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         refreshDownloadPlace()
