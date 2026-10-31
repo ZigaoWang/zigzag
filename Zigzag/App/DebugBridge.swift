@@ -254,6 +254,10 @@ enum DebugBridge {
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "slowmo":
+            // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
+            let factor = max(1, Float(arg) ?? 1)
+            controller.window?.contentView?.layer?.speed = 1 / factor
         case "quit": NSApp.terminate(nil)
         case "history": HistoryPage.open(in: controller)
         case "newwindow": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false)
