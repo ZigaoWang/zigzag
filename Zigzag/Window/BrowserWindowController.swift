@@ -963,24 +963,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let side = 1 - pow(1 - t, 1.6)
             points.append(NSValue(point: NSPoint(x: start.x + (end.x - start.x) * side, y: start.y + b * t + a * t * t)))
         }
-        let duration = 1.1 * Tokens.Motion.debugSlowdown
+        let duration = 0.55 * Tokens.Motion.debugSlowdown
         let move = CAKeyframeAnimation(keyPath: "position")
         move.values = points
         move.calculationMode = .linear
         let scale = CAKeyframeAnimation(keyPath: "transform.scale")
-        scale.values = [0.55, 1.12, 1.0, 0.9, 0.42]
-        scale.keyTimes = [0, 0.22, 0.42, 0.75, 1]
-        scale.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeInEaseOut),
-                                 CAMediaTimingFunction(name: .linear), CAMediaTimingFunction(name: .easeIn)]
-        // A small tip as it leaves and lands, so it reads as thrown, not slid.
-        let tilt = CAKeyframeAnimation(keyPath: "transform.rotation.z")
-        tilt.values = [0, 0.12, 0, -0.1]
-        tilt.keyTimes = [0, 0.3, 0.6, 1]
+        // Grows to its size as it leaves and shrinks into the button: no overshoot, no tilt.
+        scale.values = [0.6, 1.0, 0.5]
+        scale.keyTimes = [0, 0.3, 1]
+        scale.timingFunctions = [Tokens.Motion.easeOut, CAMediaTimingFunction(name: .linear)]
         let fade = CAKeyframeAnimation(keyPath: "opacity")
         fade.values = [0, 1, 1, 1]
         fade.keyTimes = [0, 0.1, 0.9, 1]
         let group = CAAnimationGroup()
-        group.animations = [move, scale, tilt, fade]
+        group.animations = [move, scale, fade]
         group.duration = duration
         flyingDownloads.insert(item.id)
         CATransaction.begin()
