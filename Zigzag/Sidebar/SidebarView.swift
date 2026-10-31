@@ -59,6 +59,7 @@ final class AddressView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        pressScale = 0.985
         // Its buttons sit 4pt in, with 6pt corners: 10 here keeps the two curves running side by side.
         layer?.cornerRadius = Tokens.Radius.control + AddressView.buttonInset
         layer?.cornerCurve = .continuous
@@ -156,6 +157,7 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Space.x6, height: Tokens.Space.x6))
+        pressScale = 0.8
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         setAccessibilityRole(.button)

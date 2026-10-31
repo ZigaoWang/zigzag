@@ -34,7 +34,46 @@ class InteractiveView: NSView {
         }
     }
     var hoverChanged: ((Bool) -> Void)?
-    var isPressed = false { didSet { if oldValue != isPressed { stateDidChange(animated: false) } } }
+    var isPressed = false {
+        didSet {
+            guard oldValue != isPressed else { return }
+            stateDidChange(animated: false)
+            animatePress(isPressed)
+        }
+    }
+    /// How far it gives under a press, 1 for not at all: buttons squeeze a little and spring back as you let go,
+    /// so a click feels like it landed. Small buttons give more, wide ones and rows less or none.
+    var pressScale: CGFloat = 1
+
+    private func animatePress(_ down: Bool) {
+        guard pressScale < 1, let layer, !Tokens.Motion.reduceMotion, bounds.width > 0 else { return }
+        let w = bounds.width, h = bounds.height
+        // A view's layer scales from its corner; moved back by half the shrink, it scales from its middle.
+        func scaled(_ k: CGFloat) -> CATransform3D {
+            CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(w / 2 * (1 - k), h / 2 * (1 - k), 0))
+        }
+        let now = layer.presentation()?.transform ?? CATransform3DIdentity
+        if down {
+            let squeeze = CABasicAnimation(keyPath: "transform")
+            squeeze.fromValue = NSValue(caTransform3D: now)
+            squeeze.toValue = NSValue(caTransform3D: scaled(pressScale))
+            squeeze.duration = 0.08
+            squeeze.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            squeeze.fillMode = .forwards
+            squeeze.isRemovedOnCompletion = false
+            layer.add(squeeze, forKey: "press")
+        } else {
+            // Back with a small spring: settles past its size by a hair, like something with give in it.
+            let release = CASpringAnimation(keyPath: "transform")
+            release.fromValue = NSValue(caTransform3D: now)
+            release.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            release.mass = 1
+            release.stiffness = 500
+            release.damping = 24
+            release.duration = release.settlingDuration
+            layer.add(release, forKey: "press")
+        }
+    }
     var isSelected = false {
         didSet {
             guard oldValue != isSelected else { return }
@@ -247,6 +286,7 @@ final class IconButton: InteractiveView {
         self.symbol = symbol
         self.symbolSize = symbolSize
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
+        pressScale = 0.88
         layer?.cornerRadius = radius
         layer?.cornerCurve = .continuous
         imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
@@ -417,6 +457,7 @@ final class PrimaryButton: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.brand.onAccent)
         super.init(frame: .zero)
+        pressScale = 0.97
         themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
@@ -530,6 +571,7 @@ final class ChoicePill: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
+        pressScale = 0.96
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         [check, label].forEach { addSubview($0) }
@@ -736,6 +778,7 @@ final class CheckBox: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
+        pressScale = 0.9
         box.wantsLayer = true
         box.layer?.cornerRadius = 4
         box.layer?.cornerCurve = .continuous
@@ -798,6 +841,7 @@ final class MenuButton: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)

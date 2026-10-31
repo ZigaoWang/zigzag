@@ -143,6 +143,7 @@ final class BannerButton: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Brand.ribbon)
         super.init(frame: .zero)
+        pressScale = 0.96
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         label.alignment = .center
