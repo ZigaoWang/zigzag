@@ -537,14 +537,38 @@ final class SidebarView: NSView {
         let b = downloadsButton.bounds
         let d = min(b.width, b.height) - 6
         let rect = CGRect(x: (b.width - d) / 2, y: (b.height - d) / 2, width: d, height: d)
-        // Starts at the top and runs clockwise, like the system's own progress rings.
-        var flip = CGAffineTransform(translationX: rect.midX, y: rect.midY).rotated(by: .pi / 2).scaledBy(x: -1, y: 1).translatedBy(x: -rect.midX, y: -rect.midY)
-        downloadsRing.path = CGPath(ellipseIn: rect, transform: &flip)
-        downloadsRing.frame = b
+        // Shape, place and color are set as they are: animating them on every progress tick restarted a fade a few
+        // times a second, which is what made the ring jump.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if downloadsRing.frame != b {
+            // Starts at the top and runs clockwise, like the system's own progress rings.
+            var flip = CGAffineTransform(translationX: rect.midX, y: rect.midY).rotated(by: .pi / 2).scaledBy(x: -1, y: 1).translatedBy(x: -rect.midX, y: -rect.midY)
+            downloadsRing.path = CGPath(ellipseIn: rect, transform: &flip)
+            downloadsRing.frame = b
+        }
         tintDownloadsRing()
-        downloadsRing.opacity = downloading ? 1 : 0
-        downloadsRing.strokeEnd = downloading ? CGFloat(max(0.04, min(progress, 1))) : 0
-        downloadsButton.symbol = downloading ? "arrow.down" : (wasDownloading ? "checkmark.circle" : "arrow.down.circle")
+        CATransaction.commit()
+        // The fill only moves forward while a download runs, easing from wherever it is on screen to the new amount.
+        let target = downloading ? CGFloat(max(0.04, min(progress, 1))) : 0
+        let shown = downloadsRing.presentation()?.strokeEnd ?? downloadsRing.strokeEnd
+        let to = downloading && wasDownloading ? max(target, downloadsRing.strokeEnd) : target
+        if to != downloadsRing.strokeEnd {
+            let ease = CABasicAnimation(keyPath: "strokeEnd")
+            ease.fromValue = shown
+            ease.toValue = to
+            ease.duration = downloading ? 0.35 : 0.2
+            ease.timingFunction = CAMediaTimingFunction(name: downloading ? .linear : .easeOut)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            downloadsRing.strokeEnd = to
+            CATransaction.commit()
+            downloadsRing.add(ease, forKey: "progress")
+        }
+        let opacity: Float = downloading ? 1 : 0
+        if downloadsRing.opacity != opacity { downloadsRing.opacity = opacity }
+        let symbol = downloading ? "arrow.down" : (wasDownloading ? "checkmark.circle" : "arrow.down.circle")
+        if downloadsButton.symbol != symbol { downloadsButton.symbol = symbol }
         if wasDownloading, !downloading {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
                 guard let self, !self.wasDownloading else { return }
