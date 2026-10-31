@@ -1242,7 +1242,7 @@ final class IntoZigzag: NSView {
                         ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.5, 0, 0.3, 1)
                         if !Tokens.Motion.reduceMotion { view.animator().frame = target.insetBy(dx: 26, dy: 26) }
                         view.animator().alphaValue = 0
-                    }, completionHandler: { view.removeFromSuperview() })
+                    }, completionHandler: { MainActor.assumeIsolated { view.removeFromSuperview() } })
                 }
             }
             // The wave fades out where it is, rather than vanishing mid-step.

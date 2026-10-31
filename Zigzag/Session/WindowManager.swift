@@ -190,10 +190,12 @@ final class WindowManager {
         }
         for id in savedStates.keys where !keep.contains(id) { savedStates[id] = nil }
         let directory = Paths.tabState
+        // Frozen copies for the writer's queue, so nothing it reads can change under it.
+        let toWrite = writes, kept = keep
         if synchronously {
-            stateWriter.sync { Self.writeTabStates(writes, keeping: keep, in: directory) }
+            stateWriter.sync { Self.writeTabStates(toWrite, keeping: kept, in: directory) }
         } else {
-            stateWriter.async { Self.writeTabStates(writes, keeping: keep, in: directory) }
+            stateWriter.async { Self.writeTabStates(toWrite, keeping: kept, in: directory) }
         }
     }
 

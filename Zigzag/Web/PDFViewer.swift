@@ -233,10 +233,12 @@ final class PDFViewerView: NSView, PDFViewDelegate {
             context.timingFunction = Tokens.Motion.easeInOut
             clip.animator().setBoundsOrigin(origin)
         } completionHandler: { [weak self, weak clip] in
-            guard let self, let clip else { return }
-            clip.enclosingScrollView?.reflectScrolledClipView(clip)
-            // Landed: the page count follows what's now at the top.
-            MainActor.assumeIsolated { self.pageChanged() }
+            MainActor.assumeIsolated {
+                guard let self, let clip else { return }
+                clip.enclosingScrollView?.reflectScrolledClipView(clip)
+                // Landed: the page count follows what's now at the top.
+                self.pageChanged()
+            }
         }
     }
 

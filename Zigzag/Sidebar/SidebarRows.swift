@@ -587,8 +587,10 @@ final class SeparatorRowView: NSView {
             clearButton.animator().alphaValue = show ? 1 : 0
             layoutSubtreeIfNeeded()
         }, completionHandler: { [weak self] in
-            guard let self, !self.clearShown, !self.clearInTabOrder else { return }
-            self.clearButton.isHidden = true
+            MainActor.assumeIsolated {
+                guard let self, !self.clearShown, !self.clearInTabOrder else { return }
+                self.clearButton.isHidden = true
+            }
         })
     }
 

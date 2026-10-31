@@ -273,6 +273,6 @@ final class SwipeArrowView: NSView {
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = navigated ? 0.3 : 0.18
             self.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in self?.removeFromSuperview() })
+        }, completionHandler: { [weak self] in MainActor.assumeIsolated { self?.removeFromSuperview() } })
     }
 }
