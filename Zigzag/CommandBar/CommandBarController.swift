@@ -201,6 +201,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             field.stringValue = ""
         }
         typed = field.stringValue
+        // A site search hint from the last time the bar was open never carries over.
+        refreshHint()
         completionURL = nil
         suggestions = []
         refreshResults(animated: false)
