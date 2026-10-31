@@ -266,6 +266,9 @@ private final class StepPage: NSView {
         needsLayout = true
     }
 
+    /// Where every step's title starts.
+    private static let titleTop: CGFloat = 88
+
     override func layout() {
         super.layout()
         let width = Self.cardWidth
@@ -286,8 +289,9 @@ private final class StepPage: NSView {
         let footY = bounds.height - 40 - Tokens.Space.x10
         let head = th + 10 + bh0 + 28
         let want = head + content.preferredHeight(for: width - Self.cardPad * 2) + Self.cardPad * 2
-        // Title and card together, in the middle of the room above the buttons (never under the progress).
-        var y = max(76, round((footY - 28 - want) / 2 + 20))
+        // The title sits at the same height on every step, so going from one to the next only changes what's under
+        // it; a step with a tall card starts a little higher to make room, never under the progress.
+        var y = max(76, min(Self.titleTop, round(footY - 28 - want)))
         title.frame = NSRect(x: x, y: y, width: width, height: th)
         y = title.frame.maxY + 10
         let bh = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)
