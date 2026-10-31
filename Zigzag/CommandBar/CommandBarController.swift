@@ -160,20 +160,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(0.25)]
         }
         rows.forEach { $0.stateDidChange(animated: false) }
-        refreshAnchorLook()
     }
 
-    /// Editing the address with nothing to suggest is the address bar itself, lit the way a selected tab is: its
-    /// corners and place, no shadow, no outline. With suggestions it lifts into a proper panel under your pointer.
-    private func refreshAnchorLook() {
-        guard let controller else { return }
-        let inPlace = isAnchored && results.isEmpty
-        let sidebar = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
-        panel.liftedFrom = inPlace ? sidebar : nil
-        panel.isElevated = !inPlace
-        panel.edgeColor = nil
-        panel.radius = inPlace ? controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel : Tokens.Radius.panel
-    }
 
     func show(mode: Mode) {
         guard let controller else { return }
@@ -260,11 +248,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         guard let controller else { return .zero }
         if isAnchored {
             let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
-            // Nothing to suggest yet (the address as it is): it is the address bar, exactly. It reaches into the
-            // page only once there are suggestions to show, growing from that same top-left corner.
+            // From the address's own corner, wide enough for the whole address at once, reaching over the page;
+            // suggestions continue below in the same panel.
             let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
-            // The Tab hint ("Search Wikipedia") needs the room: it opens the list rather than crowding the address.
-            if results.isEmpty && hint.isHidden { return address }
             return NSRect(x: address.minX, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
         let card = controller.root.cardFrame
@@ -409,7 +395,6 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         selectedIndex = min(selectedIndex, max(0, results.count - 1))
         if !results.isEmpty { selectedIndex = 0 }
         updateSelection()
-        refreshAnchorLook()
         let frame = panelFrame()
         // While you type, the list never bounces: it grows at once to fit more, and gives back room only once the
         // results have stayed fewer for a moment (web suggestions arrive a beat after what's local).
