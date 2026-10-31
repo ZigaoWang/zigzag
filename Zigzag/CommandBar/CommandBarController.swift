@@ -251,7 +251,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // From the address's own corner, wide enough for the whole address at once, reaching over the page;
             // suggestions continue below in the same panel.
             let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
-            return NSRect(x: address.minX, y: address.minY, width: wide, height: fieldHeight + listHeight)
+            // Taller than the address, it grows evenly above and below it, so the text stays on the address's line.
+            let top = address.minY - floor((fieldHeight - address.height) / 2)
+            return NSRect(x: address.minX, y: top, width: wide, height: fieldHeight + listHeight)
         }
         let card = controller.root.cardFrame
         // Room to breathe on both sides of the page, however narrow the window.
@@ -282,9 +284,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         return max(1, min(Tokens.Metric.commandBarMaxRows, Int(room / Tokens.Metric.commandBarRowHeight)))
     }
 
-    /// Anchored to the address it's a little smaller, close to the address bar's own size.
-    /// Anchored, the field is the address bar itself, being edited: its height, its text, its place.
-    private var fieldHeight: CGFloat { isAnchored ? Tokens.Metric.addressHeight : Tokens.Metric.commandBarFieldHeight }
+    /// Opened from the address it keeps the sidebar's text size, but the line you type on is as tall as a suggestion
+    /// and a little more, so it never looks squeezed above them.
+    private var fieldHeight: CGFloat { isAnchored ? Tokens.Metric.commandBarRowHeight + Tokens.Space.x2 : Tokens.Metric.commandBarFieldHeight }
 
     private func layoutPanel() {
         let b = panel.bounds
