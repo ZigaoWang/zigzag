@@ -61,7 +61,9 @@ final class BrowserWindow: NSWindow {
     /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         // ⌘Z / ⇧⌘Z: the sidebar's undo, unless you were just typing on the page or in a field.
-        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        // Only the four modifier keys count: arrow keys always carry .function and .numericPad, and Caps Lock may be
+        // on, so comparing all of the flags would never match and the guards below would never run.
+        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
         if event.charactersIgnoringModifiers?.lowercased() == "z", mods == .command || mods == [.command, .shift],
            let controller = windowController as? BrowserWindowController, controller.handleUndoKey(redo: mods.contains(.shift)) {
             return true
