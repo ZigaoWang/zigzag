@@ -1,5 +1,6 @@
 import AppKit
 import QuickLookThumbnailing
+import UniformTypeIdentifiers
 
 /// One download: file icon, name, progress or size, and a reveal button.
 final class DownloadRowView: InteractiveView, NSDraggingSource {
@@ -12,6 +13,11 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// Pause or resume, beside Cancel, while a download is under way or paused.
     let pauseButton = IconButton(symbol: "pause.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Pause")
     private(set) var item: DownloadItem?
+    /// Finished in the last few minutes: the one you're looking for, so it says so and stands out.
+    private var isFresh: Bool {
+        guard let item, item.state == .finished, !item.fileIsMissing else { return false }
+        return Date().timeIntervalSince(item.started) < 5 * 60
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -49,6 +55,14 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// Previews made for finished files, by path, so reopening the panel doesn't make them again.
     private static var thumbnails: [String: NSImage] = [:]
 
+    /// "3.7 of 9 MB": the unit once when both share it, so it fits beside the buttons.
+    static func progress(_ done: Int64, of total: Int64, _ formatter: ByteCountFormatter) -> String {
+        let a = formatter.string(fromByteCount: done), b = formatter.string(fromByteCount: total)
+        let unitA = a.split(separator: " ").last, unitB = b.split(separator: " ").last
+        guard unitA == unitB, let number = a.split(separator: " ").first else { return "\(a) of \(b)" }
+        return "\(number) of \(b)"
+    }
+
     private static func timeLeft(_ seconds: Double) -> String {
         if seconds < 5 { return "a few seconds left" }
         if seconds < 60 { return "\(Int(seconds.rounded())) seconds left" }
@@ -58,11 +72,15 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         return hours == 1 ? "about an hour left" : "about \(hours) hours left"
     }
 
-    /// The real picture for images, PDFs and videos once they're here; the file type's icon before that.
+    /// The file's own icon, as Finder shows it (a disk image looks like one); a picture of it for images, PDFs and
+    /// videos once they're here.
     private func showIcon(for item: DownloadItem) {
         let path = item.destination?.path ?? item.filename
-        icon.image = NSWorkspace.shared.icon(for: .init(filenameExtension: (path as NSString).pathExtension) ?? .data)
-        guard item.state == .finished, let url = item.destination else { return }
+        let type = UTType(filenameExtension: (path as NSString).pathExtension) ?? .data
+        icon.image = NSWorkspace.shared.icon(for: type)
+        guard item.state == .finished, let url = item.destination, FileManager.default.fileExists(atPath: url.path) else { return }
+        icon.image = NSWorkspace.shared.icon(forFile: url.path)
+        guard type.conforms(to: .image) || type.conforms(to: .pdf) || type.conforms(to: .movie) else { return }
         if let cached = Self.thumbnails[url.path] { icon.image = cached; return }
         let scale = window?.backingScaleFactor ?? 2
         let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 64, height: 64), scale: scale, representationTypes: .thumbnail)
@@ -83,7 +101,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         switch item.state {
         case .downloading:
             let done = formatter.string(fromByteCount: item.completedBytes)
-            let amount = item.totalBytes > 0 ? "\(done) of \(formatter.string(fromByteCount: item.totalBytes))" : done
+            let amount = item.totalBytes > 0 ? Self.progress(item.completedBytes, of: item.totalBytes, formatter) : done
             status.stringValue = item.secondsLeft.map { "\(amount), \(Self.timeLeft($0))" } ?? amount
             actionButton.symbol = "xmark"
             actionButton.toolTip = "Cancel"
@@ -106,7 +124,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
                 .map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
-            status.stringValue = site.map { "\(size) from \($0)" } ?? size
+            status.stringValue = isFresh ? "Just downloaded, \(size)" : site.map { "\(size) from \($0)" } ?? size
             actionButton.symbol = "magnifyingglass"
             actionButton.toolTip = "Show in Finder"
         case .failed, .cancelled:
@@ -117,7 +135,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             actionButton.toolTip = canRetry ? "Try Again" : "Remove"
         }
         bar.isHidden = item.state != .downloading && item.state != .paused
-        refreshAction()
+        stateDidChange(animated: false)
         pauseButton.isHidden = !(item.state == .paused || DownloadManager.shared.canPause(item))
         // A paused bar is quiet, so it reads as stopped.
         fill.color = item.state == .paused ? Tokens.Color.textTertiary : Tokens.Color.accent
@@ -164,7 +182,8 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     }
 
     override func stateDidChange(animated: Bool) {
-        let color: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        let fresh = Brand.Theme.for(self).accent.withAlphaComponent(0.12)
+        let color: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : isFresh ? fresh : nil
         layer?.set(backgroundColor: color.map { cgColor($0) }, animated: animated && !isHovered)
         refreshAction()
         needsLayout = true
@@ -181,9 +200,19 @@ enum DownloadsPanel {
     /// Opened by a download landing in the button: it goes away by itself a while after that download is done,
     /// unless you're using it; a click elsewhere closes it sooner, as always.
     static func reveal(from anchor: NSView, in controller: BrowserWindowController, closingAfter item: DownloadItem) {
-        guard current == nil else { return }
-        show(from: anchor, in: controller, arrival: .burst)
-        current?.closeWhenDone(item)
+        // Already open: it shows this one too, at the top, marked as new.
+        if let current {
+            // Showing just one download: the newest takes its place.
+            if current.focused != nil { current.focused = item }
+            current.reload()
+            return
+        }
+        controller.closeFloatingPanels()
+        let panel = DownloadsPanelView(controller: controller)
+        panel.focused = item
+        current = panel
+        panel.show(from: anchor, arrival: .burst)
+        panel.closeWhenDone(item)
     }
 
     static func show(from anchor: NSView, in controller: BrowserWindowController, arrival: FloatingPanelView.Arrival = .pop) {
@@ -198,6 +227,10 @@ enum DownloadsPanel {
 final class DownloadsPanelView: FloatingPanelView {
     private weak var controller: BrowserWindowController?
     private var rows: [DownloadRowView] = []
+    /// Opened by a download landing: just that one (and any others still coming), not the whole list.
+    fileprivate var focused: DownloadItem?
+    /// How many it lists when you open it yourself; the rest are in the folder.
+    private static let recentCount = 5
     private let title = Label("Downloads", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let clearButton = TextButton(title: "Clear", font: Tokens.Font.body(.medium))
     private let folderButton = TextButton(title: "Open Downloads Folder", font: Tokens.Font.body(.medium))
@@ -230,8 +263,15 @@ final class DownloadsPanelView: FloatingPanelView {
         folderButton.showsFillAtRest = true
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            if self.focused != nil, self.folderButton.title == "Show All Downloads" {
+                self.focused = nil
+                self.touched = true
+                self.reload()
+                return
+            }
             NSWorkspace.shared.open(DownloadManager.folder)
-            self?.close()
+            self.close()
         }
         token = DownloadManager.shared.changed.observe { [weak self] _ in
             self?.reload()
@@ -329,9 +369,17 @@ final class DownloadsPanelView: FloatingPanelView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak controller] in controller?.hideFloatingDownloads() }
     }
 
-    private func reload() {
+    fileprivate func reload() {
         let all = DownloadManager.shared.items(isPrivate: isPrivate)
-        let items = Array(all.prefix(8))
+        let items: [DownloadItem]
+        if let focused {
+            items = all.filter { $0 === focused || $0.state == .downloading || $0.state == .paused }
+        } else {
+            items = Array(all.prefix(Self.recentCount))
+        }
+        // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
+        let more = focused != nil && all.count > items.count
+        folderButton.title = more ? "Show All Downloads" : "Open Downloads Folder"
         while rows.count < items.count {
             let row = DownloadRowView()
             row.onClick = { [weak row] _ in if let item = row?.item { DownloadManager.shared.open(item) } }
