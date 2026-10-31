@@ -182,9 +182,10 @@ enum Tokens {
                 return
             }
             if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                // Reduce Motion: things move to where they go at once; nothing slides.
                 NSAnimationContext.runAnimationGroup({ ctx in
-                    ctx.duration = quick
-                    ctx.allowsImplicitAnimation = true
+                    ctx.duration = 0
+                    ctx.allowsImplicitAnimation = false
                     changes()
                 }, completionHandler: completion)
                 return
@@ -318,8 +319,8 @@ enum Tokens {
         /// Row and button overlays drawn on top of the window background.
         static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06))
         static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
-        static let selectedFill = dynamic(light: hex(0xFFFFFF, alpha: 0.78), dark: hex(0xFFFFFF, alpha: 0.11))
-        static let selectedHoverFill = dynamic(light: hex(0xFFFFFF, alpha: 0.92), dark: hex(0xFFFFFF, alpha: 0.14))
+        static let selectedFill = dynamic(light: hex(0xFFFFFF, alpha: 0.78), dark: hex(0xFFFFFF, alpha: 0.16))
+        static let selectedHoverFill = dynamic(light: hex(0xFFFFFF, alpha: 0.92), dark: hex(0xFFFFFF, alpha: 0.19))
         static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.04))
         /// The keyboard-selected row in floating lists (command bar, downloads).
         static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09))
