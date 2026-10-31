@@ -118,7 +118,12 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         field.frame = NSRect(x: Tokens.Space.x3, y: (b.height - fieldHeight) / 2, width: countLabel.frame.minX - Tokens.Space.x3 - Tokens.Space.x2, height: fieldHeight)
     }
 
-    func show(query newQuery: String? = nil) {
+    /// ⌘F: opens the bar, or puts you back in it; pressed again while you're typing in it, closes it.
+    func toggle() {
+        if isVisible, field.currentEditor() != nil { hide() } else { show() }
+    }
+
+    func show(query newQuery: String? = nil, focus: Bool = true) {
         guard let window else { return }
         if let newQuery { query = newQuery; field.stringValue = newQuery }
         if !isVisible {
@@ -126,36 +131,74 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             panel.frame = frame
             window.root.overlay.addSubview(panel)
             panel.present()
+            watchEscape()
         } else {
             panel.frame = frame
         }
-        window.window?.makeFirstResponder(field)
-        field.currentEditor()?.selectAll(nil)
-        if !query.isEmpty { search(backwards: false) }
+        if focus {
+            window.window?.makeFirstResponder(field)
+            field.currentEditor()?.selectAll(nil)
+        }
+        if !query.isEmpty { search(backwards: false, fromStart: !focus) }
     }
+
+    /// Esc closes the bar from the page too, not only from its field, so you never need the mouse for it.
+    private var escapeMonitor: Any?
+    private func watchEscape() {
+        guard escapeMonitor == nil else { return }
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.keyCode == 53, self.isVisible, event.window === self.window?.window,
+                  event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+                  // Something else in front (the address bar, peek) takes its own Esc first.
+                  self.window?.commandBar.isVisible != true, self.window?.peek.isVisible != true else { return event }
+            self.hide()
+            return nil
+        }
+    }
+
+    /// What you were finding in each tab: switching away puts the bar away, and coming back brings it back.
+    private let remembered = NSMapTable<WKWebView, NSString>.weakToStrongObjects()
 
     func reposition() {
         guard isVisible else { return }
         panel.frame = frame
     }
 
-    /// Another pane (or tab) came to the front: the bar moves over it and searches there instead.
+    /// Another page came to the front. The other pane of a split: the bar moves over it and searches there. Another
+    /// tab: the bar goes with the tab it was opened in, and comes back when you return to a tab you were finding in.
     func pageChanged() {
-        guard isVisible else { return }
         let current = window?.selectedWebView
+        guard isVisible else {
+            if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false) }
+            return
+        }
         guard current !== searched else { return }
+        // Still on screen (the other half of a split): follow over to the pane you're in. Otherwise it was another tab.
+        let stillShown = searched.map { $0.window != nil && !$0.isHiddenOrHasHiddenAncestor } ?? false
+        if !stillShown {
+            if let searched, !query.isEmpty { remembered.setObject(query as NSString, forKey: searched) }
+            hide(keepingMemory: true, focusPage: false)
+            if let current, let saved = remembered.object(forKey: current) as String? { show(query: saved, focus: false) }
+            return
+        }
         clearHighlights()
         let target = frame
         Tokens.Motion.animate(Tokens.Motion.snappy) { [panel] in panel.animator().frame = target }
         if query.isEmpty { countLabel.stringValue = ""; layoutPanel() } else { search(backwards: false, fromStart: true) }
     }
 
-    func hide() {
+    func hide() { hide(keepingMemory: false, focusPage: true) }
+
+    private func hide(keepingMemory: Bool, focusPage: Bool) {
         guard isVisible else { return }
         isVisible = false
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
+        // Closed on purpose: that tab's search is done.
+        if !keepingMemory, let webView = searched ?? window?.selectedWebView { remembered.removeObject(forKey: webView) }
         panel.dismiss()
         clearHighlights()
-        if let webView = window?.selectedWebView { window?.window?.makeFirstResponder(webView) }
+        if focusPage, let webView = window?.selectedWebView { window?.window?.makeFirstResponder(webView) }
     }
 
     func next(backwards: Bool) {

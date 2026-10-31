@@ -186,7 +186,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         Toast.show("Markdown link copied", symbol: "link", in: self)
     }
 
-    @objc func showFindBar(_ sender: Any?) { findBar.show() }
+    @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
     @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
     @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
     @objc func useSelectionForFind(_ sender: Any?) {
