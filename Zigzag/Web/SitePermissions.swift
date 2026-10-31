@@ -205,10 +205,24 @@ final class PermissionPrompt: FloatingPanelView {
     /// The question on screen in each window, so it can follow the sidebar.
     private static var shown: [ObjectIdentifier: PermissionPrompt] = [:]
 
-    /// Puts the window's question back under the address after the sidebar or the window changed.
-    static func reposition(in controller: BrowserWindowController) {
+    /// Puts the window's question back under the address after the sidebar or the window changed. It never jumps:
+    /// riding a sidebar slide (`slide` is its duration) it moves with the sidebar, on the same curve; going between
+    /// the address and the top of the page, it glides there.
+    static func reposition(in controller: BrowserWindowController, slide: TimeInterval? = nil) {
         guard let prompt = shown[ObjectIdentifier(controller)], prompt.superview != nil, !prompt.isHidden else { return }
+        let old = prompt.frame
         prompt.place(in: controller)
+        let dx = old.minX - prompt.frame.minX, dy = old.minY - prompt.frame.minY
+        // Dragging the window's edge, it simply stays with the page; gliding there would trail behind.
+        guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, controller.window?.inLiveResize != true,
+              let layer = prompt.layer else { return }
+        let move = CABasicAnimation(keyPath: "transform")
+        move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
+        move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        move.duration = slide ?? 0.24
+        move.timingFunction = slide == nil ? Tokens.Motion.easeInOut : Tokens.Motion.slide.timing
+        move.fillMode = .backwards
+        layer.add(move, forKey: "follow")
     }
 
     /// `title` is the request ("Use your camera" by default). `alwaysTitle` is the box that keeps a yes: ticked,

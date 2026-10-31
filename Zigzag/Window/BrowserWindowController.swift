@@ -53,7 +53,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.onSlide = { [weak self] duration in
             guard let self else { return }
             self.sidebarSliding(duration)
-            PermissionPrompt.reposition(in: self)
+            PermissionPrompt.reposition(in: self, slide: duration)
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         root.keepsRevealed = { [weak self] in SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) }
@@ -963,7 +963,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let side = 1 - pow(1 - t, 1.6)
             points.append(NSValue(point: NSPoint(x: start.x + (end.x - start.x) * side, y: start.y + b * t + a * t * t)))
         }
-        let duration = 0.55 * Tokens.Motion.debugSlowdown
+        // Long enough to follow the arc, which is the point of it: a download landing is a rare moment, not a
+        // shortcut you press all day.
+        let duration = 0.8 * Tokens.Motion.debugSlowdown
         let move = CAKeyframeAnimation(keyPath: "position")
         move.values = points
         move.calculationMode = .linear
