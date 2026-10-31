@@ -59,7 +59,7 @@ final class AddressView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        pressScale = 0.985
+        pressScale = 0.99
         // Its buttons sit 4pt in, with 6pt corners: 10 here keeps the two curves running side by side.
         layer?.cornerRadius = Tokens.Radius.control + AddressView.buttonInset
         layer?.cornerCurve = .continuous
@@ -157,7 +157,7 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Space.x6, height: Tokens.Space.x6))
-        pressScale = 0.8
+        pressScale = 0.94
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         setAccessibilityRole(.button)
@@ -602,7 +602,7 @@ final class SidebarView: NSView {
         let pulse = CAKeyframeAnimation(keyPath: "transform")
         pulse.values = [scaled(1), scaled(0.86), scaled(1)]
         pulse.keyTimes = [0, 0.35, 1]
-        pulse.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeOut)]
+        pulse.timingFunctions = [Tokens.Motion.easeOut, Tokens.Motion.easeOut]
         pulse.duration = 0.26
         layer.add(pulse, forKey: "pulse")
     }

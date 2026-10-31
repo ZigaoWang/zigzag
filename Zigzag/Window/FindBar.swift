@@ -437,7 +437,7 @@ class FloatingPanelView: NSView {
             if !on && held { continue }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = on ? 0.16 : 0.14
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                context.timingFunction = Tokens.Motion.easeOut
                 view.animator().alphaValue = on ? 0.12 : 1
             }
         }
@@ -459,38 +459,19 @@ class FloatingPanelView: NSView {
         // something happening (`always`: a download landing, a prompt), it arrives with a short movement.
         let instant = arrival == .instant || (Tokens.Motion.isFromKey && !always)
         guard let layer, !instant else { return }
-        if arrival == .burst, !Tokens.Motion.reduceMotion {
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 0
-            fade.toValue = 1
-            fade.duration = 0.12
-            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            let grow = CASpringAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: scaled(0.88))
-            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            grow.mass = 1
-            grow.stiffness = 420
-            grow.damping = 2 * sqrt(420)   // critically damped: it settles, it doesn't bounce
-            grow.initialVelocity = 0
-            grow.duration = grow.settlingDuration
-            layer.add(fade, forKey: "present")
-            layer.add(grow, forKey: "present.grow")
-            return
-        }
         if (arrival == .fade || arrival == .pop || arrival == .burst), !Tokens.Motion.reduceMotion {
+            // Grows out of what opened it, from a little smaller (never from nothing), eased out in under 200ms. A
+            // panel a download just landed in starts a touch smaller, so you see it come from the button.
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.16
-            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            let grow = CASpringAnimation(keyPath: "transform")
-            grow.fromValue = NSValue(caTransform3D: scaled(0.97))
+            fade.duration = 0.14
+            fade.timingFunction = Tokens.Motion.easeOut
+            let grow = CABasicAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: scaled(arrival == .burst ? 0.94 : 0.97))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            grow.mass = 1
-            grow.stiffness = 520
-            grow.damping = 48
-            grow.initialVelocity = 0
-            grow.duration = grow.settlingDuration
+            grow.duration = 0.18
+            grow.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "present")
             layer.add(grow, forKey: "present.grow")
             return
@@ -501,7 +482,7 @@ class FloatingPanelView: NSView {
             fade.fromValue = 0
             fade.toValue = 1
             fade.duration = 0.1
-            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            fade.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "present")
             return
         }
@@ -555,7 +536,7 @@ class FloatingPanelView: NSView {
             shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
             shrink.toValue = NSValue(caTransform3D: scaled(0.98))
             shrink.duration = 0.14
-            shrink.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            shrink.timingFunction = Tokens.Motion.easeOut
             shrink.fillMode = .forwards
             shrink.isRemovedOnCompletion = false
             layer.add(shrink, forKey: "dismiss.shrink")
@@ -573,7 +554,7 @@ class FloatingPanelView: NSView {
         fade.fromValue = layer.presentation()?.opacity ?? 1
         fade.toValue = 0
         fade.duration = 0.12
-        fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        fade.timingFunction = Tokens.Motion.easeOut
         layer.add(fade, forKey: "dismiss")
         layer.opacity = 0
         CATransaction.commit()

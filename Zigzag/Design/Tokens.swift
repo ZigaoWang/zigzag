@@ -134,15 +134,22 @@ enum Tokens {
             let duration: TimeInterval
             /// When set, slides use a real spring with this much bounce instead of an eased curve.
             var bounce: CGFloat? = nil
-            var timing: CAMediaTimingFunction { CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1) }
+            var timing: CAMediaTimingFunction { Motion.easeOut }
         }
+
+        /// The one ease-out for anything arriving, leaving or settling: fast at first, so it answers at once, then a
+        /// long soft finish (cubic-bezier(0.23, 1, 0.32, 1)). Never ease-in: it starts slow, right when you're looking.
+        static let easeOut = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
+
+        /// Something moving from one place on screen to another: cubic-bezier(0.77, 0, 0.175, 1).
+        static let easeInOut = CAMediaTimingFunction(controlPoints: 0.77, 0, 0.175, 1)
 
         static let snappy = Curve(duration: standard)
         static let slide = Curve(duration: slideDuration)
         /// Finishing a swipe: the fingers already did most of the travel, so the rest is quick.
         static let snap = Curve(duration: 0.14)
-        /// Switching spaces: quick, with a small spring settle so it feels alive.
-        static let spaceSwitch = Curve(duration: 0.26, bounce: 0.12)
+        /// Switching spaces: a quick slide that shows which way you went, eased out, with no bounce.
+        static let spaceSwitch = Curve(duration: 0.22)
         /// Letting go of a swipe between spaces: a critically damped spring that carries on at the fingers' speed
         /// and never overshoots, whether it lands on the next space or springs back.
         static let swipeSettle = Curve(duration: 0.15, bounce: 0)

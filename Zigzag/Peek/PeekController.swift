@@ -216,19 +216,18 @@ final class PeekController {
             panel.present()
             return
         }
-        let start = shrunk(toward: origin ?? NSPoint(x: panel.frame.midX, y: panel.frame.midY), scale: 0.86)
-        let spring = CASpringAnimation(keyPath: "transform")
+        // From a little smaller, toward where you clicked, never from nothing; over in 220ms.
+        let start = shrunk(toward: origin ?? NSPoint(x: panel.frame.midX, y: panel.frame.midY), scale: 0.95)
+        let spring = CABasicAnimation(keyPath: "transform")
         spring.fromValue = NSValue(caTransform3D: origin == nil ? CATransform3DMakeScale(0.97, 0.97, 1) : start)
         spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        spring.mass = 1
-        spring.stiffness = 320
-        spring.damping = 2 * sqrt(320)   // no overshoot
-        spring.duration = spring.settlingDuration
+        spring.duration = 0.22
+        spring.timingFunction = Tokens.Motion.easeOut
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
         fade.duration = 0.16
-        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        fade.timingFunction = Tokens.Motion.easeOut
         layer.add(spring, forKey: "grow")
         layer.add(fade, forKey: "fade")
     }
@@ -260,7 +259,7 @@ final class PeekController {
         let both = CAAnimationGroup()
         both.animations = [move, fade]
         both.duration = 0.16
-        both.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        both.timingFunction = Tokens.Motion.easeOut
         both.fillMode = .forwards
         both.isRemovedOnCompletion = false
         layer.add(both, forKey: "shrink")

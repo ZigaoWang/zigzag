@@ -918,7 +918,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         target.origin.y = max(Tokens.Space.x2, target.origin.y)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.standard
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.timingFunction = Tokens.Motion.easeOut
             context.allowsImplicitAnimation = true
             animator().frame = target
             layoutSubtreeIfNeeded()

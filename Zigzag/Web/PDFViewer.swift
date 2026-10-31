@@ -230,7 +230,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         origin.y = min(max(origin.y, 0), maxY)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.snappy.duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.timingFunction = Tokens.Motion.easeInOut
             clip.animator().setBoundsOrigin(origin)
         } completionHandler: { [weak self, weak clip] in
             guard let self, let clip else { return }

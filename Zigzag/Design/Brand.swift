@@ -187,7 +187,7 @@ enum Brand {
             fade.duration = 0.22
             fade.beginTime = begin
             fade.fillMode = .backwards
-            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            fade.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "enter.fade")
             // With Reduce Motion, it only fades in, in place.
             guard !Tokens.Motion.reduceMotion else { continue }

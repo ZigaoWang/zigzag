@@ -475,7 +475,7 @@ final class TextButton: InteractiveView {
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
         label = Label(title, font: font, color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
-        pressScale = 0.96
+        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         addSubview(label)

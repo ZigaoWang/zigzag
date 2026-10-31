@@ -17,7 +17,8 @@ extension CALayer {
             animation.fromValue = presentation()?.backgroundColor ?? backgroundColor
             animation.toValue = color
             animation.duration = duration
-            animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            // A color changing in place: the plain ease, not the arrival curve.
+            animation.timingFunction = CAMediaTimingFunction(name: .default)
             add(animation, forKey: "backgroundColor")
         }
         Tokens.Motion.withoutAnimation { backgroundColor = color }
@@ -43,38 +44,23 @@ class InteractiveView: NSView {
             animatePress(isPressed)
         }
     }
-    /// How far it gives under a press, 1 for not at all: buttons squeeze a little and spring back as you let go,
-    /// so a click feels like it landed. Small buttons give more, wide ones and rows less or none.
+    /// How far it gives under a press, 1 for not at all: a shallow squeeze (0.95–0.98) that eases down and back, so a
+    /// click feels like it landed. No spring: a wobble on something you press all day reads as goofy, not alive.
     var pressScale: CGFloat = 1
 
     private func animatePress(_ down: Bool) {
         guard pressScale < 1, let layer, !Tokens.Motion.reduceMotion, bounds.width > 0 else { return }
-        let w = bounds.width, h = bounds.height
+        let w = bounds.width, h = bounds.height, k = pressScale
         // A view's layer scales from its corner; moved back by half the shrink, it scales from its middle.
-        func scaled(_ k: CGFloat) -> CATransform3D {
-            CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(w / 2 * (1 - k), h / 2 * (1 - k), 0))
-        }
-        let now = layer.presentation()?.transform ?? CATransform3DIdentity
-        if down {
-            let squeeze = CABasicAnimation(keyPath: "transform")
-            squeeze.fromValue = NSValue(caTransform3D: now)
-            squeeze.toValue = NSValue(caTransform3D: scaled(pressScale))
-            squeeze.duration = 0.08
-            squeeze.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            squeeze.fillMode = .forwards
-            squeeze.isRemovedOnCompletion = false
-            layer.add(squeeze, forKey: "press")
-        } else {
-            // Back with a small spring: settles past its size by a hair, like something with give in it.
-            let release = CASpringAnimation(keyPath: "transform")
-            release.fromValue = NSValue(caTransform3D: now)
-            release.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            release.mass = 1
-            release.stiffness = 500
-            release.damping = 24
-            release.duration = release.settlingDuration
-            layer.add(release, forKey: "press")
-        }
+        let squeezed = CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(w / 2 * (1 - k), h / 2 * (1 - k), 0))
+        let move = CABasicAnimation(keyPath: "transform")
+        move.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
+        move.toValue = NSValue(caTransform3D: down ? squeezed : CATransform3DIdentity)
+        move.duration = down ? 0.1 : 0.16
+        move.timingFunction = Tokens.Motion.easeOut
+        move.fillMode = .forwards
+        move.isRemovedOnCompletion = !down
+        layer.add(move, forKey: "press")
     }
     var isSelected = false {
         didSet {
@@ -288,7 +274,7 @@ final class IconButton: InteractiveView {
         self.symbol = symbol
         self.symbolSize = symbolSize
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
-        pressScale = 0.88
+        pressScale = 0.94
         layer?.cornerRadius = radius
         layer?.cornerCurve = .continuous
         imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
@@ -573,7 +559,7 @@ final class ChoicePill: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        pressScale = 0.96
+        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         [check, label].forEach { addSubview($0) }
@@ -780,7 +766,7 @@ final class CheckBox: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
-        pressScale = 0.9
+        pressScale = 0.95
         box.wantsLayer = true
         box.layer?.cornerRadius = 4
         box.layer?.cornerCurve = .continuous
@@ -843,7 +829,7 @@ final class MenuButton: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        pressScale = 0.97
+        pressScale = 0.98
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)

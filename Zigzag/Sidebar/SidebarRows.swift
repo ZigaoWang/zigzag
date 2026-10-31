@@ -701,7 +701,7 @@ final class ClearTabsButton: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        pressScale = 0.94
+        pressScale = 0.96
         layer?.cornerCurve = .continuous
         arrow.image = NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: Tokens.TypeSize.small - 2, weight: .semibold))

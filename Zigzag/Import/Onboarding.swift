@@ -1251,7 +1251,7 @@ final class IntoZigzag: NSView {
                 out.fromValue = from
                 out.toValue = 0
                 out.duration = 0.3
-                out.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                out.timingFunction = Tokens.Motion.easeOut
                 dot.add(out, forKey: "out")
                 dot.opacity = 0
             }

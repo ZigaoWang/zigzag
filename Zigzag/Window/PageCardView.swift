@@ -67,7 +67,7 @@ final class PageCardView: NSView {
         progress = target
         CATransaction.begin()
         CATransaction.setAnimationDuration(loading ? 0.3 : 0.18)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         layoutProgress()
         CATransaction.commit()
         guard !loading else { return }
