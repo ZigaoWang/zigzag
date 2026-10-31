@@ -381,15 +381,18 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         }
         // An inline completion becomes the first result.
         if let completionURL, !typed.isEmpty {
-            var top = CommandResult(kind: .open(completionURL), title: CommandRanker.displayURL(completionURL), detail: "",
+            let top = CommandResult(kind: .open(completionURL), title: CommandRanker.displayURL(completionURL), detail: "",
                                     icon: FaviconStore.shared.cachedIcon(for: completionURL), symbol: "globe")
-            // Already open? Then the top hit is switching to it, not a second copy.
-            if let existing = controller.tabManager.existingTab(for: completionURL) {
-                top = CommandResult(kind: .switchTo(existing.id), title: existing.displayTitle,
-                                    detail: CommandRanker.displayURL(completionURL), icon: existing.favicon)
-            }
-            results.removeAll { $0.kind == .open(completionURL) || $0.kind == top.kind || ($0.title == top.title) }
+            results.removeAll { $0.kind == .open(completionURL) || $0.title == top.title }
             results.insert(top, at: 0)
+            // Already open in another tab? Enter still opens what you typed; switching to that tab is the row under it,
+            // one ↓ away, so neither ever happens by surprise.
+            if let existing = controller.tabManager.existingTab(for: completionURL), existing !== controller.tabManager.selectedTab {
+                let other = CommandResult(kind: .switchTo(existing.id), title: existing.displayTitle,
+                                          detail: CommandRanker.displayURL(completionURL), icon: existing.favicon)
+                results.removeAll { $0.kind == other.kind }
+                results.insert(other, at: 1)
+            }
         }
         // A short window shows fewer rows rather than letting the list run off its bottom edge.
         results = Array(results.prefix(rowsThatFit))
@@ -666,7 +669,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         guard let controller, result.isActionable else { return }
         let manager = controller.tabManager
         let inBackground = modifiers.contains(.command)
-        // ⌥↩: always a new tab, even for a page that's open already (a second copy of it).
+        // ⌥↩ on Switch to Tab: a second copy of that page in a new tab instead.
         let forceNew = modifiers.contains(.option)
         let inCurrent = mode == .editCurrent && manager.selectedTab != nil
         dismiss(restoringFocus: false)
@@ -675,8 +678,6 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             if inCurrent {
                 manager.selectedTab?.load(url)
                 manager.selectedTab?.isSearchTab = search
-            } else if !search, !inBackground, !forceNew, let existing = manager.existingTab(for: url) {
-                manager.select(existing)
             } else {
                 let tab = manager.newTab(url: url, select: !inBackground)
                 tab.isSearchTab = search
