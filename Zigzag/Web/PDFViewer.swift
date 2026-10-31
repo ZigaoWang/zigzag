@@ -37,8 +37,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     private var showsSidebar = false
     private var saveWork: DispatchWorkItem?
 
-    /// Links in the PDF open like links on a page.
+    /// Links in the PDF open like links on a page: web links here, other apps' links through `onExternalLink`.
     var onOpenLink: ((URL) -> Void)?
+    var onExternalLink: ((URL) -> Void)?
     /// Swipes to go back or forward, handed to the page underneath with which way the pages can still scroll.
     var onSwipe: ((NSEvent, (left: Bool, right: Bool)) -> Bool)? {
         get { pdfView.onSwipe }
@@ -452,7 +453,14 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     // MARK: PDFViewDelegate
 
     nonisolated func pdfViewWillClick(onLink sender: PDFView, with url: URL) {
-        MainActor.assumeIsolated { onOpenLink?(url) }
+        // Never a file on your Mac: a local PDF's relative links would otherwise reach the files beside it.
+        MainActor.assumeIsolated {
+            switch Reader.route(for: url) {
+            case .browse: onOpenLink?(url)
+            case .externalApp: onExternalLink?(url)
+            case .ignore: break
+            }
+        }
     }
 
     // MARK: Loading

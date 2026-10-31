@@ -6,6 +6,20 @@ import WebKit
 /// or interfere with it. The result is shown in a separate web view with JavaScript off, over the page,
 /// which stays loaded underneath.
 enum Reader {
+    /// Where a link clicked in Reader or a PDF goes. Only web pages open in Zigzag; another app's link asks first, as
+    /// on a page; anything else (a file on your Mac, a script) goes nowhere, since these views read local files.
+    enum LinkRoute: Equatable {
+        case browse
+        case externalApp
+        case ignore
+    }
+
+    static func route(for url: URL) -> LinkRoute {
+        let scheme = url.scheme?.lowercased() ?? ""
+        if scheme == "http" || scheme == "https" { return url.host()?.isEmpty == false ? .browse : .ignore }
+        return ExternalLinks.isExternal(url) ? .externalApp : .ignore
+    }
+
     /// Readability itself plus a small helper that says whether a page looks like an article.
     static var scripts: [WKUserScript] {
         guard let readability = resource("Readability"), let readerable = resource("Readability-readerable") else { return [] }
@@ -292,6 +306,8 @@ final class ReaderView: NSView {
     var onBackgroundLink: ((URL) -> Void)?
     var onForegroundLink: ((URL) -> Void)?
     private let controls = ReaderControls()
+    /// The page the article came from: the reading page's own address, the one load it makes by itself.
+    private var articleURL: URL?
 
     override init(frame: NSRect) {
         webView = WKWebView(frame: .zero, configuration: Self.configuration())
@@ -349,6 +365,7 @@ final class ReaderView: NSView {
     }
 
     func show(_ article: Reader.Article, from url: URL) {
+        articleURL = url
         webView.navigationDelegate = self
         webView.loadHTMLString(Reader.html(for: article), baseURL: url)
         controls.preferences = .saved
@@ -684,6 +701,14 @@ extension ReaderView: WKNavigationDelegate {
     /// Links in an article open in the page, not inside the reader.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
+            switch Reader.route(for: url) {
+            case .browse: break
+            case .externalApp:
+                ExternalLinks.open(url, isMainFrame: true, isClick: true, from: webView)
+                return .cancel
+            case .ignore:
+                return .cancel
+            }
             let flags = navigationAction.modifierFlags
             // The same as on any page: ⌘ for a tab behind, ⌘⇧ for one in front, ⇧ alone to peek.
             if flags.contains(.command) || navigationAction.buttonNumber == 4 {
@@ -692,6 +717,8 @@ extension ReaderView: WKNavigationDelegate {
             else { onOpenLink?(url) }
             return .cancel
         }
+        // Nothing else leaves the article for a file on your Mac, whatever the article's markup tries.
+        if let url = navigationAction.request.url, url.isFileURL, url != articleURL { return .cancel }
         return .allow
     }
 }

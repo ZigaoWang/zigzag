@@ -913,6 +913,9 @@ extension Tab {
                 // A quiet blank over WebKit's own viewer at once, so it never shows before ours.
                 let viewer = PDFViewerView(url: url, isPrivate: self.isPrivate)
                 viewer.onOpenLink = { [weak self] link in self?.load(link) }
+                viewer.onExternalLink = { [weak webView] link in
+                    if let webView { ExternalLinks.open(link, isMainFrame: true, isClick: true, from: webView) }
+                }
                 viewer.onSwipe = { [weak webView] event, room in (webView as? BrowserWebView)?.handleSwipe(event, room: room) ?? false }
                 self.setPDFViewer(viewer)
                 let userAgent = values?.count == 2 ? values?[1] : nil
