@@ -578,6 +578,7 @@ final class PanelRow: NSView {
 
     static func toggle(_ title: String, symbol: String, status: @escaping (Bool) -> String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
         let toggle = Toggle(isOn: on)
+        toggle.setAccessibilityLabel(title)
         let row = PanelRow(title, symbol: symbol, control: toggle, value: status(on))
         toggle.onChange = { [weak row] on in
             row?.value?.stringValue = status(on)
