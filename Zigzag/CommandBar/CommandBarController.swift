@@ -190,7 +190,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             scrim.show()
         }
         applySpaceTheme()
-        let font = isAnchored ? Tokens.Font.body() : Tokens.Font.large()
+        // From the address: 15pt, easy to read across the wide field; the centered bar for a new tab keeps 18pt.
+        let font = isAnchored ? NSFont.systemFont(ofSize: 15) : Tokens.Font.large()
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
