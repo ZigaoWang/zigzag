@@ -174,19 +174,22 @@ enum SitePermissions {
     }
 }
 
-/// "Open Tencent Meeting?", asked on the page that asked, as Chrome does: what it wants as a question, the site
-/// asking under it, and two answers. Allow goes last, filled; ticking "Always allow on this site" keeps the yes
-/// for next time, and Don't Allow is kept as asked by each caller. Esc puts it off; Return is left to whatever
-/// you're typing in. One question at a time per window: a second request waits for the first answer. It belongs
-/// to the tab that asked: it steps aside while another tab is in front and comes back with that tab, and closing
-/// that tab is "not now".
+/// "Use your location?", hanging from the address of the site that asked, as Arc does: the question, the site under
+/// it, and two answers, Allow last and filled. The answer is kept for that site (never in a private window), and
+/// can be changed in the site panel. Not answering is easy: the close button, Esc, or a click anywhere else puts
+/// it off ("not now"), and so does the tab going to another site. One question at a time per window. It belongs
+/// to the tab that asked: it steps aside while another tab is in front and comes back with that tab.
 final class PermissionPrompt: FloatingPanelView {
     /// The app's own icon when it's an app that would open, else the request's symbol on a soft circle.
     private let picture = NSImageView()
     private let badge = ColorView(color: .clear)
     private let request = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private var always: CheckBox?
+    private let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Not Now")
+    /// The site that asked: when the tab goes elsewhere, the question no longer applies.
+    private var askingHost = ""
+    private var urlToken: SignalToken?
+    private var clickMonitor: Any?
     /// Don't Allow, then Allow at the far right, as macOS places them.
     private var buttons: [(button: InteractiveView, width: CGFloat)] = []
     private var answer: ((Answer) -> Void)?
@@ -248,7 +251,8 @@ final class PermissionPrompt: FloatingPanelView {
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
             prompt.request.stringValue = "\(request)?"
-            prompt.asker.stringValue = "Asked by \(host)"
+            prompt.asker.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            prompt.askingHost = host
             if let icon {
                 prompt.picture.image = icon
                 prompt.badge.isHidden = true
@@ -258,18 +262,11 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = accent
                 prompt.badge.color = accent.withAlphaComponent(0.16)
             }
-            if let alwaysTitle {
-                let box = CheckBox(title: alwaysTitle)
-                prompt.addSubview(box)
-                prompt.always = box
-            }
             let deny = TextButton.form(denyTitle)
             deny.onClick = { [weak prompt] _ in prompt?.finish(.deny) }
             let allow = PrimaryButton(title: allowTitle)
-            allow.onClick = { [weak prompt] _ in
-                guard let prompt else { return }
-                prompt.finish(prompt.always.map { $0.isOn ? .allow : .allowOnce } ?? .allow)
-            }
+            // Kept for the site (the caller keeps nothing in a private window).
+            allow.onClick = { [weak prompt] _ in prompt?.finish(.allow) }
             for button in [deny, allow] as [InteractiveView] { prompt.addSubview(button) }
             // Side by side at one width, as a Mac dialog sets its answers.
             let width = max(deny.fittingWidth + Tokens.Space.x3, allow.fittingWidth, 84)
@@ -286,6 +283,20 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.tabsToken = controller.tabManager.changed.observe { [weak prompt] change in
                 guard change == .selection || change == .structure || change == .space else { return }
                 prompt?.followTab()
+            }
+            // The tab went to another site: this question was that site's, so it's put off.
+            prompt.urlToken = asking?.changed.observe { [weak prompt, weak asking] change in
+                guard change == .url, let prompt, let now = asking?.url?.host() else { return }
+                if now != prompt.askingHost { prompt.finish(.notNow) }
+            }
+            // A click anywhere else, outside it and the address it hangs from, puts it off too.
+            prompt.clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak prompt, weak controller] event in
+                guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
+                let inside = prompt.bounds.contains(prompt.convert(event.locationInWindow, from: nil))
+                let address = controller?.sidebar.address
+                let onAddress = address.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
+                if !inside && !onAddress { prompt.finish(.notNow) }
+                return event
             }
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
@@ -317,13 +328,20 @@ final class PermissionPrompt: FloatingPanelView {
         }
     }
 
-    /// A raised card at the top left of the page that asked, where you're looking, not in the sidebar's color
-    /// beside it. In split view, over the pane that asked.
+    /// Hanging from the address in the sidebar, its width, the way the site panel does: it's the site asking. A
+    /// raised card so it's noticed. With the sidebar hidden, at the top left of the page that asked.
     private func place(in controller: BrowserWindowController) {
         surfaceTint = nil
         tintStrength = nil
         isElevated = true
         radius = Tokens.Radius.panel
+        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
+            let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
+            growsFrom = CGPoint(x: 0.5, y: 0)
+            frame = NSRect(x: address.minX, y: address.maxY + Tokens.Space.x1, width: address.width, height: height(for: address.width))
+            return
+        }
+        growsFrom = CGPoint(x: 0.2, y: 0)
         let area = controller.focusedPaneFrame
         let width = min(Self.width, area.width - Tokens.Space.x6)
         frame = NSRect(x: area.minX + Tokens.Space.x3, y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
@@ -338,7 +356,8 @@ final class PermissionPrompt: FloatingPanelView {
         request.lineBreakMode = .byWordWrapping
         request.usesSingleLineMode = false
         request.maximumNumberOfLines = 2
-        [badge, picture, request, asker].forEach { addSubview($0) }
+        closeButton.onClick = { [weak self] _ in self?.finish(.notNow) }
+        [badge, picture, request, asker, closeButton].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -366,7 +385,10 @@ final class PermissionPrompt: FloatingPanelView {
     private func stopListening() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
         tabsToken = nil
+        urlToken = nil
         if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
     }
 
@@ -377,41 +399,43 @@ final class PermissionPrompt: FloatingPanelView {
     private static let buttonGap: CGFloat = 8
 
     private var textX: CGFloat { Self.pad + Self.iconSide + Tokens.Space.x3 }
+    /// Room kept at the right of the text for the close button.
+    private var closeRoom: CGFloat { Tokens.Space.x6 }
 
     private func requestHeight(for width: CGFloat) -> CGFloat {
-        let textWidth = width - textX - Self.pad
+        let textWidth = width - textX - Self.pad - closeRoom
         return ceil(request.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth, height: 200)).height ?? request.lineHeight)
     }
 
     private func textHeight(for width: CGFloat) -> CGFloat { requestHeight(for: width) + 2 + asker.lineHeight }
 
     private func height(for width: CGFloat) -> CGFloat {
-        var h = Self.pad + max(Self.iconSide, textHeight(for: width))
-        if let always { h += Tokens.Space.x3 + always.intrinsicContentSize.height }
+        let h = Self.pad + max(Self.iconSide, textHeight(for: width))
         return h + Tokens.Space.x4 + Self.buttonHeight + Self.pad
     }
 
     private func layoutContent() {
         let pad = Self.pad, w = bounds.width
-        let textWidth = w - textX - pad
+        let textWidth = w - textX - pad - closeRoom
         let th = textHeight(for: w)
+        let cs = closeButton.frame.size
+        closeButton.frame.origin = NSPoint(x: w - Tokens.Space.x2 - cs.width, y: Tokens.Space.x2)
         let header = max(Self.iconSide, th)
         badge.frame = NSRect(x: pad, y: pad + (header - Self.iconSide) / 2, width: Self.iconSide, height: Self.iconSide)
         picture.frame = badge.frame
         let top = pad + (header - th) / 2
         request.frame = NSRect(x: textX - Label.inset, y: top, width: textWidth + Label.inset * 2, height: requestHeight(for: w))
         asker.frame = NSRect(x: textX - Label.inset, y: request.frame.maxY + 2, width: textWidth + Label.inset * 2, height: asker.lineHeight)
-        var y = pad + header
-        if let always {
-            let size = always.intrinsicContentSize
-            always.frame = NSRect(x: textX, y: y + Tokens.Space.x3, width: min(size.width, textWidth), height: size.height)
-            y = always.frame.maxY
-        }
-        y += Tokens.Space.x4
+        let y = pad + header + Tokens.Space.x4
+        // The two answers share the row evenly when it's narrow (in the sidebar); otherwise they sit at the right.
+        let total = buttons.reduce(0) { $0 + $1.width } + Self.buttonGap * CGFloat(max(0, buttons.count - 1))
+        let even = total > w - pad * 2 || w < Self.width
+        let each = (w - pad * 2 - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count))
         var x = w - pad
         for (button, width) in buttons.reversed() {
-            x -= width
-            button.frame = NSRect(x: x, y: y, width: width, height: Self.buttonHeight)
+            let bw = even ? each : width
+            x -= bw
+            button.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
             x -= Self.buttonGap
         }
     }
