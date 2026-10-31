@@ -295,10 +295,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var bookmarkIcon: NSImage?
 
     private func refreshTitleColor() {
-        title.textColor = isUnloaded && !isSelected ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
+        // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
+        title.textColor = Tokens.Color.textPrimary
         let split = isSplit
         title.font = Tokens.Font.body(isSelected && (!split || focusedHalf == 0) ? .medium : .regular)
-        partnerTitle.textColor = pinnedPartner?.unloaded == true && !isSelected ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
+        partnerTitle.textColor = Tokens.Color.textPrimary
         partnerTitle.font = Tokens.Font.body(isSelected && focusedHalf == 1 ? .medium : .regular)
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))

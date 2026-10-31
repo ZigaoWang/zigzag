@@ -200,6 +200,10 @@ final class FavoriteTile: InteractiveView {
         layer?.cornerRadius = Tokens.Radius.card
         layer?.cornerCurve = .continuous
         addSubview(icon)
+        openDot.wantsLayer = true
+        openDot.layer?.cornerRadius = Self.dotSide / 2
+        openDot.isHidden = true
+        addSubview(openDot)
         toolTip = bookmark?.title
         setAccessibilityRole(.button)
         setAccessibilityLabel(bookmark?.title)
@@ -240,6 +244,8 @@ final class FavoriteTile: InteractiveView {
         super.layout()
         let size = Tokens.Metric.favicon + 4
         icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
+        let dot = Self.dotSide
+        openDot.frame = NSRect(x: (bounds.width - dot) / 2, y: isFlipped ? bounds.height - dot - 5 : 5, width: dot, height: dot)
         // The badge hangs over the edge; AppKit turns clipping back on for a rounded layer, so it's turned off here.
         clipsToBounds = false
         layer?.masksToBounds = false
@@ -286,11 +292,11 @@ final class FavoriteTile: InteractiveView {
         if !closeDisc.isHidden, let superview, superview.subviews.last !== self {
             superview.addSubview(self, positioned: .above, relativeTo: nil)
         }
-        // An open favorite shows its icon in full; one that isn't loaded is softly faded, with no mark to read.
-        let iconAlpha: CGFloat = isOpen || isSelected || isHovered ? 1 : 0.5
-        if icon.alphaValue != iconAlpha {
-            Tokens.Motion.animate(Tokens.Motion.feedback) { self.icon.animator().alphaValue = iconAlpha }
-        }
+        // Every favorite shows its icon in full (faded means old elsewhere in Zigzag). One that's open has a small
+        // dot under its icon, as an app open in the Dock does; the one you're on is lit instead.
+        icon.alphaValue = 1
+        openDot.isHidden = !isOpen || isSelected
+        openDot.color = Tokens.Color.textSecondary
         let fill: NSColor
         if isSelected {
             // The favorite you're on stands clearly apart from the resting tiles beside it.
@@ -310,6 +316,9 @@ final class FavoriteTile: InteractiveView {
         layer?.borderWidth = isSelected ? Tokens.Metric.hairline : 0
         layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
     }
+
+    private let openDot = ColorView(color: Tokens.Color.textSecondary)
+    private static let dotSide: CGFloat = 4
 
     /// Light on dark and dark on light, so the badge reads on any tile.
     private static let badgeFill = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF), dark: Tokens.Color.hex(0x5C5C62))
