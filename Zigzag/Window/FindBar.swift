@@ -330,10 +330,21 @@ class FloatingPanelView: NSView {
     var isElevated = true { didSet { refreshColors() } }
     /// The edge, if not the usual hairline (an edited field's soft accent outline).
     var edgeColor: NSColor? { didSet { refreshColors() } }
+    /// Set for a panel that's part of the sidebar: the sidebar's color, which the panel takes lifted the way a
+    /// selected tab is, so it reads as the sidebar's own and stands out clearly from it.
+    var liftedFrom: NSColor? { didSet { refreshColors() } }
+    /// What the panel sits over (the sidebar's tabs): faded back while it's open, so nothing peeks around it.
+    var recedes: [NSView] = []
 
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
-            if let tint = surfaceTint {
+            if let base = liftedFrom {
+                effectiveAppearance.performAsCurrentDrawingAppearance {
+                    let under = base.usingColorSpace(.sRGB) ?? base
+                    let lift = Tokens.Color.selectedFill.usingColorSpace(.sRGB) ?? Tokens.Color.selectedFill
+                    surface.color = under.blended(withFraction: lift.alphaComponent, of: lift.withAlphaComponent(1)) ?? under
+                }
+            } else if let tint = surfaceTint {
                 effectiveAppearance.performAsCurrentDrawingAppearance {
                     let base = Tokens.Color.panelBackground.usingColorSpace(.sRGB) ?? Tokens.Color.panelBackground
                     let mixed = base.blended(withFraction: tintStrength ?? (effectiveAppearance.isDark ? 0.55 : 0.6), of: tint.usingColorSpace(.sRGB) ?? tint) ?? base
@@ -373,8 +384,30 @@ class FloatingPanelView: NSView {
         return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
     }
 
+    private func recede(_ on: Bool) {
+        for view in recedes {
+            // Another panel still open over the same tabs keeps them back.
+            let held = superview?.subviews.contains { other in
+                guard let other = other as? FloatingPanelView, other !== self, !other.dismissing else { return false }
+                return other.recedes.contains { $0 === view }
+            } ?? false
+            if !on && held { continue }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = on ? 0.16 : 0.14
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                view.animator().alphaValue = on ? 0.12 : 1
+            }
+        }
+    }
+
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+        if newSuperview == nil { recede(false) }
+        super.viewWillMove(toSuperview: newSuperview)
+    }
+
     func present(always: Bool = false, arrival: Arrival = .pop) {
         layoutSubtreeIfNeeded()
+        recede(true)
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
         dismissing = false
@@ -468,6 +501,7 @@ class FloatingPanelView: NSView {
         layer.removeAnimation(forKey: "present")
         layer.removeAnimation(forKey: "present.grow")
         dismissing = true
+        recede(false)
         if !Tokens.Motion.reduceMotion {
             let shrink = CABasicAnimation(keyPath: "transform")
             shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)

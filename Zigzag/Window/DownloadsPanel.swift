@@ -117,6 +117,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             actionButton.toolTip = canRetry ? "Try Again" : "Remove"
         }
         bar.isHidden = item.state != .downloading && item.state != .paused
+        refreshAction()
         pauseButton.isHidden = !(item.state == .paused || DownloadManager.shared.canPause(item))
         // A paused bar is quiet, so it reads as stopped.
         fill.color = item.state == .paused ? Tokens.Color.textTertiary : Tokens.Color.accent
@@ -140,7 +141,8 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         actionButton.frame.origin = NSPoint(x: bounds.width - pad - b.width, y: (bounds.height - b.height) / 2)
         pauseButton.frame.origin = NSPoint(x: actionButton.frame.minX - Tokens.Space.x1 - pauseButton.frame.width, y: actionButton.frame.minY)
         let x = icon.frame.maxX + Tokens.Space.x2
-        let width = (pauseButton.isHidden ? actionButton.frame.minX : pauseButton.frame.minX) - Tokens.Space.x2 - x
+        let right = !pauseButton.isHidden ? pauseButton.frame.minX : !actionButton.isHidden ? actionButton.frame.minX : bounds.width - pad
+        let width = right - Tokens.Space.x2 - x
         let nameH = name.lineHeight, statusH = status.lineHeight
         let top = (bounds.height - nameH - statusH - Tokens.Space.x1) / 2
         name.frame = NSRect(x: x, y: top, width: width, height: nameH)
@@ -154,9 +156,18 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         }
     }
 
+    /// A finished file's Show in Finder waits for the pointer, so a list of downloads reads as files, not buttons.
+    /// Anything that needs you (under way, paused, failed, missing) keeps its button in view.
+    private func refreshAction() {
+        let quiet = item?.state == .finished && item?.fileIsMissing == false
+        actionButton.isHidden = quiet && !isHovered
+    }
+
     override func stateDidChange(animated: Bool) {
         let color: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: color.map { cgColor($0) }, animated: animated && !isHovered)
+        refreshAction()
+        needsLayout = true
     }
 }
 
@@ -254,10 +265,11 @@ final class DownloadsPanelView: FloatingPanelView {
         guard let controller else { return }
         self.anchor = anchor
         // In the sidebar it's part of the sidebar, exactly like the site panel under the address bar: the address
-        // bar's width and corners, flat, in the space's color a shade lighter. Over the page it stays a card.
+        // bar's width and corners, flat, in the space's color lifted like a selected tab, with the tabs under it
+        // faded back. Over the page it stays a card.
         if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
-            surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
-            tintStrength = 0.82
+            liftedFrom = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
+            recedes = [controller.sidebar.list]
             isElevated = false
             radius = controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel
         }
