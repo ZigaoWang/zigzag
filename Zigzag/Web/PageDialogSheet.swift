@@ -1,9 +1,10 @@
 import AppKit
 import WebKit
 
-/// A website's alert, confirm, prompt or sign-in, drawn as Zigzag's own sheet over the window: who's asking, what
-/// they say, their fields, and Zigzag buttons. From a page's second dialog on, it offers to block the rest, so a
-/// page stuck showing dialogs can't take the window hostage.
+/// A website's alert, confirm, prompt or sign-in, drawn as Zigzag's own sheet over the page that asked: who's asking,
+/// what they say, their fields, and Zigzag buttons. It belongs to that page, so it dims only its pane, never the
+/// sidebar or another tab, goes with the tab when another is in front and comes back with it. From a page's second
+/// dialog on, it offers to block the rest, so a page stuck showing dialogs can't take the window hostage.
 final class PageDialogSheet: NSView {
     struct Field {
         let placeholder: String
@@ -27,12 +28,15 @@ final class PageDialogSheet: NSView {
     private let block = TextButton(title: "Block Dialogs", font: Tokens.Font.body(.medium))
     private var monitor: Any?
     private var closeObserver: Any?
-    /// The page that asked, when a page did: its dialog goes when the page does.
+    /// The page that asked, when a page did: the sheet sits on it, and goes when the page does.
     private weak var page: WKWebView?
+    /// The window it was asked in: closing that window answers it, even while its tab isn't in front.
+    private weak var homeWindow: NSWindow?
     private static var open: [WeakBox] = []
     private struct WeakBox { weak var sheet: PageDialogSheet? }
     private var completion: (Result) -> Void
-    private let width: CGFloat = 380
+    /// Narrower in a narrow pane, so it never runs past the page it belongs to.
+    private var width: CGFloat { min(380, max(240, bounds.width - Tokens.Space.x4 * 2)) }
     private let pad = Tokens.Space.x5
 
     private init(title: String, message: String, fields: [Field], confirmTitle: String, showsCancel: Bool, offersBlock: Bool,
@@ -76,25 +80,30 @@ final class PageDialogSheet: NSView {
     @MainActor
     static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = "OK",
                     showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil) async -> Result {
-        guard let host = window.contentView else { return .cancelled }
+        // Over the page that asked, so it stays with its tab; a dialog without a page covers the window.
+        guard let host = page ?? window.contentView else { return .cancelled }
         return await withCheckedContinuation { continuation in
             let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle,
                                         showsCancel: showsCancel, offersBlock: offersBlock) { continuation.resume(returning: $0) }
             sheet.page = page
+            sheet.homeWindow = window
             open = open.filter { $0.sheet != nil } + [WeakBox(sheet: sheet)]
-            // Closing the window doesn't take its views down with it: the page hears "cancel", not silence.
-            sheet.closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak sheet] _ in
-                MainActor.assumeIsolated { sheet?.finish(.cancelled) }
+            // Closing the window doesn't take its views down with it: the page hears "cancel", not silence. Its tab
+            // may be out of sight, or have moved to another window, so it's the window it's on now, else where it asked.
+            sheet.closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [weak sheet] note in
+                let closing = ObjectIdentifier(note.object as AnyObject)
+                MainActor.assumeIsolated {
+                    guard let sheet, let window = sheet.window ?? sheet.homeWindow, ObjectIdentifier(window) == closing else { return }
+                    sheet.finish(.cancelled)
+                }
             }
             sheet.frame = host.bounds
             sheet.autoresizingMask = [.width, .height]
-            host.addSubview(sheet)
             sheet.layer?.backgroundColor = sheet.cgColor(Tokens.Color.scrim)
-            sheet.panel.present(always: true)
-            if let first = sheet.inputs.first { window.makeFirstResponder(first.field) }
-            // Return answers (the page asked, and is waiting); Escape cancels.
+            // Return answers (the page asked, and is waiting); Escape cancels. Only while it's on screen, and only when
+            // the keyboard is on its page: typing in the sidebar's address, or another pane, stays there.
             sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
-                guard let sheet, event.window === window else { return event }
+                guard let sheet, let window = sheet.window, event.window === window, sheet.ownsKeyboard else { return event }
                 // Return that commits a word being composed (Chinese, Japanese) belongs to the field.
                 if (window.firstResponder as? NSTextView)?.hasMarkedText() == true { return event }
                 switch event.keyCode {
@@ -103,7 +112,17 @@ final class PageDialogSheet: NSView {
                 default: return event
                 }
             }
+            // On a tab out of sight, it waits there until the tab is in front again; `viewDidMoveToWindow` shows it.
+            host.addSubview(sheet)
         }
+    }
+
+    /// Whether the keyboard is with this dialog: in one of its fields, or on the page it covers.
+    private var ownsKeyboard: Bool {
+        guard let responder = window?.firstResponder as? NSView else { return page == nil }
+        if responder.isDescendant(of: self) { return true }
+        guard let page else { return true }
+        return responder.isDescendant(of: page)
     }
 
     /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
@@ -117,20 +136,43 @@ final class PageDialogSheet: NSView {
         monitor = nil
         if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
         closeObserver = nil
+        // Typing goes back to the page, not nowhere.
+        if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: self) {
+            window.makeFirstResponder(page)
+        }
         let completion = self.completion
         self.completion = { _ in }
         removeFromSuperview()
         completion(result)
     }
 
-    /// Its window closed with it up: the page hears "cancel" rather than waiting forever.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window == nil, monitor != nil { finish(.cancelled) }
+        guard monitor != nil else { return }
+        guard let window else {
+            // Over the whole window, and that window went: the page hears "cancel" rather than waiting forever. On a
+            // page, it's only that page's tab going out of sight; it waits for the tab to come back.
+            if page == nil { finish(.cancelled) }
+            return
+        }
+        needsLayout = true
+        panel.present(always: true)
+        // The card puts the keyboard on the page as the tab comes in front; the dialog's field takes it after that.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window === window else { return }
+            if let first = self.inputs.first {
+                window.makeFirstResponder(first.field)
+            } else if !(window.firstResponder is NSView), let page = self.page {
+                // Nothing has the keyboard: the page does, so Return answers.
+                window.makeFirstResponder(page)
+            }
+        }
     }
 
-    // Clicks on the backdrop don't reach the page underneath.
+    // Clicks, scrolling and right-clicks on the backdrop don't reach the page underneath.
     override func mouseDown(with event: NSEvent) {}
+    override func rightMouseDown(with event: NSEvent) {}
+    override func scrollWheel(with event: NSEvent) {}
 
     private var bodyHeight: CGFloat { ceil(body.sizeThatFits(NSSize(width: width - pad * 2, height: 600)).height) }
     private let fieldHeight: CGFloat = 36
@@ -139,7 +181,7 @@ final class PageDialogSheet: NSView {
         super.layout()
         let fields = CGFloat(inputs.count) * (fieldHeight + Tokens.Space.x2)
         let height = pad + titleLabel.lineHeight + Tokens.Space.x2 + bodyHeight + Tokens.Space.x4 + fields + Tokens.Space.x2 + Tokens.Space.x8 + pad
-        panel.frame = NSRect(x: round((bounds.width - width) / 2), y: round((bounds.height - height) / 2.4), width: width, height: height)
+        panel.frame = NSRect(x: round((bounds.width - width) / 2), y: max(0, round((bounds.height - height) / 2.4)), width: width, height: height)
     }
 
     private func layoutPanel() {

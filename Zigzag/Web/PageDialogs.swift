@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 import UniformTypeIdentifiers
 
-/// Dialogs pages are allowed to ask for. Always sheets on the window, never free-floating.
+/// Dialogs pages are allowed to ask for. Always sheets over the page that asked, never free-floating.
 enum PageDialogs {
     private static func originText(_ frame: WKFrameInfo) -> String {
         let origin = frame.securityOrigin
@@ -111,8 +111,10 @@ enum PageDialogs {
 }
 
 enum AuthenticationPrompt {
-    /// `store`: the asking web view's data store, whose certificate exceptions apply.
-    static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?, store: WKWebsiteDataStore) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+    /// `store`: the asking web view's data store, whose certificate exceptions apply. `page`: the web view asking,
+    /// whose tab the sign-in sheet stays with; without one it covers the window.
+    static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?, store: WKWebsiteDataStore,
+                        page: WKWebView? = nil) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let method = challenge.protectionSpace.authenticationMethod
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
@@ -129,7 +131,7 @@ enum AuthenticationPrompt {
         let message = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
         let result = await PageDialogSheet.ask(in: window, title: "Sign in to \(challenge.protectionSpace.host)", message: message,
                                                fields: [.init(placeholder: "Username"), .init(placeholder: "Password", secure: true)],
-                                               confirmTitle: "Sign In", showsCancel: true, offersBlock: false)
+                                               confirmTitle: "Sign In", showsCancel: true, offersBlock: false, page: page)
         guard case .confirmed(let values) = result, values.count == 2 else { return (.cancelAuthenticationChallenge, nil) }
         return (.useCredential, URLCredential(user: values[0], password: values[1], persistence: .forSession))
     }
