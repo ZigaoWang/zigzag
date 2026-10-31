@@ -184,7 +184,7 @@ enum ImportCoordinator {
                 let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
                 return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
             case .safari:
-                return SafariImporter.hasAccess ? "Bookmarks and history. Passwords come from the Passwords app." : "Bookmarks and history need your permission. Passwords come from the Passwords app."
+                return SafariImporter.hasAccess ? "Bookmarks and history, no passwords" : "Bookmarks and history, with your permission"
             case .file(let url):
                 return url.lastPathComponent
             }
