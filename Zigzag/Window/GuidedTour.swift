@@ -21,7 +21,7 @@ final class GuidedTour: NSView {
     private let wordmark = WordmarkView()
     private let header = BrandSurface()
     private let letter = NSTextField(wrappingLabelWithString: "")
-    private let signature = Label("— Zigao, who makes Zigzag", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+    private let signature = Label("Zigao, who makes Zigzag", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
     /// A short real recording of the step being done, on a loop, above what to do.
     private let video = NSView()
     private let videoLayer = AVPlayerLayer()
