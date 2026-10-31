@@ -335,16 +335,19 @@ final class PermissionPrompt: FloatingPanelView {
         tintStrength = nil
         isElevated = true
         radius = Tokens.Radius.panel
-        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
+        // Wherever the address is on screen (the sidebar docked, or slid in from the edge), it hangs from it.
+        if controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible {
             let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
             growsFrom = CGPoint(x: 0.5, y: 0)
             frame = NSRect(x: address.minX, y: address.maxY + Tokens.Space.x1, width: address.width, height: height(for: address.width))
             return
         }
-        growsFrom = CGPoint(x: 0.2, y: 0)
+        // No sidebar: at the top of the page, in the middle, where the bar for a new tab appears; clear of the
+        // window's corner and of the site's own controls at its edges.
+        growsFrom = CGPoint(x: 0.5, y: 0)
         let area = controller.focusedPaneFrame
         let width = min(Self.width, area.width - Tokens.Space.x6)
-        frame = NSRect(x: area.minX + Tokens.Space.x3, y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
+        frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
     override init(frame: NSRect) {
