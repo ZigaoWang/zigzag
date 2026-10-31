@@ -1034,12 +1034,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
+    /// The window's place before it went full screen: what's saved, so leaving full screen after a relaunch gives
+    /// back the window you had, not one the size of the screen.
+    private(set) var windowedFrame: NSRect?
+
+    func windowWillEnterFullScreen(_ notification: Notification) { windowedFrame = window?.frame }
+
     func windowDidEnterFullScreen(_ notification: Notification) {
         layoutTrafficLights()
         root.needsLayout = true
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {
+        windowedFrame = nil
         layoutTrafficLights()
         root.needsLayout = true
     }

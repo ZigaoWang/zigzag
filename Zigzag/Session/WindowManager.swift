@@ -212,7 +212,8 @@ final class WindowManager {
 
     private func windowState(_ controller: BrowserWindowController) -> SessionState.WindowState {
         let manager = controller.tabManager
-        let frame = controller.window?.frame ?? .zero
+        let fullScreen = controller.window?.styleMask.contains(.fullScreen) == true
+        let frame = (fullScreen ? controller.windowedFrame : nil) ?? controller.window?.frame ?? .zero
         func state(_ tab: Tab) -> SessionState.TabState {
             SessionState.TabState(id: tab.id, url: tab.url, title: tab.title.isEmpty ? tab.displayTitle : tab.title, lastActivated: tab.lastActivated,
                                   createdAt: tab.createdAt, customTitle: tab.customTitle)
@@ -252,6 +253,10 @@ final class WindowManager {
     /// Brings back the last closed window, its spaces, tabs, history and place on screen.
     func reopenClosedWindow() {
         guard let closed = closedWindows.popLast() else { return }
+        // Already back (the Dock icon restored it after the last window closed): never a second copy of the same tabs.
+        let open = Set(controllers.flatMap { $0.tabManager.allTabs.map(\.id) })
+        let ids = closed.state.spaces.flatMap { $0.tabs.map(\.id) } + closed.state.bookmarkTabs.map(\.tab.id)
+        guard !ids.contains(where: open.contains) else { return }
         restoreWindow(closed.state, history: closed.history)
     }
 
@@ -261,10 +266,14 @@ final class WindowManager {
             var allIDs = Set<UUID>()
             let manager = TabManager(spaceID: windowState.currentSpaceID)
             var selection: [UUID: UUID] = [:]
-            for spaceTabs in windowState.spaces where Library.shared.space(spaceTabs.spaceID) != nil {
-                let tabs = spaceTabs.tabs.map { restoreTab($0, spaceID: spaceTabs.spaceID, history: history[$0.id]) }
-                manager.adopt(tabs, in: spaceTabs.spaceID)
-                if let selected = spaceTabs.selectedTabID { selection[spaceTabs.spaceID] = selected }
+            // A space that's gone (the library couldn't be read and started over) keeps its tabs: they join the space
+            // the window was on, or the first one, rather than vanish and be overwritten by the next save.
+            let fallback = Library.shared.space(windowState.currentSpaceID) != nil ? windowState.currentSpaceID : Library.shared.spaces[0].id
+            for spaceTabs in windowState.spaces {
+                let space = Library.shared.space(spaceTabs.spaceID) != nil ? spaceTabs.spaceID : fallback
+                let tabs = spaceTabs.tabs.map { restoreTab($0, spaceID: space, history: history[$0.id]) }
+                manager.adopt(tabs, in: space)
+                if space == spaceTabs.spaceID, let selected = spaceTabs.selectedTabID { selection[space] = selected }
                 allIDs.formUnion(tabs.map(\.id))
             }
             for bookmarkState in windowState.bookmarkTabs {
