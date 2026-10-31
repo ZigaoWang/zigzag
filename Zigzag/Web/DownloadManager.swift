@@ -15,6 +15,9 @@ final class DownloadItem {
     fileprivate weak var download: WKDownload?
     fileprivate var progressObservation: NSKeyValueObservation?
     fileprivate var resumeData: Data?
+    /// The file this download replaces once it's done; until then it goes to a hidden file beside it, so a failed
+    /// or canceled download never costs you the one you had.
+    fileprivate var replaces: URL?
     let sourceURL: URL?
     /// Bytes a second, smoothed over the last few seconds, for "time left".
     fileprivate(set) var speed: Double = 0
@@ -399,9 +402,10 @@ extension DownloadManager: WKDownloadDelegate {
             try? FileManager.default.removeItem(at: earlier)
             return earlier
         }
+        var replacing: URL?
         if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
-            try? FileManager.default.removeItem(at: chosen)
             destination = chosen
+            if FileManager.default.fileExists(atPath: chosen.path) { replacing = chosen }
         } else if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
@@ -410,11 +414,16 @@ extension DownloadManager: WKDownloadDelegate {
                 return nil
             }
             destination = chosen
-            // The sheet already asked about replacing a file of the same name.
-            try? FileManager.default.removeItem(at: chosen)
+            // The sheet already asked about replacing a file of the same name; it's replaced when this one is done.
+            if FileManager.default.fileExists(atPath: chosen.path) { replacing = chosen }
+        }
+        let shownName = destination.lastPathComponent
+        if let replacing {
+            destination = replacing.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString)-\(replacing.lastPathComponent).download")
         }
         if let item = item(for: download) {
-            item.filename = destination.lastPathComponent
+            item.filename = shownName
+            item.replaces = replacing
             item.destination = destination
             changed.send(item)
             started.send((item, window))
@@ -443,6 +452,11 @@ extension DownloadManager: WKDownloadDelegate {
     func downloadDidFinish(_ download: WKDownload) {
         guard let item = item(for: download) else { return }
         helpers[item.id] = nil
+        // Done: now it takes the place of the file it replaces.
+        if let target = item.replaces, let temporary = item.destination {
+            if (try? FileManager.default.replaceItemAt(target, withItemAt: temporary)) != nil { item.destination = target }
+            item.replaces = nil
+        }
         item.state = .finished
         item.fractionCompleted = 1
         item.progressObservation = nil
@@ -465,6 +479,10 @@ extension DownloadManager: WKDownloadDelegate {
         helpers[item.id] = nil
         item.resumeData = resumeData
         item.progressObservation = nil
+        // Gave up (not paused): the hidden file goes, and the file it would have replaced stays as it was.
+        if item.replaces != nil, resumeData == nil, let temporary = item.destination {
+            try? FileManager.default.removeItem(at: temporary)
+        }
         if item.state != .cancelled {
             item.state = .failed
             item.failure = Self.reason(for: error)
