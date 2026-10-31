@@ -5,6 +5,17 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-31
+
+### New
+- Turn off search suggestions in Settings › General, and nothing you type in the address bar leaves your Mac for them.
+
+### Changed
+- A small sideways nudge of a mouse wheel over the sidebar switches spaces. One turn moves one space.
+
+### Fixed
+- A page with its own icon, like a Claude artifact, no longer replaces its site's icon on your favorites and tabs.
+
 ## [0.3.0] - 2026-10-31
 
 ### New
