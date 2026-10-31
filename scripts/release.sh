@@ -113,5 +113,14 @@ PY
   rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
   # The website's changelog page, with this version on top.
   zsh site/deploy.sh
+  # The Homebrew cask, in a checkout of ZigaoWang/homebrew-tap beside this repository. It points at the DMG on
+  # GitHub Releases, so push the tap only after `gh release create`.
+  TAP="${ZIGZAG_TAP:-../homebrew-tap}"
+  if [[ -f "$TAP/Casks/zigzag.rb" ]]; then
+    SHA=$(shasum -a 256 "$DMG" | cut -d' ' -f1)
+    sed -i '' -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" "$TAP/Casks/zigzag.rb"
+    git -C "$TAP" commit -q -am "zigzag $VERSION"
+    echo "Homebrew cask bumped to $VERSION in $TAP; push it after the GitHub release is up."
+  fi
 fi
 echo "Done: $ZIP and $DMG"
