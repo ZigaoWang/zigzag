@@ -674,20 +674,15 @@ final class SidebarView: NSView {
         let gap = now - lastSwipeEventTime
         lastSwipeEventTime = now
 
-        // A mouse wheel that tilts sideways: one notch, one space.
-        if !event.hasPreciseScrollingDeltas {
-            guard abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY), event.scrollingDeltaX != 0 else { return false }
-            if now - lastWheelSwitch > 0.35 {
-                lastWheelSwitch = now
-                _ = onSwipeSpace?(event.scrollingDeltaX > 0 ? -1 : 1)
-            }
-            return true
+        // A mouse: a notched wheel tilted sideways or turned with Shift, or one that scrolls smoothly (Logi Options+,
+        // Mos) and so sends fine steps with no gesture phases. A tiny nudge sideways switches straight away.
+        let momentum = event.momentumPhase != []
+        if !event.hasPreciseScrollingDeltas || (event.phase == [] && !momentum) {
+            return handleWheel(event, now: now, gap: gap)
         }
 
-        let momentum = event.momentumPhase != []
-        let phaseless = event.phase == [] && !momentum
-        // A new gesture starts on its first phase, or after the fingers have been still for a moment.
-        if event.phase == .began || event.phase == .mayBegin || (phaseless && gap > 0.2) {
+        // A new gesture starts on its first phase.
+        if event.phase == .began || event.phase == .mayBegin {
             // The last one's end never came: it lets go where it is before this one starts.
             if swipeState == .tracking { finishSwipe(velocity: 0) }
             beginSwipe()
@@ -696,7 +691,7 @@ final class SidebarView: NSView {
         switch swipeState {
         case .idle:
             // Momentum from a scroll that's over, or a gesture that started before the pointer came over the sidebar.
-            if momentum || phaseless { return false }
+            if momentum { return false }
             beginSwipe()
         case .scrolling:
             // Its momentum, if any, scrolls the list too (idle lets it through).
@@ -732,7 +727,7 @@ final class SidebarView: NSView {
             swipeTravel += swipeAccumX
             swipeSamples.append((now, swipeAccumX))
             moveSwipe()
-            scheduleSwipeEnd(phaseless: phaseless)
+            scheduleSwipeEnd()
             return true
         }
 
@@ -746,12 +741,34 @@ final class SidebarView: NSView {
         swipeSamples.append((now, event.scrollingDeltaX))
         swipeSamples.removeAll { now - $0.time > SpaceSwipe.velocityWindow }
         moveSwipe()
-        scheduleSwipeEnd(phaseless: phaseless)
+        scheduleSwipeEnd()
+        return true
+    }
+
+    /// One turn of the wheel, however many notches or fine steps it sends, moves one space: steps closer together
+    /// than a moment belong to the same turn, so a free spinning wheel never races through every space.
+    private func handleWheel(_ event: NSEvent, now: TimeInterval, gap: TimeInterval) -> Bool {
+        if gap > SpaceSwipe.wheelTurnGap {
+            wheelAccumX = 0
+            wheelAccumY = 0
+            wheelTurnSwitched = false
+        }
+        wheelAccumX += event.scrollingDeltaX
+        wheelAccumY += event.scrollingDeltaY
+        // Up and down scrolls the list as usual.
+        guard abs(wheelAccumX) > abs(wheelAccumY) else { return false }
+        // A notch is enough; fine steps need the same few points that tell a trackpad gesture is sideways.
+        if !wheelTurnSwitched, abs(wheelAccumX) > (event.hasPreciseScrollingDeltas ? SpaceSwipe.axisLock : 0) {
+            wheelTurnSwitched = true
+            _ = onSwipeSpace?(wheelAccumX > 0 ? -1 : 1)
+        }
         return true
     }
 
     private var lastSwipeEventTime: TimeInterval = 0
-    private var lastWheelSwitch: TimeInterval = 0
+    private var wheelAccumX: CGFloat = 0
+    private var wheelAccumY: CGFloat = 0
+    private var wheelTurnSwitched = false
     private var swipeAccumX: CGFloat = 0
     private var swipeAccumY: CGFloat = 0
     /// How far the fingers have moved sideways since the list started following them.
@@ -856,22 +873,16 @@ final class SidebarView: NSView {
         neighborScroll.frame = frame
     }
 
-    /// For trackpads that don't mark a gesture's phases, the fingers going quiet is letting go. With phases, it's
-    /// only a safety net for an end that never arrives (macOS sometimes drops it): resting fingers send nothing, so
-    /// it waits long, and then only springs home, never switching space under fingers that may still be down.
-    private func scheduleSwipeEnd(phaseless: Bool) {
+    /// A safety net for an end that never arrives (macOS sometimes drops it): resting fingers send nothing, so it
+    /// waits long, and then only springs home, never switching space under fingers that may still be down.
+    private func scheduleSwipeEnd() {
         swipeEndWork?.cancel()
-        let lastMove = lastSwipeEventTime
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.swipeState == .tracking else { return }
-            if phaseless {
-                self.finishSwipe(velocity: SpaceSwipe.velocity(self.swipeSamples, at: lastMove))
-            } else {
-                self.finishSwipe(velocity: 0, cancelled: true)
-            }
+            self.finishSwipe(velocity: 0, cancelled: true)
         }
         swipeEndWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + (phaseless ? 0.12 : 3), execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
     }
 
     /// Letting go: lands on the next space or springs home, carrying on at the fingers' speed either way.
@@ -928,6 +939,8 @@ enum SpaceSwipe {
     static let flickSpeed: CGFloat = 300
     /// How much recent movement counts toward the speed at letting go.
     static let velocityWindow: TimeInterval = 0.08
+    /// A mouse wheel going quiet this long ends one turn of it; the next turn can move another space.
+    static let wheelTurnGap: TimeInterval = 0.25
     /// Past the first or last space the list gives less the further it's pulled, up to this share of the width.
     static let edgeGive: CGFloat = 0.5
     private static let edgeStiffness: CGFloat = 0.55
