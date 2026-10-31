@@ -289,7 +289,7 @@ final class DeskController {
         guard let controller else { return }
         let id = transition
         let current = currentCard
-        fade(backdrop, to: 1, duration: Tokens.Motion.large)
+        fade(backdrop, to: 1, duration: Tokens.Motion.standard)
         if settle { settleIn(except: current) }
         guard let current, let tab = current.tab else { return }
         let target = current.imageClip.convert(current.imageClip.bounds, to: flightView)
@@ -451,7 +451,7 @@ final class DeskController {
         Tokens.Motion.withoutAnimation { card.imageClip.alphaValue = 0 }
         flight.show(Self.picture(of: page), card.partner?.snapshot, split: card.split)
         // The desk is gone, and out of the way of clicks, a moment before the page lands.
-        fade(backdrop, to: 0, duration: Tokens.Motion.large, completion: finish)
+        fade(backdrop, to: 0, duration: Tokens.Motion.standard, completion: finish)
         fly(flight, to: flightView.convert(root.cardFrame, from: root), radius: pageRadius) { [weak self] in
             guard let self, self.transition == id else { return }
             self.handOff(flight)
