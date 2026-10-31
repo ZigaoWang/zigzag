@@ -22,6 +22,14 @@ enum SettingsPage {
     /// ⌘,: the Settings tab this window already has (in this space first, then any other), or a new one; at `pane`
     /// when one is asked for.
     static func open(_ pane: SettingsPane? = nil, in controller: BrowserWindowController) {
+        // Settings belong to your everyday windows, never a private one: the frontmost normal window, or a new one.
+        if controller.tabManager.isPrivate {
+            let normal = NSApp.orderedWindows.lazy.compactMap { window in
+                WindowManager.shared.controllers.first { $0.window === window && !$0.tabManager.isPrivate }
+            }.first
+            open(pane, in: normal ?? WindowManager.shared.newWindow(showCommandBar: false))
+            return
+        }
         let manager = controller.tabManager
         if let existing = (manager.currentTabs + manager.allTabs).first(where: { isSettings($0.url) }) {
             manager.select(existing)
