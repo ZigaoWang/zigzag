@@ -120,7 +120,7 @@ enum Tokens {
         /// Large surface moves: the desk fading in and out.
         static let large: TimeInterval = 0.3
         /// The page shrinking into its card in desk view, and a card growing back into the page.
-        static let zoom: TimeInterval = 0.36
+        static let zoom: TimeInterval = 0.28
         /// Delay before a hover preview appears.
         static let previewDelay: TimeInterval = 0.6
         /// How long the pointer can stray off the floating sidebar before it slides away.
@@ -156,6 +156,10 @@ enum Tokens {
             // The T key wherever it is, in any keyboard layout, with Caps Lock on or off.
             return event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command && event.keyCode == 17
         }
+
+        /// True while handling any key press. Panels (find, downloads, a confirmation) opened or closed by a key appear
+        /// and go at once; changes to the window's layout still move, so you see where things went.
+        static var isFromKey: Bool { NSApp.currentEvent?.type == .keyDown }
 
         /// Runs AppKit animator() changes. Frames jump to their final values right away (so layout and
         /// hit-testing always see the truth); only what's drawn animates.

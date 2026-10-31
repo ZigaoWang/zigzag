@@ -454,8 +454,11 @@ class FloatingPanelView: NSView {
         layer?.removeAnimation(forKey: "dismiss")
         alphaValue = 1
         dismissing = false
-        // Shown from the keyboard too: a panel appearing out of nowhere reads as a glitch, and this takes 0.2s.
-        guard let layer, arrival != .instant else { return }
+        // Opened from the keyboard it's simply there: something you summon with a key, often many times a day, should
+        // never make you wait for it (https://emilkowal.ski/ui/you-dont-need-animations). Opened with the mouse, or by
+        // something happening (`always`: a download landing, a prompt), it arrives with a short movement.
+        let instant = arrival == .instant || (Tokens.Motion.isFromKey && !always)
+        guard let layer, !instant else { return }
         if arrival == .burst, !Tokens.Motion.reduceMotion {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
@@ -540,7 +543,9 @@ class FloatingPanelView: NSView {
 
     /// The one way a panel leaves: a quick fade as it eases a touch smaller, back toward where it came from.
     func dismiss(always: Bool = false, instantly: Bool = false, completion: (() -> Void)? = nil) {
-        guard let layer, !instantly else { removeFromSuperview(); completion?(); return }
+        // Esc or a shortcut: gone at once, for the same reason it arrives at once.
+        let instantly = instantly || (Tokens.Motion.isFromKey && !always)
+        guard let layer, !instantly else { recede(false); removeFromSuperview(); completion?(); return }
         layer.removeAnimation(forKey: "present")
         layer.removeAnimation(forKey: "present.grow")
         dismissing = true
