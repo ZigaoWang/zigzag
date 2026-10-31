@@ -233,7 +233,11 @@ final class SidebarView: NSView {
     private let bottomBar = NSView()
     let nowPlaying = NowPlayingView()
 
-    private let downloadsButton = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
+    /// The arrow alone; its circle is drawn under it (the track), the same circle the progress fills.
+    private let downloadsButton = IconButton(symbol: "arrow.down", symbolSize: SidebarView.downloadsGlyph, toolTip: "Downloads")
+    private static let downloadsGlyph: CGFloat = 9
+    /// The circle's size: the same as the system's circled arrow at the sidebar's icon size.
+    private static let downloadsCircle: CGFloat = 16
     private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
     private var dots: [SpaceDotView] = []
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
@@ -522,6 +526,9 @@ final class SidebarView: NSView {
 
     /// A thin ring around the button that fills as downloads run, and a check for a moment when they're done.
     private let downloadsRing = CAShapeLayer()
+    /// The button's own circle, always there: a download fills it in with the accent, so nothing is swapped or
+    /// resized as one starts or ends.
+    private let downloadsTrack = CAShapeLayer()
     private var wasDownloading = false
     private var themeToken: SignalToken?
 
@@ -530,14 +537,18 @@ final class SidebarView: NSView {
         downloadsButton.isHidden = false
         let downloading = active > 0
         if downloadsRing.superlayer == nil, let host = downloadsButton.layer {
+            downloadsTrack.fillColor = nil
+            downloadsTrack.lineWidth = 1.5
+            host.addSublayer(downloadsTrack)
             downloadsRing.fillColor = nil
-            downloadsRing.lineWidth = 2
+            downloadsRing.lineWidth = 1.5
             downloadsRing.lineCap = .round
             downloadsRing.strokeEnd = 0
+            downloadsRing.opacity = 0
             host.addSublayer(downloadsRing)
         }
         let b = downloadsButton.bounds
-        let d = min(b.width, b.height) - 6
+        let d = Self.downloadsCircle
         let rect = CGRect(x: (b.width - d) / 2, y: (b.height - d) / 2, width: d, height: d)
         // Shape, place and color are set as they are: animating them on every progress tick restarted a fade a few
         // times a second, which is what made the ring jump.
@@ -548,11 +559,13 @@ final class SidebarView: NSView {
             var flip = CGAffineTransform(translationX: rect.midX, y: rect.midY).rotated(by: .pi / 2).scaledBy(x: -1, y: 1).translatedBy(x: -rect.midX, y: -rect.midY)
             downloadsRing.path = CGPath(ellipseIn: rect, transform: &flip)
             downloadsRing.frame = b
+            downloadsTrack.path = downloadsRing.path
+            downloadsTrack.frame = b
         }
         tintDownloadsRing()
         CATransaction.commit()
         // The fill only moves forward while a download runs, easing from wherever it is on screen to the new amount.
-        let target = downloading ? CGFloat(max(0.04, min(progress, 1))) : 0
+        let target = downloading ? CGFloat(max(0.04, min(progress, 1))) : (wasDownloading ? 1 : 0)
         let shown = downloadsRing.presentation()?.strokeEnd ?? downloadsRing.strokeEnd
         let to = downloading && wasDownloading ? max(target, downloadsRing.strokeEnd) : target
         if to != downloadsRing.strokeEnd {
@@ -567,14 +580,25 @@ final class SidebarView: NSView {
             CATransaction.commit()
             downloadsRing.add(ease, forKey: "progress")
         }
+        // Comes and goes with a short fade, never in a single frame.
         let opacity: Float = downloading ? 1 : 0
-        if downloadsRing.opacity != opacity { downloadsRing.opacity = opacity }
-        let symbol = downloading ? "arrow.down" : (wasDownloading ? "checkmark.circle" : "arrow.down.circle")
+        if downloadsRing.opacity != opacity {
+            for layer in [downloadsRing] {
+                let fade = CABasicAnimation(keyPath: "opacity")
+                fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
+                fade.toValue = opacity
+                fade.duration = 0.15
+                fade.timingFunction = Tokens.Motion.easeOut
+                Tokens.Motion.withoutAnimation { layer.opacity = opacity }
+                layer.add(fade, forKey: "fade")
+            }
+        }
+        let symbol = downloading ? "arrow.down" : (wasDownloading ? "checkmark" : "arrow.down")
         if downloadsButton.symbol != symbol { downloadsButton.symbol = symbol }
         if wasDownloading, !downloading {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
                 guard let self, !self.wasDownloading else { return }
-                self.downloadsButton.symbol = "arrow.down.circle"
+                self.downloadsButton.symbol = "arrow.down"
             }
         }
         wasDownloading = downloading
@@ -583,6 +607,8 @@ final class SidebarView: NSView {
     /// The ring is in this window's space accent, resolved for light or dark; set again when either changes.
     private func tintDownloadsRing() {
         downloadsRing.strokeColor = cgColor(Brand.Theme.for(self).accent)
+        // The resting circle is drawn in the icon color, like every other icon in the sidebar.
+        downloadsTrack.strokeColor = cgColor(Tokens.Color.icon)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -600,7 +626,7 @@ final class SidebarView: NSView {
                                                        CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
         }
         let pulse = CAKeyframeAnimation(keyPath: "transform")
-        pulse.values = [scaled(1), scaled(0.86), scaled(1)]
+        pulse.values = [scaled(1), scaled(0.95), scaled(1)]
         pulse.keyTimes = [0, 0.35, 1]
         pulse.timingFunctions = [Tokens.Motion.easeOut, Tokens.Motion.easeOut]
         pulse.duration = 0.26
