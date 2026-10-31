@@ -9,9 +9,6 @@ final class CommandRowView: InteractiveView {
     private let action = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let returnKey = NSImageView()
     /// On a tab that's already open: the other choice, a fresh copy in a new tab with ⌥↩.
-    private let altAction = Label("New Tab", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-    private let altKey = Label("⌥↩", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-    private var offersNewTab = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -22,7 +19,7 @@ final class CommandRowView: InteractiveView {
         returnKey.image = Tokens.Symbol.image("return", size: Tokens.TypeSize.small)
         returnKey.contentTintColor = Tokens.Color.textTertiary
         returnKey.imageScaling = .scaleNone
-        [icon, symbolView, title, detail, action, returnKey, altAction, altKey].forEach { addSubview($0) }
+        [icon, symbolView, title, detail, action, returnKey].forEach { addSubview($0) }
         setAccessibilityRole(.button)
     }
 
@@ -32,7 +29,6 @@ final class CommandRowView: InteractiveView {
         title.stringValue = result.title
         detail.stringValue = result.detail
         action.stringValue = result.actionLabel
-        if case .switchTo = result.kind { offersNewTab = true } else { offersNewTab = false }
         if let image = result.icon {
             icon.image = image
             icon.isHidden = false
@@ -63,15 +59,6 @@ final class CommandRowView: InteractiveView {
             let h = ceil(action.intrinsicContentSize.height)
             action.frame = NSRect(x: returnKey.frame.minX - Tokens.Space.x1 - w, y: (bounds.height - h) / 2, width: w, height: h)
             right = action.frame.minX - Tokens.Space.x3
-        }
-        altAction.isHidden = !(showAction && offersNewTab)
-        altKey.isHidden = altAction.isHidden
-        if !altAction.isHidden {
-            let kw = altKey.textWidth, aw = altAction.textWidth
-            let h = ceil(altAction.intrinsicContentSize.height)
-            altKey.frame = NSRect(x: right - kw, y: (bounds.height - h) / 2, width: kw, height: h)
-            altAction.frame = NSRect(x: altKey.frame.minX - Tokens.Space.x1 - aw, y: (bounds.height - h) / 2, width: aw, height: h)
-            right = altAction.frame.minX - Tokens.Space.x4
         }
         let x = icon.frame.maxX + Tokens.Space.x3
         let h = ceil(title.intrinsicContentSize.height)
