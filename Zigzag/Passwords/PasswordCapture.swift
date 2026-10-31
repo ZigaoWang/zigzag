@@ -1,9 +1,13 @@
 import AppKit
 import WebKit
 
-/// Notices logins as they happen and offers to save them. The watching script runs in Zigzag's own script
-/// world, where neither the page nor extensions can see it; the password goes from its message straight into
-/// a `SecretString`, and nothing about it is logged.
+/// Notices logins as they happen and offers to save them once the site has taken them. The watching script runs in
+/// Zigzag's own script world, where neither the page nor extensions can see it; the password goes from its message
+/// straight into a `SecretString`, and nothing about it is logged.
+///
+/// A login is held, per tab, from the moment it's sent until the site answers: offered once the tab is on a page
+/// without the sign-in form (or on another site), dropped if the form comes back with its password empty. A
+/// mistyped password is never offered, so it can't replace a good saved one.
 @MainActor
 final class PasswordCapture: NSObject, WKScriptMessageHandler {
     static let shared = PasswordCapture()
@@ -18,6 +22,62 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     /// For logins split over two pages: the username from the first step, per tab, for a couple of minutes.
     private var pendingUsernames: [ObjectIdentifier: (origin: Origin, username: String, at: Date)] = [:]
 
+    /// A login that was sent, waiting for the site's answer.
+    private final class HeldLogin {
+        let origin: Origin
+        let username: String
+        let password: SecretString
+        let isChange: Bool
+        weak var tab: Tab?
+        var urlToken: SignalToken?
+        var checks: [DispatchWorkItem] = []
+
+        init(origin: Origin, username: String, password: SecretString, isChange: Bool, tab: Tab) {
+            self.origin = origin
+            self.username = username
+            self.password = password
+            self.isChange = isChange
+            self.tab = tab
+        }
+    }
+
+    /// Per tab: the login sent there whose answer hasn't come yet.
+    private var held: [ObjectIdentifier: HeldLogin] = [:]
+
+    /// What the page in a tab shows after a login was sent.
+    nonisolated struct PageAfterLogin: Equatable, Sendable {
+        /// The host of the page now.
+        var host: String?
+        /// A password field a person can see.
+        var hasPasswordField: Bool
+        /// …with something in it.
+        var passwordFilled: Bool
+    }
+
+    nonisolated enum Verdict: Equatable, Sendable {
+        /// The site took it: offer to save or update.
+        case offer
+        /// The sign-in failed: forget it, offering nothing.
+        case drop
+        /// Can't tell yet (still on the form, the password still in it).
+        case wait
+    }
+
+    /// Whether a login sent on `loginHost` worked, from the page the tab is on now. Another site means it went
+    /// through (signed in, on to the app); on the same site, the form gone means it worked, the form back with its
+    /// password empty means it didn't, and the password still typed in means the site hasn't answered.
+    nonisolated static func verdict(loginHost: String, page: PageAfterLogin) -> Verdict {
+        if let host = page.host?.lowercased(), !host.isEmpty, site(of: host) != site(of: loginHost.lowercased()) { return .offer }
+        if !page.hasPasswordField { return .offer }
+        return page.passwordFilled ? .wait : .drop
+    }
+
+    /// The site a host belongs to: a sign-in often hops between its hosts (accounts. to www.).
+    nonisolated private static func site(of host: String) -> String { PublicSuffix.registrableDomain(host) ?? host }
+
+    /// How long a sent login waits for the site's answer before it's forgotten.
+    private static let holdFor: TimeInterval = 180
+
     static var script: WKUserScript {
         WKUserScript(source: watcher, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient)
     }
@@ -31,6 +91,13 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         let key = ObjectIdentifier(tab)
         let typedUsername = (body["username"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
+        // A new page finished loading in the tab: the site's answer to a login sent before it, if one is waiting.
+        if kind == "page" {
+            guard message.frameInfo.isMainFrame, held[key] != nil else { return }
+            judge(key, page: PageAfterLogin(host: origin.host, hasPasswordField: body["form"] as? Bool ?? false,
+                                            passwordFilled: body["filled"] as? Bool ?? false))
+            return
+        }
         if kind == "username" {
             if !typedUsername.isEmpty { pendingUsernames[key] = (origin, typedUsername, Date()) }
             return
@@ -43,8 +110,69 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         }
         pendingUsernames[key] = nil
         guard Self.offersToSave else { return }
-        Task { await self.consider(origin: origin, username: username, password: password, isChange: kind == "change", in: tab) }
+        hold(HeldLogin(origin: origin, username: username, password: password, isChange: kind == "change", tab: tab), key: key)
     }
+
+    /// Keeps a sent login until the site answers. The answer is usually a new page, which reports itself; a site that
+    /// signs in without one (it changes its address, or just takes the form away) is checked on now and then.
+    private func hold(_ login: HeldLogin, key: ObjectIdentifier) {
+        release(key)
+        held[key] = login
+        login.urlToken = login.tab?.changed.observe { [weak self] change in
+            guard change == .url else { return }
+            self?.check(key, after: 0.8)
+        }
+        for delay in [3.0, 8.0, 20.0] { check(key, after: delay) }
+        let expire = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { if self?.held[key] === login { self?.release(key) } }
+        }
+        login.checks.append(expire)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.holdFor, execute: expire)
+    }
+
+    private func release(_ key: ObjectIdentifier) {
+        guard let login = held.removeValue(forKey: key) else { return }
+        login.urlToken = nil
+        login.checks.forEach { $0.cancel() }
+    }
+
+    /// Asks the tab's page how it looks now. Not while a new page is on its way: that one reports itself once it's
+    /// loaded, and a half-built page could look like the form had gone.
+    private func check(_ key: ObjectIdentifier, after delay: TimeInterval) {
+        guard let login = held[key] else { return }
+        let work = DispatchWorkItem { [weak self, weak login] in
+            MainActor.assumeIsolated {
+                guard let self, let login, self.held[key] === login, let tab = login.tab, !tab.isClosed,
+                      let webView = tab.webView, !webView.isLoading else { return }
+                // Only whether there's a password field and whether it's filled; never what's in it.
+                webView.evaluateJavaScript(Self.stateCall, in: nil, in: .defaultClient) { [weak self, weak login, weak tab] result in
+                    guard let self, let login, self.held[key] === login, let tab,
+                          case .success(let value) = result, let state = value as? [String: Any] else { return }
+                    self.judge(key, page: PageAfterLogin(host: tab.url?.host(), hasPasswordField: state["form"] as? Bool ?? false,
+                                                         passwordFilled: state["filled"] as? Bool ?? false))
+                }
+            }
+        }
+        login.checks.append(work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func judge(_ key: ObjectIdentifier, page: PageAfterLogin) {
+        guard let login = held[key] else { return }
+        switch Self.verdict(loginHost: login.origin.host, page: page) {
+        case .wait:
+            return
+        case .drop:
+            release(key)
+        case .offer:
+            release(key)
+            guard let tab = login.tab, !tab.isClosed, Self.offersToSave else { return }
+            Task { await self.consider(origin: login.origin, username: login.username, password: login.password, isChange: login.isChange, in: tab) }
+        }
+    }
+
+    /// The watcher's own look at the page, from Zigzag's script world.
+    private static let stateCall = "window.__zigzagPasswordState ? window.__zigzagPasswordState() : null"
 
     /// Saves nothing by itself: decides whether to ask, and what.
     private func consider(origin: Origin, username: String, password: SecretString, isChange: Bool, in tab: Tab) async {
@@ -75,7 +203,8 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     }
 
     /// Watches password fields and reports a login when it's submitted, or when the page goes away with a
-    /// typed password (sites that sign in without a form). Hidden fields are ignored.
+    /// typed password (sites that sign in without a form). Hidden fields are ignored. The top page also says, once
+    /// it has loaded, whether it shows a password field and whether it's filled: how a sent login turned out.
     private static let watcher = """
     (() => {
       if (window.__zigzagPasswordWatcher) return;
@@ -101,7 +230,8 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         return before.length ? before[before.length - 1].value : '';
       };
       let typed = new WeakSet(), last = '';
-      document.addEventListener('input', (e) => { if (e.target && e.target.type === 'password') typed.add(e.target); }, true);
+      // A password typed again (after a failed try, often the same length) is a new login to report.
+      document.addEventListener('input', (e) => { if (e.target && e.target.type === 'password') { typed.add(e.target); last = ''; } }, true);
       const capture = (scope) => {
         const passwords = fields(scope).filter((el) => el.type === 'password' && el.value);
         if (!passwords.length) {
@@ -141,6 +271,24 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
       window.addEventListener('pagehide', () => {
         if (fields(document).some((el) => el.type === 'password' && el.value && typed.has(el))) capture(document);
       });
+      // Whether the page shows a password field, and whether anything's in it. Never the password itself.
+      const state = () => {
+        const passwords = fields(document).filter((el) => el.type === 'password');
+        return { form: passwords.length > 0, filled: passwords.some((el) => !!el.value) };
+      };
+      window.__zigzagPasswordState = state;
+      if (window === top) {
+        // Once the page has loaded and drawn its form (if it has one), or after a few seconds for pages that never
+        // quite finish.
+        let reported = false;
+        const report = () => {
+          if (reported) return;
+          reported = true;
+          setTimeout(() => post(Object.assign({ kind: 'page' }, state())), 400);
+        };
+        if (document.readyState === 'complete') report();
+        else { addEventListener('load', report, { once: true }); setTimeout(report, 3000); }
+      }
     })();
     """
 }
