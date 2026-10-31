@@ -728,6 +728,7 @@ extension CommandBarController {
         case "clear-cookies": controller.confirmClearCookies()
         case "feedback": Feedback.show(in: controller)
         case "history": HistoryPage.open(in: controller)
+        case "settings": SettingsPage.open(in: controller)
         default: break
         }
     }
