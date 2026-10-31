@@ -375,20 +375,23 @@ final class SidebarView: NSView {
         Self.fade(bottomFade, for: scrollView, list: list)
     }
 
-    /// Tabs running on below the bottom of a list fade out there.
-    private static func fade(_ bottomFade: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
+    /// Tabs running on below the bottom of a list fade out there. Only the bottom: the top holds the space's name,
+    /// pinned while you scroll, and a hairline already says there's more above.
+    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
-        let more = list.frame.height - clip.maxY > 1
+        let moreBelow = list.frame.height - clip.maxY > 1
         let fade = bounds.height > 0 ? min(Tokens.Space.x6 / bounds.height, 0.5) : 0
+        let clear = NSColor.clear.cgColor, solid = NSColor.black.cgColor
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        bottomFade.frame = bounds
-        // The mask's y runs up from the bottom: clear there while there's more below, solid everywhere else.
-        bottomFade.colors = [more ? NSColor.clear.cgColor : NSColor.black.cgColor, NSColor.black.cgColor, NSColor.black.cgColor]
-        bottomFade.locations = [0, NSNumber(value: Double(fade)), 1]
-        bottomFade.startPoint = CGPoint(x: 0.5, y: 0)
-        bottomFade.endPoint = CGPoint(x: 0.5, y: 1)
+        mask.frame = bounds
+        // Drawn top to bottom in the list's own terms; the gradient's y runs the other way in an unflipped layer.
+        mask.colors = [solid, solid, moreBelow ? clear : solid]
+        mask.locations = [0, NSNumber(value: Double(1 - fade)), 1]
+        let flipped = scrollView.layer?.isGeometryFlipped == true || scrollView.isFlipped
+        mask.startPoint = CGPoint(x: 0.5, y: flipped ? 0 : 1)
+        mask.endPoint = CGPoint(x: 0.5, y: flipped ? 1 : 0)
         CATransaction.commit()
     }
 
