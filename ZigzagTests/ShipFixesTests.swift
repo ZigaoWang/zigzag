@@ -218,4 +218,11 @@ struct BookmarkFolderTests {
         #expect(SuggestionFetcher.url(for: "github.com", engine: .google, isOn: true) == nil)
         #expect(SuggestionFetcher.url(for: "s", engine: .google, isOn: true) == nil)
     }
+
+    @Test func linkStatusShowsTheWholeAddress() throws {
+        let link = try #require(URL(string: "https://www.iana.org/domains/reserved/rfc6761?x=1"))
+        #expect(LinkStatusController.describe(link) == "iana.org/domains/reserved/rfc6761?x=1")
+        #expect(LinkStatusController.describe(try #require(URL(string: "https://example.com/")))  == "example.com")
+        #expect(LinkStatusController.describe(try #require(URL(string: "mailto:a@example.com"))) == "Email a@example.com")
+    }
 }

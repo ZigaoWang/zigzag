@@ -27,6 +27,7 @@ final class LinkStatusController {
         }
         hideDebouncer.cancel()
         label.stringValue = Self.describe(url)
+        label.lineBreakMode = .byTruncatingMiddle
         let height = Tokens.Space.x6
         let width = min(label.textWidth + Tokens.Space.x2, area.width * 0.6)
         pill.frame = NSRect(x: area.minX + Tokens.Space.x2, y: area.maxY - height - Tokens.Space.x2, width: ceil(width), height: height)
@@ -44,9 +45,15 @@ final class LinkStatusController {
         pill.dismiss()
     }
 
-    /// Readable, without the noise: no "https://", no "www.", no trailing slash.
+    /// The whole address, so you know where a link goes before you click it, without the noise: no "https://", no
+    /// "www.", no trailing slash. Too long for the pill, it's cut in the middle, keeping the site and the end.
     static func describe(_ url: URL) -> String {
         if url.scheme == "mailto" { return url.absoluteString.replacingOccurrences(of: "mailto:", with: "Email ") }
-        return CommandRanker.displayURL(url).removingPercentEncoding ?? CommandRanker.displayURL(url)
+        guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else { return url.absoluteString }
+        var text = url.absoluteString
+        if let range = text.range(of: "\(scheme)://") { text.removeSubrange(range) }
+        if text.hasPrefix("www.") { text.removeFirst(4) }
+        if text.hasSuffix("/") { text.removeLast() }
+        return text.removingPercentEncoding ?? text
     }
 }
