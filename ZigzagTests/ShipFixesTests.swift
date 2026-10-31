@@ -225,4 +225,12 @@ struct BookmarkFolderTests {
         #expect(LinkStatusController.describe(try #require(URL(string: "https://example.com/")))  == "example.com")
         #expect(LinkStatusController.describe(try #require(URL(string: "mailto:a@example.com"))) == "Email a@example.com")
     }
+
+    @Test func aCutOffSecureConnectionIsNotCalledAnImpostor() throws {
+        let url = try #require(URL(string: "https://example.com/"))
+        let cutOff = ErrorPage.describe(NSError(domain: NSURLErrorDomain, code: NSURLErrorSecureConnectionFailed), url: url)
+        #expect(!cutOff.0.contains("private"))
+        let forged = ErrorPage.describe(NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted), url: url)
+        #expect(forged.0 == "This connection isn’t private")
+    }
 }

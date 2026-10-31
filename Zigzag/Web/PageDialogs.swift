@@ -146,8 +146,19 @@ enum ErrorPage {
          NSURLErrorServerCertificateHasUnknownRoot].contains(error.code) && error.domain == NSURLErrorDomain
     }
 
+    /// Web views whose next commit is an error page, so it isn't recorded as a visit (see `Tab.didCommit`).
+    static let pending = NSHashTable<WKWebView>.weakObjects()
+
+    /// True, once, when the page that just committed in `webView` is an error page.
+    static func consume(_ webView: WKWebView) -> Bool {
+        guard pending.contains(webView) else { return false }
+        pending.remove(webView)
+        return true
+    }
+
     static func show(error: NSError, url: URL?, in webView: WKWebView) {
         guard let url else { return }
+        pending.add(webView)
         let (title, message) = describe(error, url: url)
         // For a certificate you know is fine (your router, a dev server), a quiet way through, with the reason first.
         var proceed = ""
@@ -220,7 +231,10 @@ enum ErrorPage {
             return ("Can’t find \(host)", "Your Mac may not be connected to the internet, or the address may have a typo. Check both, then try again.")
         case NSURLErrorTimedOut:
             return ("\(host) took too long", "The site didn’t respond in time. Try again in a moment.")
-        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,
+        // The secure connection itself failed (reset, blocked by a network): nothing says the site is an impostor.
+        case NSURLErrorSecureConnectionFailed:
+            return ("Can’t connect securely to \(host)", "The secure connection was cut off, often by the network you’re on. Try again, or try another network.")
+        case NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateNotYetValid, NSURLErrorServerCertificateHasUnknownRoot:
             return ("This connection isn’t private", "\(host) can’t prove it is who it says it is, so Zigzag didn’t open it.")
         case NSURLErrorClientCertificateRequired, NSURLErrorClientCertificateRejected:

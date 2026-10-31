@@ -445,10 +445,12 @@ final class Tab: NSObject {
 
     /// The address last written to history, so a load and its address change count as one visit.
     private var lastRecorded: URL?
+    /// The address an error page is showing for ("Can't find…"): not a visit, so not history or a suggestion.
+    private var errorShownFor: URL?
 
     private func recordHistory(_ url: URL, title: String?) {
-        // Zigzag's own pages (History, Settings) aren't visits.
-        guard !isPrivate, url != lastRecorded, !HistoryPage.isInternal(url) else { return }
+        // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
+        guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
         HistoryStore.shared.recordVisit(url: url, title: title)
     }
@@ -733,6 +735,7 @@ extension Tab: WKNavigationDelegate {
             let zoom = ZoomLevels.zoom(for: url)
             if webView.pageZoom != zoom { webView.pageZoom = zoom }
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
+            errorShownFor = ErrorPage.consume(webView) ? url : nil
             recordHistory(url, title: webView.title)
         }
     }
