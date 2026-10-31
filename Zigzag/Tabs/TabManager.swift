@@ -296,7 +296,8 @@ final class TabManager {
         let others = tabs.filter { $0 !== current && $0 !== partner }
         let faded = others.filter { now.timeIntervalSince($0.lastActivated) > Tokens.Fade.start && !$0.isPlayingAudio }
         if !faded.isEmpty { return (faded, true) }
-        return (others.isEmpty ? tabs.filter { $0 === current || $0 === partner } : others, false)
+        // Never the tab you're on: with nothing else left, there's nothing to clear (⌘W closes that one).
+        return (others, false)
     }
 
     /// Ends a drag that opened another space and was dropped there: it becomes the space you're in, its colors and

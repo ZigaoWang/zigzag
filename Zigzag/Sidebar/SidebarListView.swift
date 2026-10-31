@@ -551,11 +551,10 @@ final class SidebarListView: NSView {
         case .separator:
             // For the space this list shows: the neighbor sliding in during a swipe has its own tabs.
             let space = shownSpaceID ?? manager.currentSpaceID
-            let tabs = manager.tabs(in: space)
-            (view as? SeparatorRowView)?.hasTabs = !tabs.isEmpty
             let (closing, faded) = manager.tabsToClear(in: space)
-            let current = manager.selectedTab(in: space)
-            (view as? SeparatorRowView)?.clearButton.step = faded ? .faded : closing.contains { $0 === current } ? .current : .others
+            // Clear is there only when it has something to close, and says which: the old tabs, or all the others.
+            (view as? SeparatorRowView)?.hasTabs = !closing.isEmpty
+            (view as? SeparatorRowView)?.clearButton.step = faded ? .old(closing.count) : .others(closing.count)
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }

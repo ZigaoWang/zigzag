@@ -1274,11 +1274,11 @@ extension BrowserWindowController: SidebarDelegate {
     func listNewTab() { commandBar.show(mode: .newTab) }
 
     func listClearTabs() {
-        // Faded tabs first, then the rest but yours, then yours (TabManager.tabsToClear).
+        // Old (faded) tabs first, then the rest but yours (TabManager.tabsToClear).
         let (closing, faded) = tabManager.tabsToClear(in: tabManager.currentSpaceID)
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing, leavingSpaceEmpty: true)
-        let kind = faded ? "faded tab" : "tab"
+        let kind = faded ? "old tab" : "tab"
         let what = closing.count == 1 ? "Closed 1 \(kind)" : "Closed \(closing.count) \(kind)s"
         // Undo brings back these tabs, never whatever else was done since.
         Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in

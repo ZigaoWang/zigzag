@@ -707,20 +707,25 @@ final class ClearTabsButton: InteractiveView {
         arrow.imageScaling = .scaleNone
         [arrow, label].forEach { addSubview($0) }
         setAccessibilityRole(.button)
-        step = .others
+        step = .others(0)
         stateDidChange(animated: false)
     }
 
-    /// What a click does now: faded tabs first, then every tab but yours, then yours.
-    enum Step { case faded, others, current }
-    var step: Step = .others {
+    /// What a click does now, and its label says so: the old (faded) tabs while there are any, then every tab but
+    /// the one you're on. Never yours.
+    enum Step: Equatable { case old(Int), others(Int) }
+    var step: Step = .others(0) {
         didSet {
-            toolTip = switch step {
-            case .faded: "Close Faded Tabs"
-            case .others: "Close All Tabs but This One"
-            case .current: "Close This Tab"
+            switch step {
+            case .old(let n):
+                label.stringValue = "Clear old"
+                toolTip = n == 1 ? "Close the tab you haven’t used in a while" : "Close the \(n) tabs you haven’t used in a while"
+            case .others(let n):
+                label.stringValue = "Clear"
+                toolTip = n == 1 ? "Close the other tab" : "Close the other \(n) tabs"
             }
             setAccessibilityLabel(toolTip)
+            if oldValue != step { needsLayout = true; superview?.needsLayout = true }
         }
     }
 
