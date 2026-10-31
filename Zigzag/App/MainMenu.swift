@@ -54,7 +54,8 @@ enum MainMenu {
             .separator(),
             item("Import from Another Browser…", #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
             .separator(),
-            item("Duplicate Tab", #selector(C.duplicateTab(_:)), "d", [.command, .option]),
+            // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
+            item("Duplicate Tab", #selector(C.duplicateTab(_:)), ""),
             item("Pin Tab", #selector(C.toggleBookmark(_:)), "d"),
             item("Add to Favorites", #selector(C.addToFavorites(_:)), ""),
             item("Move Tab to New Window", #selector(C.moveTabToNewWindow(_:)), ""),
