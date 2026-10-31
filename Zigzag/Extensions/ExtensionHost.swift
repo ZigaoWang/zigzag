@@ -416,17 +416,33 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
     }
 
+    /// An extension asking for sites (`permissions.request`, or a page it wants to reach) gets only what your
+    /// site access already gives it: asking for <all_urls> never widens "only sites I list" or "when I click it".
+    /// A site you want to add is added in its site access instead.
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionToAccess urls: Set<URL>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<URL>, Date?) -> Void) {
-        completionHandler(urls, nil)
+        let granted = Array(extensionContext.grantedPermissionMatchPatterns.keys)
+        let denied = Array(extensionContext.deniedPermissionMatchPatterns.keys)
+        completionHandler(urls.filter { url in
+            granted.contains { $0.matches(url) } && !denied.contains { $0.matches(url) }
+        }, nil)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
-        completionHandler(matchPatterns, nil)
-        DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
+        completionHandler(Self.patternsWithinAccess(matchPatterns, granted: Array(extensionContext.grantedPermissionMatchPatterns.keys),
+                                                    denied: Array(extensionContext.deniedPermissionMatchPatterns.keys)), nil)
+    }
+
+    /// The requested patterns that a pattern already granted covers in full, and that no denied one touches.
+    static func patternsWithinAccess(_ requested: Set<WKWebExtension.MatchPattern>, granted: [WKWebExtension.MatchPattern],
+                                     denied: [WKWebExtension.MatchPattern]) -> Set<WKWebExtension.MatchPattern> {
+        requested.filter { pattern in
+            granted.contains { $0.matches(pattern) }
+                && !denied.contains { $0.matches(pattern, options: .matchBidirectionally) }
+        }
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action, forExtensionContext context: WKWebExtensionContext) {
@@ -625,17 +641,34 @@ final class NativeMessagingHost {
     private var onExit: (() -> Void)?
 
     init?(name: String?, context: WKWebExtensionContext) {
-        guard let name, let manifest = Self.manifest(named: name),
-              let path = manifest["path"] as? String else { return nil }
-        executable = URL(fileURLWithPath: path)
-        // Hosts only talk to the extension IDs they list; we present the extension's Chrome ID.
-        let allowed = (manifest["allowed_origins"] as? [String]) ?? []
         let id = context.uniqueIdentifier
+        guard let name, let manifest = Self.manifest(named: name), let host = Self.host(in: manifest, for: id) else { return nil }
+        executable = host.executable
+        origin = host.origin
         extensionID = id
-        origin = allowed.first { $0.contains(id) } ?? "chrome-extension://\(id)/"
+    }
+
+    /// Chrome's rule for a host's name: lowercase words of letters, digits and underscores, joined by dots. Anything
+    /// else (a slash, "..") could reach a file outside the hosts folder.
+    static func isValidName(_ name: String) -> Bool {
+        name.range(of: "\\A[a-z0-9_]+(\\.[a-z0-9_]+)*\\z", options: .regularExpression) != nil
+    }
+
+    /// The helper to run and the origin to hand it, as Chrome would: only when the manifest lists this extension's
+    /// origin exactly, and its path is an absolute path to a program. Nil means no host for this extension.
+    static func host(in manifest: [String: Any], for id: String) -> (executable: URL, origin: String)? {
+        let origin = "chrome-extension://\(id)/"
+        guard let allowed = manifest["allowed_origins"] as? [String], allowed.contains(origin),
+              let path = manifest["path"] as? String, path.hasPrefix("/") else { return nil }
+        let executable = URL(fileURLWithPath: path).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: executable.path, isDirectory: &isDirectory), !isDirectory.boolValue,
+              FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
+        return (executable, origin)
     }
 
     static func manifest(named name: String) -> [String: Any]? {
+        guard isValidName(name) else { return nil }
         let home = FileManager.default.homeDirectoryForCurrentUser
         let dirs = [
             "Library/Application Support/Google/Chrome/NativeMessagingHosts",
