@@ -29,7 +29,8 @@ final class LinkStatusController {
         label.stringValue = Self.describe(url)
         label.lineBreakMode = .byTruncatingMiddle
         let height = Tokens.Space.x6
-        let width = min(label.textWidth + Tokens.Space.x2, area.width * 0.6)
+        // The label sits 8pt in on each side: the pill is that much wider than the text, so a short address is whole.
+        let width = min(label.textWidth + Tokens.Space.x4, area.width * 0.6)
         pill.frame = NSRect(x: area.minX + Tokens.Space.x2, y: area.maxY - height - Tokens.Space.x2, width: ceil(width), height: height)
         pill.needsLayout = true
         if !visible {
