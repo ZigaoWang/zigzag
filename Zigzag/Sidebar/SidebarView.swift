@@ -236,8 +236,10 @@ final class SidebarView: NSView {
     /// The arrow alone; its circle is drawn under it (the track), the same circle the progress fills.
     private let downloadsButton = IconButton(symbol: "arrow.down", symbolSize: SidebarView.downloadsGlyph, toolTip: "Downloads")
     private static let downloadsGlyph: CGFloat = 9
-    /// The circle's size: the same as the system's circled arrow at the sidebar's icon size.
-    private static let downloadsCircle: CGFloat = 16
+    /// The circle's size and line: the system's circled arrow at the sidebar's 13pt icon size, so it sits with the
+    /// plain glyphs beside it (+) at the same size and weight.
+    private static let downloadsCircle: CGFloat = 14.5
+    private static let downloadsLine: CGFloat = 1.4
     private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
     private var dots: [SpaceDotView] = []
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
@@ -538,10 +540,10 @@ final class SidebarView: NSView {
         let downloading = active > 0
         if downloadsRing.superlayer == nil, let host = downloadsButton.layer {
             downloadsTrack.fillColor = nil
-            downloadsTrack.lineWidth = 1.5
+            downloadsTrack.lineWidth = Self.downloadsLine
             host.addSublayer(downloadsTrack)
             downloadsRing.fillColor = nil
-            downloadsRing.lineWidth = 1.5
+            downloadsRing.lineWidth = Self.downloadsLine + 0.3
             downloadsRing.lineCap = .round
             downloadsRing.strokeEnd = 0
             downloadsRing.opacity = 0
