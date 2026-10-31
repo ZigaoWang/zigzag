@@ -97,9 +97,11 @@ final class HistoryStore {
         exec("COMMIT")
     }
 
+    /// Archived tabs go with it: they're pages you visited, and the address bar suggests them.
     func clearAll() {
         exec("DELETE FROM visits")
         PDFViewerView.forgetPlaces()
+        TabArchive.shared.clear()
     }
 
     /// Everything visited since `date` (Clear Last Hour, Today…).
@@ -109,9 +111,11 @@ final class HistoryStore {
         sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
         sqlite3_step(statement)
         PDFViewerView.forgetPlaces(since: date)
+        TabArchive.shared.clear(since: date)
     }
 
     func delete(_ url: URL) {
+        TabArchive.shared.remove(url: url)
         guard let statement = prepare("DELETE FROM visits WHERE url = ?1") else { return }
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)

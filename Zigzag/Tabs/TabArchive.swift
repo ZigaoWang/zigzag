@@ -81,6 +81,13 @@ final class TabArchive {
         save()
     }
 
+    /// Clearing history since a moment clears tabs archived since then too: the address bar suggests them.
+    func clear(since date: Date) {
+        let before = entries.count
+        entries.removeAll { $0.archivedAt >= date }
+        if entries.count != before { save() }
+    }
+
     func search(_ words: [String], limit: Int) -> [ArchivedTab] {
         var found: [ArchivedTab] = []
         for entry in entries where found.count < limit {
