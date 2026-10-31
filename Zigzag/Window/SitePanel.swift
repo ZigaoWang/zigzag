@@ -34,6 +34,7 @@ final class SitePanel: FloatingPanelView {
     private var extensionTiles: [PanelTile] = []
     private let siteLabel = Label("This site", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
     private var rows: [PanelRow] = []
+    private let group = PanelGroup()
 
     static let width: CGFloat = 300
     /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
@@ -75,6 +76,7 @@ final class SitePanel: FloatingPanelView {
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite { self.close() }
         }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
+        moreButton.isHidden = !canClear
         if isBlank {
             [security, securityIcon, moreButton].forEach { $0.isHidden = true }
             icon.image = Tokens.Symbol.image("plus.square.on.square", size: 16)
@@ -102,10 +104,10 @@ final class SitePanel: FloatingPanelView {
         // reads as part of the sidebar. Anywhere else (sidebar hidden) it keeps its own width.
         if anchor === controller.sidebar.address, controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
             // Part of the sidebar, not a card over it: the address bar's own width, flat (no shadow), in the
-            // sidebar's colour a shade lighter, like the address field itself.
+            // sidebar's color lifted like a selected tab, with the tabs under it faded back.
             panel.width = anchorFrame.width
-            panel.surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
-            panel.tintStrength = 0.82
+            panel.liftedFrom = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
+            panel.recedes = [controller.sidebar.list]
             panel.isElevated = false
             panel.radius = controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel
             panel.frame.size = NSSize(width: panel.width, height: panel.layoutContent(dryRun: true))
@@ -140,32 +142,38 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Content
 
-    /// What this page can do right now, as a row of icons: sharing and a screenshot always, Reader, Translate and
+    /// What this page can do right now, as named tiles: sharing, the link and a screenshot always, Reader, Translate and
     /// Picture in Picture when the page has them. The steady ones come first, so they never move.
     private func buildTiles() {
         guard let controller else { return }
         let readerOn = controller.isShowingReader
-        var specs: [(String, String, Bool, () -> Void)] = []
-        specs.append(("square.and.arrow.up", "Share", false, { [weak self] in self?.close(); self?.controller?.sharePage(nil) }))
+        // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
+        var specs: [(String, String, String, Bool, () -> Void)] = []
+        specs.append(("square.and.arrow.up", "Share", "Share", false, { [weak self] in self?.close(); self?.controller?.sharePage(nil) }))
+        specs.append(("link", "Copy Link", "Copy Link", false, { [weak self] in
+            guard let self else { return }
+            self.controller?.copyLink(self.url)
+            self.close()
+        }))
         if PageScreenshot.canTake(tab), !readerOn {
-            specs.append(("camera.viewfinder", "Screenshot of the Whole Page", false, { [weak self] in
+            specs.append(("camera.viewfinder", "Screenshot", "Screenshot of the Whole Page", false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 PageScreenshot.take(self.tab, in: controller)
             }))
         }
         if tab.isArticle || readerOn {
-            specs.append(("doc.plaintext", readerOn ? "Close Reader" : "Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
+            specs.append(("doc.plaintext", "Reader", readerOn ? "Close Reader" : "Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
         }
         if tab.foreignLanguage != nil || tab.isTranslated {
-            specs.append(("translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
+            specs.append(("translate", tab.isTranslated ? "Original" : "Translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
         }
         let floating = tab.webView?.isPictureInPictureActive ?? false
         if floating || tab.webView?.canTogglePictureInPicture ?? false {
-            specs.append(("pip", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
+            specs.append(("pip", "Float", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
-        actionTiles = specs.map { symbol, title, on, run in
-            let tile = PanelTile(symbol: symbol, caption: nil)
+        actionTiles = specs.map { symbol, caption, title, on, run in
+            let tile = PanelTile(symbol: symbol, caption: caption)
             tile.toolTip = title
             tile.setAccessibilityLabel(title)
             tile.isOn = on
@@ -175,18 +183,14 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
-    /// Copy Link, and clearing this site's cache or cookies: there when you need them, out of the way when you don't.
+    /// Only a web site has a cache and cookies of its own to clear: not a file, an extension's page or a new tab.
+    private var canClear: Bool { !tab.isPrivate && (url.scheme == "http" || url.scheme == "https") }
+
+    /// Clearing this site's cache or cookies: there when you need it, out of the way when you don't.
     private func showMoreMenu() {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item("Copy Link") { [weak self] in
-            guard let self else { return }
-            self.controller?.copyLink(self.url)
-            self.close()
-        })
-        // Only a web site has a cache and cookies of its own to clear: not a file, an extension's page or a new tab.
-        if !tab.isPrivate, url.scheme == "http" || url.scheme == "https" {
-            menu.addItem(.separator())
+        if canClear {
             menu.addItem(SidebarMenus.Item("Clear Cache for This Site") { [weak self] in self?.clear(.cache) })
             menu.addItem(SidebarMenus.Item("Clear Cookies for This Site") { [weak self] in self?.clear(.cookies) })
         }
@@ -226,11 +230,10 @@ final class SitePanel: FloatingPanelView {
     }
 
     private func buildRows() {
-        rows.forEach { $0.removeFromSuperview() }
         rows = []
         if ContentBlocker.isEnabled {
             let blocked = !ContentBlocker.isAllowed(on: url)
-            rows.append(.toggle("Block ads and trackers", on: blocked) { [weak self] on in
+            rows.append(.toggle("Block ads and trackers", symbol: "shield.lefthalf.filled", on: blocked) { [weak self] on in
                 guard let self else { return }
                 ContentBlocker.setAllowed(!on, on: self.url)
                 self.tab.reload()
@@ -238,7 +241,7 @@ final class SitePanel: FloatingPanelView {
         }
         if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
             let off = ExtensionStore.extensionsOffSites.contains(site)
-            rows.append(.toggle("Extensions on this site", on: !off) { [weak self] on in
+            rows.append(.toggle("Extensions on this site", symbol: "puzzlepiece.extension", on: !off) { [weak self] on in
                 guard let self else { return }
                 var sites = ExtensionStore.extensionsOffSites
                 if on { sites.remove(self.site) } else { sites.insert(self.site) }
@@ -248,7 +251,7 @@ final class SitePanel: FloatingPanelView {
         }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
-            rows.append(.toggle("Always translate \(name)", on: PageTranslator.translatesAlways(language)) { [weak self] on in
+            rows.append(.toggle("Always translate \(name)", symbol: "translate", on: PageTranslator.translatesAlways(language)) { [weak self] on in
                 PageTranslator.setTranslatesAlways(on, language)
                 if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
             })
@@ -257,33 +260,35 @@ final class SitePanel: FloatingPanelView {
         let camera = SitePermissions.decision(host: host, type: .camera), microphone = SitePermissions.decision(host: host, type: .microphone)
         if camera != nil || microphone != nil {
             let allowed = [camera, microphone].compactMap { $0 }.allSatisfy { $0 }
-            rows.append(.value("Camera and microphone", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+            rows.append(.value("Camera and microphone", symbol: "video", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
                 SitePermissions.forget(host: host)
                 self?.rebuildRows()
             })
         }
         if let allowed = SitePermissions.location(host: host) {
-            rows.append(.value("Location", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+            rows.append(.value("Location", symbol: "location", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
                 SitePermissions.forgetLocation(host: host)
                 self?.rebuildRows()
             })
         }
         if !tab.isPrivate, let allowed = SitePermissions.notifications(host: host.lowercased()) {
-            rows.append(.toggle("Notifications", on: allowed) { on in
+            rows.append(.toggle("Notifications", symbol: "bell", on: allowed) { on in
                 SitePermissions.setNotifications(on, host: host.lowercased())
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
         }
         let zoom = ZoomLevels.zoom(for: url)
         if abs(zoom - 1) > 0.001 {
-            rows.append(.value("Zoom", "\(Int((zoom * 100).rounded()))%", action: "Reset") { [weak self] in
+            rows.append(.value("Zoom", symbol: "plus.magnifyingglass", "\(Int((zoom * 100).rounded()))%", action: "Reset") { [weak self] in
                 guard let self else { return }
                 ZoomLevels.set(1, for: self.url)
                 self.tab.webView?.pageZoom = 1
                 self.rebuildRows()
             })
         }
-        rows.forEach { addSubview($0) }
+        if group.superview == nil { addSubview(group) }
+        group.rows = rows
+        group.isHidden = rows.isEmpty
         siteLabel.isHidden = rows.isEmpty
         if siteLabel.superview == nil { addSubview(siteLabel) }
     }
@@ -327,35 +332,40 @@ final class SitePanel: FloatingPanelView {
         place(security, NSRect(x: textX + lockSide + 4, y: y + siteName.lineHeight + 1, width: textWidth - lockSide - 4, height: security.lineHeight))
         y += headerHeight + Tokens.Space.x4
 
-        // Actions and extensions share one grid: the same tiles, the same size, lined up with each other.
-        let gap: CGFloat = 6, columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
-        let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
-        func grid(_ tiles: [PanelTile]) {
+        // Actions are named tiles, as many to a row as fit; extensions are icons on the same rhythm below.
+        let gap: CGFloat = 6
+        func grid(_ tiles: [PanelTile], columns: Int, height: ((CGFloat) -> CGFloat)? = nil) {
+            let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
+            let h = height?(side) ?? side
             for (i, tile) in tiles.enumerated() {
                 let column = i % columns, row = i / columns
-                place(tile, NSRect(x: pad + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (side + gap), width: side, height: side))
+                place(tile, NSRect(x: pad + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (h + gap), width: side, height: h))
             }
-            y += CGFloat((tiles.count + columns - 1) / columns) * (side + gap) - gap
+            y += CGFloat((tiles.count + columns - 1) / columns) * (h + gap) - gap
         }
+        let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
         if !actionTiles.isEmpty {
-            grid(actionTiles)
+            // As many across as fit with every name whole, up to four; never so few that one sits alone.
+            let needed = actionTiles.map(\.captionWidth).max() ?? 0
+            var across = max(2, min(4, Int((inner + gap) / (needed + gap))))
+            if actionTiles.count % across == 1, across > 2, actionTiles.count > 1 { across -= 1 }
+            grid(actionTiles, columns: min(across, actionTiles.count)) { _ in 54 }
             y += Tokens.Space.x5
         }
         if !extensionTiles.isEmpty {
             place(extensionsLabel, NSRect(x: pad, y: y, width: inner, height: extensionsLabel.lineHeight))
             y += extensionsLabel.lineHeight + Tokens.Space.x2
-            grid(extensionTiles)
+            grid(extensionTiles, columns: columns)
             y += Tokens.Space.x5
         }
 
         // This site's own settings.
         if !rows.isEmpty {
             place(siteLabel, NSRect(x: pad, y: y, width: inner, height: siteLabel.lineHeight))
-            y += siteLabel.lineHeight
-            for row in rows {
-                place(row, NSRect(x: pad, y: y, width: inner, height: PanelRow.height))
-                y += PanelRow.height
-            }
+            y += siteLabel.lineHeight + Tokens.Space.x2
+            let h = group.height
+            place(group, NSRect(x: pad, y: y, width: inner, height: h))
+            y += h
         } else {
             y -= Tokens.Space.x5
         }
@@ -421,6 +431,9 @@ final class PanelTile: InteractiveView {
         }
     }
 
+    /// How wide the tile must be for its name to show whole.
+    var captionWidth: CGFloat { caption.map { ceil($0.textWidth) + 8 } ?? 0 }
+
     init(image: NSImage? = nil, symbol: String, caption text: String?) {
         caption = text.map { Label($0, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
@@ -449,8 +462,11 @@ final class PanelTile: InteractiveView {
         if let caption {
             let total = side + Tokens.Space.x1 + caption.lineHeight
             let top = (bounds.height - total) / 2
-            iconView.frame = NSRect(x: (bounds.width - side) / 2, y: bounds.height - top - side, width: side, height: side)
-            caption.frame = NSRect(x: 2, y: top, width: bounds.width - 4, height: caption.lineHeight)
+            // The icon above its name, whichever way the view counts.
+            let iconY = isFlipped ? top : bounds.height - top - side
+            let captionY = isFlipped ? top + side + Tokens.Space.x1 : top
+            iconView.frame = NSRect(x: (bounds.width - side) / 2, y: iconY, width: side, height: side)
+            caption.frame = NSRect(x: 2, y: captionY, width: bounds.width - 4, height: caption.lineHeight)
         } else {
             iconView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
         }
@@ -473,49 +489,109 @@ final class PanelTile: InteractiveView {
     }
 }
 
-/// One line of "This site": a name and a switch, or a name, its value and a small action.
+/// "This site"'s settings as one card, the way Settings groups its rows: a quiet fill, hairlines between.
+final class PanelGroup: NSView {
+    var rows: [PanelRow] = [] {
+        didSet {
+            oldValue.forEach { $0.removeFromSuperview() }
+            lines.forEach { $0.removeFromSuperview() }
+            lines = rows.dropFirst().map { _ in ColorView(color: Tokens.Color.separator) }
+            (rows + lines).forEach { addSubview($0) }
+            needsLayout = true
+        }
+    }
+    private var lines: [ColorView] = []
+    private let fill = ColorView(color: Tokens.Color.fieldFill)
+
+    var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        fill.wantsLayer = true
+        fill.layer?.cornerRadius = Tokens.Radius.group
+        fill.layer?.cornerCurve = .continuous
+        addSubview(fill)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        fill.frame = bounds
+        let inset = Tokens.Space.x3
+        for (i, row) in rows.enumerated() {
+            row.frame = NSRect(x: inset, y: CGFloat(i) * PanelRow.height, width: bounds.width - inset * 2, height: PanelRow.height)
+        }
+        // Each line starts where the titles do, under the icons' column, as in Settings.
+        for (i, line) in lines.enumerated() {
+            let x = inset + PanelRow.titleX
+            line.frame = NSRect(x: x, y: CGFloat(i + 1) * PanelRow.height, width: bounds.width - x, height: Tokens.Metric.hairline)
+        }
+    }
+}
+
+/// One line of "This site": an icon, a name and a switch, or a name, its value and a small action.
 final class PanelRow: NSView {
-    static let height: CGFloat = 34
+    static let height: CGFloat = 40
+    /// Where the title starts, after the icon.
+    static let titleX: CGFloat = 16 + Tokens.Space.x2 + 2
+    private let icon = NSImageView()
     private let title: Label
     private let control: NSView
     private let value: Label?
 
-    private init(_ title: String, control: NSView, value: String? = nil) {
+    private init(_ title: String, symbol: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         self.control = control
         // What was chosen sits under the name, so neither is cut short beside the button.
         self.value = value.map { Label($0, font: Tokens.Font.small(), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
-        [self.title, control].forEach { addSubview($0) }
+        icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
+        icon.contentTintColor = Tokens.Color.icon
+        [icon, self.title, control].forEach { addSubview($0) }
         if let label = self.value { addSubview(label) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    static func toggle(_ title: String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
+    static func toggle(_ title: String, symbol: String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
         let toggle = Toggle(isOn: on)
         toggle.onChange = changed
-        return PanelRow(title, control: toggle)
+        return PanelRow(title, symbol: symbol, control: toggle)
     }
 
-    static func value(_ title: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
+    static func value(_ title: String, symbol: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
         let button = TextButton(title: action, font: Tokens.Font.body(.medium))
         button.onClick = { _ in run() }
-        return PanelRow(title, control: button, value: value)
+        return PanelRow(title, symbol: symbol, control: button, value: value)
     }
 
     override func layout() {
         super.layout()
+        icon.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 16, height: 16)
         let size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
-        let right = control.frame.minX - Tokens.Space.x2
+        let x = Self.titleX
+        let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value else {
-            title.frame = NSRect(x: 0, y: (bounds.height - title.lineHeight) / 2, width: right, height: title.lineHeight)
+            // A long name takes a second line in a narrow sidebar rather than losing its end.
+            let line = ceil(title.font?.boundingRectForFont.height ?? 16)
+            let wraps = title.textWidth > right
+            title.maximumNumberOfLines = wraps ? 2 : 1
+            title.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
+            title.usesSingleLineMode = !wraps
+            title.cell?.wraps = wraps
+            let h = wraps ? line * 2 : line
+            title.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: right, height: h)
             return
         }
+        title.maximumNumberOfLines = 1
+        title.lineBreakMode = .byTruncatingTail
+        title.usesSingleLineMode = true
         let top = (bounds.height - title.lineHeight - value.lineHeight) / 2
-        title.frame = NSRect(x: 0, y: top, width: right, height: title.lineHeight)
-        value.frame = NSRect(x: 0, y: title.frame.maxY, width: right, height: value.lineHeight)
+        title.frame = NSRect(x: x, y: top, width: right, height: title.lineHeight)
+        value.frame = NSRect(x: x, y: title.frame.maxY, width: right, height: value.lineHeight)
     }
 }
