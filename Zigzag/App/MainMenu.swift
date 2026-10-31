@@ -173,7 +173,7 @@ enum MainMenu {
             item("Reopen Closed Window", #selector(AppDelegate.reopenClosedWindow(_:)), ""),
             .separator(),
             item("Clear History…", #selector(C.clearHistory(_:)), ""),
-            item("Clear Cache", #selector(C.clearCache(_:)), ""),
+            item("Clear Cache…", #selector(C.clearCache(_:)), ""),
             item("Clear Cookies…", #selector(C.clearCookies(_:)), ""),
         ]))
 

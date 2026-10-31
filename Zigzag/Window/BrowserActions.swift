@@ -49,12 +49,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         DownloadsPanel.show(from: anchor, in: self)
     }
 
-    @objc func clearCache(_ sender: Any?) {
-        Task { @MainActor in
-            await WebsiteData.clear(.cache)
-            Toast.show("Cache cleared", symbol: "arrow.clockwise", duration: 2, in: self)
-        }
-    }
+    @objc func clearCache(_ sender: Any?) { confirmClearCache() }
 
     @objc func clearCookies(_ sender: Any?) { confirmClearCookies() }
 

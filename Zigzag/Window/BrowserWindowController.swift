@@ -380,6 +380,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// What you can change for the site you're on: right-click the address.
+    /// Clearing can't be taken back, so it asks first, even for the cache, which only costs a slower first load.
+    func confirmClearCache() {
+        ConfirmSheet.show(in: root.overlay, title: "Clear the cache for every site?",
+                          message: "Pages load a little slower the first time you open them again. You stay signed in.",
+                          confirmTitle: "Clear Cache", destructive: false) { [weak self] confirmed in
+            guard confirmed else { return }
+            Task { @MainActor in
+                await WebsiteData.clear(.cache)
+                if let self { Toast.show("Cache cleared", symbol: "arrow.clockwise", duration: 2, in: self) }
+            }
+        }
+    }
+
     /// Signing out of every site is a big step, so it asks first.
     func confirmClearCookies() {
         ConfirmSheet.show(in: root.overlay, title: "Clear cookies for every site?",

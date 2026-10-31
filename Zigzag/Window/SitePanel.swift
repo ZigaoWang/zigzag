@@ -191,8 +191,8 @@ final class SitePanel: FloatingPanelView {
         let menu = NSMenu()
         menu.autoenablesItems = false
         if canClear {
-            menu.addItem(SidebarMenus.Item("Clear Cache for This Site") { [weak self] in self?.clear(.cache) })
-            menu.addItem(SidebarMenus.Item("Clear Cookies for This Site") { [weak self] in self?.clear(.cookies) })
+            menu.addItem(SidebarMenus.Item("Clear Cache for This Site…") { [weak self] in self?.clear(.cache) })
+            menu.addItem(SidebarMenus.Item("Clear Cookies for This Site…") { [weak self] in self?.clear(.cookies) })
         }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: moreButton.isFlipped ? moreButton.bounds.maxY + 4 : -4), in: moreButton)
     }
@@ -299,9 +299,22 @@ final class SitePanel: FloatingPanelView {
         needsLayout = true
     }
 
+    /// Asks first: cookies sign you out of the site, and neither can be taken back.
     private func clear(_ kind: WebsiteData.Kind) {
         let site = site, tab = tab
         close()
+        guard let controller else { return }
+        let cookies = kind == .cookies
+        ConfirmSheet.show(in: controller.root.overlay,
+                          title: cookies ? "Clear cookies for \(site)?" : "Clear the cache for \(site)?",
+                          message: cookies ? "You’ll be signed out of \(site). Other sites aren’t touched." : "It loads a little slower the first time. You stay signed in.",
+                          confirmTitle: cookies ? "Clear Cookies" : "Clear Cache", destructive: cookies) { [weak controller] confirmed in
+            guard confirmed else { return }
+            Self.clearNow(kind, site: site, tab: tab, controller: controller)
+        }
+    }
+
+    private static func clearNow(_ kind: WebsiteData.Kind, site: String, tab: Tab, controller: BrowserWindowController?) {
         Task { @MainActor [weak controller] in
             await WebsiteData.clear(kind, site: site)
             tab.reload()

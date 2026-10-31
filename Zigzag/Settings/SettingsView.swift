@@ -1270,14 +1270,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         historyButtons.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", icon: SettingsIcon.symbol("clock.fill"), control: historyButtons))
 
-        let cache = TextButton.form("Clear Cache")
-        cache.onClick = { [weak cache] _ in
-            Task { @MainActor in
-                await WebsiteData.clear(.cache)
-                cache?.flash("Cleared")
+        let cache = TextButton.form("Clear Cache…")
+        cache.onClick = { [weak self, weak cache] _ in
+            self?.confirm(title: "Clear the cache for every site?", message: "Pages load a little slower the first time you open them again. You stay signed in.", action: "Clear Cache") {
+                Task { @MainActor in
+                    await WebsiteData.clear(.cache)
+                    cache?.flash("Cleared")
+                }
             }
         }
-        let cookies = TextButton.form("Clear Cookies")
+        let cookies = TextButton.form("Clear Cookies…")
         cookies.onClick = { [weak self, weak cookies] _ in
             self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, pinned tabs and history stay.", action: "Clear Cookies") {
                 Task { @MainActor in

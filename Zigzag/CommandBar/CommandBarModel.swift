@@ -121,7 +121,7 @@ enum CommandRanker {
     }
 
     static let actions: [Action] = [
-        Action(id: "clear-cache", title: "Clear Cache", keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
+        Action(id: "clear-cache", title: "Clear Cache…", keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
         Action(id: "clear-cookies", title: "Clear Cookies…", keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
         Action(id: "settings", title: "Settings", keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
         Action(id: "passwords", title: "Passwords", keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key.fill"),
