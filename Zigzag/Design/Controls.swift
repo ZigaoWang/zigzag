@@ -265,6 +265,13 @@ final class IconButton: InteractiveView {
             imageView.imageScaling = image == nil ? .scaleNone : .scaleProportionallyDown
         }
     }
+    /// A glyph drawn in code in place of the symbol: a template image, centered and tinted exactly like one.
+    var glyph: NSImage? {
+        didSet {
+            imageView.image = glyph ?? Tokens.Symbol.image(symbol, size: symbolSize)
+            imageView.imageScaling = .scaleNone
+        }
+    }
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
     var radius: CGFloat = Tokens.Radius.control { didSet { layer?.cornerRadius = radius } }
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
