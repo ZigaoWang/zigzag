@@ -312,7 +312,7 @@ enum Tokens {
 
         static let textPrimary = dynamic(light: hex(0x000000, alpha: 0.86), dark: hex(0xFFFFFF, alpha: 0.92))
         static let textSecondary = dynamic(light: hex(0x000000, alpha: 0.54), dark: hex(0xFFFFFF, alpha: 0.56))
-        static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.32))
+        static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.45), dark: hex(0xFFFFFF, alpha: 0.42))
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66))
 
