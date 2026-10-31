@@ -637,9 +637,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func extensionsFooterMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") {
-            SettingsWindowController.shared.show()
-            SettingsWindowController.shared.show(.extensions)
+        menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") { [weak self] in
+            if let self { SettingsPage.open(.extensions, in: self) }
         })
         menu.addItem(SidebarMenus.Item("Get Extensions…", symbol: "bag") { [weak self] in
             self?.tabManager.newTab(url: ExtensionStore.webStoreURL)

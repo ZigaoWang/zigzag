@@ -8,7 +8,9 @@ enum HistoryPage {
     static let url = URL(string: "zigzag://history")!
     static let scheme = "zigzag"
 
-    static func isHistory(_ url: URL?) -> Bool { url?.scheme == scheme }
+    static func isHistory(_ url: URL?) -> Bool { isInternal(url) && url?.host() == "history" }
+    /// One of Zigzag's own pages (History, Settings): never a visit, never fetched from the network.
+    static func isInternal(_ url: URL?) -> Bool { url?.scheme == scheme }
 
     /// Lets a page configuration show History. A configuration WebKit hands over for a popup already has it.
     static func attach(to configuration: WKWebViewConfiguration) {
@@ -43,6 +45,9 @@ enum HistoryPage {
                 type = "image/png"
             } else if url.host() == "history" {
                 data = Data(HistoryPage.html(for: webView).utf8)
+                type = "text/html"
+            } else if url.host() == SettingsPage.host {
+                data = Data(SettingsPage.html.utf8)
                 type = "text/html"
             } else {
                 task.didFailWithError(URLError(.fileDoesNotExist))

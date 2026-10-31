@@ -226,8 +226,8 @@ final class SpaceSettingsRow: InteractiveView {
         onClick = { [weak self] _ in self?.openEditor() }
         editButton.onClick = { [weak self] _ in self?.openEditor() }
         deleteButton.onClick = { [weak self] _ in
-            guard let self, let window = self.window else { return }
-            SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
+            guard let self, let host = self.host else { return }
+            SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
         }
         deleteButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
         toolTip = "Click to edit"
@@ -247,7 +247,9 @@ final class SpaceSettingsRow: InteractiveView {
         let b = deleteButton.frame.width
         deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
         let x = tile.frame.maxX + Tokens.Space.x3 - Label.inset
-        let width = max(0, deleteButton.frame.minX - x - Tokens.Space.x2)
+        // The name has the room up to Edit while Delete isn't showing: a narrow page cuts it short only on hover.
+        let end = deleteButton.alphaValue > 0 ? deleteButton.frame.minX : editButton.frame.minX
+        let width = max(0, end - x - Tokens.Space.x2)
         let top = round((bounds.height - name.lineHeight - 2 - detail.lineHeight) / 2)
         name.frame = NSRect(x: x, y: top, width: width, height: name.lineHeight)
         detail.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: detail.lineHeight)
@@ -288,8 +290,8 @@ final class SpaceSettingsRow: InteractiveView {
         menu.addItem(SidebarMenus.Item("Edit…") { [weak self] in self?.openEditor() })
         if Library.shared.spaces.count > 1 {
             menu.addItem(SidebarMenus.Item("Delete Space…") { [weak self] in
-                guard let self, let window = self.window else { return }
-                SpaceSettingsRow.confirmDelete(self.spaceID, window: window)
+                guard let self, let host = self.host else { return }
+                SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
             })
         }
         return menu
@@ -303,6 +305,7 @@ final class SpaceSettingsRow: InteractiveView {
         let showsDelete = (isHovered || deleteButton.hasKeyboardFocus) && !isLifted
         deleteButton.isHidden = !showsDelete && !(NSApp.isFullKeyboardAccessEnabled && !isLifted)
         deleteButton.alphaValue = showsDelete ? 1 : 0
+        needsLayout = true
         let fill: NSColor? = isLifted ? Tokens.Color.formGroup : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
@@ -313,8 +316,13 @@ final class SpaceSettingsRow: InteractiveView {
         layer?.borderColor = cgColor(Brand.Theme.brand.accent.withAlphaComponent(0.5))
     }
 
+    /// Settings, in the page it's on: what floats over a row (the editor, a confirmation) stays in that page.
+    private var host: NSView? {
+        sequence(first: superview, next: { $0?.superview }).compactMap { $0 as? SettingsView }.first ?? window?.contentView
+    }
+
     func openEditor() {
-        guard let host = window?.contentView else { return }
+        guard let host else { return }
         if let open = SpaceEditorPanel.current {
             let same = open.spaceID == spaceID
             open.close()
@@ -325,21 +333,20 @@ final class SpaceSettingsRow: InteractiveView {
         editor.show(in: host, below: editButton)
     }
 
-    static func confirmDelete(_ id: UUID, window: NSWindow) {
+    static func confirmDelete(_ id: UUID, in host: NSView) {
         guard let space = Library.shared.space(id), Library.shared.spaces.count > 1 else { return }
         // Its tabs can come back with Undo in the browser, but it's still a big step, so it asks first.
-        guard let host = window.contentView else { return }
         ConfirmSheet.show(in: host, title: "Delete “\(space.name)”?",
-                          message: "Its tabs and pinned tabs close. You can bring it back with Undo in the browser window.",
+                          message: "Its tabs and pinned tabs close. You can bring them back with Undo.",
                           confirmTitle: "Delete Space", destructive: true) { confirmed in
             if confirmed { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
         }
     }
 }
 
-// MARK: - Window
+// MARK: - The page
 
-/// The parts of Settings, each a pane of its own, picked from the toolbar at the top.
+/// The parts of Settings, each a pane of its own, picked from the column of sections at the left.
 enum SettingsPane: Int, CaseIterable {
     case general, spaces, passwords, privacy, translation, extensions, shortcuts
 
@@ -367,22 +374,32 @@ enum SettingsPane: Int, CaseIterable {
         }
     }
 
+    /// Its name in the page's address: zigzag://settings/privacy.
+    var path: String { "\(self)" }
 }
 
-/// One pane button in the toolbar: its symbol over its name, a soft fill of the space's accent when chosen.
-private final class PaneTab: InteractiveView {
+/// One section in the column: its symbol and name, a soft fill of the space's accent when chosen. With little room
+/// (half of a split, a small window) it's just the symbol.
+private final class SectionItem: InteractiveView {
     let pane: SettingsPane
     private let icon = NSImageView()
     private let label: Label
+    var isCompact = false {
+        didSet {
+            label.isHidden = isCompact
+            toolTip = isCompact ? pane.title : nil
+            needsLayout = true
+        }
+    }
 
     init(_ pane: SettingsPane) {
         self.pane = pane
-        label = Label(pane.title, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+        label = Label(pane.title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.group
+        layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        icon.image = Tokens.Symbol.image(pane.symbol, size: 18)
-        label.alignment = .center
+        icon.image = Tokens.Symbol.image(pane.symbol, size: 15)
+        icon.imageScaling = .scaleNone
         [icon, label].forEach { addSubview($0) }
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(pane.title)
@@ -390,35 +407,40 @@ private final class PaneTab: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    static let size = NSSize(width: 76, height: 54)
-
     override func layout() {
         super.layout()
-        let side: CGFloat = 22
-        // Flipped: the symbol on top, its name under it.
-        icon.frame = NSRect(x: (bounds.width - side) / 2, y: 7, width: side, height: side)
-        label.frame = NSRect(x: 0, y: bounds.height - 6 - label.lineHeight, width: bounds.width, height: label.lineHeight)
+        let side: CGFloat = 20
+        if isCompact {
+            icon.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
+        } else {
+            icon.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - side) / 2, width: side, height: side)
+            let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
+            label.frame = NSRect(x: x, y: (bounds.height - label.lineHeight) / 2, width: max(0, bounds.width - x - Tokens.Space.x2), height: label.lineHeight)
+        }
     }
 
     override func stateDidChange(animated: Bool) {
-        let accent = Brand.Theme.brand.accent
+        let accent = Brand.Theme.for(self).accent
         let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : 0.14) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
-        label.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        label.font = Tokens.Font.body(isSelected ? .medium : .regular)
     }
 }
 
-/// Settings: a pane toolbar, then each pane's header and its groups, built from Zigzag's own controls.
-final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate {
-    static let shared = SettingsWindowController()
-    private let root = FlippedView()
-    private var tabs: [PaneTab] = []
-    private let toolbarEdge = ColorView(color: Tokens.Color.separator)
+/// Settings, as a page in a tab (zigzag://settings): the sections in a column at the left, the chosen one filling the
+/// rest of the page, built from Zigzag's own controls. It takes whatever width the page has, a whole window or half
+/// of a split, and the column folds down to symbols when that gets narrow.
+final class SettingsView: NSView, NSTextFieldDelegate {
+    private var items: [SectionItem] = []
+    private let column = FlippedView()
+    private let columnTitle = Label("Settings", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let columnEdge = ColorView(color: Tokens.Color.separator)
     private let scroll = NSScrollView()
     private let documentView = FlippedView()
-    private let banner = BrandBanner()
     private(set) var pane = SettingsPane.general
+    /// You picked another section: the tab's address follows, so the tab comes back to it.
+    var onPaneChange: ((SettingsPane) -> Void)?
 
     private let brandGroup = FormGroup()
     private let generalGroup = FormGroup()
@@ -467,37 +489,31 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
 
-    private let width: CGFloat = 720
-    private let toolbarHeight: CGFloat = 96
+    private var keyToken: NSObjectProtocol?
 
-    private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 640),
-                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
-        window.title = "Settings"
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.isReleasedWhenClosed = false
-        window.tabbingMode = .disallowed
-        window.autorecalculatesKeyViewLoop = true
-        window.backgroundColor = Tokens.Color.formBackground
-        window.contentMinSize = NSSize(width: 720, height: 300)
-        window.contentMaxSize = NSSize(width: 720, height: 2000)
-        super.init(window: window)
-        window.delegate = self
+    init(pane: SettingsPane = .general) {
+        self.pane = pane
+        super.init(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
         build()
         token = Library.shared.changed.observe { [weak self] in
-            guard let self, self.window?.isVisible == true else { return }
+            guard let self, self.window != nil else { return }
             self.reloadSpaces()
         }
         if #available(macOS 15.4, *) {
             extensionsToken = ExtensionHost.shared.changed.observe { [weak self] in
-                guard let self, self.window?.isVisible == true else { return }
+                guard let self, self.window != nil else { return }
                 self.reloadExtensions()
             }
         }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    /// Covering the page, it takes the keyboard from the web view underneath, so typing goes nowhere unexpected.
+    override var acceptsFirstResponder: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() { layer?.backgroundColor = Tokens.Color.formBackground.cgColor }
 
     private func header(_ text: String) -> Label {
         Label(text, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
@@ -506,14 +522,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     // MARK: Building
 
     private func build() {
-        // The toolbar of panes.
-        tabs = SettingsPane.allCases.map { pane in
-            let tab = PaneTab(pane)
-            tab.onClick = { [weak self] _ in self?.show(pane) }
-            root.addSubview(tab)
-            return tab
+        // The column of sections.
+        column.addSubview(columnTitle)
+        items = SettingsPane.allCases.map { pane in
+            let item = SectionItem(pane)
+            item.onClick = { [weak self] _ in self?.pick(pane) }
+            column.addSubview(item)
+            return item
         }
-        root.addSubview(toolbarEdge)
+        addSubview(column)
+        addSubview(columnEdge)
 
         // General
         engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
@@ -591,57 +609,126 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         scroll.autohidesScrollers = true
         scroll.documentView = documentView
         scroll.useSlimScroller()
-        root.addSubview(scroll)
-        window?.contentView = root
-        root.postsFrameChangedNotifications = true
-        NotificationCenter.default.addObserver(self, selector: #selector(rootResized), name: NSView.frameDidChangeNotification, object: root)
+        addSubview(scroll)
         reloadSpaces()
         reloadExtensions()
-        show(.general)
+        show(pane)
     }
 
-    /// The window grows and shrinks in height between panes, a step at a time. The pane's rows depend only on the
-    /// width, so a resize that keeps it just stretches the page under them instead of rebuilding every row each step
-    /// (Shortcuts has about a hundred).
-    @objc private func rootResized() {
-        guard root.bounds.width != laidOutWidth else {
-            placeScroll()
-            documentView.frame.size.height = max(contentHeight, scroll.contentSize.height)
-            return
-        }
-        layoutRoot()
-    }
+    // MARK: The page's layout
+
+    /// How the sections sit: a column with their names, a rail of symbols when the page gets narrower, and a row of
+    /// symbols across the top when it's too narrow for even that (half of a split in a small window).
+    private enum Arrangement { case column, rail, row }
+    private var arrangement: Arrangement { bounds.width >= 720 ? .column : bounds.width >= 520 ? .rail : .row }
     private var laidOutWidth: CGFloat = -1
 
-    private func layoutRoot() {
-        let size = PaneTab.size
-        let gap: CGFloat = 2
-        let total = CGFloat(tabs.count) * size.width + CGFloat(tabs.count - 1) * gap
-        var x = round((root.bounds.width - total) / 2)
-        for tab in tabs {
-            tab.frame = NSRect(x: x, y: toolbarHeight - size.height - Tokens.Space.x2, width: size.width, height: size.height)
-            x += size.width + gap
+    override func layout() {
+        super.layout()
+        let arrangement = arrangement
+        let line = Tokens.Metric.hairline
+        switch arrangement {
+        case .column, .rail:
+            let width: CGFloat = arrangement == .column ? 232 : Tokens.Space.x16
+            column.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
+            columnEdge.frame = NSRect(x: width, y: 0, width: line, height: bounds.height)
+            scroll.frame = NSRect(x: width + line, y: 0, width: max(0, bounds.width - width - line), height: bounds.height)
+        case .row:
+            let height = Tokens.Space.x10 + Tokens.Space.x4
+            column.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
+            columnEdge.frame = NSRect(x: 0, y: height, width: bounds.width, height: line)
+            scroll.frame = NSRect(x: 0, y: height + line, width: bounds.width, height: max(0, bounds.height - height - line))
         }
-        toolbarEdge.frame = NSRect(x: 0, y: toolbarHeight, width: root.bounds.width, height: Tokens.Metric.hairline)
-        placeScroll()
-        laidOutWidth = root.bounds.width
-        layoutDocument()
+        layoutColumn(arrangement)
+        // The pane's rows depend only on the width, so a change of height just stretches the page under them,
+        // instead of rebuilding every row (Shortcuts has about a hundred).
+        if scroll.frame.width != laidOutWidth {
+            layoutDocument()
+        } else {
+            documentView.frame.size.height = max(contentHeight, scroll.contentSize.height)
+        }
     }
 
-    private func placeScroll() {
-        scroll.frame = NSRect(x: 0, y: toolbarHeight + Tokens.Metric.hairline, width: root.bounds.width, height: max(0, root.bounds.height - toolbarHeight - Tokens.Metric.hairline))
+    private func layoutColumn(_ arrangement: Arrangement) {
+        columnTitle.isHidden = arrangement != .column
+        items.forEach { $0.isCompact = arrangement != .column }
+        let count = CGFloat(items.count)
+        // In the row they shrink to fit, rather than run off the page's edge.
+        let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2) / count)) : Tokens.Space.x10
+        switch arrangement {
+        case .column:
+            let pad = Tokens.Space.x4
+            columnTitle.frame = NSRect(x: pad + Tokens.Space.x2 - Label.inset, y: Tokens.Space.x6, width: column.bounds.width - pad * 2, height: columnTitle.lineHeight)
+            var y = columnTitle.frame.maxY + Tokens.Space.x4
+            for item in items {
+                item.frame = NSRect(x: pad, y: y, width: column.bounds.width - pad * 2, height: Tokens.Space.x8)
+                y += Tokens.Space.x8 + 2
+            }
+        case .rail:
+            var y = Tokens.Space.x6
+            for item in items {
+                item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: side)
+                y += side + 2
+            }
+        case .row:
+            // Spread evenly across, but never further apart than the rail has them.
+            let gap = min(Tokens.Space.x2, max(0, (column.bounds.width - Tokens.Space.x4 * 2 - side * count) / (count - 1)))
+            let total = side * count + gap * (count - 1)
+            var x = max(0, round((column.bounds.width - total) / 2))
+            for item in items {
+                item.frame = NSRect(x: x, y: (column.bounds.height - side) / 2, width: side, height: side)
+                x += side + gap
+            }
+        }
     }
 
     /// Opens a pane.
     func show(_ pane: SettingsPane) {
         self.pane = pane
-        tabs.forEach { $0.isSelected = $0.pane == pane }
+        items.forEach { $0.isSelected = $0.pane == pane }
         if pane == .privacy { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
-        layoutRoot()
-        fitWindow(animated: true)
+        layoutDocument()
         documentView.scroll(.zero)
+    }
 
+    /// A section picked in the column.
+    private func pick(_ pane: SettingsPane) {
+        guard pane != self.pane else { return }
+        show(pane)
+        onPaneChange?(pane)
+    }
+
+    /// Shown again (its tab chosen, or moved to another window): what may have changed elsewhere is read afresh.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let keyToken { NotificationCenter.default.removeObserver(keyToken) }
+        keyToken = nil
+        guard let window else { return }
+        keyToken = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        refresh()
+        reloadSpaces()
+        reloadExtensions()
+        reloadPasswords()
+        reloadTranslation()
+        if pane == .privacy { reloadPrivacy() }
+        layoutDocument()
+    }
+
+    /// Its picture, for the tab's preview and switcher.
+    func snapshot() -> NSImage? {
+        guard bounds.width > 0, bounds.height > 0, let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
+        cacheDisplay(in: bounds, to: rep)
+        let image = NSImage(size: bounds.size)
+        image.addRepresentation(rep)
+        return image
+    }
+
+    /// The browser window it's in, for what it opens there (History, the Chrome Web Store).
+    private var browser: BrowserWindowController? {
+        (window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
     }
 
     // MARK: Groups
@@ -674,8 +761,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         var controls: [NSView] = []
         if ExtensionStore.needsApproval(id) {
             let review = TextButton.form("Review Update")
-            review.onClick = { _ in
-                guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            review.onClick = { [weak self] _ in
+                guard let controller = self?.browser else { return }
                 controller.window?.makeKeyAndOrderFront(nil)
                 controller.reviewExtensionUpdate(id)
             }
@@ -720,10 +807,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         panel.canChooseFiles = false
         panel.prompt = "Load"
         panel.message = "Choose the folder that contains the extension’s manifest.json."
-        panel.beginSheetModal(for: window) { response in
+        panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor in
-                if await ExtensionStore.loadUnpacked(url) == nil, let host = window.contentView {
+                if await ExtensionStore.loadUnpacked(url) == nil, let host = self {
                     ConfirmSheet.notice(in: host, title: "Couldn’t load this extension", message: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.")
                 }
             }
@@ -834,10 +921,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private func layoutDocument() {
         documentView.subviews.forEach { $0.removeFromSuperview() }
-        let pad = Tokens.Space.x8
-        let contentWidth = width - pad * 2
-        // No heading: the selected tab above already says which pane this is.
-        var y: CGFloat = Tokens.Space.x6
+        let width = scroll.contentSize.width
+        laidOutWidth = scroll.frame.width
+        // The pane takes the page's width, with margins that grow a little with it.
+        let pad = min(Tokens.Space.x16, max(Tokens.Space.x4, round(width * 0.05)))
+        let contentWidth = max(0, width - pad * 2)
+        var y: CGFloat = Tokens.Space.x8
+
+        let title = Label(pane.title, font: .systemFont(ofSize: Tokens.TypeSize.title, weight: .bold), color: Tokens.Color.textPrimary)
+        title.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: title.lineHeight)
+        documentView.addSubview(title)
+        y = title.frame.maxY + Tokens.Space.x5
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if title != nil || accessory != nil {
@@ -906,7 +1000,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 self?.layoutDocument()
             }
             let rw = resetAll.fittingWidth
-            resetAll.frame = NSRect(x: width - pad - rw, y: y, width: rw, height: Tokens.Space.x8)
+            resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: Tokens.Space.x8)
             documentView.addSubview(resetAll)
             let hint = Label("Click a shortcut to change it.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
             hint.frame = NSRect(x: pad + Tokens.Space.x1, y: y + (Tokens.Space.x8 - hint.lineHeight) / 2, width: contentWidth - rw - Tokens.Space.x4, height: hint.lineHeight)
@@ -932,21 +1026,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private var contentHeight: CGFloat = 0
 
-    /// Like the system's settings: the window grows or shrinks to the pane, keeping its top where it is.
-    private func fitWindow(animated: Bool) {
-        guard let window else { return }
-        let screen = window.screen?.visibleFrame.height ?? 900
-        let wanted = toolbarHeight + Tokens.Metric.hairline + contentHeight
-        let content = min(max(wanted, 300), min(720, screen - 80))
-        let chrome = window.frame.height - window.contentLayoutRect.height
-        var frame = window.frame
-        let height = content + chrome
-        guard abs(frame.height - height) > 1 else { return }
-        frame.origin.y += frame.height - height
-        frame.size.height = height
-        window.setFrame(frame, display: true, animate: animated && window.isVisible && !Tokens.Motion.reduceMotion)
-    }
-
     private var hasExtensions: Bool {
         if #available(macOS 15.4, *) { return !ExtensionHost.shared.installed.isEmpty }
         return false
@@ -957,7 +1036,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private func refresh() {
         engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
         engine.selectedIndex = SearchEngine.allCases.firstIndex(of: Library.shared.searchEngine) ?? 0
-        let isDefault = Self.isDefaultBrowser
+        let isDefault = DefaultBrowser.isDefault
         defaultStatus.isHidden = !isDefault
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
@@ -972,22 +1051,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         translateOffer.isOn = PageTranslator.offers
         generalGroup.rows.forEach { $0.needsLayout = true }
     }
-
-    func show() {
-        refresh()
-        reloadSpaces()
-        reloadExtensions()
-        reloadPasswords()
-        reloadTranslation()
-        if window?.isVisible != true { window?.center() }
-        showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
-        layoutRoot()
-        // Nothing is focused until you click it; a settings window shouldn't start in edit mode.
-        window?.makeFirstResponder(nil)
-    }
-
-    func windowDidBecomeKey(_ notification: Notification) { refresh() }
 
     // MARK: Reordering spaces
 
@@ -1052,8 +1115,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             }
         }
         let showHistory = TextButton.form("Show History")
-        showHistory.onClick = { _ in
-            guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        showHistory.onClick = { [weak self] _ in
+            guard let controller = self?.browser else { return }
             HistoryPage.open(in: controller)
         }
         let historyButtons = NSStackView(views: [showHistory, history])
@@ -1138,23 +1201,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func confirm(title: String, message: String, action: String, then run: @escaping () -> Void) {
-        guard let host = window?.contentView else { return }
-        ConfirmSheet.show(in: host, title: title, message: message, confirmTitle: action, destructive: true) { confirmed in
+        ConfirmSheet.show(in: self, title: title, message: message, confirmTitle: action, destructive: true) { confirmed in
             if confirmed { run() }
         }
     }
 
     /// Removing an extension deletes its data too, and can't be undone, so it asks first.
     private func confirmRemove(id: String, name: String) {
-        guard let host = window?.contentView else { return }
-        ConfirmSheet.show(in: host, title: "Remove \(name)?", message: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.",
+        ConfirmSheet.show(in: self, title: "Remove \(name)?", message: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.",
                           confirmTitle: "Remove", destructive: true) { confirmed in
             if confirmed { ExtensionStore.uninstall(id) }
         }
     }
 
     private func getExtensions() {
-        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        guard let controller = browser else { return }
         controller.tabManager.newTab(url: ExtensionStore.webStoreURL)
         controller.window?.makeKeyAndOrderFront(nil)
     }
@@ -1164,13 +1225,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let copy = icon.copy() as! NSImage
         copy.size = NSSize(width: 16, height: 16)
         return copy
-    }
-
-    static var isDefaultBrowser: Bool {
-        guard let url = URL(string: "https://example.com"),
-              let app = NSWorkspace.shared.urlForApplication(toOpen: url) else { return false }
-        return app.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL
-            || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
     }
 }
 
@@ -1393,6 +1447,13 @@ final class FlippedView: NSView {
 }
 
 enum DefaultBrowser {
+    static var isDefault: Bool {
+        guard let url = URL(string: "https://example.com"),
+              let app = NSWorkspace.shared.urlForApplication(toOpen: url) else { return false }
+        return app.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL
+            || Bundle(url: app)?.bundleIdentifier == Bundle.main.bundleIdentifier
+    }
+
     static func make() {
         let app = Bundle.main.bundleURL
         // macOS asks once, for http, and that answer makes Zigzag the web browser. Asking for https at the same time

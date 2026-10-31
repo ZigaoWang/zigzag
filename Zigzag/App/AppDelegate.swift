@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let defaults = UserDefaults.standard
         let launches = defaults.integer(forKey: "LaunchCount") + 1
         defaults.set(launches, forKey: "LaunchCount")
-        guard launches >= 2, !defaults.bool(forKey: "DefaultBrowserOffered"), !SettingsWindowController.isDefaultBrowser else { return }
+        guard launches >= 2, !defaults.bool(forKey: "DefaultBrowserOffered"), !DefaultBrowser.isDefault else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             guard let controller = WindowManager.shared.keyController else { return }
             defaults.set(true, forKey: "DefaultBrowserOffered")
@@ -153,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
 
-    // With Settings or Passwords in front, or no window open, these reach here rather than a browser window: that
+    // With Passwords or Import in front, or no window open, these reach here rather than a browser window: that
     // window comes forward (or the closed one comes back) and does it, instead of the menu item being greyed out.
     @objc func newTab(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .newTab) }
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
@@ -162,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
 
-    /// ⌘W in a window without tabs (Settings, Passwords, Import) closes that window, as on any Mac.
+    /// ⌘W in a window without tabs (Passwords, Import) closes that window, as on any Mac.
     @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
 
     private func frontBrowserWindow() -> BrowserWindowController? {
@@ -175,7 +175,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
 
-    @objc func showSettings(_ sender: Any?) { SettingsWindowController.shared.show() }
+    /// Settings opens as a tab in the front window, as History does.
+    @objc func showSettings(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(in: $0) } }
 
     @objc func checkForUpdates(_ sender: Any?) { Updater.shared.checkForUpdates() }
 

@@ -48,6 +48,7 @@ final class FaviconStore {
             return context.webExtension.icon(for: NSSize(width: 32, height: 32))
         }
         // Zigzag's own pages wear a symbol.
+        if SettingsPage.isSettings(url) { return Tokens.Symbol.image("gearshape", size: 14) }
         if url.scheme == HistoryPage.scheme { return Tokens.Symbol.image("clock.arrow.circlepath", size: 14) }
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }

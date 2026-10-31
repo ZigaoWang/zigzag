@@ -2180,7 +2180,7 @@ private final class ReadyPicker: StepContent {
     override func preferredHeight(for width: CGFloat) -> CGFloat { Onboard.answerHeight }
 
     override func commit(_ done: @escaping () -> Void) {
-        if makeDefault, !SettingsWindowController.isDefaultBrowser { DefaultBrowser.make() }
+        if makeDefault, !DefaultBrowser.isDefault { DefaultBrowser.make() }
         done()
     }
 

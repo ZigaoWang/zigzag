@@ -78,7 +78,7 @@ enum DebugBridge {
         case "fullscreen": controller.window?.toggleFullScreen(nil)
         case "settingsspaceedit":
             func rows(_ v: NSView) -> [SpaceSettingsRow] { (v as? SpaceSettingsRow).map { [$0] } ?? v.subviews.flatMap(rows) }
-            if let root = SettingsWindowController.shared.window?.contentView { rows(root).first?.openEditor() }
+            if let root = controller.tabManager.selectedTab?.settingsView { rows(root).first?.openEditor() }
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
         case "suspendtab": controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(arg) == true }?.suspend()
@@ -343,7 +343,7 @@ enum DebugBridge {
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
-        case "settings": SettingsWindowController.shared.show()
+        case "settings": SettingsPage.open(in: controller)
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         case "cancelsheet":
             // Cancels any open confirmation, in every window, without confirming it.
@@ -390,14 +390,13 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1]); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsbottom":
-            if let root = SettingsWindowController.shared.window?.contentView,
+            if let root = controller.tabManager.selectedTab?.settingsView,
                let scroll = root.subviews.compactMap({ $0 as? NSScrollView }).first, let document = scroll.documentView {
                 document.scroll(NSPoint(x: 0, y: document.bounds.height - scroll.contentSize.height))
             }
         case "settingspane":
             // settingspane <general|spaces|passwords|privacy|translation|extensions|shortcuts>
-            SettingsWindowController.shared.show()
-            if let pane = SettingsPane.allCases.first(where: { "\($0)" == arg }) { SettingsWindowController.shared.show(pane) }
+            SettingsPage.open(SettingsPane.allCases.first { "\($0)" == arg }, in: controller)
         case "allowads": ContentBlocker.setAllowed(arg != "off", on: controller.tabManager.selectedTab?.url); controller.tabManager.selectedTab?.reload()
         case "addext": controller.installExtension(arg)
         case "storeadd": WebStoreOffer.debugAdd()
@@ -442,7 +441,8 @@ enum DebugBridge {
         case "extoff": ExtensionStore.setEnabled(arg, false)
         case "exton": ExtensionStore.setEnabled(arg, true)
         case "settingsid":
-            if let w = SettingsWindowController.shared.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
+            // Settings is a tab now: its window is the browser window it's in.
+            if let w = controller.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }
         case "editspace": controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: arg == "dot" ? controller.sidebar.dot(for: controller.tabManager.currentSpaceID) : controller.sidebar.list.headerView)
         case "pagemove":
             let n = arg.split(separator: " ").compactMap { Double($0) }

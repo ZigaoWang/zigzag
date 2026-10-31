@@ -10,13 +10,15 @@ final class BrowserWebView: WKWebView {
     /// unless it can still scroll that way (`room`).
     func handleSwipe(_ event: NSEvent, room: (left: Bool, right: Bool)) -> Bool { swipe.handle(event, room: room) }
 
-    /// Covered by the PDF viewer: typing (arrows, space, ⌘F's text) goes to the viewer instead.
+    /// Covered by the PDF viewer or Settings: typing (arrows, space, ⌘F's text) goes to that instead.
     override func becomeFirstResponder() -> Bool {
-        if let viewer = owner?.pdfViewer, viewer.superview != nil {
+        let cover: NSView? = owner?.pdfViewer.flatMap { $0.superview != nil ? $0.pdfView : nil }
+            ?? owner?.settingsView.flatMap { $0.superview != nil ? $0 : nil }
+        if let cover {
             // Only if the page still has the keyboard by then: a click elsewhere in between keeps it there.
-            DispatchQueue.main.async { [weak self, weak viewer] in
-                guard let self, let viewer, viewer.superview != nil, let window = self.window, window.firstResponder === self else { return }
-                window.makeFirstResponder(viewer.pdfView)
+            DispatchQueue.main.async { [weak self, weak cover] in
+                guard let self, let cover, cover.window != nil, let window = self.window, window.firstResponder === self else { return }
+                window.makeFirstResponder(cover)
             }
         }
         return super.becomeFirstResponder()

@@ -51,6 +51,7 @@
 		44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */; };
 		477BB8ED8D0C8DC49A0AFC15 /* PopupNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */; };
 		4927062255CE94309C7E277F /* tlds.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5795B0D3216D1BBB137286B3 /* tlds.txt */; };
+		4A65CC145A4105C2BA63B742 /* SettingsPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5152360ED2798576497043 /* SettingsPageTests.swift */; };
 		4AD56EAFBF0AFF722B1CBEC0 /* PasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8DEA66B0550FB3754D7255 /* PasswordStore.swift */; };
 		4D9511C5D1A46A84D045245D /* public_suffix_list.txt in Resources */ = {isa = PBXBuildFile; fileRef = F32FB26AFED6DCCFDB468E39 /* public_suffix_list.txt */; };
 		4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EE88C88464115895D3647DF /* PopupWindowController.swift */; };
@@ -70,6 +71,7 @@
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
 		6A40F1B6C44683319AB1B0F5 /* tour-split.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = FBE5D581AAECE4A02481AF87 /* tour-split.mp4 */; };
+		6CA8173B28E0BD8CD7796BFE /* SettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */; };
 		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
 		6F00D32C32387168F17DADDA /* Passkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */; };
 		70473A9BA477CEFAB852CC91 /* TabArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17AF38DFC935177F4D6F19F5 /* TabArchive.swift */; };
@@ -107,7 +109,6 @@
 		B739E540C2AEA048EEC341DE /* LinkStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672B7AF38828D9E9738B29FD /* LinkStatus.swift */; };
 		B7FC60AE25ED52099E5FDF43 /* WebSocketBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737418196BB38BD7D36DDC5 /* WebSocketBridge.swift */; };
 		B9BAF8A4CC1907F52C65274B /* Readability-LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DB536661E9E732536910C2 /* Readability-LICENSE.md */; };
-		BAE0DD62477D753E854410F6 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49E59809F43972950AA5B568 /* SettingsWindowController.swift */; };
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
 		C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */; };
@@ -137,6 +138,7 @@
 		E77131ED815A795FB7D6F9B8 /* Tutorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D9F429D6C84167482CCFC1 /* Tutorial.swift */; };
 		E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
+		ED98E29840EB4D47CE0DB5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B6B0BECF34D62E3B175E0A /* SettingsView.swift */; };
 		EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */; };
 		F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118460E2A057D11B6C1946F1 /* ExtensionStore.swift */; };
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
@@ -197,7 +199,6 @@
 		3CB299E45AC189FC47ACB508 /* custom-progress-bar.crx */ = {isa = PBXFileReference; path = "custom-progress-bar.crx"; sourceTree = "<group>"; };
 		3D49789A1E612924BE5AD995 /* DeskController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskController.swift; sourceTree = "<group>"; };
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		49E59809F43972950AA5B568 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		4A8DEA66B0550FB3754D7255 /* PasswordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStore.swift; sourceTree = "<group>"; };
 		4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSheet.swift; sourceTree = "<group>"; };
 		4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Passkeys.swift; sourceTree = "<group>"; };
@@ -211,6 +212,8 @@
 		6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBar.swift; sourceTree = "<group>"; };
 		66958B9657E4B52FE56AA408 /* TabPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPreview.swift; sourceTree = "<group>"; };
 		672B7AF38828D9E9738B29FD /* LinkStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkStatus.swift; sourceTree = "<group>"; };
+		67B6B0BECF34D62E3B175E0A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPage.swift; sourceTree = "<group>"; };
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -296,6 +299,7 @@
 		F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealthTests.swift; sourceTree = "<group>"; };
 		F7CEDF75CC1B9CA997C2CF1C /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		FA898046DCAF6AC4AC020C07 /* ContactCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactCard.swift; sourceTree = "<group>"; };
+		FB5152360ED2798576497043 /* SettingsPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageTests.swift; sourceTree = "<group>"; };
 		FBE5D581AAECE4A02481AF87 /* tour-split.mp4 */ = {isa = PBXFileReference; path = "tour-split.mp4"; sourceTree = "<group>"; };
 		FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shortcuts.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -481,7 +485,8 @@
 		AD198676FC355DA00F18BD4B /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				49E59809F43972950AA5B568 /* SettingsWindowController.swift */,
+				68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */,
+				67B6B0BECF34D62E3B175E0A /* SettingsView.swift */,
 				FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */,
 			);
 			path = Settings;
@@ -610,6 +615,7 @@
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
 				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
+				FB5152360ED2798576497043 /* SettingsPageTests.swift */,
 				014C509EA75D15344BB68028 /* ShipFixesTests.swift */,
 				F0210E259AE4B1296648499E /* WhatsNewTests.swift */,
 				C4B669E7DCAC024FCA58F074 /* Fixtures */,
@@ -866,7 +872,8 @@
 				BEC7556625226B96D886206F /* SafariImporter.swift in Sources */,
 				995DC7DEF8E08A8C2ADFFE2D /* SavePasswordPrompt.swift in Sources */,
 				0E626C05ABE9E50F2CB2A884 /* SecretString.swift in Sources */,
-				BAE0DD62477D753E854410F6 /* SettingsWindowController.swift in Sources */,
+				6CA8173B28E0BD8CD7796BFE /* SettingsPage.swift in Sources */,
+				ED98E29840EB4D47CE0DB5DE /* SettingsView.swift in Sources */,
 				2519AB56C923531EC8C11096 /* Shortcuts.swift in Sources */,
 				793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */,
 				A6B3999818FDB11071ED1832 /* SidebarMenus.swift in Sources */,
@@ -914,6 +921,7 @@
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */,
+				4A65CC145A4105C2BA63B742 /* SettingsPageTests.swift in Sources */,
 				80ADEAD45C5C339358B88DFB /* ShipFixesTests.swift in Sources */,
 				5DEA33BF35DB8A21FE90DDC9 /* WhatsNewTests.swift in Sources */,
 			);

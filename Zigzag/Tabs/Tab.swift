@@ -32,6 +32,8 @@ final class Tab: NSObject {
         case renamed
         /// Its PDF viewer came or went.
         case pdf
+        /// Settings came or went over its page.
+        case settings
     }
 
     let id: UUID
@@ -61,6 +63,8 @@ final class Tab: NSObject {
     /// address (Reload); and a form's reply, sent by POST, is never fetched a second time, so WebKit's viewer shows it.
     private var pdfFreshLoad = false
     private var pageIsGet = true
+    /// Settings, over the page while the tab is at zigzag://settings; nil for any other page.
+    private(set) var settingsView: SettingsView?
     private(set) var isPlayingAudio = false
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
@@ -122,7 +126,7 @@ final class Tab: NSObject {
          interactionState: Data? = nil, lastActivated: Date = Date(), createdAt: Date = Date()) {
         self.id = id
         self.url = url
-        self.title = title ?? url?.host() ?? "New Tab"
+        self.title = title ?? (SettingsPage.isSettings(url) ? "Settings" : url?.host() ?? "New Tab")
         self.spaceID = spaceID
         self.pendingConfiguration = configuration
         self.pendingInteractionState = interactionState
@@ -222,6 +226,7 @@ final class Tab: NSObject {
         // A new web view starts with sound and playing; carry over what you'd set on the old one.
         if isMuted { setMuted(true) }
         isPlaybackPaused = false
+        refreshSettingsPage()
         changed.send(.webView)
         return webView
     }
@@ -248,6 +253,10 @@ final class Tab: NSObject {
 
     private func tearDown(_ webView: BrowserWebView) {
         setPDFViewer(nil)
+        if settingsView != nil {
+            settingsView = nil
+            changed.send(.settings)
+        }
         PageDialogSheet.cancel(for: webView)
         observations.forEach { $0.invalidate() }
         observations = []
@@ -284,6 +293,7 @@ final class Tab: NSObject {
         }
         let webView = ensureWebView()
         Self.load(url, in: webView)
+        refreshSettingsPage()
     }
 
     /// The page looks like an article, so Reader is offered.
@@ -411,7 +421,8 @@ final class Tab: NSObject {
     func captureSnapshot(_ completion: (() -> Void)? = nil) {
         guard let webView, webView.window != nil, webView.bounds.width > 0, hasLoadedOnce else { completion?(); return }
         // A PDF's picture is of Zigzag's viewer, as you see it (dark pages and all), not WebKit's underneath.
-        if let viewer = pdfViewer, viewer.window != nil, let image = viewer.snapshot() {
+        // Settings likewise: the picture is of what covers the page, not the empty page under it.
+        if let image = pdfViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil }) ?? settingsView.flatMap({ $0.window != nil ? $0.snapshot() : nil }) {
             snapshot = image
             if !isPrivate { SnapshotStore.save(image, for: id) }
             changed.send(.snapshot)
@@ -436,8 +447,8 @@ final class Tab: NSObject {
     private var lastRecorded: URL?
 
     private func recordHistory(_ url: URL, title: String?) {
-        // History's own page isn't a visit.
-        guard !isPrivate, url != lastRecorded, !HistoryPage.isHistory(url) else { return }
+        // Zigzag's own pages (History, Settings) aren't visits.
+        guard !isPrivate, url != lastRecorded, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
         HistoryStore.shared.recordVisit(url: url, title: title)
     }
@@ -477,6 +488,7 @@ final class Tab: NSObject {
                         if self.favicon == nil { self.refreshFavicon() }
                     }
                     self.changed.send(.url)
+                    self.refreshSettingsPage()
                 }
             },
             webView.observe(\.isLoading, options: [.new]) { [weak self] wv, _ in
@@ -539,7 +551,7 @@ final class Tab: NSObject {
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
         // Private tabs only use icons already saved from normal browsing; they never fetch or save one.
-        if isPrivate || Self.isExtensionPage(pageURL) || HistoryPage.isHistory(pageURL) {
+        if isPrivate || Self.isExtensionPage(pageURL) || HistoryPage.isInternal(pageURL) {
             favicon = FaviconStore.shared.cachedIcon(for: pageURL)
             changed.send(.favicon)
             return
@@ -931,5 +943,42 @@ extension Tab {
         pdfTask = nil
         pdfViewer = viewer
         changed.send(.pdf)
+    }
+}
+
+// MARK: - Settings
+
+extension Tab {
+    /// Settings comes and goes with the tab's address, and its section follows what comes after it.
+    fileprivate func refreshSettingsPage() {
+        guard webView != nil, SettingsPage.isSettings(url) else {
+            if settingsView != nil {
+                settingsView = nil
+                changed.send(.settings)
+            }
+            return
+        }
+        let pane = SettingsPage.pane(for: url)
+        if let settingsView {
+            if settingsView.pane != pane { settingsView.show(pane) }
+            return
+        }
+        let view = SettingsView(pane: pane)
+        view.onPaneChange = { [weak self] pane in self?.settingsAddressFollows(pane) }
+        settingsView = view
+        changed.send(.settings)
+    }
+
+    /// Opens a section of the Settings this tab shows, or takes the tab there.
+    func showSettings(_ pane: SettingsPane) {
+        guard let settingsView else { load(SettingsPage.url(for: pane)); return }
+        settingsView.show(pane)
+        settingsAddressFollows(pane)
+    }
+
+    /// The address names the section, without adding a page to Back and Forward, so the tab comes back to it.
+    private func settingsAddressFollows(_ pane: SettingsPane) {
+        let path = pane == .general ? "/" : "/" + pane.path
+        webView?.evaluateJavaScript("history.replaceState(null, '', '\(path)')")
     }
 }
