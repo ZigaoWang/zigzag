@@ -263,7 +263,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // Nothing to suggest yet (the address as it is): it is the address bar, exactly. It reaches into the
             // page only once there are suggestions to show, growing from that same top-left corner.
             let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
-            if results.isEmpty { return address }
+            // The Tab hint ("Search Wikipedia") needs the room: it opens the list rather than crowding the address.
+            if results.isEmpty && hint.isHidden { return address }
             return NSRect(x: address.minX, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
         let card = controller.root.cardFrame
@@ -307,7 +308,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // Anchored there's no icon: the text starts exactly where the address's own text was.
         fieldIcon.isHidden = isAnchored
         let textHeight = ceil(field.intrinsicContentSize.height)
-        var fieldX = isAnchored ? Tokens.Space.x3 - 2 : fieldIcon.frame.maxX + Tokens.Space.x2
+        // Anchored, the text starts exactly where the resting address's does, so nothing moves as you click in: the
+        // label's 12pt, its own inset, less the gap the field's editor adds.
+        var fieldX = isAnchored ? Tokens.Space.x3 + Label.inset + 3 : fieldIcon.frame.maxX + Tokens.Space.x2
         if scope != nil {
             // In the sidebar's address it's sized to the sidebar's text, not the big bar's.
             chipLabel.font = isAnchored ? Tokens.Font.small(.semibold) : Tokens.Font.body(.semibold)
