@@ -62,7 +62,14 @@ final class FaviconStore {
     func resolve(pageURL: URL, links: [[String: String]], completion: @escaping (NSImage?) -> Void) {
         guard let key = key(for: pageURL) else { completion(nil); return }
         let candidates = rank(links: links, pageURL: pageURL)
-        fetchFirst(candidates, key: key, completion: completion)
+        let hasIcon = memory[key] != nil || FileManager.default.fileExists(atPath: file(for: key).path)
+        fetchFirst(candidates, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasIcon), completion: completion)
+    }
+
+    /// Whether a page's icon becomes its whole site's. A page deep in a site can wear its own (each claude.ai artifact
+    /// has one), and that mustn't replace the icon of the site's favorites and tabs; a front page's icon can.
+    static func speaksForSite(_ pageURL: URL, hasIcon: Bool) -> Bool {
+        !hasIcon || pageURL.pathComponents.filter { $0 != "/" }.count <= 1
     }
 
     /// Loads an icon for a URL we have never visited (bookmarks, imports, history).
@@ -110,22 +117,21 @@ final class FaviconStore {
         return result
     }
 
-    private func fetchFirst(_ candidates: [URL], key: String, completion: @escaping (NSImage?) -> Void) {
+    /// Without `save`, the icon is only handed back, for the one page that declared it.
+    private func fetchFirst(_ candidates: [URL], key: String, save: Bool = true, completion: @escaping (NSImage?) -> Void) {
         guard let next = candidates.first else { completion(nil); return }
         let rest = Array(candidates.dropFirst())
         if next.scheme == "data", let data = try? Data(contentsOf: next), let image = NSImage(data: data), image.isValid {
-            store(image, key: key)
-            completion(image)
+            if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
             return
         }
         Task {
             let result = try? await session.data(from: next)
             let ok = ((result?.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400
             if ok, let data = result?.0, let image = NSImage(data: data), image.isValid, image.size.width > 0 {
-                store(image, key: key)
-                completion(memory[key])
+                if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
             } else {
-                fetchFirst(rest, key: key, completion: completion)
+                fetchFirst(rest, key: key, save: save, completion: completion)
             }
         }
     }

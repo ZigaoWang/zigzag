@@ -195,4 +195,15 @@ struct BookmarkFolderTests {
         #expect(IconButton.withoutShortcut("Hide Sidebar (⌥⌘S)") == "Hide Sidebar")
         #expect(IconButton.withoutShortcut("Downloads") == "Downloads")
     }
+
+    @Test func onlyFrontPagesReplaceASitesIcon() throws {
+        let artifact = try #require(URL(string: "https://claude.ai/artifact/4TsSgQ42Jkne"))
+        // An artifact wears its own icon; once Claude has one, the artifact's never replaces it.
+        #expect(!FaviconStore.speaksForSite(artifact, hasIcon: true))
+        // With no icon yet, any page's is better than a globe.
+        #expect(FaviconStore.speaksForSite(artifact, hasIcon: false))
+        // The front page (where claude.ai lands) and the bare host do replace it.
+        #expect(FaviconStore.speaksForSite(try #require(URL(string: "https://claude.ai/new")), hasIcon: true))
+        #expect(FaviconStore.speaksForSite(try #require(URL(string: "https://github.com")), hasIcon: true))
+    }
 }
