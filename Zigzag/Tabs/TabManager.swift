@@ -57,6 +57,8 @@ final class TabManager {
         let index: Int
         let interactionState: Data?
         var customTitle: String? = nil
+        /// The split it was half of, so bringing it back puts it beside its partner again.
+        var split: SplitPair? = nil
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -539,11 +541,12 @@ final class TabManager {
 
     func close(_ tab: Tab) {
         let partnerTab = partner(of: tab)
+        let pair = split(for: tab)
         splits.removeAll { $0.left == tab.id || $0.right == tab.id }
         // Closing one half of a split shows the other half.
         if selectedTab === tab, let partnerTab {
             if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
-            closeKeepingSelection(tab)
+            closeKeepingSelection(tab, split: pair)
             select(partnerTab)
             return
         }
@@ -561,7 +564,7 @@ final class TabManager {
         }
         guard var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { return }
         closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                                    interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle))
+                                    interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair))
         if closedTabs.count > 50 { closedTabs.removeFirst() }
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
@@ -572,12 +575,12 @@ final class TabManager {
     }
 
     /// Removes a tab without choosing a new selection (the caller does).
-    private func closeKeepingSelection(_ tab: Tab) {
+    private func closeKeepingSelection(_ tab: Tab, split pair: SplitPair? = nil) {
         if let bookmarkID = tab.bookmarkID {
             bookmarkTabs[bookmarkID] = nil
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
             closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                                        interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle))
+                                        interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair))
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
         }
@@ -639,6 +642,13 @@ final class TabManager {
         var list = tabsBySpace[space] ?? []
         list.insert(tab, at: min(closed.index, list.count))
         tabsBySpace[space] = list
+        // Half of a split: back beside its partner, on the same side and at the same size, if that's still free.
+        if let pair = closed.split, let other = self.tab(with: pair.left == closed.id ? pair.right : pair.left),
+           other.spaceID == space, split(for: other) == nil, canSplit(tab, with: other) {
+            var restored = pair
+            if restored.left == closed.id { restored.left = tab.id } else { restored.right = tab.id }
+            splits.append(restored)
+        }
         changed.send(.structure)
         if select { self.select(tab) } else { recentTabIDs.insert(tab.id, at: min(1, recentTabIDs.count)) }
         return tab
