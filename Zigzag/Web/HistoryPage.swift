@@ -61,6 +61,23 @@ enum HistoryPage {
         func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
     }
 
+    /// A site with no icon gets the sidebar's fallback, the globe: drawn black at 2x, set in the page as a mask that
+    /// takes the page's own muted text color.
+    static let globe: Data? = {
+        guard let symbol = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 26, weight: .regular)) else { return nil }
+        let side: CGFloat = 32
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let size = symbol.size
+            let place = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
+            symbol.draw(in: place)
+            NSColor.black.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        return png(image)
+    }()
+
     private static func png(_ image: NSImage) -> Data? {
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
         return rep.representation(using: .png, properties: [:])
@@ -177,6 +194,7 @@ enum HistoryPage {
             .replacingOccurrences(of: "%ACCENT_LIGHT%", with: accent.light)
             .replacingOccurrences(of: "%ACCENT_DARK%", with: accent.dark)
             .replacingOccurrences(of: "%MARK%", with: mark)
+            .replacingOccurrences(of: "%GLOBE%", with: globe?.base64EncodedString() ?? "")
     }
 
     private static let mark = #"""
@@ -252,7 +270,7 @@ h1 { font-size: 15px; font-weight: 600; margin: 0 auto 0 0; }
        min-height: 30px; padding: 0 8px; border-radius: 6px; color: inherit; text-decoration: none; width: 100%; text-align: left; }
 .row:hover { background: var(--hover); }
 .row img, .row .dot { grid-column: 2; width: 16px; height: 16px; border-radius: 3px; }
-.row .dot { background: var(--field); }
+.row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 15px no-repeat; }
 /* Dark: icons drawn in black (GitHub, Wikipedia) sit on a light tile, as in the sidebar. */
 @media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; border-radius: 4px; } }
 .row .title { grid-column: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
