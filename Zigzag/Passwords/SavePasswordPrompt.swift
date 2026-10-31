@@ -1,7 +1,9 @@
 import AppKit
 
 /// "Save password for github.com?" A calm panel at the top of the page, under the address. The username can be
-/// corrected before saving; Never is remembered (and synced) so it never asks there again.
+/// corrected before saving; Never is remembered (and synced) so it never asks there again. It belongs to the tab
+/// that signed in: it steps aside while another tab is in front, comes back with that tab, and goes once the tab
+/// goes to another site or closes, so it never names the wrong site over someone else's page.
 final class SavePasswordPrompt: FloatingPanelView {
     enum Kind {
         case save(username: String)
@@ -24,6 +26,14 @@ final class SavePasswordPrompt: FloatingPanelView {
     private var hideWork: DispatchWorkItem?
     private var finish: (Bool) -> Void = { _ in }
     private var keyMonitor: Any?
+    /// The tab that signed in, and the window it's in.
+    private weak var tab: Tab?
+    private weak var controller: BrowserWindowController?
+    /// The site it's about: the tab going anywhere else ends the question.
+    private var site = ""
+    private var tabsToken: SignalToken?
+    private var urlToken: SignalToken?
+    private var frameObservers: [Any] = []
 
     static let width: CGFloat = 320
     private let pad = Tokens.Space.x4
@@ -101,19 +111,34 @@ final class SavePasswordPrompt: FloatingPanelView {
         }
         prompt.notNowButton.onClick = { [weak prompt] _ in prompt?.close(saved: false) }
         prompt.saveButton.onClick = { [weak prompt] _ in prompt?.close(saved: true) }
-        let card = controller.root.cardFrame
-        // At the top of the page, in the middle, like every question a page asks; it slides down from the top edge.
-        prompt.frame.origin = NSPoint(x: round(card.midX - prompt.frame.width / 2), y: card.minY + Tokens.Space.x3)
-        controller.root.overlay.addSubview(prompt)
-        prompt.needsLayout = true
+        prompt.tab = tab
+        prompt.controller = controller
+        prompt.site = Self.site(of: origin.host)
+        // It slides down from the top edge of its page, like every question a page asks.
         prompt.slidesFromTop = true
-        prompt.present(always: true)
+        prompt.isHidden = true
+        controller.root.overlay.addSubview(prompt)
         current = prompt
-        prompt.scheduleHide()
+        prompt.followTab()
+        prompt.tabsToken = controller.tabManager.changed.observe { [weak prompt] change in
+            guard change == .selection || change == .structure || change == .space else { return }
+            prompt?.followTab()
+        }
+        // The tab went to another site: this was the last site's question.
+        prompt.urlToken = tab.changed.observe { [weak prompt, weak tab] change in
+            guard change == .url, let prompt, let host = tab?.url?.host(), Self.site(of: host) != prompt.site else { return }
+            prompt.close(saved: false)
+        }
+        // The window resizing, the sidebar coming or going, or the split moving: it stays on its page.
+        for card in [controller.root.card, controller.root.secondCard] {
+            prompt.frameObservers.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: card, queue: .main) { [weak prompt] _ in
+                MainActor.assumeIsolated { prompt?.reposition() }
+            })
+        }
         // The keyboard stays where you were typing: a prompt that appears mid-sign-in must never catch the rest of
         // a password, or a second Return. Once you click into it, Return saves and Esc says Not Now.
         prompt.keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
-            guard let prompt, prompt.superview != nil, let window = prompt.window, event.window === window else { return event }
+            guard let prompt, prompt.superview != nil, !prompt.isHidden, let window = prompt.window, event.window === window else { return event }
             let focused = (window.firstResponder as? NSView).map { $0 === prompt || $0.isDescendant(of: prompt) } ?? false
             // Return that commits a word being composed (Chinese, Japanese) belongs to the field.
             guard focused, !((window.firstResponder as? NSTextView)?.hasMarkedText() ?? false) else { return event }
@@ -123,6 +148,67 @@ final class SavePasswordPrompt: FloatingPanelView {
             default: return event
             }
         }
+    }
+
+    /// The site a host belongs to ("github.com" for "gist.github.com"): signing in often hops between its hosts.
+    private static func site(of host: String) -> String {
+        let host = host.lowercased()
+        return PublicSuffix.registrableDomain(host) ?? host
+    }
+
+    /// Shown while its tab is in front (either side of a split counts), set aside while another tab is, and gone
+    /// once its tab has closed or left the window. It only counts down while it can be seen.
+    private func followTab() {
+        guard superview != nil, let controller else { return }
+        let manager = controller.tabManager
+        guard let tab, !tab.isClosed, manager.allTabs.contains(where: { $0 === tab }) else { close(saved: false); return }
+        let front = manager.selectedTab
+        if front === tab || front.map({ manager.partner(of: $0) === tab }) == true {
+            // The window puts the tab's page in its card as it comes in front, maybe after this: it's placed once
+            // the page is there.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.superview != nil, let area = controller.pageFrame(showing: tab) else { return }
+                if self.isHidden {
+                    self.place(in: area)
+                    self.isHidden = false
+                    self.present(always: true)
+                    self.scheduleHide()
+                } else {
+                    self.reposition()
+                }
+            }
+        } else if !isHidden {
+            hideWork?.cancel()
+            // Typing that was in it goes back to the page in front.
+            if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: self) {
+                window.makeFirstResponder(controller.tabManager.selectedTab?.webView)
+            }
+            isHidden = true
+        }
+    }
+
+    /// At the top of its page, in the middle (over its pane, in a split).
+    private func place(in area: NSRect) {
+        let width = min(Self.width, area.width - Tokens.Space.x6)
+        frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: measuredHeight)
+    }
+
+    /// Back to the top of its page after the page moved. It never jumps: it glides there, except while the window's
+    /// edge is being dragged, when it simply stays with the page.
+    private func reposition() {
+        guard superview != nil, !isHidden, let controller, let tab, let area = controller.pageFrame(showing: tab) else { return }
+        let old = frame
+        place(in: area)
+        let dx = old.minX - frame.minX, dy = old.minY - frame.minY
+        guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, controller.window?.inLiveResize != true,
+              let layer else { return }
+        let move = CABasicAnimation(keyPath: "transform")
+        move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
+        move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        move.duration = 0.24
+        move.timingFunction = Tokens.Motion.easeInOut
+        move.fillMode = .backwards
+        layer.add(move, forKey: "follow")
     }
 
     #if DEBUG
@@ -163,6 +249,10 @@ final class SavePasswordPrompt: FloatingPanelView {
         hideWork?.cancel()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
+        tabsToken = nil
+        urlToken = nil
+        frameObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        frameObservers = []
         if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: self) {
             window.makeFirstResponder(BrowserWindowController.undoTarget?.selectedWebView)
         }
@@ -170,7 +260,8 @@ final class SavePasswordPrompt: FloatingPanelView {
         let finish = self.finish
         self.finish = { _ in }
         finish(saved)
-        dismiss(always: true)
+        // Out of sight already (its tab is behind another): simply gone, with nothing to watch leave.
+        if isHidden { removeFromSuperview() } else { dismiss(always: true) }
     }
 
     private func layoutContent() {
@@ -241,5 +332,17 @@ final class KeyHint: NSView {
         let ink = onAccent ? Brand.Theme.for(self).onAccent : Tokens.Color.textSecondary
         label.textColor = ink
         layer?.backgroundColor = cgColor(onAccent ? ink.withAlphaComponent(0.18) : Tokens.Color.fieldFill)
+    }
+}
+
+extension BrowserWindowController {
+    /// Where `tab`'s page is, in the overlay's coordinates: its pane in a split, otherwise the whole page area. Nil
+    /// while the tab isn't in front.
+    func pageFrame(showing tab: Tab) -> NSRect? {
+        guard let webView = tab.webView else { return nil }
+        for card in [root.card, root.secondCard] where !card.isHidden && card.alphaValue > 0 && webView.isDescendant(of: card) {
+            return root.overlay.convert(card.frame, from: card.superview)
+        }
+        return nil
     }
 }
