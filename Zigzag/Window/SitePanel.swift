@@ -233,7 +233,7 @@ final class SitePanel: FloatingPanelView {
         rows = []
         if ContentBlocker.isEnabled {
             let blocked = !ContentBlocker.isAllowed(on: url)
-            rows.append(.toggle("Block ads and trackers", symbol: "shield.lefthalf.filled", on: blocked) { [weak self] on in
+            rows.append(.toggle("Ad blocking", symbol: "shield.lefthalf.filled", on: blocked, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
                 guard let self else { return }
                 ContentBlocker.setAllowed(!on, on: self.url)
                 self.tab.reload()
@@ -241,7 +241,7 @@ final class SitePanel: FloatingPanelView {
         }
         if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
             let off = ExtensionStore.extensionsOffSites.contains(site)
-            rows.append(.toggle("Extensions on this site", symbol: "puzzlepiece.extension", on: !off) { [weak self] on in
+            rows.append(.toggle("Extensions", symbol: "puzzlepiece.extension", on: !off, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
                 guard let self else { return }
                 var sites = ExtensionStore.extensionsOffSites
                 if on { sites.remove(self.site) } else { sites.insert(self.site) }
@@ -251,7 +251,7 @@ final class SitePanel: FloatingPanelView {
         }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
-            rows.append(.toggle("Always translate \(name)", symbol: "translate", on: PageTranslator.translatesAlways(language)) { [weak self] on in
+            rows.append(.toggle(name, symbol: "translate", status: { $0 ? "Always translated" : "Translated when you ask" }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
                 PageTranslator.setTranslatesAlways(on, language)
                 if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
             })
@@ -272,7 +272,7 @@ final class SitePanel: FloatingPanelView {
             })
         }
         if !tab.isPrivate, let allowed = SitePermissions.notifications(host: host.lowercased()) {
-            rows.append(.toggle("Notifications", symbol: "bell", on: allowed) { on in
+            rows.append(.toggle("Notifications", symbol: "bell", on: allowed, status: { $0 ? "Allowed" : "Blocked" }) { on in
                 SitePermissions.setNotifications(on, host: host.lowercased())
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
@@ -533,7 +533,7 @@ final class PanelGroup: NSView {
 
 /// One line of "This site": an icon, a name and a switch, or a name, its value and a small action.
 final class PanelRow: NSView {
-    static let height: CGFloat = 40
+    static let height: CGFloat = 46
     /// Where the title starts, after the icon.
     static let titleX: CGFloat = 16 + Tokens.Space.x2 + 2
     private let icon = NSImageView()
@@ -556,10 +556,19 @@ final class PanelRow: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    static func toggle(_ title: String, symbol: String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
+    /// A short name, a switch, and under the name what the switch means right now ("Allowed on this site").
+    static func toggle(_ title: String, symbol: String, on: Bool, status: @escaping (Bool) -> String, changed: @escaping (Bool) -> Void) -> PanelRow {
+        toggle(title, symbol: symbol, status: status, on: on, changed: changed)
+    }
+
+    static func toggle(_ title: String, symbol: String, status: @escaping (Bool) -> String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
         let toggle = Toggle(isOn: on)
-        toggle.onChange = changed
-        return PanelRow(title, symbol: symbol, control: toggle)
+        let row = PanelRow(title, symbol: symbol, control: toggle, value: status(on))
+        toggle.onChange = { [weak row] on in
+            row?.value?.stringValue = status(on)
+            changed(on)
+        }
+        return row
     }
 
     static func value(_ title: String, symbol: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
@@ -576,20 +585,9 @@ final class PanelRow: NSView {
         let x = Self.titleX
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value else {
-            // A long name takes a second line in a narrow sidebar rather than losing its end.
-            let line = ceil(title.font?.boundingRectForFont.height ?? 16)
-            let wraps = title.textWidth > right
-            title.maximumNumberOfLines = wraps ? 2 : 1
-            title.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
-            title.usesSingleLineMode = !wraps
-            title.cell?.wraps = wraps
-            let h = wraps ? line * 2 : line
-            title.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: right, height: h)
+            title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2, width: right, height: title.lineHeight)
             return
         }
-        title.maximumNumberOfLines = 1
-        title.lineBreakMode = .byTruncatingTail
-        title.usesSingleLineMode = true
         let top = (bounds.height - title.lineHeight - value.lineHeight) / 2
         title.frame = NSRect(x: x, y: top, width: right, height: title.lineHeight)
         value.frame = NSRect(x: x, y: title.frame.maxY, width: right, height: value.lineHeight)
