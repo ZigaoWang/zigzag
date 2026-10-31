@@ -3,6 +3,9 @@ import AppKit
 /// A confirmation drawn over a window's content: a dimmed backdrop and a small panel with what will happen and
 /// two buttons. Return confirms, Escape cancels. Used where a choice needs a pause, like exporting passwords.
 /// It can offer a second way forward too (`choose`), drawn as a quiet button beside the main one.
+/// A destructive one (deleting, clearing) never goes ahead on Return: it takes a click, or Tab to the button and
+/// Space, so a Return meant for something else can't throw anything away. While it's up it has the keyboard: typing
+/// and shortcuts like ⌘W don't reach the page or window behind it.
 final class ConfirmSheet: NSView {
     enum Choice { case confirm, alternate, cancel }
 
@@ -13,6 +16,9 @@ final class ConfirmSheet: NSView {
     private let cancel = TextButton(title: "Cancel", font: Tokens.Font.body(.medium))
     private let alternate: TextButton?
     private var monitor: Any?
+    private let isDestructive: Bool
+    /// Where the keyboard was, given back when the sheet goes.
+    private weak var previousResponder: NSResponder?
     private var completion: (Choice) -> Void
 
     private init(title: String, message: String, confirmTitle: String, alternateTitle: String? = nil, destructive: Bool, completion: @escaping (Choice) -> Void) {
@@ -20,6 +26,7 @@ final class ConfirmSheet: NSView {
         body = NSTextField(wrappingLabelWithString: message)
         confirm = PrimaryButton(title: confirmTitle)
         confirm.isDestructive = destructive
+        isDestructive = destructive
         alternate = alternateTitle.map(TextButton.form)
         self.completion = completion
         super.init(frame: .zero)
@@ -60,15 +67,83 @@ final class ConfirmSheet: NSView {
         sheet.layoutSubtreeIfNeeded()
         sheet.panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
         sheet.panel.present(arrival: .pop)
+        // The keyboard comes to the sheet, so typing doesn't go on into the page or field behind it.
+        if let window = host.window {
+            sheet.previousResponder = window.firstResponder
+            window.makeFirstResponder(sheet)
+        }
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
-            guard let sheet, event.window === host.window else { return event }
-            switch event.keyCode {
-            case 36, 76: sheet.finish(.confirm); return nil
-            case 53: sheet.finish(.cancel); return nil
-            default: return event
-            }
+            guard let sheet, let window = sheet.window, event.window === window else { return event }
+            return sheet.handle(event, in: window)
         }
     }
+
+    /// What a key does while a sheet is up.
+    enum KeyAction: Equatable {
+        case confirm, cancel
+        /// Tab or Shift-Tab: to the sheet's next (or previous) button.
+        case moveFocus(backward: Bool)
+        /// To the button Tab reached, which presses it.
+        case press
+        /// Nothing: no key gets past the sheet to the page or window behind it.
+        case swallow
+        /// On to the app as usual (⌘Q, which asks about quitting itself).
+        case pass
+    }
+
+    /// Return and Escape answer, Tab moves between its buttons, Space presses the one with the focus ring. A
+    /// destructive sheet never confirms on Return: its button takes a click, or Tab to it and Space. `focused` is the
+    /// button Tab reached, if any: `confirmFocused` says whether it's the main one.
+    static func keyAction(keyCode: UInt16, modifiers: NSEvent.ModifierFlags, characters: String?, destructive: Bool,
+                          buttonFocused: Bool, confirmFocused: Bool) -> KeyAction {
+        let mods = modifiers.intersection([.command, .option, .control])
+        if mods == .command, characters?.lowercased() == "q" { return .pass }
+        switch keyCode {
+        case 53:
+            return .cancel
+        case 48:
+            return mods.isEmpty ? .moveFocus(backward: modifiers.contains(.shift)) : .swallow
+        case 49:
+            return mods.isEmpty && buttonFocused ? .press : .swallow
+        case 36, 76:
+            guard mods.isEmpty else { return .swallow }
+            if buttonFocused { return destructive && confirmFocused ? .swallow : .press }
+            return destructive ? .swallow : .confirm
+        default:
+            return .swallow
+        }
+    }
+
+    /// Every key while it's up goes through here; ⌘W and other shortcuts don't reach the page behind it.
+    private func handle(_ event: NSEvent, in window: NSWindow) -> NSEvent? {
+        let focused = (window.firstResponder as? InteractiveView).flatMap { $0.isDescendant(of: panel) && $0.hasKeyboardFocus ? $0 : nil }
+        switch Self.keyAction(keyCode: event.keyCode, modifiers: event.modifierFlags, characters: event.charactersIgnoringModifiers,
+                              destructive: isDestructive, buttonFocused: focused != nil, confirmFocused: focused === confirm) {
+        case .confirm: finish(.confirm)
+        case .cancel: finish(.cancel)
+        case .moveFocus(let backward): moveFocus(backward: backward, in: window)
+        case .press, .pass: return event
+        case .swallow: break
+        }
+        return nil
+    }
+
+    /// Tab and Shift-Tab go round the sheet's own buttons, never out to the page behind. With Full Keyboard Access
+    /// off, buttons don't take focus, so there's nowhere to go.
+    private func moveFocus(backward: Bool, in window: NSWindow) {
+        let stops = ([cancel, alternate, confirm] as [InteractiveView?]).compactMap { $0 }.filter(\.canBecomeKeyView)
+        guard !stops.isEmpty else { return }
+        let current = stops.firstIndex { $0 === window.firstResponder }
+        let next: Int
+        if let current {
+            next = (current + (backward ? stops.count - 1 : 1)) % stops.count
+        } else {
+            next = backward ? stops.count - 1 : 0
+        }
+        window.makeFirstResponder(stops[next])
+    }
+
+    override var acceptsFirstResponder: Bool { true }
 
     /// Something that didn't work, said plainly, with one button to acknowledge it.
     static func notice(in host: NSView, title: String, message: String) {
@@ -83,10 +158,35 @@ final class ConfirmSheet: NSView {
     private func finish(_ choice: Choice) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        giveBackKeyboard()
         let completion = self.completion
         self.completion = { _ in }
         Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
         completion(choice)
+    }
+
+    /// The keyboard goes back where it was, if that's still in the window.
+    private func giveBackKeyboard() {
+        guard let window, let responder = window.firstResponder as? NSView, responder === self || responder.isDescendant(of: self) else { return }
+        var previous = previousResponder as? NSView
+        // Typing in a field was in its field editor, which isn't the field's for long: the field itself takes it back.
+        if let editor = previous as? NSTextView, editor.isFieldEditor { previous = editor.delegate as? NSView }
+        if let view = previous, view.window === window, !view.isDescendant(of: self) {
+            window.makeFirstResponder(view)
+        } else {
+            window.makeFirstResponder(nil)
+        }
+    }
+
+    /// Taken away without an answer (its host went, or ⌘Q a second time took it down): the key monitor goes with it,
+    /// rather than eating keys for a sheet no one can see. Whoever took it away answers for it.
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+        if newSuperview == nil, let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+            giveBackKeyboard()
+        }
+        super.viewWillMove(toSuperview: newSuperview)
     }
 
     // Clicks on the backdrop don't reach the window underneath.
