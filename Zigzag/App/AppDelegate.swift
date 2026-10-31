@@ -189,9 +189,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: NSMenuItemValidation {
-    /// Reopen Closed Window is dimmed when there's nothing to bring back.
+    /// Reopen Closed Window is dimmed when there's nothing to bring back; Set as Default Browser hides once it is.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        // Already your browser: nothing to offer, so it isn't there (as in Safari and Chrome).
+        if menuItem.action == #selector(makeDefaultBrowser(_:)) { menuItem.isHidden = DefaultBrowser.isDefault; return true }
         if menuItem.action == #selector(closeTab(_:)) { return NSApp.keyWindow?.styleMask.contains(.closable) ?? false }
         return true
     }
