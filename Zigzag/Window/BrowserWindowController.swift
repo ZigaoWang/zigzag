@@ -853,9 +853,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private static func readerTransition(_ view: NSView, entering: Bool, completion: (() -> Void)? = nil) {
         if entering { view.alphaValue = 0.01 }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = (entering ? 0.3 : 0.18) * Tokens.Motion.debugSlowdown
-            ctx.timingFunction = entering ? CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
-                                          : CAMediaTimingFunction(controlPoints: 0.4, 0, 0.8, 0.4)
+            ctx.duration = (entering ? 0.24 : 0.16) * Tokens.Motion.debugSlowdown
+            ctx.timingFunction = Tokens.Motion.easeOut
             view.animator().alphaValue = entering ? 1 : 0.01
         }, completionHandler: completion)
     }

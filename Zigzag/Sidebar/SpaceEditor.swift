@@ -119,8 +119,8 @@ final class ColorWheel: NSView {
     private func placeKnobs(animated: Bool) {
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(0.35)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1))
+        CATransaction.setAnimationDuration(0.24)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeInOut)
         for (i, knob) in knobs.enumerated() {
             knob.layer.isHidden = i >= spots.count
             guard i < spots.count else { continue }

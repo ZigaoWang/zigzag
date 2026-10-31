@@ -467,7 +467,7 @@ class FloatingPanelView: NSView {
             let drop = CABasicAnimation(keyPath: "transform")
             drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
             drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            drop.duration = 0.32
+            drop.duration = 0.28
             drop.timingFunction = Tokens.Motion.easeOut
             drop.fillMode = .backwards
             let fade = CABasicAnimation(keyPath: "opacity")
