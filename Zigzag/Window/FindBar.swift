@@ -690,12 +690,7 @@ enum Toast {
             toast.growsFrom = CGPoint(x: 0.5, y: 0)
             toast.present(always: true, arrival: .pop)
         } else if !Tokens.Motion.reduceMotion {
-            // A repeat (zoom 90% → 80%) gives a small pulse so the change registers.
-            let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
-            pulse.values = [1, 1.04, 1]
-            pulse.duration = Tokens.Motion.snappy.duration
-            pulse.timingFunction = Tokens.Motion.snappy.timing
-            toast.layer?.add(pulse, forKey: "pulse")
+            // A repeat (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         }
         state.toast = toast
         state.hideWork?.cancel()
