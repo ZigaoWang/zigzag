@@ -259,24 +259,24 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     private func updateCount(found: Bool) {
         guard let webView = window?.selectedWebView else { return }
-        // WebKit's public find API doesn't count; a quick text scan does.
-        let escaped = query.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`").replacingOccurrences(of: "$", with: "\\$")
+        // WebKit's public find API doesn't count; a quick text scan does. It runs in Zigzag's own script world with
+        // the query passed in, so the page can't see what you search for or change how it's counted.
         // Counted over the same text twice, the whole page and the part before the match WebKit just selected, so
         // "3 of 12" is where you are in the page.
         let script = """
-        (() => { const q = `\(escaped)`.toLowerCase(); if (!q || !document.body) return [0, 0];
-          const count = (t) => { t = t.toLowerCase(); let n = 0, i = 0; while ((i = t.indexOf(q, i)) !== -1) { n++; i += q.length; } return n; };
-          const all = document.createRange(); all.selectNodeContents(document.body);
-          const total = count(all.toString());
-          const sel = window.getSelection(); if (!sel.rangeCount) return [0, total];
-          const before = document.createRange(); before.setStart(document.body, 0);
-          const r = sel.getRangeAt(0); before.setEnd(r.startContainer, r.startOffset);
-          return [count(before.toString()) + 1, total]; })()
+        const q = String(query).toLowerCase(); if (!q || !document.body) return [0, 0];
+        const count = (t) => { t = t.toLowerCase(); let n = 0, i = 0; while ((i = t.indexOf(q, i)) !== -1) { n++; i += q.length; } return n; };
+        const all = document.createRange(); all.selectNodeContents(document.body);
+        const total = count(all.toString());
+        const sel = window.getSelection(); if (!sel.rangeCount) return [0, total];
+        const before = document.createRange(); before.setStart(document.body, 0);
+        const r = sel.getRangeAt(0); before.setEnd(r.startContainer, r.startOffset);
+        return [count(before.toString()) + 1, total];
         """
-        webView.evaluateJavaScript(script) { [weak self] result, _ in
+        webView.callAsyncJavaScript(script, arguments: ["query": query], in: nil, in: .defaultClient) { [weak self] result in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                let pair = (result as? [Int]) ?? [0, 0]
+                let pair = ((try? result.get()) as? [Int]) ?? [0, 0]
                 let count = max(pair.count > 1 ? pair[1] : 0, 1), place = pair.first ?? 0
                 self.showCount(!found ? "No matches" : count == 1 ? "1 match"
                     : (1...count).contains(place) ? "\(place) of \(count)" : "\(count) matches")
