@@ -41,26 +41,7 @@ class InteractiveView: NSView {
         didSet {
             guard oldValue != isPressed else { return }
             stateDidChange(animated: false)
-            animatePress(isPressed)
         }
-    }
-    /// How far it gives under a press, 1 for not at all: a shallow squeeze (0.95–0.98) that eases down and back, so a
-    /// click feels like it landed. No spring: a wobble on something you press all day reads as goofy, not alive.
-    var pressScale: CGFloat = 1
-
-    private func animatePress(_ down: Bool) {
-        guard pressScale < 1, let layer, !Tokens.Motion.reduceMotion, bounds.width > 0 else { return }
-        let w = bounds.width, h = bounds.height, k = pressScale
-        // A view's layer scales from its corner; moved back by half the shrink, it scales from its middle.
-        let squeezed = CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(w / 2 * (1 - k), h / 2 * (1 - k), 0))
-        let move = CABasicAnimation(keyPath: "transform")
-        move.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
-        move.toValue = NSValue(caTransform3D: down ? squeezed : CATransform3DIdentity)
-        move.duration = down ? 0.1 : 0.16
-        move.timingFunction = Tokens.Motion.easeOut
-        move.fillMode = .forwards
-        move.isRemovedOnCompletion = !down
-        layer.add(move, forKey: "press")
     }
     var isSelected = false {
         didSet {
@@ -281,7 +262,6 @@ final class IconButton: InteractiveView {
         self.symbol = symbol
         self.symbolSize = symbolSize
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
-        pressScale = 0.94
         layer?.cornerRadius = radius
         layer?.cornerCurve = .continuous
         imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
@@ -452,7 +432,6 @@ final class PrimaryButton: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.brand.onAccent)
         super.init(frame: .zero)
-        pressScale = 0.97
         themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
@@ -566,7 +545,6 @@ final class ChoicePill: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         [check, label].forEach { addSubview($0) }
@@ -647,7 +625,6 @@ final class SegmentedPills: NSView {
             let tint = tint ?? Brand.Theme.for(self).accent
             let fill: NSColor? = isSelected ? tint.withAlphaComponent(isPressed ? 0.24 : 0.16) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
             layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-            title.font = Tokens.Font.body(isSelected ? .semibold : .medium)
             title.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
             count.textColor = isSelected ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
         }
@@ -773,7 +750,6 @@ final class CheckBox: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
-        pressScale = 0.95
         box.wantsLayer = true
         box.layer?.cornerRadius = 4
         box.layer?.cornerCurve = .continuous
@@ -836,7 +812,6 @@ final class MenuButton: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        pressScale = 0.98
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)
@@ -1015,7 +990,6 @@ final class SlidingSwitch: NSView {
         }
         for (i, label) in labels.enumerated() {
             label.textColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-            label.font = Tokens.Font.body(i == selectedIndex ? .semibold : .medium)
         }
         for (i, icon) in icons.enumerated() { icon.contentTintColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.icon }
     }

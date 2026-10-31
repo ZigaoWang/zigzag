@@ -143,7 +143,6 @@ final class BannerButton: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Brand.ribbon)
         super.init(frame: .zero)
-        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         label.alignment = .center
@@ -491,7 +490,6 @@ private final class SectionItem: InteractiveView {
         let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : 0.14) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
-        label.font = Tokens.Font.body(isSelected ? .medium : .regular)
     }
 }
 

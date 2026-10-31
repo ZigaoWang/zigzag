@@ -195,7 +195,6 @@ final class FavoriteTile: InteractiveView {
     init(bookmark: Bookmark?) {
         self.bookmark = bookmark
         super.init(frame: .zero)
-        pressScale = 0.97
         clipsToBounds = false
         layer?.masksToBounds = false
         layer?.cornerRadius = Tokens.Radius.card

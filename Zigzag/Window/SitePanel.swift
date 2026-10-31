@@ -395,7 +395,6 @@ final class ActionChip: InteractiveView {
     init(symbol: String, title: String) {
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous
         icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
@@ -451,7 +450,6 @@ final class PanelTile: InteractiveView {
     init(image: NSImage? = nil, symbol: String, caption text: String?) {
         caption = text.map { Label($0, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
-        pressScale = 0.97
         layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
         iconView.image = image ?? Tokens.Symbol.image(symbol, size: text == nil ? Tokens.TypeSize.body : 17)

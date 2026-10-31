@@ -297,10 +297,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshTitleColor() {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
         title.textColor = Tokens.Color.textPrimary
-        let split = isSplit
-        title.font = Tokens.Font.body(isSelected && (!split || focusedHalf == 0) ? .medium : .regular)
+        // One weight always: selection shows in the fill, never by text getting wider and shifting.
         partnerTitle.textColor = Tokens.Color.textPrimary
-        partnerTitle.font = Tokens.Font.body(isSelected && focusedHalf == 1 ? .medium : .regular)
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))
     }
@@ -701,7 +699,6 @@ final class ClearTabsButton: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        pressScale = 0.96
         layer?.cornerCurve = .continuous
         arrow.image = NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: Tokens.TypeSize.small - 2, weight: .semibold))
