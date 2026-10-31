@@ -40,7 +40,18 @@ final class FormGroup: NSView {
 
     var fittingHeight: CGFloat { fittingHeight(for: frame.width > 0 ? frame.width : 492) }
 
-    func fittingHeight(for width: CGFloat) -> CGFloat { rows.map { rowHeight($0, width) }.reduce(0, +) }
+    func fittingHeight(for width: CGFloat) -> CGFloat { rows.filter { !$0.isHidden }.map { rowHeight($0, width) }.reduce(0, +) }
+
+    /// Shows only the rows that have every word of a search (all of them when `names`, its heading or its pane,
+    /// has them, or there are no words). Returns how many show.
+    @discardableResult
+    func filter(_ words: [String], names: [String] = []) -> Int {
+        func has(_ text: String) -> Bool { words.allSatisfy { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil } }
+        let all = words.isEmpty || has(names.joined(separator: " "))
+        for row in rows { row.isHidden = !all && !has((row as? SettingsSearchable)?.searchText ?? "") }
+        needsLayout = true
+        return rows.filter { !$0.isHidden }.count
+    }
 
     private func rowHeight(_ row: NSView, _ width: CGFloat) -> CGFloat { (row as? FormRow)?.height(for: width) ?? row.frame.height }
 
@@ -49,13 +60,16 @@ final class FormGroup: NSView {
         background.frame = bounds
         background.layer?.borderColor = background.cgColor(Tokens.Color.formGroupEdge)
         var y: CGFloat = 0
-        for (i, row) in rows.enumerated() {
+        let shown = rows.filter { !$0.isHidden }
+        lines.forEach { $0.isHidden = true }
+        for (i, row) in shown.enumerated() {
             let h = rowHeight(row, bounds.width)
             row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
             y += h
-            if i < lines.count {
+            if i < shown.count - 1 {
                 // The divider starts where the text does, past the icons, as the system's settings draw it.
-                let x = (rows[i] as? FormRow)?.textInset ?? (rows[i] as? SpaceSettingsRow)?.textInset ?? Tokens.Space.x3
+                let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Space.x3
+                lines[i].isHidden = false
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
             }
         }
@@ -67,10 +81,12 @@ final class FormGroup: NSView {
     }
 }
 
-/// A form row: a title (and optional explanation, which wraps) on the left, a control on the right. Rows grow to
-/// fit their explanation, so nothing is ever cut off.
+/// A row "Find a setting" can find, by the words it shows.
+protocol SettingsSearchable { var searchText: String { get } }
+
 /// The top of General: the drawn wordmark, the version you have, and a way to get the next one.
-final class SettingsBrandRow: NSView {
+final class SettingsBrandRow: NSView, SettingsSearchable {
+    var searchText: String { "Zigzag version check for updates" }
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let update = TextButton.form("Check for Updates…")
@@ -127,7 +143,10 @@ enum SettingsIcon {
     }
 }
 
-final class FormRow: NSView {
+/// A form row: a title (and optional explanation, which wraps) on the left, a control on the right. Rows grow to
+/// fit their explanation, so nothing is ever cut off.
+final class FormRow: NSView, SettingsSearchable {
+    var searchText: String { title.stringValue + " " + detail.stringValue }
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
@@ -200,7 +219,8 @@ final class FormRow: NSView {
 // MARK: - Spaces list
 
 /// A space in Settings: its color (click to change), its name (edit in place), delete on hover, drag to reorder.
-final class SpaceSettingsRow: InteractiveView {
+final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
+    var searchText: String { name.stringValue + " " + detail.stringValue }
     let spaceID: UUID
     /// Its color as a tile with its first letter, the same size and shape as the icons on every other row.
     private let tile = NSImageView()
@@ -439,6 +459,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let scroll = NSScrollView()
     private let documentView = FlippedView()
     private(set) var pane = SettingsPane.general
+    /// Finds a setting in any section. In the column when it has room, otherwise at the top of the page.
+    private let settingSearch = FilledField(placeholder: "Find a setting")
     /// You picked another section: the tab's address follows, so the tab comes back to it.
     var onPaneChange: ((SettingsPane) -> Void)?
 
@@ -600,6 +622,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // Shortcuts
         shortcutSearch.field.delegate = self
+        settingSearch.field.delegate = self
+        settingSearch.field.setAccessibilityLabel("Find a setting")
 
         reloadPrivacy()
 
@@ -651,6 +675,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func layoutColumn(_ arrangement: Arrangement) {
         columnTitle.isHidden = arrangement != .column
+        if arrangement != .column, settingSearch.superview === column { settingSearch.removeFromSuperview() }
         items.forEach { $0.isCompact = arrangement != .column }
         let count = CGFloat(items.count)
         // In the row they shrink to fit, rather than run off the page's edge.
@@ -660,6 +685,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let pad = Tokens.Space.x4
             columnTitle.frame = NSRect(x: pad + Tokens.Space.x2 - Label.inset, y: Tokens.Space.x6, width: column.bounds.width - pad * 2, height: columnTitle.lineHeight)
             var y = columnTitle.frame.maxY + Tokens.Space.x4
+            if settingSearch.superview !== column { column.addSubview(settingSearch) }
+            settingSearch.frame = NSRect(x: pad, y: y, width: column.bounds.width - pad * 2, height: Tokens.Space.x8)
+            settingSearch.tint = Brand.Theme.for(self).accent
+            y = settingSearch.frame.maxY + Tokens.Space.x3
             for item in items {
                 item.frame = NSRect(x: pad, y: y, width: column.bounds.width - pad * 2, height: Tokens.Space.x8)
                 y += Tokens.Space.x8 + 2
@@ -685,6 +714,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Opens a pane.
     func show(_ pane: SettingsPane) {
         self.pane = pane
+        settingSearch.stringValue = ""
         items.forEach { $0.isSelected = $0.pane == pane }
         if pane == .privacy { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
@@ -694,7 +724,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// A section picked in the column.
     private func pick(_ pane: SettingsPane) {
-        guard pane != self.pane else { return }
+        guard pane != self.pane || isSearching else { return }
         show(pane)
         onPaneChange?(pane)
     }
@@ -736,7 +766,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadExtensions() {
         extensionsGroup.removeAllRows()
         developerGroup.removeAllRows()
-        defer { if pane == .extensions { layoutDocument() } }
+        defer { if pane == .extensions || isSearching { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
         loadUnpackedButton.isHidden = !ExtensionStore.developerMode
         let installed = ExtensionHost.shared.installed.sorted {
@@ -828,7 +858,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             spacesGroup.add(row)
             return row
         }
-        if pane == .spaces { layoutDocument() }
+        if pane == .spaces || isSearching { layoutDocument() }
     }
 
     /// When a password-manager extension is on, Zigzag's own saving and filling start off, and say why.
@@ -877,8 +907,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Shortcuts
 
     /// Every shortcut, read from the menu bar itself so the list is always right.
-    private func reloadShortcuts() {
-        let query = shortcutSearch.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
+    private func reloadShortcuts(ignoringItsSearch: Bool = false) {
+        let query = ignoringItsSearch ? "" : shortcutSearch.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -913,25 +943,86 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     func controlTextDidChange(_ obj: Notification) {
+        if (obj.object as? NSTextField) === settingSearch.field {
+            searchChanged()
+            return
+        }
         reloadShortcuts()
         layoutDocument()
+    }
+
+    // MARK: Finding a setting
+
+    private var searchWords: [String] { settingSearch.stringValue.split(whereSeparator: \.isWhitespace).map(String.init) }
+    private var isSearching: Bool { !searchWords.isEmpty }
+
+    private func searchChanged() {
+        items.forEach { $0.isSelected = !isSearching && $0.pane == pane }
+        // Every shortcut can be found, whatever the Shortcuts section's own search holds.
+        reloadShortcuts(ignoringItsSearch: isSearching)
+        layoutDocument()
+        documentView.scroll(.zero)
+    }
+
+    /// Escape empties the search, and the section you were on comes back.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard control === settingSearch.field, selector == #selector(cancelOperation(_:)), isSearching else { return false }
+        settingSearch.stringValue = ""
+        searchChanged()
+        return true
+    }
+
+    #if DEBUG
+    func debugFind(_ text: String) {
+        settingSearch.stringValue = text
+        searchChanged()
+    }
+    #endif
+
+    /// ⌘F on Settings finds a setting, rather than text in the empty page under it.
+    @objc func showFindBar(_ sender: Any?) {
+        window?.makeFirstResponder(settingSearch.field)
+    }
+
+    /// Each section's groups and their headings, as a search goes through them.
+    private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
+        switch pane {
+        case .general: [(nil, brandGroup), (nil, generalGroup), ("Tabs", tabsGroup), ("Window", windowGroup), ("Downloads", downloadsGroup), (nil, importGroup)]
+        case .spaces: [("Your spaces", spacesGroup)]
+        case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
+        case .privacy: [(nil, blockingGroup), ("Browsing data", privacyGroup), ("Sites", sitesGroup)]
+        case .translation: [(nil, translationGroup), ("Always translate", alwaysGroup)]
+        case .extensions: [("Installed", extensionsGroup), (nil, developerGroup)]
+        case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
+        }
     }
 
     // MARK: Layout
 
     private func layoutDocument() {
-        documentView.subviews.forEach { $0.removeFromSuperview() }
+        // The fields stay put while they're typed in; everything else is laid out afresh.
+        documentView.subviews.filter { $0 !== settingSearch && $0 !== shortcutSearch }.forEach { $0.removeFromSuperview() }
         let width = scroll.contentSize.width
         laidOutWidth = scroll.frame.width
         // The pane takes the page's width, with margins that grow a little with it.
         let pad = min(Tokens.Space.x16, max(Tokens.Space.x4, round(width * 0.05)))
         let contentWidth = max(0, width - pad * 2)
         var y: CGFloat = Tokens.Space.x8
+        if settingSearch.superview !== column {
+            // No room for it in the column: it heads the page instead.
+            if settingSearch.superview !== documentView { documentView.addSubview(settingSearch) }
+            settingSearch.frame = NSRect(x: pad, y: Tokens.Space.x6, width: contentWidth, height: Tokens.Space.x8)
+            settingSearch.tint = Brand.Theme.for(self).accent
+            y = settingSearch.frame.maxY + Tokens.Space.x6
+        }
+        if shortcutSearch.superview === documentView && (pane != .shortcuts || isSearching) { shortcutSearch.removeFromSuperview() }
 
-        let title = Label(pane.title, font: .systemFont(ofSize: Tokens.TypeSize.title, weight: .bold), color: Tokens.Color.textPrimary)
-        title.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: title.lineHeight)
-        documentView.addSubview(title)
-        y = title.frame.maxY + Tokens.Space.x5
+        if !isSearching {
+            let title = Label(pane.title, font: .systemFont(ofSize: Tokens.TypeSize.title, weight: .bold), color: Tokens.Color.textPrimary)
+            title.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: title.lineHeight)
+            documentView.addSubview(title)
+            y = title.frame.maxY + Tokens.Space.x5
+        }
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if title != nil || accessory != nil {
@@ -954,6 +1045,34 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             group.needsLayout = true
             documentView.addSubview(group)
             y = group.frame.maxY + Tokens.Space.x6
+        }
+
+        // A search: what matches, from every section, under the section's name.
+        let words = searchWords
+        for pane in SettingsPane.allCases {
+            for (title, group) in groups(of: pane) { group.filter(words, names: [pane.title, title ?? ""]) }
+        }
+        if isSearching {
+            var found = false
+            for pane in SettingsPane.allCases {
+                let shown = groups(of: pane).filter { $0.group.rows.contains { !$0.isHidden } }
+                guard !shown.isEmpty else { continue }
+                found = true
+                let heading = Label(pane.title, font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+                heading.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: heading.lineHeight)
+                documentView.addSubview(heading)
+                y = heading.frame.maxY + Tokens.Space.x3
+                for (title, group) in shown { section(title, group) }
+                y += Tokens.Space.x2
+            }
+            if !found {
+                let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+                none.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth, height: none.lineHeight)
+                documentView.addSubview(none)
+                y = none.frame.maxY + Tokens.Space.x6
+            }
+            finishDocument(y, width: width)
+            return
         }
 
         switch pane {
@@ -1008,7 +1127,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             y += Tokens.Space.x8 + Tokens.Space.x3
             shortcutSearch.frame = NSRect(x: pad, y: y, width: contentWidth, height: Tokens.Space.x8)
             shortcutSearch.tint = Brand.Theme.brand.accent
-            documentView.addSubview(shortcutSearch)
+            if shortcutSearch.superview !== documentView { documentView.addSubview(shortcutSearch) }
             y = shortcutSearch.frame.maxY + Tokens.Space.x5
             if shortcutGroups.isEmpty {
                 let none = Label("No shortcuts match “\(shortcutSearch.stringValue)”.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
@@ -1018,7 +1137,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             for (title, group) in shortcutGroups { section(title, group) }
         }
+        finishDocument(y, width: width)
+    }
 
+    private func finishDocument(_ y: CGFloat, width: CGFloat) {
         contentHeight = y
         let height = max(y, scroll.contentSize.height)
         documentView.frame = NSRect(x: 0, y: 0, width: width, height: height)
@@ -1229,7 +1351,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 }
 
 /// One shortcut: what it does, and its keys drawn as small keycaps. Click it to give it new keys.
-final class ShortcutRow: InteractiveView {
+final class ShortcutRow: InteractiveView, SettingsSearchable {
+    var searchText: String { title.stringValue + " shortcut" }
     private let item: NSMenuItem?
     private let title: Label
     private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)

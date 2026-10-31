@@ -389,6 +389,7 @@ enum DebugBridge {
             let f = arg.split(separator: " ").map(String.init)
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1]); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
+        case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
         case "settingsbottom":
             if let root = controller.tabManager.selectedTab?.settingsView,
                let scroll = root.subviews.compactMap({ $0 as? NSScrollView }).first, let document = scroll.documentView {
