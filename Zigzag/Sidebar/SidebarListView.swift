@@ -331,10 +331,11 @@ final class SidebarListView: NSView {
         addSubview(view)
         let layer = view.layer
         layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowRadius = 10
+        layer?.shadowRadius = Tokens.Shadow.carryRadius
         // Its shape given up front, so the shadow costs nothing to draw while it moves.
-        layer?.shadowPath = CGPath(roundedRect: view.bounds, cornerWidth: Tokens.Radius.control, cornerHeight: Tokens.Radius.control, transform: nil)
-        layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? 4 : -4)
+        let radius = Tokens.Sidebar.rowRadius
+        layer?.shadowPath = CGPath(roundedRect: view.bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.carryDrop : -Tokens.Shadow.carryDrop)
         let lift = CAKeyframeAnimation(keyPath: "shadowOpacity")
         lift.values = [0, 0.14, 0.14, 0]
         lift.keyTimes = [0, 0.25, 0.7, 1]
@@ -938,7 +939,7 @@ final class SidebarListView: NSView {
         let picture = CarriedCopy.picture(of: view)
         (view as? SidebarRowView)?.isLifted = false
         let copy = CarriedCopy(of: view, picture: picture, grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
-                               ground: Tokens.Color.panelBackground, radius: Tokens.Radius.row)
+                               ground: Tokens.Color.panelBackground, radius: Tokens.Sidebar.rowRadius)
         drag = DragState(item: item, view: view, copy: copy, together: together, carried: carried, faint: faint,
                          targetSection: nil, targetIndex: 0, originSpace: shownSpaceID ?? manager.currentSpaceID)
         if let start = drag.map({ reorderTarget(pointerY: convert(event.locationInWindow, from: nil).y, dragging: $0) }) {

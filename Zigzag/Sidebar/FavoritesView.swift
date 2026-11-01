@@ -193,9 +193,9 @@ final class FavoritesView: NSView {
         let row = CarriedRow(favorite, icon: tile.iconImage, partner: tile.partner, partnerIcon: tile.partnerIconImage)
         let rowSize = NSSize(width: bounds.width, height: Tokens.Sidebar.rowHeight)
         // As a row it's held just past its icon, as if it had been picked up there.
-        let rowGrab = NSPoint(x: Tokens.Space.x2 + Tokens.Metric.favicon + Tokens.Space.x1, y: rowSize.height / 2)
+        let rowGrab = NSPoint(x: Tokens.Sidebar.rowInset + Tokens.Sidebar.favicon + Tokens.Space.x1, y: rowSize.height / 2)
         let copy = CarriedCopy(of: tile, picture: CarriedCopy.picture(of: tile), grabbedAt: start, ground: Tokens.Color.panelBackground,
-                               radius: Tokens.Radius.tile, alternate: (row, rowSize, rowGrab, Tokens.Radius.row))
+                               radius: Tokens.Sidebar.favoriteRadius, alternate: (row, rowSize, rowGrab, Tokens.Sidebar.rowRadius))
         tile.alphaValue = CarriedCopy.faint
         copy.lift()
         let carried = TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil)
@@ -251,7 +251,7 @@ final class FavoritesView: NSView {
         var all = tiles
         if isDropTarget, tiles.isEmpty { all.append(dropTile) }
         let gap = Tokens.Sidebar.favoriteGap
-        // Up to three columns, every tile one size, a shorter last row from the left. A lone favorite is never
+        // Up to four columns, every tile one size, a shorter last row from the left. A lone favorite is never
         // wider than two would be: half the row, not a long bar around a small icon.
         let columns = max(2, min(Self.maxColumns, all.count))
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
@@ -292,11 +292,11 @@ final class FavoriteTile: InteractiveView {
     var onClose: (() -> Void)?
     /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
     /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
-    private static let closeSide: CGFloat = 16
+    private static let closeSide = Tokens.Sidebar.favoriteClose
     /// From the tile's top and right edges to the button: inside the tile's rounded corner, not on it.
-    private static let closeInset: CGFloat = 5
+    private static let closeInset = Tokens.Sidebar.favoriteCloseInset
     private lazy var closeButton: IconButton = {
-        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: 7, toolTip: "Unload Page")
+        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph, toolTip: "Unload Page")
         button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
         button.radius = Self.closeSide / 2
@@ -319,13 +319,13 @@ final class FavoriteTile: InteractiveView {
         self.bookmark = bookmark
         self.partner = partner
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.tile
+        layer?.cornerRadius = Tokens.Sidebar.favoriteRadius
         layer?.cornerCurve = .continuous
         addSubview(icon)
         partnerIcon.isHidden = partner == nil
         addSubview(partnerIcon)
         dropHalf.wantsLayer = true
-        dropHalf.layer?.cornerRadius = Tokens.Radius.tile - Tokens.Metric.dropInset
+        dropHalf.layer?.cornerRadius = Tokens.Sidebar.favoriteRadius - Tokens.Metric.dropInset
         dropHalf.layer?.cornerCurve = .continuous
         dropHalf.layer?.borderWidth = Tokens.Metric.dropEdge
         dropHalf.isHidden = true
@@ -383,15 +383,15 @@ final class FavoriteTile: InteractiveView {
             // A split: both pages' icons side by side, at a tab's size. In the narrowest tiles they move closer, then
             // shrink, so the two always fit inside it.
             let room = bounds.width - inset * 2
-            let gap = max(2, min(Tokens.Space.x2, room - Tokens.Metric.favicon * 2))
-            let size = min(Tokens.Metric.favicon, floor((room - gap) / 2))
+            let gap = max(2, min(Tokens.Space.x1, room - Tokens.Sidebar.favicon * 2))
+            let size = min(Tokens.Sidebar.favicon, floor((room - gap) / 2))
             let x = (bounds.width - size * 2 - gap) / 2, y = (bounds.height - size) / 2
             icon.frame = NSRect(x: x, y: y, width: size, height: size).integral
             partnerIcon.frame = NSRect(x: x + size + gap, y: y, width: size, height: size).integral
         } else {
             // Every favorite at one size: a site's own 32px icon is drawn up to it with the best filtering, only a
             // 16px one stays at a tab's size rather than blur.
-            let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Tokens.Metric.favicon } == true ? Self.iconSide : Tokens.Metric.favicon
+            let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Sidebar.favicon
             icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         }
         let side = Self.closeSide, edge = Self.closeInset
@@ -401,23 +401,20 @@ final class FavoriteTile: InteractiveView {
     override func stateDidChange(animated: Bool) {
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
-            setLifted(false)
             layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha))
             layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
             layer?.borderWidth = Tokens.Metric.dropEdge
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Soft gray tiles, a step deeper under the pointer and pressed; the one you're on is the same plain card as
-        // the tab you're on.
-        let fill = isSelected ? (isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
-            : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.favoriteHover : Tokens.Color.favoriteFill
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
-        setLifted(isSelected)
-        guard !isSelected else { return }
-        // Its page open in the background: a fine darker edge, to tell at a glance which are loaded.
-        layer?.borderWidth = isOpen ? Tokens.Metric.hairline : 0
-        layer?.borderColor = cgColor(Tokens.Color.openEdge)
+        // Bare at rest: the icon alone. A faint fill while its page is open (so you can tell which are loaded) or
+        // under the pointer; the one you're on takes the selected row's fill. No edge, no shadow.
+        let fill: NSColor? = isSelected ? (isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
+            : isPressed ? Tokens.Color.pressedFill
+            : isOpen ? (isHovered ? Tokens.Color.favoriteOpenHover : Tokens.Color.favoriteOpen)
+            : isHovered ? Tokens.Color.quietHover : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered, duration: Tokens.Motion.selection)
+        Tokens.Motion.withoutAnimation { layer?.borderWidth = 0 }
     }
 
     private static let iconSide = Tokens.Sidebar.favoriteIcon

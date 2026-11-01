@@ -4,15 +4,15 @@ import AppKit
 /// the site, play/pause and mute. Click the title to go there.
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
-    private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    let playButton = IconButton(symbol: "pause.fill", size: .compact, toolTip: "Pause")
-    let muteButton = IconButton(symbol: "speaker.wave.2.fill", size: .compact, toolTip: "Mute")
+    private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+    let playButton = TabRowView.rowButton("pause.fill", toolTip: "Pause")
+    let muteButton = TabRowView.rowButton("speaker.wave.2.fill", toolTip: "Mute")
     private(set) weak var tab: Tab?
     var isPaused = false { didSet { refresh() } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         [icon, title, playButton, muteButton].forEach { addSubview($0) }
         setAccessibilityRole(.group)
@@ -39,19 +39,21 @@ final class NowPlayingView: InteractiveView {
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x2
-        let size = Tokens.Metric.favicon
-        icon.frame = NSRect(x: pad, y: (bounds.height - size) / 2, width: size, height: size)
-        let b = Tokens.Metric.compactIconButton
-        muteButton.frame = NSRect(x: bounds.width - Tokens.Space.x1 - b, y: (bounds.height - b) / 2, width: b, height: b)
-        playButton.frame = NSRect(x: muteButton.frame.minX - b, y: muteButton.frame.minY, width: b, height: b)
-        let x = icon.frame.maxX + Tokens.Space.x2
+        // A sidebar row's proportions: the icon and title where a tab's are, the buttons as a tab's close.
+        let size = Tokens.Sidebar.favicon
+        icon.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - size) / 2, width: size, height: size)
+        let b = Tokens.Sidebar.rowButton
+        let edge = (bounds.height - b) / 2
+        muteButton.frame = NSRect(x: bounds.width - edge - b, y: edge, width: b, height: b)
+        playButton.frame = NSRect(x: muteButton.frame.minX - 2 - b, y: edge, width: b, height: b)
+        let x = icon.frame.maxX + SidebarRowView.titleOffset
         let h = title.lineHeight
         title.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: playButton.frame.minX - x - Tokens.Space.x1, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
+        // An open page's faint fill, as an open favorite's: it's a page that's running.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.favoriteOpenHover : Tokens.Color.favoriteOpen
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
     }
 }

@@ -14,11 +14,14 @@ final class AddressView: InteractiveView {
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
-    static let buttonSide: CGFloat = Tokens.Metric.compactIconButton
-    static let buttonInset: CGFloat = (Tokens.Metric.addressHeight - buttonSide) / 2
-    let captureButton = IconButton(symbol: "video.fill", size: .compact, toolTip: "Camera and Microphone")
+    static let buttonSide: CGFloat = Tokens.Sidebar.addressButton
+    static let buttonInset: CGFloat = (Tokens.Sidebar.addressHeight - buttonSide) / 2
+    static func button(_ symbol: String, toolTip: String) -> IconButton {
+        IconButton(symbol: symbol, size: buttonSide, symbolSize: Tokens.Sidebar.addressGlyph, toolTip: toolTip)
+    }
+    let captureButton = AddressView.button("video.fill", toolTip: "Camera and Microphone")
     /// Shown on articles: opens Reader.
-    let readerButton = IconButton(symbol: "doc.plaintext", size: .compact, toolTip: "Show Reader")
+    let readerButton = AddressView.button("doc.plaintext", toolTip: "Show Reader")
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
@@ -45,7 +48,7 @@ final class AddressView: InteractiveView {
     func setActions(_ items: [ActionButton]) {
         actionButtons.forEach { $0.removeFromSuperview() }
         actionButtons = items.map { item in
-            let button = IconButton(symbol: item.symbol, size: .compact, toolTip: item.label)
+            let button = AddressView.button(item.symbol, toolTip: item.label)
             if let image = item.image { button.image = image }
             button.onClick = { [weak button] _ in if let button { item.action(button) } }
             button.onRightClick = { _ in item.menu() }
@@ -59,12 +62,11 @@ final class AddressView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        // Its buttons sit 4pt in, with 6pt corners: 10 here keeps the two curves running side by side.
-        layer?.cornerRadius = Tokens.Radius.control + AddressView.buttonInset
+        layer?.cornerRadius = Tokens.Sidebar.addressRadius
         layer?.cornerCurve = .continuous
-        // Keyboard focus rings it brightly, as a field.
-        focusRingGlows = true
+        // Keyboard focus: the accent ring, as a field's.
         lock.imageScaling = .scaleNone
+        label.fadesTruncation = true
         lock.contentTintColor = Tokens.Color.textTertiary
         addSubview(lock)
         addSubview(label)
@@ -104,9 +106,9 @@ final class AddressView: InteractiveView {
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
         if label.stringValue.isEmpty { label.stringValue = "Search or enter address" }
+        // In the icon column: a quiet magnifying glass, or the not-secure mark on a plain http page.
         let insecure = url?.scheme == "http"
-        lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
-        lock.isHidden = !insecure
+        lock.image = Tokens.Symbol.image(insecure ? SitePanel.notSecureSymbol : "magnifyingglass", size: Tokens.Sidebar.addressGlyph)
         lock.toolTip = insecure ? SitePanel.notSecure : nil
         setAccessibilityLabel(insecure ? "\(label.stringValue), \(SitePanel.notSecure)" : label.stringValue)
         needsLayout = true
@@ -114,29 +116,29 @@ final class AddressView: InteractiveView {
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x3
-        var x = pad
-        if !lock.isHidden {
-            lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
-            x = lock.frame.maxX + Tokens.Space.x1
-        }
+        // The glyph in the rows' icon column, the host's first letter in their text column.
+        let side16 = Tokens.Sidebar.favicon
+        lock.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - side16) / 2, width: side16, height: side16)
+        let x = SidebarRowView.textX
+        let pad = SidebarRowView.inset
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         var right = bounds.width - inset
         let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
         for button in trailingButtons.reversed() {
             button.frame = NSRect(x: right - side, y: inset, width: side, height: side)
-            button.radius = Tokens.Radius.control
+            // Concentric with the field's corners.
+            button.radius = Tokens.Sidebar.addressRadius - inset
             right = button.frame.minX - 2
         }
         let trailing = trailingButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
         let h = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: trailing - x, height: h)
+        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: trailing - x + Label.inset * 2, height: h)
     }
 
     override func stateDidChange(animated: Bool) {
-        // A quiet fill at rest, a step deeper under the pointer and pressed.
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.addressFill
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        // Bare at rest, a line of quiet text like a row; the rows' faint fill under the pointer.
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.quietHover : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }
 
@@ -149,7 +151,7 @@ final class SpaceDotView: InteractiveView {
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.Symbol.compactGlyph) }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.Sidebar.glyph) }
             stateDidChange(animated: false)
         }
     }
@@ -168,7 +170,7 @@ final class SpaceDotView: InteractiveView {
 
     init(spaceID: UUID) {
         self.spaceID = spaceID
-        super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Metric.iconButton, height: Tokens.Metric.iconButton))
+        super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         iconView.imageScaling = .scaleNone
@@ -189,9 +191,9 @@ final class SpaceDotView: InteractiveView {
     private var wasSelected: Bool?
 
     override func stateDidChange(animated: Bool) {
-        let height = Tokens.Metric.spaceDot
+        let height = Tokens.Sidebar.spaceDot
         let share = swipeShare ?? (isSelected ? 1 : 0)
-        let width = height + (Tokens.Metric.currentSpaceDot - height) * share
+        let width = height + (Tokens.Sidebar.currentSpaceDot - height) * share
         let ink = Tokens.Color.textPrimary
         let resting: CGFloat = isHovered ? 0.5 : 0.28
         let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
@@ -230,14 +232,19 @@ final class SidebarView: NSView {
         didSet { list.delegate = delegate; neighborList.delegate = delegate }
     }
 
-    /// The top row's buttons, level with the traffic lights: regular icon buttons, easy to hit.
-    static let toolbarButton: CGFloat = Tokens.Metric.iconButton
-    let backButton = IconButton(symbol: "chevron.left", toolTip: "Back")
-    let forwardButton = IconButton(symbol: "chevron.right", toolTip: "Forward")
-    let reloadButton = IconButton(symbol: "arrow.clockwise", toolTip: "Reload")
+    /// The top row's and bottom bar's buttons: 26pt, 14pt glyphs, every glyph's ink on the traffic lights' line.
+    static let toolbarButton: CGFloat = Tokens.Sidebar.button
+    static func chromeButton(_ symbol: String, toolTip: String) -> IconButton {
+        let button = IconButton(symbol: symbol, size: toolbarButton, symbolSize: Tokens.Sidebar.glyph, toolTip: toolTip)
+        button.isChrome = true
+        return button
+    }
+    let backButton = SidebarView.chromeButton("chevron.left", toolTip: "Back")
+    let forwardButton = SidebarView.chromeButton("chevron.right", toolTip: "Forward")
+    let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar")
+    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: "Hide Sidebar")
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
@@ -254,11 +261,11 @@ final class SidebarView: NSView {
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
     private let downloadsButton: IconButton = {
-        let button = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
+        let button = SidebarView.chromeButton("arrow.down.circle", toolTip: "Downloads")
         button.glyph = DownloadGlyph.image(.arrow)
         return button
     }()
-    private let newSpaceButton = IconButton(symbol: "plus", toolTip: "New Space")
+    private let newSpaceButton = SidebarView.chromeButton("plus", toolTip: "New Space")
     private var dots: [SpaceDotView] = []
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
     var isPrivate = false {
@@ -277,10 +284,7 @@ final class SidebarView: NSView {
         wantsLayer = true
         layer?.masksToBounds = true
 
-        for button in [sidebarButton, backButton, forwardButton, reloadButton] {
-            button.isChrome = true
-            addSubview(button)
-        }
+        for button in [sidebarButton, backButton, forwardButton, reloadButton] { addSubview(button) }
         trafficLightsPicture.imageScaling = .scaleNone
         trafficLightsPicture.isHidden = true
         addSubview(trafficLightsPicture)
@@ -318,8 +322,6 @@ final class SidebarView: NSView {
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
 
-        downloadsButton.isChrome = true
-        newSpaceButton.isChrome = true
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
@@ -361,18 +363,21 @@ final class SidebarView: NSView {
     // MARK: Layout
 
     /// Where the traffic lights start, from the sidebar's left edge.
-    static let trafficLightsX = Tokens.Metric.sidebarPadding + Tokens.Space.x2
+    static let trafficLightsX = Tokens.Sidebar.lightsX
 
     /// The y position (from the top) where the traffic lights should be centered.
-    var trafficLightCenterY: CGFloat { Tokens.Metric.topRowHeight / 2 + Tokens.Space.x1 }
+    var trafficLightCenterY: CGFloat { Tokens.Sidebar.lightsCenter }
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Metric.sidebarPadding
+        let pad = Tokens.Sidebar.edge
         let width = bounds.width
         let rowCenter = trafficLightCenterY
         let button = Self.toolbarButton
-        var x = width - pad - button + 2
+        // Back, forward and reload at the trailing end, their glyphs a button apart, reload's ink as far from the
+        // sidebar's edge as the lights' from the other.
+        let reloadInk = Tokens.Symbol.inkSize("arrow.clockwise", size: Tokens.Sidebar.glyph).width
+        var x = round(width - Self.trafficLightsX - reloadInk / 2 - button / 2)
         for b in [reloadButton, forwardButton, backButton] {
             b.frame = NSRect(x: x, y: rowCenter - button / 2, width: button, height: button)
             x -= button
@@ -380,21 +385,20 @@ final class SidebarView: NSView {
         // The sidebar toggle sits right after the traffic lights, where Arc and Safari put it.
         // Without traffic lights (full screen) the sidebar button starts the row.
         // Its glyph sits `Sidebar.lightsGap` after the lights (the button's own padding inside that), on their line.
-        let glyphWidth = Tokens.Symbol.inkSize(sidebarButton.symbol, size: Tokens.Symbol.glyph).width
+        let glyphWidth = Tokens.Symbol.inkSize(sidebarButton.symbol, size: Tokens.Sidebar.glyph).width
         let lead = trafficLightsWidth > 0
             ? round(Self.trafficLightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (button - glyphWidth) / 2) : pad
         sidebarButton.frame = NSRect(x: lead, y: rowCenter - button / 2, width: button, height: button)
-        let topRowBottom = Tokens.Metric.topRowHeight + Tokens.Space.x2
-        address.frame = NSRect(x: pad, y: topRowBottom, width: width - pad * 2, height: Tokens.Metric.addressHeight)
+        address.frame = NSRect(x: pad, y: Tokens.Sidebar.addressTop, width: width - pad * 2, height: Tokens.Sidebar.addressHeight)
 
-        let bottomHeight = Tokens.Metric.bottomBarHeight
+        let bottomHeight = Tokens.Sidebar.bottomBarHeight
         // Its buttons sit as far from the bottom edge as from the side.
-        let buttonInset = (bottomHeight - Tokens.Metric.iconButton) / 2
+        let buttonInset = (bottomHeight - Tokens.Sidebar.button) / 2
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
         let favoritesHeight = favorites.preferredHeight
         favorites.isHidden = favoritesHeight == 0
-        favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x3, width: width - pad * 2, height: favoritesHeight)
-        let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : address.frame.maxY) + Tokens.Metric.sectionGap
+        favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: favoritesHeight)
+        let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : address.frame.maxY) + Tokens.Sidebar.sectionGap
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
         let listBottom = frames.listBottom
@@ -433,13 +437,14 @@ final class SidebarView: NSView {
     }
 
     private func layoutBottomBar() {
-        let pad = Tokens.Metric.sidebarPadding
-        let button = Tokens.Metric.iconButton
+        let button = Tokens.Sidebar.button
+        // Downloads' glyph centered on the icon column, + mirrored at the other end.
+        let pad = round(Tokens.Sidebar.iconColumn + Tokens.Sidebar.favicon / 2 - button / 2)
         let h = bottomBar.bounds.height
         downloadsButton.frame = NSRect(x: pad, y: (h - button) / 2, width: button, height: button)
         newSpaceButton.frame = NSRect(x: bottomBar.bounds.width - pad - button, y: (h - button) / 2, width: button, height: button)
         let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
-        let dotSize = min(Tokens.Metric.iconButton, floor(available / CGFloat(max(dots.count, 1))))
+        let dotSize = min(Tokens.Sidebar.button, floor(available / CGFloat(max(dots.count, 1))))
         let total = CGFloat(dots.count) * dotSize
         var x = downloadsButton.frame.maxX + Tokens.Space.x1 + (available - total) / 2
         for dot in dots {
@@ -523,9 +528,9 @@ final class SidebarView: NSView {
 
     /// The bottom stack: the now-playing control sits above the dots.
     private func bottomFrames() -> (nowPlaying: NSRect, listBottom: CGFloat) {
-        let pad = Tokens.Metric.sidebarPadding
+        let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
-        let playingHeight = Tokens.Space.x10
+        let playingHeight = Tokens.Sidebar.nowPlayingHeight
         let playing = NSRect(x: pad, y: bottom - (nowPlaying.isHidden ? 0 : playingHeight), width: bounds.width - pad * 2, height: playingHeight)
         if !nowPlaying.isHidden { bottom = playing.minY - Tokens.Space.x1 }
         return (playing, bottom)
@@ -692,7 +697,7 @@ final class SidebarView: NSView {
     /// Slides the old list out and the new one in, in the direction of travel.
     /// If a swipe is in progress, the new list continues from where the fingers left it.
     func transitionList(direction: CGFloat, from snapshot: NSImage?) {
-        let fromSwipe = scrollView.frame.minX - Tokens.Metric.sidebarPadding
+        let fromSwipe = scrollView.frame.minX - Tokens.Sidebar.edge
         // Let go of a swipe past the line: the spring carries on at the fingers' speed. Any other switch (a click
         // on a dot, ⌃2) ends a swipe in progress, and the new list simply slides in from where the old one was.
         let landing = landingVelocity
@@ -703,7 +708,7 @@ final class SidebarView: NSView {
         neighborScroll.isHidden = true
         clearSwipeDots()
         var finalFrame = scrollView.frame
-        finalFrame.origin.x = Tokens.Metric.sidebarPadding
+        finalFrame.origin.x = Tokens.Sidebar.edge
         // Space switches slide even from the keyboard (⌃1, ⌃2…): the motion tells you which way you went.
         let animate = snapshot != nil && direction != 0 && !Tokens.Motion.reduceMotion
         Tokens.Motion.withoutAnimation { scrollView.frame = finalFrame }
@@ -927,7 +932,7 @@ final class SidebarView: NSView {
         guard !Tokens.Motion.reduceMotion else { return }
         swipeOffset = swipeTarget
         Tokens.Motion.withoutAnimation {
-            scrollView.frame.origin.x = Tokens.Metric.sidebarPadding + swipeOffset
+            scrollView.frame.origin.x = Tokens.Sidebar.edge + swipeOffset
             showNeighbor()
         }
         // The dots follow too: the pill shrinks on this space and grows on the one coming in.
@@ -1004,7 +1009,7 @@ final class SidebarView: NSView {
         clearSwipeDots()
         guard offset != 0 else { neighborScroll.isHidden = true; return }
         Tokens.Motion.withoutAnimation {
-            scrollView.frame.origin.x = Tokens.Metric.sidebarPadding
+            scrollView.frame.origin.x = Tokens.Sidebar.edge
             placeNeighbor()
         }
         let curve = Tokens.Motion.swipeSettle
@@ -1133,10 +1138,10 @@ final class BadgeView: NSView {
 /// arrow or (for a moment, when downloads finish) a check in it.
 enum DownloadGlyph {
     enum Mark { case arrow, check }
-    /// Drawn to the size of the bottom bar's other symbols (`Symbol.glyph`): the circle's diameter through the middle
+    /// Drawn to the size of the bottom bar's other symbols (`Sidebar.glyph`): the circle's diameter through the middle
     /// of its line, and the line, as SF's arrow.down.circle has them.
-    static let circle: CGFloat = (Tokens.Symbol.glyph * 1.046 * 10).rounded() / 10
-    static let line: CGFloat = 1.6
+    static let circle: CGFloat = (Tokens.Sidebar.glyph * 1.046 * 10).rounded() / 10
+    static let line: CGFloat = 1.3
     /// The arrow and the check were drawn for a 13.6pt circle; they grow with it.
     private static let k = circle / 13.6
 

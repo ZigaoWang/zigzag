@@ -4,8 +4,6 @@ import AppKit
 class SidebarRowView: InteractiveView {
     let icon = FaviconView()
     let title = Label()
-    /// Soft color from the site's own theme.
-    var siteTint: NSColor? { didSet { stateDidChange(animated: false) } }
     /// 1 = just looked at, down to the faded floor for tabs left alone a long time.
     var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
@@ -15,9 +13,10 @@ class SidebarRowView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         title.font = Tokens.Font.sidebarRow()
+        title.fadesTruncation = true
         addSubview(icon)
         addSubview(title)
         setAccessibilityRole(.button)
@@ -28,17 +27,23 @@ class SidebarRowView: InteractiveView {
     /// Space reserved at the trailing edge for accessory buttons.
     var trailingAccessoryWidth: CGFloat { 0 }
 
-    /// From the row's edge to its icon, and from the icon to the title, as every row has it.
-    static let inset = CardRow.inset
+    /// From the row's edge to its icon.
+    static let inset = Tokens.Sidebar.rowInset
+    /// Where a title's text frame starts after an icon frame ends: the icon gap, less the label's own padding, so the
+    /// first letter sits exactly `Sidebar.iconGap` from the icon.
+    static let titleOffset = Tokens.Sidebar.iconGap - Label.inset
+    /// Where every title's first letter sits in a row: the text column.
+    static var textX: CGFloat { inset + Tokens.Sidebar.favicon + Tokens.Sidebar.iconGap }
+    /// A row's own buttons sit this far in from its trailing edge, as far as from its top and bottom.
+    static var buttonEdge: CGFloat { (Tokens.Sidebar.rowHeight - Tokens.Sidebar.rowButton) / 2 }
 
     override func layout() {
         super.layout()
-        let pad = Self.inset
-        let iconSize = Tokens.Metric.favicon
-        icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
-        let titleX = icon.frame.maxX + Self.inset
+        let iconSize = Tokens.Sidebar.favicon
+        icon.frame = NSRect(x: Self.inset, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
+        let titleX = icon.frame.maxX + Self.titleOffset
         let titleHeight = ceil(title.intrinsicContentSize.height)
-        let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : pad
+        let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
         title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
     }
 
@@ -51,32 +56,15 @@ class SidebarRowView: InteractiveView {
         } else if isPressed {
             base = Tokens.Color.pressedFill
         } else if isHovered {
-            base = Tokens.Color.hoverFill
+            base = Tokens.Color.quietHover
         } else {
             base = nil
         }
-        var fill = base.map { cgColor($0) }
-        // The site's color shows only on the tab you're on.
-        if let siteTint, isSelected || isLifted {
-            fill = cgColor(SidebarRowView.tinted(selectedFill: base ?? Tokens.Color.selectedFill, with: siteTint, appearance: effectiveAppearance))
-        }
-        layer?.set(backgroundColor: fill, animated: animated && !isHovered)
-        // The tab you're on is a plain card: a hairline edge and a barely-there shadow under it.
-        setLifted(isSelected || isLifted)
+        layer?.set(backgroundColor: base.map { cgColor($0) }, animated: animated && !isHovered)
+        // The tab you're on is the faint fill alone, no edge or shadow; only a row picked up to carry stands off the
+        // list.
+        setLifted(isLifted)
         applyFreshness()
-    }
-
-    /// Selected rows take on a whisper of the site's color, the way the page itself would look.
-    static func tinted(selectedFill: NSColor, with tint: NSColor, appearance: NSAppearance) -> NSColor {
-        var result = selectedFill
-        appearance.performAsCurrentDrawingAppearance {
-            let fill = selectedFill.usingColorSpace(.sRGB) ?? selectedFill
-            let site = tint.usingColorSpace(.sRGB) ?? tint
-            let amount: CGFloat = appearance.isDark ? 0.16 : 0.12
-            let blended = (fill.withAlphaComponent(1).blended(withFraction: amount, of: site) ?? fill)
-            result = blended.withAlphaComponent(appearance.isDark ? max(fill.alphaComponent, 0.16) : fill.alphaComponent)
-        }
-        return result
     }
 
     /// While the pointer is on Clear, the rows it would close sink back, so you see what goes before you click.
@@ -98,8 +86,17 @@ class SidebarRowView: InteractiveView {
 final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
-    let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Close Tab")
-    let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: .compact, toolTip: "Mute Tab")
+    let closeButton = TabRowView.rowButton("xmark", toolTip: "Close Tab")
+    /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
+    /// the partner's half. Clicking one mutes or unmutes that page.
+    let audioButton = TabRowView.rowButton("speaker.wave.2.fill", toolTip: "Mute Tab")
+    let partnerAudioButton = TabRowView.rowButton("speaker.wave.2.fill", toolTip: "Mute Tab")
+
+    static func rowButton(_ symbol: String, toolTip: String) -> IconButton {
+        let button = IconButton(symbol: symbol, size: Tokens.Sidebar.rowButton, symbolSize: Tokens.Sidebar.rowGlyph, toolTip: toolTip)
+        button.radius = Tokens.Radius.small + 1
+        return button
+    }
     var onClose: (() -> Void)?
     /// Bookmarks keep their own title; only the icon and state follow the page.
     var fixedTitle: String? { didSet { refresh() } }
@@ -140,7 +137,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var pinName: String? { didSet { pinLabel.stringValue = pinName ?? ""; needsLayout = true } }
     private lazy var pinLabel: Label = {
         let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
-        label.lineBreakMode = .byTruncatingTail
+        label.fadesTruncation = true
         addSubview(label)
         return label
     }()
@@ -181,7 +178,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
-    private let partnerTitle = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+    private let partnerTitle: Label = {
+        let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
+        label.fadesTruncation = true
+        return label
+    }()
     private let divider = ColorView(color: Tokens.Color.separator)
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
@@ -212,8 +213,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             tab.setMuted(!tab.isMuted)
         }
         audioButton.isHidden = true
+        partnerAudioButton.onClick = { [weak self] _ in
+            guard let partner = self?.partner else { return }
+            partner.setMuted(!partner.isMuted)
+        }
+        partnerAudioButton.isHidden = true
         dropHalf.wantsLayer = true
-        dropHalf.layer?.cornerRadius = Tokens.Radius.row - 2
+        dropHalf.layer?.cornerRadius = Tokens.Sidebar.rowRadius - Tokens.Metric.dropInset
         dropHalf.layer?.cornerCurve = .continuous
         dropHalf.layer?.borderWidth = Tokens.Metric.dropEdge
         dropHalf.alphaValue = 0
@@ -223,6 +229,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         divider.isHidden = true
         [partnerIcon, partnerTitle, divider].forEach { addSubview($0) }
         addSubview(audioButton)
+        addSubview(partnerAudioButton)
         addSubview(closeButton)
     }
 
@@ -230,7 +237,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard partner !== self.partner else { return }
         self.partner = partner
         partnerToken = partner?.changed.observe { [weak self] change in
-            if change == .title || change == .favicon || change == .loading || change == .url { self?.refreshPartner() }
+            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio { self?.refreshPartner() }
         }
         [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
@@ -246,6 +253,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
         partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
+        partnerAudioButton.symbol = partner?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        partnerAudioButton.toolTip = partner?.isMuted == true ? "Unmute Tab" : "Mute Tab"
+        refreshAccessories()
         refreshAccessibilityLabel()
         refreshTitleColor()
         needsLayout = true
@@ -254,8 +264,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
         setAccessibilityLabel(!isSplit ? title.stringValue : "\(title.stringValue), split with \(partnerTitle.stringValue)")
-        // What VoiceOver says after the name: the tab you're on, and whether it's playing or muted.
-        let state = [isSelected ? "current tab" : nil, tab?.isMuted == true ? "muted" : tab?.isPlayingAudio == true ? "playing audio" : nil]
+        // What VoiceOver says after the name: the tab you're on, and whether either page is playing or muted.
+        func sound(_ tab: Tab?, _ name: String?) -> String? {
+            let state = tab?.isMuted == true ? "muted" : tab?.isPlayingAudio == true ? "playing audio" : nil
+            return state.map { state in name.map { "\($0) \(state)" } ?? state }
+        }
+        let split = partner != nil
+        let state = [isSelected ? "current tab" : nil, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             .compactMap { $0 }.joined(separator: ", ")
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
@@ -284,10 +299,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     var showsAudio: Bool { tab?.isPlayingAudio == true || tab?.isMuted == true }
+    var partnerShowsAudio: Bool { partner?.isPlayingAudio == true || partner?.isMuted == true }
+
+    /// The gap between two of a row's buttons side by side.
+    private static let buttonGap: CGFloat = 2
+
+    private var showsClose: Bool { !closeButton.isHidden }
 
     override var trailingAccessoryWidth: CGFloat {
-        let close = (isHovered || isSelected) && !isLifted ? closeButton.frame.width : 0
-        let audio = showsAudio ? audioButton.frame.width + (close > 0 ? Tokens.Space.x1 : 0) : 0
+        let close = showsClose ? closeButton.frame.width : 0
+        // In a split each half's speaker sits at that half's end (laid out with the halves).
+        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close > 0 ? Self.buttonGap : 0) : 0
         return close + audio
     }
 
@@ -297,7 +319,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
         audioButton.symbol = tab?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
         audioButton.toolTip = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
-        siteTint = tab.flatMap { SiteTint.color(for: $0) }
         refreshAccessibilityLabel()
         refreshTitleColor()
         refreshAccessories()
@@ -319,6 +340,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         closeButton.isHidden = !showClose
         closeButton.toolTip = isAway ? "Back to Pinned Page" : isBookmark ? "Unload Page" : "Close Tab"
         audioButton.isHidden = !showsAudio || renameField != nil
+        partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         needsLayout = true
     }
 
@@ -326,7 +348,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard let field = renameField else { return }
         let x = title.frame.minX
         let height = ceil(field.intrinsicContentSize.height)
-        field.frame = NSRect(x: x, y: (bounds.height - height) / 2, width: max(0, bounds.width - x - Tokens.Space.x2), height: height)
+        field.frame = NSRect(x: x, y: (bounds.height - height) / 2, width: max(0, bounds.width - x - Self.inset), height: height)
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
@@ -346,6 +368,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func layout() {
         super.layout()
+        layoutButtonsAndHalves()
         if isAway {
             // The pin's own name, then the mark, then the page it's on now. The name takes what it needs up to
             // two fifths of the room, so the page's own title always shows too.
@@ -358,7 +381,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame.origin.x += shift
             title.frame.size.width = max(0, title.frame.width - shift)
             let x = title.frame.minX
-            let h: CGFloat = 12
+            let h: CGFloat = 11
             Tokens.Motion.withoutAnimation {
                 awayMark.frame = CGRect(x: x, y: (bounds.height - h) / 2, width: 6, height: h)
                 let path = CGMutablePath()
@@ -371,30 +394,44 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame.size.width = max(0, title.frame.width - 6 - Tokens.Space.x1)
         }
         layoutRenameField()
+    }
+
+    private func layoutButtonsAndHalves() {
         let size = closeButton.frame.size
+        let edge = Self.buttonEdge
         let y = (bounds.height - size.height) / 2
-        var x = bounds.width - Tokens.Space.x1 - size.width
-        closeButton.frame.origin = NSPoint(x: x, y: y)
-        if !closeButton.isHidden { x -= size.width + Tokens.Space.x1 }
-        audioButton.frame.origin = NSPoint(x: x, y: y)
+        closeButton.frame.origin = NSPoint(x: bounds.width - edge - size.width, y: y)
+        let end = showsClose ? closeButton.frame.minX - Self.buttonGap : bounds.width - edge
         layoutDropHalf()
 
-        // A split shows both pages in one row: left half, a hairline, right half.
-        guard isSplit else { return }
+        guard isSplit else {
+            audioButton.frame.origin = NSPoint(x: end - size.width, y: y)
+            return
+        }
+        // A split shows both pages in one row: two halves with a hairline between, each with its icon, its title
+        // and, while that page plays or is muted, its own speaker at the half's end. The row's close is at its end.
         let mid = bounds.midX
-        title.frame.size.width = max(0, mid - Tokens.Space.x1 - title.frame.minX)
         divider.frame = NSRect(x: mid, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
-        partnerIcon.frame = icon.frame.offsetBy(dx: mid, dy: 0)
-        let titleX = partnerIcon.frame.maxX + Self.inset
-        let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : Self.inset
-        partnerTitle.frame = NSRect(x: titleX, y: title.frame.minY, width: max(0, bounds.width - titleX - trailing), height: title.frame.height)
-        guard partnerLeads else { return }
-        // Same two halves, the pages trading places.
-        let ownIcon = icon.frame, ownTitle = title.frame
-        icon.frame.origin.x = partnerIcon.frame.minX
-        title.frame = NSRect(x: titleX, y: ownTitle.minY, width: partnerTitle.frame.width, height: ownTitle.height)
-        partnerIcon.frame = ownIcon
-        partnerTitle.frame = NSRect(x: ownTitle.minX, y: partnerTitle.frame.minY, width: ownTitle.width, height: partnerTitle.frame.height)
+        let iconY = icon.frame.minY, side = icon.frame.width
+        let titleY = title.frame.minY, titleH = title.frame.height
+        func place(icon: NSView, title: NSView, audio: IconButton, from start: CGFloat, to stop: CGFloat) {
+            icon.frame = NSRect(x: start + Self.inset, y: iconY, width: side, height: side)
+            var textEnd = stop
+            if !audio.isHidden {
+                audio.frame.origin = NSPoint(x: stop - size.width, y: y)
+                textEnd = audio.frame.minX - Self.buttonGap
+            }
+            let x = icon.frame.maxX + Self.titleOffset
+            title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd + Label.inset - x), height: titleH)
+        }
+        let leadEnd = mid - edge, trailEnd = showsClose ? end : bounds.width - edge
+        if partnerLeads {
+            place(icon: partnerIcon, title: partnerTitle, audio: partnerAudioButton, from: 0, to: leadEnd)
+            place(icon: icon, title: title, audio: audioButton, from: mid, to: trailEnd)
+        } else {
+            place(icon: icon, title: title, audio: audioButton, from: 0, to: leadEnd)
+            place(icon: partnerIcon, title: partnerTitle, audio: partnerAudioButton, from: mid, to: trailEnd)
+        }
     }
 }
 
@@ -451,7 +488,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     func configure(name: String, open: Bool, count: Int, icon: String? = nil) {
         title.stringValue = name
-        folderIcon.image = IconChoice.folder(icon, open: open, size: Tokens.Metric.favicon)
+        folderIcon.image = IconChoice.folder(icon, open: open, size: Tokens.Sidebar.favicon)
         isOpen = open
         setAccessibilityLabel("\(name), folder, \(count) pinned")
         setAccessibilityValue(open ? 1 : 0)
@@ -485,7 +522,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
         if let field = renameField {
             let height = ceil(field.intrinsicContentSize.height)
-            field.frame = NSRect(x: title.frame.minX, y: (bounds.height - height) / 2, width: max(0, bounds.width - title.frame.minX - Tokens.Space.x2), height: height)
+            field.frame = NSRect(x: title.frame.minX, y: (bounds.height - height) / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
         }
     }
 
@@ -575,12 +612,11 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        // In line with the rows' icons and titles below it.
-        var x = SidebarRowView.inset - Label.inset
+        // In the rows' text column, its icon (if any) in their icon column.
+        let x = SidebarRowView.textX - Label.inset
         if icon != nil {
-            let side = Tokens.Metric.favicon
+            let side = Tokens.Sidebar.favicon
             iconView.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - side) / 2, width: side, height: side)
-            x = iconView.frame.maxX + Tokens.Space.x1
         }
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
@@ -662,7 +698,7 @@ final class SeparatorRowView: NSView {
         // The label sits low, nearer the tabs it names than the pinned tabs above.
         let h = label.lineHeight
         let mid = bounds.height - Tokens.Space.x3
-        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: floor(mid - h / 2), width: label.inkWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: SidebarRowView.textX - Label.inset, y: floor(mid - h / 2), width: label.inkWidth + Label.inset * 2, height: h)
         let cw = clearButton.fittingWidth, ch: CGFloat = 20
         clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()
