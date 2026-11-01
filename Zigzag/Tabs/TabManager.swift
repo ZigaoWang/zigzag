@@ -252,7 +252,7 @@ final class TabManager {
 
     /// Turns a tab into a favorite at a position. Its page stays open behind the tile.
     func favoriteTab(_ tab: Tab, at index: Int? = nil) {
-        guard let url = tab.url else { return }
+        guard let url = address(of: tab) else { return }
         // Half of a split brings the other half: the two become one favorite, side by side.
         if let pair = split(for: tab), let other = partner(of: tab), favoriteSplit(pair, at: index) { return }
         if let bookmarkID = tab.bookmarkID {
@@ -269,6 +269,9 @@ final class TabManager {
         Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id)
     }
 
+    /// Where a page is, or, for a pinned page not loaded yet, where it's pinned to.
+    private func address(of tab: Tab) -> URL? { tab.url ?? tab.bookmarkID.flatMap { Library.shared.bookmark($0)?.url } }
+
     /// A bookmark's page, made (not yet shown) if it isn't open.
     func pageTab(for bookmark: Bookmark) -> Tab { liveTab(for: bookmark) }
 
@@ -276,7 +279,9 @@ final class TabManager {
     /// was, and open together.
     @discardableResult
     func joinFavorite(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) -> Bool {
-        guard let url = tab.url, let favorite = Library.shared.bookmark(favoriteID), Library.shared.isFavorite(favoriteID),
+        // A pinned page that isn't loaded has no address of its own yet: its pinned one stands in.
+        guard let url = address(of: tab),
+              let favorite = Library.shared.bookmark(favoriteID), Library.shared.isFavorite(favoriteID),
               Library.shared.pinnedSplit(containing: favoriteID) == nil, tab.bookmarkID != favoriteID else { return false }
         unsplit(tab, notify: false)
         let mark: Bookmark
@@ -311,7 +316,7 @@ final class TabManager {
     private func favoriteSplit(_ pair: SplitPair, at index: Int?) -> Bool {
         guard let left = tab(with: pair.left) ?? bookmarkTabs.values.first(where: { $0.id == pair.left }),
               let right = tab(with: pair.right) ?? bookmarkTabs.values.first(where: { $0.id == pair.right }),
-              left.url != nil, right.url != nil else { return false }
+              address(of: left) != nil, address(of: right) != nil else { return false }
         // Already a pinned split: it moves up as it is.
         if let l = left.bookmarkID, let r = right.bookmarkID, Library.shared.pinnedSplit(containing: l)?.contains(r) == true {
             if !Library.shared.isFavorite(l) { Library.shared.makeFavorite(l) }
@@ -322,7 +327,7 @@ final class TabManager {
         }
         var marks: [Bookmark] = []
         for half in [left, right] {
-            let url = half.url!
+            let url = address(of: half)!
             if let id = half.bookmarkID, let mark = Library.shared.detachBookmark(id) ?? Library.shared.bookmark(id) {
                 marks.append(mark)
             } else {
