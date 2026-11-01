@@ -366,9 +366,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func refreshTitleColor() {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
-        title.textColor = Tokens.Color.textPrimary
+        let ink = Brand.Theme.for(self).rowInk
+        title.textColor = ink
         // One weight always: selection shows in the fill, never by text getting wider and shifting.
-        partnerTitle.textColor = Tokens.Color.textPrimary
+        partnerTitle.textColor = ink
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
     }
@@ -480,13 +481,22 @@ final class NewTabRowView: SidebarRowView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         title.stringValue = "new tab"
-        title.textColor = Tokens.Color.textSecondary
         icon.isHidden = true
         plus.image = LineGlyph.plus
-        plus.contentTintColor = Tokens.Color.textSecondary
         plus.imageScaling = .scaleNone
         addSubview(plus)
         setAccessibilityLabel("New Tab")
+    }
+
+    override func stateDidChange(animated: Bool) {
+        super.stateDidChange(animated: animated)
+        title.textColor = Brand.Theme.for(self).quietInk
+        plus.contentTintColor = title.textColor
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        stateDidChange(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -615,6 +625,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
+    /// After the space's color changes: the name takes its new ink.
+    func refreshInk() { stateDidChange(animated: false) }
     /// The space's name, set large, light and lowercase, a little tight, in the space's own ink.
     var name = "" {
         didSet {
@@ -709,6 +721,8 @@ final class SpaceHeaderView: InteractiveView {
 final class SeparatorRowView: NSView {
     private let label = Label("tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
+    /// The label in the space's quiet ink.
+    func refreshInk() { label.textColor = Brand.Theme.for(self).quietInk }
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
     /// Shown under the pointer, or while Tab has brought keyboard focus to it.

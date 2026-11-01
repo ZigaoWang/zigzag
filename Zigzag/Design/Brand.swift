@@ -89,6 +89,24 @@ enum Brand {
 
         /// The hue a floating panel's surface leans toward: the space's own, nil for white, grays and black.
         var surfaceHue: Double? = nil
+        /// Whether row titles and labels take the space's ink: only on frames whose lightness is known to keep it past
+        /// AA (curated and soft custom colors, solid); elsewhere they keep the plain text colors.
+        var tintsInk = false
+
+        /// A row's title on the frame: a deep ink of the space's hue by day, a pale one at night. Checked against
+        /// every curated color, under the hover and card washes too: 11.7:1 by day, 7.5:1 at night at the least.
+        var rowInk: NSColor {
+            guard tintsInk, let h = surfaceHue else { return Tokens.Color.textPrimary }
+            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: 0.27, chroma: 0.035),
+                                        dark: SpaceColor.tone(hue: h, lightness: 0.94, chroma: 0.015))
+        }
+
+        /// A quiet word on the frame ("tabs", "new tab", "clear"): 5.2:1 by day, 4.8:1 at night at the least.
+        var quietInk: NSColor {
+            guard tintsInk, let h = surfaceHue else { return Tokens.Color.textSecondary }
+            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: 0.47, chroma: 0.04),
+                                        dark: SpaceColor.tone(hue: h, lightness: 0.8, chroma: 0.025))
+        }
 
         /// A floating panel's surface (the command bar, menus, find, downloads, Peek): nearly white by day and a deep
         /// gray at night, each leaning just perceptibly toward the space, so a panel belongs to the window it's in
@@ -123,6 +141,9 @@ enum Brand {
             var theme = Theme.navy
             if let hue = space.hue { theme = Theme(hue: hue) } else if !(space.color.isNeutral || space.color == .sky) { theme = Theme(hue: space.color.hue) }
             theme.surfaceHue = space.baseHue
+            // Soft at either end of the scale (or following the Mac), the frame is light or deep enough for the inks.
+            let depths = [space.brightness, space.hue2 == nil ? nil : space.brightness2 ?? space.brightness].compactMap { $0 }
+            theme.tintsInk = !space.isSeeThrough && (depths.isEmpty || depths.allSatisfy { $0 <= 0.15 } || depths.allSatisfy { $0 >= 0.85 })
             return theme
         }
 

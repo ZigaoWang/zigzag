@@ -582,6 +582,7 @@ final class SidebarListView: NSView {
             (view as? SpaceHeaderView)?.canCollapse = !Library.shared.bookmarks(in: spaceID).isEmpty
             (view as? SpaceHeaderView)?.isCollapsed = Self.isCollapsed(spaceID)
             (view as? SpaceHeaderView)?.name = privateLabel ? "private" : spaceName
+            (view as? SpaceHeaderView)?.refreshInk()
             (view as? SpaceHeaderView)?.icon = privateLabel ? nil : Library.shared.space(spaceID)?.icon
             view.needsLayout = true
 
@@ -591,6 +592,7 @@ final class SidebarListView: NSView {
             let (closing, faded) = manager.tabsToClear(in: space)
             // Clear is there only when it has something to close, and says which: the old tabs, or all the others.
             (view as? SeparatorRowView)?.hasTabs = !closing.isEmpty
+            (view as? SeparatorRowView)?.refreshInk()
             (view as? SeparatorRowView)?.clearButton.step = faded ? .old(closing.count) : .others(closing.count)
 
         case .tab(let id):
