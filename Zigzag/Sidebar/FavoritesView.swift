@@ -149,8 +149,19 @@ final class FavoritesView: NSView {
     /// One tile per favorite; a split favorite's two pages share one, each half opening its own page.
     func reload(favorites: [(Bookmark, partner: Bookmark?)], openIDs: Set<UUID>, selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
         if tiles.map({ [$0.bookmark?.id, $0.partner?.id] }) != favorites.map({ [$0.0.id, $0.partner?.id] }) {
-            tiles.forEach { $0.removeFromSuperview() }
+            // The tiles that stay are the same tiles, gliding to their new places; a new one fades in where it lands
+            // and one that's gone fades out where it was.
+            let animated = window != nil && !tiles.isEmpty && !Tokens.Motion.isFromKey
+            var kept: [[UUID?]: FavoriteTile] = [:]
+            for tile in tiles { kept[[tile.bookmark?.id, tile.partner?.id]] = tile }
+            let wanted = Set(favorites.map { [$0.0.id, $0.partner?.id] as [UUID?] })
+            for (key, tile) in kept where !wanted.contains(key) {
+                kept[key] = nil
+                guard animated else { tile.removeFromSuperview(); continue }
+                Tokens.Motion.animate(Tokens.Motion.feedback, { tile.animator().alphaValue = 0 }, completion: { tile.removeFromSuperview() })
+            }
             tiles = favorites.map { favorite, partner in
+                if let tile = kept[[favorite.id, partner?.id]] { return tile }
                 let tile = FavoriteTile(bookmark: favorite, partner: partner)
                 tile.onClick = { [weak self, weak tile] event in
                     guard let self, let tile else { return }
@@ -166,9 +177,13 @@ final class FavoritesView: NSView {
                     return true
                 }
                 addSubview(tile)
+                if animated {
+                    tile.alphaValue = 0
+                    DispatchQueue.main.async { Tokens.Motion.animate(Tokens.Motion.feedback) { tile.animator().alphaValue = 1 } }
+                }
                 return tile
             }
-            needsLayout = true
+            relayout(gliding: animated)
         }
         for tile in tiles {
             guard let id = tile.bookmark?.id else { continue }
