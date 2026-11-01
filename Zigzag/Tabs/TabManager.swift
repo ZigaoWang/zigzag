@@ -628,6 +628,10 @@ final class TabManager {
     // MARK: Closing
 
     func close(_ tab: Tab) {
+        // Opened from half of a split, it took that pane: the page it came from goes back in, as Back does.
+        if selectedTab === tab, let opener = tab.opener, !opener.isClosed, self.tab(with: opener.id) === opener {
+            returnPane(of: tab, to: opener)
+        }
         let partnerTab = partner(of: tab)
         let pair = split(for: tab)
         splits.removeAll { $0.left == tab.id || $0.right == tab.id }
