@@ -659,39 +659,6 @@ enum SiteTint {
     }
 }
 
-/// A dashed outline that invites a drop.
-final class DropZoneView: NSView {
-    private let label: Label
-    private let border = CAShapeLayer()
-
-    init(text: String) {
-        label = Label(text, font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
-        label.alignment = .center
-        super.init(frame: .zero)
-        wantsLayer = true
-        border.fillColor = nil
-        border.lineWidth = Tokens.Metric.hairline
-        border.lineDashPattern = [3, 3]
-        layer?.addSublayer(border)
-        addSubview(label)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    override func layout() {
-        super.layout()
-        Tokens.Motion.withoutAnimation {
-            border.frame = bounds
-            border.path = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), cornerWidth: Tokens.Radius.row, cornerHeight: Tokens.Radius.row, transform: nil)
-            border.strokeColor = cgColor(Tokens.Color.textTertiary)
-        }
-        let h = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: bounds.width, height: h)
-    }
-}
-
 /// Where a dragged tab will land: a short accent line with round ends.
 final class InsertionLineView: NSView {
     private let line = ColorView(color: Tokens.Color.accent)

@@ -1243,18 +1243,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         spaceRows.forEach { $0.isHovered = false }
         // Lifted for its picture: its own solid card, so the copy reads off the list.
         row.isLifted = true
-        let ghost = DragGhost(of: row, event: event)
+        let copy = CarriedCopy(of: row, picture: CarriedCopy.picture(of: row), grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
+                               ground: nil, radius: Tokens.Radius.row)
         row.isLifted = false
-        row.alphaValue = 0.35
+        row.alphaValue = CarriedCopy.faint
+        copy.lift()
         let line = InsertionLineView()
         line.isHidden = true
         spacesGroup.addSubview(line)
         let others = spaceRows.filter { $0 !== row }
         var target = startIndex
-        window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
-            guard let event else { return }
-            if event.type == .leftMouseUp { stop.pointee = true; return }
-            ghost?.follow(event)
+        let released = CarriedCopy.track(in: window) { event in
+            copy.follow(window.convertPoint(toScreen: event.locationInWindow))
             self.documentView.autoscroll(with: event)
             // Its new place: after every other space whose middle is above the pointer.
             let y = self.spacesGroup.convert(event.locationInWindow, from: nil).y
@@ -1266,17 +1266,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         line.removeFromSuperview()
         SpaceSettingsRow.isReordering = false
         let spaceID = row.spaceID
-        if target != startIndex {
-            BrowserWindowController.undoTarget?.libraryChange("Move Space") { Library.shared.moveSpace(spaceID, to: target) }
+        if released != nil, target != startIndex {
+            BrowserWindowController.changeLibrary("Move Space") { Library.shared.moveSpace(spaceID, to: target) }
         }
         reloadSpaces()
         layoutSubtreeIfNeeded()
-        let landed = spaceRows.first { $0.spaceID == spaceID }
-        landed?.alphaValue = 0
-        ghost?.land(on: landed) { [weak self] in
-            landed?.alphaValue = 1
-            self?.syncSpaceHover()
-        }
+        row.alphaValue = 1
+        copy.land(on: spaceRows.first { $0.spaceID == spaceID }) { [weak self] in self?.syncSpaceHover() }
         return true
     }
 

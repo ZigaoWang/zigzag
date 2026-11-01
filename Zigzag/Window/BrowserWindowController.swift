@@ -144,46 +144,55 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.favorites.onDragMove = { [weak self] _, point in
             guard let self, let window = self.window else { return false }
-            let over = self.isOverList(point)
+            if self.favoriteDragOrigin == nil { self.favoriteDragOrigin = self.tabManager.currentSpaceID }
+            let over = !self.tabManager.isPrivate && self.isOverList(point)
             self.sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
             self.favoriteSpring(at: window.convertPoint(fromScreen: point))
             return over
         }
         sidebar.favorites.onDrop = { [weak self] favorite, point in
-            guard let self else { return false }
-            let overList = self.isOverList(point)
-            let (section, index) = self.sidebar.list.dropTarget(at: point, allowsPinned: true)
+            guard let self, !self.tabManager.isPrivate, let window = self.window else { return (false, nil) }
+            // Let go on a space's dot: it becomes a tab there, at the top, whichever space is showing.
+            if let dot = self.sidebar.spaceDot(at: window.convertPoint(fromScreen: point)) {
+                self.unfavoriteWithUndo(favorite.id, to: 0, in: dot)
+                return (true, nil)
+            }
+            guard self.isOverList(point) else { return (false, nil) }
+            // Dragged down into the list: a pinned tab among the pinned ones (in a folder, if it's let go among a
+            // folder's pages), or a regular tab among the tabs, right where it was dropped.
+            let landing = self.sidebar.list.dropTarget(at: point, allowsPinned: true)
+            let space = self.tabManager.currentSpaceID
+            if landing.section == .bookmarks {
+                self.pageChange("Pin Tab") {
+                    Library.shared.pinFavorite(favorite.id, in: space, at: landing.index)
+                    if let folder = landing.folder { Library.shared.moveBookmark(favorite.id, to: landing.index, in: space, folder: .some(folder)) }
+                }
+                return (true, self.sidebar.list.row(forBookmark: favorite.id))
+            }
+            self.unfavoriteWithUndo(favorite.id, to: landing.index)
+            let tabs = self.tabManager.tabs(in: space)
+            return (true, tabs.indices.contains(landing.index) ? self.sidebar.list.row(for: tabs[landing.index]) : nil)
+        }
+        sidebar.favorites.onDragEnd = { [weak self] cancelled in
+            guard let self else { return }
             self.sidebar.list.externalHover(at: nil)
-            let dot = self.window.flatMap { self.sidebar.spaceDot(at: $0.convertPoint(fromScreen: point)) }
             self.favoriteSpring(at: nil)
             self.sidebar.clearDropTargets()
-            defer { self.listDropFinished() }
-            // Let go on another space's dot: it becomes a tab there, at the top, and that space shows.
-            if let dot, dot != self.tabManager.currentSpaceID {
-                self.tabManager.showSpaceKeepingPage(dot)
-                self.unfavoriteWithUndo(favorite.id, to: 0)
-                return true
-            }
-            guard overList else { return false }
-            // Dragged down into the list: a pinned tab among the pinned ones, or a regular tab among the tabs, right
-            // where it was dropped.
-            if section == .bookmarks {
-                let space = self.tabManager.currentSpaceID
-                self.pageChange("Pin Tab") { Library.shared.pinFavorite(favorite.id, in: space, at: index) }
-            } else {
-                self.unfavoriteWithUndo(favorite.id, to: index)
-            }
-            return true
+            // Called off: back to the space it started in, as if it had never moved.
+            if cancelled, let origin = self.favoriteDragOrigin { self.tabManager.showSpaceKeepingPage(origin) }
+            self.favoriteDragOrigin = nil
+            self.listDropFinished()
         }
         sidebar.favorites.onJoin = { [weak self] favorite, targetID, onRight in
-            guard let self else { return }
+            guard let self, !self.tabManager.isPrivate else { return }
             self.pageChange("Split View") { [tabManager = self.tabManager] in
                 Library.shared.joinFavorite(favorite, onto: targetID, onRight: onRight)
                 tabManager.openBookmark(favorite)
             }
         }
         sidebar.favorites.onReorder = { [weak self] favorite, index in
-            self?.pageChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
+            guard let self, !self.tabManager.isPrivate else { return }
+            self.pageChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
         }
         reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID
@@ -238,6 +247,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// A favorite held over another space's dot opens that space after a beat, so it can be dropped among that
     /// space's tabs, as a tab can. Nil: the drag is over.
     private var favoriteSpringTarget: (space: UUID, work: DispatchWorkItem)?
+    /// The space a favorite's drag started in, to go back to if it's called off.
+    private var favoriteDragOrigin: UUID?
     private func favoriteSpring(at windowPoint: NSPoint?) {
         let hovered = windowPoint.flatMap { sidebar.spaceDot(at: $0) }
         guard hovered != favoriteSpringTarget?.space else { return }
@@ -1350,7 +1361,12 @@ extension BrowserWindowController: SidebarDelegate {
     func listRenameSpace() { renameSpace(nil) }
     func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
-    func listDragEnded() { sidebar.clearDropTargets() }
+    func listDragEnded() {
+        sidebar.clearDropTargets()
+        sidebar.favorites.isDropTarget = false
+        root.splitDropHint.show(nil)
+    }
+    func listFavoriteTile(for bookmarkID: UUID) -> NSView? { sidebar.favorites.tile(for: bookmarkID) }
     /// A drag that opened another space kept the page on screen. Dropped in that space, you stay there, with its
     /// own page, as if you'd switched to it; dropped back home, the page you were on stays in front. Either way the
     /// selection matches what's showing, so ⌘W closes the page you see.
@@ -1442,8 +1458,13 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
-    func listDragOverFavorites(at windowPoint: NSPoint, carrying: TabManager.SplitSide?) -> Bool {
+    func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool {
         let favorites = sidebar.favorites
+        // Favorites are shared by every window: a private one doesn't change them.
+        guard let windowPoint, !tabManager.isPrivate else {
+            favorites.isDropTarget = false
+            return false
+        }
         // An empty grid still takes drops in the band under the address.
         var zone = favorites.convert(favorites.bounds, to: nil)
         if favorites.isHidden {
@@ -1457,7 +1478,7 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listDropOnFavorites(_ tab: Tab) -> Bool {
-        guard sidebar.favorites.isDropTarget else { return false }
+        guard sidebar.favorites.isDropTarget, !tabManager.isPrivate else { return false }
         let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
         if let split {
@@ -1481,7 +1502,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
 
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
-        guard sidebar.favorites.isDropTarget else { return false }
+        guard sidebar.favorites.isDropTarget, !tabManager.isPrivate else { return false }
         let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
         if let split, let pinned = Library.shared.bookmark(bookmarkID) {
@@ -1492,8 +1513,8 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
-    func listDragOverPage(at windowPoint: NSPoint, tab: Tab) {
-        guard canDropBeside(tab) else { root.splitDropHint.show(nil); return }
+    func listDragOverPage(at windowPoint: NSPoint?, tab: Tab) {
+        guard let windowPoint, canDropBeside(tab) else { root.splitDropHint.show(nil); return }
         let side = root.splitDropHint.side(at: windowPoint)
         if let side, side != root.splitDropHint.side { Haptics.snap() }
         root.splitDropHint.show(side)

@@ -294,14 +294,14 @@ final class GuidedTour: NSView {
     /// Where to point.
     private func view(for target: String) -> NSView? {
         guard let controller else { return nil }
-        let row = controller.tabManager.selectedTab.flatMap { controller.sidebar.list.rowView(for: $0) }
+        let row = controller.tabManager.selectedTab.flatMap { controller.sidebar.list.row(for: $0) }
         switch target {
         case "newTab": return controller.sidebar.address
         case "bar": return controller.commandBar.panelView
         case "pin", "done.newTab", "done.pin": return row ?? controller.sidebar.list
         case "peek": return controller.peek.panelView
         case "done.peek", "article": return controller.root.card
-        case "split": return splitCandidate.flatMap { controller.sidebar.list.rowView(for: $0) }
+        case "split": return splitCandidate.flatMap { controller.sidebar.list.row(for: $0) }
         case "done.split": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
         case "editor": return SpaceEditorPanel.current

@@ -64,12 +64,10 @@ final class FavoritesView: NSView {
             return
         }
         showSplit(nil)
-        let gap = Tokens.Space.x2
-        if let i = tiles.firstIndex(where: { $0.frame.insetBy(dx: -gap / 2, dy: -gap / 2).contains(point) }) {
-            dropIndex = point.x < tiles[i].frame.midX ? i : i + 1
-        } else if dropIndex == nil {
-            dropIndex = tiles.count
-        }
+        // The row of tiles at the pointer's height, and the slot in it by which tiles' middles it's past.
+        let row = tiles.filter { point.y >= $0.frame.minY - Tokens.Space.x2 / 2 }.last.map { $0.frame.minY }
+        let rowStart = tiles.firstIndex { $0.frame.minY == row } ?? 0
+        dropIndex = rowStart + tiles[rowStart...].prefix { $0.frame.minY == row && $0.frame.midX < point.x }.count
         // Next to where the carried favorite already is, it wouldn't move: no bar.
         if let moving, let from = tiles.firstIndex(where: { $0 === moving }), dropIndex == from || dropIndex == from + 1 {
             dropBar.isHidden = true
@@ -113,8 +111,10 @@ final class FavoritesView: NSView {
     /// A tile is being carried: where the pointer is, in screen points. Returns true while it's over the tab list,
     /// where it would become a tab again.
     var onDragMove: ((Bookmark, NSPoint) -> Bool)?
-    /// Dropped somewhere outside the grid. Returns true if it was handled.
-    var onDrop: ((Bookmark, NSPoint) -> Bool)?
+    /// Dropped somewhere outside the grid: whether that did something, and the row it became, to land on.
+    var onDrop: ((Bookmark, NSPoint) -> (handled: Bool, landing: NSView?))?
+    /// The drag is over, dropped or called off with Esc (true).
+    var onDragEnd: ((Bool) -> Void)?
     var onReorder: ((Bookmark, Int) -> Void)?
     /// A favorite dropped on another's middle: the two become one, side by side (`onRight`: the carried one right).
     var onJoin: ((Bookmark, UUID, Bool) -> Void)?
@@ -179,72 +179,60 @@ final class FavoritesView: NSView {
         }
     }
 
+    /// The tile showing a favorite (either page of a split one).
+    func tile(for bookmarkID: UUID) -> NSView? { tiles.first { $0.bookmark?.id == bookmarkID || $0.partner?.id == bookmarkID } }
+
     /// Picks the tile up, as a row in the tab list is: it stays in its place, faint, and a see-through copy follows
     /// the pointer. Over the grid a bar shows where it would go, and the middle of another favorite offers to open
-    /// the two side by side as one. Off the grid (the tab list, another window) it's handed on.
+    /// the two side by side as one. Off the grid (the tab list, a space's dot) it's handed on; over the tab list the
+    /// copy turns into the row it would be there.
     private func drag(_ tile: FavoriteTile, favorite: Bookmark, event: NSEvent) {
         guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
-        let rect = window.convertToScreen(tile.convert(tile.bounds, to: nil))
         let start = window.convertPoint(toScreen: event.locationInWindow)
-        let grab = NSPoint(x: start.x - rect.minX, y: start.y - rect.minY)
-        let carried = CarriedFavorite(tile: Self.picture(of: tile), tileSize: rect.size, grab: grab, favorite: favorite,
-                                      icon: tile.iconImage, partner: tile.partner, partnerIcon: tile.partnerIconImage,
-                                      rowWidth: bounds.width, appearance: window.effectiveAppearance)
-        carried.move(to: start)
-        carried.panel.alphaValue = SidebarListView.carriedOpacity
-        carried.panel.orderFront(nil)
-        let panel = carried.panel
-        tile.alphaValue = 0.35
-
+        let row = CarriedRow(favorite, icon: tile.iconImage, partner: tile.partner, partnerIcon: tile.partnerIconImage)
+        let rowSize = NSSize(width: bounds.width, height: Tokens.Metric.rowHeight)
+        // As a row it's held just past its icon, as if it had been picked up there.
+        let rowGrab = NSPoint(x: Tokens.Space.x2 + Tokens.Metric.favicon + Tokens.Space.x1, y: rowSize.height / 2)
+        let copy = CarriedCopy(of: tile, picture: CarriedCopy.picture(of: tile), grabbedAt: start, ground: Tokens.Color.panelBackground,
+                               radius: Tokens.Radius.card, alternate: (row, rowSize, rowGrab, Tokens.Radius.row))
+        tile.alphaValue = CarriedCopy.faint
+        copy.lift()
+        let carried = TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil)
         var last = start
         var inside = true
-        window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
-            guard let event else { return }
+        let released = CarriedCopy.track(in: window) { event in
             last = window.convertPoint(toScreen: event.locationInWindow)
-            if event.type == .leftMouseUp { stop.pointee = true; return }
-            carried.move(to: last)
+            copy.follow(last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
             inside = self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
-            if inside { self.aim(at: local, carried: TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil), moving: tile) } else { self.clearAim() }
-            // Over the tab list it becomes the row it would be there; back over the grid, a tile again.
-            carried.isRow = self.onDragMove?(favorite, last) ?? false
+            if inside { self.aim(at: local, carried: carried, moving: tile) } else { self.clearAim() }
+            copy.showsAlternate = self.onDragMove?(favorite, last) ?? false
         }
         let split = splitTarget, index = dropIndex
         clearAim()
-        guard inside else {
-            panel.orderOut(nil)
-            tile.alphaValue = 1
-            _ = onDrop?(favorite, last)
-            return
-        }
-        if let split {
-            panel.orderOut(nil)
-            tile.alphaValue = 1
-            onJoin?(favorite, split.id, split.onRight)
-            return
-        }
-        // The bar counts the carried favorite where it is; past it, everything is one place earlier.
-        var slot = index ?? from
-        if slot > from { slot -= 1 }
-        if slot != from { onReorder?(favorite, slot) }
-        layoutSubtreeIfNeeded()
-        let landed = tiles.first { $0.bookmark?.id == favorite.id } ?? tile
-        landed.alphaValue = 0
-        carried.isRow = false
-        let landing = window.convertToScreen(landed.convert(landed.bounds, to: nil))
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Tokens.Motion.reduceMotion ? 0 : 0.18
-            context.timingFunction = Tokens.Motion.easeOut
-            panel.animator().setFrame(carried.panelFrame(placingTileAt: landing), display: true)
-            panel.animator().alphaValue = 1
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                panel.orderOut(nil)
-                landed.alphaValue = 1
-                tile.alphaValue = 1
-                _ = self?.onDrop?(favorite, NSPoint(x: -10_000, y: -10_000))
+        var landing: NSView? = tile
+        if released == nil {
+            copy.showsAlternate = false
+        } else if inside {
+            if let split {
+                onJoin?(favorite, split.id, split.onRight)
+            } else {
+                // The bar counts the carried favorite where it is; past it, everything is one place earlier.
+                var slot = index ?? from
+                if slot > from { slot -= 1 }
+                if slot != from { onReorder?(favorite, slot) }
             }
-        })
+            copy.showsAlternate = false
+            layoutSubtreeIfNeeded()
+            landing = self.tile(for: favorite.id)
+        } else if let dropped = onDrop?(favorite, last), dropped.handled {
+            landing = dropped.landing
+        } else {
+            copy.showsAlternate = false
+        }
+        onDragEnd?(released == nil)
+        tile.alphaValue = 1
+        copy.land(on: landing)
     }
 
     /// While true, tiles already in place slide to their new places instead of jumping there.
@@ -255,26 +243,6 @@ final class FavoritesView: NSView {
         needsLayout = true
         layoutSubtreeIfNeeded()
         glides = false
-    }
-
-    /// The tile as it looks, from its layers, for the copy that follows the pointer.
-    private static func picture(of tile: NSView) -> NSImage? {
-        guard let layer = tile.layer else { return nil }
-        let scale = tile.window?.backingScaleFactor ?? 2
-        let size = tile.bounds.size
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
-                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
-              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
-        let cg = context.cgContext
-        cg.scaleBy(x: scale, y: scale)
-        // Layers draw flipped against the bitmap.
-        cg.translateBy(x: 0, y: size.height)
-        cg.scaleBy(x: 1, y: -1)
-        layer.render(in: cg)
-        let image = NSImage(size: size)
-        image.addRepresentation(rep)
-        return image
     }
 
     override func layout() {
@@ -455,113 +423,6 @@ final class FavoriteTile: InteractiveView {
 
     private static let selected = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.95), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
     private static let selectedHover = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 1), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.24))
-}
-
-/// A favorite on its way somewhere: a floating copy that follows the pointer. Over the grid it's the tile; over the
-/// tab list it turns into the row it would become there, and back again, so you see what a drop will do.
-@MainActor
-final class CarriedFavorite {
-    let panel: NSPanel
-    private let card = NSView()
-    private let tileView = NSImageView()
-    private let row: CarriedRow
-    private let tileSize: NSSize
-    private let rowSize: NSSize
-    /// Where the pointer holds the tile, from its bottom-left corner.
-    private let grab: NSPoint
-    /// Where the pointer holds it as a row: just past its icon, as if it had been picked up there.
-    private let rowGrab: NSPoint
-    /// The panel is big enough for both shapes; the pointer stays at this spot in it.
-    private let anchor: NSPoint
-    private static let margin: CGFloat = 20
-
-    init(tile: NSImage?, tileSize: NSSize, grab: NSPoint, favorite: Bookmark, icon: NSImage?, partner: Bookmark? = nil,
-         partnerIcon: NSImage? = nil, rowWidth: CGFloat, appearance: NSAppearance) {
-        row = CarriedRow(favorite, icon: icon, partner: partner, partnerIcon: partnerIcon)
-        self.tileSize = tileSize
-        self.grab = grab
-        rowSize = NSSize(width: rowWidth, height: Tokens.Metric.rowHeight)
-        let rowGrab = NSPoint(x: Tokens.Space.x2 + Tokens.Metric.favicon + Tokens.Space.x1, y: rowSize.height / 2)
-        self.rowGrab = rowGrab
-        let m = Self.margin
-        anchor = NSPoint(x: m + max(grab.x, rowGrab.x), y: m + max(grab.y, rowGrab.y))
-        let width = anchor.x + max(tileSize.width - grab.x, rowSize.width - rowGrab.x) + m
-        let height = anchor.y + max(tileSize.height - grab.y, rowSize.height - rowGrab.y) + m
-        panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
-                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.level = .floating
-        panel.ignoresMouseEvents = true
-        let content = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        content.wantsLayer = true
-        panel.contentView = content
-
-        card.wantsLayer = true
-        card.layer?.cornerRadius = Tokens.Radius.card
-        card.layer?.cornerCurve = .continuous
-        card.layer?.shadowColor = NSColor.black.cgColor
-        card.layer?.shadowOpacity = 0.18
-        card.layer?.shadowRadius = 8
-        card.layer?.shadowOffset = CGSize(width: 0, height: -3)
-        content.addSubview(card)
-        tileView.image = tile
-        tileView.imageScaling = .scaleNone
-        tileView.autoresizingMask = [.width, .height]
-        row.autoresizingMask = [.width, .height]
-        row.alphaValue = 0
-        card.addSubview(row)
-        card.addSubview(tileView)
-        // Tiles and rows are see-through on the sidebar; lifted off it, the copy stands on solid ground.
-        var ground = NSColor.clear.cgColor
-        appearance.performAsCurrentDrawingAppearance { ground = Tokens.Color.panelBackground.cgColor }
-        card.layer?.backgroundColor = ground
-        panel.appearance = appearance
-        card.frame = tileFrame
-        tileView.frame = card.bounds
-        row.frame = card.bounds
-        updateShadow()
-    }
-
-    private var tileFrame: NSRect { NSRect(x: anchor.x - grab.x, y: anchor.y - grab.y, width: tileSize.width, height: tileSize.height) }
-    private var rowFrame: NSRect { NSRect(x: anchor.x - rowGrab.x, y: anchor.y - rowGrab.y, width: rowSize.width, height: rowSize.height) }
-
-    var isRow = false {
-        didSet {
-            guard isRow != oldValue else { return }
-            let target = isRow ? rowFrame : tileFrame
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Tokens.Motion.reduceMotion ? 0 : 0.18
-                context.timingFunction = Tokens.Motion.easeOut
-                context.allowsImplicitAnimation = true
-                card.animator().frame = target
-                row.animator().alphaValue = isRow ? 1 : 0
-                tileView.animator().alphaValue = isRow ? 0 : 1
-                card.layer?.cornerRadius = isRow ? Tokens.Radius.row : Tokens.Radius.card
-            }
-            updateShadow(for: target)
-        }
-    }
-
-    private func updateShadow(for frame: NSRect? = nil) {
-        let size = (frame ?? card.frame).size
-        let radius = isRow ? Tokens.Radius.row : Tokens.Radius.card
-        card.layer?.shadowPath = CGPath(roundedRect: CGRect(origin: .zero, size: size), cornerWidth: radius, cornerHeight: radius, transform: nil)
-    }
-
-    /// Keeps the pointer where it holds the copy.
-    func move(to screenPoint: NSPoint) {
-        panel.setFrameOrigin(NSPoint(x: screenPoint.x - anchor.x, y: screenPoint.y - anchor.y))
-    }
-
-    /// The tile's middle on screen, for which slot it's over.
-    var tileCenter: NSPoint { NSPoint(x: panel.frame.minX + tileFrame.midX, y: panel.frame.minY + tileFrame.midY) }
-
-    /// Where the panel goes for the tile to sit at `rect` on screen.
-    func panelFrame(placingTileAt rect: NSRect) -> NSRect {
-        NSRect(x: rect.minX - tileFrame.minX, y: rect.minY - tileFrame.minY, width: panel.frame.width, height: panel.frame.height)
-    }
 }
 
 /// The row a carried favorite turns into over the tab list: its page, or a split's two pages side by side with a
