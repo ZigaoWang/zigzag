@@ -147,6 +147,8 @@ final class SidebarListView: NSView {
 
     /// A tab being carried in from another window: where its gap opens in this list.
     private var externalIndex: Int?
+    /// Which part of the list it would land in: a favorite can become a pinned tab, a tab from elsewhere a tab.
+    private var externalSection: Section = .tabs
 
     enum Section { case bookmarks, tabs }
 
@@ -853,15 +855,22 @@ final class SidebarListView: NSView {
     }
 
     /// Another window's tab hovering this list: open a gap where it would land (nil to close it).
-    func externalHover(at screenPoint: NSPoint?) {
-        var index: Int?
-        if let screenPoint, let window {
-            let y = convert(window.convertPoint(fromScreen: screenPoint), from: nil).y
-            index = target(at: y, dragging: nil).1
-        }
-        guard index != externalIndex else { return }
-        externalIndex = index
+    /// `allowsPinned`: what's carried can land among the pinned tabs too (a favorite), not only among the tabs.
+    func externalHover(at screenPoint: NSPoint?, allowsPinned: Bool = false) {
+        var landing: (Section, Int)?
+        if let screenPoint { landing = dropTarget(at: screenPoint, allowsPinned: allowsPinned) }
+        guard landing?.1 != externalIndex || landing?.0 != externalSection else { return }
+        externalIndex = landing?.1
+        externalSection = landing?.0 ?? .tabs
         placeLine()
+    }
+
+    /// Where something from outside the list lands, at a point on screen.
+    func dropTarget(at screenPoint: NSPoint, allowsPinned: Bool) -> (Section, Int) {
+        guard let window else { return (.tabs, 0) }
+        let y = convert(window.convertPoint(fromScreen: screenPoint), from: nil).y
+        // Targeting counts pinned tabs only for something being carried; a stand-in item says so.
+        return target(at: y, dragging: allowsPinned ? .placeholder : nil)
     }
 
     private func liftedImage(of view: NSView) -> NSImage? {
@@ -1043,7 +1052,7 @@ final class SidebarListView: NSView {
             index = drag.targetIndex
             pointX = drag.pointX
         } else if let externalIndex {
-            (section, index, pointX) = (.tabs, externalIndex, 0)
+            (section, index, pointX) = (externalSection, externalIndex, 0)
         } else {
             section = nil; index = 0; pointX = 0
         }
@@ -1054,7 +1063,7 @@ final class SidebarListView: NSView {
             insertionLine.isHidden = true
             return
         }
-        let before = placed[..<gap].last { rows[$0] != nil && $0 != .header }
+        let before = placed[..<gap].last { rows[$0] != nil }
         let after = placed[(gap + 1)...].first { rows[$0] != nil }
         var y: CGFloat
         if let after, after != .separator, let next = rows[after] {

@@ -145,17 +145,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.favorites.onDragMove = { [weak self] _, point in
             guard let self else { return false }
             let over = self.isOverList(point)
-            self.sidebar.list.externalHover(at: over ? point : nil)
+            self.sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
             return over
         }
         sidebar.favorites.onDrop = { [weak self] favorite, point in
             guard let self else { return false }
             let overList = self.isOverList(point)
-            let index = self.sidebar.list.dropIndex(at: point)
+            let (section, index) = self.sidebar.list.dropTarget(at: point, allowsPinned: true)
             self.sidebar.list.externalHover(at: nil)
             guard overList else { return false }
-            // Dragged down into the list: it's a regular tab again, right where it was dropped.
-            self.unfavoriteWithUndo(favorite.id, to: index)
+            // Dragged down into the list: a pinned tab among the pinned ones, or a regular tab among the tabs, right
+            // where it was dropped.
+            if section == .bookmarks {
+                let space = self.tabManager.currentSpaceID
+                self.libraryChange("Pin Tab") { Library.shared.pinFavorite(favorite.id, in: space, at: index) }
+            } else {
+                self.unfavoriteWithUndo(favorite.id, to: index)
+            }
             return true
         }
         sidebar.favorites.onJoin = { [weak self] favorite, targetID, onRight in

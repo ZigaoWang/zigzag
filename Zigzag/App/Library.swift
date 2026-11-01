@@ -466,6 +466,22 @@ final class Library {
         commit()
     }
 
+    /// A favorite moved down among a space's pinned tabs, at a place in its list; a split favorite becomes a pinned
+    /// split there.
+    func pinFavorite(_ id: UUID, in spaceID: UUID, at index: Int) {
+        guard let s = self.index(of: spaceID) else { return }
+        let pair = favoriteSplits.first { $0.contains(id) }
+        let ids = pair.map { [$0.left, $0.right] } ?? [id]
+        let moving = favorites.filter { ids.contains($0.id) }
+        guard !moving.isEmpty else { return }
+        favorites.removeAll { ids.contains($0.id) }
+        favoriteSplits.removeAll { $0.contains(id) }
+        spaces[s].bookmarks.insert(contentsOf: moving, at: min(max(index, 0), spaces[s].bookmarks.count))
+        if let pair { spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [pair] }
+        tidyFolders(s)
+        commit()
+    }
+
     /// Takes a pinned page out of its space, to become a favorite; the caller commits.
     func detachBookmark(_ id: UUID) -> Bookmark? {
         guard let bookmark = spaces.lazy.compactMap({ $0.bookmarks.first { $0.id == id } }).first else { return nil }
