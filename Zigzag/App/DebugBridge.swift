@@ -595,7 +595,11 @@ enum DebugBridge {
         case "focus":
             // focus <n>: the nth window comes to the front, for commands that follow.
             let all = WindowManager.shared.controllers
-            if let n = Int(arg), all.indices.contains(n) { all[n].window?.makeKeyAndOrderFront(nil) }
+            if let n = Int(arg), all.indices.contains(n) {
+                all[n].window?.makeKeyAndOrderFront(nil)
+                // With another app in front, the window can't take key: commands follow it all the same.
+                WindowManager.shared.windowBecameKey(all[n])
+            }
         case "reducemotion": Tokens.Motion.debugReduceMotion = arg != "off"
         case "unload":
             // unload <title>: a pinned page or favorite goes back to not loaded.
