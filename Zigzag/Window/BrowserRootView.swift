@@ -252,6 +252,9 @@ final class BrowserRootView: ColorView {
         splitVertical = vertical
         // Like the sidebar, a split moves the window's layout: it animates from the keyboard too.
         guard animated, !Tokens.Motion.reduceMotion, window != nil else { needsLayout = true; return }
+        // Closing: the pane that goes stays where it is and fades while the other grows over its place.
+        let closingFrame = wasSplit && ratio == nil ? secondCard.frame : nil
+        if closingFrame != nil { secondCardLeaving = true }
         layoutSubtreeIfNeeded()
         let panes = paneFrames
         card.frame = oldLeft
@@ -259,14 +262,24 @@ final class BrowserRootView: ColorView {
             secondCard.alphaValue = 0
             secondCard.frame = vertical ? right.offsetBy(dx: 0, dy: Tokens.Space.x6) : right.offsetBy(dx: Tokens.Space.x6, dy: 0)
         }
-        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, moves: true) {
+        // At the standard pace, like the sidebar: a split is a change of layout you watch, not a show.
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true, {
             self.card.animator().frame = panes.left
             if let right = panes.right {
                 self.secondCard.animator().frame = right
                 self.secondCard.animator().alphaValue = self.pagesHidden ? 0 : 1
+            } else if closingFrame != nil {
+                self.secondCard.animator().alphaValue = 0
             }
-        }
+        }, completion: {
+            guard closingFrame != nil, self.splitRatio == nil else { return }
+            self.secondCardLeaving = false
+            self.secondCard.alphaValue = 1
+            self.needsLayout = true
+        })
     }
+    /// While the closed pane fades, layout leaves it showing where it was.
+    private var secondCardLeaving = false
     var onSplitRatioChange: ((CGFloat, Bool) -> Void)?
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
@@ -323,8 +336,10 @@ final class BrowserRootView: ColorView {
             self.onSplitRatioChange?(ratio, true)
         }
         splitHandle.onDoubleClick = { [weak self] in
-            self?.splitRatio = 0.5
-            self?.onSplitRatioChange?(0.5, true)
+            guard let self else { return }
+            // Even again: the two panes glide to halves rather than jumping.
+            self.setSplit(ratio: 0.5, vertical: self.splitVertical, animated: true)
+            self.onSplitRatioChange?(0.5, true)
         }
         addSubview(resizeHandle)
         addSubview(sidebarContainer)
@@ -439,7 +454,7 @@ final class BrowserRootView: ColorView {
                 ? NSRect(x: right.minX, y: panes.left.maxY - 2, width: right.width, height: right.minY - panes.left.maxY + 4)
                 : NSRect(x: panes.left.maxX - 2, y: right.minY, width: right.minX - panes.left.maxX + 4, height: right.height)
         } else {
-            secondCard.isHidden = true
+            secondCard.isHidden = !secondCardLeaving
             splitHandle.isHidden = true
         }
         splitDropHint.frame = cardFrame
