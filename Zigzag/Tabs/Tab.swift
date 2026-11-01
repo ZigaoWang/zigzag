@@ -424,13 +424,15 @@ final class Tab: NSObject {
 
     // MARK: Snapshots
 
-    func captureSnapshot(_ completion: (() -> Void)? = nil) {
+    /// Retakes the page's picture. `keep: false` only refreshes it in memory (a preview being watched, every second)
+    /// and leaves the disk alone until `keepSnapshot()`.
+    func captureSnapshot(keep: Bool = true, _ completion: (() -> Void)? = nil) {
         guard let webView, webView.window != nil, webView.bounds.width > 0, hasLoadedOnce else { completion?(); return }
         // A PDF's picture is of Zigzag's viewer, as you see it (dark pages and all), not WebKit's underneath.
         // Settings likewise: the picture is of what covers the page, not the empty page under it.
         if let image = pdfViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil }) ?? settingsView.flatMap({ $0.window != nil ? $0.snapshot() : nil }) {
             snapshot = image
-            if !isPrivate { SnapshotStore.save(image, for: id) }
+            if keep, !isPrivate { SnapshotStore.save(image, for: id) }
             changed.send(.snapshot)
             completion?()
             return
@@ -442,11 +444,16 @@ final class Tab: NSObject {
             guard let self else { return }
             if let image {
                 self.snapshot = image
-                if !self.isPrivate { SnapshotStore.save(image, for: self.id) }
+                if keep, !self.isPrivate { SnapshotStore.save(image, for: self.id) }
                 self.changed.send(.snapshot)
             }
             completion?()
         }
+    }
+
+    /// Saves the picture last taken in memory only, so it's there after a relaunch.
+    func keepSnapshot() {
+        if let snapshot, !isPrivate { SnapshotStore.save(snapshot, for: id) }
     }
 
     /// The address last written to history, so a load and its address change count as one visit.

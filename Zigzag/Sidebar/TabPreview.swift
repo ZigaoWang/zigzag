@@ -183,16 +183,27 @@ final class TabPreviewController {
         // Live pages refresh while you look at the preview.
         refreshTimer?.invalidate()
         let live = pages.filter { !$0.isSuspended }
+        keepWatched()
+        watched = live
         if !live.isEmpty {
-            live.forEach { $0.captureSnapshot() }
+            // In memory while you watch; written to disk once, when the preview goes.
+            live.forEach { $0.captureSnapshot(keep: false) }
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak first, weak partner] _ in
                 MainActor.assumeIsolated {
-                    [first, partner].forEach { if let page = $0, !page.isSuspended { page.captureSnapshot() } }
+                    [first, partner].forEach { if let page = $0, !page.isSuspended { page.captureSnapshot(keep: false) } }
                 }
             }
             // Roughly once a second is plenty; slack lets the system batch the wake-ups.
             refreshTimer?.tolerance = 0.3
         }
+    }
+
+    /// The live pages the preview refreshed, whose last picture is saved when it stops watching them.
+    private var watched: [Tab] = []
+
+    private func keepWatched() {
+        watched.forEach { if !$0.isClosed { $0.keepSnapshot() } }
+        watched = []
     }
 
     private func scheduleHide(immediately: Bool = false) {
@@ -225,6 +236,7 @@ final class TabPreviewController {
         watchTimer = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
+        keepWatched()
         snapshotTokens = []
         guard let panel else { return }
         self.panel = nil
