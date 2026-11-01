@@ -198,12 +198,6 @@ final class ColorWheel: NSView {
         return "\(name), \(Int((spot.amount * 100).rounded())) percent color"
     }
 
-    /// Anywhere on the disc can be clicked to pick that color.
-    override func resetCursorRects() {
-        let r = radius
-        addCursorRect(NSRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2), cursor: .pointingHand)
-    }
-
     /// Within a knob's reach, clicking takes hold of it without moving it.
     private func knob(at p: CGPoint) -> Int? {
         let distances = spots.indices.map { (index: $0, distance: hypot(point(spots[$0]).x - p.x, point(spots[$0]).y - p.y)) }
