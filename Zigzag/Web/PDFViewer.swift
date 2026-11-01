@@ -47,8 +47,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     }
 
     private static let sidebarWidth: CGFloat = 196
-    /// Behind the pages: a shade off the card, so each page stands out as paper.
-    private static let backdrop = Tokens.Color.dynamic(light: Tokens.Color.hex(0xEDEDF0), dark: Tokens.Color.hex(0x161618))
+    private static let barHeight = Tokens.Space.x10
+    private static let backdrop = Tokens.Color.pdfBackdrop
 
     private static var twoPages: Bool {
         get { UserDefaults.standard.bool(forKey: "pdfTwoPages") }
@@ -102,7 +102,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         addSubview(sidebar)
         addSubview(sidebarEdge)
 
-        bar.radius = Tokens.Space.x5
+        // A capsule, as the Reader's bar is.
+        bar.radius = Self.barHeight / 2
         [sidebarButton, pageButton, zoomOutButton, zoomInButton, twoPagesButton, darkButton, saveButton].forEach { bar.addSubview($0) }
         bar.isHidden = true
         addSubview(bar)
@@ -169,7 +170,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         sidebar.frame = NSRect(x: side - Self.sidebarWidth, y: 0, width: Self.sidebarWidth, height: bounds.height)
         sidebarEdge.frame = NSRect(x: side - Tokens.Metric.hairline, y: 0, width: Tokens.Metric.hairline, height: bounds.height)
         pdfView.frame = NSRect(x: side, y: 0, width: bounds.width - side, height: bounds.height)
-        let switchHeight: CGFloat = sidebarSwitch.isHidden ? 0 : 28
+        let switchHeight: CGFloat = sidebarSwitch.isHidden ? 0 : Tokens.Page.controlHeight
         let top = sidebarSwitch.isHidden ? 0 : Tokens.Space.x3 + switchHeight + Tokens.Space.x2
         sidebarSwitch.frame = NSRect(x: Tokens.Space.x3, y: sidebar.bounds.height - Tokens.Space.x3 - switchHeight,
                                      width: Self.sidebarWidth - Tokens.Space.x6, height: switchHeight)
@@ -177,7 +178,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         thumbnails.frame = below
         contents.frame = below
         let width = barWidth
-        let h = Tokens.Space.x10
+        let h = Self.barHeight
         bar.frame = NSRect(x: round(side + (bounds.width - side - width) / 2), y: bounds.height - h - Tokens.Space.x4, width: width, height: h)
     }
 
@@ -314,8 +315,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
     }
 
-    /// Between the pages: with dark pages, a shade lighter than the dark paper, so each page still reads as one.
-    private static func around(dark: Bool) -> NSColor { dark ? Tokens.Color.hex(0x2A2A2D) : backdrop }
+    private static func around(dark: Bool) -> NSColor { dark ? Tokens.Color.pdfBackdropDarkPages : backdrop }
 
     /// Dark pages: each page drawn dark by `DarkablePage` (soft dark paper, light ink, its colors kept), and no
     /// page shadows, which would glow.
@@ -662,11 +662,12 @@ private final class PDFContentsView: NSView {
     override func layout() {
         super.layout()
         scroll.frame = bounds
+        // The sidebar's rhythm: rows 8pt in from the edges, a hairline apart.
+        let pad = Tokens.Metric.sidebarPadding
         var y = Tokens.Space.x1
-        let width = bounds.width - Tokens.Space.x4
         for (row, _) in rows {
-            row.frame = NSRect(x: Tokens.Space.x2, y: y, width: width, height: Tokens.Metric.rowHeight - 4)
-            y += Tokens.Metric.rowHeight - 4
+            row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: Tokens.Metric.rowHeight)
+            y += Tokens.Metric.rowHeight + Tokens.Metric.rowGap
         }
         stack.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(y + Tokens.Space.x2, bounds.height))
     }
@@ -680,7 +681,8 @@ private final class ContentsRow: InteractiveView {
         self.level = level
         label = Label(title, font: level == 0 ? Tokens.Font.body(.medium) : Tokens.Font.body(), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
         label.lineBreakMode = .byTruncatingTail
         addSubview(label)
         toolTip = title
@@ -692,14 +694,13 @@ private final class ContentsRow: InteractiveView {
 
     override func layout() {
         super.layout()
-        let x = Tokens.Space.x2 + CGFloat(min(level, 4)) * Tokens.Space.x3
+        let x = CardRow.inset - Label.inset + CGFloat(min(level, 4)) * Tokens.Space.x3
         let h = label.lineHeight
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: bounds.width - x - Tokens.Space.x2, height: h)
+        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, bounds.width - x - CardRow.inset), height: h)
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isSelected ? Tokens.Color.selectedFill : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        applyRowStyle(animated: animated)
         label.textColor = level == 0 || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
     }
 }

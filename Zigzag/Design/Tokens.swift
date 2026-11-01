@@ -525,6 +525,10 @@ enum Tokens {
         /// A group of rows on the surface, and its hairline edge.
         static let surfaceGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
         static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06))
+        /// Behind a PDF's pages and in its sidebar: a shade off the card, so each page stands out as paper.
+        static let pdfBackdrop = dynamic(light: hex(0xEDEDF0), dark: hex(0x161618))
+        /// Between a PDF's pages while they're drawn dark: a shade lighter than the dark paper, so each still reads as one.
+        static let pdfBackdropDarkPages = hex(0x2A2A2D)
         /// Something chosen in a list (a section, a row reached with the keyboard), drawn in the accent at this opacity.
         static let selectionAlpha: CGFloat = 0.14
         /// The same, held down.
