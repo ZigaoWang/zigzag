@@ -612,6 +612,26 @@ final class WordmarkView: NSView {
             + "stroke-width=\"\(n(strokeWeight))\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\(paths.joined())</g></svg>"
     }
 
+    /// The wordmark's ink as one filled outline, fit and centered in `rect` (y up): for drawing it as a material,
+    /// with a gradient, a bevel and a shadow of its own (`EmbossedWordmark`).
+    static func outline(in rect: CGRect) -> CGPath {
+        let scale = min(rect.width / (aspect * (60 + strokeWeight)), rect.height / (60 + strokeWeight))
+        let inset = strokeWeight / 2 * scale
+        let originX = rect.minX + (rect.width - aspect * (60 + strokeWeight) * scale) / 2 + inset
+        let originY = rect.minY + (rect.height - (60 + strokeWeight) * scale) / 2 + inset
+        var x = originX
+        var result: CGPath?
+        for letter in letters {
+            for skeleton in letter.strokes {
+                let stroked = Brand.path(skeleton.map { CGPoint(x: x + $0.x * scale, y: originY + $0.y * scale) })
+                    .copy(strokingWithWidth: strokeWeight * scale, lineCap: .round, lineJoin: .round, miterLimit: 10)
+                result = result.map { $0.union(stroked) } ?? stroked.normalized()
+            }
+            x += (letter.width + gap) * scale
+        }
+        return result ?? CGMutablePath()
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
