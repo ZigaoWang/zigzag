@@ -10,7 +10,7 @@ protocol SidebarDelegate: SidebarListDelegate {
 
 /// The address at the top of the sidebar. Shows only the domain; clicking opens the command bar.
 final class AddressView: InteractiveView {
-    private let label = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let label = Label("", font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
@@ -131,7 +131,8 @@ final class AddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.fieldFill
+        // Quieter than a field at rest; the usual hover when the pointer comes to it.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.addressFill
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
     }
 }
@@ -228,7 +229,7 @@ final class SidebarView: NSView {
 
     /// The top row's buttons are a size up from the rest, level with the traffic lights, so they're easy to hit.
     static let toolbarButton: CGFloat = 30
-    static let toolbarSymbol: CGFloat = 16
+    static let toolbarSymbol: CGFloat = 15
     let backButton = IconButton(symbol: "chevron.left", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Back")
     let forwardButton = IconButton(symbol: "chevron.right", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Forward")
     let reloadButton = IconButton(symbol: "arrow.clockwise", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Reload")
@@ -379,7 +380,7 @@ final class SidebarView: NSView {
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
         let favoritesHeight = favorites.preferredHeight
         favorites.isHidden = favoritesHeight == 0
-        favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: favoritesHeight)
+        favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x3, width: width - pad * 2, height: favoritesHeight)
         let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : address.frame.maxY) + Tokens.Metric.sectionGap
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
