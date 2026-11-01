@@ -951,7 +951,7 @@ enum AttentionHint {
             let accent = Brand.Theme.for(anchor).accent
             let badge = ColorView(color: accent.withAlphaComponent(Tokens.Color.selectionAlpha))
             badge.wantsLayer = true
-            badge.layer?.cornerRadius = 10
+            badge.layer?.cornerRadius = Tokens.Space.x5 / 2
             let digit = Label("\(number)", font: Tokens.Font.small(.semibold), color: accent)
             digit.alignment = .center
             badge.addSubview(digit)
@@ -959,7 +959,7 @@ enum AttentionHint {
             body.font = Tokens.Font.body()
             body.textColor = Tokens.Color.textPrimary
             body.isSelectable = false
-            let textX = pad + 20 + Tokens.Space.x3
+            let textX = pad + Tokens.Space.x5 + Tokens.Space.x3
             let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width - textX - pad, height: 200)).height)
             badge.frame = NSRect(x: pad, y: y, width: 20, height: 20)
             digit.frame = NSRect(x: 0, y: (20 - digit.lineHeight) / 2, width: 20, height: digit.lineHeight)
