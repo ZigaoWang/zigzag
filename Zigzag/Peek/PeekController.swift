@@ -70,7 +70,14 @@ final class PeekController {
     private let content = NSView()
     private(set) var tab: Tab?
     private var token: SignalToken?
-    private(set) var isVisible = false { didSet { if !isVisible { stopEsc() } } }
+    private(set) var isVisible = false {
+        didSet {
+            guard !isVisible else { return }
+            stopEsc()
+            // Getting started's Peek step is done once a peek closes again, in whichever window it was.
+            if oldValue { Tutorial.complete("peek") }
+        }
+    }
     private var escMonitor: Any?
 
     private func stopEsc() {

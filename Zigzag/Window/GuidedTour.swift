@@ -38,7 +38,6 @@ final class GuidedTour: NSView {
 
     /// Showing what a step just did, before the next one.
     private var confirming: Tutorial.Task?
-    private var sawPeek = false
     /// What the pill shows now, so it only redraws when that changes.
     private var shown = ""
     /// The step the pill was last showing, so its note follows it.
@@ -189,10 +188,6 @@ final class GuidedTour: NSView {
 
     private func tick() {
         guard let controller, !ending else { return }
-        // Peek counts once you've closed it again: that's the whole move.
-        if confirming == nil, Tutorial.current?.id == "peek" {
-            if controller.peek.isVisible { sawPeek = true } else if sawPeek { sawPeek = false; Tutorial.complete("peek") }
-        }
         // Other panels (site controls, downloads) come first: the guide steps aside.
         let bar = controller.commandBar.isVisible, peek = controller.peek.isVisible
         let editing = SpaceEditorPanel.current != nil
