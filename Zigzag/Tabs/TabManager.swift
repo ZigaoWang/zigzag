@@ -269,6 +269,43 @@ final class TabManager {
         Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id)
     }
 
+    /// A bookmark's page, made (not yet shown) if it isn't open.
+    func pageTab(for bookmark: Bookmark) -> Tab { liveTab(for: bookmark) }
+
+    /// A tab (or a pinned page's tab) joins a favorite: the two become one favorite, side by side where the favorite
+    /// was, and open together.
+    @discardableResult
+    func joinFavorite(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) -> Bool {
+        guard let url = tab.url, let favorite = Library.shared.bookmark(favoriteID), Library.shared.isFavorite(favoriteID),
+              Library.shared.pinnedSplit(containing: favoriteID) == nil, tab.bookmarkID != favoriteID else { return false }
+        unsplit(tab, notify: false)
+        let mark: Bookmark
+        if let id = tab.bookmarkID, let pinned = Library.shared.detachBookmark(id) {
+            mark = pinned
+        } else {
+            removeFromList(tab)
+            mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url))
+            tab.bookmarkID = mark.id
+            bookmarkTabs[mark.id] = tab
+        }
+        tab.isFavorite = true
+        let slot = Library.shared.snapshot.favoriteIndex(of: favoriteID)
+        Library.shared.addFavoriteSplit(onRight ? favorite : mark, onRight ? mark : favorite, at: slot)
+        openBookmark(mark)
+        return true
+    }
+
+    /// A tab that was made a favorite goes back to being a tab in the list (undoing that).
+    func returnToList(_ tab: Tab, at index: Int) {
+        if let id = tab.bookmarkID, bookmarkTabs[id] === tab { bookmarkTabs[id] = nil }
+        tab.bookmarkID = nil
+        tab.isFavorite = false
+        // The library may already have put it back (at the top) when its bookmark went: it moves to its place.
+        tabsBySpace[tab.spaceID]?.removeAll { $0 === tab }
+        tabsBySpace[tab.spaceID, default: []].insert(tab, at: min(index, tabsBySpace[tab.spaceID]?.count ?? 0))
+        changed.send(.structure)
+    }
+
     /// A split view as one favorite. Pinned halves keep their ids (and so their pages); a tab becomes one. False
     /// when it can't (a page with no address yet).
     private func favoriteSplit(_ pair: SplitPair, at index: Int?) -> Bool {

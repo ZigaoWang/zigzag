@@ -158,6 +158,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.unfavoriteWithUndo(favorite.id, to: index)
             return true
         }
+        sidebar.favorites.onJoin = { [weak self] favorite, targetID, onRight in
+            guard let self, let target = Library.shared.bookmark(targetID) else { return }
+            self.libraryChange("Split View") {
+                Library.shared.addFavoriteSplit(onRight ? target : favorite, onRight ? favorite : target,
+                                                at: Library.shared.snapshot.favoriteIndex(of: targetID))
+            }
+            self.tabManager.openBookmark(favorite)
+        }
         sidebar.favorites.onReorder = { [weak self] favorite, index in
             self?.libraryChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
         }
@@ -1418,7 +1426,7 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
-    func listDragOverFavorites(at windowPoint: NSPoint) -> Bool {
+    func listDragOverFavorites(at windowPoint: NSPoint, canSplit: Bool) -> Bool {
         let favorites = sidebar.favorites
         // An empty grid still takes drops in the band under the address.
         var zone = favorites.convert(favorites.bounds, to: nil)
@@ -1428,15 +1436,19 @@ extension BrowserWindowController: SidebarDelegate {
         }
         let over = zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
         favorites.isDropTarget = over
-        if over { favorites.hoverDrop(at: windowPoint) }
+        if over { favorites.hoverDrop(at: windowPoint, canSplit: canSplit) }
         return over
     }
 
     func listDropOnFavorites(_ tab: Tab) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
-        let index = sidebar.favorites.dropIndex
+        let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
-        favoriteWithUndo(tab, at: index)
+        if let split {
+            joinFavoriteWithUndo(tab, onto: split.id, onRight: split.onRight)
+        } else {
+            favoriteWithUndo(tab, at: index)
+        }
         return true
     }
 
@@ -1454,9 +1466,11 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
-        let index = sidebar.favorites.dropIndex
+        let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
-        if let tab = tabManager.bookmarkTab(for: bookmarkID) {
+        if let split, let pinned = Library.shared.bookmark(bookmarkID) {
+            joinFavoriteWithUndo(tabManager.pageTab(for: pinned), onto: split.id, onRight: split.onRight)
+        } else if let tab = tabManager.bookmarkTab(for: bookmarkID) {
             favoriteWithUndo(tab, at: index)
         } else {
             let before = Library.shared.snapshot

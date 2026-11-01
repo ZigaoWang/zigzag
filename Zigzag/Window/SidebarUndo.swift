@@ -110,6 +110,27 @@ extension BrowserWindowController {
         sidebarUndo.setActionName("Add to Favorites")
     }
 
+    /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side. ⌘Z puts the
+    /// favorite back on its own and the page back where it was.
+    func joinFavoriteWithUndo(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) {
+        let before = Library.shared.snapshot
+        let pinned = tab.bookmarkID
+        let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
+        guard tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) else { return }
+        let after = Library.shared.snapshot
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            guard controller.libraryUnchanged(since: after) else { return }
+            controller.tabManager.unsplit(tab)
+            Library.shared.restore(before)
+            tab.isFavorite = false
+            // A tab goes back into the list; a pinned page is pinned again by the restore.
+            if pinned == nil { controller.tabManager.returnToList(tab, at: oldIndex) }
+            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.joinFavoriteWithUndo(tab, onto: favoriteID, onRight: onRight) }
+            controller.sidebarUndo.setActionName("Split View")
+        }
+        sidebarUndo.setActionName("Split View")
+    }
+
     /// A favorite back to a regular tab in the list.
     func unfavoriteWithUndo(_ id: UUID, to index: Int) {
         let before = Library.shared.snapshot
