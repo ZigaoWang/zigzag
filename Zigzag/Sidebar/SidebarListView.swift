@@ -557,6 +557,7 @@ final class SidebarListView: NSView {
             (view as? SpaceHeaderView)?.canCollapse = !Library.shared.bookmarks(in: spaceID).isEmpty
             (view as? SpaceHeaderView)?.isCollapsed = Self.isCollapsed(spaceID)
             (view as? SpaceHeaderView)?.label.stringValue = privateLabel ? "Private" : spaceName
+            (view as? SpaceHeaderView)?.icon = privateLabel ? nil : Library.shared.space(spaceID)?.icon
             view.needsLayout = true
 
         case .separator:

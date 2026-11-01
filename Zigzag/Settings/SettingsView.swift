@@ -338,6 +338,22 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
             let base = space.swatch.usingColorSpace(.sRGB) ?? space.swatch
             NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
+            // Its icon if it has one, white on the color like the letter; an emoji in its own colors.
+            if let icon = space.icon {
+                let image = IconChoice.image(icon, size: 12)
+                let size = image.size
+                let spot = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
+                if IconChoice.isSymbol(icon), let tinted = image.copy() as? NSImage {
+                    tinted.lockFocus()
+                    NSColor.white.set()
+                    NSRect(origin: .zero, size: size).fill(using: .sourceAtop)
+                    tinted.unlockFocus()
+                    tinted.draw(in: spot)
+                } else {
+                    image.draw(in: spot)
+                }
+                return true
+            }
             let text = NSAttributedString(string: letter, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white])
             let size = text.size()
             text.draw(at: NSPoint(x: (side - size.width) / 2, y: (side - size.height) / 2))

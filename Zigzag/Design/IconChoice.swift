@@ -20,12 +20,13 @@ enum IconChoice {
         return emoji(icon, size: size)
     }
 
+    /// Exactly `size` square, like a symbol of that size, so it lines up wherever a symbol would. An emoji's glyph
+    /// runs wider than its font size, so it's set a little smaller and centered on its own ink.
     private static func emoji(_ text: String, size: CGFloat) -> NSImage {
-        let string = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size)])
-        let measured = string.size()
-        let side = max(measured.width, measured.height, size)
-        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            string.draw(at: NSPoint(x: (rect.width - measured.width) / 2, y: (rect.height - measured.height) / 2))
+        let string = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size * 0.8)])
+        let ink = string.boundingRect(with: NSSize(width: size * 4, height: size * 4), options: [.usesLineFragmentOrigin, .usesFontLeading])
+        return NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            string.draw(at: NSPoint(x: rect.midX - ink.midX, y: rect.midY - ink.midY))
             return true
         }
     }

@@ -140,6 +140,15 @@ final class AddressView: InteractiveView {
 final class SpaceDotView: InteractiveView {
     let spaceID: UUID
     private let dot = CALayer()
+    /// A space with an icon shows it here instead of a dot, quiet until it's the space you're in.
+    private let iconView = NSImageView()
+    var icon: String? {
+        didSet {
+            guard icon != oldValue else { return }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.small) }
+            stateDidChange(animated: false)
+        }
+    }
     var color: NSColor = .gray { didSet { stateDidChange(animated: false) } }
     var isDropTarget = false { didSet { stateDidChange(animated: true) } }
     /// While a swipe pulls toward or away from this space: how much it looks like the space you're in, 0 to 1,
@@ -158,6 +167,9 @@ final class SpaceDotView: InteractiveView {
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Space.x6, height: Tokens.Space.x6))
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
+        iconView.imageScaling = .scaleNone
+        iconView.isHidden = true
+        addSubview(iconView)
         setAccessibilityRole(.button)
     }
 
@@ -188,6 +200,12 @@ final class SpaceDotView: InteractiveView {
             self.dot.cornerRadius = height / 2
             self.dot.backgroundColor = self.cgColor(tint)
         }
+        iconView.frame = bounds
+        iconView.isHidden = icon == nil
+        iconView.contentTintColor = tint
+        // An emoji keeps its colors, so it says which space is yours by how strongly it shows.
+        iconView.alphaValue = icon.map(IconChoice.isSymbol) == false ? 0.45 + 0.55 * share : 1
+        dot.isHidden = icon != nil
         if changed && !Tokens.Motion.reduceMotion {
             CATransaction.begin()
             CATransaction.setAnimationDuration(0.28)
@@ -462,6 +480,7 @@ final class SidebarView: NSView {
         for dot in dots {
             guard let space = Library.shared.space(dot.spaceID) else { continue }
             dot.color = space.swatch
+            dot.icon = space.icon
             dot.isSelected = space.id == current
             dot.toolTip = space.name
             dot.setAccessibilityLabel("Space \(space.name)")

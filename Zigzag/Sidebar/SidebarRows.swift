@@ -513,6 +513,16 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
     private let chevron = NSImageView()
+    private let iconView = NSImageView()
+    /// The space's icon, before its name. Nil: the name alone.
+    var icon: String? {
+        didSet {
+            guard icon != oldValue else { return }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.small) }
+            iconView.isHidden = icon == nil
+            needsLayout = true
+        }
+    }
     var isCollapsed = false { didSet { stateDidChange(animated: false) } }
     /// Only spaces with bookmarks can fold.
     var canCollapse = false { didSet { stateDidChange(animated: false) } }
@@ -521,6 +531,10 @@ final class SpaceHeaderView: InteractiveView {
         super.init(frame: frame)
         chevron.imageScaling = .scaleNone
         chevron.contentTintColor = Tokens.Color.textTertiary
+        iconView.imageScaling = .scaleNone
+        iconView.contentTintColor = Tokens.Color.textSecondary
+        iconView.isHidden = true
+        addSubview(iconView)
         addSubview(label)
         addSubview(chevron)
         setAccessibilityRole(.button)
@@ -531,13 +545,19 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        let x = Tokens.Space.x2
+        var x = Tokens.Space.x2
+        if icon != nil {
+            let side = Tokens.Space.x4
+            iconView.frame = NSRect(x: x - 1, y: (bounds.height - side) / 2, width: side, height: side)
+            x = iconView.frame.maxX + Tokens.Space.x1
+        }
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
     }
 
     override func stateDidChange(animated: Bool) {
         label.textColor = isHovered && canCollapse ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        iconView.contentTintColor = label.textColor
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small - 2)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)

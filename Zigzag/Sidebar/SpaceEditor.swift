@@ -894,6 +894,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The name sits on a soft field, so it reads as something you can type into.
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let editor: SpaceLookEditor
+    /// The space's icon, at the start of its name; click it to choose one in place of the colors.
+    private let iconButton = IconButton(symbol: "circle.dashed", size: 26, symbolSize: Tokens.TypeSize.body, toolTip: "Choose Icon")
+    private var iconGrid: IconGrid?
     private var monitor: Any?
     static let width: CGFloat = 300
 
@@ -911,7 +914,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.field
-        [nameBackground, nameField, editor].forEach { addSubview($0) }
+        [nameBackground, nameField, editor, iconButton].forEach { addSubview($0) }
+        refreshIconButton(space.icon)
+        iconButton.onClick = { [weak self] _ in self?.toggleIcons() }
         editor.onPreview = { [weak self] look in
             guard let self else { return }
             (self.controller ?? BrowserWindowController.undoTarget)?.previewSpace(look)
@@ -932,7 +937,37 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let pad = Tokens.Space.x4
     private let nameHeight: CGFloat = 34
 
-    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + editor.preferredHeight + pad }
+    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
+
+    private func refreshIconButton(_ icon: String?) {
+        iconButton.glyph = icon.map { IconChoice.image($0, size: Tokens.TypeSize.body + 1) }
+        iconButton.isSelected = iconGrid != nil
+    }
+
+    /// The icons take the colors' place, and the button again (or picking one) brings the colors back.
+    private func toggleIcons() {
+        if let grid = iconGrid {
+            grid.removeFromSuperview()
+            iconGrid = nil
+            editor.isHidden = false
+        } else {
+            let grid = IconGrid(noneSymbol: "circle.dashed", selected: Library.shared.space(spaceID)?.icon)
+            grid.onPick = { [weak self] icon in
+                guard let self else { return }
+                Library.shared.setIcon(icon, forSpace: self.spaceID)
+                self.edited = true
+                self.refreshIconButton(icon)
+                // An emoji is typed one at a time; a symbol is one click and done.
+                if icon.map(IconChoice.isSymbol) != false { self.toggleIcons() }
+            }
+            addSubview(grid)
+            iconGrid = grid
+            editor.isHidden = true
+        }
+        refreshIconButton(Library.shared.space(spaceID)?.icon)
+        layoutContent()
+        resizeToFit()
+    }
 
     /// The panel grows or shrinks with the kind, keeping the edge nearest what opened it.
     private func resizeToFit() {
@@ -958,8 +993,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let width = bounds.width - pad * 2
         let fh = ceil(nameField.intrinsicContentSize.height)
         nameBackground.frame = NSRect(x: pad, y: pad, width: width, height: nameHeight)
-        nameField.frame = NSRect(x: pad + Tokens.Space.x2 + 2, y: pad + (nameHeight - fh) / 2, width: width - Tokens.Space.x4, height: fh)
+        let ib = iconButton.frame.width
+        iconButton.frame.origin = NSPoint(x: pad + (nameHeight - ib) / 2, y: pad + (nameHeight - ib) / 2)
+        let textX = pad + nameHeight
+        nameField.frame = NSRect(x: textX, y: pad + (nameHeight - fh) / 2, width: pad + width - textX - Tokens.Space.x2, height: fh)
         editor.frame = NSRect(x: pad, y: pad + nameHeight + Tokens.Space.x3, width: width, height: editor.preferredHeight)
+        iconGrid?.frame = NSRect(x: pad, y: pad + nameHeight + Tokens.Space.x3, width: width, height: IconGrid.height)
     }
 
     func show(from anchor: NSView? = nil) {
