@@ -18,11 +18,36 @@ struct InlineCompletionTests {
     }
 
     @Test func onlyTheHostsBeginningCounts() {
-        let sites = [site("https://en.wikipedia.org"), site("https://example.com/wiki")]
-        // Inside the host, or in its path, is not its start.
-        #expect(InlineCompletion.best(for: "pedia", among: [site("https://wikipedia.org")]) == nil)
-        #expect(InlineCompletion.best(for: "wiki", among: sites) == nil)
-        #expect(InlineCompletion.best(for: "en.wi", among: sites)?.text == "en.wikipedia.org")
+        // Inside a label, or in the path, is not a beginning.
+        #expect(InlineCompletion.best(for: "pedia", among: [site("https://en.wikipedia.org")]) == nil)
+        #expect(InlineCompletion.best(for: "wiki", among: [site("https://example.com/wiki")]) == nil)
+        #expect(InlineCompletion.best(for: "en.wi", among: [site("https://en.wikipedia.org")])?.text == "en.wikipedia.org")
+        // A public suffix is never a site of its own.
+        #expect(InlineCompletion.best(for: "co", among: [site("https://news.bbc.co.uk")]) == nil)
+        #expect(InlineCompletion.best(for: "local", among: [site("http://printer.local")]) == nil)
+    }
+
+    @Test func aSubdomainDropsAway() {
+        let wiki = InlineCompletion.best(for: "wiki", among: [site("https://en.wikipedia.org/wiki/Swift")])
+        #expect(wiki?.text == "wikipedia.org")
+        #expect(wiki?.url.absoluteString == "https://wikipedia.org")
+        #expect(InlineCompletion.best(for: "you", among: [site("https://m.youtube.com")])?.text == "youtube.com")
+        #expect(InlineCompletion.best(for: "goo", among: [site("https://docs.google.com")])?.text == "google.com")
+        #expect(InlineCompletion.best(for: "bb", among: [site("https://news.bbc.co.uk")])?.text == "bbc.co.uk")
+        #expect(InlineCompletion.best(for: "dev", among: [site("https://a.dev.example.com")])?.text == "dev.example.com")
+        #expect(InlineCompletion.shortenedHosts("a.b.example.co.uk") == ["b.example.co.uk", "example.co.uk"])
+        #expect(InlineCompletion.shortenedHosts("example.com").isEmpty)
+        #expect(InlineCompletion.shortenedHosts("192.168.1.1").isEmpty)
+    }
+
+    @Test func aWholeHostBeatsAShortenedOne() {
+        // en.wikipedia.org is used far more, but wikihow.com starts with what you typed as it is.
+        let sites = [site("https://en.wikipedia.org", 50), site("https://www.wikihow.com", 1)]
+        #expect(InlineCompletion.best(for: "wiki", among: sites)?.text == "wikihow.com")
+        #expect(InlineCompletion.best(for: "wikip", among: sites)?.text == "wikipedia.org")
+        // Two that both only match shortened: the more used.
+        let both = [site("https://de.wikipedia.org", 2), site("https://en.wikipedia.org", 7)]
+        #expect(InlineCompletion.best(for: "wiki", among: both)?.text == "wikipedia.org")
     }
 
     @Test func matchesWithAndWithoutWWW() {
@@ -133,5 +158,19 @@ struct InlineCompletionTests {
         #expect(git.first?.entry.url.absoluteString == "https://github.com/zigzag/app")
         let sites = git.compactMap { entry, score in InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) } }
         #expect(InlineCompletion.best(for: "gi", among: sites)?.text == "github.com/zigzag/app")
+    }
+
+    @Test func historyFindsASiteBehindItsSubdomain() {
+        let store = HistoryStore(path: ":memory:")
+        store.recordVisit(url: URL(string: "https://en.wikipedia.org/wiki/Swift")!, title: "Swift", at: Date(), count: 3)
+        store.recordVisit(url: URL(string: "https://example.com/wiki_page")!, title: "Wiki", at: Date(), count: 3)
+        // Not by the indexed lookup, which only sees hosts' beginnings.
+        #expect(store.completionSites(for: "wiki").isEmpty)
+        let found = store.completionSites(for: "wiki", afterSubdomain: true)
+        #expect(found.map { HistoryStore.normalizedHost($0.entry.url) } == ["en.wikipedia.org"])
+        // "_" and "%" are letters to look for, not patterns.
+        #expect(store.completionSites(for: "w_ki", afterSubdomain: true).isEmpty)
+        let sites = found.compactMap { entry, score in InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) } }
+        #expect(InlineCompletion.best(for: "wiki", among: sites)?.text == "wikipedia.org")
     }
 }
