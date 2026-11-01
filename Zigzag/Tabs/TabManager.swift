@@ -651,6 +651,7 @@ final class TabManager {
             // opens fresh at its own address next time.
             bookmarkTabs[bookmarkID] = nil
             recentTabIDs.removeAll { $0 == tab.id }
+            tabTokens[tab.id] = nil
             tab.close()
             changed.send(.structure)
             if wasSelected { selectAfterClosing(tab, index: 0) }
@@ -663,6 +664,7 @@ final class TabManager {
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
         recentTabIDs.removeAll { $0 == tab.id }
+        tabTokens[tab.id] = nil
         tab.close()
         changed.send(.structure)
         if wasSelected { selectAfterClosing(tab, index: index) }
@@ -679,6 +681,7 @@ final class TabManager {
             tabsBySpace[tab.spaceID] = list
         }
         recentTabIDs.removeAll { $0 == tab.id }
+        tabTokens[tab.id] = nil
         tab.close()
         changed.send(.structure)
     }
@@ -1095,6 +1098,7 @@ final class TabManager {
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
             recentTabIDs.removeAll { $0 == tab.id }
+            tabTokens[tab.id] = nil
             tab.close()
         }
         changed.send(.structure)
