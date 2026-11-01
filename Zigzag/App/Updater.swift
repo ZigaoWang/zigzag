@@ -160,7 +160,9 @@ nonisolated enum ProfileBackup {
         // The new copy waits for this one to finish saving before it starts reading.
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done; open \"\(app.path)\""]
+        // The path and process go in as arguments, never into the script itself.
+        task.arguments = ["-c", "while kill -0 \"$2\" 2>/dev/null; do sleep 0.2; done; open \"$1\"",
+                          "sh", app.path, String(ProcessInfo.processInfo.processIdentifier)]
         try? task.run()
         NSApp.terminate(nil)
     }
