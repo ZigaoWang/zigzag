@@ -332,22 +332,16 @@ final class SidebarListView: NSView {
             Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { view.removeFromSuperview() })
             return
         }
-        layer.masksToBounds = true
         CATransaction.begin()
         CATransaction.setCompletionBlock { view.removeFromSuperview() }
-        let shut = CABasicAnimation(keyPath: "bounds.size.height")
-        shut.fromValue = layer.presentation()?.bounds.height ?? layer.bounds.height
-        shut.toValue = 0
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = layer.presentation()?.opacity ?? 1
+        let shown = layer.presentation()?.opacity ?? 1
+        reveal(layer, from: layer.bounds.height, to: 0)
+        let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.standard)
+        fade.fromValue = shown
         fade.toValue = 0
-        for animation in [shut, fade] {
-            animation.duration = Tokens.Motion.standard
-            animation.timingFunction = Tokens.Motion.easeOut
-            animation.fillMode = .forwards
-            animation.isRemovedOnCompletion = false
-            layer.add(animation, forKey: animation.keyPath)
-        }
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        layer.add(fade, forKey: "opacity")
         CATransaction.commit()
     }
 
@@ -355,15 +349,27 @@ final class SidebarListView: NSView {
     /// with the rows below making room. From the keyboard or with Reduce Motion it's simply there.
     private func grow(_ view: NSView) {
         guard let layer = view.layer, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion else { return }
-        layer.masksToBounds = true
         CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak layer] in layer?.masksToBounds = false }
-        let open = Tokens.Motion.easeAnimation(keyPath: "bounds.size.height", duration: Tokens.Motion.standard)
-        open.fromValue = 0
-        open.toValue = layer.bounds.height
-        open.fillMode = .backwards
-        layer.add(open, forKey: "grow")
+        CATransaction.setCompletionBlock { [weak layer] in layer?.mask = nil }
+        reveal(layer, from: 0, to: layer.bounds.height)
         CATransaction.commit()
+    }
+
+    /// Shows a row's top `from`...`to` points through a mask, on the same curve and pace as the rows gliding around
+    /// it (`Motion.standard`, ease in-out), so the two edges move together and nothing overlaps.
+    private func reveal(_ layer: CALayer, from: CGFloat, to: CGFloat) {
+        let mask = CALayer()
+        mask.backgroundColor = NSColor.black.cgColor
+        mask.anchorPoint = .zero
+        mask.position = .zero
+        mask.bounds = CGRect(x: 0, y: 0, width: layer.bounds.width, height: to)
+        layer.mask = mask
+        let open = Tokens.Motion.easeAnimation(keyPath: "bounds.size.height", duration: Tokens.Motion.standard)
+        open.timingFunction = Tokens.Motion.easeInOut
+        open.fromValue = from
+        open.toValue = to
+        open.fillMode = .backwards
+        mask.add(open, forKey: "reveal")
     }
 
     /// The page each row showed at the last update.
