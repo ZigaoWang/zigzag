@@ -335,7 +335,13 @@ final class TabSwitcher {
 
     private func begin(backwards: Bool) {
         guard let controller else { return }
-        tabs = Array(controller.tabManager.recentTabs.prefix(9))
+        let manager = controller.tabManager
+        // A split is one card, as on the desk: the half you were on last stands for both.
+        var seen: Set<UUID> = []
+        tabs = Array(manager.recentTabs.filter { tab in
+            defer { seen.insert(tab.id) }
+            return manager.partner(of: tab).map { !seen.contains($0.id) } ?? true
+        }.prefix(9))
         guard tabs.count > 1 else { return }
         controller.tabManager.selectedTab?.captureSnapshot()
         isActive = true
@@ -364,7 +370,12 @@ final class TabSwitcher {
         let thumbHeight = round((thumbWidth - Tokens.Space.x4) * aspect) + TabThumbnailView.titleHeight + Tokens.Space.x2
         thumbs = tabs.enumerated().map { i, tab in
             let thumb = TabThumbnailView()
-            thumb.configure(tab)
+            if let pair = controller.tabManager.split(for: tab), let left = controller.tabManager.tab(with: pair.left),
+               let right = controller.tabManager.tab(with: pair.right) {
+                thumb.configure(left, partner: right, split: (CGFloat(pair.ratio), pair.vertical))
+            } else {
+                thumb.configure(tab)
+            }
             thumb.showsHover = false
             thumb.frame = NSRect(x: pad + CGFloat(i) * (thumbWidth + gap), y: pad, width: thumbWidth, height: thumbHeight)
             thumb.onClick = { [weak self] _ in self?.index = i; self?.commit() }
@@ -393,7 +404,8 @@ final class TabSwitcher {
         guard isActive else { return }
         let target = tabs.indices.contains(index) ? tabs[index] : nil
         finish()
-        if let target { controller?.tabManager.select(target) }
+        // Closed while the switcher was up: nothing to switch to.
+        if let target, let manager = controller?.tabManager, manager.tab(with: target.id) === target { manager.select(target) }
     }
 
     private func cancel() { finish() }
