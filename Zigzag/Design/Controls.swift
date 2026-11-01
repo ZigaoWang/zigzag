@@ -1767,6 +1767,26 @@ final class SlidingSwitch: NSView {
             }
         }
         setAccessibilityRole(.radioGroup)
+        // One radio button per choice for VoiceOver, each chosen with a press.
+        segments = items.enumerated().map { i, item in
+            let element = SegmentElement()
+            element.setAccessibilityParent(self)
+            switch item {
+            case .text(let title), .styled(let title, _): element.setAccessibilityLabel(title)
+            case .symbol(_, let tip): element.setAccessibilityLabel(tip)
+            }
+            element.press = { [weak self] in self?.choose(i) }
+            return element
+        }
+        setAccessibilityChildren(segments)
+    }
+
+    private var segments: [SegmentElement] = []
+
+    private func choose(_ index: Int) {
+        guard index != selectedIndex else { return }
+        selectedIndex = index
+        onChange?(index)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1792,6 +1812,7 @@ final class SlidingSwitch: NSView {
             label.frame = NSRect(x: r.minX, y: (r.midY - label.lineHeight / 2).rounded(), width: r.width, height: label.lineHeight)
         }
         for (i, icon) in icons.enumerated() { icon.frame = segment(i) }
+        for (i, element) in segments.enumerated() { element.setAccessibilityFrameInParentSpace(segment(i)) }
         layoutPill(animated: false)
         effectiveAppearance.performAsCurrentDrawingAppearance {
             pill.layer?.shadowColor = NSColor.black.withAlphaComponent(0.14).cgColor
@@ -1815,6 +1836,7 @@ final class SlidingSwitch: NSView {
             label.textColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
         for (i, icon) in icons.enumerated() { icon.contentTintColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.icon }
+        for (i, element) in segments.enumerated() { element.setAccessibilityValue(i == selectedIndex ? 1 : 0) }
     }
 
     /// The labels span whole segments, so a click anywhere lands on the switch, not on a label.
@@ -1824,10 +1846,23 @@ final class SlidingSwitch: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let x = convert(event.locationInWindow, from: nil).x
-        let index = min(max(Int((x - inset) / segmentWidth), 0), items.count - 1)
-        guard index != selectedIndex else { return }
-        selectedIndex = index
-        onChange?(index)
+        choose(min(max(Int((x - inset) / segmentWidth), 0), items.count - 1))
+    }
+}
+
+/// One choice of a sliding switch, for VoiceOver: a radio button that a press chooses.
+nonisolated private final class SegmentElement: NSAccessibilityElement {
+    var press: (@MainActor () -> Void)?
+
+    override init() {
+        super.init()
+        setAccessibilityRole(.radioButton)
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        let press = press
+        MainActor.assumeIsolated { press?() }
+        return true
     }
 }
 
