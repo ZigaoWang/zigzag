@@ -226,10 +226,6 @@ final class FavoriteTile: InteractiveView {
         layer?.cornerRadius = Tokens.Radius.card
         layer?.cornerCurve = .continuous
         addSubview(icon)
-        openDot.wantsLayer = true
-        openDot.layer?.cornerRadius = Self.dotSide / 2
-        openDot.isHidden = true
-        addSubview(openDot)
         toolTip = bookmark?.title
         setAccessibilityRole(.button)
         setAccessibilityLabel(bookmark?.title)
@@ -254,13 +250,14 @@ final class FavoriteTile: InteractiveView {
 
     private func refreshLoading() {
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        if let favicon = tab?.favicon, !(tab?.isLoading ?? false) { icon.image = favicon }
+        if let favicon = tab?.favicon, !(tab?.isLoading ?? false) { icon.image = favicon; needsLayout = true }
     }
 
     func refreshIcon() {
         guard let bookmark else { return }
         if let image = FaviconStore.shared.cachedIcon(for: bookmark.url) {
             icon.image = image
+            needsLayout = true
         } else {
             FaviconStore.shared.prefetch(for: bookmark.url)
         }
@@ -268,11 +265,10 @@ final class FavoriteTile: InteractiveView {
 
     override func layout() {
         super.layout()
-        // At its own 16pt, like a tab's icon: any other size scales the bitmap unevenly and blurs it.
-        let size = Tokens.Metric.favicon
-        icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
-        let dot = Self.dotSide
-        openDot.frame = NSRect(x: (bounds.width - dot) / 2, y: isFlipped ? bounds.height - dot - 5 : 5, width: dot, height: dot)
+        // Big enough to read at a glance when the site gives a sharp icon; a small one stays at a tab's 16pt rather
+        // than being stretched and blurred.
+        let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Metric.favicon
+        icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         let side = Self.closeSide
         closeButton.frame = NSRect(x: bounds.width - side - 4, y: isFlipped ? 4 : bounds.height - side - 4, width: side, height: side)
     }
@@ -285,11 +281,9 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Every favorite shows its icon in full (faded means old elsewhere in Zigzag). One that's open has a small
-        // dot under its icon, as an app open in the Dock does; the one you're on is lit instead.
+        // Every favorite looks the same at rest, as in Arc: the one you're on is lit, and one that's open shows its ×
+        // under the pointer.
         icon.alphaValue = 1
-        openDot.isHidden = !isOpen || isSelected
-        openDot.color = Tokens.Color.textSecondary
         let fill: NSColor
         if isSelected {
             // The favorite you're on stands clearly apart from the resting tiles beside it.
@@ -310,8 +304,7 @@ final class FavoriteTile: InteractiveView {
         layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
     }
 
-    private let openDot = ColorView(color: Tokens.Color.textSecondary)
-    private static let dotSide: CGFloat = 4
+    private static let iconSide: CGFloat = 22
 
     private static let selected = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.95), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
     private static let selectedHover = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 1), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.24))
