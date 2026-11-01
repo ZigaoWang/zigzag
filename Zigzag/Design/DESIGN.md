@@ -194,6 +194,41 @@ something came from, answers at once, and can be interrupted.
   `.isOutlined` for the page look, white with a hairline and a faint shadow like the buttons beside it, which a
   page's header gives its search; `FilledField.search` with the magnifying glass.
 
+## Materials
+
+For brand moments (onboarding, Import, About) only, never for the browser's everyday chrome: things drawn as
+objects under one light straight above. `Materials.swift` holds them; every value is in `Tokens.Material`.
+
+- **Light**: highlights on top edges, shadows straight down, tinted with the navy (`Material.shadowInk`), deeper in
+  dark mode (`darkShadowGain`). Every lifted thing has two shadows, a tight contact one and a soft ambient one
+  (`CastShadow`, from a path, so they cost nothing to move).
+- **`SkyBackdrop`**: the world they stand in. Zigzag's own colors as a sky (pale ribbon blue by day, deep navy by
+  night), a few soft drifting fields (`Atmosphere`), grain, and a pool of light from above. Never stock gradients.
+- **`GlassSurface`**: the one panel. Liquid Glass (frost before macOS 26) under a wash brighter at the top, a glow
+  inside the edge, a specular rim on the top edge with a faint catch light on the bottom, grain, and a hot spot that
+  leans toward `light` (the pointer). `Radius`: `Material.heroRadius`. One per screen; nothing nests in it but
+  controls.
+- **`RaisedTile`** (and `RaisedTileLayers` for a 3D scene): the app-icon object. Continuous corners at
+  `tileCorner` of its side, a porcelain or colored body, a bevel (light top edge, darker bottom one), a hairline, a
+  hot spot that slides toward the pointer. A site's own square icon fills the face (`fillsFace`). Hover lifts it
+  `tileLift` and grows its shadow; it turns up to `Material.tilt` degrees toward the pointer.
+- **`TactileButton`**: a capsule `controlHeight` tall. `.primary` is glossy in the accent with a shadow of its own
+  color, one per surface; `.secondary` is porcelain. Hover rises `lift`; pressed it sinks `sink`, shrinks to
+  `pressScale`, its gradient turns over and its shadow tightens.
+- **`TactileToggle`**: a glassy knob on its own shadows in a recessed track; the accent fills the track when on.
+  With a title, the whole row is the control. Pressed, the knob stretches toward where it's going.
+- **`RecessedField`**: set into the surface: darker under the top lip, an inner shadow, the lower lip catching
+  light. Typing, the accent rings it with a soft glow.
+- **`EmbossedWordmark`**: the drawn ZIGZAG as a beveled object with a glint that follows the pointer.
+- **Recipes**: `MaterialShape.rounded` (continuous corners as a path), `GradientStroke` (rims, bevels, lips),
+  `InnerShadow` (recesses), `MaterialMotion` (the ease-out, poses, tilt), `OcclusionPause`.
+
+Motion: the material ease-out (`Motion.easeOut`), no bounce, interruptible (each change starts where the last got
+to). A material object's hover moves (`settle`, 0.2) rather than appearing at once, because a thing is moving, not a
+fill changing; pressing in is quicker (`pressIn`). Turning toward the pointer is slower (`follow`), for weight.
+From the keyboard everything is instant; with Reduce Motion nothing drifts, tilts or lifts. Drift pauses while the
+window is out of sight. Text stays on the wash or a solid surface, at AA contrast; effects never sit under it.
+
 ## Words
 
 US English. No em dashes, no "A · B · C" lines, no filler. Labels say what a thing is; nothing explains itself.
