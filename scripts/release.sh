@@ -100,7 +100,9 @@ md += ("\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires
 open(f"{out}/notes.md", "w", encoding="utf-8").write(md)
 PY
 }
-GENERATE=$(find build/rd/SourcePackages build/dd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1)
+# Sparkle's tool comes with the package the archive just resolved.
+GENERATE=$(find build/rd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1 || true)
+[[ -x "$GENERATE" ]] || { echo "Sparkle's generate_appcast wasn't found under build/rd."; exit 1; }
 
 if [[ "${1:-}" == "--beta" ]]; then
   # Only the beta feed: everyone else stays on the stable one. The zip sits with the other releases.
