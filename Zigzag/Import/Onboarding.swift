@@ -1940,7 +1940,7 @@ final class LiveBrowser: NSView {
     var page: Page = .wikipedia { didSet { needsDisplay = true } }
     var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
     private var background: NSColor = SpaceColor.sky.background
-    /// Where a gradient ends, which way it runs, how grainy, and whether it's glass: the frame as the real one draws it.
+    /// Where a gradient ends, which way it runs, how grainy, and whether it's see-through: the frame as the real one draws it.
     private var background2: NSColor?
     private var angle: Double = 90
     private var grain: Double = 0
@@ -1976,10 +1976,10 @@ final class LiveBrowser: NSView {
         appearance = look == "dark" ? NSAppearance(named: .darkAqua) : look == "light" ? NSAppearance(named: .aqua) : nil
         effectiveAppearance.performAsCurrentDrawingAppearance {
             self.isDark = self.effectiveAppearance.isDark
-            self.glass = space?.glass == true
-            let bg = self.glass ? space?.glassColor ?? .clear : space?.background ?? SpaceColor.sky.background
+            self.glass = space?.isSeeThrough == true
+            let bg = space?.frameColor ?? SpaceColor.sky.background
             self.background = bg.usingColorSpace(.sRGB) ?? bg
-            self.background2 = self.glass ? nil : space?.background2.map { $0.usingColorSpace(.sRGB) ?? $0 }
+            self.background2 = space?.frameColor2.map { $0.usingColorSpace(.sRGB) ?? $0 }
             self.angle = space?.gradientAngle ?? 90
             self.grain = space?.grain ?? 0
             self.accent = Brand.Theme.of(space).accent.usingColorSpace(.sRGB) ?? Brand.Theme.brand.accent

@@ -59,35 +59,53 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var intensity2: Double? = nil
     /// Which way the gradient runs, in degrees (0: left to right, 90: top to bottom). Nil: 45, top left to bottom right.
     var angle: Double? = nil
-    /// The frame is frosted glass: the desktop shows through, softly tinted. Nil: solid.
+    /// Saved before 0.4, when see-through was a look of its own, washed white to black. Read once by `upgraded`,
+    /// which turns it into `translucency`; never set now.
     var glass: Bool? = nil
     /// How light or dark the space is, from 0 (lightest) to 1 (darkest); the window's mode follows it.
     /// Nil: automatic, light by day and dark at night with the system.
     var brightness: Double? = nil
     /// The second color's own brightness; nil: the same as the first.
     var brightness2: Double? = nil
+    /// How much of its hue the color has, from 0 (none: white, a gray or black) to 1 (all of it). Nil: all.
+    var tint: Double? = nil
+    /// The second color's own tint. Nil: all of it.
+    var tint2: Double? = nil
+    /// How much of the desktop shows through the frame, from 0 (solid) to 1 (the most). Nil: solid.
+    var translucency: Double? = nil
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
-    /// What washes over the glass: white to black with the brightness, or with the system when automatic.
-    var glassColor: NSColor {
-        brightness.map { NSColor(white: 1 - CGFloat($0), alpha: 0.5) }
-            ?? Tokens.Color.dynamic(light: NSColor(white: 1, alpha: 0.5), dark: NSColor(white: 0, alpha: 0.5))
-    }
 
     /// No hue of its own: white, a gray, or black.
-    var isNeutral: Bool { hue == nil && color.isNeutral }
+    var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
+    /// How much of its hue the first color has, 0 for white, grays and black.
+    var tintAmount: Double { isNeutral ? 0 : min(max(tint ?? 1, 0), 1) }
+    var tintAmount2: Double { min(max(tint2 ?? 1, 0), 1) }
 
-    /// The window frame color for this space.
+    /// How much of the desktop shows through, 0 when solid.
+    var seeThrough: Double { min(max(translucency ?? 0, 0), 1) }
+    var isSeeThrough: Bool { seeThrough > 0.005 }
+    /// How much the space's color covers the desktop behind a see-through frame: never less than a fifth, so the
+    /// color still reads and text keeps something to stand on.
+    var coverage: CGFloat { CGFloat(1 - 0.8 * seeThrough) }
+
+    /// The window frame color for this space, solid.
     var background: NSColor {
-        if let brightness { return SpaceColor.paint(hue: baseHue, depth: brightness, neutral: isNeutral) }
+        if let brightness { return SpaceColor.paint(hue: baseHue, depth: brightness, tint: tintAmount) }
+        if isNeutral {
+            // Following the Mac and see-through: clear white by day, smoked black at night.
+            if isSeeThrough { return Tokens.Color.dynamic(light: .white, dark: .black) }
+            return color.isNeutral ? color.background : SpaceColor.graphite.background
+        }
         return hue.map { SpaceColor.background(hue: $0, intensity: intensity ?? SpaceColor.defaultIntensity) } ?? color.background
     }
     /// The strong version, for dots and swatches.
     var swatch: NSColor {
         if let brightness {
             return isNeutral ? NSColor(white: 0.86 - 0.56 * brightness, alpha: 1)
-                : SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * brightness)
+                : SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * brightness, tint: tintAmount)
         }
+        if isNeutral { return color.isNeutral ? color.swatch : SpaceColor.graphite.swatch }
         return hue.map(SpaceColor.swatch(hue:)) ?? color.swatch
     }
     /// The hue the space is built on, curated or custom.
@@ -95,16 +113,51 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// Where the gradient ends.
     var background2: NSColor? {
         hue2.map { h in
-            if let depth = brightness2 ?? brightness { return SpaceColor.paint(hue: h, depth: depth) }
+            if let depth = brightness2 ?? brightness { return SpaceColor.paint(hue: h, depth: depth, tint: tintAmount2) }
             return SpaceColor.background(hue: h, intensity: intensity2 ?? intensity ?? SpaceColor.defaultIntensity)
         }
     }
     var gradientAngle: Double { angle ?? 45 }
 
+    /// The frame as the window lays it down: the color, thinned when see-through so the desktop shows under it.
+    var frameColor: NSColor { Self.covering(background, by: isSeeThrough ? coverage : 1) }
+    var frameColor2: NSColor? { background2.map { Self.covering($0, by: isSeeThrough ? coverage : 1) } }
+
+    /// `color` at `alpha`, still following light and dark when it does.
+    private static func covering(_ color: NSColor, by alpha: CGFloat) -> NSColor {
+        guard alpha < 1 else { return color }
+        return NSColor(name: nil) { appearance in
+            var resolved = color
+            appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) ?? color }
+            return resolved.withAlphaComponent(alpha)
+        }
+    }
+
+    /// How see-through a space saved as glass before 0.4 becomes: its old wash covered the desktop by half.
+    static let glassTranslucency = 0.625
+
+    /// The space as this version keeps it, looking just as it did: white, grays and black get no tint, and glass
+    /// becomes a see-through gray at the shade it had.
+    var upgraded: SpaceInfo {
+        var space = self
+        if hue == nil, color.isNeutral, tint == nil { space.tint = 0 }
+        if glass == true {
+            space.glass = nil
+            space.translucency = translucency ?? Self.glassTranslucency
+            space.tint = 0
+            space.hue2 = nil
+            space.brightness2 = nil
+            space.tint2 = nil
+            space.brightness = brightness.map { SpaceColor.depth(ofWhite: 1 - $0) }
+        }
+        return space
+    }
+
     /// Light or dark for the window: whichever text reads better on this space's own colors, judged at the
-    /// harder end of a gradient. Glass and spaces that follow the Mac keep what they were given.
+    /// harder end of a gradient. See-through spaces are judged the same way: the frosting under them follows the
+    /// mode chosen, so it lands on the same side. Spaces that follow the Mac keep what they were given.
     var readableAppearance: String? {
-        guard brightness != nil, glass != true else { return appearance }
+        guard brightness != nil else { return appearance }
         let colors = [background] + (background2.map { [$0] } ?? [])
         func luminance(_ color: NSColor) -> Double {
             guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
@@ -211,7 +264,7 @@ final class Library {
 
     private init() {
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
-            spaces = stored.spaces
+            spaces = stored.spaces.map(\.upgraded)
             favorites = stored.favorites ?? []
             favoriteSplits = stored.favoriteSplits ?? []
             searchEngine = stored.searchEngine
@@ -276,6 +329,7 @@ final class Library {
         spaces[i].color = color
         spaces[i].hue = nil
         spaces[i].intensity = nil
+        spaces[i].tint = nil
         commit()
     }
 
@@ -303,7 +357,10 @@ final class Library {
         spaces[i].brightness = look.brightness
         spaces[i].brightness2 = look.brightness2
         spaces[i].angle = look.angle
-        spaces[i].glass = look.glass
+        spaces[i].tint = look.tint
+        spaces[i].tint2 = look.tint2
+        spaces[i].translucency = look.translucency
+        spaces[i].glass = nil
         spaces[i].grain = look.grain
         spaces[i].appearance = look.appearance
         commit()
@@ -329,12 +386,6 @@ final class Library {
         commit()
     }
 
-    func setGlass(_ on: Bool, for id: UUID) {
-        guard let i = index(of: id) else { return }
-        spaces[i].glass = on ? true : nil
-        commit()
-    }
-
     func setGrain(_ grain: Double, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].grain = grain > 0.01 ? min(grain, 1) : nil
@@ -344,6 +395,7 @@ final class Library {
     func setHue(_ hue: Double, intensity: Double? = nil, for id: UUID) {
         guard let i = index(of: id) else { return }
         spaces[i].hue = hue
+        spaces[i].tint = nil
         if let intensity { spaces[i].intensity = intensity }
         commit()
     }

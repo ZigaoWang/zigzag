@@ -1,21 +1,26 @@
 import AppKit
 
 /// The space's color wheel: a disc of small dots, each painted the very color it gives. Around the disc picks the
-/// hue; the middle is white, and toward the rim the color deepens until it's nearly black, with the window turning
-/// dark past halfway. Drag the knob, or click any dot to jump there. With a gradient there are two knobs, and a drag
-/// moves whichever is nearer.
+/// hue, and out from the middle how much of it: the rim is the color at its fullest, the middle no color at all,
+/// white, a gray or black. Every dot shows at the depth the Shade slider sets. Drag a knob, or click anywhere to bring
+/// the selected knob there. With two colors there are two knobs; clicking one selects it.
 final class ColorWheel: NSView {
     struct Spot: Equatable {
         var hue: Double
-        var depth: Double
+        /// How much color, from none in the middle (0) to all of it at the rim (1).
+        var amount: Double
     }
 
     /// One or two: the color, or where a gradient starts and ends.
-    private(set) var spots: [Spot] = [Spot(hue: 0.6, depth: 0.3)]
-    /// A gray or black has no hue: its knob sits in the middle, showing that gray, until you move it.
-    private(set) var knobColors: [NSColor] = []
+    private(set) var spots: [Spot] = [Spot(hue: 0.6, amount: 1)]
+    /// How deep each knob's color is, for its fill.
+    private(set) var depths: [Double] = [0.3]
+    /// The knob the wheel, the Shade slider and VoiceOver act on.
+    private(set) var selected = 0
     /// Called while dragging (`final` false) and once on release (`final` true), with which knob moved.
     var onChange: ((Int, Spot, Bool) -> Void)?
+    /// A knob was clicked and is now the selected one.
+    var onSelect: ((Int) -> Void)?
 
     private let dots = CALayer()
     /// A faint disc behind the dots, so the wheel stays round where its deepest colors meet a dark panel.
@@ -24,7 +29,10 @@ final class ColorWheel: NSView {
     /// With a gradient, a line from one knob to the other: the two are one gradient, from here to there.
     private let link = CAShapeLayer()
     private var paintedSize: CGSize = .zero
+    private var paintedDepth: Double = -1
     private var pressed: Int?
+    private var shownCount = 1
+    private let elements = [KnobElement(), KnobElement()]
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -43,6 +51,13 @@ final class ColorWheel: NSView {
         knobs.forEach { layer?.addSublayer($0.layer) }
         setAccessibilityRole(.group)
         setAccessibilityLabel("Color")
+        for (i, element) in elements.enumerated() {
+            element.setAccessibilityParent(self)
+            element.setAccessibilityRole(.slider)
+            element.setAccessibilityLabel(i == 0 ? "Color" : "Second color")
+            element.step = { [weak self] amount, hue in self?.nudge(i, amount: amount, hue: hue) }
+            element.addHueActions()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -56,11 +71,14 @@ final class ColorWheel: NSView {
         needsLayout = true
     }
 
-    /// Shows these spots; `animated` glides the knobs there, as when a preset is picked.
-    func show(_ spots: [Spot], colors: [NSColor], animated: Bool) {
+    /// Shows these spots, the dots at the selected one's depth; `animated` glides the knobs there, as when a preset is
+    /// picked, and a second knob comes out of the first.
+    func show(_ spots: [Spot], depths: [Double], selected: Int, animated: Bool) {
         self.spots = spots
-        knobColors = colors
-        placeKnobs(animated: animated)
+        self.depths = depths
+        self.selected = min(selected, spots.count - 1)
+        if abs(depths[self.selected] - paintedDepth) > 0.001 { paintDots() }
+        placeKnobs(animated: animated && !Tokens.Motion.reduceMotion)
     }
 
     private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
@@ -68,18 +86,18 @@ final class ColorWheel: NSView {
 
     private func point(_ spot: Spot) -> CGPoint {
         let a = spot.hue * 2 * .pi - .pi / 2
-        let r = radius * CGFloat(spot.depth)
+        let r = radius * CGFloat(spot.amount)
         return CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
     }
 
     private func spot(at p: CGPoint, keeping hue: Double) -> Spot {
         let dx = p.x - center.x, dy = p.y - center.y
-        let depth = min(Double(hypot(dx, dy) / radius), 1)
-        // Right in the middle every hue is the same white: keep the one it had.
-        guard depth > 0.03 else { return Spot(hue: hue, depth: depth) }
+        let amount = min(Double(hypot(dx, dy) / radius), 1)
+        // Right in the middle every hue is the same gray: keep the one it had.
+        guard amount > 0.03 else { return Spot(hue: hue, amount: amount) }
         var h = (atan2(dy, dx) + .pi / 2) / (2 * .pi)
         if h < 0 { h += 1 }
-        return Spot(hue: Double(h), depth: depth)
+        return Spot(hue: Double(h), amount: amount)
     }
 
     override func layout() {
@@ -94,9 +112,11 @@ final class ColorWheel: NSView {
         placeKnobs(animated: false)
     }
 
-    /// The dots on a honeycomb, so the disc's edge reads round. They never change, so they're painted once.
+    /// The dots on a honeycomb, so the disc's edge reads round, painted again whenever the depth changes.
     private func paintDots() {
         paintedSize = bounds.size
+        let depth = depths[min(selected, depths.count - 1)]
+        paintedDepth = depth
         let scale = window?.backingScaleFactor ?? 2
         let w = Int(bounds.width * scale), h = Int(bounds.height * scale)
         guard w > 0, h > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
@@ -116,7 +136,7 @@ final class ColorWheel: NSView {
                 let x = center.x + CGFloat(column) * step + offset
                 guard hypot(x - center.x, y - center.y) <= radius - size / 2 + 0.5 else { continue }
                 let spot = spot(at: CGPoint(x: x, y: y), keeping: 0)
-                context.setFillColor(SpaceColor.paint(hue: spot.hue, depth: spot.depth).cgColor)
+                context.setFillColor(SpaceColor.paint(hue: spot.hue, depth: depth, tint: spot.amount).cgColor)
                 context.fillEllipse(in: CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size))
             }
         }
@@ -128,17 +148,26 @@ final class ColorWheel: NSView {
     }
 
     private func placeKnobs(animated: Bool) {
+        // A second knob just added starts on the first and slides out from it.
+        if animated, spots.count > shownCount, spots.count > 1 {
+            Tokens.Motion.withoutAnimation {
+                knobs[1].layer.position = point(spots[0])
+                knobs[1].layer.isHidden = false
+            }
+        }
+        shownCount = spots.count
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(0.24)
-        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeInOut)
+        CATransaction.setAnimationDuration(Tokens.Motion.standard)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         for (i, knob) in knobs.enumerated() {
             knob.layer.isHidden = i >= spots.count
             guard i < spots.count else { continue }
             knob.layer.position = point(spots[i])
-            knob.fill = i < knobColors.count ? knobColors[i] : SpaceColor.paint(hue: spots[i].hue, depth: spots[i].depth)
-            // The one you're holding rides on top.
-            knob.layer.zPosition = pressed == i ? 2 : CGFloat(1 - i)
+            knob.fill = SpaceColor.paint(hue: spots[i].hue, depth: depths[i], tint: spots[i].amount)
+            // With two, the one not selected sits a little smaller and lower.
+            knob.isSelected = spots.count == 1 || i == selected
+            knob.layer.zPosition = pressed == i ? 3 : i == selected ? 2 : 1
         }
         if spots.count > 1 {
             let path = CGMutablePath()
@@ -151,7 +180,21 @@ final class ColorWheel: NSView {
             link.isHidden = true
         }
         CATransaction.commit()
-        setAccessibilityValue(spots.map { "\(Int($0.depth * 100)) percent deep" }.joined(separator: ", "))
+        for (i, element) in elements.enumerated() where i < spots.count {
+            let p = point(spots[i])
+            element.setAccessibilityFrameInParentSpace(NSRect(x: p.x - 12, y: p.y - 12, width: 24, height: 24))
+            element.setAccessibilityValue(Self.describe(spots[i]))
+        }
+        setAccessibilityChildren(Array(elements.prefix(spots.count)))
+    }
+
+    /// What VoiceOver says for a knob: the color's family, and how much of it.
+    static func describe(_ spot: Spot) -> String {
+        guard spot.amount > 0.005 else { return "No color" }
+        let names: [(Double, String)] = [(0.04, "Red"), (0.11, "Orange"), (0.18, "Yellow"), (0.43, "Green"), (0.53, "Teal"),
+                                         (0.7, "Blue"), (0.83, "Purple"), (0.96, "Pink"), (1.01, "Red")]
+        let name = names.first { spot.hue < $0.0 }?.1 ?? "Red"
+        return "\(name), \(Int((spot.amount * 100).rounded())) percent color"
     }
 
     /// Anywhere on the disc can be clicked to pick that color.
@@ -160,31 +203,88 @@ final class ColorWheel: NSView {
         addCursorRect(NSRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2), cursor: .pointingHand)
     }
 
+    /// Within a knob's reach, clicking takes hold of it without moving it.
+    private func knob(at p: CGPoint) -> Int? {
+        let distances = spots.indices.map { (index: $0, distance: hypot(point(spots[$0]).x - p.x, point(spots[$0]).y - p.y)) }
+        // Over both, the selected one wins, since it's drawn on top.
+        let hits = distances.filter { $0.distance <= 14 }
+        return hits.first { $0.index == selected }?.index ?? hits.min { $0.distance < $1.distance }?.index
+    }
+
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        let index = spots.indices.min { hypot(point(spots[$0]).x - p.x, point(spots[$0]).y - p.y) < hypot(point(spots[$1]).x - p.x, point(spots[$1]).y - p.y) } ?? 0
+        let index = knob(at: p) ?? selected
+        // Grabbed off-center, a knob keeps that offset rather than jumping under the pointer.
+        let grip = knob(at: p).map { CGPoint(x: point(spots[$0]).x - p.x, y: point(spots[$0]).y - p.y) } ?? .zero
+        if index != selected {
+            selected = index
+            onSelect?(index)
+        }
         pressed = index
-        move(index, to: p, final: false)
+        var moved = knob(at: p) == nil
+        if moved { move(index, to: p, final: false) } else { placeKnobs(animated: false) }
         window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
-            let p = self.convert(event.locationInWindow, from: nil)
+            let q = self.convert(event.locationInWindow, from: nil)
+            let target = CGPoint(x: q.x + grip.x, y: q.y + grip.y)
             if event.type == .leftMouseUp {
                 stop.pointee = true
                 self.pressed = nil
-                self.move(index, to: p, final: true)
+                if moved { self.move(index, to: target, final: true) } else { self.placeKnobs(animated: false) }
             } else {
-                self.move(index, to: p, final: false)
+                moved = true
+                self.move(index, to: target, final: false)
             }
         }
     }
 
     private func move(_ index: Int, to p: CGPoint, final: Bool) {
         guard index < spots.count else { return }
-        let spot = spot(at: p, keeping: spots[index].hue)
+        var spot = spot(at: p, keeping: spots[index].hue)
+        // The middle holds on a little, with a tap, so no color at all is easy to land on.
+        if spot.amount < 0.07 {
+            if spots[index].amount > 0 { Haptics.snap() }
+            spot.amount = 0
+        }
         spots[index] = spot
-        if index < knobColors.count { knobColors[index] = SpaceColor.paint(hue: spot.hue, depth: spot.depth) }
         placeKnobs(animated: false)
         onChange?(index, spot, final)
+    }
+
+    /// VoiceOver: more or less color, or the next hue around.
+    private func nudge(_ index: Int, amount: Double, hue: Double) {
+        guard index < spots.count else { return }
+        var spot = spots[index]
+        spot.amount = min(max(spot.amount + amount, 0), 1)
+        spot.hue = (spot.hue + hue + 1).truncatingRemainder(dividingBy: 1)
+        spots[index] = spot
+        placeKnobs(animated: false)
+        onChange?(index, spot, true)
+    }
+}
+
+/// A knob on the wheel, for VoiceOver: up and down is how much color, and two actions turn it to the next hue.
+nonisolated private final class KnobElement: NSAccessibilityElement {
+    var step: (@MainActor @Sendable (Double, Double) -> Void)?
+
+    func addHueActions() {
+        let step = step
+        setAccessibilityCustomActions([
+            NSAccessibilityCustomAction(name: "Next hue") { MainActor.assumeIsolated { step?(0, 1 / 12) }; return true },
+            NSAccessibilityCustomAction(name: "Previous hue") { MainActor.assumeIsolated { step?(0, -1 / 12) }; return true },
+        ])
+    }
+
+    override func accessibilityPerformIncrement() -> Bool {
+        let step = step
+        MainActor.assumeIsolated { step?(0.1, 0) }
+        return true
+    }
+
+    override func accessibilityPerformDecrement() -> Bool {
+        let step = step
+        MainActor.assumeIsolated { step?(-0.1, 0) }
+        return true
     }
 }
 
@@ -193,6 +293,12 @@ private final class WheelKnob {
     let layer = CALayer()
     private let inner = CALayer()
     var fill: NSColor = .white { didSet { inner.backgroundColor = fill.cgColor } }
+    var isSelected = true {
+        didSet {
+            layer.setAffineTransform(isSelected ? .identity : CGAffineTransform(scaleX: 0.8, y: 0.8))
+            layer.shadowOpacity = isSelected ? 0.3 : 0.18
+        }
+    }
 
     init() {
         let size: CGFloat = 24
@@ -211,79 +317,102 @@ private final class WheelKnob {
     }
 }
 
-/// A ready-made look: a color, or two in a gradient, at a spot on the wheel.
+/// A ready-made look: a color, or two in a gradient, maybe see-through.
 struct SpaceLook {
     let name: String
-    /// Nil: no hue, for white, grays and black.
-    var hue: Double?
+    var hue: Double = 0
+    /// How much color: 0 for white, grays and black.
+    var tint: Double = 1
     var depth: Double
     var hue2: Double? = nil
     var depth2: Double = 0
     var angle: Double = 90
+    var seeThrough: Double = 0
 
-    var colors: [NSColor] {
-        let first = SpaceColor.paint(hue: hue ?? 0, depth: depth, neutral: hue == nil)
-        return [first, hue2.map { SpaceColor.paint(hue: $0, depth: depth2) } ?? first]
+    /// How it looks as a space.
+    var space: SpaceInfo {
+        var space = SpaceInfo(name: name, color: .graphite)
+        apply(to: &space)
+        return space
     }
 
     func apply(to space: inout SpaceInfo) {
         space.glass = nil
-        if let hue { space.hue = hue } else {
+        if tint < 0.005 {
             space.hue = nil
             space.color = .graphite
+            space.tint = 0
+        } else {
+            space.hue = hue
+            space.tint = tint > 0.995 ? nil : tint
         }
         space.intensity = nil
         space.brightness = depth
         space.hue2 = hue2
+        space.tint2 = nil
         space.intensity2 = nil
         space.brightness2 = hue2 == nil ? nil : depth2
         if hue2 != nil { space.angle = angle }
+        space.translucency = seeThrough > 0 ? seeThrough : nil
     }
 
     func matches(_ space: SpaceInfo) -> Bool {
-        guard space.glass != true, let b = space.brightness, abs(b - depth) < 0.005 else { return false }
-        if let hue { guard let h = space.hue, abs(h - hue) < 0.002 else { return false } } else if !space.isNeutral { return false }
+        guard let b = space.brightness, abs(b - depth) < 0.005, abs(space.seeThrough - seeThrough) < 0.01 else { return false }
+        if tint < 0.005 {
+            guard space.isNeutral else { return false }
+        } else {
+            guard !space.isNeutral, let h = space.hue, abs(h - hue) < 0.002, abs(space.tintAmount - tint) < 0.01 else { return false }
+        }
         guard let hue2 else { return space.hue2 == nil }
-        guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005 else { return false }
+        guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005,
+              space.tintAmount2 > 0.99 else { return false }
         return true
     }
 
-    /// The four you can't get from the wheel, white to black, and three colors to start from, Zigzag's navy among them.
-    /// Colors only: white, grays and black have their own tab, Mono.
-    static let colors: [SpaceLook] = [
+    /// One row: white, gray and black, three colors (Zigzag's navy among them), two gradients, and frosted white.
+    static let presets: [SpaceLook] = [
+        SpaceLook(name: "White", tint: 0, depth: 0),
+        SpaceLook(name: "Gray", tint: 0, depth: 0.12),
+        SpaceLook(name: "Black", tint: 0, depth: 1),
         SpaceLook(name: "Sky", hue: 0.57, depth: 0.22),
-        SpaceLook(name: "Mint", hue: 0.44, depth: 0.2),
-        SpaceLook(name: "Sand", hue: 0.11, depth: 0.2),
         SpaceLook(name: "Rose", hue: 0.96, depth: 0.2),
-        SpaceLook(name: "Lavender", hue: 0.75, depth: 0.22),
-        SpaceLook(name: "Forest", hue: 0.36, depth: 0.78),
         SpaceLook(name: "Navy", hue: 0.62, depth: 0.82),
-    ]
-
-    /// Neighbors on the wheel, one a little deeper than the other, the way light falls across a wall.
-    static let gradients: [SpaceLook] = [
+        // Neighbors on the wheel, one a little deeper than the other, the way light falls across a wall.
         SpaceLook(name: "Dawn", hue: 0.07, depth: 0.16, hue2: 0.95, depth2: 0.3, angle: 90),
-        SpaceLook(name: "Lagoon", hue: 0.47, depth: 0.16, hue2: 0.58, depth2: 0.34, angle: 90),
-        SpaceLook(name: "Meadow", hue: 0.17, depth: 0.14, hue2: 0.33, depth2: 0.3, angle: 45),
-        SpaceLook(name: "Lilac", hue: 0.78, depth: 0.15, hue2: 0.62, depth2: 0.3, angle: 45),
-        SpaceLook(name: "Ember", hue: 0.06, depth: 0.62, hue2: 0.97, depth2: 0.84, angle: 90),
         SpaceLook(name: "Deep Sea", hue: 0.5, depth: 0.62, hue2: 0.63, depth2: 0.86, angle: 90),
-        SpaceLook(name: "Midnight", hue: 0.62, depth: 0.74, hue2: 0.76, depth2: 0.92, angle: 45),
+        SpaceLook(name: "Frost", tint: 0, depth: 0.04, seeThrough: 0.6),
     ]
 }
 
-/// One preset: a round swatch of the look, ringed when it's the one in use.
+/// A small checkerboard, the usual sign for see-through.
+enum Checker {
+    static let image = NSImage(size: NSSize(width: 8, height: 8), flipped: false) { rect in
+        NSColor(white: 0.97, alpha: 1).setFill()
+        rect.fill()
+        NSColor(white: 0.8, alpha: 1).setFill()
+        NSRect(x: 0, y: 0, width: 4, height: 4).fill()
+        NSRect(x: 4, y: 4, width: 4, height: 4).fill()
+        return true
+    }
+}
+
+/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard.
 final class LookSwatch: InteractiveView {
     let look: SpaceLook
     private let fill = CAGradientLayer()
+    private let checker = CALayer()
     private let ring = CALayer()
 
     init(look: SpaceLook) {
         self.look = look
         super.init(frame: .zero)
         layer?.addSublayer(ring)
+        layer?.addSublayer(checker)
         layer?.addSublayer(fill)
         fill.masksToBounds = true
+        checker.masksToBounds = true
+        checker.isHidden = look.seeThrough == 0
+        checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
         toolTip = look.name
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(look.name)
@@ -311,31 +440,34 @@ final class LookSwatch: InteractiveView {
                 let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
                 fill.frame = bounds.insetBy(dx: inset, dy: inset)
                 fill.cornerRadius = fill.frame.width / 2
-                fill.colors = look.colors.map(\.cgColor)
+                checker.frame = fill.frame
+                checker.cornerRadius = fill.cornerRadius
+                let space = look.space
+                let start = space.frameColor
+                fill.colors = [start, space.frameColor2 ?? start].map(\.cgColor)
                 fill.startPoint = CGPoint(x: 0.2, y: 0.1)
                 fill.endPoint = CGPoint(x: 0.8, y: 0.9)
                 fill.borderWidth = Tokens.Metric.hairline
-                fill.borderColor = Tokens.Color.panelEdge.cgColor
+                // A firmer edge than a panel's, so black still reads on a dark panel and white on a light one.
+                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
             }
         }
         setAccessibilityValue(isSelected ? "selected" : nil)
     }
 }
 
-/// How grainy the space's frame is: a pill that goes from smooth on the left to the most grain on the right,
-/// tinted like the space, so the track itself shows what each point gives.
-final class GrainSlider: NSView {
-    var grain: Double = 0 { didSet { needsLayout = true } }
-    var tint: NSColor = SpaceColor.sky.background { didSet { needsLayout = true } }
-    /// With a gradient, the track runs from one color to the other.
-    var tint2: NSColor? { didSet { needsLayout = true } }
-    /// As a brightness slider instead: light to dark in `toneColors`, no grain; over a checkerboard for glass.
-    var isTone = false { didSet { needsLayout = true; setAccessibilityLabel(isTone ? "Brightness" : "Grain"); toolTip = isTone ? "Brightness" : "Grain" } }
-    var toneColors: [NSColor] = [.white, .black] { didSet { needsLayout = true } }
-    var showsChecker = false { didSet { needsLayout = true } }
-    private let checker = CALayer()
+/// One of the editor's sliders: a pill whose track shows what each point gives, with a white knob riding in it.
+/// Shade runs light to dark in the space's own color; see-through runs from solid to clear over a checkerboard;
+/// grain builds texture from smooth on the left.
+final class LookSlider: NSView {
+    enum Kind { case shade, seeThrough, grain }
+    let kind: Kind
+    var value: Double = 0 { didSet { needsLayout = true } }
+    /// The colors along the track: light to dark for shade; the space's one or two colors otherwise.
+    var colors: [NSColor] = [SpaceColor.sky.background] { didSet { needsLayout = true } }
     /// Called while dragging (`final` false) and once on release (`final` true).
     var onChange: ((Double, Bool) -> Void)?
+    private let checker = CALayer()
     private let track = CAGradientLayer()
     private let texture = CALayer()
     private let texture2 = CALayer()
@@ -344,8 +476,9 @@ final class GrainSlider: NSView {
     private let knob = CALayer()
     private let stopDots = CAShapeLayer()
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
+    init(_ kind: Kind) {
+        self.kind = kind
+        super.init(frame: .zero)
         wantsLayer = true
         track.masksToBounds = true
         track.cornerCurve = .continuous
@@ -353,7 +486,7 @@ final class GrainSlider: NSView {
         track.startPoint = CGPoint(x: 0, y: 0.5)
         track.endPoint = CGPoint(x: 1, y: 0.5)
         // The texture builds from the left, clearly: smooth at 0, heavy grain at the far end.
-        for (layer, mask, mode) in [(texture, ramp, "overlayBlendMode"), (texture2, ramp2, "softLightBlendMode")] {
+        for (layer, mask, mode) in [(texture, ramp, "overlayBlendMode"), (texture2, ramp2, "softLightBlendMode")] where kind == .grain {
             layer.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
             layer.compositingFilter = mode
             mask.startPoint = CGPoint(x: 0, y: 0.5)
@@ -363,6 +496,8 @@ final class GrainSlider: NSView {
             track.addSublayer(layer)
         }
         checker.masksToBounds = true
+        checker.isHidden = kind != .seeThrough
+        checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
         layer?.addSublayer(checker)
         layer?.addSublayer(track)
         track.addSublayer(stopDots)
@@ -375,8 +510,7 @@ final class GrainSlider: NSView {
         knob.borderColor = NSColor.black.withAlphaComponent(0.08).cgColor
         layer?.addSublayer(knob)
         setAccessibilityRole(.slider)
-        setAccessibilityLabel("Grain")
-        toolTip = "Grain"
+        setAccessibilityLabel(kind == .shade ? "Shade" : kind == .seeThrough ? "See-through" : "Grain")
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -394,36 +528,43 @@ final class GrainSlider: NSView {
             track.frame = bounds
             track.cornerRadius = track.frame.height / 2
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                track.colors = isTone ? toneColors.map { $0.withAlphaComponent(showsChecker ? 0.85 : 1).cgColor }
-                    : [tint.cgColor, (tint2 ?? tint).cgColor]
-                checker.backgroundColor = isTone && showsChecker ? NSColor(patternImage: Self.checkerImage).cgColor : nil
-                checker.frame = track.frame
-                checker.cornerRadius = track.cornerRadius
+                let first = colors.first ?? .white
+                switch kind {
+                case .shade: track.colors = colors.map(\.cgColor)
+                // Solid on the left, and as thin as the frame gets on the right.
+                case .seeThrough: track.colors = [first.withAlphaComponent(1).cgColor, first.withAlphaComponent(0.2).cgColor]
+                case .grain: track.colors = [first.cgColor, (colors.last ?? first).cgColor]
+                }
                 track.borderColor = Tokens.Color.panelEdge.cgColor
                 knob.shadowColor = NSColor.black.withAlphaComponent(0.25).cgColor
             }
+            checker.frame = track.frame
+            checker.cornerRadius = track.cornerRadius
             for (layer, mask) in [(texture, ramp), (texture2, ramp2)] {
                 layer.frame = track.bounds
                 mask.frame = layer.bounds
-                layer.isHidden = isTone
             }
-            let x = inset + CGFloat(grain) * (bounds.width - inset * 2)
+            let x = inset + CGFloat(value) * (bounds.width - inset * 2)
             knob.bounds = CGRect(x: 0, y: 0, width: knobWidth, height: knobWidth)
             knob.position = CGPoint(x: x, y: bounds.height / 2)
             knob.cornerRadius = knobWidth / 2
             stopDots.frame = track.bounds
             let path = CGMutablePath()
-            for stop in Self.stops.dropFirst().dropLast() {
+            for stop in stops.dropFirst().dropLast() {
                 let sx = inset + CGFloat(stop) * (bounds.width - inset * 2)
                 path.addEllipse(in: CGRect(x: sx - 1.5, y: bounds.height / 2 - 1.5, width: 3, height: 3))
             }
             stopDots.path = path
             stopDots.fillColor = NSColor.black.withAlphaComponent(0.18).cgColor
         }
-        knob.opacity = 1
         // Held, the knob swells a little under your finger.
         knob.setAffineTransform(pressed ? CGAffineTransform(scaleX: 1.12, y: 1.12) : .identity)
-        setAccessibilityValue(grain < 0.01 ? "Smooth" : "\(Int(grain * 100)) percent")
+        let percent = "\(Int((value * 100).rounded())) percent"
+        switch kind {
+        case .shade: setAccessibilityValue(value < 0.01 ? "Lightest" : value > 0.99 ? "Darkest" : "\(percent) dark")
+        case .seeThrough: setAccessibilityValue(value < 0.01 ? "Solid" : percent)
+        case .grain: setAccessibilityValue(value < 0.01 ? "Smooth" : percent)
+        }
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -431,23 +572,15 @@ final class GrainSlider: NSView {
         needsLayout = true
     }
 
-    private static let checkerImage = NSImage(size: NSSize(width: 8, height: 8), flipped: false) { rect in
-        NSColor(white: 0.97, alpha: 1).setFill()
-        rect.fill()
-        NSColor(white: 0.8, alpha: 1).setFill()
-        NSRect(x: 0, y: 0, width: 4, height: 4).fill()
-        NSRect(x: 4, y: 4, width: 4, height: 4).fill()
-        return true
-    }
-
-    /// Five stops it settles into, with a tap at each, so it feels like a real control with some resistance.
-    private static let stops: [Double] = [0, 0.25, 0.5, 0.75, 1]
+    /// Stops it settles into, with a tap at each, so it feels like a real control with some resistance. Shade runs
+    /// smooth: every depth is as good as the next.
+    private var stops: [Double] { kind == .shade ? [] : [0, 0.25, 0.5, 0.75, 1] }
     private var lastStop: Double?
 
     private func value(at event: NSEvent) -> Double {
         let x = convert(event.locationInWindow, from: nil).x
         let v = Double(min(max((x - inset) / (bounds.width - inset * 2), 0), 1))
-        if let stop = Self.stops.first(where: { abs($0 - v) < 0.045 }) {
+        if let stop = stops.first(where: { abs($0 - v) < 0.045 }) {
             if stop != lastStop { Haptics.snap() }
             lastStop = stop
             return stop
@@ -459,21 +592,21 @@ final class GrainSlider: NSView {
     private var pressed = false { didSet { needsLayout = true } }
 
     override func mouseDown(with event: NSEvent) {
-        lastStop = Self.stops.first { abs($0 - grain) < 0.001 }
+        lastStop = stops.first { abs($0 - value) < 0.001 }
         pressed = true
-        grain = value(at: event)
+        value = value(at: event)
         layoutSubtreeIfNeeded()
-        onChange?(grain, false)
+        onChange?(value, false)
         window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
-            self.grain = self.value(at: event)
+            self.value = self.value(at: event)
             self.layoutSubtreeIfNeeded()
             if event.type == .leftMouseUp {
                 stop.pointee = true
                 self.pressed = false
-                self.onChange?(self.grain, true)
+                self.onChange?(self.value, true)
             } else {
-                self.onChange?(self.grain, false)
+                self.onChange?(self.value, false)
             }
         }
     }
@@ -482,8 +615,8 @@ final class GrainSlider: NSView {
     override func accessibilityPerformDecrement() -> Bool { step(-0.1) }
 
     private func step(_ delta: Double) -> Bool {
-        grain = min(max(grain + delta, 0), 1)
-        onChange?(grain, true)
+        value = min(max(value + delta, 0), 1)
+        onChange?(value, true)
         return true
     }
 }
@@ -621,29 +754,26 @@ final class DirectionKnob: NSView {
     override func accessibilityPerformDecrement() -> Bool { angle = (angle + 315).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
 }
 
-/// How a space looks, in one piece that the space editor and the first-run color step both use, so they're the
-/// same everywhere: Color, Gradient or Glass on top; then the wheel and a row of presets (or, for glass, how light or
-/// dark the glass is); then grain, and for a gradient its direction. `onPreview` fires while you drag, `onCommit`
-/// when you let go or pick something.
+
+/// How a space looks, in one piece, the same wherever it's edited: the wheel (around for the hue, out from the
+/// middle for how much of it, with a + for a second color and the direction dial once there are two), a row of
+/// presets, then Shade, See-through and Grain. `onPreview` fires while you drag, `onCommit` when you let go or pick
+/// something.
 final class SpaceLookEditor: NSView {
-    private let kindSwitch = SlidingSwitch([.text("Color"), .text("Gradient"), .text("Mono"), .text("Glass")])
-    /// Says what glass is, since it's the one that isn't obvious.
-    private let glassNote = Label("Your desktop shows through", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let wheel = ColorWheel()
-    private let colorSwatches = SpaceLook.colors.map { LookSwatch(look: $0) }
-    private let gradientSwatches = SpaceLook.gradients.map { LookSwatch(look: $0) }
-    private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
-    /// Glass: clear white to smoked black.
-    private let shadeSlider = GrainSlider()
-    private let grainLabel = SpaceLookEditor.rowLabel("Grain")
-    private let grainSlider = GrainSlider()
-    private let directionLabel = SpaceLookEditor.rowLabel("Direction")
+    /// Adds a second color for a gradient, or takes it away again.
+    private let secondButton = IconButton(symbol: "plus", size: 26, toolTip: "Add Second Color")
     private let dial = DirectionKnob()
+    private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
+    private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
+    private let shadeSlider = LookSlider(.shade)
+    private let clearLabel = SpaceLookEditor.rowLabel("See-through")
+    private let clearSlider = LookSlider(.seeThrough)
+    private let grainLabel = SpaceLookEditor.rowLabel("Grain")
+    private let grainSlider = LookSlider(.grain)
 
     var onPreview: ((SpaceInfo) -> Void)?
     var onCommit: ((SpaceInfo) -> Void)?
-    /// The kind changed, and with it how tall this is.
-    var onResize: (() -> Void)?
 
     /// The space as the editor has it right now.
     private var draft: SpaceInfo
@@ -651,67 +781,65 @@ final class SpaceLookEditor: NSView {
     private let original: SpaceInfo
     /// A space never given a color follows the Mac, light by day and dark at night, until you choose one.
     private var colorChosen: Bool
+    /// Which color the wheel's selected knob is, and Shade shows: 0, or 1 for a gradient's second.
+    private var selected = 0
 
-    private enum Kind: Int { case color, gradient, mono, glass }
-    private var kind: Kind { draft.glass == true ? .glass : draft.hue2 != nil ? .gradient : draft.isNeutral ? .mono : .color }
-
-    /// `dark`: whether the window looks dark right now, for where a space that follows the Mac starts on the wheel.
+    /// `dark`: whether the window looks dark right now, for where a space that follows the Mac starts.
     init(space: SpaceInfo, dark: Bool) {
+        let space = space.upgraded
         original = space
         draft = space
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [kindSwitch, glassNote, wheel, shadeLabel, shadeSlider, grainLabel, grainSlider, directionLabel, dial]
-        (views + colorSwatches + gradientSwatches).forEach { addSubview($0) }
-
-        kindSwitch.selectedIndex = kind.rawValue
-        kindSwitch.onChange = { [weak self] index in self?.switchKind(Kind(rawValue: index) ?? .color) }
+        let views: [NSView] = [wheel, secondButton, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, grainLabel, grainSlider]
+        (views + swatches).forEach { addSubview($0) }
 
         wheel.onChange = { [weak self] index, spot, final in
             guard let self else { return }
+            let tint = spot.amount > 0.995 ? nil : spot.amount
             if index == 0 {
                 self.draft.hue = spot.hue
-                self.draft.brightness = spot.depth
+                self.draft.tint = tint
             } else {
                 self.draft.hue2 = spot.hue
-                self.draft.brightness2 = spot.depth
+                self.draft.tint2 = tint
             }
             self.draft.intensity = nil
             self.draft.intensity2 = nil
             self.colorChosen = true
-            self.changed(final: final, wheel: false)
+            self.changed(final: final, animated: false)
         }
-        for swatch in colorSwatches + gradientSwatches {
+        wheel.onSelect = { [weak self] index in
+            self?.selected = index
+            self?.sync(animated: false)
+        }
+        secondButton.radius = 13
+        secondButton.onClick = { [weak self] _ in self?.toggleSecondColor() }
+        for swatch in swatches {
             swatch.onClick = { [weak self, weak swatch] _ in
                 guard let self, let look = swatch?.look else { return }
                 look.apply(to: &self.draft)
+                self.selected = 0
                 self.colorChosen = true
-                self.changed(final: true, wheel: true)
+                self.changed(final: true, animated: true)
             }
         }
-        shadeSlider.isTone = true
-        shadeSlider.showsChecker = true
-        shadeSlider.toneColors = [.white, .black]
-        shadeSlider.setAccessibilityLabel("Shade")
-        shadeSlider.toolTip = nil
-        shadeSlider.onChange = { [weak self] value, final in
+        shadeSlider.onChange = { [weak self] value, final in self?.shade(to: value, final: final) }
+        clearSlider.onChange = { [weak self] value, final in
             guard let self else { return }
-            self.draft.brightness = value
-            self.colorChosen = true
-            self.changed(final: final, wheel: false)
+            self.draft.translucency = value > 0.005 ? value : nil
+            self.changed(final: final, animated: false)
         }
-        grainSlider.toolTip = nil
         grainSlider.onChange = { [weak self] grain, final in
             guard let self else { return }
             self.draft.grain = grain > 0.01 ? grain : nil
-            self.changed(final: final, wheel: false)
+            self.changed(final: final, animated: false)
         }
-        dial.toolTip = nil
         dial.onChange = { [weak self] angle, final in
             guard let self else { return }
             self.draft.angle = angle
-            self.changed(final: final, wheel: false)
+            self.changed(final: final, animated: false)
         }
         sync(animated: false)
     }
@@ -742,52 +870,56 @@ final class SpaceLookEditor: NSView {
             space.appearance = original.appearance
             return space
         }
-        // Light or dark: glass goes by its shade, a color by whichever text reads better on it.
-        space.appearance = space.glass == true ? ((draft.brightness ?? 0) < 0.5 ? "light" : "dark") : space.readableAppearance
+        // Light or dark: whichever text reads better on it.
+        space.appearance = space.readableAppearance
         return space
     }
 
-    private func changed(final: Bool, wheel moveWheel: Bool) {
-        if final { onCommit?(look) } else { onPreview?(look) }
-        sync(animated: moveWheel)
+    private func depth(_ index: Int) -> Double {
+        index == 0 ? draft.brightness ?? 0 : draft.brightness2 ?? draft.brightness ?? 0
     }
 
-    private func switchKind(_ new: Kind) {
-        guard new != kind else { return }
-        switch new {
-        case .color:
-            draft.glass = nil
-            draft.hue2 = nil
-            draft.brightness2 = nil
-            // From white, gray or black: start on Zigzag's blue, somewhere a color shows.
-            if draft.hue == nil {
-                draft.hue = 0.6
-                draft.brightness = min(max(draft.brightness ?? 0.22, 0.15), 0.85)
-            }
-        case .mono:
-            draft.glass = nil
-            draft.hue = nil
-            draft.color = .graphite
-            draft.hue2 = nil
-            draft.brightness2 = nil
-        case .gradient:
-            draft.glass = nil
-            // A gradient needs two colors: a gray takes on Zigzag's blue, and the second starts as its neighbor.
-            if draft.hue == nil { draft.hue = 0.6 }
-            // Far enough from the middle, and from each other, that both knobs show and the gradient reads at once.
-            let depth = min(max(draft.brightness ?? 0.3, 0.3), 0.8)
-            draft.brightness = depth
-            draft.hue2 = (draft.hue! + 0.14).truncatingRemainder(dividingBy: 1)
-            draft.brightness2 = depth < 0.55 ? depth + 0.2 : depth - 0.2
-            draft.angle = draft.angle ?? 90
-        case .glass:
-            draft.glass = true
-            draft.hue2 = nil
-            draft.brightness2 = nil
+    /// Lighter or darker. With two colors both move together, keeping the step between them; holding Option moves
+    /// only the selected one.
+    private func shade(to value: Double, final: Bool) {
+        if draft.hue2 == nil || NSEvent.modifierFlags.contains(.option) {
+            if selected == 0 { draft.brightness = value } else { draft.brightness2 = value }
+        } else {
+            let first = depth(0), second = depth(1)
+            let delta = min(max(value - depth(selected), -min(first, second)), 1 - max(first, second))
+            draft.brightness = first + delta
+            draft.brightness2 = second + delta
         }
         colorChosen = true
-        changed(final: true, wheel: false)
-        onResize?()
+        changed(final: final, animated: false)
+    }
+
+    /// The +: a second color, the first's neighbor on the wheel and a step deeper, so the gradient reads at once.
+    /// The − takes it away.
+    private func toggleSecondColor() {
+        if draft.hue2 == nil {
+            // From white, a gray or black, the second is Zigzag's blue, so there's something to fade into.
+            draft.hue2 = draft.isNeutral ? 0.6 : (draft.baseHue + 0.14).truncatingRemainder(dividingBy: 1)
+            draft.tint2 = draft.isNeutral ? nil : draft.tint
+            let first = depth(0)
+            draft.brightness2 = first < 0.6 ? first + 0.16 : first - 0.16
+            draft.angle = draft.angle ?? 90
+            selected = 1
+        } else {
+            draft.hue2 = nil
+            draft.tint2 = nil
+            draft.brightness2 = nil
+            draft.intensity2 = nil
+            selected = 0
+        }
+        draft.intensity = nil
+        colorChosen = true
+        changed(final: true, animated: true)
+    }
+
+    private func changed(final: Bool, animated: Bool) {
+        if final { onCommit?(look) } else { onPreview?(look) }
+        sync(animated: animated)
     }
 
     // MARK: Showing it
@@ -795,93 +927,99 @@ final class SpaceLookEditor: NSView {
     /// Every control from the draft.
     private func sync(animated: Bool) {
         let space = draft
-        kindSwitch.selectedIndex = kind.rawValue
-        var spots = [ColorWheel.Spot(hue: space.baseHue, depth: space.isNeutral ? 0 : space.brightness ?? 0)]
-        var colors = [space.background]
-        if let hue2 = space.hue2, let end = space.background2 {
-            spots.append(ColorWheel.Spot(hue: hue2, depth: space.brightness2 ?? space.brightness ?? 0))
-            colors.append(end)
+        if space.hue2 == nil { selected = 0 }
+        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: space.tintAmount)]
+        var depths = [depth(0)]
+        if let hue2 = space.hue2 {
+            spots.append(ColorWheel.Spot(hue: hue2, amount: space.tintAmount2))
+            depths.append(depth(1))
         }
-        wheel.show(spots, colors: colors, animated: animated)
-        for swatch in colorSwatches + gradientSwatches { swatch.isSelected = swatch.look.matches(space) }
+        wheel.show(spots, depths: depths, selected: selected, animated: animated)
+        for swatch in swatches { swatch.isSelected = swatch.look.matches(space) }
         let shown = look
-        grainSlider.grain = space.grain ?? 0
-        grainSlider.tint = kind == .glass ? NSColor(white: 0.92 - 0.75 * CGFloat(space.brightness ?? 0), alpha: 1) : shown.background
-        grainSlider.tint2 = kind == .glass ? nil : shown.background2
-        shadeSlider.grain = space.brightness ?? 0
+        let colors = [shown.background] + (shown.background2.map { [$0] } ?? [])
+        let spot = spots[selected]
+        shadeSlider.value = depth(selected)
+        shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
+        clearSlider.value = space.seeThrough
+        clearSlider.colors = colors
+        grainSlider.value = space.grain ?? 0
+        grainSlider.colors = colors
         dial.angle = space.gradientAngle
-        // Mono and glass are one slider each, white to black; glass shows the checkerboard that means see-through.
-        let slider = kind == .glass || kind == .mono
-        wheel.isHidden = slider
-        colorSwatches.forEach { $0.isHidden = kind != .color }
-        gradientSwatches.forEach { $0.isHidden = kind != .gradient }
-        shadeLabel.isHidden = !slider
-        shadeSlider.isHidden = !slider
-        shadeSlider.showsChecker = kind == .glass
-        glassNote.isHidden = kind != .glass
-        directionLabel.isHidden = kind != .gradient
-        dial.isHidden = kind != .gradient
+        let two = space.hue2 != nil
+        secondButton.symbol = two ? "minus" : "plus"
+        secondButton.toolTip = two ? "Remove Second Color" : "Add Second Color"
+        secondButton.setAccessibilityLabel(secondButton.toolTip)
+        showDial(two, animated: animated)
         needsLayout = true
+    }
+
+    /// The direction dial fades in beside the wheel once there are two colors.
+    private func showDial(_ show: Bool, animated: Bool) {
+        guard show == dial.isHidden || dial.alphaValue != (show ? 1 : 0) else { return }
+        dial.isHidden = false
+        guard animated, !Tokens.Motion.reduceMotion else {
+            dial.alphaValue = show ? 1 : 0
+            dial.isHidden = !show
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Tokens.Motion.standard
+            context.timingFunction = Tokens.Motion.easeOut
+            dial.animator().alphaValue = show ? 1 : 0
+        } completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.draft.hue2 == nil else { return }
+                self.dial.isHidden = true
+            }
+        }
     }
 
     // MARK: Layout
 
-    private let switchHeight: CGFloat = 30
-    private let swatchSize: CGFloat = 26
+    private let swatchSize: CGFloat = 24
     private let sliderHeight: CGFloat = 30
-    private let dialSize: CGFloat = 60
-    private let labelWidth: CGFloat = 72
-    /// How tall the wheel is; the first-run step has a little less room.
-    var wheelHeight: CGFloat = 236 { didSet { needsLayout = true } }
+    private let dialSize: CGFloat = 50
+    /// How tall the wheel is.
+    var wheelHeight: CGFloat = 216 { didSet { needsLayout = true } }
 
-    /// How tall it is for the kind it shows.
     var preferredHeight: CGFloat {
-        var height = switchHeight + Tokens.Space.x4
-        switch kind {
-        case .glass: height += glassNote.lineHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x4
-        case .mono: height += sliderHeight + Tokens.Space.x4
-        default: height += wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5
-        }
-        height += sliderHeight
-        if kind == .gradient { height += Tokens.Space.x3 + dialSize }
-        return height
+        wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5 + sliderHeight * 3 + Tokens.Space.x3 * 2
+    }
+
+    /// Wide enough for the longest name, so every control starts at the same line.
+    private var labelWidth: CGFloat {
+        let widest = [shadeLabel, clearLabel, grainLabel].map { ceil($0.intrinsicContentSize.width) }.max() ?? 0
+        return max(72, widest + Tokens.Space.x3)
     }
 
     override func layout() {
         super.layout()
         let width = bounds.width
         var y: CGFloat = 0
-        kindSwitch.frame = NSRect(x: 0, y: y, width: width, height: switchHeight)
-        y += switchHeight + Tokens.Space.x4
-        if kind == .glass {
-            glassNote.frame = NSRect(x: 0, y: y, width: width, height: glassNote.lineHeight)
-            y += glassNote.lineHeight + Tokens.Space.x3
+        wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
+        // In the corners the round wheel leaves free: the + above, the dial below.
+        secondButton.frame.origin = NSPoint(x: width - secondButton.frame.width, y: y)
+        dial.frame = NSRect(x: width - dialSize, y: y + wheelHeight - dialSize, width: dialSize, height: dialSize)
+        y += wheelHeight + Tokens.Space.x3
+        let count = CGFloat(swatches.count)
+        let gap = (width - count * swatchSize) / max(count - 1, 1)
+        for (i, swatch) in swatches.enumerated() {
+            swatch.frame = NSRect(x: CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
         }
-        if kind == .glass || kind == .mono {
-            row(shadeLabel, shadeSlider, y: y, height: sliderHeight, width: width)
-            y += sliderHeight + Tokens.Space.x4
-        } else {
-            wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
-            y += wheelHeight + Tokens.Space.x3
-            for swatches in [colorSwatches, gradientSwatches] {
-                let count = CGFloat(swatches.count)
-                let gap = (width - count * swatchSize) / max(count - 1, 1)
-                for (i, swatch) in swatches.enumerated() {
-                    swatch.frame = NSRect(x: CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
-                }
-            }
-            y += swatchSize + Tokens.Space.x5
+        y += swatchSize + Tokens.Space.x5
+        for (label, slider) in [(shadeLabel, shadeSlider), (clearLabel, clearSlider), (grainLabel, grainSlider)] {
+            row(label, slider, y: y, height: sliderHeight)
+            y += sliderHeight + Tokens.Space.x3
         }
-        row(grainLabel, grainSlider, y: y, height: sliderHeight, width: width)
-        y += sliderHeight + Tokens.Space.x3
-        if kind == .gradient { row(directionLabel, dial, y: y, height: dialSize, width: dialSize) }
     }
 
     /// A name on the left and its control beside it, every control starting at the same line.
-    private func row(_ label: Label, _ control: NSView, y: CGFloat, height: CGFloat, width: CGFloat) {
+    private func row(_ label: Label, _ control: NSView, y: CGFloat, height: CGFloat) {
         let lh = ceil(label.intrinsicContentSize.height)
-        label.frame = NSRect(x: 0, y: y + (height - lh) / 2, width: labelWidth, height: lh)
-        control.frame = NSRect(x: labelWidth, y: y, width: min(width, bounds.width - labelWidth), height: height)
+        let x = labelWidth
+        label.frame = NSRect(x: 0, y: y + (height - lh) / 2, width: x, height: lh)
+        control.frame = NSRect(x: x, y: y, width: bounds.width - x, height: height)
     }
 }
 
@@ -926,7 +1064,6 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             Library.shared.setLook(look)
             self.edited = true
         }
-        editor.onResize = { [weak self] in self?.resizeToFit() }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -969,7 +1106,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         resizeToFit()
     }
 
-    /// The panel grows or shrinks with the kind, keeping the edge nearest what opened it.
+    /// The panel grows or shrinks between the colors and the icons, keeping the edge nearest what opened it.
     private func resizeToFit() {
         guard superview != nil, abs(frame.height - contentHeight) > 0.5 else { return }
         var target = frame
@@ -1021,7 +1158,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
                 top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
             }
             x = sidebar.maxX + Tokens.Space.x2
-            // Hanging from the header, it grows downward when a gradient adds its row.
+            // Hanging from the header, it grows downward when the icons take the colors' place.
             anchoredBelow = true
         }
         top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))

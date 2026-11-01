@@ -90,7 +90,7 @@ enum Brand {
         static let navy = Theme(hue: nil)
 
         static func of(_ space: SpaceInfo?) -> Theme {
-            guard let space else { return .navy }
+            guard let space, !space.isNeutral else { return .navy }
             if let hue = space.hue { return Theme(hue: hue) }
             return space.color.isNeutral || space.color == .sky ? .navy : Theme(hue: space.color.hue)
         }

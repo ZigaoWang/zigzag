@@ -381,30 +381,27 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         render(tabManager.currentSpace, animated: animated)
     }
 
-    /// Draws the window for a space: its mode, color or glass, gradient and grain.
+    /// Draws the window for a space: its mode, color, gradient, how see-through it is, and grain.
     private func render(_ space: SpaceInfo, animated: Bool) {
         if !tabManager.isPrivate {
             let mode = space.readableAppearance
             let name: NSAppearance.Name? = mode == "light" ? .aqua : mode == "dark" ? .darkAqua : nil
             if window?.appearance?.name != name { window?.appearance = name.flatMap(NSAppearance.init(named:)) }
         }
-        let glass = !tabManager.isPrivate && space.glass == true
-        let color = tabManager.isPrivate ? SpaceColor.graphite.background : glass ? space.glassColor : space.background
-        // Glass: the window lets the desktop through, and the space's color washes over it instead of covering it.
-        window?.isOpaque = !glass
-        window?.backgroundColor = glass ? .clear : .windowBackgroundColor
-        root.setGlass(glass)
-        let end = tabManager.isPrivate ? nil : space.background2
-        if glass {
-            root.setColor(color, animated: animated)
-            root.setGradient(from: color, to: nil, animated: animated)
-        } else {
-            root.setColor(color, animated: animated)
-            root.setGradient(from: color, to: end, angle: space.gradientAngle, animated: animated)
-        }
+        let clear = !tabManager.isPrivate && space.isSeeThrough
+        let color = tabManager.isPrivate ? SpaceColor.graphite.background : space.frameColor
+        let end = tabManager.isPrivate ? nil : space.frameColor2
+        // See-through: the window lets the frosted desktop through, and the space's color washes over it, thinner the
+        // more shows.
+        window?.isOpaque = !clear
+        window?.backgroundColor = clear ? .clear : .windowBackgroundColor
+        root.setGlass(clear)
+        // A see-through gradient carries the whole wash itself: the color under it would thicken it.
+        root.setColor(clear && end != nil ? .clear : color, animated: animated)
+        root.setGradient(from: color, to: end, angle: space.gradientAngle, animated: animated)
         root.setGrain(tabManager.isPrivate ? 0 : space.grain ?? 0, animated: animated)
         root.sidebarContainer.tint = color
-        root.sidebarContainer.gradient = glass ? nil : end.map { ($0, space.gradientAngle) }
+        root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
         root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
     }
 

@@ -58,16 +58,17 @@ enum SpaceColor: String, Codable, CaseIterable {
                                     dark: NSColor(hue: hue, saturation: 0.12 + 0.45 * t, brightness: 0.15 + 0.06 * t, alpha: 1))
     }
 
-    /// A color on the space wheel: `hue` around it (red at 0, as on any color wheel), `depth` from the middle, near
-    /// white, out to the rim, deep. Mixed in OKLCH, so every hue at one depth is equally light: a yellow and a blue the
-    /// same distance out weigh the same, and the window's mode can follow depth alone. Neutral drops the hue for
-    /// white, grays and black.
-    static func paint(hue: Double, depth: Double, neutral: Bool = false) -> NSColor {
+    /// A space's color: `hue` (red at 0, as on any color wheel), `depth` from near white (0) to deep (1), and `tint`,
+    /// how much of the hue it has, from none (white, a gray or black at that depth) to all of it. Mixed in OKLCH, so
+    /// every hue at one depth is equally light: a yellow and a blue at the same depth weigh the same, and the window's
+    /// mode can follow depth alone.
+    static func paint(hue: Double, depth: Double, tint: Double = 1) -> NSColor {
         let d = min(max(depth, 0), 1)
         let lightness = 0.975 - 0.69 * d
-        // A whisper of color in the middle, richest around halfway, a little quieter again in the deep.
+        // A whisper of color when pale, richest around halfway, a little quieter again in the deep.
         let rise = min(d / 0.5, 1)
-        var chroma = neutral ? 0 : 0.02 + 0.13 * rise * rise * (3 - 2 * rise) - 0.03 * max(0, d - 0.65) / 0.35
+        let most = 0.02 + 0.13 * rise * rise * (3 - 2 * rise) - 0.03 * max(0, d - 0.65) / 0.35
+        var chroma = most * min(max(tint, 0), 1)
         let angle = okHue(hue)
         // Some hues can't be that rich at that lightness on a screen: back off until it fits.
         var rgb = OKLab.rgb(l: lightness, a: chroma * cos(angle), b: chroma * sin(angle))
@@ -77,6 +78,13 @@ enum SpaceColor: String, Codable, CaseIterable {
         }
         let c = rgb.map { OKLab.encode(min(max($0, 0), 1)) }
         return NSColor(srgbRed: c[0], green: c[1], blue: c[2], alpha: 1)
+    }
+
+    /// The depth whose gray is this white (0 black, 1 white), as near as depths reach: how see-through spaces from
+    /// before 0.4, washed in plain white to black, keep their shade.
+    static func depth(ofWhite white: Double) -> Double {
+        let lightness = cbrt(OKLab.decode(CGFloat(min(max(white, 0), 1))))
+        return min(max((0.975 - lightness) / 0.69, 0), 1)
     }
 
     /// A shade of a wheel hue with WCAG relative luminance `luminance`, for accents made from a space's color. Mixed
