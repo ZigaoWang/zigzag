@@ -67,9 +67,16 @@ enum ImportCoordinator {
     /// Browsers on this Mac with something to bring, Arc first, then by how commonly they're switched from.
     static func detectedSources() -> [Source] {
         var sources: [Source] = []
+        #if DEBUG
+        // A debug copy checked by script lists each browser once, by name: its profiles' names (often email
+        // addresses) never show in a capture.
+        let plainNames = !(ProcessInfo.processInfo.environment["ZIGZAG_FAKE_BROWSERS"] ?? "").isEmpty
+        #else
+        let plainNames = false
+        #endif
         for browser in ChromiumImporter.browsers where ChromiumImporter.isInstalled(browser) {
             // Several profiles: each is its own choice ("Chrome (Work)"), as other browsers' importers do.
-            let profiles = browser.name == "Arc" ? [] : ChromiumImporter.profileNames(of: browser)
+            let profiles = browser.name == "Arc" || plainNames ? [] : ChromiumImporter.profileNames(of: browser)
             if profiles.count > 1 {
                 // "Wang (a@zigao.xyz)" reads as just "Wang"; the email only when two profiles share a name.
                 let short = profiles.map { Self.shortProfileName($0.1) }
