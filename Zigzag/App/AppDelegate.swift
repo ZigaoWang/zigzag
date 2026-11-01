@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var blockerToken: SignalToken?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // A restore asked for before restarting: the backed-up profile goes back before anything reads it.
+        if !Self.isHostingTests { ProfileBackup.restoreIfAsked() }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleGetURL(_:withReply:)),
