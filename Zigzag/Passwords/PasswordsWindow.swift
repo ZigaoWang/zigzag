@@ -169,9 +169,10 @@ final class PasswordsView: NSView {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
         layer?.backgroundColor = cgColor(Tokens.Color.surface)
-        // The column of kinds in a light tint of the space in front, so Passwords belongs to the browser you came from.
+        // The column of kinds in its window's theme, the same one its wordmark takes: a light tint of the space when
+        // it's shown in a browser window, the plain form gray in a window of its own.
         column.wantsLayer = true
-        column.layer?.backgroundColor = cgColor(Brand.Theme.current.wash)
+        column.layer?.backgroundColor = cgColor(Brand.Theme.for(self).wash)
     }
     private lazy var themeToken: SignalToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
 
