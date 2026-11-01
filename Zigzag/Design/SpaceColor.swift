@@ -118,6 +118,19 @@ enum SpaceColor: String, Codable, CaseIterable {
         return atan2(lab.b, lab.a)
     }
 
+    /// A space's color as the window's frame wears it: in light mode toned toward neutral (`Tokens.Color.frameChroma`
+    /// of its saturation), so the sidebar reads as a calm surface with the color as an accent and the chrome on it stays
+    /// crisp; in dark mode as it is.
+    static func frame(_ color: NSColor) -> NSColor {
+        NSColor(name: nil) { appearance in
+            var resolved = color
+            appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) ?? color }
+            guard !appearance.isDark, resolved.alphaComponent > 0 else { return resolved }
+            return NSColor(colorSpace: .sRGB, hue: resolved.hueComponent, saturation: resolved.saturationComponent * Tokens.Color.frameChroma,
+                           brightness: resolved.brightnessComponent, alpha: resolved.alphaComponent)
+        }
+    }
+
     static func swatch(hue: Double) -> NSColor {
         Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.5, brightness: 0.8, alpha: 1),
                              dark: NSColor(hue: hue, saturation: 0.45, brightness: 0.85, alpha: 1))
