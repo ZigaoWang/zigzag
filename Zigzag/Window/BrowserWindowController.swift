@@ -396,9 +396,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window?.isOpaque = !clear
         window?.backgroundColor = clear ? .clear : .windowBackgroundColor
         root.setGlass(clear)
-        // A see-through gradient carries the whole wash itself: the color under it would thicken it.
-        root.setColor(clear && end != nil ? .clear : color, animated: animated)
-        root.setGradient(from: color, to: end, angle: space.gradientAngle, animated: animated)
+        // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
+        // sits under it and would be hidden); a single color washes as a gradient of itself.
+        root.setColor(clear ? .clear : color, animated: animated)
+        root.setGradient(from: color, to: clear ? end ?? color : end, angle: space.gradientAngle, animated: animated)
         root.setGrain(tabManager.isPrivate ? 0 : space.grain ?? 0, animated: animated)
         root.sidebarContainer.tint = color
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
