@@ -53,4 +53,33 @@ struct BrandContrastTests {
             #expect(Brand.contrast(resolved(theme.accent, dark: true), resolved(Tokens.Color.formBackground, dark: true)) >= 3)
         }
     }
+
+    @Test func spaceInkPassesOnItsOwnFrame() {
+        // Whatever a space's color, its row and quiet inks read at AA on its frame, or fall back to the plain text.
+        var spaces = SpaceColor.allCases.map { SpaceInfo(name: $0.name, color: $0) }
+        for depth in stride(from: 0.0, through: 1, by: 0.1) {
+            var custom = SpaceInfo(name: "custom", color: .sky)
+            custom.hue = 0.3
+            custom.brightness = depth
+            spaces.append(custom)
+        }
+        for space in spaces {
+            let theme = Brand.Theme.of(space)
+            for dark in [false, true] {
+                let frame = resolved(space.background, dark: dark)
+                for (ink, plain) in [(theme.rowInk, Tokens.Color.textPrimary), (theme.quietInk, Tokens.Color.textSecondary)] {
+                    let shown = resolved(ink, dark: dark), plainShown = resolved(plain, dark: dark)
+                    let isPlain = shown.redComponent == plainShown.redComponent && shown.alphaComponent == plainShown.alphaComponent
+                    #expect(isPlain || Brand.contrast(shown, frame) >= 4.5, "\(space.name) \(space.brightness ?? -1) \(dark)")
+                }
+            }
+        }
+        // The curated colors all keep their ink in both modes.
+        for color in SpaceColor.allCases where !color.isNeutral {
+            let theme = Brand.Theme.of(SpaceInfo(name: color.name, color: color))
+            for dark in [false, true] {
+                #expect(resolved(theme.rowInk, dark: dark).alphaComponent == 1, "\(color.name) \(dark)")
+            }
+        }
+    }
 }

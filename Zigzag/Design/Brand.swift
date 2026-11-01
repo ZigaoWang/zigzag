@@ -89,23 +89,44 @@ enum Brand {
 
         /// The hue a floating panel's surface leans toward: the space's own, nil for white, grays and black.
         var surfaceHue: Double? = nil
-        /// Whether row titles and labels take the space's ink: only on frames whose lightness is known to keep it past
-        /// AA (curated and soft custom colors, solid); elsewhere they keep the plain text colors.
-        var tintsInk = false
+        /// The frame's colors (both ends of a gradient), for judging the inks against. Empty for see-through, where
+        /// what's under the frame can't be known.
+        var inkGrounds: [NSColor] = []
 
-        /// A row's title on the frame: a deep ink of the space's hue by day, a pale one at night. Checked against
-        /// every curated color, under the hover and card washes too: 11.7:1 by day, 7.5:1 at night at the least.
-        var rowInk: NSColor {
-            guard tintsInk, let h = surfaceHue else { return Tokens.Color.textPrimary }
-            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: 0.27, chroma: 0.035),
-                                        dark: SpaceColor.tone(hue: h, lightness: 0.94, chroma: 0.015))
-        }
+        /// A row's title on the frame: a deep ink of the space's hue by day, a pale one at night (on the curated
+        /// colors at least 11.7:1 by day and 7.5:1 at night, under the hover and card washes too).
+        var rowInk: NSColor { inked(day: (0.27, 0.035), night: (0.94, 0.015), plain: Tokens.Color.textPrimary) }
 
-        /// A quiet word on the frame ("tabs", "new tab", "clear"): 5.2:1 by day, 4.8:1 at night at the least.
-        var quietInk: NSColor {
-            guard tintsInk, let h = surfaceHue else { return Tokens.Color.textSecondary }
-            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: 0.47, chroma: 0.04),
-                                        dark: SpaceColor.tone(hue: h, lightness: 0.8, chroma: 0.025))
+        /// A quiet word on the frame ("tabs", "new tab", "clear"): on the curated colors 5.2:1 by day, 4.8:1 at night.
+        var quietInk: NSColor { inked(day: (0.47, 0.04), night: (0.8, 0.025), plain: Tokens.Color.textSecondary) }
+
+        /// The space's ink at an OKLCH lightness and chroma, checked against this space's own frame in each mode,
+        /// bare and under the hover and card washes: wherever it would fall under AA (4.5:1), that mode takes the plain
+        /// text color instead. Computed per color, so a mid-scale custom shade keeps its ink in whichever mode it can.
+        private func inked(day: (Double, Double), night: (Double, Double), plain: NSColor) -> NSColor {
+            guard let h = surfaceHue, !inkGrounds.isEmpty else { return plain }
+            let grounds = inkGrounds
+            let dayInk = SpaceColor.tone(hue: h, lightness: day.0, chroma: day.1)
+            let nightInk = SpaceColor.tone(hue: h, lightness: night.0, chroma: night.1)
+            return NSColor(name: nil) { appearance in
+                let ink = appearance.isDark ? nightInk : dayInk
+                var passes = true
+                var fallback = plain
+                appearance.performAsCurrentDrawingAppearance {
+                    fallback = plain.usingColorSpace(.sRGB) ?? plain
+                    let washes = [Tokens.Chrome.hover, Tokens.Chrome.card].map { $0.usingColorSpace(.sRGB)?.alphaComponent ?? 0 } + [0]
+                    for ground in grounds {
+                        guard let c = ground.usingColorSpace(.sRGB) else { continue }
+                        for w in washes {
+                            let mixed = NSColor(srgbRed: c.redComponent + (1 - c.redComponent) * w,
+                                                green: c.greenComponent + (1 - c.greenComponent) * w,
+                                                blue: c.blueComponent + (1 - c.blueComponent) * w, alpha: 1)
+                            if Brand.contrast(ink, mixed) < 4.5 { passes = false }
+                        }
+                    }
+                }
+                return passes ? ink : fallback
+            }
         }
 
         /// A floating panel's surface (the command bar, menus, find, downloads, Peek): nearly white by day and a deep
@@ -141,9 +162,7 @@ enum Brand {
             var theme = Theme.navy
             if let hue = space.hue { theme = Theme(hue: hue) } else if !(space.color.isNeutral || space.color == .sky) { theme = Theme(hue: space.color.hue) }
             theme.surfaceHue = space.baseHue
-            // Soft at either end of the scale (or following the Mac), the frame is light or deep enough for the inks.
-            let depths = [space.brightness, space.hue2 == nil ? nil : space.brightness2 ?? space.brightness].compactMap { $0 }
-            theme.tintsInk = !space.isSeeThrough && (depths.isEmpty || depths.allSatisfy { $0 <= 0.15 } || depths.allSatisfy { $0 >= 0.85 })
+            theme.inkGrounds = space.isSeeThrough ? [] : [space.background] + (space.background2.map { [$0] } ?? [])
             return theme
         }
 
