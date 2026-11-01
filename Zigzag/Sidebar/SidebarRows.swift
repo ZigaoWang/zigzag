@@ -425,7 +425,6 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         folderIcon.imageScaling = .scaleNone
         folderIcon.contentTintColor = Tokens.Color.textSecondary
         addSubview(folderIcon)
-        title.font = Tokens.Font.row(.medium)
         setAccessibilityRole(.disclosureTriangle)
     }
 
