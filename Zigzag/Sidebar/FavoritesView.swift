@@ -195,7 +195,7 @@ final class FavoritesView: NSView {
         // As a row it's held just past its icon, as if it had been picked up there.
         let rowGrab = NSPoint(x: Tokens.Space.x2 + Tokens.Metric.favicon + Tokens.Space.x1, y: rowSize.height / 2)
         let copy = CarriedCopy(of: tile, picture: CarriedCopy.picture(of: tile), grabbedAt: start, ground: Tokens.Color.panelBackground,
-                               radius: Tokens.Radius.card, alternate: (row, rowSize, rowGrab, Tokens.Radius.row))
+                               radius: Tokens.Radius.tile, alternate: (row, rowSize, rowGrab, Tokens.Radius.row))
         tile.alphaValue = CarriedCopy.faint
         copy.lift()
         let carried = TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil)
@@ -311,13 +311,13 @@ final class FavoriteTile: InteractiveView {
         self.bookmark = bookmark
         self.partner = partner
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.card
+        layer?.cornerRadius = Tokens.Radius.tile
         layer?.cornerCurve = .continuous
         addSubview(icon)
         partnerIcon.isHidden = partner == nil
         addSubview(partnerIcon)
         dropHalf.wantsLayer = true
-        dropHalf.layer?.cornerRadius = Tokens.Radius.card - 2
+        dropHalf.layer?.cornerRadius = Tokens.Radius.tile - 3
         dropHalf.layer?.cornerCurve = .continuous
         dropHalf.layer?.borderWidth = 1.5
         dropHalf.isHidden = true
@@ -398,32 +398,28 @@ final class FavoriteTile: InteractiveView {
         // The one you're on is lit; one that's open in the background has a fine edge, so you can tell at a glance
         // which are loaded without anything fading or moving.
         icon.alphaValue = 1
+        // Resting tiles are soft glass; the one you're on is the same card as the tab you're on.
         let fill: NSColor
         if isSelected {
-            // The favorite you're on stands clearly apart from the resting tiles beside it.
-            fill = isHovered ? Self.selectedHover : Self.selected
+            fill = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
         } else if isPressed {
             fill = Tokens.Color.pressedFill
         } else if isHovered {
-            fill = Tokens.Color.pressedFill
+            fill = Tokens.Color.glassHover
         } else {
-            fill = Tokens.Color.fieldFill
+            fill = Tokens.Color.glassFill
         }
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
-        layer?.shadowOpacity = isSelected ? 1 : 0
-        layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
-        layer?.shadowRadius = 2
-        layer?.shadowOffset = CGSize(width: 0, height: -1)
-        layer?.borderWidth = isSelected ? Tokens.Metric.hairline : isOpen ? 1 : 0
-        layer?.borderColor = cgColor(isSelected ? Tokens.Color.selectedEdge : Self.openEdge)
+        setLifted(isSelected)
+        if !isSelected {
+            layer?.borderWidth = Tokens.Metric.hairline
+            layer?.borderColor = cgColor(isOpen ? Self.openEdge : Tokens.Color.glassEdge)
+        }
     }
 
-    private static let openEdge = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.13), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.16))
+    private static let openEdge = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.14), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
 
     private static let iconSide: CGFloat = 22
-
-    private static let selected = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.95), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
-    private static let selectedHover = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 1), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.24))
 }
 
 /// The row a carried favorite turns into over the tab list: its page, or a split's two pages side by side with a
