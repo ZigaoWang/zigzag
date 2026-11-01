@@ -1,7 +1,7 @@
 import AppKit
 
 /// One result row: an icon, the title, quiet detail after it, and on the chosen row what Return does, with its key.
-/// The chosen row is the space's accent, soft (`Tokens.Color.selectionAlpha`), so you always see where Return goes.
+/// The chosen row is the neutral highlight menus use (`Tokens.Color.highlight`), so you always see where Return goes.
 final class CommandRowView: InteractiveView {
     private let icon = FaviconView()
     private let symbolView = NSImageView()
@@ -71,10 +71,8 @@ final class CommandRowView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The chosen row in the space's accent, like the rest of the window; hover moves the choice, so it has no
-        // fill of its own.
-        let accent = Brand.Theme.for(self).accent
-        let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? Tokens.Color.selectionPressedAlpha : Tokens.Color.selectionAlpha) : nil
+        // The chosen row in the neutral highlight, as a menu's; hover moves the choice, so it has no fill of its own.
+        let fill: NSColor? = isSelected ? (isPressed ? Tokens.Color.pressedFill : Tokens.Color.highlight) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         needsLayout = true
     }
@@ -90,7 +88,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private let panel = FloatingPanelView()
     /// The bar itself, for pointing at it (the Getting started guide).
     var panelView: NSView { panel }
-    private let field = PlainTextField(font: Tokens.Font.title(), placeholder: "Search or enter address")
+    private let field = PlainTextField(font: Tokens.Font.title(.regular), placeholder: "Search or enter address")
     private let fieldIcon = NSImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
     private var rows: [CommandRowView] = []
@@ -203,9 +201,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
         }
         applySpaceTheme()
-        // From the address: a size up from the sidebar's, easy to read across the wide field; the centered bar for a
-        // new tab is large.
-        let font = isAnchored ? Tokens.Font.heading(.regular) : Tokens.Font.title()
+        // From the address: the sidebar's own size, so the text doesn't change as you click in; the centered bar for
+        // a new tab is large. Regular weight both ways: what you type reads as text, not a heading.
+        let font = isAnchored ? Tokens.Font.sidebarRow() : Tokens.Font.title(.regular)
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
@@ -506,7 +504,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             typed = typedBeforeScope
             (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (typedBeforeScope as NSString).length, length: 0)
         }
-        let font = field.font ?? Tokens.Font.title()
+        let font = field.font ?? Tokens.Font.title(.regular)
         field.placeholderAttributedString = NSAttributedString(string: site.map { "Search \($0.name)" } ?? (mode == .history ? "Search history" : "Search or enter address"),
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
         if let site { FaviconStore.shared.prefetch(for: site.home) }
