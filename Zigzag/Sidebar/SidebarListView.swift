@@ -267,7 +267,7 @@ final class SidebarListView: NSView {
                 continue
             }
             if animated {
-                Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { view.removeFromSuperview() })
+                collapse(view)
             } else {
                 view.removeFromSuperview()
             }
@@ -319,6 +319,33 @@ final class SidebarListView: NSView {
         updateDocumentHeight()
         pinHeader()
         slideCard()
+    }
+
+    /// A row that's going (a closed tab) folds away: it stops taking clicks at once, and its height closes to nothing
+    /// as it fades, in step with the rows below gliding up, so they never slide over it. With Reduce Motion it fades.
+    private func collapse(_ view: NSView) {
+        (view as? SidebarRowView)?.isLeaving = true
+        guard let layer = view.layer, !Tokens.Motion.reduceMotion else {
+            Tokens.Motion.animate(Tokens.Motion.feedback, { view.animator().alphaValue = 0 }, completion: { view.removeFromSuperview() })
+            return
+        }
+        layer.masksToBounds = true
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { view.removeFromSuperview() }
+        let shut = CABasicAnimation(keyPath: "bounds.size.height")
+        shut.fromValue = layer.presentation()?.bounds.height ?? layer.bounds.height
+        shut.toValue = 0
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = layer.presentation()?.opacity ?? 1
+        fade.toValue = 0
+        for animation in [shut, fade] {
+            animation.duration = Tokens.Motion.standard
+            animation.timingFunction = Tokens.Motion.easeOut
+            animation.fillMode = .forwards
+            animation.isRemovedOnCompletion = false
+            layer.add(animation, forKey: animation.keyPath)
+        }
+        CATransaction.commit()
     }
 
     /// The page each row showed at the last update.

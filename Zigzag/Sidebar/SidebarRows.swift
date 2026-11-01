@@ -8,6 +8,10 @@ class SidebarRowView: InteractiveView {
     var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    /// On its way out of the list: it takes no more clicks while it folds away.
+    var isLeaving = false
+    override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
+
     /// Set while the list's sliding card travels to this row: the row draws no card of its own until it lands.
     var holdsCardBack = false { didSet { if oldValue != holdsCardBack { stateDidChange(animated: false) } } }
     /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
