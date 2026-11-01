@@ -36,6 +36,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool
     /// Tabs dropped into another window's sidebar at an index, in order. Returns true if handled.
     func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool
+    /// A pinned page dropped into another window's sidebar at a point on screen. Returns the row it landed as.
+    func listMovePinnedToWindow(_ bookmarkID: UUID, controller: BrowserWindowController, at screenPoint: NSPoint) -> NSView?
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID)
     /// A tab or bookmark dragged over the favorites grid (nil: it's not over this window). Returns true while it's
     /// over the grid.
@@ -1089,11 +1091,11 @@ final class SidebarListView: NSView {
         let hit = Self.list(at: mouse)
         let inWindow = Self.window(at: mouse) === window.windowController
 
-        // Another window's list shows where a tab would land there.
-        if let (_, list) = hit, list !== self, case .tab = drag.item {
+        // Another window's list shows where a tab would land there; a pinned page can land among its pinned tabs too.
+        if let (_, list) = hit, list !== self, drag.item.canBeFavorite {
             if externalTarget !== list { externalTarget?.externalHover(at: nil) }
             externalTarget = list
-            list.externalHover(at: mouse)
+            list.externalHover(at: mouse, allowsPinned: { if case .bookmark = drag.item { true } else { false } }())
         } else if externalTarget != nil {
             externalTarget?.externalHover(at: nil)
             externalTarget = nil
@@ -1274,6 +1276,10 @@ final class SidebarListView: NSView {
         if let tab, let external, let (controller, list) = Self.list(at: mouse), list === external, controller.tabManager !== manager,
            delegate?.listMoveToWindow(tabs, controller: controller, index: list.dropIndex(at: mouse)) == true {
             return list.row(for: tab)
+        }
+        if case .bookmark(let id) = drag.item, let external, let (controller, list) = Self.list(at: mouse), list === external,
+           controller.tabManager !== manager, let landed = delegate?.listMovePinnedToWindow(id, controller: controller, at: mouse) {
+            return landed
         }
 
         // Somewhere that isn't any Zigzag window: the tabs become a new window there.

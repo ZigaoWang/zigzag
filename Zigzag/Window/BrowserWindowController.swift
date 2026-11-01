@@ -296,6 +296,33 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return tabs.indices.contains(landing.index) ? sidebar.list.row(for: tabs[landing.index]) : nil
     }
 
+    /// A pinned page carried over from another window's list: its open pages come along (one already open here stays
+    /// instead), it lands among the pinned tabs or the tabs right where it was dropped, and this window comes forward.
+    func takePinned(_ bookmarkID: UUID, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
+        let ids = Library.shared.pinnedSplit(containing: bookmarkID).map { [$0.left, $0.right] } ?? [bookmarkID]
+        for id in ids {
+            if tabManager.bookmarkTab(for: id) != nil {
+                if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
+            } else if let live = source.tabManager.detachBookmarkTab(id) {
+                tabManager.insertBookmarkTab(live, bookmarkID: id)
+            }
+        }
+        let landing = sidebar.list.dropTarget(at: screenPoint, allowsPinned: true)
+        let space = tabManager.currentSpaceID
+        window?.makeKeyAndOrderFront(nil)
+        if landing.section == .bookmarks {
+            pageChange("Move Pinned Tab") { Library.shared.moveBookmark(bookmarkID, to: landing.index, in: space, folder: .some(landing.folder)) }
+            return sidebar.list.row(forBookmark: bookmarkID)
+        }
+        pageChange("Unpin Tab") { [tabManager] in
+            // Into this space first, so it comes down among the tabs you're looking at.
+            Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space)
+            tabManager.unbookmark(bookmarkID, toIndex: landing.index)
+        }
+        let tabs = tabManager.tabs(in: space)
+        return tabs.indices.contains(landing.index) ? sidebar.list.row(for: tabs[landing.index]) : nil
+    }
+
     /// A favorite carried over from another window's Favorites: its open pages come along (one already open here
     /// stays instead), it lands as it would from this window's own, and this window comes forward.
     func takeFavorite(_ favorite: Bookmark, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
@@ -1623,6 +1650,11 @@ extension BrowserWindowController: SidebarDelegate {
         for tab in tabs.reversed() { transfer(tab, to: controller, at: index) }
         controller.window?.makeKeyAndOrderFront(nil)
         return true
+    }
+
+    func listMovePinnedToWindow(_ bookmarkID: UUID, controller: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
+        guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return nil }
+        return controller.takePinned(bookmarkID, from: self, at: screenPoint)
     }
 
     func listSwitchSpaceDuringDrag(_ spaceID: UUID) {
