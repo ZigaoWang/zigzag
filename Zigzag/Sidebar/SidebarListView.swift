@@ -84,7 +84,7 @@ enum SidebarItem: Hashable {
         switch self {
         case .header: Tokens.Space.x6 + Tokens.Space.x1
         // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
-        case .separator: Tokens.Space.x6
+        case .separator: Tokens.Metric.sectionLabelHeight
         case .placeholder, .bookmark, .folder, .newTab, .tab: Tokens.Metric.rowHeight
         }
     }
@@ -125,7 +125,7 @@ final class SidebarListView: NSView {
     private var lastFolderTarget: UUID?
     private var lastSplitTarget: SplitDrop?
     var isDragging: Bool { drag != nil }
-    private let rowGap: CGFloat = Tokens.Space.x1
+    private let rowGap: CGFloat = Tokens.Metric.rowGap
 
     struct DragState {
         let item: SidebarItem

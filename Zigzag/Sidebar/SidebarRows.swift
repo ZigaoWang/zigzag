@@ -17,6 +17,7 @@ class SidebarRowView: InteractiveView {
         super.init(frame: frame)
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
+        title.font = Tokens.Font.row()
         addSubview(icon)
         addSubview(title)
         setAccessibilityRole(.button)
@@ -27,12 +28,15 @@ class SidebarRowView: InteractiveView {
     /// Space reserved at the trailing edge for accessory buttons.
     var trailingAccessoryWidth: CGFloat { 0 }
 
+    /// From the row's edge to its icon, and from the icon to the title.
+    static let inset: CGFloat = Tokens.Space.x2 + 2
+
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x2
+        let pad = Self.inset
         let iconSize = Tokens.Metric.favicon
         icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
-        let titleX = icon.frame.maxX + Tokens.Space.x2
+        let titleX = icon.frame.maxX + Self.inset
         let titleHeight = ceil(title.intrinsicContentSize.height)
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : pad
         title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
@@ -57,11 +61,8 @@ class SidebarRowView: InteractiveView {
             fill = cgColor(SidebarRowView.tinted(selectedFill: base ?? Tokens.Color.selectedFill, with: siteTint, appearance: effectiveAppearance))
         }
         layer?.set(backgroundColor: fill, animated: animated && !isHovered)
-        let shadowed = isSelected || isLifted
-        layer?.shadowOpacity = shadowed ? 1 : 0
-        layer?.shadowColor = cgColor(isLifted ? Tokens.Color.panelShadow : Tokens.Color.selectedEdge)
-        layer?.shadowRadius = isLifted ? Tokens.Space.x2 : 0.5
-        layer?.shadowOffset = CGSize(width: 0, height: isLifted ? -Tokens.Space.x1 : -0.5)
+        // The tab you're on is a soft card: a hairline edge and a faint shadow under it.
+        setLifted(isSelected || isLifted)
         applyFreshness()
     }
 
@@ -337,7 +338,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         super.layout()
         if isAway {
             // Make room for the mark: the title moves over by its width.
-            let x = icon.frame.maxX + Tokens.Space.x2
+            let x = icon.frame.maxX + Self.inset
             let h: CGFloat = 12
             Tokens.Motion.withoutAnimation {
                 awayMark.frame = CGRect(x: x, y: (bounds.height - h) / 2, width: 6, height: h)
@@ -365,8 +366,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.frame.size.width = max(0, mid - Tokens.Space.x1 - title.frame.minX)
         divider.frame = NSRect(x: mid, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
         partnerIcon.frame = icon.frame.offsetBy(dx: mid, dy: 0)
-        let titleX = partnerIcon.frame.maxX + Tokens.Space.x2
-        let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : Tokens.Space.x2
+        let titleX = partnerIcon.frame.maxX + Self.inset
+        let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Tokens.Space.x1 : Self.inset
         partnerTitle.frame = NSRect(x: titleX, y: title.frame.minY, width: max(0, bounds.width - titleX - trailing), height: title.frame.height)
         guard partnerLeads else { return }
         // Same two halves, the pages trading places.
@@ -424,7 +425,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         folderIcon.imageScaling = .scaleNone
         folderIcon.contentTintColor = Tokens.Color.textSecondary
         addSubview(folderIcon)
-        title.font = Tokens.Font.body(.medium)
+        title.font = Tokens.Font.row(.medium)
         setAccessibilityRole(.disclosureTriangle)
     }
 
@@ -460,7 +461,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     override func layout() {
         super.layout()
         let side = Tokens.Space.x3
-        chevron.frame = NSRect(x: bounds.width - Tokens.Space.x2 - side, y: (bounds.height - side) / 2, width: side, height: side)
+        chevron.frame = NSRect(x: bounds.width - Self.inset - side, y: (bounds.height - side) / 2, width: side, height: side)
         folderIcon.frame = icon.frame
         turnChevron(animated: false)
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
@@ -472,7 +473,10 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
-        if isDropTarget { layer?.set(backgroundColor: cgColor(Tokens.Color.selectedFill), animated: animated) }
+        if isDropTarget {
+            layer?.set(backgroundColor: cgColor(Tokens.Color.selectedFill), animated: animated)
+            setLifted(true)
+        }
         chevron.alphaValue = isHovered || !isOpen || isDropTarget ? 1 : 0.6
     }
 
@@ -512,14 +516,14 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// The space name above its bookmarks. Click the name to edit the space; click the chevron beside it to fold the
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
-    let label = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textSecondary)
+    let label = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     private let chevron = NSImageView()
     private let iconView = NSImageView()
     /// The space's icon, before its name. Nil: the name alone.
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.body) }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.label) }
             iconView.isHidden = icon == nil
             needsLayout = true
         }
@@ -533,7 +537,7 @@ final class SpaceHeaderView: InteractiveView {
         chevron.imageScaling = .scaleNone
         chevron.contentTintColor = Tokens.Color.textTertiary
         iconView.imageScaling = .scaleNone
-        iconView.contentTintColor = Tokens.Color.textSecondary
+        iconView.contentTintColor = Tokens.Color.textTertiary
         iconView.isHidden = true
         addSubview(iconView)
         addSubview(label)
@@ -546,10 +550,11 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        var x = Tokens.Space.x2
+        // In line with the rows' icons and titles below it.
+        var x = SidebarRowView.inset - Label.inset
         if icon != nil {
-            let side = Tokens.Space.x5
-            iconView.frame = NSRect(x: x - 1, y: (bounds.height - side) / 2, width: side, height: side)
+            let side = Tokens.Metric.favicon
+            iconView.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - side) / 2, width: side, height: side)
             x = iconView.frame.maxX + Tokens.Space.x1
         }
         label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
@@ -562,7 +567,7 @@ final class SpaceHeaderView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        label.textColor = isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
         iconView.contentTintColor = label.textColor
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
@@ -572,11 +577,11 @@ final class SpaceHeaderView: InteractiveView {
     }
 }
 
-/// Thin line between bookmarks and tabs.
-/// The line above today's tabs. Clear sits at its end, as in Arc: on a line of its own, apart from New Tab and the
-/// pinned tabs it leaves alone, and only while the pointer is over the list and there are tabs to clear.
+/// The quiet "Tabs" label above today's tabs, with generous room above it in place of a line. Clear sits at its end,
+/// as in Arc: on a line of its own, apart from New Tab and the pinned tabs it leaves alone, and only while the
+/// pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
-    private let line = ColorView(color: Tokens.Color.separator)
+    private let label = Label("Tabs", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
@@ -592,7 +597,7 @@ final class SeparatorRowView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        addSubview(line)
+        addSubview(label)
         clearButton.alphaValue = 0
         clearButton.isHidden = true
         clearButton.keyboardFocusChanged = { [weak self] _ in self?.refreshClear() }
@@ -623,12 +628,13 @@ final class SeparatorRowView: NSView {
 
     override func layout() {
         super.layout()
-        let cw = clearButton.fittingWidth, ch: CGFloat = 18
-        clearButton.frame = NSRect(x: bounds.width - cw, y: floor((bounds.height - ch) / 2), width: cw, height: ch)
+        // The label sits low, nearer the tabs it names than the pinned tabs above.
+        let h = label.lineHeight
+        let mid = bounds.height - Tokens.Space.x3
+        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: floor(mid - h / 2), width: label.inkWidth + Label.inset * 2, height: h)
+        let cw = clearButton.fittingWidth, ch: CGFloat = 20
+        clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()
-        // The line runs up to Clear while it shows, so the two read as one.
-        let end = clearShown ? clearButton.frame.minX - Tokens.Space.x1 : bounds.width - Tokens.Space.x2
-        line.frame = NSRect(x: Tokens.Space.x2, y: floor(bounds.height / 2), width: max(0, end - Tokens.Space.x2), height: Tokens.Metric.hairline)
     }
 }
 
@@ -683,7 +689,7 @@ final class InsertionLineView: NSView {
 
     override func layout() {
         super.layout()
-        line.frame = NSRect(x: Tokens.Space.x2, y: floor((bounds.height - 2) / 2), width: bounds.width - Tokens.Space.x4, height: 2)
+        line.frame = NSRect(x: SidebarRowView.inset, y: floor((bounds.height - 2) / 2), width: bounds.width - SidebarRowView.inset * 2, height: 2)
     }
 }
 
