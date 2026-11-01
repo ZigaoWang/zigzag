@@ -519,7 +519,7 @@ final class GuidedTour: NSView {
         frame.origin.y = min(max(Tokens.Space.x2, frame.origin.y), bounds.height - size.height - Tokens.Space.x4)
         // With Reduce Motion the card simply appears in its new place.
         if animated, card.frame != frame, !Tokens.Motion.reduceMotion {
-            Tokens.Motion.animate(curve, evenFromKeyboard: true) { self.card.animator().frame = frame }
+            Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true) { self.card.animator().frame = frame }
         } else if card.frame != frame {
             card.frame = frame
         }

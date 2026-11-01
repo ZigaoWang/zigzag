@@ -259,7 +259,7 @@ final class BrowserRootView: ColorView {
             secondCard.alphaValue = 0
             secondCard.frame = vertical ? right.offsetBy(dx: 0, dy: Tokens.Space.x6) : right.offsetBy(dx: Tokens.Space.x6, dy: 0)
         }
-        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) {
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, moves: true) {
             self.card.animator().frame = panes.left
             if let right = panes.right {
                 self.secondCard.animator().frame = right
@@ -333,7 +333,7 @@ final class BrowserRootView: ColorView {
         borderlessToken = NotificationCenter.default.addObserver(forName: Self.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                Tokens.Motion.animate(Tokens.Motion.gentle) {
+                Tokens.Motion.animate(Tokens.Motion.gentle, moves: true) {
                     self.needsLayout = true
                     self.layoutSubtreeIfNeeded()
                 }
@@ -581,7 +581,7 @@ final class BrowserRootView: ColorView {
         secondCard.isAttached = visible && Self.isBorderless
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
         secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
-        Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, {
+        Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, moves: true, {
             self.card.animator().frame = self.paneFrames.left
             self.emptyHint.animator().frame = Self.markFrame(in: self.paneFrames.left)
             if let right = self.paneFrames.right { self.secondCard.animator().frame = right }
@@ -748,7 +748,7 @@ final class SplitDropHint: NSView {
         zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
         label.stringValue = side == .left ? "Open on the Left" : "Open on the Right"
         label.textColor = Tokens.Color.accent
-        Tokens.Motion.animate(Tokens.Motion.feedback) { self.zone.animator().frame = target }
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.zone.animator().frame = target }
         if zone.frame.isEmpty { zone.frame = target }
         let h = label.lineHeight
         label.frame = NSRect(x: 0, y: (target.height - h) / 2, width: target.width, height: h)

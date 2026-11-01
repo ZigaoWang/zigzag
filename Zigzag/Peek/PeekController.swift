@@ -286,7 +286,7 @@ final class PeekController {
         content.layer?.backgroundColor = nil
         let target = controller.root.cardFrame
         scrim.hide()
-        Tokens.Motion.animate(Tokens.Motion.snappy, {
+        Tokens.Motion.animate(Tokens.Motion.snappy, moves: true, {
             self.panel.animator().frame = target
         }, completion: {
             if !self.isVisible { self.panel.removeFromSuperview() }

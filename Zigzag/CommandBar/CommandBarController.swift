@@ -560,7 +560,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if before != after, before != .zero {
             field.frame = before
             // Tab is how you get here, so it moves even from the keyboard.
-            Tokens.Motion.animate(curve, evenFromKeyboard: true) { self.field.animator().frame = after }
+            Tokens.Motion.animate(curve, evenFromKeyboard: true, moves: true) { self.field.animator().frame = after }
         }
         // The words you typed fade as the field empties, rather than vanishing.
         let fade = CATransition()

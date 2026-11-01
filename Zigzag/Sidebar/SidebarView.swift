@@ -749,7 +749,7 @@ final class SidebarView: NSView {
         var finalFrame = scrollView.frame
         finalFrame.origin.x = Tokens.Sidebar.edge
         // Space switches slide even from the keyboard (⌃1, ⌃2…): the motion tells you which way you went.
-        let animate = snapshot != nil && direction != 0 && !Tokens.Motion.reduceMotion
+        let animate = snapshot != nil && direction != 0
         Tokens.Motion.withoutAnimation { scrollView.frame = finalFrame }
         // Mid-drag the list keeps its gap and hidden row; otherwise it simply reloads.
         if list.isDragging { list.refreshDuringDrag() } else { list.reload(animated: false); restoreListScroll() }
@@ -762,6 +762,21 @@ final class SidebarView: NSView {
         ghost.wantsLayer = true
         addSubview(ghost)
         swipeGhost = ghost
+        // Reduce Motion: nothing slides, but the old list still fades into the new one where it stands.
+        if Tokens.Motion.reduceMotion {
+            CATransaction.begin()
+            CATransaction.setCompletionBlock { ghost.removeFromSuperview() }
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 1
+            fade.toValue = 0
+            fade.duration = Tokens.Motion.standard
+            fade.timingFunction = Tokens.Motion.easeOut
+            fade.fillMode = .forwards
+            fade.isRemovedOnCompletion = false
+            ghost.layer?.add(fade, forKey: "fade")
+            CATransaction.commit()
+            return
+        }
         // The old list leaves from where it is; the new one arrives from the other side.
         var ghostEnd = finalFrame
         ghostEnd.origin.x -= direction * width

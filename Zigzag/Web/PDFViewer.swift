@@ -142,7 +142,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         pageChanged()
         bar.isHidden = false
         needsLayout = true
-        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true) {
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, moves: true) {
             self.pdfView.animator().alphaValue = 1
         }
         bar.present(arrival: .pop)
@@ -261,7 +261,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         showsSidebar.toggle()
         sidebarButton.showsFillAtRest = showsSidebar
         if showsSidebar { sidebar.isHidden = false; sidebarEdge.isHidden = false }
-        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, {
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true, {
             let side = self.showsSidebar ? Self.sidebarWidth : 0
             self.sidebar.animator().frame.origin.x = side - Self.sidebarWidth
             self.sidebarEdge.animator().frame.origin.x = side - Tokens.Metric.hairline

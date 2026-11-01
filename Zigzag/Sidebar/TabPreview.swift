@@ -178,7 +178,7 @@ final class TabPreviewController {
             overlay.addSubview(panel)
             panel.present()
         } else if panel.frame != frame {
-            Tokens.Motion.animate(Tokens.Motion.snappy) { panel.animator().frame = frame }
+            Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = frame }
         }
         // Live pages refresh while you look at the preview.
         refreshTimer?.invalidate()

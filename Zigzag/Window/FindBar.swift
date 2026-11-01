@@ -208,7 +208,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
         clearHighlights()
         let target = frame
-        Tokens.Motion.animate(Tokens.Motion.snappy) { [panel] in panel.animator().frame = target }
+        Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { [panel] in panel.animator().frame = target }
         if query.isEmpty { countLabel.stringValue = ""; layoutPanel() } else { search(backwards: false, fromStart: true) }
     }
 
