@@ -312,9 +312,11 @@ private final class WheelKnob {
     }
 }
 
-/// A ready-made look: a color, or two in a gradient, maybe see-through.
+/// A ready-made look: one of the curated colors, which follows the Mac between its soft day and deep night shades.
 struct SpaceLook {
     let name: String
+    /// One of the curated colors.
+    var curated: SpaceColor? = nil
     var hue: Double = 0
     /// How much color: 0 for white, grays and black.
     var tint: Double = 1
@@ -331,8 +333,25 @@ struct SpaceLook {
         return space
     }
 
+    /// A curated color, as a preset: the color alone, light by day and deep at night with the Mac.
+    static func curated(_ color: SpaceColor) -> SpaceLook { SpaceLook(name: color.name, curated: color, depth: 0) }
+
     func apply(to space: inout SpaceInfo) {
         space.glass = nil
+        if let curated {
+            space.color = curated
+            space.hue = nil
+            space.tint = nil
+            space.intensity = nil
+            space.brightness = nil
+            space.hue2 = nil
+            space.tint2 = nil
+            space.intensity2 = nil
+            space.brightness2 = nil
+            space.translucency = nil
+            space.appearance = nil
+            return
+        }
         if tint < 0.005 {
             space.hue = nil
             space.color = .graphite
@@ -352,6 +371,10 @@ struct SpaceLook {
     }
 
     func matches(_ space: SpaceInfo) -> Bool {
+        if let curated {
+            return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil && !space.isSeeThrough
+                && (curated.isNeutral || space.tintAmount > 0.99)
+        }
         guard let b = space.brightness, abs(b - depth) < 0.005, abs(space.seeThrough - seeThrough) < 0.01 else { return false }
         if tint < 0.005 {
             guard space.isNeutral else { return false }
@@ -364,19 +387,8 @@ struct SpaceLook {
         return true
     }
 
-    /// One row: white, gray and black, three colors (Zigzag's navy among them), two gradients, and frosted white.
-    static let presets: [SpaceLook] = [
-        SpaceLook(name: "White", tint: 0, depth: 0),
-        SpaceLook(name: "Gray", tint: 0, depth: 0.12),
-        SpaceLook(name: "Black", tint: 0, depth: 1),
-        SpaceLook(name: "Sky", hue: 0.57, depth: 0.22),
-        SpaceLook(name: "Rose", hue: 0.96, depth: 0.2),
-        SpaceLook(name: "Navy", hue: 0.62, depth: 0.82),
-        // Neighbors on the wheel, one a little deeper than the other, the way light falls across a wall.
-        SpaceLook(name: "Dawn", hue: 0.07, depth: 0.16, hue2: 0.95, depth2: 0.3, angle: 90),
-        SpaceLook(name: "Deep Sea", hue: 0.5, depth: 0.62, hue2: 0.63, depth2: 0.86, angle: 90),
-        SpaceLook(name: "Frost", tint: 0, depth: 0.04, seeThrough: 0.6),
-    ]
+    /// One row of curated colors that sit well together: white, the seven soft hues around the wheel, and graphite.
+    static let presets: [SpaceLook] = [SpaceColor.snow, .sky, .lavender, .rose, .peach, .sand, .sage, .mint, .graphite].map { curated($0) }
 }
 
 /// A small checkerboard, the usual sign for see-through.
@@ -900,10 +912,64 @@ final class AddColorSlot: InteractiveView {
     }
 }
 
-/// How a space looks, in one piece, the same wherever it's edited: the wheel (around for the hue, out from the
-/// middle for how much of it), a row of presets, then Colors (the space's one or two colors, a slot to add a second,
-/// and the direction once there are two), Shade, See-through and Grain. `onPreview` fires while you drag, `onCommit`
-/// when you let go or pick something.
+/// A quiet heading that folds what's under it away: its name, and a chevron that turns as it opens.
+final class DisclosureRow: InteractiveView {
+    private let label: Label
+    private let chevron = NSImageView()
+    var isOpen = false { didSet { if oldValue != isOpen { turn(animated: true) } } }
+
+    init(title: String) {
+        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
+        chevron.imageScaling = .scaleNone
+        chevron.wantsLayer = true
+        addSubview(label)
+        addSubview(chevron)
+        setAccessibilityRole(.disclosureTriangle)
+        setAccessibilityLabel(title)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        let h = label.lineHeight
+        label.frame = NSRect(x: 0, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        let side = Tokens.Space.x4
+        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: (bounds.height - side) / 2, width: side, height: side)
+        turn(animated: false)
+    }
+
+    /// The chevron points right when folded and down when open, turning about its own middle.
+    private func turn(animated: Bool) {
+        guard let layer = chevron.layer else { return }
+        let frame = chevron.frame
+        Tokens.Motion.withoutAnimation {
+            layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            layer.position = CGPoint(x: frame.midX, y: frame.midY)
+        }
+        let angle: CGFloat = isOpen ? -.pi / 2 : 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(!animated || Tokens.Motion.reduceMotion)
+        CATransaction.setAnimationDuration(Tokens.Motion.selection)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
+        layer.setAffineTransform(CGAffineTransform(rotationAngle: angle))
+        CATransaction.commit()
+        setAccessibilityValue(isOpen ? 1 : 0)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        chevron.contentTintColor = label.textColor
+    }
+}
+
+/// How a space looks, in one piece, the same wherever it's edited: a row of curated colors first (one tap, tried on
+/// the window while the pointer is on one), then the wheel (around for the hue, out from the middle for how much of
+/// it) and Shade for a color of your own, then Effects, folded until wanted: Colors (a slot to add a second, and the
+/// direction once there are two), See-through and Grain. `onPreview` fires while you drag or point at a preset,
+/// `onCommit` when you let go or pick something.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
     private let colorsLabel = SpaceLookEditor.rowLabel("Colors")
@@ -913,6 +979,9 @@ final class SpaceLookEditor: NSView {
     private let addSlot = AddColorSlot()
     private let dial = DirectionKnob()
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
+    /// Gradient, see-through and grain: there when you want them, folded away until then.
+    private let effects = DisclosureRow(title: "Effects")
+    private var showsEffects = false
     private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
     private let shadeSlider = LookSlider(.shade)
     private let clearLabel = SpaceLookEditor.rowLabel("See-through")
@@ -922,6 +991,8 @@ final class SpaceLookEditor: NSView {
 
     var onPreview: ((SpaceInfo) -> Void)?
     var onCommit: ((SpaceInfo) -> Void)?
+    /// The editor grew or shrank (Effects opened or folded).
+    var onResize: (() -> Void)?
 
     /// The space as the editor has it right now.
     private var draft: SpaceInfo
@@ -940,7 +1011,8 @@ final class SpaceLookEditor: NSView {
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, grainLabel, grainSlider]
+        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, grainLabel, grainSlider, effects]
+        showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
         (views + chips + swatches).forEach { addSubview($0) }
 
         wheel.onChange = { [weak self] index, spot, final in
@@ -981,6 +1053,23 @@ final class SpaceLookEditor: NSView {
                 self.colorChosen = true
                 self.changed(final: true, animated: true)
             }
+            // Pointing at a preset tries it on the window; moving away puts back what you have.
+            swatch.hoverChanged = { [weak self, weak swatch] hovered in
+                guard let self, let look = swatch?.look else { return }
+                if hovered, !look.matches(self.look) {
+                    var trial = self.draft
+                    look.apply(to: &trial)
+                    self.onPreview?(trial)
+                } else if !hovered {
+                    self.onPreview?(self.look)
+                }
+            }
+        }
+        effects.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.showsEffects.toggle()
+            self.sync(animated: true)
+            self.onResize?()
         }
         shadeSlider.onChange = { [weak self] value, final in self?.shade(to: value, final: final) }
         clearSlider.onChange = { [weak self] value, final in
@@ -1092,7 +1181,7 @@ final class SpaceLookEditor: NSView {
             depths.append(depth(1))
         }
         wheel.show(spots, depths: depths, selected: selected, animated: animated)
-        for swatch in swatches { swatch.isSelected = swatch.look.matches(space) }
+        for swatch in swatches { swatch.isSelected = swatch.look.matches(look) }
         let shown = look
         let colors = [shown.background] + (shown.background2.map { [$0] } ?? [])
         let spot = spots[selected]
@@ -1110,7 +1199,10 @@ final class SpaceLookEditor: NSView {
         chips[1].isHidden = !two
         addSlot.isHidden = two
         dial.colors = (colors[0], colors.last ?? colors[0])
-        showDial(two, animated: animated)
+        effects.isOpen = showsEffects
+        for view in [colorsLabel, chips[0], clearLabel, clearSlider, grainLabel, grainSlider] as [NSView] { view.isHidden = !showsEffects }
+        if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }
+        showDial(two && showsEffects, animated: animated)
         needsLayout = true
     }
 
@@ -1129,7 +1221,7 @@ final class SpaceLookEditor: NSView {
             dial.animator().alphaValue = show ? 1 : 0
         } completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.draft.hue2 == nil else { return }
+                guard let self, self.draft.hue2 == nil || !self.showsEffects else { return }
                 self.dial.isHidden = true
             }
         }
@@ -1142,11 +1234,15 @@ final class SpaceLookEditor: NSView {
     private let sliderHeight: CGFloat = 30
     /// The Colors row: as tall as the dial, a little more than a slider.
     private let dialSize: CGFloat = 40
+    private let disclosureHeight: CGFloat = 28
     /// How tall the wheel is.
-    var wheelHeight: CGFloat = 232 { didSet { needsLayout = true } }
+    var wheelHeight: CGFloat = 200 { didSet { needsLayout = true } }
 
+    /// The presets first, one tap each; the wheel and Shade for a color of your own; then Effects, folded.
     var preferredHeight: CGFloat {
-        wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5 + dialSize + sliderHeight * 3 + Tokens.Space.x3 * 3
+        var h = swatchSize + Tokens.Space.x4 + wheelHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x3 + disclosureHeight
+        if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
+        return h
     }
 
     /// Wide enough for the longest name, so every control starts at the same line.
@@ -1159,14 +1255,18 @@ final class SpaceLookEditor: NSView {
         super.layout()
         let width = bounds.width
         var y: CGFloat = 0
-        wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
-        y += wheelHeight + Tokens.Space.x3
         let count = CGFloat(swatches.count)
         let gap = (width - count * swatchSize) / max(count - 1, 1)
         for (i, swatch) in swatches.enumerated() {
             swatch.frame = NSRect(x: CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
         }
-        y += swatchSize + Tokens.Space.x5
+        y += swatchSize + Tokens.Space.x4
+        wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
+        y += wheelHeight + Tokens.Space.x3
+        row(shadeLabel, shadeSlider, y: y, height: sliderHeight)
+        y += sliderHeight + Tokens.Space.x3
+        effects.frame = NSRect(x: 0, y: y, width: width, height: disclosureHeight)
+        y += disclosureHeight + Tokens.Space.x2
         // Colors: the space's own, then the slot for a second or, with two, which way they run.
         let lh = ceil(colorsLabel.intrinsicContentSize.height)
         colorsLabel.frame = NSRect(x: 0, y: y + (dialSize - lh) / 2, width: labelWidth, height: lh)
@@ -1179,7 +1279,7 @@ final class SpaceLookEditor: NSView {
         x += chipSize + Tokens.Space.x3
         dial.frame = NSRect(x: x, y: y, width: dialSize, height: dialSize)
         y += dialSize + Tokens.Space.x3
-        for (label, slider) in [(shadeLabel, shadeSlider), (clearLabel, clearSlider), (grainLabel, grainSlider)] {
+        for (label, slider) in [(clearLabel, clearSlider), (grainLabel, grainSlider)] {
             row(label, slider, y: y, height: sliderHeight)
             y += sliderHeight + Tokens.Space.x3
         }
@@ -1234,6 +1334,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             guard let self else { return }
             Library.shared.setLook(look)
             self.edited = true
+        }
+        editor.onResize = { [weak self] in
+            self?.layoutContent()
+            self?.resizeToFit()
         }
         onLayout = { [weak self] in self?.layoutContent() }
     }

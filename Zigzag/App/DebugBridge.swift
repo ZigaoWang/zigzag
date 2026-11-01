@@ -661,6 +661,12 @@ enum DebugBridge {
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
         case "pagecorner":
             if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.card.needsLayout = true; controller.root.secondCard.needsLayout = true }
+        case "spacecolor":
+            // spacecolor <sky|sage|sand|...>: the current space takes that curated color, following light and dark.
+            if let color = SpaceColor(rawValue: arg), var look = Library.shared.space(controller.tabManager.currentSpaceID) {
+                SpaceLook.curated(color).apply(to: &look)
+                Library.shared.setLook(look)
+            }
         case "spacelook":
             // spacelook <hue 0-360> <second hue or -> <see-through 0-1>: the current space's color, gradient and glass.
             let f = arg.split(separator: " ").map(String.init)
