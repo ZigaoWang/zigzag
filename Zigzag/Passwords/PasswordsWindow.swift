@@ -1097,7 +1097,7 @@ private final class WarningBanner: NSView {
 
     private func updateColors() {
         // A soft wash of the warning's color: noticed, never loud.
-        effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.withAlphaComponent(0.09).cgColor }
+        effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.withAlphaComponent(Tokens.Color.statusFillAlpha).cgColor }
     }
 
     override func viewDidChangeEffectiveAppearance() {
