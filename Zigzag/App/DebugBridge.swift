@@ -193,6 +193,11 @@ enum DebugBridge {
             // newfolder <n>: a folder holding the space's first n pinned pages.
             let ids = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).prefix(Int(arg) ?? 0).map(\.id)
             controller.newFolder(with: Array(ids))
+        case "foldericon":
+            // foldericon <picker|none|symbol or emoji>: the first folder's icon, or its picker.
+            if let folder = Library.shared.folders(in: controller.tabManager.currentSpaceID).first {
+                if arg == "picker" { controller.chooseFolderIcon(folder.id) } else { Library.shared.setIcon(arg == "none" ? nil : arg, forFolder: folder.id) }
+            }
         case "togglefolder":
             if let folder = Library.shared.folders(in: controller.tabManager.currentSpaceID).first { controller.listSetFolderOpen(folder.id, !folder.isOpen) }
         case "listhover": controller.sidebar.list.debugHover(arg != "off")

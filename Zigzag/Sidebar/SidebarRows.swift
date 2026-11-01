@@ -430,9 +430,9 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(name: String, open: Bool, count: Int) {
+    func configure(name: String, open: Bool, count: Int, icon: String? = nil) {
         title.stringValue = name
-        folderIcon.image = Tokens.Symbol.image(open ? "folder" : "folder.fill", size: Tokens.TypeSize.body)
+        folderIcon.image = IconChoice.folder(icon, open: open, size: Tokens.Metric.favicon)
         isOpen = open
         setAccessibilityLabel("\(name), folder, \(count) pinned")
         setAccessibilityValue(open ? 1 : 0)

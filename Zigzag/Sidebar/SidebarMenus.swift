@@ -178,6 +178,7 @@ enum SidebarMenus {
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.addItem(Item("Rename…") { controller.sidebar.list.renameFolder(folder.id) })
+        menu.addItem(Item("Change Icon…") { controller.chooseFolderIcon(folder.id) })
         menu.addItem(Item(folder.isOpen ? "Close Folder" : "Open Folder") { controller.listSetFolderOpen(folder.id, !folder.isOpen) })
         menu.addItem(.separator())
         // The folder goes; what was in it stays pinned, where it was.

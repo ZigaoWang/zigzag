@@ -13,6 +13,8 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     var name: String
     var bookmarkIDs: [UUID] = []
     var isOpen = true
+    /// Drawn inside the folder: an SF Symbol's name, or an emoji. Nil: a plain folder.
+    var icon: String? = nil
 }
 
 /// Two pinned pages that open side by side, as the split view they were pinned from. Its pages stay in the space's
@@ -64,6 +66,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var brightness: Double? = nil
     /// The second color's own brightness; nil: the same as the first.
     var brightness2: Double? = nil
+    /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
+    var icon: String? = nil
     /// What washes over the glass: white to black with the brightness, or with the system when automatic.
     var glassColor: NSColor {
         brightness.map { NSColor(white: 1 - CGFloat($0), alpha: 0.5) }
@@ -252,6 +256,12 @@ final class Library {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         spaces[i].name = trimmed
+        commit()
+    }
+
+    func setIcon(_ icon: String?, forSpace id: UUID) {
+        guard let i = index(of: id), spaces[i].icon != icon else { return }
+        spaces[i].icon = icon
         commit()
     }
 
@@ -510,6 +520,13 @@ final class Library {
     func renameFolder(_ id: UUID, to name: String) {
         guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }) else { return }
         spaces[s].folders?[f].name = name
+        commit()
+    }
+
+    func setIcon(_ icon: String?, forFolder id: UUID) {
+        guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }),
+              spaces[s].folders?[f].icon != icon else { return }
+        spaces[s].folders?[f].icon = icon
         commit()
     }
 

@@ -1407,6 +1407,16 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
+    /// The icon grid beside the sidebar, level with the folder's row; each pick shows at once and can be undone.
+    func chooseFolderIcon(_ id: UUID) {
+        guard let folder = Library.shared.folder(id), let row = sidebar.list.folderRow(id) else { return }
+        closeFloatingPanels()
+        let panel = IconPickerPanel(noneSymbol: "folder", selected: folder.icon) { [weak self] icon in
+            self?.libraryChange("Change Icon") { Library.shared.setIcon(icon, forFolder: id) }
+        }
+        panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
+    }
+
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
         sidebar.favorites.isDropTarget = false

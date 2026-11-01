@@ -580,7 +580,7 @@ final class SidebarListView: NSView {
             row.isMarked = marked.contains(item)
         case .folder(let id):
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
-            row.configure(name: folder.name, open: folder.isOpen, count: folder.bookmarkIDs.count)
+            row.configure(name: folder.name, open: folder.isOpen, count: folder.bookmarkIDs.count, icon: folder.icon)
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)
@@ -687,6 +687,7 @@ final class SidebarListView: NSView {
     }
 
     var headerView: NSView? { rows[.header] }
+    func folderRow(_ id: UUID) -> NSView? { rows[.folder(id)] }
 
     /// Starts renaming a pinned page right in its row.
     func beginRenaming(bookmark id: UUID) -> Bool {
