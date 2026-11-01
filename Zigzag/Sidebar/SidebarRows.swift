@@ -185,7 +185,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func layoutDropHalf() {
-        let inset: CGFloat = 3
+        let inset = Tokens.Metric.dropInset
         let width = bounds.width / 2 - inset
         let x = splitDropSide == 0 ? inset : bounds.midX
         Tokens.Motion.withoutAnimation { dropHalf.frame = NSRect(x: x, y: inset, width: width, height: bounds.height - inset * 2) }
@@ -205,7 +205,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         dropHalf.wantsLayer = true
         dropHalf.layer?.cornerRadius = Tokens.Radius.row - 2
         dropHalf.layer?.cornerCurve = .continuous
-        dropHalf.layer?.borderWidth = 1.5
+        dropHalf.layer?.borderWidth = Tokens.Metric.dropEdge
         dropHalf.alphaValue = 0
         addSubview(dropHalf, positioned: .below, relativeTo: icon)
         partnerIcon.isHidden = true
@@ -300,8 +300,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.textColor = Tokens.Color.textPrimary
         // One weight always: selection shows in the fill, never by text getting wider and shifting.
         partnerTitle.textColor = Tokens.Color.textPrimary
-        dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
-        dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))
+        dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
+        dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
     }
 
     private func refreshAccessories() {
@@ -474,8 +474,11 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
         if isDropTarget {
-            layer?.set(backgroundColor: cgColor(Tokens.Color.selectedFill), animated: animated)
-            setLifted(true)
+            // The one drop target look, as on the favorites and a split's half.
+            setLifted(false)
+            layer?.set(backgroundColor: cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)), animated: animated)
+            layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
+            layer?.borderWidth = Tokens.Metric.dropEdge
         }
         chevron.alphaValue = isHovered || !isOpen || isDropTarget ? 1 : 0.6
     }

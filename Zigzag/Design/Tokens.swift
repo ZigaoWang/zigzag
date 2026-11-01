@@ -85,6 +85,10 @@ enum Tokens {
         /// Keyboard focus: the ring's width, and its gap outside the control.
         static let focusRing: CGFloat = 2
         static let focusGap: CGFloat = 2
+        /// A drop target's accent edge (`Color.dropAlpha`), and how far a split's half sits inside the row or tile
+        /// it would open beside.
+        static let dropEdge: CGFloat = 1.5
+        static let dropInset: CGFloat = 3
         /// Zigzag's switch (`Toggle`): track and knob.
         static let toggleSize = NSSize(width: 36, height: 22)
         static let toggleKnob: CGFloat = 18
@@ -665,6 +669,10 @@ enum Tokens {
         static let selectionAlpha: CGFloat = 0.14
         /// The same, held down.
         static let selectionPressedAlpha: CGFloat = 0.22
+        /// Where something carried would land (a folder, the first favorite's place, a split's half): the accent at
+        /// this opacity, inside a `Metric.dropEdge` accent edge at `dropEdgeAlpha`. One look for every drop target.
+        static let dropAlpha: CGFloat = 0.14
+        static let dropEdgeAlpha: CGFloat = 0.7
         /// Selected text in our own fields (the command bar, its inline completion), in the accent at this opacity.
         static let textSelectionAlpha: CGFloat = 0.26
         /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.

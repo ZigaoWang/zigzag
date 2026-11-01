@@ -317,9 +317,9 @@ final class FavoriteTile: GlassTile {
         partnerIcon.isHidden = partner == nil
         addSubview(partnerIcon)
         dropHalf.wantsLayer = true
-        dropHalf.layer?.cornerRadius = Tokens.Radius.tile - 3
+        dropHalf.layer?.cornerRadius = Tokens.Radius.tile - Tokens.Metric.dropInset
         dropHalf.layer?.cornerCurve = .continuous
-        dropHalf.layer?.borderWidth = 1.5
+        dropHalf.layer?.borderWidth = Tokens.Metric.dropEdge
         dropHalf.isHidden = true
         addSubview(dropHalf, positioned: .below, relativeTo: icon)
         let name = [bookmark?.title, partner?.title].compactMap { $0 }.joined(separator: " and ")
@@ -367,10 +367,10 @@ final class FavoriteTile: GlassTile {
         super.layout()
         // Big enough to read at a glance when the site gives a sharp icon; a small one stays at a tab's 16pt rather
         // than being stretched and blurred.
-        let inset: CGFloat = 3
+        let inset = Tokens.Metric.dropInset
         dropHalf.frame = NSRect(x: splitSide == 1 ? bounds.midX : inset, y: inset, width: bounds.width / 2 - inset, height: bounds.height - inset * 2)
-        dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
-        dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))
+        dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
+        dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
         if partner != nil {
             // A split: both pages' icons side by side, at a tab's size. In the narrowest tiles they move closer, then
             // shrink, so the two always fit inside it.
@@ -394,9 +394,9 @@ final class FavoriteTile: GlassTile {
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
             setLifted(false)
-            layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.12))
-            layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-            layer?.borderWidth = 1.5
+            layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha))
+            layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
+            layer?.borderWidth = Tokens.Metric.dropEdge
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
