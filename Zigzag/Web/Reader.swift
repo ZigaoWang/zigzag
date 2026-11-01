@@ -707,6 +707,11 @@ extension ReaderView: WKNavigationDelegate {
     /// Links in an article open in the page, not inside the reader.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
+            // A footnote or a heading in the article itself: Reader scrolls to it, and stays.
+            if url.fragment != nil, let articleURL,
+               url.absoluteString.prefix(while: { $0 != "#" }) == articleURL.absoluteString.prefix(while: { $0 != "#" }) {
+                return .allow
+            }
             switch Reader.route(for: url) {
             case .browse: break
             case .externalApp:
