@@ -1141,7 +1141,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .peek:
             showPeek(url: url, configuration: nil)
         case .newWindow:
-            WindowManager.shared.newWindow(url: url)
+            // A private window's links stay private.
+            WindowManager.shared.newWindow(url: url, isPrivate: tabManager.isPrivate)
         case .privateWindow:
             WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: true)
         }
@@ -1207,8 +1208,9 @@ extension BrowserWindowController: TabHost {
             BrowserWebView.pendingDisposition = nil
             if pending == .peek { return showPeek(url: nil, configuration: configuration) }
             // A new window gets its own fresh page, not one tied to this tab (and a private one never shares anything).
+            // From a private window, it is private too.
             if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
-                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow)
+                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: tabManager.isPrivate || pending == .privateWindow)
                 return nil
             }
             let newTab = tabManager.newTab(url: action.request.url, select: false, configuration: configuration, opener: tab)
