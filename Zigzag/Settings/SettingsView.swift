@@ -174,6 +174,38 @@ enum SettingsVersionRow {
         row.keywords = "check for updates"
         return row
     }
+
+    /// Betas first, for those who want to try new versions on their own tabs and data.
+    static func betas() -> FormRow {
+        let toggle = Toggle(isOn: Updater.getsBetas)
+        toggle.onChange = { on in Updater.getsBetas = on }
+        let row = FormRow(title: "Beta updates", detail: "Try new versions first, on your own tabs and data.", control: toggle)
+        row.keywords = "beta channel prerelease"
+        return row
+    }
+
+    /// The profile as it was before the last update, put back. Only there when a backup is.
+    static func restore() -> FormRow? {
+        guard let date = ProfileBackup.latestDate else { return nil }
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
+        var detail = "Saved \(formatter.string(from: date))"
+        if let name = ProfileBackup.latest?.lastPathComponent, let space = name.firstIndex(of: " ") {
+            detail += ", before updating from \(name[name.index(after: space)...])"
+        }
+        let button = PillButton(title: "Restore…")
+        button.onClick = { [weak button] _ in
+            guard let host = button?.window?.contentView else { return }
+            ConfirmSheet.show(in: host, title: "Restore from before the last update?",
+                              message: "Your spaces, tabs, favorites and history go back to how they were before the last update, and Zigzag restarts. Logins and passwords aren’t affected.",
+                              confirmTitle: "Restore and Restart") { confirmed in
+                if confirmed { ProfileBackup.restoreLatestAndRelaunch() }
+            }
+        }
+        let row = FormRow(title: "Restore from before the last update", detail: detail, control: button)
+        row.keywords = "backup undo update rollback"
+        return row
+    }
 }
 
 /// A symbol in a settings row, where a picture is missing (a site with no favicon): the app's icon color.
@@ -532,6 +564,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         versionGroup.add(SettingsVersionRow.make())
+        versionGroup.add(SettingsVersionRow.betas())
+        if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
         generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", control: suggestionsToggle))
