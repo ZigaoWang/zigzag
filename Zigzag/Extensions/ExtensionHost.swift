@@ -524,8 +524,11 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
 @available(macOS 15.4, *)
 extension Tab: WKWebExtensionTab {
+    /// The window the tab's in: its own host when that window holds it (most often), else a look through them all.
+    /// Asked for every tab each time an extension lists tabs, so the quick answer comes first.
     private var windowController: BrowserWindowController? {
-        WindowManager.shared.controllers.first { $0.tabManager.allTabs.contains { $0 === self } }
+        if let host = host as? BrowserWindowController, host.tabManager.tab(with: id) === self { return host }
+        return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { windowController }
