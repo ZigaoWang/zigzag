@@ -850,6 +850,37 @@ final class TabManager {
         }
     }
 
+    /// One side of a drop that would open two pages side by side: a row in the list or a tile in the grid.
+    struct SplitSide {
+        enum Kind { case tab, pinned, favorite }
+        var kind: Kind
+        /// Already half of a split (of tabs, of pinned pages, or a split favorite): it moves as one, never split again.
+        var inSplit: Bool
+        /// A tab still on its new-tab page has nothing to show beside another.
+        var hasPage = true
+    }
+
+    /// The one rule for dropping a page on another's middle: two tabs, a tab and a pinned page (the pair takes the
+    /// kind of the one dropped on), or anything with a page onto a favorite. Never half of a split, either side.
+    nonisolated static func canSplit(_ carried: SplitSide, onto target: SplitSide) -> Bool {
+        guard !carried.inSplit, !target.inSplit, carried.hasPage, target.hasPage else { return false }
+        switch (carried.kind, target.kind) {
+        case (.tab, .tab), (.tab, .pinned), (.pinned, .tab), (_, .favorite): return true
+        case (.pinned, .pinned), (.favorite, _): return false
+        }
+    }
+
+    func splitSide(of tab: Tab) -> SplitSide {
+        if let id = tab.bookmarkID { return splitSide(ofBookmark: id) }
+        return SplitSide(kind: .tab, inSplit: split(for: tab) != nil, hasPage: tab.url != nil)
+    }
+
+    func splitSide(ofBookmark id: UUID) -> SplitSide {
+        let open = bookmarkTabs[id].map { split(for: $0) != nil } ?? false
+        return SplitSide(kind: Library.shared.isFavorite(id) ? .favorite : .pinned,
+                         inSplit: open || Library.shared.pinnedSplit(containing: id) != nil)
+    }
+
     /// Puts `other` beside `tab` (on the right or left), ending any splits either was in.
     func makeSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
         // A pinned page stays in its space; only a tab moves to join the other.

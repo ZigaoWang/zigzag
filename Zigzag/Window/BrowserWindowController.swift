@@ -1475,7 +1475,7 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
-    func listDragOverFavorites(at windowPoint: NSPoint, canSplit: Bool) -> Bool {
+    func listDragOverFavorites(at windowPoint: NSPoint, carrying: TabManager.SplitSide?) -> Bool {
         let favorites = sidebar.favorites
         // An empty grid still takes drops in the band under the address.
         var zone = favorites.convert(favorites.bounds, to: nil)
@@ -1485,7 +1485,7 @@ extension BrowserWindowController: SidebarDelegate {
         }
         let over = zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
         favorites.isDropTarget = over
-        if over { favorites.hoverDrop(at: windowPoint, canSplit: canSplit) }
+        if over { favorites.hoverDrop(at: windowPoint, carrying: carrying) }
         return over
     }
 
@@ -1531,8 +1531,7 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listDragOverPage(at windowPoint: NSPoint, tab: Tab) {
-        // Only another tab can open beside the current page.
-        guard let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { root.splitDropHint.show(nil); return }
+        guard canDropBeside(tab) else { root.splitDropHint.show(nil); return }
         let side = root.splitDropHint.side(at: windowPoint)
         if let side, side != root.splitDropHint.side { Haptics.snap() }
         root.splitDropHint.show(side)
@@ -1541,9 +1540,15 @@ extension BrowserWindowController: SidebarDelegate {
     func listDropOnPage(_ tab: Tab) -> Bool {
         let side = root.splitDropHint.side
         root.splitDropHint.show(nil)
-        guard let side, let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { return false }
+        guard let side, canDropBeside(tab), let current = tabManager.selectedTab else { return false }
         splitWithUndo(current, with: tab, otherOnRight: side == .right)
         return true
+    }
+
+    /// Only another tab opens beside the page you're on, and neither may already be half of a split.
+    private func canDropBeside(_ tab: Tab) -> Bool {
+        guard let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { return false }
+        return TabManager.canSplit(tabManager.splitSide(of: tab), onto: tabManager.splitSide(of: current))
     }
 
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool {

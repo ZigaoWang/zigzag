@@ -37,7 +37,7 @@ protocol SidebarListDelegate: AnyObject {
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID)
     /// A tab or bookmark dragged over the favorites grid. Returns true while it's over it.
-    func listDragOverFavorites(at windowPoint: NSPoint, canSplit: Bool) -> Bool
+    func listDragOverFavorites(at windowPoint: NSPoint, carrying: TabManager.SplitSide?) -> Bool
     /// Dropped on the favorites grid. Returns true if it became a favorite.
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool)
@@ -1009,43 +1009,26 @@ final class SidebarListView: NSView {
         return target(at: y, dragging: drag.item)
     }
 
-    /// Whether the carried row and a row it's over can open side by side: a tab with a tab, or a tab with a pinned
-    /// page (neither a favorite nor already half of a pinned split). Two pinned pages are a pinned split's to make.
-    private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
-        guard let manager, carried != target else { return false }
-        func freePin(_ id: UUID) -> Bool { !Library.shared.isFavorite(id) && Library.shared.pinnedSplit(containing: id) == nil }
-        switch (carried, target) {
-        case let (.tab(a), .tab(b)):
-            guard let t = manager.tab(with: a), let u = manager.tab(with: b), u.url != nil else { return false }
-            return manager.canSplit(t, with: u)
-        case let (.tab(a), .bookmark(b)), let (.bookmark(b), .tab(a)):
-            guard let t = manager.tab(with: a), t.url != nil, manager.split(for: t) == nil || target == .tab(a) || carried == .tab(a) else { return false }
-            return freePin(b)
-        default:
-            return false
+    /// The row as one side of a split drop (see TabManager.canSplit); nil for rows that aren't a page.
+    private func splitSide(of item: SidebarItem) -> TabManager.SplitSide? {
+        guard let manager else { return nil }
+        switch item {
+        case .tab(let id): return manager.tab(with: id).map(manager.splitSide(of:))
+        case .bookmark(let id): return manager.splitSide(ofBookmark: id)
+        default: return nil
         }
     }
 
-    /// Whether the carried row can open beside a favorite, as one split favorite: a page of its own, not already
-    /// half of a split.
-    private func canJoinFavorite(_ item: SidebarItem) -> Bool {
-        guard let manager else { return false }
-        switch item {
-        case .tab(let id):
-            guard let tab = manager.tab(with: id), tab.url != nil else { return false }
-            return manager.split(for: tab) == nil
-        case .bookmark(let id):
-            return !Library.shared.isFavorite(id) && Library.shared.pinnedSplit(containing: id) == nil
-        default:
-            return false
-        }
+    private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
+        guard carried != target, let a = splitSide(of: carried), let b = splitSide(of: target) else { return false }
+        return TabManager.canSplit(a, onto: b)
     }
 
     /// The row whose middle the pointer is on: most of a row's height, so it's easy to hit and holds still. Its
     /// top and bottom edges are for reordering.
     private func splitTarget(pointer: NSPoint, dragging item: SidebarItem) -> SplitDrop? {
         for (candidate, view) in rows where view !== drag?.view {
-            guard let row = view as? TabRowView, row.partner == nil else { continue }
+            guard view is TabRowView else { continue }
             let band = view.frame.insetBy(dx: 0, dy: view.frame.height * 0.22)
             guard band.contains(pointer), canSplit(item, onto: candidate) else { continue }
             switch candidate {
@@ -1160,7 +1143,7 @@ final class SidebarListView: NSView {
         // Over the favorites grid: it opens a slot for the tab, and the list closes its gap.
         var overFavorites = false
         if drag.item.canBeFavorite, Self.window(at: mouse) === window.windowController {
-            overFavorites = delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse), canSplit: canJoinFavorite(drag.item)) ?? false
+            overFavorites = delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse), carrying: splitSide(of: drag.item)) ?? false
         }
         if overFavorites, !wasOverFavorites { Haptics.snap() }
         wasOverFavorites = overFavorites

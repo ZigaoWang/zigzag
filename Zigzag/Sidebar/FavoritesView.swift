@@ -43,18 +43,21 @@ final class FavoritesView: NSView {
     /// The favorite whose middle it's over, and on which side it would open.
     private(set) var splitTarget: (id: UUID, onRight: Bool)?
 
-    /// Carried over the grid at this point (in window coordinates). `canSplit`: whether what's carried can open
-    /// beside a favorite (a page of its own, not already half of a split).
-    func hoverDrop(at windowPoint: NSPoint, canSplit: Bool) {
-        aim(at: convert(windowPoint, from: nil), canSplit: canSplit, carrying: nil)
+    /// Carried over the grid at this point (in window coordinates). `carrying`: what's carried, as one side of a
+    /// split (nil: it can't open beside a favorite).
+    func hoverDrop(at windowPoint: NSPoint, carrying: TabManager.SplitSide?) {
+        aim(at: convert(windowPoint, from: nil), carried: carrying, moving: nil)
     }
 
     /// Where something carried over the grid would go, from a point in this view: beside a favorite as a split, or
-    /// between two. `carrying`: a favorite of this grid being moved, which stays where it is meanwhile.
-    private func aim(at point: NSPoint, canSplit: Bool, carrying: FavoriteTile?) {
+    /// between two. `moving`: a favorite of this grid being moved, which stays where it is meanwhile.
+    private func aim(at point: NSPoint, carried: TabManager.SplitSide?, moving: FavoriteTile?) {
         guard !tiles.isEmpty else { dropIndex = 0; return }
-        // Most of a tile, away from its edges, is for a split; a split tile already holds two.
-        let middle = canSplit ? tiles.first { $0 !== carrying && $0.partner == nil && $0.frame.insetBy(dx: $0.frame.width * 0.2, dy: $0.frame.height * 0.2).contains(point) } : nil
+        // Most of a tile, away from its edges, is for a split.
+        let middle = tiles.first { tile in
+            guard tile !== moving, let carried, tile.frame.insetBy(dx: tile.frame.width * 0.2, dy: tile.frame.height * 0.2).contains(point) else { return false }
+            return TabManager.canSplit(carried, onto: TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil))
+        }
         if let middle, let id = middle.bookmark?.id {
             showSplit((id, point.x > middle.frame.midX))
             dropBar.isHidden = true
@@ -68,7 +71,7 @@ final class FavoritesView: NSView {
             dropIndex = tiles.count
         }
         // Next to where the carried favorite already is, it wouldn't move: no bar.
-        if let carrying, let from = tiles.firstIndex(where: { $0 === carrying }), dropIndex == from || dropIndex == from + 1 {
+        if let moving, let from = tiles.firstIndex(where: { $0 === moving }), dropIndex == from || dropIndex == from + 1 {
             dropBar.isHidden = true
             return
         }
@@ -202,7 +205,7 @@ final class FavoritesView: NSView {
             carried.move(to: last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
             inside = self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
-            if inside { self.aim(at: local, canSplit: tile.partner == nil, carrying: tile) } else { self.clearAim() }
+            if inside { self.aim(at: local, carried: TabManager.SplitSide(kind: .favorite, inSplit: tile.partner != nil), moving: tile) } else { self.clearAim() }
             // Over the tab list it becomes the row it would be there; back over the grid, a tile again.
             carried.isRow = self.onDragMove?(favorite, last) ?? false
         }
