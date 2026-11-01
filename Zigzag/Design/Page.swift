@@ -281,7 +281,7 @@ enum PageStyle {
         typealias C = Tokens.Color
         let colors: [(String, NSColor)] = [
             ("accent", theme.accent), ("on-accent", theme.onAccent), ("mark", theme.mark),
-            ("bg", C.surface), ("text", C.textPrimary), ("muted", C.textSecondary), ("faint", C.textTertiary), ("icon", C.icon),
+            ("bg", C.surface), ("wash", theme.wash), ("text", C.textPrimary), ("muted", C.textSecondary), ("faint", C.textTertiary), ("icon", C.icon),
             ("hover", C.hoverFill), ("pressed", C.pressedFill), ("highlight", C.highlight), ("field", C.fieldFill), ("line", C.separator),
             ("group", C.surfaceGroup), ("group-edge", C.surfaceGroupEdge),
             ("panel", C.panelBackground), ("panel-wash", C.panelWash), ("panel-edge", C.panelEdge), ("panel-shadow", C.panelShadow), ("destructive", C.destructive),
@@ -322,7 +322,7 @@ enum PageStyle {
     :focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) var(--focus), transparent); outline-offset: 2px; }
 
     /* The header: the title at the left, the search field and actions at the right, the page under it. */
-    .page-header { position: sticky; top: 0; z-index: 4; background: var(--bg); box-shadow: 0 1px 0 transparent; transition: box-shadow .15s; }
+    .page-header { position: sticky; top: 0; z-index: 4; background: var(--wash); box-shadow: 0 1px 0 transparent; transition: box-shadow .15s; }
     .page-header.scrolled { box-shadow: 0 1px 0 var(--line); }
     .page-header > .inner { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }

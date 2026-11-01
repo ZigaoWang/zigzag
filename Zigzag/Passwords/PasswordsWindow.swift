@@ -167,7 +167,19 @@ final class PasswordsView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
     override var wantsUpdateLayer: Bool { true }
-    override func updateLayer() { layer?.backgroundColor = cgColor(Tokens.Color.surface) }
+    override func updateLayer() {
+        layer?.backgroundColor = cgColor(Tokens.Color.surface)
+        // The column of kinds in a light tint of the space in front, so Passwords belongs to the browser you came from.
+        column.wantsLayer = true
+        column.layer?.backgroundColor = cgColor(Brand.Theme.current.wash)
+    }
+    private lazy var themeToken: SignalToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        _ = themeToken
+        needsDisplay = true
+    }
 
     isolated deinit {
         if let changeObserver { NotificationCenter.default.removeObserver(changeObserver) }
