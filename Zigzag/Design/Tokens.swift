@@ -30,6 +30,8 @@ enum Tokens {
     enum Radius {
         /// The web page card. Concentric with the window corner at an 8pt inset.
         static let card: CGFloat = 8
+        /// The window's own corner. A page that meets the window's edges takes it, so the two curves match.
+        static let window: CGFloat = 16
         static let row: CGFloat = 8
         static let control: CGFloat = 6
         /// Fields, pills, menu buttons and filter segments: a step rounder than a plain control.

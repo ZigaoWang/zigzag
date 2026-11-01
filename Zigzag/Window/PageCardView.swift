@@ -32,7 +32,7 @@ final class PageCardView: NSView {
     func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
         guard on != edgeToEdge else { return }
         edgeToEdge = on
-        let radius = on ? 0 : Tokens.Radius.card
+        let radius = on ? 0 : squaresRightCorners ? Tokens.Radius.window : Tokens.Radius.card
         CATransaction.begin()
         CATransaction.setDisableActions(duration == 0)
         CATransaction.setAnimationDuration(duration)
@@ -150,7 +150,9 @@ final class PageCardView: NSView {
             overlay?.frame = content
             edge.frame = clip.bounds
             if progressLine.superlayer != nil { layoutProgress() }
-            let radius = isEdgeToEdge ? 0 : Tokens.Radius.card
+            let radius = isEdgeToEdge ? 0 : squaresRightCorners ? Tokens.Radius.window : Tokens.Radius.card
+            clip.layer?.cornerRadius = radius
+            edge.cornerRadius = radius
             let corners: CACornerMask = squaresRightCorners ? [.layerMinXMinYCorner, .layerMinXMaxYCorner]
                 : [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
             clip.layer?.maskedCorners = corners

@@ -536,6 +536,9 @@ final class BrowserRootView: ColorView {
         let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - targetSidebar.minX, curve: Tokens.Motion.slide, fromKeyboard: true)
         onSlide?(duration)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
+        // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
+        card.squaresRightCorners = visible && Self.isBorderless && paneFrames.left.maxX >= bounds.maxX - 1
+        secondCard.squaresRightCorners = visible && Self.isBorderless
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
         secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, {
