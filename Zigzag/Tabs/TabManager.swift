@@ -299,21 +299,8 @@ final class TabManager {
             bookmarkTabs[mark.id] = tab
         }
         tab.isFavorite = true
-        let slot = Library.shared.snapshot.favoriteIndex(of: favoriteID)
-        Library.shared.addFavoriteSplit(onRight ? favorite : mark, onRight ? mark : favorite, at: slot)
+        Library.shared.joinFavorite(mark, onto: favoriteID, onRight: onRight)
         openBookmark(mark)
-        return true
-    }
-
-    /// A tab that was made a favorite goes back to being a tab in the list (undoing that).
-    func returnToList(_ tab: Tab, at index: Int) {
-        if let id = tab.bookmarkID, bookmarkTabs[id] === tab { bookmarkTabs[id] = nil }
-        tab.bookmarkID = nil
-        tab.isFavorite = false
-        // The library may already have put it back (at the top) when its bookmark went: it moves to its place.
-        tabsBySpace[tab.spaceID]?.removeAll { $0 === tab }
-        tabsBySpace[tab.spaceID, default: []].insert(tab, at: min(index, tabsBySpace[tab.spaceID]?.count ?? 0))
-        changed.send(.structure)
     }
 
     /// A split view as one favorite. Pinned halves keep their ids (and so their pages); a tab becomes one. False
@@ -522,14 +509,30 @@ final class TabManager {
         Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), to: space, at: index, id: bookmarkID)
     }
 
+    /// A tab dropped on a pinned page: it's pinned beside it as a pinned split, where the page is and in its folder.
+    /// The page keeps its pin as it is, and the two open side by side.
+    func pinSplit(_ tab: Tab, with bookmarkID: UUID, tabOnRight: Bool) {
+        guard let url = tab.url, let space = Library.shared.spaceID(ofBookmark: bookmarkID),
+              Self.canSplit(splitSide(of: tab), onto: splitSide(ofBookmark: bookmarkID)) else { return }
+        let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url))
+        removeFromList(tab)
+        tab.bookmarkID = mark.id
+        tab.spaceID = space
+        bookmarkTabs[mark.id] = tab
+        Library.shared.pinBeside(mark, bookmarkID, onRight: tabOnRight)
+        openBookmark(mark)
+    }
+
     /// Turns a bookmark's live tab back into a normal tab, removing the bookmark. Returns the tab now in the list:
-    /// the live one, or, for an unloaded bookmark dropped at an index, a new one.
+    /// the live one, or, for an unloaded bookmark dropped at an index, a new one. `spaceID`: where a favorite goes
+    /// (nil: the space you're in); a pinned page stays in its own.
     @discardableResult
-    func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil) -> Tab? {
-        if let pinned = Library.shared.pinnedSplit(containing: bookmarkID) { return unpin(pinned, returning: bookmarkID, toIndex: index) }
-        if Library.shared.isFavorite(bookmarkID) {
-            // A favorite comes back as a tab in the space you're in.
-            bookmarkTabs[bookmarkID]?.spaceID = currentSpaceID
+    func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil, in spaceID: UUID? = nil) -> Tab? {
+        let isFavorite = Library.shared.isFavorite(bookmarkID)
+        let space = (isFavorite ? spaceID : nil) ?? Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID
+        if let pinned = Library.shared.pinnedSplit(containing: bookmarkID) { return unpin(pinned, returning: bookmarkID, toIndex: index, in: space) }
+        if isFavorite {
+            bookmarkTabs[bookmarkID]?.spaceID = space
             bookmarkTabs[bookmarkID]?.isFavorite = false
         }
         var result: Tab?
@@ -540,7 +543,7 @@ final class TabManager {
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: at)
             result = tab
         } else if let bookmark = Library.shared.bookmark(bookmarkID), let index {
-            let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID)
+            let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
             tab.host = host
             watch(tab)
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: min(index, tabsBySpace[tab.spaceID]?.count ?? 0))
@@ -552,8 +555,7 @@ final class TabManager {
 
     /// Either half of a pinned split unpins the pair, back to two tabs in split view. Open pages come along as they
     /// are; one that isn't open opens fresh beside the other.
-    private func unpin(_ pinned: PinnedSplit, returning bookmarkID: UUID, toIndex index: Int?) -> Tab? {
-        let space = Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID
+    private func unpin(_ pinned: PinnedSplit, returning bookmarkID: UUID, toIndex index: Int?, in space: UUID) -> Tab? {
         let anyOpen = bookmarkTabs[pinned.left] != nil || bookmarkTabs[pinned.right] != nil
         var halves: [(id: UUID, tab: Tab)] = []
         for id in [pinned.left, pinned.right] {
@@ -979,6 +981,73 @@ final class TabManager {
             guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }
             return canSplit(left, with: right)
         }
+    }
+
+    // MARK: Undo
+
+    /// Where every tab of the window is: each space's list, which pinned page or favorite each live page belongs to,
+    /// and which pages are side by side. ⌘Z puts it back exactly, with the library.
+    struct Arrangement {
+        fileprivate var lists: [UUID: [UUID]]
+        fileprivate var pinned: [UUID: UUID]
+        fileprivate var pairs: [[UUID]]
+        fileprivate var splits: [SplitPair]
+        fileprivate var tabs: [UUID: Tab]
+        fileprivate var spaces: [UUID: UUID]
+        fileprivate var selected: [UUID: UUID]
+
+        /// The same tabs in the same places, whatever else opened since; selection and split sizes don't count.
+        fileprivate func matches(_ now: Arrangement) -> Bool {
+            let ids = Set(tabs.keys)
+            return lists.filter { !$0.value.isEmpty } == now.lists.mapValues { $0.filter(ids.contains) }.filter { !$0.value.isEmpty }
+                && pinned == now.pinned.filter { ids.contains($0.value) }
+                && pairs == now.pairs.filter { $0.allSatisfy(ids.contains) }
+                && now.tabs.keys.filter(ids.contains).count == ids.count
+        }
+
+        /// The same tabs, in the same places.
+        func isSame(as other: Arrangement) -> Bool { matches(other) && other.matches(self) }
+    }
+
+    var arrangement: Arrangement {
+        let tabs = allTabs
+        return Arrangement(lists: tabsBySpace.mapValues { $0.map(\.id) }, pinned: bookmarkTabs.mapValues(\.id),
+                           pairs: splits.map { [$0.left, $0.right] }, splits: splits,
+                           tabs: Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }),
+                           spaces: Dictionary(tabs.map { ($0.id, $0.spaceID) }, uniquingKeysWith: { a, _ in a }), selected: selectedBySpace)
+    }
+
+    /// Whether the tabs `done` placed are still where it left them.
+    func isUnchanged(since done: Arrangement) -> Bool { done.matches(arrangement) }
+
+    /// Puts the tabs back as `target` had them, undoing `done`: tabs `done` made are closed, ones opened since stay.
+    func restore(_ target: Arrangement, undoing done: Arrangement) {
+        let now = arrangement
+        for (id, tab) in now.tabs where target.tabs[id] == nil && done.tabs[id] != nil {
+            tab.close()
+            tabTokens[id] = nil
+            recentTabIDs.removeAll { $0 == id }
+        }
+        let since = now.tabs.filter { target.tabs[$0.key] == nil && done.tabs[$0.key] == nil }
+        let alive = target.tabs.filter { now.tabs[$0.key] != nil }
+        var lists = target.lists.mapValues { $0.compactMap { alive[$0] } }
+        for (space, ids) in now.lists {
+            for (i, id) in ids.enumerated() { if let tab = since[id] { lists[space, default: []].insert(tab, at: min(i, lists[space]?.count ?? 0)) } }
+        }
+        tabsBySpace = lists
+        bookmarkTabs = target.pinned.compactMapValues { alive[$0] }
+        for (bookmark, id) in now.pinned { if let tab = since[id], bookmarkTabs[bookmark] == nil { bookmarkTabs[bookmark] = tab } }
+        for (id, tab) in alive {
+            tab.spaceID = target.spaces[id] ?? tab.spaceID
+            tab.bookmarkID = target.pinned.first { $0.value == id }?.key
+            tab.isFavorite = tab.bookmarkID.map(Library.shared.isFavorite) ?? false
+        }
+        splits = target.splits.filter { alive[$0.left] != nil && alive[$0.right] != nil }
+            + now.splits.filter { since[$0.left] != nil || since[$0.right] != nil }
+        for (space, id) in target.selected where alive[id] != nil { selectedBySpace[space] = id }
+        selectedBySpace = selectedBySpace.filter { tab(with: $0.value) != nil }
+        changed.send(.structure)
+        changed.send(.selection)
     }
 
     // MARK: Suspension

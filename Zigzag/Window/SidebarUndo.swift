@@ -47,119 +47,74 @@ extension BrowserWindowController {
         return false
     }
 
+    /// Runs a change to tabs, pinned pages or favorites. ⌘Z puts the library and this window's tabs back exactly as
+    /// they were (the same pages, names and places, open or not); ⇧⌘Z does the change again.
+    func pageChange(_ name: String, _ change: @escaping () -> Void) {
+        let before = (library: Library.shared.snapshot, tabs: tabManager.arrangement)
+        change()
+        let after = (library: Library.shared.snapshot, tabs: tabManager.arrangement)
+        guard before.library != after.library || !before.tabs.isSame(as: after.tabs) else { return }
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            guard controller.libraryUnchanged(since: after.library), controller.tabsUnchanged(since: after.tabs) else { return }
+            Library.shared.restore(before.library)
+            controller.tabManager.restore(before.tabs, undoing: after.tabs)
+            controller.sidebarUndo.registerUndo(withTarget: controller) { controller in
+                guard controller.libraryUnchanged(since: before.library), controller.tabsUnchanged(since: before.tabs) else { return }
+                controller.pageChange(name, change)
+            }
+            controller.sidebarUndo.setActionName(name)
+        }
+        sidebarUndo.setActionName(name)
+    }
+
+    /// Whether this window's tabs are still as a change left them; if not, says why ⌘Z did nothing.
+    private func tabsUnchanged(since arrangement: TabManager.Arrangement) -> Bool {
+        guard !tabManager.isUnchanged(since: arrangement) else { return true }
+        Toast.show("Can’t undo: tabs changed since", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        return false
+    }
+
     // MARK: Split view
 
     func splitWithUndo(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
         guard tabManager.canSplit(tab, with: other) else { return }
-        let previous = [tabManager.split(for: tab), tabManager.split(for: other)].compactMap { $0 }
-        let selected = tabManager.selectedTab
-        tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight)
-        sidebarUndo.registerUndo(withTarget: self) { controller in
-            controller.tabManager.unsplit(other, notify: true)
-            previous.forEach { controller.tabManager.restoreSplit($0) }
-            if let selected { controller.tabManager.select(selected) }
-            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
-            controller.sidebarUndo.setActionName("Split View")
-        }
-        sidebarUndo.setActionName("Split View")
+        pageChange("Split View") { [tabManager] in tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight) }
     }
 
     /// Ends a split, showing `keep` (or the tab itself) on its own. A pinned split ends too: both pages stay pinned,
     /// no longer a pair.
     func unsplitWithUndo(_ tab: Tab, keep: Tab? = nil) {
-        guard let pair = tabManager.split(for: tab) else { return }
-        let selected = tabManager.selectedTab
-        let before = Library.shared.snapshot
-        if let keep { tabManager.unsplit(tab, keep: keep) } else { tabManager.unsplit(tab) }
-        if let id = tab.bookmarkID { Library.shared.removePinnedSplit(containing: id) }
-        let after = Library.shared.snapshot
-        sidebarUndo.registerUndo(withTarget: self) { controller in
-            if before != after {
-                guard controller.libraryUnchanged(since: after) else { return }
-                Library.shared.restore(before)
-            }
-            controller.tabManager.restoreSplit(pair)
-            if let selected { controller.tabManager.select(selected) }
-            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.unsplitWithUndo(tab, keep: keep) }
-            controller.sidebarUndo.setActionName("Separate Tabs")
+        guard tabManager.split(for: tab) != nil else { return }
+        pageChange("Separate Tabs") { [tabManager] in
+            if let keep { tabManager.unsplit(tab, keep: keep) } else { tabManager.unsplit(tab) }
+            if let id = tab.bookmarkID { Library.shared.removePinnedSplit(containing: id) }
         }
-        sidebarUndo.setActionName("Separate Tabs")
     }
 
     /// A split favorite parted into two favorites, side by side in the grid; open, its pages part on screen too.
     func separateFavoriteSplitWithUndo(_ favoriteID: UUID) {
         guard let pair = Library.shared.pinnedSplit(containing: favoriteID) else { return }
-        if let live = [pair.left, pair.right].lazy.compactMap({ self.tabManager.bookmarkTab(for: $0) }).first(where: { self.tabManager.split(for: $0) != nil }) {
-            unsplitWithUndo(live)
-        } else {
-            libraryChange("Separate Tabs") { Library.shared.removePinnedSplit(containing: favoriteID) }
+        pageChange("Separate Tabs") { [tabManager] in
+            for id in [pair.left, pair.right] { if let live = tabManager.bookmarkTab(for: id) { tabManager.unsplit(live) } }
+            Library.shared.removePinnedSplit(containing: favoriteID)
         }
     }
 
     // MARK: Favorites
 
+    /// A tab (and a split's other half) into the favorites at a tile's place (nil: the end).
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {
-        let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
-        let wasBookmark = tab.bookmarkID
-        let before = Library.shared.snapshot
-        tabManager.favoriteTab(tab, at: index)
-        guard let id = tab.bookmarkID else { return }
-        let after = Library.shared.snapshot
-        sidebarUndo.registerUndo(withTarget: self) { controller in
-            if wasBookmark != nil {
-                // It was a bookmark: it simply goes back to its space.
-                guard controller.libraryUnchanged(since: after) else { return }
-                Library.shared.restore(before)
-                tab.isFavorite = false
-            } else {
-                controller.tabManager.unbookmark(id, toIndex: oldIndex)
-            }
-            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.favoriteWithUndo(tab, at: index) }
-            controller.sidebarUndo.setActionName("Add to Favorites")
-        }
-        sidebarUndo.setActionName("Add to Favorites")
+        pageChange("Add to Favorites") { [tabManager] in tabManager.favoriteTab(tab, at: index) }
     }
 
-    /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side. ⌘Z puts the
-    /// favorite back on its own and the page back where it was.
+    /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side.
     func joinFavoriteWithUndo(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) {
-        let before = Library.shared.snapshot
-        let pinned = tab.bookmarkID
-        let oldIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
-        guard tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) else { return }
-        let after = Library.shared.snapshot
-        sidebarUndo.registerUndo(withTarget: self) { controller in
-            guard controller.libraryUnchanged(since: after) else { return }
-            controller.tabManager.unsplit(tab)
-            Library.shared.restore(before)
-            tab.isFavorite = false
-            // A tab goes back into the list; a pinned page is pinned again by the restore.
-            if pinned == nil { controller.tabManager.returnToList(tab, at: oldIndex) }
-            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.joinFavoriteWithUndo(tab, onto: favoriteID, onRight: onRight) }
-            controller.sidebarUndo.setActionName("Split View")
-        }
-        sidebarUndo.setActionName("Split View")
+        pageChange("Split View") { [tabManager] in tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) }
     }
 
-    /// A favorite back to a regular tab in the list.
-    func unfavoriteWithUndo(_ id: UUID, to index: Int) {
-        let before = Library.shared.snapshot
-        let live = tabManager.bookmarkTab(for: id)
-        tabManager.unbookmark(id, toIndex: index)
-        let after = Library.shared.snapshot
-        sidebarUndo.registerUndo(withTarget: self) { controller in
-            if let live {
-                let oldPosition = before.favoriteIndex(of: id) ?? Library.shared.favorites.count
-                controller.tabManager.favoriteTab(live, at: oldPosition)
-            } else {
-                guard controller.libraryUnchanged(since: after) else { return }
-                Library.shared.restore(before)
-            }
-            let redoID = live?.bookmarkID ?? id
-            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.unfavoriteWithUndo(redoID, to: index) }
-            controller.sidebarUndo.setActionName("Move to Tabs")
-        }
-        sidebarUndo.setActionName("Move to Tabs")
+    /// A favorite back to a regular tab in a space's list (nil: the space you're in).
+    func unfavoriteWithUndo(_ id: UUID, to index: Int, in spaceID: UUID? = nil) {
+        pageChange("Move to Tabs") { [tabManager] in tabManager.unbookmark(id, toIndex: index, in: spaceID) }
     }
 
     func removeFavoriteWithUndo(_ id: UUID) {

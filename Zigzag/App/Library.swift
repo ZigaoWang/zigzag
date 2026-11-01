@@ -794,6 +794,21 @@ final class Library {
         commit()
     }
 
+    /// Pins a new page beside a pinned one as a pinned split, in its place and its folder.
+    func pinBeside(_ page: Bookmark, _ pinnedID: UUID, onRight: Bool) {
+        guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == pinnedID } }),
+              let at = spaces[s].bookmarks.firstIndex(where: { $0.id == pinnedID }) else { return }
+        spaces[s].bookmarks.insert(page, at: onRight ? at + 1 : at)
+        spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [onRight ? PinnedSplit(left: pinnedID, right: page.id) : PinnedSplit(left: page.id, right: pinnedID)]
+        // The split's right page follows its left one into the folder.
+        if !onRight, let f = spaces[s].folders?.firstIndex(where: { $0.bookmarkIDs.contains(pinnedID) }),
+           let i = spaces[s].folders?[f].bookmarkIDs.firstIndex(of: pinnedID) {
+            spaces[s].folders?[f].bookmarkIDs[i] = page.id
+        }
+        tidyFolders(s)
+        commit()
+    }
+
     /// Ends a pinned split; both pages stay pinned where they are.
     func removePinnedSplit(containing bookmarkID: UUID) {
         if favoriteSplits.contains(where: { $0.contains(bookmarkID) }) {
