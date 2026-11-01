@@ -305,13 +305,13 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             let base = space.swatch.usingColorSpace(.sRGB) ?? space.swatch
             NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
             // A fine edge, so a white or pale space still shows its tile.
-            NSColor.black.withAlphaComponent(0.1).setStroke()
-            let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.25, dy: 0.25), xRadius: radius - 0.25, yRadius: radius - 0.25)
-            edge.lineWidth = 0.5
+            Tokens.Color.keyCapEdge.setStroke()
+            let half = Tokens.Metric.hairline / 4
+            let edge = NSBezierPath(roundedRect: rect.insetBy(dx: half, dy: half), xRadius: radius - half, yRadius: radius - half)
+            edge.lineWidth = Tokens.Metric.hairline / 2
             edge.stroke()
             // White on a color, dark on a pale one.
-            let light = 0.2126 * base.redComponent + 0.7152 * base.greenComponent + 0.0722 * base.blueComponent > 0.7
-            let ink = light ? NSColor(white: 0.2, alpha: 1) : NSColor.white
+            let ink = Tokens.Color.ink(on: base)
             // Its icon if it has one, white on the color like the letter; an emoji in its own colors.
             if let icon = space.icon {
                 let image = IconChoice.image(icon, size: Tokens.Symbol.inline)
@@ -1543,8 +1543,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         field.isHidden = !(isRecording || none)
         // Recording looks like a field being typed in: the soft fill and the window's accent ring.
         let accent = Brand.Theme.for(self).accent
-        field.layer?.borderColor = isRecording ? cgColor(accent.withAlphaComponent(0.6)) : nil
-        field.layer?.borderWidth = isRecording ? 1.5 : 0
+        field.layer?.borderColor = isRecording ? cgColor(accent.withAlphaComponent(Tokens.Color.focusAlpha)) : nil
+        field.layer?.borderWidth = isRecording ? Tokens.Metric.fieldRing : 0
         field.layer?.backgroundColor = isRecording ? cgColor(Tokens.Color.fieldFill) : nil
         if !isRecording && none { fieldLabel.stringValue = "None"; fieldLabel.textColor = Tokens.Color.textTertiary }
         needsLayout = true
