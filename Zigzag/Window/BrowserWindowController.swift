@@ -645,6 +645,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Leaving a tab while its video plays keeps the video with you, floating; coming back puts it in the page.
     private func floatVideoOnSwitch(from old: Tab?, to new: Tab?) {
         guard PictureInPicture.followsTabs else { return }
+        // Into the other pane of a split: both pages stay on screen, so the video stays in its page.
+        if let old, let new, tabManager.partner(of: old) === new { return }
         if let webView = new?.webView, webView.isPictureInPictureActive, new?.floatedOnSwitch == true {
             webView.togglePictureInPicture()
             new?.floatedOnSwitch = false
