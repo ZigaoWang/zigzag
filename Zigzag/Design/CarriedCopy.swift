@@ -127,6 +127,11 @@ final class CarriedCopy {
 
     /// Picked up: it comes off the item and turns see-through.
     func lift() {
+        // Picked up by a move already past the press: it starts under the pointer there, not where the press was, so
+        // it never jumps to catch up on the next move.
+        if let event = NSApp.currentEvent, event.type == .leftMouseDragged, let window = event.window {
+            follow(window.convertPoint(toScreen: event.locationInWindow))
+        }
         panel.alphaValue = 1
         panel.orderFront(nil)
         Tokens.Motion.animate(Tokens.Motion.feedback) { self.panel.animator().alphaValue = Self.opacity }
