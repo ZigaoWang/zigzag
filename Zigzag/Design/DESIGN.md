@@ -8,6 +8,35 @@ Aside's polish, and the interaction craft of animations.dev. Still unmistakably 
 ZIGZAG wordmark exactly as they are, the see-through frame, the sidebar that carries back, forward, reload and the
 address.
 
+## Character
+
+Arc's warmth and a color per space, set with the care of a good piece of hardware: light lowercase words with a
+confident jump in size, thin precise line drawings, a few small details that each do something, and controls you want
+to touch. Warm and friendly, never techy: no monospace, no capitals for effect, no readouts.
+
+- **Typeface: SF Pro, tuned.** Zigzag keeps the system face on purpose: it renders natively at every size, covers every
+  script a page title can be in, and its display cut is the Univers-like grotesque this direction wants. What makes it
+  ours is how it's set: light weights, one large display size against small text, display type tracked tight
+  (`Sidebar.spaceNameKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
+- **Lowercase voice.** The app's own words are lowercase: the space's name in the sidebar, "tabs", "new tab", "clear",
+  every pill button's title (`PillButton` shows it lowercase; VoiceOver reads it as written), the space editor's
+  labels. What isn't ours keeps its case: page titles, site names, what you typed in a field, menu items.
+- **Confident contrast.** The space's name is 26 light against 13pt rows and 11pt labels, nothing in between.
+- **Line drawings** (`LineGlyph`): where a stock symbol says too little, Zigzag draws its own on a 16pt square with
+  one 1.1pt stroke, round caps and joins, 1.5pt margins: the sidebar toggle, the plus for new tab and new space,
+  downloads (its circle shares the stroke, so the progress ring lies on it). Every other symbol is SF's light weight.
+- **One warm accent on what's live** (`Color.live`, a matte persimmon): the knob of a switch that's on, the tick under
+  the space you're in. Never on anything at rest, never a fill.
+- **Small details that work:** the space keys' numbers set in tabular figures like a dial's markings; the tick under
+  the current key; the selected card's top edge catching the light by one pixel (`Chrome.rim`, `setCardRim`); a
+  hairline under the toolbar only while the list is scrolled under it.
+- **Edges.** The sidebar has three, and everything sits on one of them: the container edge (6pt: the address field,
+  the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, and the
+  space's name, whose ink is pulled back by its side bearing to meet it), and the text column (36pt: every row's
+  title, "tabs", "new tab"). The large name stands on the outer edge as a heading, a full 24pt out from the rows'
+  text, not a near miss. No state moves anything: hover, selection, the sliding card and switching spaces change
+  fills and color only.
+
 ## Space color
 
 The soul of the window. A space's color fills the sidebar and the frame around the page completely, by day and at
@@ -58,14 +87,15 @@ Mac-like. The browser window's chrome (the sidebar and a split pane's header) is
 `Tokens.Sidebar` and `Tokens.Pane`, in the table after these. Nothing else picks a size.
 
 SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight. The
-space's name in the sidebar is the one heading there: 16 light (`Font.spaceName`), in a 40pt slot, low in it.
+space's name in the sidebar is the one heading there: 26 light, lowercase, tracked tight (`Font.spaceName`), in the
+space's own ink (`Brand.Theme.ink`), low in a 52pt slot.
 
 | Text | Token | Size, weight | For |
 |---|---|---|---|
 | label | `Font.label()` | 12 medium, `textTertiary` | A section's label ("Tabs", the space name), a group's heading on a page |
 | | `Font.detail()` | 12 regular, `textSecondary` | A row's explanation under its title |
 | small | `Font.small()` | 11 | Small print, captions, counts, keycaps |
-| body | `Font.body()`, `Font.control()` | 13 regular; 13 medium | Panels, forms, menus; what a button or dropdown says |
+| body | `Font.body()`, `Font.control()` | 13 regular | Panels, forms, menus; what a button or dropdown says |
 | row | `Font.row()` | 14 regular | A row's title in a list on a page: Settings' sections and rows, History, Passwords |
 | heading | `Font.heading()` | 15 semibold | A panel's title, a section's title on a page |
 | title | `Font.title()` | 17 semibold | A page's title in its header, a big panel's title, the command bar's field |
@@ -97,12 +127,12 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
 | Favorites | 4 to a row, 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
-| Space name | 16 light (`Font.spaceName`), 40pt slot, in the titles' column |
+| Space name | 26 light lowercase (`Font.spaceName`), kern -0.6, 52pt slot, its ink on the icon column |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36 |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
 | Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
 | Section labels | 11pt medium, `textTertiary`, in the titles' column, low in a 28pt slot |
-| Bottom bar | 14pt icons in 26pt buttons, 6pt space dots, the current one a 14pt pill |
+| Bottom bar | 14pt glyphs in 26pt buttons; a space key for each space (`SpaceDotView`): an 18pt matte key, radius 5, its number in 10pt tabular figures; the current key lit and pressed in, a 5pt `Color.live` tick under it |
 | Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field |
 
 ## Spacing
@@ -202,7 +232,7 @@ something came from, answers at once, and can be interrupted.
   ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
   The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons,
   the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name,
-  16 light, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
+  26 light and lowercase, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
@@ -252,10 +282,10 @@ something came from, answers at once, and can be interrupted.
     (`primaryFill`, light in dark mode) with `onPrimary` text, whatever the space; red only for what can't be undone.
   - Quiet (`.quiet`): no fill until the pointer is over it.
   `PrimaryButton` and `TextButton` draw the same looks for the forms that still use them; new code uses `PillButton`.
-- **Switch** (`Toggle`): 36 by 22, a white 18pt knob with a soft shadow. On is the window's accent: one accent per
-  window, solved for contrast against white for every space's hue, so on reads at a glance and the switch agrees
-  with focus and selection; a green would be a second hue competing with the space's. Off is a plain gray track
-  (`toggleOff`), so the two never look alike. The knob settles in 200ms on a critically damped spring and stretches
+- **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
+  around it) and a small round 14pt knob. Off, the knob is porcelain on the left; on, it slides right and turns the
+  one warm color (`Color.live`). The track never lights up: what's on is the knob, so on and off differ by place
+  and by color. The knob settles in 200ms on a critically damped spring and stretches
   4pt while held; the track's color fades over the same time. Reduce Motion: the knob jumps, the color fades.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
   `.isOutlined` for the page look, white with a hairline and a faint shadow like the buttons beside it, which a
