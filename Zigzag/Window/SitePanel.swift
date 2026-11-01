@@ -30,9 +30,9 @@ final class SitePanel: FloatingPanelView {
     private let securityIcon = NSImageView()
     private let moreButton = IconButton(symbol: "ellipsis", toolTip: "More")
     private var actionTiles: [PanelTile] = []
-    private let extensionsLabel = Label.section("Extensions")
+    private let extensionsLabel = Label.section("extensions")
     private var extensionTiles: [PanelTile] = []
-    private let siteLabel = Label.section("This site")
+    private let siteLabel = Label.section("this site")
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
 
@@ -176,7 +176,8 @@ final class SitePanel: FloatingPanelView {
             specs.append(("pip", "Float", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
         actionTiles = specs.map { symbol, caption, title, on, run in
-            let tile = PanelTile(symbol: symbol, caption: caption)
+            // The panel's own action words, lowercase like every button; the tooltip and VoiceOver keep the full name.
+            let tile = PanelTile(symbol: symbol, caption: caption.lowercased())
             tile.toolTip = title
             tile.setAccessibilityLabel(title)
             tile.isOn = on
