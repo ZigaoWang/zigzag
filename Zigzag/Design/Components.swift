@@ -148,19 +148,6 @@ final class PillButton: InteractiveView {
     var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
     var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
 
-    /// The words on it, changed as what it does changes ("Import", then "Importing…").
-    var title: String {
-        get { label.stringValue }
-        set {
-            label.stringValue = newValue
-            label.isHidden = newValue.isEmpty
-            setAccessibilityLabel(newValue)
-            invalidateIntrinsicContentSize()
-            needsLayout = true
-            superview?.needsLayout = true
-        }
-    }
-
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
         label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
