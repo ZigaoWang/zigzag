@@ -77,10 +77,20 @@ final class FaviconView: NSView {
             let key = RenderKey(base: image.map(ObjectIdentifier.init), side: bounds.width,
                                 scale: scale, dark: effectiveAppearance.isDark, ink: isInk)
             if key != lastRender || renderedImage !== image {
+                // A site's icon swapping for another (a better one arriving, the page moving on) cross-fades; a
+                // first icon, a new size or a change of ink is simply drawn.
+                let swaps = renderedImage != nil && image != nil && renderedImage !== image && imageLayer.contents != nil && window != nil
                 lastRender = key
                 renderedImage = image
                 let shown = isInk ? image.map { Self.inked($0, Tokens.Color.textPrimary, appearance: effectiveAppearance) } : image
                 imageLayer.contents = shown.flatMap { Self.render($0, side: bounds.width, scale: scale) }
+                if swaps {
+                    let fade = CATransition()
+                    fade.type = .fade
+                    fade.duration = Tokens.Motion.selection
+                    fade.timingFunction = Tokens.Motion.easeOut
+                    imageLayer.add(fade, forKey: "swap")
+                }
             }
             imageLayer.contentsScale = scale
         }
