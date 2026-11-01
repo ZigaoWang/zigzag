@@ -418,14 +418,22 @@ final class BrowserRootView: ColorView {
         return NSRect(x: x, y: inset, width: sidebarWidth, height: bounds.height - inset * 2)
     }
 
-    /// Frosted glass behind the frame, for spaces that want the desktop to show through.
-    private lazy var glassView: NSVisualEffectView = {
-        let glass = NSVisualEffectView()
-        glass.blendingMode = .behindWindow
-        // The sidebar's own material: the clearest frosting macOS has, so what's behind the window shows through as
-        // a soft blur rather than a gray wash.
-        glass.material = .sidebar
-        glass.state = .active
+    /// Glass behind the frame, for spaces that want the desktop to show through: on macOS 26, clear Liquid Glass, so
+    /// what's behind reads almost as it is; before that, the sidebar's frosting, the clearest it has.
+    private lazy var glassView: NSView = {
+        let glass: NSView
+        if #available(macOS 26.0, *) {
+            let clear = NSGlassEffectView()
+            clear.style = .clear
+            clear.cornerRadius = 0
+            glass = clear
+        } else {
+            let frost = NSVisualEffectView()
+            frost.blendingMode = .behindWindow
+            frost.material = .sidebar
+            frost.state = .active
+            glass = frost
+        }
         glass.isHidden = true
         addSubview(glass, positioned: .below, relativeTo: nil)
         glass.wantsLayer = true
