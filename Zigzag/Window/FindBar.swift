@@ -470,9 +470,9 @@ class FloatingPanelView: NSView {
             } ?? false
             if !on && held { continue }
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = on ? 0.16 : 0.14
+                context.duration = on ? Tokens.Motion.menuIn : Tokens.Motion.highlightGlide
                 context.timingFunction = Tokens.Motion.easeOut
-                view.animator().alphaValue = on ? 0.12 : 1
+                view.animator().alphaValue = on ? Tokens.Opacity.receded : 1
             }
         }
     }

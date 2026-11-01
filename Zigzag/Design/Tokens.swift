@@ -720,6 +720,9 @@ enum Tokens {
         static let disabled: CGFloat = 0.35
         /// Floor for tabs that have not been looked at in a long time.
         static let fadedFloor: CGFloat = 0.42
+        /// What a panel opened over the sidebar (downloads, the site panel) sits on: stepped back, still readable,
+        /// so the panel reads first without the tabs vanishing.
+        static let receded: CGFloat = 0.4
     }
 
     // MARK: - Fading
