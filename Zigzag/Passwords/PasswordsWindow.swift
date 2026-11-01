@@ -616,8 +616,9 @@ private final class SiteRow: InteractiveView {
 
     init(title: String, subtitle: String, origin: Origin) {
         self.origin = origin
-        self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-        self.subtitle = Label(subtitle, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+        // A list of places on a page: the row's title over its explanation, as Settings and History set them.
+        self.title = Label(title, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
+        self.subtitle = Label(subtitle, font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
@@ -643,7 +644,7 @@ private final class SiteRow: InteractiveView {
 
     override func layout() {
         super.layout()
-        let side = Tokens.Space.x5
+        let side = Tokens.Metric.favicon
         icon.frame = NSRect(x: CardRow.inset, y: round((bounds.height - side) / 2), width: side, height: side)
         let x = icon.frame.maxX + CardRow.inset - Label.inset
         let top = round((bounds.height - title.lineHeight - subtitle.lineHeight) / 2)
@@ -659,10 +660,11 @@ private enum SiteIcon {
     static func image(for origin: Origin) -> NSImage {
         if let url = origin.url, let icon = FaviconStore.shared.cachedIcon(for: url) { return icon }
         let letter = String(origin.displayName.first.map { String($0).uppercased() } ?? "?")
-        return NSImage(size: NSSize(width: 24, height: 24), flipped: false) { rect in
+        let side = Tokens.Metric.favicon
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
             Tokens.Color.fieldFill.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
-            let attributes: [NSAttributedString.Key: Any] = [.font: Tokens.Font.body(.semibold), .foregroundColor: Tokens.Color.textSecondary]
+            NSBezierPath(roundedRect: rect, xRadius: Tokens.Radius.control, yRadius: Tokens.Radius.control).fill()
+            let attributes: [NSAttributedString.Key: Any] = [.font: Tokens.Font.small(.medium), .foregroundColor: Tokens.Color.textSecondary]
             let size = (letter as NSString).size(withAttributes: attributes)
             (letter as NSString).draw(at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2), withAttributes: attributes)
             return true
