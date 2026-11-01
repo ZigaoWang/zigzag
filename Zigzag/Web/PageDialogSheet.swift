@@ -20,12 +20,13 @@ final class PageDialogSheet: NSView {
     }
 
     private let panel = FloatingPanelView()
-    private let titleLabel: Label
+    private let header: DialogHeader
     private let body: NSTextField
     private var inputs: [FilledField] = []
-    private let confirm: PrimaryButton
-    private let cancel = TextButton.form("Cancel")
-    private let block = TextButton(title: "Block Dialogs", font: Tokens.Font.body(.medium))
+    private let buttons = DialogButtons()
+    private let confirm: PillButton
+    private let cancel = PillButton(title: "Cancel", style: .plain)
+    private let block = PillButton(title: "Block Dialogs", style: .quiet)
     private var monitor: Any?
     private var closeObserver: Any?
     /// The page that asked, when a page did: the sheet sits on it, and goes when the page does.
@@ -36,15 +37,14 @@ final class PageDialogSheet: NSView {
     private struct WeakBox { weak var sheet: PageDialogSheet? }
     private var completion: (Result) -> Void
     /// Narrower in a narrow pane, so it never runs past the page it belongs to.
-    private var width: CGFloat { min(380, max(240, bounds.width - Tokens.Space.x4 * 2)) }
-    private let pad = Tokens.Space.x5
+    private var width: CGFloat { min(Tokens.Dialog.width, max(240, bounds.width - Tokens.Space.x4 * 2)) }
+    private let pad = Tokens.Dialog.padding
 
     private init(title: String, message: String, fields: [Field], confirmTitle: String, showsCancel: Bool, offersBlock: Bool,
                  completion: @escaping (Result) -> Void) {
-        titleLabel = Label(title, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-        titleLabel.lineBreakMode = .byTruncatingMiddle
+        header = DialogHeader(title: title)
         body = NSTextField(wrappingLabelWithString: message)
-        confirm = PrimaryButton(title: confirmTitle)
+        confirm = PillButton(title: confirmTitle, style: .prominent)
         self.completion = completion
         super.init(frame: .zero)
         wantsLayer = true
@@ -53,18 +53,17 @@ final class PageDialogSheet: NSView {
         body.isSelectable = true
         body.maximumNumberOfLines = 12
         addSubview(panel)
-        [titleLabel, body, confirm].forEach { panel.addSubview($0) }
+        [header, body, buttons].forEach { panel.addSubview($0) }
         for field in fields {
             let input = FilledField(placeholder: field.placeholder, secure: field.secure)
             input.stringValue = field.value
             panel.addSubview(input)
             inputs.append(input)
         }
-        if showsCancel { panel.addSubview(cancel) }
+        buttons.trailing = showsCancel ? [cancel, confirm] : [confirm]
         if offersBlock {
-            block.textColor = Tokens.Color.textSecondary
             block.toolTip = "Don’t let this page show more dialogs"
-            panel.addSubview(block)
+            buttons.leading = [block]
         }
         confirm.onClick = { [weak self] _ in self?.finish(.confirmed(self?.inputs.map(\.stringValue) ?? [])) }
         cancel.onClick = { [weak self] _ in self?.finish(.cancelled) }
@@ -180,25 +179,21 @@ final class PageDialogSheet: NSView {
     override func layout() {
         super.layout()
         let fields = CGFloat(inputs.count) * (fieldHeight + Tokens.Space.x2)
-        let height = pad + titleLabel.lineHeight + Tokens.Space.x2 + bodyHeight + Tokens.Space.x4 + fields + Tokens.Space.x2 + Tokens.Space.x8 + pad
+        let height = pad + header.height(for: width - pad * 2) + Tokens.Space.x2 + bodyHeight + Tokens.Dialog.gap + fields
+            + Tokens.Space.x2 + DialogButtons.height + pad
         panel.frame = NSRect(x: round((bounds.width - width) / 2), y: max(0, round((bounds.height - height) / 2.4)), width: width, height: height)
     }
 
     private func layoutPanel() {
         let inner = panel.bounds.width - pad * 2
-        titleLabel.frame = NSRect(x: pad, y: pad, width: inner, height: titleLabel.lineHeight)
-        body.frame = NSRect(x: pad, y: titleLabel.frame.maxY + Tokens.Space.x2, width: inner, height: bodyHeight)
-        var y = body.frame.maxY + Tokens.Space.x4
+        header.frame = NSRect(x: pad, y: pad, width: inner, height: header.height(for: inner))
+        body.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Space.x2, width: inner, height: bodyHeight)
+        var y = body.frame.maxY + Tokens.Dialog.gap
         for input in inputs {
             input.frame = NSRect(x: pad, y: y, width: inner, height: fieldHeight)
             y += fieldHeight + Tokens.Space.x2
         }
         y += inputs.isEmpty ? 0 : Tokens.Space.x2
-        let h = Tokens.Space.x8
-        let cw = max(confirm.fittingWidth, 80)
-        confirm.frame = NSRect(x: panel.bounds.width - pad - cw, y: y, width: cw, height: h)
-        let xw = cancel.fittingWidth + Tokens.Space.x2
-        cancel.frame = NSRect(x: confirm.frame.minX - Tokens.Space.x2 - xw, y: y, width: xw, height: h)
-        block.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: block.fittingWidth, height: h)
+        buttons.frame = NSRect(x: pad, y: y, width: inner, height: DialogButtons.height)
     }
 }

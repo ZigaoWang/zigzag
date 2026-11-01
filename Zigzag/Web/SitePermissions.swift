@@ -277,14 +277,15 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = accent
                 prompt.badge.color = accent.withAlphaComponent(0.16)
             }
-            let deny = TextButton.form(denyTitle)
+            let deny = PillButton(title: denyTitle, style: .plain)
             deny.onClick = { [weak prompt] _ in prompt?.finish(.deny) }
-            let allow = PrimaryButton(title: allowTitle)
+            let allow = PillButton(title: allowTitle, style: .prominent)
+            allow.tint = accent
             // Kept for the site (the caller keeps nothing in a private window).
             allow.onClick = { [weak prompt] _ in prompt?.finish(.allow) }
             for button in [deny, allow] as [InteractiveView] { prompt.addSubview(button) }
             // Side by side at one width, as a Mac dialog sets its answers.
-            let width = max(deny.fittingWidth + Tokens.Space.x3, allow.fittingWidth, 84)
+            let width = max(deny.fittingWidth, allow.fittingWidth, Tokens.Dialog.minButtonWidth)
             prompt.buttons = [(deny, width), (allow, width)]
             prompt.setAccessibilityLabel("\(host): \(request)?")
             prompt.answer = { continuation.resume(returning: $0) }
@@ -447,9 +448,9 @@ final class PermissionPrompt: FloatingPanelView {
 
     private static let width: CGFloat = 340
     private static let pad: CGFloat = 16
-    private static let iconSide: CGFloat = 32
-    private static let buttonHeight = Tokens.Space.x7Height
-    private static let buttonGap: CGFloat = 8
+    private static let iconSide = Tokens.Dialog.iconSide
+    private static let buttonHeight = DialogButtons.height
+    private static let buttonGap = Tokens.Dialog.buttonGap
 
     private var textX: CGFloat { Self.pad + Self.iconSide + Tokens.Space.x3 }
     /// Room kept at the right of the text for the close button.

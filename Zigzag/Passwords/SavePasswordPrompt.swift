@@ -19,10 +19,11 @@ final class SavePasswordPrompt: FloatingPanelView {
     private let usernameField = PlainTextField(font: Tokens.Font.body(), placeholder: "Username")
     private let usernameText = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let isUpdate: Bool
-    private let saveButton: PrimaryButton
-    private let notNowButton = TextButton.form("Not Now")
+    private let buttons = DialogButtons()
+    private let saveButton: PillButton
+    private let notNowButton = PillButton(title: "Not Now", style: .plain)
     // The quiet choice, on its own at the left: the two answers on the right are the ones you see.
-    private let neverButton = TextButton(title: "Never", font: Tokens.Font.body(.medium))
+    private let neverButton = PillButton(title: "Never", style: .quiet)
     private var hideWork: DispatchWorkItem?
     private var finish: (Bool) -> Void = { _ in }
     private var keyMonitor: Any?
@@ -39,11 +40,11 @@ final class SavePasswordPrompt: FloatingPanelView {
     private let pad = Tokens.Space.x4
     private let headerHeight: CGFloat = 36
     private let fieldHeight: CGFloat = 36
-    private let buttonHeight = Tokens.Space.x8
+    private let buttonHeight = DialogButtons.height
 
     private init(kind: Kind, origin: Origin) {
         isUpdate = { if case .update = kind { true } else { false } }()
-        saveButton = PrimaryButton(title: isUpdate ? "Update" : "Save")
+        saveButton = PillButton(title: isUpdate ? "Update" : "Save", style: .prominent)
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: 0))
         radius = Tokens.Radius.panel
         titleLabel.stringValue = isUpdate ? "Update password?" : "Save password?"
@@ -64,9 +65,10 @@ final class SavePasswordPrompt: FloatingPanelView {
             usernameText.stringValue = credential.username.isEmpty ? "No username" : credential.username
             usernameBox.addSubview(usernameText)
         }
-        [icon, titleLabel, siteLabel, usernameBox, neverButton, notNowButton, saveButton].forEach { addSubview($0) }
+        [icon, titleLabel, siteLabel, usernameBox, buttons].forEach { addSubview($0) }
+        buttons.leading = [neverButton]
+        buttons.trailing = [notNowButton, saveButton]
         neverButton.isHidden = isUpdate
-        neverButton.textColor = Tokens.Color.textSecondary
         neverButton.toolTip = "Never offer to save on \(origin.displayName)"
         frame.size.height = measuredHeight
         onLayout = { [weak self] in self?.layoutContent() }
@@ -280,11 +282,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         usernameText.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - usernameText.lineHeight) / 2, width: inner - Tokens.Space.x3 * 2, height: usernameText.lineHeight)
         // Never at the left; Not Now and Save at the right.
         let y = usernameBox.frame.maxY + Tokens.Space.x3
-        let saveWidth = max(saveButton.fittingWidth, 76)
-        saveButton.frame = NSRect(x: w - pad - saveWidth, y: y, width: saveWidth, height: buttonHeight)
-        let notNowWidth = notNowButton.fittingWidth + Tokens.Space.x2
-        notNowButton.frame = NSRect(x: saveButton.frame.minX - Tokens.Space.x2 - notNowWidth, y: y, width: notNowWidth, height: buttonHeight)
-        neverButton.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: neverButton.fittingWidth, height: buttonHeight)
+        buttons.frame = NSRect(x: pad, y: y, width: inner, height: buttonHeight)
     }
 }
 

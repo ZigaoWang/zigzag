@@ -17,40 +17,34 @@ final class ExtensionSheet: FloatingPanelView {
 
     private static weak var current: ExtensionSheet?
 
-    private let iconView = NSImageView()
-    private let titleLabel: NSTextField
-    private let subtitleLabel: NSTextField
+    private let header: DialogHeader
     private let headingLabel: Label
     private var rows: [(NSImageView, NSTextField)] = []
     private let limitsBox = ColorView(color: Tokens.Color.fieldFill)
     private let limitsIcon = NSImageView()
     private let limitsText = NSTextField(wrappingLabelWithString: "")
+    private let buttons = DialogButtons()
     private let confirmButton: PillButton
     private let cancelButton: PillButton
     private var monitor: Any?
     private var onConfirm: () -> Void = {}
     private var onCancel: () -> Void = {}
 
-    static let width: CGFloat = 360
+    static let width: CGFloat = Tokens.Dialog.width
 
     private init(_ content: Content) {
-        // Both wrap: an extension's name, or an update's sentence, can be longer than one line.
-        titleLabel = NSTextField(wrappingLabelWithString: content.title)
-        titleLabel.font = Tokens.Font.body(.semibold)
-        titleLabel.textColor = Tokens.Color.textPrimary
-        titleLabel.maximumNumberOfLines = 2
-        titleLabel.isSelectable = false
-        subtitleLabel = NSTextField(wrappingLabelWithString: content.subtitle)
-        subtitleLabel.font = Tokens.Font.small()
-        subtitleLabel.textColor = Tokens.Color.textSecondary
-        subtitleLabel.isSelectable = false
-        headingLabel = Label.section(content.heading)
+        // The title wraps: an extension's name, or an update's sentence, can be longer than one line.
+        header = DialogHeader(title: content.title, subtitle: content.subtitle)
+        headingLabel = Label(content.heading, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
         confirmButton = PillButton(title: content.confirm, style: .prominent)
-        cancelButton = PillButton(title: content.cancel)
+        cancelButton = PillButton(title: content.cancel, style: .plain)
         super.init(frame: .zero)
-        iconView.image = content.icon ?? Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.TypeSize.large)
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        [iconView, titleLabel, subtitleLabel].forEach { addSubview($0) }
+        if let icon = content.icon {
+            header.setImage(icon)
+        } else {
+            header.setSymbol("puzzlepiece.extension", tint: Tokens.Color.icon)
+        }
+        addSubview(header)
         if !content.report.abilities.isEmpty { addSubview(headingLabel) }
         for line in content.report.abilities {
             let symbol = NSImageView(image: Tokens.Symbol.image(line.symbol))
@@ -79,8 +73,8 @@ final class ExtensionSheet: FloatingPanelView {
             limitsBox.addSubview(limitsIcon)
             limitsBox.addSubview(limitsText)
         }
-        addSubview(cancelButton)
-        addSubview(confirmButton)
+        addSubview(buttons)
+        buttons.trailing = [cancelButton, confirmButton]
         confirmButton.onClick = { [weak self] _ in self?.finish(confirmed: true) }
         cancelButton.onClick = { [weak self] _ in self?.finish(confirmed: false) }
         frame.size = NSSize(width: Self.width, height: layoutContent(dryRun: true))
@@ -136,21 +130,13 @@ final class ExtensionSheet: FloatingPanelView {
 
     /// Lays everything out top to bottom and returns the height it needs.
     private func layoutContent(dryRun: Bool) -> CGFloat {
-        let pad = Tokens.Space.x4
+        let pad = Tokens.Dialog.padding
         let inner = Self.width - pad * 2
         func place(_ view: NSView, _ rect: NSRect) { if !dryRun { view.frame = rect } }
         var y = pad
-        let iconSize = Tokens.Space.x10
-        place(iconView, NSRect(x: pad, y: y, width: iconSize, height: iconSize))
-        let textX = pad + iconSize + Tokens.Space.x3
-        let textWidth = Self.width - textX - pad
-        let titleHeight = ceil(titleLabel.sizeThatFits(NSSize(width: textWidth, height: 200)).height)
-        let subtitleHeight = ceil(subtitleLabel.sizeThatFits(NSSize(width: textWidth, height: 200)).height)
-        let textHeight = titleHeight + 2 + subtitleHeight
-        let textY = y + max(0, (iconSize - textHeight) / 2)
-        place(titleLabel, NSRect(x: textX, y: textY, width: textWidth, height: titleHeight))
-        place(subtitleLabel, NSRect(x: textX, y: textY + titleHeight + 2, width: textWidth, height: subtitleHeight))
-        y += max(iconSize, textHeight) + Tokens.Space.x4
+        let headerHeight = header.height(for: inner)
+        place(header, NSRect(x: pad, y: y, width: inner, height: headerHeight))
+        y += headerHeight + Tokens.Dialog.gap
         if !rows.isEmpty {
             place(headingLabel, NSRect(x: pad, y: y, width: inner, height: headingLabel.lineHeight))
             y += headingLabel.lineHeight + Tokens.Space.x2
@@ -180,12 +166,8 @@ final class ExtensionSheet: FloatingPanelView {
         } else {
             y += Tokens.Space.x2
         }
-        let buttonHeight = Tokens.Page.controlHeight
-        let confirmWidth = confirmButton.fittingWidth
-        place(confirmButton, NSRect(x: Self.width - pad - confirmWidth, y: y, width: confirmWidth, height: buttonHeight))
-        let cancelWidth = cancelButton.fittingWidth
-        place(cancelButton, NSRect(x: Self.width - pad - confirmWidth - Tokens.Space.x2 - cancelWidth, y: y, width: cancelWidth, height: buttonHeight))
-        y += buttonHeight + pad
+        place(buttons, NSRect(x: pad, y: y, width: inner, height: DialogButtons.height))
+        y += DialogButtons.height + pad
         return y
     }
 }
