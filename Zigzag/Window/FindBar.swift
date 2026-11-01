@@ -307,9 +307,17 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private static let hideFindUI = NSSelectorFromString("_hideFindUI")
 }
 
-/// A floating rounded surface with a real shadow (it sits above the page) and spring in/out.
+/// A floating surface (the design's top layer, see Design/DESIGN.md): Liquid Glass on macOS 26 (frosted before it)
+/// under a wash of the panel color, a hairline edge, the one panel shadow, `Tokens.Radius.panel` corners, and an
+/// eased arrival. Panels that belong to the sidebar (`liftedFrom`), are tinted (`surfaceTint`) or stand in for
+/// something in place (`isElevated` off) are solid instead.
 class FloatingPanelView: NSView {
     private let surface = ColorView(color: Tokens.Color.panelBackground)
+    /// The glass under the surface's wash; nil while the panel is solid.
+    private var material: NSView?
+    /// Off for a panel that must be fully opaque (one showing a picture edge to edge).
+    var isGlass = true { didSet { refreshColors() } }
+    private var showsGlass: Bool { isGlass && isElevated && liftedFrom == nil && surfaceTint == nil && edgeColor == nil }
     var onLayout: (() -> Void)?
     var radius: CGFloat = Tokens.Radius.panel { didSet { needsLayout = true } }
 
@@ -341,6 +349,10 @@ class FloatingPanelView: NSView {
         super.layout()
         surface.frame = bounds
         surface.layer?.cornerRadius = radius
+        if let material {
+            material.frame = bounds
+            PanelMaterial.setRadius(radius, of: material)
+        }
         layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         onLayout?()
         matchCorners()
@@ -394,8 +406,15 @@ class FloatingPanelView: NSView {
                     surface.color = mixed
                 }
             } else {
-                surface.color = Tokens.Color.panelBackground
+                surface.color = showsGlass ? Tokens.Color.panelWash : Tokens.Color.panelBackground
             }
+            if showsGlass, material == nil {
+                let glass = PanelMaterial.make(radius: radius)
+                glass.frame = bounds
+                super.addSubview(glass, positioned: .below, relativeTo: surface)
+                material = glass
+            }
+            material?.isHidden = !showsGlass
             surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
             surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)

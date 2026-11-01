@@ -566,13 +566,17 @@ final class FilledField: NSView {
 
     override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(field) }
 
+    /// Capsule ends instead of the field's corners: a search or address field standing on its own in a panel.
+    var isPill = false { didSet { needsLayout = true } }
+
     override func layout() {
         super.layout()
+        layer?.cornerRadius = isPill ? bounds.height / 2 : Tokens.Radius.field
         let h = ceil(field.intrinsicContentSize.height)
-        var x = Tokens.Space.x2 + 2
+        var x = (isPill ? Tokens.Space.x3 : Tokens.Space.x2) + 2
         if let symbolView {
             let side = Tokens.Space.x4
-            symbolView.frame = NSRect(x: Tokens.Space.x2, y: round((bounds.height - side) / 2), width: side, height: side)
+            symbolView.frame = NSRect(x: isPill ? Tokens.Space.x3 : Tokens.Space.x2, y: round((bounds.height - side) / 2), width: side, height: side)
             x = symbolView.frame.maxX + Tokens.Space.x1
         }
         field.frame = NSRect(x: x, y: round((bounds.height - h) / 2), width: bounds.width - x - Tokens.Space.x3, height: h)

@@ -413,11 +413,9 @@ final class FavoriteTile: InteractiveView {
         setLifted(isSelected)
         if !isSelected {
             layer?.borderWidth = Tokens.Metric.hairline
-            layer?.borderColor = cgColor(isOpen ? Self.openEdge : Tokens.Color.glassEdge)
+            layer?.borderColor = cgColor(isOpen ? Tokens.Color.openEdge : Tokens.Color.glassEdge)
         }
     }
-
-    private static let openEdge = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.14), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
 
     private static let iconSide: CGFloat = 22
 }

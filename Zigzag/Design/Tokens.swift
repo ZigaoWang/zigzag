@@ -1,6 +1,7 @@
 import AppKit
 
-/// The single source of truth for every visual decision in Zigzag.
+/// The single source of truth for every visual decision in Zigzag. The system these values make, its layers,
+/// materials, type, spacing, radii, states and motion, is written down in Design/DESIGN.md: build to it.
 /// Views never use literal numbers or colors; they reach in here.
 enum Tokens {
 
@@ -206,6 +207,8 @@ enum Tokens {
     enum Motion {
         /// Hover and press feedback.
         static let quick: TimeInterval = 0.1
+        /// A change of selection in a list: the card settling onto the chosen row.
+        static let selection: TimeInterval = 0.15
         /// Most UI transitions: sidebar slide, command bar, row moves.
         static let standard: TimeInterval = 0.2
         /// Large surface moves: the desk fading in and out.
@@ -455,6 +458,8 @@ enum Tokens {
         static let glassFill = dynamic(light: hex(0xFFFFFF, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.06))
         static let glassHover = dynamic(light: hex(0xFFFFFF, alpha: 0.5), dark: hex(0xFFFFFF, alpha: 0.1))
         static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08))
+        /// A tile whose page is open in the background: a fine darker edge in place of the light one.
+        static let openEdge = dynamic(light: hex(0x000000, alpha: 0.14), dark: hex(0xFFFFFF, alpha: 0.2))
         /// The sidebar's address: quieter than a field, there without asking to be looked at.
         static let addressFill = dynamic(light: hex(0x000000, alpha: 0.035), dark: hex(0xFFFFFF, alpha: 0.05))
         /// The keyboard-selected row in floating lists (command bar, downloads).
@@ -469,8 +474,11 @@ enum Tokens {
         /// Only shadow in the window: lifts the page off the frame.
         static let cardShadow = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0x000000, alpha: 0.28))
 
-        /// Floating surfaces (command bar, previews, switcher).
+        /// Floating surfaces (command bar, previews, switcher), where they're solid.
         static let panelBackground = dynamic(light: hex(0xFCFCFC), dark: hex(0x2A2A2D))
+        /// The panel color washed over a floating panel's glass: enough to keep text calm and readable on any page,
+        /// little enough that the glass still reads as glass.
+        static let panelWash = dynamic(light: hex(0xFCFCFC, alpha: 0.74), dark: hex(0x2A2A2D, alpha: 0.7))
         static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0xFFFFFF, alpha: 0.10))
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.13), dark: hex(0x000000, alpha: 0.42))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
