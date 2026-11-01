@@ -107,7 +107,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         let card = window.focusedPaneFrame
         let height = Tokens.Metric.findBarHeight
         let width = Tokens.Metric.findBarWidth
-        return NSRect(x: card.maxX - width - Tokens.Space.x3, y: card.minY + Tokens.Space.x3, width: width, height: height)
+        // Below a split pane's header, as far into the page as without one, clear of the header's buttons.
+        let header = window.root.card.showsHeader ? PaneHeaderView.height : 0
+        return NSRect(x: card.maxX - width - Tokens.Space.x3, y: card.minY + header + Tokens.Space.x3, width: width, height: height)
     }
 
     private func layoutPanel() {
