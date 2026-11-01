@@ -820,10 +820,30 @@ final class SidebarListView: NSView {
         CATransaction.commit()
     }
 
-    /// Pinned pages show their icon as soon as one arrives, not only after a relaunch.
-    private lazy var iconToken: SignalToken = FaviconStore.shared.updated.observe { [weak self] _ in
+    /// Pinned pages show their icon as soon as one arrives, not only after a relaunch: only the rows showing that
+    /// site redraw, not every row in every window.
+    private lazy var iconToken: SignalToken = FaviconStore.shared.updated.observe { [weak self] key in
         guard let self, self.window != nil else { return }
-        self.refreshRows()
+        for (item, view) in self.rows where self.iconKeys(for: item).contains(key) { self.configure(view, for: item) }
+    }
+
+    /// The sites a row's icons come from: its page, and in a split its partner's.
+    private func iconKeys(for item: SidebarItem) -> Set<String> {
+        let store = FaviconStore.shared
+        var urls: [URL?] = []
+        switch item {
+        case .tab(let id):
+            let tab = manager?.tab(with: id)
+            urls = [tab?.url, tab.flatMap { manager?.partner(of: $0) }?.url]
+        case .bookmark(let id):
+            urls = [Library.shared.bookmark(id)?.url, manager?.bookmarkTab(for: id)?.url]
+            if let pair = Library.shared.pinnedSplit(containing: id) {
+                urls += [Library.shared.bookmark(pair.left)?.url, Library.shared.bookmark(pair.right)?.url]
+            }
+        default:
+            break
+        }
+        return Set(urls.compactMap { store.iconKey(for: $0) })
     }
 
     override func viewDidMoveToWindow() {

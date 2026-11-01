@@ -358,8 +358,10 @@ final class FavoriteTile: InteractiveView {
         setAccessibilityRole(.button)
         setAccessibilityLabel(name)
         refreshIcon()
-        iconToken = FaviconStore.shared.updated.observe { [weak self] _ in
-            guard let self, self.tab?.favicon == nil || self.tab?.isLoading != true else { return }
+        // Only its own sites' icons arriving redraw it.
+        let keys = Set([bookmark?.url, partner?.url].compactMap { FaviconStore.shared.iconKey(for: $0) })
+        iconToken = FaviconStore.shared.updated.observe { [weak self] key in
+            guard let self, keys.contains(key), self.tab?.favicon == nil || self.tab?.isLoading != true else { return }
             self.refreshIcon()
         }
     }

@@ -19,7 +19,10 @@ final class FaviconStore {
     /// Fires with the host whose icon changed.
     let updated = Signal<String>()
 
-    private func key(for url: URL) -> String? {
+    /// The site an icon is kept for: what `updated` sends when one arrives, so a view can tell whether it's its own.
+    nonisolated func iconKey(for url: URL?) -> String? { url.flatMap(key(for:)) }
+
+    nonisolated private func key(for url: URL) -> String? {
         guard let host = url.host()?.lowercased() else { return nil }
         let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         // Google runs separate apps under one host, each with its own icon: Maps mustn't become Search's icon.
@@ -29,7 +32,7 @@ final class FaviconStore {
         return site
     }
 
-    private static let googleApps: Set<String> = ["maps", "travel", "flights", "finance", "shopping", "books", "earth"]
+    nonisolated private static let googleApps: Set<String> = ["maps", "travel", "flights", "finance", "shopping", "books", "earth"]
 
     private init() {
         // Before Google's apps had their own icons, one of them could have taken over google.com's.
