@@ -427,6 +427,8 @@ query.addEventListener('input', () => {
   }, 120);
 });
 query.addEventListener('keydown', (e) => {
+  // Return and Escape while composing (Japanese, Chinese) belong to the input method, not to History.
+  if (e.isComposing || e.keyCode === 229) return;
   if (e.key === 'Enter') { const first = list.querySelector('a.row'); if (first) location.href = first.href; }
   if (e.key === 'Escape' && query.value) { query.value = ''; query.dispatchEvent(new Event('input')); e.preventDefault(); }
 });
