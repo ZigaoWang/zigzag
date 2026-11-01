@@ -369,8 +369,9 @@ final class TabSwitcher {
         // Cards side by side, the panel a step in from them: panel, card and picture corners run together.
         let gap = 0 as CGFloat
         let pad = Tokens.Space.x1
-        let bounds = controller.root.bounds
-        let maxWidth = bounds.width - Tokens.Space.x16
+        // Over the page, beside the sidebar when it shows: centered where you're looking, not on the whole window.
+        let area = controller.root.convert(card, to: controller.root.overlay)
+        let maxWidth = area.width - Tokens.Space.x16
         var thumbWidth = Tokens.Metric.switcherThumbWidth
         let count = CGFloat(tabs.count)
         if count * thumbWidth + (count - 1) * gap + pad * 2 > maxWidth {
@@ -394,7 +395,7 @@ final class TabSwitcher {
         }
         let width = pad * 2 + count * thumbWidth + (count - 1) * gap
         let height = pad * 2 + thumbHeight
-        panel.frame = NSRect(x: round(bounds.midX - width / 2), y: round(bounds.midY - height / 2), width: width, height: height)
+        panel.frame = NSRect(x: round(area.midX - width / 2), y: round(area.midY - height / 2), width: width, height: height)
         controller.root.overlay.addSubview(panel)
         panel.present()
         updateSelection()
