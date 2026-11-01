@@ -11,6 +11,18 @@ final class PlainTextField: NSTextField {
     /// Text centered top to bottom in a field taller than its line (the address). Off, the text sits where AppKit
     /// puts it, as every other field always has.
     var centersText = false
+    /// Items to offer right after Paste in the field's right-click menu (the address's Paste and Go).
+    var pasteMenuItems: (() -> [NSMenuItem])?
+
+    /// The field editor asks its delegate, this field, for the menu it shows on a right-click.
+    @objc(textView:menu:forEvent:atIndex:)
+    func textView(_ textView: NSTextView, menu: NSMenu, for event: NSEvent, at charIndex: Int) -> NSMenu? {
+        guard let items = pasteMenuItems?(), !items.isEmpty else { return menu }
+        let paste = menu.items.firstIndex { $0.action == #selector(NSText.paste(_:)) }
+        var index = paste.map { $0 + 1 } ?? 0
+        for item in items { menu.insertItem(item, at: index); index += 1 }
+        return menu
+    }
 
     init(font: NSFont, placeholder: String) {
         super.init(frame: .zero)

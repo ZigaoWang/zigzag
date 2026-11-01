@@ -131,6 +131,16 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         field.delegate = self
         field.textInset = 2
         field.centersText = true
+        // Paste and Go: what's on the clipboard, opened or searched in one step, as in Safari and Chrome.
+        field.pasteMenuItems = { [weak self] in
+            guard let self, let text = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty, !text.contains("\n") else { return [] }
+            let url = CommandRanker.url(from: text)
+            return [SidebarMenus.Item(url != nil ? "Paste and Go" : "Paste and Search") { [weak self] in
+                // Straight to the page or the search, never a suggestion listed for what was typed before.
+                self?.activate(CommandResult(kind: url.map { .open($0) } ?? .search(text), title: "", detail: ""), modifiers: [])
+            }]
+        }
         fieldIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.title)
         fieldIcon.contentTintColor = Tokens.Color.textTertiary
         fieldIcon.imageScaling = .scaleNone
