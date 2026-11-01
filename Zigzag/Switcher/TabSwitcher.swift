@@ -174,23 +174,27 @@ final class TabThumbnailView: InteractiveView {
     private static let blankness = NSMapTable<NSImage, NSNumber>.weakToStrongObjects()
 
     /// No picture, or one that's all one color: a page that hadn't drawn yet. Checked once per picture, on a
-    /// thumbnail a few pixels across.
+    /// thumbnail fine enough that a quiet page (a few lines of text on white, like History or Settings) still
+    /// shows its text; a handful of pixels across averaged that away and took such pages for empty ones.
     static func isBlank(_ image: NSImage?) -> Bool {
         guard let image else { return true }
         if let known = blankness.object(forKey: image) { return known.boolValue }
-        let side = 8
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
-                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return false }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
-        NSGraphicsContext.restoreGraphicsState()
-        var low = [CGFloat](repeating: 1, count: 3), high = [CGFloat](repeating: 0, count: 3)
-        for x in 0..<side { for y in 0..<side {
-            guard let c = rep.colorAt(x: x, y: y) else { continue }
-            for (i, v) in [c.redComponent, c.greenComponent, c.blueComponent].enumerated() { low[i] = min(low[i], v); high[i] = max(high[i], v) }
-        } }
-        let blank = zip(low, high).allSatisfy { $1 - $0 < 0.03 }
+        let side = 64
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let pixels = context.data?.bindMemory(to: UInt8.self, capacity: side * side * 4) else { return false }
+        context.interpolationQuality = .medium
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+        var low: [UInt8] = [255, 255, 255], high: [UInt8] = [0, 0, 0]
+        for p in 0..<(side * side) {
+            for i in 0..<3 {
+                let v = pixels[p * 4 + i]
+                low[i] = min(low[i], v)
+                high[i] = max(high[i], v)
+            }
+        }
+        let blank = zip(low, high).allSatisfy { Int($1) - Int($0) < 8 }
         blankness.setObject(NSNumber(value: blank), forKey: image)
         return blank
     }
