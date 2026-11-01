@@ -120,7 +120,11 @@ Quick, eased, no bounce (`Tokens.Motion`).
 - **Row** (`CardRow`): icon, title, quiet trailing detail; states above.
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
 - **Pill button** (`PillButton`): capsule, `.plain` on `fieldFill`, `.quiet` fill on hover only, `.prominent` in
-  the accent, one per surface. `PrimaryButton` and `TextButton` remain for forms until rebuilt.
+  the accent, one per surface; `isDestructive` for what can't be undone. `PrimaryButton` and `TextButton` remain
+  in Settings and a few panels until rebuilt.
+- **Dialog** (`Tokens.Dialog`): `DialogHeader` (a picture, the question in the heading's weight, a quiet line under
+  it), the explaining text, then `DialogButtons` (the answers at the trailing end, the main one last and filled; a
+  quiet choice alone at the leading end). Confirmations, page dialogs, extension and save-password prompts use it.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
   `FilledField.search` with the magnifying glass.
 
