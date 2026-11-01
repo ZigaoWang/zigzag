@@ -1192,19 +1192,28 @@ final class SidebarListView: NSView {
     private weak var externalTarget: SidebarListView?
     private var edgeDirection: Int?
     private var edgeWork: DispatchWorkItem?
+    /// The pointer has been away from the edges during this drag, so holding at one now means flip.
+    private var edgeArmed = false
 
     /// Carry a row or a favorite to the sidebar's left or right edge and hold: the space flips that way, and keeps
     /// flipping while it's held there. Nil: the drag is over.
     func carryToEdge(at screenPoint: NSPoint?) {
         let container = (window?.windowController as? BrowserWindowController)?.root.sidebarContainer
         var edge: Int?
-        if let screenPoint, let window, let container {
+        // A private window keeps to one space: nothing to flip to.
+        if let screenPoint, let window, let container, manager?.isPrivate == false {
             let local = container.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
             if local.y >= 0, local.y <= container.bounds.height,
                local.x > -Tokens.Space.x6, local.x < container.bounds.width + Tokens.Space.x12 {
-                let zone = Tokens.Space.x10
-                edge = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                // The sidebar's very edge and just past it, clear of the icons and close buttons in the rows.
+                let zone = Tokens.Space.x2
+                let side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                // Only once the pointer has been away from the edges, so a row picked up near one doesn't flip at once.
+                if side == nil { edgeArmed = true }
+                edge = edgeArmed ? side : nil
             }
+        } else if screenPoint == nil {
+            edgeArmed = false
         }
         guard edge != edgeDirection else { return }
         edgeDirection = edge
