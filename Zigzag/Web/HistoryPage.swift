@@ -413,23 +413,32 @@ async function loadMore() {
 async function reload() { sessions = []; done = false; list.textContent = ''; await loadMore(); }
 
 let timer;
+// Shows what matches the search field now. Typing waits a moment before calling it; Return calls it at once.
+async function search() {
+  clearTimeout(timer); timer = null;
+  searching = query.value.trim();
+  if (searching) {
+    const found = await ask({ action: 'search', query: searching });
+    if (query.value.trim() !== searching) return;
+    // Clusters that hold a match open by themselves.
+    found.forEach((s) => s.clusters.forEach((c) => c.open = true));
+    sessions = found; done = true; render();
+  } else { await reload(); }
+}
 query.addEventListener('input', () => {
   clearTimeout(timer);
-  timer = setTimeout(async () => {
-    searching = query.value.trim();
-    if (searching) {
-      const found = await ask({ action: 'search', query: searching });
-      if (query.value.trim() !== searching) return;
-      // Clusters that hold a match open by themselves.
-      found.forEach((s) => s.clusters.forEach((c) => c.open = true));
-      sessions = found; done = true; render();
-    } else { await reload(); }
-  }, 120);
+  timer = setTimeout(search, 120);
 });
-query.addEventListener('keydown', (e) => {
+query.addEventListener('keydown', async (e) => {
   // Return and Escape while composing (Japanese, Chinese) belong to the input method, not to History.
   if (e.isComposing || e.keyCode === 229) return;
-  if (e.key === 'Enter') { const first = list.querySelector('a.row'); if (first) location.href = first.href; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    // Typed and returned at once: the search hasn't run yet, so run it first, or the top of everything opens.
+    if (timer || query.value.trim() !== searching) await search();
+    const first = list.querySelector('a.row');
+    if (first) location.href = first.href;
+  }
   if (e.key === 'Escape' && query.value) { query.value = ''; query.dispatchEvent(new Event('input')); e.preventDefault(); }
 });
 
