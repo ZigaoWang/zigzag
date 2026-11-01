@@ -960,6 +960,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return true
     }
 
+    /// What Print and Export as PDF take: the peek in front, the article Reader shows, or the page.
+    var printableWebView: WKWebView? {
+        if peek.isVisible, let webView = peek.tab?.webView { return webView }
+        if let reader, readerTab === tabManager.selectedTab { return reader.webView }
+        return selectedWebView
+    }
+
     func toggleReader() {
         if reader != nil { closeReader(); return }
         guard let tab = tabManager.selectedTab, let webView = tab.webView, let url = tab.url else { return }

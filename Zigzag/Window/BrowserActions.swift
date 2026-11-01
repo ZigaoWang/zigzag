@@ -76,8 +76,8 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func printPage(_ sender: Any?) {
         // A PDF prints as itself, page for page.
-        if let pdf = selectedTab?.pdfViewer { pdf.print(); return }
-        guard let webView = selectedWebView, let window else { return }
+        if !(peekController?.isVisible ?? false), !isReaderOpen, let pdf = selectedTab?.pdfViewer { pdf.print(); return }
+        guard let webView = printableWebView, let window else { return }
         let info = NSPrintInfo.shared.copy() as! NSPrintInfo
         info.horizontalPagination = .fit
         info.verticalPagination = .automatic
@@ -92,10 +92,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func exportAsPDF(_ sender: Any?) {
-        guard let webView = selectedWebView, let window, let tab = selectedTab else { return }
+        guard let webView = printableWebView, let window, let tab = selectedTab else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = tab.displayTitle.replacingOccurrences(of: "/", with: "-") + ".pdf"
+        let title = webView === selectedWebView ? tab.displayTitle : (webView.title ?? tab.displayTitle)
+        panel.nameFieldStringValue = title.replacingOccurrences(of: "/", with: "-") + ".pdf"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return }
             // Paged like a printout (Letter or A4, whichever this Mac uses), not one endless strip.
