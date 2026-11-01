@@ -128,7 +128,7 @@ final class PaneAddressView: InteractiveView {
         layer?.cornerCurve = .continuous
         addSubview(label)
         setAccessibilityRole(.button)
-        setAccessibilityHelp("Edit this page's address")
+        setAccessibilityHelp("Edit this page’s address")
     }
 
     required init?(coder: NSCoder) { fatalError() }

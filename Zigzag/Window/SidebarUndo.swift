@@ -49,7 +49,7 @@ extension BrowserWindowController {
     /// Whether the library is still as a change left it; if not, says why ⌘Z did nothing.
     func libraryUnchanged(since snapshot: Library.Snapshot) -> Bool {
         guard Library.shared.snapshot != snapshot else { return true }
-        Toast.show("Can’t undo: spaces or pinned tabs changed since", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        Toast.show("Can’t undo: spaces or pinned tabs have changed since then", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
         return false
     }
 
@@ -76,7 +76,7 @@ extension BrowserWindowController {
     /// Whether this window's tabs are still as a change left them; if not, says why ⌘Z did nothing.
     private func tabsUnchanged(since arrangement: TabManager.Arrangement) -> Bool {
         guard !tabManager.isUnchanged(since: arrangement) else { return true }
-        Toast.show("Can’t undo: tabs changed since", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        Toast.show("Can’t undo: tabs have changed since then", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
         return false
     }
 

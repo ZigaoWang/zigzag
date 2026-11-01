@@ -120,7 +120,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
-        Toast.show(success ? "Saved as PDF" : "Couldn’t save the PDF", symbol: success ? "doc.richtext" : "exclamationmark.triangle", in: self)
+        Toast.show(success ? "Exported as PDF" : "Couldn’t export the PDF", symbol: success ? "doc.richtext" : "exclamationmark.triangle", in: self)
     }
 
     /// File › Share…: the page's address and title to Messages, Mail, AirDrop, Notes and the rest, from the address bar.

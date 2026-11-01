@@ -1314,7 +1314,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let cookies = PillButton(title: "Clear Cookies…")
         cookies.onClick = { [weak self, weak cookies] _ in
-            self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, pinned tabs and history stay.", action: "Clear Cookies") {
+            self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", action: "Clear Cookies") {
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies)
                     cookies?.flash("Cleared")

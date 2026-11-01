@@ -530,7 +530,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Signing out of every site is a big step, so it asks first.
     func confirmClearCookies() {
         ConfirmSheet.show(in: root.overlay, title: "Clear cookies for every site?",
-                          message: "You’ll be signed out of every website. Your passwords, pinned tabs and history stay.",
+                          message: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.",
                           confirmTitle: "Clear Cookies", destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
