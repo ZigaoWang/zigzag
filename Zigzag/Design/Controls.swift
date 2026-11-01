@@ -968,7 +968,8 @@ final class StatusLabel: NSView {
 /// A few choices on one soft track, the chosen one on a raised pill that slides to it. Words or icons; every
 /// two- or three-way choice in Zigzag uses this, so they all look and move the same.
 final class SlidingSwitch: NSView {
-    enum Item { case text(String), symbol(String, toolTip: String) }
+    /// `styled` shows its title in its own font (the Reader's "Serif" in a serif).
+    enum Item { case text(String), styled(String, NSFont), symbol(String, toolTip: String) }
     var selectedIndex = 0 { didSet { if oldValue != selectedIndex { layoutPill(animated: window != nil) } } }
     var onChange: ((Int) -> Void)?
     private let items: [Item]
@@ -991,8 +992,10 @@ final class SlidingSwitch: NSView {
         pill.layer?.shadowOffset = CGSize(width: 0, height: -0.5)
         for item in items {
             switch item {
-            case .text(let title):
-                let label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+            case .text(let title), .styled(let title, _):
+                var font = Tokens.Font.body(.medium)
+                if case .styled(_, let own) = item { font = own }
+                let label = Label(title, font: font, color: Tokens.Color.textSecondary)
                 labels.append(label)
                 addSubview(label)
             case .symbol(let name, let tip):
