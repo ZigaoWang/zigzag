@@ -28,8 +28,8 @@ final class PageCardView: NSView {
     }
     private var edgeToEdge = false
 
-    /// The card runs to the window's right edge, which rounds those corners itself.
-    var squaresRightCorners = false { didSet { if squaresRightCorners != oldValue { needsLayout = true } } }
+    /// The right corners that are the window's own corners, which the window rounds itself: square here.
+    var squaresRightCorners = (top: false, bottom: false) { didSet { if squaresRightCorners != oldValue { needsLayout = true } } }
     /// Meeting the window's edges beside the sidebar: its corners curve like the window's, so a split's two panes
     /// match across the gap and the corner by the sidebar matches the window's.
     var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true } } }
@@ -159,8 +159,10 @@ final class PageCardView: NSView {
             let radius = isEdgeToEdge ? 0 : isAttached ? Tokens.Radius.window : Tokens.Radius.card
             clip.layer?.cornerRadius = radius
             edge.cornerRadius = radius
-            let corners: CACornerMask = squaresRightCorners ? [.layerMinXMinYCorner, .layerMinXMaxYCorner]
-                : [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+            // The clip isn't flipped: its top corners are at max Y.
+            var corners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+            if squaresRightCorners.top { corners.remove(.layerMaxXMaxYCorner) }
+            if squaresRightCorners.bottom { corners.remove(.layerMaxXMinYCorner) }
             clip.layer?.maskedCorners = corners
             edge.maskedCorners = corners
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)

@@ -401,16 +401,23 @@ final class BrowserRootView: ColorView {
         return NSRect(x: round(page.midX - size.width / 2), y: round(page.midY - size.height / 2), width: size.width, height: size.height)
     }
 
+    /// Which of a pane's right corners are the window's own corners: on the window's right edge and its top or
+    /// bottom. The window rounds those itself, so they're square; every other corner, a split's at the gap
+    /// included, stays round.
+    private func windowCorners(of pane: NSRect, attached: Bool) -> (top: Bool, bottom: Bool) {
+        guard attached, pane.maxX >= bounds.maxX - 1 else { return (false, false) }
+        return (pane.minY <= bounds.minY + 1, pane.maxY >= bounds.maxY - 1)
+    }
+
     private func layoutCards() {
         let panes = paneFrames
         emptyHint.frame = Self.markFrame(in: panes.left)
         card.isEdgeToEdge = isEdgeToEdge
         secondCard.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
-        // Corners against the window's right edge are the window's own; the rest stay round.
         let attached = sidebarVisible && Self.isBorderless
-        card.squaresRightCorners = attached && panes.left.maxX >= bounds.maxX - 1
-        secondCard.squaresRightCorners = attached
+        card.squaresRightCorners = windowCorners(of: panes.left, attached: attached)
+        secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
         card.isAttached = attached
         secondCard.isAttached = attached
         if let right = panes.right {
@@ -557,8 +564,9 @@ final class BrowserRootView: ColorView {
         onSlide?(duration)
         // Borderless: the corners square off as the page grows to the window's edges, and round again as it shrinks.
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
-        card.squaresRightCorners = visible && Self.isBorderless && paneFrames.left.maxX >= bounds.maxX - 1
-        secondCard.squaresRightCorners = visible && Self.isBorderless
+        let panes = paneFrames
+        card.squaresRightCorners = windowCorners(of: panes.left, attached: visible && Self.isBorderless)
+        secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: visible && Self.isBorderless) } ?? (false, false)
         card.isAttached = visible && Self.isBorderless
         secondCard.isAttached = visible && Self.isBorderless
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
