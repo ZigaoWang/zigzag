@@ -100,16 +100,12 @@ final class SitePanel: FloatingPanelView {
         controller.closeFloatingPanels()
         panel.anchor = anchor
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
-        // From the address bar in the sidebar: its width and left edge, just below it, in the space's tint, so it
-        // reads as part of the sidebar. Anywhere else (sidebar hidden) it keeps its own width.
+        // From the address bar in the sidebar: its width and left edge, just below it. Anywhere else (sidebar
+        // hidden) it keeps its own width.
         if anchor === controller.sidebar.address, controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
-            // Part of the sidebar, not a card over it: the address bar's own width, flat (no shadow), in the
-            // sidebar's color lifted like a selected tab, with the tabs under it faded back.
+            // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.width = anchorFrame.width
-            panel.liftedFrom = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
             panel.recedes = [controller.sidebar.list]
-            panel.isElevated = false
-            panel.radius = controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel
             panel.frame.size = NSSize(width: panel.width, height: panel.layoutContent(dryRun: true))
         }
         panel.frame.origin = NSPoint(x: max(Tokens.Metric.cardInset, anchorFrame.minX), y: anchorFrame.maxY + 4)
