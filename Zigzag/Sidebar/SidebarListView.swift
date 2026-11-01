@@ -449,7 +449,10 @@ final class SidebarListView: NSView {
         switch item {
         case .header:
             let header = SpaceHeaderView()
-            header.onClick = { [weak self] _ in self?.toggleCollapsed() }
+            header.onClick = { [weak self, weak header] event in
+                guard let self, let header else { return }
+                if header.isOnChevron(event) { self.toggleCollapsed() } else { self.delegate?.listEditSpace(anchor: header) }
+            }
             header.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: .header) }
             return header
         case .folder(let id):

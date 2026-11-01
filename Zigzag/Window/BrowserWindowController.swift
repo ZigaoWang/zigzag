@@ -1416,7 +1416,11 @@ extension BrowserWindowController: SidebarDelegate {
         previews.hover(tab, row: row, bookmark: bookmark)
     }
     func listRenameSpace() { renameSpace(nil) }
-    func listEditSpace(anchor: NSView) { openSpaceEditor(tabManager.currentSpaceID, anchor: anchor) }
+    func listEditSpace(anchor: NSView) {
+        // A private window's space is borrowed: it's edited from a normal window.
+        guard !tabManager.isPrivate else { return }
+        openSpaceEditor(tabManager.currentSpaceID, anchor: anchor)
+    }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
     func listDragEnded() {
         sidebar.clearDropTargets()

@@ -509,16 +509,17 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     }
 }
 
-/// The space name above its bookmarks. Click it to fold the bookmarks away; a chevron says so.
+/// The space name above its bookmarks. Click the name to edit the space; click the chevron beside it to fold the
+/// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
-    let label = Label("", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
+    let label = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textSecondary)
     private let chevron = NSImageView()
     private let iconView = NSImageView()
     /// The space's icon, before its name. Nil: the name alone.
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.small) }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.body) }
             iconView.isHidden = icon == nil
             needsLayout = true
         }
@@ -547,7 +548,7 @@ final class SpaceHeaderView: InteractiveView {
         let h = label.lineHeight
         var x = Tokens.Space.x2
         if icon != nil {
-            let side = Tokens.Space.x4
+            let side = Tokens.Space.x5
             iconView.frame = NSRect(x: x - 1, y: (bounds.height - side) / 2, width: side, height: side)
             x = iconView.frame.maxX + Tokens.Space.x1
         }
@@ -555,13 +556,19 @@ final class SpaceHeaderView: InteractiveView {
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
     }
 
+    /// Whether a click lands on the chevron (or just past the name, where it shows), rather than on the name.
+    func isOnChevron(_ event: NSEvent) -> Bool {
+        canCollapse && convert(event.locationInWindow, from: nil).x >= label.frame.maxX
+    }
+
     override func stateDidChange(animated: Bool) {
-        label.textColor = isHovered && canCollapse ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         iconView.contentTintColor = label.textColor
-        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small - 2)
+        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
         setAccessibilityLabel(label.stringValue + (isCollapsed ? ", pinned tabs hidden" : ""))
+        setAccessibilityHelp("Edit this space")
     }
 }
 
