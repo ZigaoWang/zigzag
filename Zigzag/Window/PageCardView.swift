@@ -68,7 +68,26 @@ final class PageCardView: NSView {
     private var progress: CGFloat = 0
     private var isShowingProgress = false
 
-    func setLoading(_ loading: Bool, progress value: Double) {
+    /// The page whose load the line shows: the one in this card, whichever tab is selected. In split view each card
+    /// follows its own pane's page.
+    private weak var loadingTab: Tab?
+    private var loadingToken: SignalToken?
+
+    func showLoading(of tab: Tab?) {
+        guard tab !== loadingTab || loadingToken == nil else { return }
+        loadingTab = tab
+        loadingToken = tab?.changed.observe { [weak self, weak tab] change in
+            guard let self, let tab, tab === self.loadingTab else { return }
+            if change == .progress || change == .loading || change == .url || change == .navigation {
+                self.setLoading(tab.isLoading, progress: tab.progress)
+            }
+        }
+        // A different page: no line carried over from the last one.
+        setLoading(false, progress: 1)
+        if let tab, tab.isLoading { setLoading(true, progress: tab.progress) }
+    }
+
+    private func setLoading(_ loading: Bool, progress value: Double) {
         if progressLine.superlayer == nil {
             progressLine.opacity = 0
             progressLine.anchorPoint = CGPoint(x: 0, y: 1)

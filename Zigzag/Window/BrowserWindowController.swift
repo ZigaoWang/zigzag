@@ -447,8 +447,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             floatVideoOnSwitch(from: shownTab, to: tab)
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
-            root.card.setLoading(false, progress: 1)
-            if let tab, tab.isLoading { root.card.setLoading(true, progress: tab.progress) }
             if let webView = tab?.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
                 DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(webView) }
             }
@@ -664,8 +662,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.isUnfocusedPane = right !== tab
             root.card.showsHeader = true
             root.secondCard.showsHeader = true
+            // Each pane's header and loading line are its own page's, whichever of the two you're in.
             root.card.header.show(left)
             root.secondCard.header.show(right)
+            root.card.showLoading(of: left)
+            root.secondCard.showLoading(of: right)
             root.card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(left, keep: right) }
             root.secondCard.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(right, keep: left) }
         } else {
@@ -674,6 +675,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.card.show(tab?.ensureWebView())
             tab?.reloadIfItStopped()
             root.secondCard.show(nil)
+            root.card.showLoading(of: tab)
+            root.secondCard.showLoading(of: nil)
+            root.secondCard.header.show(nil)
             root.card.isFocusedPane = false
             root.secondCard.isFocusedPane = false
             root.card.isUnfocusedPane = false
@@ -814,11 +818,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func selectedTabChanged(_ change: Tab.Change) {
         guard let tab = shownTab else { return }
+        // Each card shows its own page's load (`PageCardView.showLoading`); the sidebar follows the page you're in.
         switch change {
-        case .progress:
-            root.card.setLoading(tab.isLoading, progress: tab.progress)
         case .url, .navigation, .loading:
-            root.card.setLoading(tab.isLoading, progress: tab.progress)
             if change == .url {
                 refreshExtensionActions()
                 // A pinned tab that moved on shows it right away.
