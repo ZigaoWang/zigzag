@@ -83,7 +83,7 @@ final class GuidedTour: NSView {
         header.showsWatermark = false
         [header, step, check, title, note, skip, finish, wordmark, letter, signature, video].forEach { card.addSubview($0) }
         video.wantsLayer = true
-        video.layer?.cornerRadius = 10
+        video.layer?.cornerRadius = Tokens.Radius.row
         video.layer?.cornerCurve = .continuous
         video.layer?.masksToBounds = true
         videoLayer.videoGravity = .resizeAspectFill
@@ -396,7 +396,7 @@ final class GuidedTour: NSView {
         for key in d.keys {
             let cap = ColorView(color: Tokens.Color.fieldFill)
             cap.wantsLayer = true
-            cap.layer?.cornerRadius = 6
+            cap.layer?.cornerRadius = Tokens.Radius.control
             cap.layer?.cornerCurve = .continuous
             let label = Label(key, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
             label.alignment = .center
