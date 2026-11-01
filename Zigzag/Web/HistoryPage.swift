@@ -201,15 +201,15 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .clear { position: relative; }
 
 #list { padding: 4px calc(var(--gutter) - var(--row-inset)) 48px; }
-/* A session: one sitting, from the first page to a break. Its heading stays in view while its pages scroll. */
-.session { margin-bottom: 16px; }
-.session + .session { border-top: 1px solid var(--line); padding-top: 8px; }
+/* A session: one sitting, from the first page to a break. Sessions are set apart by room and a quiet label, never a
+   line. Its label stays in view while its pages scroll. */
+.session { margin-bottom: var(--group-gap); }
 .session-head { position: sticky; top: var(--header, 56px); z-index: 2; background: var(--bg); display: flex; align-items: baseline;
-                gap: 8px; padding: 8px var(--row-inset) 6px; }
-.session-head h2 { font-size: var(--body); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session-head .range { color: var(--muted); white-space: nowrap; }
+                gap: var(--space-2); padding: var(--space-3) var(--row-inset) var(--space-1); color: var(--faint); font-size: var(--label); font-weight: 500; }
+.session-head h2 { font-size: inherit; font-weight: inherit; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-head .range { white-space: nowrap; }
 .session-head .count { margin-left: auto; color: var(--faint); font-size: var(--small); white-space: nowrap; }
-.remove { flex: none; width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
+.remove { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
 .remove:hover { background: var(--hover); color: var(--text); }
 .remove:active { background: var(--pressed); }
 .session-head .remove { align-self: center; }
@@ -225,10 +225,10 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .row:active { background: var(--pressed); }
 /* Reached with the keyboard: chosen, as a section is in Settings. */
 .row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
-.row img, .row .dot { grid-column: 2; width: 16px; height: 16px; border-radius: 3px; }
+.row img, .row .dot { grid-column: 2; width: 16px; height: 16px; border-radius: var(--radius-small); }
 .row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 15px no-repeat; }
 /* Dark: icons drawn in black (GitHub, Wikipedia) sit on a light tile, as in the sidebar. */
-@media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; border-radius: 4px; } }
+@media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; } }
 .row .title { grid-column: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .where { grid-column: 4; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row time { grid-column: 5; color: var(--faint); font-size: var(--small); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
@@ -248,7 +248,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .cluster.open > .head .chevron { transform: rotate(90deg); }
 /* Indented by a wider first column rather than padding, so the address and time columns still line up with the rows above. */
 .pages .row { grid-template-columns: 38px 16px minmax(0, 1fr) minmax(0, 34%) 120px 20px; }
-.pages .more { display: block; color: var(--accent); padding: 6px 8px 6px 82px; font-size: 12px; }
+.pages .more { display: block; color: var(--accent); padding: 6px 8px 6px 82px; font-size: var(--label); }
 .pages .more:hover { text-decoration: underline; }
 @media (max-width: 640px) { .pages .row { grid-template-columns: 38px 16px minmax(0, 1fr) auto 20px; } }
 @media (prefers-reduced-motion: reduce) { .chevron, .page-header { transition: none; } }
