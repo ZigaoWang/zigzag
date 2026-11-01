@@ -207,7 +207,7 @@ enum PageStyle {
             ("bg", C.surface), ("text", C.textPrimary), ("muted", C.textSecondary), ("faint", C.textTertiary), ("icon", C.icon),
             ("hover", C.hoverFill), ("pressed", C.pressedFill), ("highlight", C.highlight), ("field", C.fieldFill), ("line", C.separator),
             ("group", C.surfaceGroup), ("group-edge", C.surfaceGroupEdge),
-            ("panel", C.panelBackground), ("panel-edge", C.panelEdge), ("panel-shadow", C.panelShadow), ("destructive", C.destructive),
+            ("panel", C.panelBackground), ("panel-wash", C.panelWash), ("panel-edge", C.panelEdge), ("panel-shadow", C.panelShadow), ("destructive", C.destructive),
         ]
         func block(_ name: NSAppearance.Name) -> String { colors.map { "--\($0.0): \(color($0.1, name));" }.joined(separator: " ") }
         let page = Tokens.Page.self, radius = Tokens.Radius.self, size = Tokens.TypeSize.self
@@ -215,9 +215,11 @@ enum PageStyle {
             "--gutter: \(px(page.gutter))", "--header-top: \(px(page.headerTop))", "--header-bottom: \(px(page.headerBottom))",
             "--control: \(px(page.controlHeight))", "--max: \(px(page.maxWidth))", "--row: \(px(page.rowHeight))",
             "--row-inset: \(px(page.rowInset))", "--wordmark: \(px(page.wordmarkHeight))", "--search: \(px(page.searchWidth))",
-            "--radius-control: \(px(radius.control))", "--radius-field: \(px(radius.field))", "--radius-row: \(px(radius.row))",
-            "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
-            "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%",
+            "--radius-small: \(px(radius.small))", "--radius-control: \(px(radius.control))", "--radius-field: \(px(radius.field))", "--radius-row: \(px(radius.row))",
+            "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--label: \(px(size.label))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
+            "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%", "--group-gap: \(px(page.groupGap))",
+            "--disabled: \(Tokens.Opacity.disabled)", "--space-1: \(px(Tokens.Space.x1))", "--space-2: \(px(Tokens.Space.x2))", "--space-3: \(px(Tokens.Space.x3))", "--space-4: \(px(Tokens.Space.x4))", "--space-5: \(px(Tokens.Space.x5))",
+            "--space-6: \(px(Tokens.Space.x6))", "--space-8: \(px(Tokens.Space.x8))",
             "--panel-blur: \(px(Tokens.Shadow.panelRadius))", "--panel-drop: \(px(Tokens.Shadow.panelDrop))",
         ].joined(separator: "; ")
         return """
@@ -256,21 +258,31 @@ enum PageStyle {
     .search input::-webkit-search-cancel-button { display: none; }
     @media (max-width: 520px) { .search { order: 3; width: 100%; } }
 
-    /* A button, as Zigzag draws them in forms and windows: body text on a quiet fill. */
-    .button { height: var(--control); padding: 0 10px; border-radius: var(--radius-control); background: var(--field); font-weight: 500;
-              white-space: nowrap; }
+    /* A pill button (PillButton): a capsule of medium body text on the soft fill. `.quiet` shows a fill only under
+       the pointer; `.prominent` is the accent, one per page. */
+    .button { height: var(--control); padding: 0 var(--space-3); border-radius: calc(var(--control) / 2); background: var(--field); color: var(--text);
+              font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
     .button:hover, .button[aria-expanded="true"] { background: var(--highlight); }
     .button:active { background: var(--pressed); }
+    .button.quiet { background: none; }
+    .button.quiet:hover, .button.quiet[aria-expanded="true"] { background: var(--hover); }
+    .button.quiet:active { background: var(--pressed); }
+    .button.prominent { background: var(--accent); color: var(--on-accent); }
+    .button.prominent:hover { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
+    .button.prominent:active { background: color-mix(in srgb, var(--accent) 78%, var(--text)); }
+    .button:disabled { opacity: var(--disabled); background: var(--field); }
 
-    /* A menu, as Zigzag's panels float: the panel's surface, a hairline edge and a soft drop. */
-    .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 200px; padding: 4px; border-radius: var(--radius-float);
-            background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
+    /* A menu, as Zigzag's panels float: glass under the panel's wash, a hairline edge and the one panel shadow. */
+    .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 5; min-width: 200px; padding: var(--space-1); border-radius: var(--radius-float);
+            background: var(--panel-wash); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
+            box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
+    @media (prefers-reduced-transparency: reduce) { .menu { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; } }
     .menu.open { display: block; }
-    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 8px; border-radius: var(--radius-row); }
+    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 var(--space-2); border-radius: var(--radius-row); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
     .menu [role="menuitem"].destructive { color: var(--destructive); }
-    .menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 8px; }
+    .menu hr { border: 0; height: 1px; background: var(--line); margin: var(--space-1) var(--space-2); }
 
     """
 }
