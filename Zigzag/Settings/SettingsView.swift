@@ -1,9 +1,10 @@
 import AppKit
 import WebKit
 
-// MARK: - Grouped form, the way System Settings lays things out
+// MARK: - Groups of rows
 
-/// A rounded group of rows separated by hairlines.
+/// A group of rows on the page: one quiet card (`Tokens.Color.surfaceGroup`, a hairline edge, `Tokens.Radius.group`)
+/// with hairlines between its rows, starting where their text does.
 final class FormGroup: NSView {
     private(set) var rows: [NSView] = []
     private var lines: [NSView] = []
@@ -38,8 +39,6 @@ final class FormGroup: NSView {
         lines = []
     }
 
-    var fittingHeight: CGFloat { fittingHeight(for: frame.width > 0 ? frame.width : 492) }
-
     func fittingHeight(for width: CGFloat) -> CGFloat { rows.filter { !$0.isHidden }.map { rowHeight($0, width) }.reduce(0, +) }
 
     /// Shows only the rows that have every word of a search (all of them when `names`, its heading or its pane,
@@ -67,8 +66,8 @@ final class FormGroup: NSView {
             row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
             y += h
             if i < shown.count - 1 {
-                // The divider starts where the text does, past the icons, as the system's settings draw it.
-                let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Space.x3
+                // The hairline starts where the text does, past any picture, and runs to the group's edge.
+                let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Page.groupPad
                 lines[i].isHidden = false
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
             }
@@ -84,61 +83,13 @@ final class FormGroup: NSView {
 /// A row "Find a setting" can find, by the words it shows.
 protocol SettingsSearchable { var searchText: String { get } }
 
-/// The top of General: the drawn wordmark in the space's color, the version you have, and a way to get the next one.
-/// A quiet row like the rest, so the page's one brand moment stays the wordmark itself.
-final class SettingsBrandRow: NSView, SettingsSearchable {
-    var searchText: String { "Zigzag version check for updates" }
-    private let wordmark = WordmarkView()
-    private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let update = TextButton.form("Check for Updates…")
-    private var themeToken: SignalToken?
-
-    override init(frame: NSRect) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 76))
-        let info = Bundle.main.infoDictionary
-        version.stringValue = "Version \(info?["CFBundleShortVersionString"] as? String ?? "")"
-        update.onClick = { _ in Updater.shared.checkForUpdates() }
-        [wordmark, version, update].forEach { addSubview($0) }
-        themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshTheme() }
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshTheme()
-    }
-
-    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).accent }
-
-    override func layout() {
-        super.layout()
-        let pad = Tokens.Space.x3, h: CGFloat = 18
-        let block = h + Tokens.Space.x2 + version.lineHeight
-        let top = round((bounds.height - block) / 2)
-        wordmark.frame = NSRect(x: pad + Tokens.Space.x1, y: top, width: ceil(h * WordmarkView.aspect), height: h)
-        version.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: wordmark.frame.maxY + Tokens.Space.x2, width: 240, height: version.lineHeight)
-        let width = ceil(update.fittingWidth)
-        update.frame = NSRect(x: bounds.width - pad - width, y: round((bounds.height - Tokens.Page.controlHeight) / 2), width: width, height: Tokens.Page.controlHeight)
-    }
-}
-
-/// The icon at the start of a settings row: a plain line symbol, tinted with the space's accent by its row, so
-/// Settings has one color, the same as everywhere else in Zigzag.
-enum SettingsIcon {
-    static func symbol(_ name: String) -> NSImage {
-        let image = Tokens.Symbol.image(name, size: 15) ?? NSImage()
-        image.isTemplate = true
-        return image
-    }
-}
-
-/// A form row: a title (and optional explanation, which wraps) on the left, a control on the right. Rows grow to
-/// fit their explanation, so nothing is ever cut off.
+/// A row of settings: its name (and a line saying more, which wraps) at the left, its control at the right. Rows grow
+/// to fit what they say, so nothing is cut off. A picture goes before the name only where the row is a thing with a
+/// face of its own: an extension, a site.
 final class FormRow: NSView, SettingsSearchable {
-    var searchText: String { title.stringValue + " " + detail.stringValue }
+    var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
+    /// More words "Find a setting" knows the row by, like its button's.
+    var keywords = ""
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
@@ -148,14 +99,15 @@ final class FormRow: NSView, SettingsSearchable {
         self.control = control
         self.icon.image = icon
         self.icon.imageScaling = icon?.isTemplate == true ? .scaleNone : .scaleProportionallyUpOrDown
+        self.icon.contentTintColor = Tokens.Color.icon
         self.icon.isHidden = icon == nil
-        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 44))
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         self.title.stringValue = title
         self.detail.stringValue = detail ?? ""
         self.detail.font = Tokens.Font.small()
         self.detail.textColor = Tokens.Color.textSecondary
         self.detail.isSelectable = false
-        self.detail.isHidden = detail == nil
+        self.detail.isHidden = (detail ?? "").isEmpty
         [self.icon, self.title, self.detail, control].forEach { addSubview($0) }
         // The row's title names its switch or menu for VoiceOver, which otherwise reads just "checkbox, 1".
         if (control.accessibilityLabel() ?? "").isEmpty { control.setAccessibilityLabel(title) }
@@ -166,50 +118,70 @@ final class FormRow: NSView, SettingsSearchable {
 
     override var isFlipped: Bool { true }
 
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        icon.contentTintColor = Brand.Theme.for(self).accent
-    }
-
-    private let pad = Tokens.Space.x3
+    private let pad = Tokens.Page.groupPad
+    /// A picture's side: an extension's icon, a site's favicon.
+    private static let iconSide = Tokens.Space.x6
 
     private var controlSize: NSSize {
         let size = control.fittingSize
         return size.width > 0 ? size : control.intrinsicContentSize
     }
 
-    private func textX() -> CGFloat { icon.isHidden ? pad : pad + Tokens.Space.x6 + Tokens.Space.x3 }
     /// Where the row's text starts.
-    var textInset: CGFloat { textX() }
+    var textInset: CGFloat { icon.isHidden ? pad : pad + Self.iconSide + Tokens.Space.x3 }
 
-    private func textWidth(for width: CGFloat) -> CGFloat { max(120, width - pad - controlSize.width - Tokens.Space.x4 - textX()) }
+    private func textWidth(for width: CGFloat) -> CGFloat {
+        let control = controlSize.width > 0 ? controlSize.width + Tokens.Space.x4 : 0
+        return max(Tokens.Space.x16 * 2, width - pad - control - textInset)
+    }
+
+    private func detailHeight(for width: CGFloat) -> CGFloat {
+        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width), height: 400)).height)
+    }
 
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
-        let titleHeight = title.lineHeight
-        guard !detail.isHidden else { return max(44, titleHeight + Tokens.Space.x6) }
-        let detailHeight = ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width), height: 400)).height)
-        return max(52, Tokens.Space.x3 + titleHeight + 2 + detailHeight + Tokens.Space.x3)
+        guard !detail.isHidden else { return Tokens.Page.groupRowHeight }
+        return max(Tokens.Page.groupRowHeight, Tokens.Space.x3 * 2 + title.lineHeight + 2 + detailHeight(for: width))
     }
 
     override func layout() {
         super.layout()
         let size = controlSize
         control.frame = NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
-        let x = textX()
         if !icon.isHidden {
-            let side = Tokens.Space.x6
+            let side = Self.iconSide
             icon.frame = NSRect(x: pad, y: round((bounds.height - side) / 2), width: side, height: side)
         }
-        let width = textWidth(for: bounds.width)
-        if detail.isHidden {
-            title.frame = NSRect(x: x, y: round((bounds.height - title.lineHeight) / 2), width: width, height: title.lineHeight)
-        } else {
-            let detailHeight = ceil(detail.sizeThatFits(NSSize(width: width, height: 400)).height)
-            let top = round((bounds.height - title.lineHeight - 2 - detailHeight) / 2)
-            title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
-            detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: width, height: detailHeight)
-        }
+        let x = textInset - Label.inset
+        let width = textWidth(for: bounds.width) + Label.inset * 2
+        let detailHeight = detailHeight(for: bounds.width)
+        let block = title.lineHeight + (detail.isHidden ? 0 : 2 + detailHeight)
+        let top = round((bounds.height - block) / 2)
+        title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
+        detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: width, height: detailHeight)
+    }
+}
+
+/// The version of Zigzag you have, at the end of General: a quiet row like the rest, so the page's one brand moment
+/// is the wordmark by its title.
+enum SettingsVersionRow {
+    static func make() -> FormRow {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let update = PillButton(title: "Check for Updates…")
+        update.onClick = { _ in Updater.shared.checkForUpdates() }
+        let row = FormRow(title: "Zigzag", detail: "Version \(version)", control: update)
+        row.keywords = "check for updates"
+        return row
+    }
+}
+
+/// A symbol in a settings row, where a picture is missing (a site with no favicon): the app's icon color.
+enum SettingsIcon {
+    static func symbol(_ name: String) -> NSImage {
+        let image = Tokens.Symbol.image(name, size: Tokens.TypeSize.row)
+        image.isTemplate = true
+        return image
     }
 }
 
@@ -223,7 +195,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     private let tile = NSImageView()
     private let name: Label
     private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let editButton = TextButton.form("Edit")
+    private let editButton = PillButton(title: "Edit")
     private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
     /// True while the row is being dragged; it draws as lifted.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
@@ -233,7 +205,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     init(space: SpaceInfo) {
         spaceID = space.id
         name = Label(space.name, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: 52))
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight + Tokens.Space.x2))
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         tile.image = Self.tile(for: space)
@@ -257,11 +229,11 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x3
+        let pad = Tokens.Page.groupPad
         let d = Tokens.Space.x6
         tile.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
-        let ew = editButton.fittingWidth
-        editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - Tokens.Space.x7Height) / 2, width: ew, height: Tokens.Space.x7Height)
+        let ew = editButton.fittingWidth, eh = Tokens.Page.controlHeight
+        editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - eh) / 2, width: ew, height: eh)
         let b = deleteButton.frame.width
         deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x1 - b, y: (bounds.height - b) / 2)
         let x = tile.frame.maxX + Tokens.Space.x3 - Label.inset
@@ -278,18 +250,19 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     }
 
     /// Where the row's text starts, for the divider under it.
-    var textInset: CGFloat { Tokens.Space.x3 + Tokens.Space.x6 + Tokens.Space.x3 }
+    var textInset: CGFloat { Tokens.Page.groupPad + Tokens.Space.x6 + Tokens.Space.x3 }
 
     private static func tile(for space: SpaceInfo) -> NSImage {
         let side: CGFloat = 24
         let letter = space.name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? ""
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
+            let radius = Tokens.Radius.control
+            let shape = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
             let base = space.swatch.usingColorSpace(.sRGB) ?? space.swatch
             NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
             // A fine edge, so a white or pale space still shows its tile.
             NSColor.black.withAlphaComponent(0.1).setStroke()
-            let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.25, dy: 0.25), xRadius: 6.25, yRadius: 6.25)
+            let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.25, dy: 0.25), xRadius: radius - 0.25, yRadius: radius - 0.25)
             edge.lineWidth = 0.5
             edge.stroke()
             // White on a color, dark on a pale one.
@@ -354,13 +327,13 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         needsLayout = true
         // At rest a space reads like every other row in Settings: no fill of its own. Carried, it's a card above
         // the others, solid at once so nothing shows through it.
-        layer?.backgroundColor = isLifted ? cgColor(Tokens.Color.formGroup) : nil
+        layer?.backgroundColor = isLifted ? cgColor(Tokens.Color.surfaceGroup) : nil
         layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
         layer?.shadowOpacity = isLifted ? 1 : 0
-        layer?.shadowRadius = 10
-        layer?.shadowOffset = CGSize(width: 0, height: -3)
+        layer?.shadowRadius = Tokens.Shadow.panelRadius / 2
+        layer?.shadowOffset = Tokens.Shadow.panelOffset(flipped: isFlipped)
         layer?.borderWidth = isLifted ? Tokens.Metric.hairline : 0
-        layer?.borderColor = cgColor(Tokens.Color.formGroupEdge)
+        layer?.borderColor = cgColor(Tokens.Color.surfaceGroupEdge)
         window?.invalidateCursorRects(for: self)
     }
 
@@ -463,7 +436,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// You picked another section: the tab's address follows, so the tab comes back to it.
     var onPaneChange: ((SettingsPane) -> Void)?
 
-    private let brandGroup = FormGroup()
+    private let versionGroup = FormGroup()
     private let generalGroup = FormGroup()
     private let tabsGroup = FormGroup()
     private let downloadsGroup = FormGroup()
@@ -476,8 +449,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let privacyGroup = FormGroup()
     private let sitesGroup = FormGroup()
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
-    private var sitesReset: TextButton?
-    private var alwaysReset: TextButton?
+    private var sitesReset: PillButton?
+    private var alwaysReset: PillButton?
     private let translationGroup = FormGroup()
     private let alwaysGroup = FormGroup()
     private let extensionsGroup = FormGroup()
@@ -486,7 +459,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private let engine = MenuButton()
     private let archiveAfter = MenuButton()
-    private let defaultButton = TextButton.form("Make Default")
+    private let defaultButton = PillButton(title: "Make Default")
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
@@ -502,9 +475,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translateOffer = Toggle()
     private let translateInto = MenuButton()
     private var languages: [(id: String, name: String)] = []
-    private let addSpaceButton = TextButton.form("New Space")
-    private let getExtensionsButton = TextButton.form("Get Extensions")
-    private let loadUnpackedButton = TextButton.form("Load Unpacked")
+    private let addSpaceButton = PillButton(title: "New Space")
+    private let getExtensionsButton = PillButton(title: "Get Extensions")
+    private let loadUnpackedButton = PillButton(title: "Load Unpacked")
     private var spaceRows: [SpaceSettingsRow] = []
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
@@ -537,10 +510,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() { layer?.backgroundColor = cgColor(Tokens.Color.surface) }
 
-    private func sectionHeading(_ text: String) -> Label {
-        Label(text, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    }
-
     // MARK: Building
 
     private func build() {
@@ -562,33 +531,33 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
-        brandGroup.add(SettingsBrandRow())
-        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", icon: SettingsIcon.symbol("magnifyingglass"), control: engine))
+        versionGroup.add(SettingsVersionRow.make())
+        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
-        generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", icon: SettingsIcon.symbol("text.magnifyingglass"), control: suggestionsToggle))
+        generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", control: suggestionsToggle))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
-        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", icon: SettingsIcon.symbol("globe"), control: defaultControl))
+        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
         downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
         archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
-        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", icon: SettingsIcon.symbol("archivebox.fill"), control: archiveAfter))
-        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", icon: SettingsIcon.symbol("pip"), control: pipToggle))
-        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", icon: SettingsIcon.symbol("arrow.down"), control: downloadPlace))
+        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
+        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
+        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", control: downloadPlace))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", icon: SettingsIcon.symbol("hand.raised.fill"), control: blockingToggle))
+        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
-        let importButton = TextButton.form("Import")
+        let importButton = PillButton(title: "Import")
         importButton.onClick = { _ in ImportWindowController.show() }
-        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", icon: SettingsIcon.symbol("square.and.arrow.down.fill"), control: importButton))
+        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", icon: SettingsIcon.symbol("rectangle.inset.filled"), control: borderlessToggle))
-        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", icon: SettingsIcon.symbol("power"), control: quitToggle))
+        windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", control: borderlessToggle))
+        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -807,9 +776,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
         if installed.isEmpty {
-            let get = TextButton.form("Get Extensions")
+            let get = PillButton(title: "Get Extensions")
             get.onClick = { [weak self] _ in self?.getExtensions() }
-            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", icon: SettingsIcon.symbol("puzzlepiece.extension.fill"), control: get))
+            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", control: get))
         }
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
         let developer = Toggle(isOn: ExtensionStore.developerMode)
@@ -817,14 +786,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ExtensionStore.developerMode = on
             self?.reloadExtensions()
         }
-        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", icon: SettingsIcon.symbol("hammer.fill"), control: developer))
+        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", control: developer))
     }
 
     @available(macOS 15.4, *)
     private func extensionRow(id: String, ext: WKWebExtension) -> FormRow {
         var controls: [NSView] = []
         if ExtensionStore.needsApproval(id) {
-            let review = TextButton.form("Review Update")
+            let review = PillButton(title: "Review Update")
             review.onClick = { [weak self] _ in
                 guard let controller = self?.browser else { return }
                 controller.window?.makeKeyAndOrderFront(nil)
@@ -906,15 +875,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let manager = PasswordManagers.active
         let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
         let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
-        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, icon: SettingsIcon.symbol("key.fill"), control: saveToggle))
-        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, icon: SettingsIcon.symbol("rectangle.and.pencil.and.ellipsis"), control: fillToggle))
+        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveToggle))
+        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillToggle))
         cardToggle.isOn = ContactCard.isOn
         cardToggle.onChange = { on in ContactCard.isOn = on }
-        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", icon: SettingsIcon.symbol("person.fill"), control: cardToggle))
-        let open = TextButton.form("Open Passwords")
+        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", control: cardToggle))
+        let open = PillButton(title: "Open Passwords")
         open.onClick = { _ in PasswordsWindowController.show() }
         // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", icon: SettingsIcon.symbol("lock.fill"), control: open))
+        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", control: open))
     }
 
     private func reloadTranslation() {
@@ -924,11 +893,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         translateInto.options = [MenuButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { MenuButton.Option(title: $0.name, image: nil) }
         translateInto.selectedIndex = PageTranslator.chosenLanguage.flatMap { chosen in languages.firstIndex { $0.id == chosen }.map { $0 + 1 } } ?? 0
         translateOffer.isOn = PageTranslator.offers
-        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", icon: SettingsIcon.symbol("character.bubble.fill"), control: translateInto))
-        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", icon: SettingsIcon.symbol("text.bubble.fill"), control: translateOffer))
+        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
+        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", control: translateOffer))
         let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
         // Laid out like Sites in Privacy: a heading, Reset beside it only when there's something to reset.
-        let reset = TextButton.form("Reset")
+        let reset = PillButton(title: "Reset")
         reset.onClick = { [weak self] _ in
             PageTranslator.alwaysLanguages = []
             self?.reloadTranslation()
@@ -1016,7 +985,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, brandGroup), (nil, generalGroup), ("Tabs", tabsGroup), ("Window", windowGroup), ("Downloads", downloadsGroup), (nil, importGroup)]
+        case .general: [(nil, generalGroup), ("Tabs", tabsGroup), ("Window", windowGroup), ("Downloads", downloadsGroup), (nil, importGroup), (nil, versionGroup)]
         case .spaces: [("Your spaces", spacesGroup)]
         case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
         case .privacy: [(nil, blockingGroup), ("Browsing data", privacyGroup), ("Sites", sitesGroup)]
@@ -1037,27 +1006,28 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let pad = span.x, contentWidth = span.width
         var y: CGFloat = Tokens.Space.x3
 
+        // A section: a quiet label low in its slot, standing in for a divider, then the group. A button that acts on the
+        // whole group (New Space, Reset All) sits at the label's right, at the group's edge.
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if title != nil || accessory != nil {
-                let label = sectionHeading(title ?? "")
-                let accessoryWidth = accessory?.fittingSize.width ?? 0
-                label.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth - accessoryWidth - Tokens.Space.x4, height: label.lineHeight)
+                let size = accessory.map { $0.fittingSize } ?? .zero
+                let slot = max(Tokens.Metric.sectionLabelHeight, size.height + Tokens.Space.x2)
+                let label = Label.section(title ?? "")
+                let labelY = y + slot - Tokens.Space.x2 - label.lineHeight
+                label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: labelY,
+                                     width: max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad), height: label.lineHeight)
                 documentView.addSubview(label)
-                var bottom = label.frame.maxY
                 if let accessory {
-                    // A button beside the heading lines up with the group's edge and keeps clear of it.
-                    let size = accessory.fittingSize
-                    accessory.frame = NSRect(x: pad + contentWidth - size.width, y: y + (label.frame.height - size.height) / 2,
+                    accessory.frame = NSRect(x: pad + contentWidth - size.width, y: round(label.frame.midY - size.height / 2),
                                              width: size.width, height: size.height)
                     documentView.addSubview(accessory)
-                    bottom = max(bottom, accessory.frame.maxY)
                 }
-                y = bottom + Tokens.Space.x2
+                y += slot
             }
             group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))
             group.needsLayout = true
             documentView.addSubview(group)
-            y = group.frame.maxY + Tokens.Space.x6
+            y = group.frame.maxY + Tokens.Page.groupGap
         }
 
         // A search: what matches, from every section, under the section's name.
@@ -1090,20 +1060,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         switch pane {
         case .general:
-            section(nil, brandGroup)
             section(nil, generalGroup)
             section("Tabs", tabsGroup)
             section("Window", windowGroup)
             section("Downloads", downloadsGroup)
             section(nil, importGroup)
+            section(nil, versionGroup)
         case .spaces:
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
-                let hint = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-                hint.frame = NSRect(x: pad - Label.inset, y: y - Tokens.Space.x6 + Tokens.Space.x2, width: contentWidth, height: hint.lineHeight)
+                let hint = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+                hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
+                                    width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
                 documentView.addSubview(hint)
-                y = hint.frame.maxY + Tokens.Space.x6
+                y = hint.frame.maxY + Tokens.Page.groupGap
             }
         case .passwords:
             section(nil, passwordsGroup)
@@ -1123,7 +1094,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section("Installed", extensionsGroup, accessory: buttons)
             section(nil, developerGroup)
         case .shortcuts:
-            let resetAll = TextButton.form("Reset All")
+            let resetAll = PillButton(title: "Reset All")
             resetAll.isHidden = !Shortcuts.hasChanges
             resetAll.onClick = { [weak self] _ in
                 Shortcuts.resetAll()
@@ -1131,13 +1102,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self?.reloadShortcuts()
                 self?.layoutDocument()
             }
-            let rw = resetAll.fittingWidth
-            resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: Tokens.Space.x8)
+            let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
+            resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
-            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-            hint.frame = NSRect(x: pad - Label.inset, y: y + (Tokens.Space.x8 - hint.lineHeight) / 2, width: contentWidth - rw - Tokens.Space.x4, height: hint.lineHeight)
+            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            hint.lineBreakMode = .byTruncatingTail
+            hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
+                                width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad), height: hint.lineHeight)
             documentView.addSubview(hint)
-            y += Tokens.Space.x8 + Tokens.Space.x5
+            y += rh
             for (title, group) in shortcutGroups { section(title, group) }
         }
         finishDocument(y, width: width)
@@ -1246,7 +1219,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadPrivacy() {
         privacyGroup.removeAllRows()
         sitesGroup.removeAllRows()
-        let history = TextButton.form("Clear History…")
+        let history = PillButton(title: "Clear History…")
         history.onClick = { [weak self, weak history] _ in
             self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.",
                           action: "Clear History") {
@@ -1254,16 +1227,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 history?.flash("Cleared")
             }
         }
-        let showHistory = TextButton.form("Show History")
+        let showHistory = PillButton(title: "Show History")
         showHistory.onClick = { [weak self] _ in
             guard let controller = self?.browser else { return }
             HistoryPage.open(in: controller)
         }
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", icon: SettingsIcon.symbol("clock.fill"), control: historyButtons))
+        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: historyButtons))
 
-        let cache = TextButton.form("Clear Cache…")
+        let cache = PillButton(title: "Clear Cache…")
         cache.onClick = { [weak self, weak cache] _ in
             self?.confirm(title: "Clear the cache for every site?", message: "Pages load a little slower the first time you open them again. You stay signed in.", action: "Clear Cache") {
                 Task { @MainActor in
@@ -1272,7 +1245,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
             }
         }
-        let cookies = TextButton.form("Clear Cookies…")
+        let cookies = PillButton(title: "Clear Cookies…")
         cookies.onClick = { [weak self, weak cookies] _ in
             self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every website. Your passwords, pinned tabs and history stay.", action: "Clear Cookies") {
                 Task { @MainActor in
@@ -1283,14 +1256,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", icon: SettingsIcon.symbol("internaldrive.fill"), control: data))
+        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", control: data))
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
         let media = SitePermissions.sites.count, zoom = ZoomLevels.count
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
         let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set")].compactMap { $0 }
-        let reset = TextButton.form("Reset All")
+        let reset = PillButton(title: "Reset All")
         sitesReset = parts.isEmpty ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
@@ -1323,7 +1296,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if ExtensionStore.extensionsOffSites.contains(site) { said.append("extensions off") }
             if let zoom = ZoomLevels.all[site] { said.append("zoom \(Int((zoom * 100).rounded()))%") }
             guard !said.isEmpty else { continue }
-            let forget = TextButton.form("Forget")
+            let forget = PillButton(title: "Forget")
             forget.onClick = { [weak self] _ in
                 SitePermissions.forgetEverything(host: site)
                 WebNotifications.shared.removeAll(host: site)
