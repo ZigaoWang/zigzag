@@ -35,15 +35,21 @@ if [[ "${1:-}" == "--beta" ]]; then
   VERSION_OVERRIDE=(MARKETING_VERSION="$PLANNED-beta.$2")
 fi
 
+# Only --publish and --beta write a feed; a plain or --local run builds without the network or Sparkle's tools.
+PUBLISHING=false
+if [[ "${1:-}" == "--publish" || "${1:-}" == "--beta" ]]; then PUBLISHING=true; fi
+
 # Sparkle orders updates by build number: one no higher than what either feed already offers would never arrive.
 BUILD=$(awk -F'"' '/CURRENT_PROJECT_VERSION:/ {print $2; exit}' project.yml)
-for FEED in appcast beta; do
-  LIVE=$(curl -fsSL "https://$SITE_HOST/updates/$FEED.xml" 2>/dev/null | grep -oE 'sparkle:version="?>?[0-9]+' | grep -oE '[0-9]+$' | sort -n | tail -1 || true)
-  if [[ -n "$LIVE" && "$BUILD" -le "$LIVE" ]]; then
-    echo "CURRENT_PROJECT_VERSION is $BUILD but the $FEED feed already has build $LIVE. Raise it in project.yml, then release."
-    exit 1
-  fi
-done
+if $PUBLISHING; then
+  for FEED in appcast beta; do
+    LIVE=$(curl -fsSL "https://$SITE_HOST/updates/$FEED.xml" 2>/dev/null | grep -oE 'sparkle:version="?>?[0-9]+' | grep -oE '[0-9]+$' | sort -n | tail -1 || true)
+    if [[ -n "$LIVE" && "$BUILD" -le "$LIVE" ]]; then
+      echo "CURRENT_PROJECT_VERSION is $BUILD but the $FEED feed already has build $LIVE. Raise it in project.yml, then release."
+      exit 1
+    fi
+  done
+fi
 
 xcodegen generate -q
 xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -configuration Release -allowProvisioningUpdates \
@@ -101,8 +107,10 @@ open(f"{out}/notes.md", "w", encoding="utf-8").write(md)
 PY
 }
 # Sparkle's tool comes with the package the archive just resolved.
-GENERATE=$(find build/rd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1 || true)
-[[ -x "$GENERATE" ]] || { echo "Sparkle's generate_appcast wasn't found under build/rd."; exit 1; }
+if $PUBLISHING; then
+  GENERATE=$(find build/rd/SourcePackages -name generate_appcast -type f -perm +111 2>/dev/null | head -1 || true)
+  [[ -x "$GENERATE" ]] || { echo "Sparkle's generate_appcast wasn't found under build/rd."; exit 1; }
+fi
 
 if [[ "${1:-}" == "--beta" ]]; then
   # Only the beta feed: everyone else stays on the stable one. The zip sits with the other releases.
