@@ -554,7 +554,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Covering the page, it takes the keyboard from the web view underneath, so typing goes nowhere unexpected.
     override var acceptsFirstResponder: Bool { true }
     override var wantsUpdateLayer: Bool { true }
-    override func updateLayer() { layer?.backgroundColor = cgColor(Tokens.Color.surface) }
+    override func updateLayer() {
+        layer?.backgroundColor = cgColor(Tokens.Color.surface)
+        column.layer?.backgroundColor = cgColor(Brand.Theme.for(self).wash)
+    }
+
+    private var themeToken: SignalToken?
 
     // MARK: Building
 
@@ -569,8 +574,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             column.addSubview(item)
             return item
         }
+        // The column of sections takes a light tint of the window's space, so Settings belongs to it.
+        column.wantsLayer = true
         addSubview(column)
         addSubview(columnEdge)
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
 
         // General
         engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
@@ -792,6 +800,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Shown again (its tab chosen, or moved to another window): what may have changed elsewhere is read afresh.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        needsDisplay = true
         if let keyToken { NotificationCenter.default.removeObserver(keyToken) }
         keyToken = nil
         guard let window else { return }
