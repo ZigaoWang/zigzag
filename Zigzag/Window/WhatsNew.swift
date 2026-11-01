@@ -80,7 +80,7 @@ final class WhatsNewSheet: NSView {
     private let done = PillButton(title: "Done", style: .prominent)
     private let all = PillButton(title: "All Release Notes", style: .quiet)
     private var monitor: Any?
-    private var width: CGFloat { min(560, bounds.width - Tokens.Space.x6 * 2) }
+    private var width: CGFloat { min(Tokens.Welcome.cardWidth, bounds.width - Tokens.Space.x6 * 2) }
     private let pad = Tokens.Space.x6
     /// The notes scroll between the header and the buttons, so a long list never pushes Done out of reach.
     private let scroll = NSScrollView()
@@ -98,13 +98,13 @@ final class WhatsNewSheet: NSView {
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         for section in WhatsNew.sections {
-            let heading = Label(section.title, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+            let heading = Label(section.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
             headings.append(heading)
             notes.addSubview(heading)
             for item in section.items {
                 let dot = ColorView(color: Tokens.Color.accent)
                 dot.wantsLayer = true
-                dot.layer?.cornerRadius = 2.5
+                dot.layer?.cornerRadius = Tokens.Metric.bullet / 2
                 let text = NSTextField(wrappingLabelWithString: item)
                 text.font = Tokens.Font.body()
                 text.textColor = Tokens.Color.textSecondary
@@ -224,7 +224,8 @@ final class WhatsNewSheet: NSView {
             if layingOut {
                 text.frame = NSRect(x: pad + Tokens.Space.x4, y: y, width: inner - Tokens.Space.x4, height: h)
                 let lineMid = y + (text.font.map { ceil($0.ascender - $0.descender + $0.leading) } ?? 16) / 2
-                dot.frame = NSRect(x: pad + Tokens.Space.x1, y: lineMid - 2.5, width: 5, height: 5)
+                let b = Tokens.Metric.bullet
+                dot.frame = NSRect(x: pad + Tokens.Space.x1, y: lineMid - b / 2, width: b, height: b)
             }
             y += h + Tokens.Space.x2
         }
