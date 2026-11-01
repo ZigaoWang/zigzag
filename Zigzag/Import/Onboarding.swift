@@ -221,7 +221,7 @@ private final class StepPage: NSView {
         for _ in 0..<count {
             let dot = ColorView(color: Brand.ribbon)
             dot.wantsLayer = true
-            dot.layer?.cornerRadius = 3
+            dot.layer?.cornerRadius = Tokens.Welcome.dot / 2
             dots.append(dot)
         }
         (dots + [card, back, skip, next] as [NSView]).forEach { addSubview($0) }
@@ -558,9 +558,9 @@ private final class DataToggle: InteractiveView {
     init(_ title: String) {
         label = Label(title, font: Tokens.Font.small(.medium), color: Onboard.ink)
         super.init(frame: .zero)
-        layer?.cornerRadius = 7
+        layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
-        check.image = Tokens.Symbol.image("checkmark", size: 9)
+        check.image = Tokens.Symbol.image("checkmark", size: Tokens.Symbol.inline - 2)
         [check, label].forEach { addSubview($0) }
         onClick = { [weak self] _ in
             guard let self, !self.isLocked else { return }
@@ -1915,12 +1915,12 @@ private final class ChoiceCard: InteractiveView {
         layer?.cornerCurve = .continuous
         ring.wantsLayer = true
         ring.layer?.cornerRadius = 10
-        ring.layer?.borderWidth = 1.5
+        ring.layer?.borderWidth = Tokens.Metric.fieldRing
         dot.wantsLayer = true
         dot.layer?.cornerRadius = 5
         ring.addSubview(dot)
         badgeFill.wantsLayer = true
-        badgeFill.layer?.cornerRadius = 6
+        badgeFill.layer?.cornerRadius = Tokens.Radius.control
         badge.alignment = .center
         badgeFill.addSubview(badge)
         badgeFill.isHidden = !recommended
