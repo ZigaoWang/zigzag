@@ -308,7 +308,8 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Every favorite looks the same at rest: the one you're on is lit.
+        // The one you're on is lit; one that's open in the background has a fine edge, so you can tell at a glance
+        // which are loaded without anything fading or moving.
         icon.alphaValue = 1
         let fill: NSColor
         if isSelected {
@@ -326,12 +327,122 @@ final class FavoriteTile: InteractiveView {
         layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
         layer?.shadowRadius = 2
         layer?.shadowOffset = CGSize(width: 0, height: -1)
-        layer?.borderWidth = isSelected ? Tokens.Metric.hairline : 0
-        layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
+        layer?.borderWidth = isSelected ? Tokens.Metric.hairline : isOpen ? 1 : 0
+        layer?.borderColor = cgColor(isSelected ? Tokens.Color.selectedEdge : Self.openEdge)
     }
+
+    private static let openEdge = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.13), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.16))
 
     private static let iconSide: CGFloat = 22
 
     private static let selected = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.95), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
     private static let selectedHover = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 1), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.24))
+}
+
+/// A favorite on its way somewhere: a floating copy that follows the pointer. Over the grid it's the tile; over the
+/// tab list it turns into the row it would become there, and back again, so you see what a drop will do.
+@MainActor
+final class CarriedFavorite {
+    let panel: NSPanel
+    private let card = NSView()
+    private let tileView = NSImageView()
+    private let row = SidebarRowView()
+    private let tileSize: NSSize
+    private let rowSize: NSSize
+    /// Where the pointer holds the tile, from its bottom-left corner.
+    private let grab: NSPoint
+    /// Where the pointer holds it as a row: just past its icon, as if it had been picked up there.
+    private let rowGrab: NSPoint
+    /// The panel is big enough for both shapes; the pointer stays at this spot in it.
+    private let anchor: NSPoint
+    private static let margin: CGFloat = 20
+
+    init(tile: NSImage?, tileSize: NSSize, grab: NSPoint, favorite: Bookmark, icon: NSImage?, rowWidth: CGFloat, appearance: NSAppearance) {
+        self.tileSize = tileSize
+        self.grab = grab
+        rowSize = NSSize(width: rowWidth, height: Tokens.Metric.rowHeight)
+        let rowGrab = NSPoint(x: Tokens.Space.x2 + Tokens.Metric.favicon + Tokens.Space.x1, y: rowSize.height / 2)
+        self.rowGrab = rowGrab
+        let m = Self.margin
+        anchor = NSPoint(x: m + max(grab.x, rowGrab.x), y: m + max(grab.y, rowGrab.y))
+        let width = anchor.x + max(tileSize.width - grab.x, rowSize.width - rowGrab.x) + m
+        let height = anchor.y + max(tileSize.height - grab.y, rowSize.height - rowGrab.y) + m
+        panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = .floating
+        panel.ignoresMouseEvents = true
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        content.wantsLayer = true
+        panel.contentView = content
+
+        card.wantsLayer = true
+        card.layer?.cornerRadius = Tokens.Radius.card
+        card.layer?.cornerCurve = .continuous
+        card.layer?.shadowColor = NSColor.black.cgColor
+        card.layer?.shadowOpacity = 0.18
+        card.layer?.shadowRadius = 8
+        card.layer?.shadowOffset = CGSize(width: 0, height: -3)
+        content.addSubview(card)
+        tileView.image = tile
+        tileView.imageScaling = .scaleNone
+        tileView.autoresizingMask = [.width, .height]
+        row.autoresizingMask = [.width, .height]
+        row.title.stringValue = favorite.title
+        row.icon.image = icon
+        row.isLifted = true
+        row.alphaValue = 0
+        card.addSubview(row)
+        card.addSubview(tileView)
+        // Tiles and rows are see-through on the sidebar; lifted off it, the copy stands on solid ground.
+        var ground = NSColor.clear.cgColor
+        appearance.performAsCurrentDrawingAppearance { ground = Tokens.Color.panelBackground.cgColor }
+        card.layer?.backgroundColor = ground
+        panel.appearance = appearance
+        card.frame = tileFrame
+        tileView.frame = card.bounds
+        row.frame = card.bounds
+        updateShadow()
+    }
+
+    private var tileFrame: NSRect { NSRect(x: anchor.x - grab.x, y: anchor.y - grab.y, width: tileSize.width, height: tileSize.height) }
+    private var rowFrame: NSRect { NSRect(x: anchor.x - rowGrab.x, y: anchor.y - rowGrab.y, width: rowSize.width, height: rowSize.height) }
+
+    var isRow = false {
+        didSet {
+            guard isRow != oldValue else { return }
+            let target = isRow ? rowFrame : tileFrame
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Tokens.Motion.reduceMotion ? 0 : 0.18
+                context.timingFunction = Tokens.Motion.easeOut
+                context.allowsImplicitAnimation = true
+                card.animator().frame = target
+                row.animator().alphaValue = isRow ? 1 : 0
+                tileView.animator().alphaValue = isRow ? 0 : 1
+                card.layer?.cornerRadius = isRow ? Tokens.Radius.row : Tokens.Radius.card
+            }
+            updateShadow(for: target)
+        }
+    }
+
+    private func updateShadow(for frame: NSRect? = nil) {
+        let size = (frame ?? card.frame).size
+        let radius = isRow ? Tokens.Radius.row : Tokens.Radius.card
+        card.layer?.shadowPath = CGPath(roundedRect: CGRect(origin: .zero, size: size), cornerWidth: radius, cornerHeight: radius, transform: nil)
+    }
+
+    /// Keeps the pointer where it holds the copy.
+    func move(to screenPoint: NSPoint) {
+        panel.setFrameOrigin(NSPoint(x: screenPoint.x - anchor.x, y: screenPoint.y - anchor.y))
+    }
+
+    /// The tile's middle on screen, for which slot it's over.
+    var tileCenter: NSPoint { NSPoint(x: panel.frame.minX + tileFrame.midX, y: panel.frame.minY + tileFrame.midY) }
+
+    /// Where the panel goes for the tile to sit at `rect` on screen.
+    func panelFrame(placingTileAt rect: NSRect) -> NSRect {
+        NSRect(x: rect.minX - tileFrame.minX, y: rect.minY - tileFrame.minY, width: panel.frame.width, height: panel.frame.height)
+    }
 }
