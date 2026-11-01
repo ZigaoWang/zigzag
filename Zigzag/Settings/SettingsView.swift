@@ -7,7 +7,7 @@ import WebKit
 final class FormGroup: NSView {
     private(set) var rows: [NSView] = []
     private var lines: [NSView] = []
-    private let background = ColorView(color: Tokens.Color.formGroup)
+    private let background = ColorView(color: Tokens.Color.surfaceGroup)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -58,7 +58,7 @@ final class FormGroup: NSView {
     override func layout() {
         super.layout()
         background.frame = bounds
-        background.layer?.borderColor = background.cgColor(Tokens.Color.formGroupEdge)
+        background.layer?.borderColor = background.cgColor(Tokens.Color.surfaceGroupEdge)
         var y: CGFloat = 0
         let shown = rows.filter { !$0.isHidden }
         lines.forEach { $0.isHidden = true }
@@ -84,93 +84,44 @@ final class FormGroup: NSView {
 /// A row "Find a setting" can find, by the words it shows.
 protocol SettingsSearchable { var searchText: String { get } }
 
-/// The top of General: a banner in the space's deep color with the drawn wordmark, the version you have, and a way
-/// to get the next one. Zigzag's one brand moment in Settings.
+/// The top of General: the drawn wordmark in the space's color, the version you have, and a way to get the next one.
+/// A quiet row like the rest, so the page's one brand moment stays the wordmark itself.
 final class SettingsBrandRow: NSView, SettingsSearchable {
     var searchText: String { "Zigzag version check for updates" }
     private let wordmark = WordmarkView()
-    private let version = Label("", font: Tokens.Font.small(.medium), color: .white)
-    private let update = BannerButton(title: "Check for Updates…")
+    private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let update = TextButton.form("Check for Updates…")
+    private var themeToken: SignalToken?
 
     override init(frame: NSRect) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 96))
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.group
-        layer?.cornerCurve = .continuous
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 76))
         let info = Bundle.main.infoDictionary
         version.stringValue = "Version \(info?["CFBundleShortVersionString"] as? String ?? "")"
         update.onClick = { _ in Updater.shared.checkForUpdates() }
         [wordmark, version, update].forEach { addSubview($0) }
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshTheme() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
-    override var wantsUpdateLayer: Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        needsDisplay = true
+        refreshTheme()
     }
 
-    override func updateLayer() {
-        let theme = Brand.Theme.for(self)
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = theme.deep.cgColor
-        }
-        wordmark.color = theme.tint
-        version.textColor = theme.tint.withAlphaComponent(0.75)
-        update.tint = theme.tint
-    }
+    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).mark }
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x5, h: CGFloat = 26
+        let pad = Tokens.Space.x3, h: CGFloat = 18
         let block = h + Tokens.Space.x2 + version.lineHeight
         let top = round((bounds.height - block) / 2)
-        wordmark.frame = NSRect(x: pad, y: top, width: ceil(h * WordmarkView.aspect), height: h)
-        version.frame = NSRect(x: pad - Label.inset, y: wordmark.frame.maxY + Tokens.Space.x2, width: 240, height: version.lineHeight)
-        let size = update.intrinsicContentSize
-        update.frame = NSRect(x: bounds.width - Tokens.Space.x3 - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
-    }
-}
-
-/// A button on a brand banner: the ribbon's pale color, on a faint fill of it that firms up on hover.
-final class BannerButton: InteractiveView {
-    private let label: Label
-    var tint: NSColor = Brand.ribbon { didSet { stateDidChange(animated: false) } }
-
-    init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.medium), color: Brand.ribbon)
-        super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control
-        layer?.cornerCurve = .continuous
-        label.alignment = .center
-        addSubview(label)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(title)
-        stateDidChange(animated: false)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var intrinsicContentSize: NSSize { NSSize(width: ceil(label.textWidth + Tokens.Space.x4), height: Tokens.Space.x8) }
-
-    override func layout() {
-        super.layout()
-        label.frame = NSRect(x: 0, y: (bounds.height - label.lineHeight) / 2, width: bounds.width, height: label.lineHeight)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        let alpha: CGFloat = isPressed ? 0.3 : isHovered ? 0.22 : 0.14
-        layer?.set(backgroundColor: cgColor(tint.withAlphaComponent(alpha)), animated: animated && !isHovered)
-        label.textColor = tint
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        guard let event = NSApp.currentEvent else { return false }
-        onClick?(event)
-        return true
+        wordmark.frame = NSRect(x: pad + Tokens.Space.x1, y: top, width: ceil(h * WordmarkView.aspect), height: h)
+        version.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: wordmark.frame.maxY + Tokens.Space.x2, width: 240, height: version.lineHeight)
+        let width = ceil(update.fittingWidth)
+        update.frame = NSRect(x: bounds.width - pad - width, y: round((bounds.height - Tokens.Page.controlHeight) / 2), width: width, height: Tokens.Page.controlHeight)
     }
 }
 
@@ -479,68 +430,36 @@ enum SettingsPane: Int, CaseIterable {
     var path: String { "\(self)" }
 }
 
-/// One section in the column: its symbol and name, a soft fill of the space's accent when chosen. With little room
-/// (half of a split, a small window) it's just the symbol.
-private final class SectionItem: InteractiveView {
+/// One section in the column: a list item, as every list of places in Zigzag draws them.
+private final class SectionItem: ListItem {
     let pane: SettingsPane
-    private let icon = NSImageView()
-    private let label: Label
-    var isCompact = false {
-        didSet {
-            label.isHidden = isCompact
-            toolTip = isCompact ? pane.title : nil
-            needsLayout = true
-        }
-    }
 
     init(_ pane: SettingsPane) {
         self.pane = pane
-        label = Label(pane.title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-        super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.row
-        layer?.cornerCurve = .continuous
-        icon.image = Tokens.Symbol.image(pane.symbol, size: 15)
-        icon.imageScaling = .scaleNone
-        [icon, label].forEach { addSubview($0) }
+        super.init(title: pane.title, symbol: pane.symbol)
         setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(pane.title)
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    override func layout() {
-        super.layout()
-        let side: CGFloat = 20
-        if isCompact {
-            icon.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
-        } else {
-            icon.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - side) / 2, width: side, height: side)
-            let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
-            label.frame = NSRect(x: x, y: (bounds.height - label.lineHeight) / 2, width: max(0, bounds.width - x - Tokens.Space.x2), height: label.lineHeight)
-        }
-    }
-
-    override func stateDidChange(animated: Bool) {
-        let accent = Brand.Theme.for(self).accent
-        let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : 0.14) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
-    }
 }
-
 /// Settings, as a page in a tab (zigzag://settings): the sections in a column at the left, the chosen one filling the
-/// rest of the page, built from Zigzag's own controls. It takes whatever width the page has, a whole window or half
-/// of a split, and the column folds down to symbols when that gets narrow.
+/// rest of the page, built from Zigzag's own controls and laid out as every Zigzag page is (`Tokens.Page`): the
+/// wordmark and title at the top left, the search at the top right. It takes whatever width the page has, a whole
+/// window or half of a split, and the column folds down to symbols when that gets narrow.
 final class SettingsView: NSView, NSTextFieldDelegate {
     private var items: [SectionItem] = []
     private let column = FlippedView()
-    private let columnTitle = Label("Settings", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    /// The wordmark and "Settings" at the top of the column, where History has its own.
+    private let columnTitle = PageTitleView("Settings")
+    /// Over the chosen section: its name, and the search at the right, as History's header has them.
+    private let header = PageHeader()
+    private let paneTitle = PageTitleView("")
     private let columnEdge = ColorView(color: Tokens.Color.separator)
     private let scroll = NSScrollView()
     private let documentView = FlippedView()
     private(set) var pane = SettingsPane.general
-    /// Finds a setting in any section. In the column when it has room, otherwise at the top of the page.
-    private let settingSearch = FilledField(placeholder: "Find a setting")
+    /// Finds a setting in any section, at the top right of the page.
+    private let settingSearch = FilledField.search("Find a setting")
     /// You picked another section: the tab's address follows, so the tab comes back to it.
     var onPaneChange: ((SettingsPane) -> Void)?
 
@@ -595,6 +514,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     init(pane: SettingsPane = .general) {
         self.pane = pane
         super.init(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+        // Its own layer, so it paints the page's surface rather than showing whatever is under it.
+        wantsLayer = true
         build()
         token = Library.shared.changed.observe { [weak self] in
             guard let self, self.window != nil else { return }
@@ -614,16 +535,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Covering the page, it takes the keyboard from the web view underneath, so typing goes nowhere unexpected.
     override var acceptsFirstResponder: Bool { true }
     override var wantsUpdateLayer: Bool { true }
-    override func updateLayer() { layer?.backgroundColor = Tokens.Color.formBackground.cgColor }
+    override func updateLayer() { layer?.backgroundColor = Tokens.Color.surface.cgColor }
 
-    private func header(_ text: String) -> Label {
+    private func sectionHeading(_ text: String) -> Label {
         Label(text, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     }
 
     // MARK: Building
 
     private func build() {
-        // The column of sections.
+        // The column of sections, under the page's title.
         column.addSubview(columnTitle)
         items = SettingsPane.allCases.map { pane in
             let item = SectionItem(pane)
@@ -701,7 +622,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // One search for everything, shortcuts included (by name or by keys).
         settingSearch.field.delegate = self
-        settingSearch.field.setAccessibilityLabel("Find a setting")
+        header.leading = paneTitle
+        header.trailing = [settingSearch]
 
         reloadPrivacy()
 
@@ -712,6 +634,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         scroll.documentView = documentView
         scroll.useSlimScroller()
         addSubview(scroll)
+        addSubview(header)
+        // The header's hairline shows once the page has scrolled under it, as History's does.
+        scroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         reloadSpaces()
         reloadExtensions()
         show(pane)
@@ -725,22 +651,46 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var arrangement: Arrangement { bounds.width >= 720 ? .column : bounds.width >= 520 ? .rail : .row }
     private var laidOutWidth: CGFloat = -1
 
+    /// The page's edge to its content: the same as History's, and tighter on a narrow page.
+    private var gutter: CGFloat { bounds.width < Tokens.Page.narrowWidth ? Tokens.Page.narrowGutter : Tokens.Page.gutter }
+
+    /// Where the pane's content runs across the scroll view: as wide as the page allows up to the shared maximum,
+    /// centered past it.
+    private func contentSpan(in width: CGFloat) -> (x: CGFloat, width: CGFloat) {
+        let inner = max(0, min(Tokens.Page.maxWidth, width - gutter * 2))
+        return (round((width - inner) / 2), inner)
+    }
+
     override func layout() {
         super.layout()
         let arrangement = arrangement
         let line = Tokens.Metric.hairline
+        let headerHeight = Tokens.Page.headerHeight
+        var area = bounds
         switch arrangement {
         case .column, .rail:
-            let width: CGFloat = arrangement == .column ? 232 : Tokens.Space.x16
+            let width = arrangement == .column ? Tokens.Page.columnWidth : Tokens.Space.x16
             column.frame = NSRect(x: 0, y: 0, width: width, height: bounds.height)
             columnEdge.frame = NSRect(x: width, y: 0, width: line, height: bounds.height)
-            scroll.frame = NSRect(x: width + line, y: 0, width: max(0, bounds.width - width - line), height: bounds.height)
+            area = NSRect(x: width + line, y: 0, width: max(0, bounds.width - width - line), height: bounds.height)
+            header.frame = NSRect(x: area.minX, y: 0, width: area.width, height: headerHeight)
         case .row:
-            let height = Tokens.Space.x10 + Tokens.Space.x4
-            column.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
-            columnEdge.frame = NSRect(x: 0, y: height, width: bounds.width, height: line)
-            scroll.frame = NSRect(x: 0, y: height + line, width: bounds.width, height: max(0, bounds.height - height - line))
+            // The header across the top, then the sections as a row of symbols under it.
+            let height = Tokens.Space.x10 + Tokens.Space.x2
+            header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
+            column.frame = NSRect(x: 0, y: headerHeight, width: bounds.width, height: height)
+            columnEdge.frame = NSRect(x: 0, y: column.frame.maxY, width: bounds.width, height: line)
+            area = NSRect(x: 0, y: column.frame.maxY + line, width: bounds.width, height: max(0, bounds.height - column.frame.maxY - line))
         }
+        // The page scrolls under the header; in a row, under the sections too.
+        let top = arrangement == .row ? area.minY : headerHeight
+        scroll.frame = NSRect(x: area.minX, y: top, width: area.width, height: max(0, bounds.height - top))
+        let span = contentSpan(in: header.frame.width)
+        header.contentFrame = (span.x, span.x + span.width)
+        // With no column to carry it, the wordmark heads the pane's own title.
+        paneTitle.showsWordmark = arrangement != .column
+        refreshTitle()
+        settingSearch.tint = Brand.Theme.for(self).accent
         layoutColumn(arrangement)
         // The pane's rows depend only on the width, so a change of height just stretches the page under them,
         // instead of rebuilding every row (Shortcuts has about a hundred).
@@ -751,28 +701,34 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// The header's title: the chosen section, or Settings while a search goes through all of them.
+    private func refreshTitle() {
+        paneTitle.title = isSearching ? "Settings" : pane.title
+        header.needsLayout = true
+    }
+
+    @objc private func scrolled() {
+        header.showsEdge = scroll.contentView.bounds.minY > 0
+    }
+
     private func layoutColumn(_ arrangement: Arrangement) {
         columnTitle.isHidden = arrangement != .column
-        if arrangement != .column, settingSearch.superview === column { settingSearch.removeFromSuperview() }
         items.forEach { $0.isCompact = arrangement != .column }
         let count = CGFloat(items.count)
         // In the row they shrink to fit, rather than run off the page's edge.
         let side = arrangement == .row ? min(Tokens.Space.x10, floor((column.bounds.width - Tokens.Space.x2 * 2) / count)) : Tokens.Space.x10
         switch arrangement {
         case .column:
-            let pad = Tokens.Space.x4
-            columnTitle.frame = NSRect(x: pad + Tokens.Space.x2 - Label.inset, y: Tokens.Space.x6, width: column.bounds.width - pad * 2, height: columnTitle.lineHeight)
-            var y = columnTitle.frame.maxY + Tokens.Space.x4
-            if settingSearch.superview !== column { column.addSubview(settingSearch) }
-            settingSearch.frame = NSRect(x: pad, y: y, width: column.bounds.width - pad * 2, height: Tokens.Space.x8)
-            settingSearch.tint = Brand.Theme.for(self).accent
-            y = settingSearch.frame.maxY + Tokens.Space.x3
+            // The title sits where History's does; the sections' text lines up under it, their fills reaching past.
+            let gutter = Tokens.Page.gutter, inset = Tokens.Page.rowInset
+            columnTitle.frame = NSRect(x: gutter, y: Tokens.Page.headerTop, width: column.bounds.width - gutter * 2, height: Tokens.Page.controlHeight)
+            var y = Tokens.Page.headerHeight + Tokens.Space.x1
             for item in items {
-                item.frame = NSRect(x: pad, y: y, width: column.bounds.width - pad * 2, height: Tokens.Space.x8)
-                y += Tokens.Space.x8 + 2
+                item.frame = NSRect(x: gutter - inset, y: y, width: column.bounds.width - (gutter - inset) * 2, height: Tokens.Page.rowHeight)
+                y += Tokens.Page.rowHeight + 2
             }
         case .rail:
-            var y = Tokens.Space.x6
+            var y = Tokens.Page.headerHeight + Tokens.Space.x1
             for item in items {
                 item.frame = NSRect(x: (column.bounds.width - side) / 2, y: y, width: side, height: side)
                 y += side + 2
@@ -788,12 +744,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         }
     }
-
     /// Opens a pane.
     func show(_ pane: SettingsPane) {
         self.pane = pane
         settingSearch.stringValue = ""
         items.forEach { $0.isSelected = $0.pane == pane }
+        refreshTitle()
         if pane == .privacy { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
         layoutDocument()
@@ -1031,6 +987,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func searchChanged() {
         items.forEach { $0.isSelected = !isSearching && $0.pane == pane }
+        refreshTitle()
         reloadShortcuts()
         layoutDocument()
         documentView.scroll(.zero)
@@ -1072,34 +1029,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Layout
 
     private func layoutDocument() {
-        // The fields stay put while they're typed in; everything else is laid out afresh.
-        documentView.subviews.filter { $0 !== settingSearch }.forEach { $0.removeFromSuperview() }
+        documentView.subviews.forEach { $0.removeFromSuperview() }
         let width = scroll.contentSize.width
         laidOutWidth = scroll.frame.width
-        // The pane takes the page's width, with margins that grow a little with it.
-        let pad = min(Tokens.Space.x16, max(Tokens.Space.x4, round(width * 0.05)))
-        let contentWidth = max(0, width - pad * 2)
-        var y: CGFloat = Tokens.Space.x8
-        if settingSearch.superview !== column {
-            // No room for it in the column: it heads the page instead.
-            if settingSearch.superview !== documentView { documentView.addSubview(settingSearch) }
-            settingSearch.frame = NSRect(x: pad, y: Tokens.Space.x6, width: contentWidth, height: Tokens.Space.x8)
-            settingSearch.tint = Brand.Theme.for(self).accent
-            y = settingSearch.frame.maxY + Tokens.Space.x6
-        }
-
-        if !isSearching {
-            let title = Label(pane.title, font: .systemFont(ofSize: Tokens.TypeSize.title, weight: .bold), color: Tokens.Color.textPrimary)
-            title.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: title.lineHeight)
-            documentView.addSubview(title)
-            y = title.frame.maxY + Tokens.Space.x5
-        }
+        // The pane lines up with the header over it: the shared margins and maximum width, centered past it.
+        let span = contentSpan(in: width)
+        let pad = span.x, contentWidth = span.width
+        var y: CGFloat = Tokens.Space.x3
 
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if title != nil || accessory != nil {
-                let label = header(title ?? "")
+                let label = sectionHeading(title ?? "")
                 let accessoryWidth = accessory?.fittingSize.width ?? 0
-                label.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth - accessoryWidth - Tokens.Space.x4, height: label.lineHeight)
+                label.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth - accessoryWidth - Tokens.Space.x4, height: label.lineHeight)
                 documentView.addSubview(label)
                 var bottom = label.frame.maxY
                 if let accessory {
@@ -1129,8 +1071,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let shown = groups(of: pane).filter { $0.group.rows.contains { !$0.isHidden } }
                 guard !shown.isEmpty else { continue }
                 found = true
-                let heading = Label(pane.title, font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-                heading.frame = NSRect(x: pad + Tokens.Space.x1 - Label.inset, y: y, width: contentWidth, height: heading.lineHeight)
+                let heading = Label(pane.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+                heading.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: heading.lineHeight)
                 documentView.addSubview(heading)
                 y = heading.frame.maxY + Tokens.Space.x3
                 for (title, group) in shown { section(title, group) }
@@ -1138,7 +1080,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             if !found {
                 let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-                none.frame = NSRect(x: pad + Tokens.Space.x1, y: y, width: contentWidth, height: none.lineHeight)
+                none.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: none.lineHeight)
                 documentView.addSubview(none)
                 y = none.frame.maxY + Tokens.Space.x6
             }
@@ -1159,7 +1101,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
                 let hint = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-                hint.frame = NSRect(x: pad + Tokens.Space.x1, y: y - Tokens.Space.x6 + Tokens.Space.x2, width: contentWidth, height: hint.lineHeight)
+                hint.frame = NSRect(x: pad - Label.inset, y: y - Tokens.Space.x6 + Tokens.Space.x2, width: contentWidth, height: hint.lineHeight)
                 documentView.addSubview(hint)
                 y = hint.frame.maxY + Tokens.Space.x6
             }
@@ -1193,7 +1135,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: Tokens.Space.x8)
             documentView.addSubview(resetAll)
             let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-            hint.frame = NSRect(x: pad + Tokens.Space.x1, y: y + (Tokens.Space.x8 - hint.lineHeight) / 2, width: contentWidth - rw - Tokens.Space.x4, height: hint.lineHeight)
+            hint.frame = NSRect(x: pad - Label.inset, y: y + (Tokens.Space.x8 - hint.lineHeight) / 2, width: contentWidth - rw - Tokens.Space.x4, height: hint.lineHeight)
             documentView.addSubview(hint)
             y += Tokens.Space.x8 + Tokens.Space.x5
             for (title, group) in shortcutGroups { section(title, group) }

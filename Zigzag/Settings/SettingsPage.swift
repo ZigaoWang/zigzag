@@ -40,9 +40,8 @@ enum SettingsPage {
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
-    /// What the tab's web view shows under Settings: just its name, and the page's color so nothing flashes.
-    static let html = """
-    <!doctype html><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>Settings</title>
-    <style>html { background: #F2F2F4 } @media (prefers-color-scheme: dark) { html { background: #1E1E20 } }</style>
-    """
+    /// What the tab's web view shows under Settings: just its name, and the page's surface so nothing flashes.
+    static var html: String {
+        #"<!doctype html><meta charset="utf-8"><title>Settings</title><style>"# + PageStyle.css(theme: .brand) + "</style>"
+    }
 }
