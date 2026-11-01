@@ -587,7 +587,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: "Borderless page", detail: "With the sidebar hidden, the page fills the whole window.", icon: SettingsIcon.symbol("rectangle.inset.filled"), control: borderlessToggle))
+        windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", icon: SettingsIcon.symbol("rectangle.inset.filled"), control: borderlessToggle))
         windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", icon: SettingsIcon.symbol("power"), control: quitToggle))
 
         // Passwords
