@@ -104,6 +104,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// you've typed it all; either way it's the first row and where Return goes.
     private var completion: InlineCompletion.Match?
     private var completionURL: URL? { completion?.url }
+    /// Takes the completion back before a letter replaces it, so the completion never enters Undo.
+    private var typingMonitor: Any?
     private(set) var isVisible = false
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
@@ -133,6 +135,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         panel.addSubview(fieldIcon)
         panel.addSubview(field)
         panel.addSubview(divider)
+        // ⌘Z undoes what you typed: the completion after it is never part of that, so it goes first.
+        NotificationCenter.default.addObserver(self, selector: #selector(undoWillChange), name: .NSUndoManagerWillUndoChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(undoWillChange), name: .NSUndoManagerWillRedoChange, object: nil)
         chip.wantsLayer = true
         chip.layer?.cornerRadius = Tokens.Radius.control
         chip.layer?.cornerCurve = .continuous
@@ -192,6 +197,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             controller.root.overlay.addSubview(scrim)
             controller.root.overlay.addSubview(panel)
             scrim.show()
+            typingMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.letterWillReplaceCompletion(event)
+                return event
+            }
         }
         applySpaceTheme()
         // From the address: 15pt, easy to read across the wide field; the centered bar for a new tab keeps 18pt.
@@ -223,6 +232,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     func dismiss(restoringFocus: Bool = true) {
         guard isVisible, let controller else { return }
         isVisible = false
+        if let typingMonitor { NSEvent.removeMonitor(typingMonitor) }
+        typingMonitor = nil
         fetcher.cancel()
         scrim.hide()
         panel.dismiss(instantly: isAnchored)
@@ -606,11 +617,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             return true
         case #selector(NSResponder.cancelOperation(_:)):
             // The first Esc takes back the completion, leaving what you typed; the next closes the bar.
-            if completion != nil, field.stringValue != typed {
-                let end = (typed as NSString).length
-                textView.replaceCharacters(in: NSRange(location: end, length: (field.stringValue as NSString).length - end), with: "")
-                textView.selectedRange = NSRange(location: end, length: 0)
-                completion = nil
+            if takeBackCompletion() {
                 refreshResults(animated: true)
             } else {
                 dismiss()
@@ -641,8 +648,48 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             acceptCompletion(textView)
             return true
         default:
+            // Deleting the selected completion takes it back, the way Esc does, so Undo never brings it back as text.
+            if NSStringFromSelector(selector).hasPrefix("delete"), completionIsSelected(textView), takeBackCompletion() {
+                refreshResults(animated: true)
+                return true
+            }
             return false
         }
+    }
+
+    /// The completion is showing after what you typed, selected the way it was filled in.
+    private func completionIsSelected(_ editor: NSTextView) -> Bool {
+        guard completion != nil, field.stringValue != typed, !editor.hasMarkedText() else { return false }
+        let end = (typed as NSString).length
+        return editor.selectedRange == NSRange(location: end, length: (field.stringValue as NSString).length - end)
+    }
+
+    /// Removes the completion from the field, leaving what you typed with the caret after it. It went in without
+    /// Undo and leaves the same way, so Undo only ever sees what you typed.
+    @discardableResult
+    private func takeBackCompletion() -> Bool {
+        guard completion != nil, field.stringValue != typed, let editor = field.currentEditor() as? NSTextView else { return false }
+        let end = (typed as NSString).length
+        editor.replaceCharacters(in: NSRange(location: end, length: (field.stringValue as NSString).length - end), with: "")
+        editor.selectedRange = NSRange(location: end, length: 0)
+        completion = nil
+        return true
+    }
+
+    /// A letter about to replace the selected completion: it's taken back first, so the letter goes after what you
+    /// typed and Undo doesn't remember the completion as something you replaced.
+    private func letterWillReplaceCompletion(_ event: NSEvent) {
+        guard isVisible, event.window === controller?.window, let editor = field.currentEditor() as? NSTextView,
+              editor.window?.firstResponder === editor, completionIsSelected(editor),
+              event.modifierFlags.intersection([.command, .control]).isEmpty,
+              let scalar = event.characters?.unicodeScalars.first,
+              scalar.value >= 0x20, scalar.value != 0x7F, !(0xF700...0xF8FF).contains(scalar.value) else { return }
+        takeBackCompletion()
+    }
+
+    @objc private func undoWillChange(_ note: Notification) {
+        guard isVisible, let editor = field.currentEditor(), note.object as? UndoManager === editor.undoManager else { return }
+        if takeBackCompletion() { refreshResults(animated: false) }
     }
 
     /// The completion becomes what you typed: the caret goes after it and it stays the first row.
