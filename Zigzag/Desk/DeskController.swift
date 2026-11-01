@@ -173,7 +173,7 @@ final class DeskController {
                 self.applyLayout(animated: false)
             }
         }
-        // A glass capsule at the bottom, its pills inset evenly so their ends run with its own.
+        // A floating capsule at the bottom, its pills inset evenly so their ends run with its own.
         actionBar.radius = Self.actionBarHeight / 2
         actionBar.addSubview(closeButton)
         actionBar.addSubview(doneButton)

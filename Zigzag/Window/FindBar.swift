@@ -60,7 +60,7 @@ private final class PaddedTextFieldCell: NSTextFieldCell {
 
 }
 
-/// Find in page: a glass capsule at the top right of the page card holding a magnifying glass, the field, the count,
+/// Find in page: a floating capsule at the top right of the page card holding a magnifying glass, the field, the count,
 /// and round buttons whose circles run with the capsule's end.
 final class FindBarController: NSObject, NSTextFieldDelegate {
     private weak var window: BrowserWindowController?

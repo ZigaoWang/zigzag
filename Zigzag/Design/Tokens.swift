@@ -105,12 +105,12 @@ enum Tokens {
         static let windowMinSize = NSSize(width: 560, height: 400)
         static let deskCardWidth: CGFloat = 208
         static let deskCardMaxWidth: CGFloat = 440
-        /// The find bar, a glass capsule over the page's top right.
+        /// The find bar, a floating capsule over the page's top right.
         static let findBarHeight: CGFloat = Space.x10
-        /// A toast, a glass capsule at the page's top; its action is a pill this tall, inset evenly.
+        /// A toast, a floating capsule at the page's top; its action is a pill this tall, inset evenly.
         static let toastHeight: CGFloat = Space.x8 + Space.x1
         static let toastButtonHeight: CGFloat = Space.x7Height
-        /// Where a hovered link goes: the small glass capsule in the page's bottom-left corner.
+        /// Where a hovered link goes: the small floating capsule in the page's bottom-left corner.
         static let linkStatusHeight: CGFloat = Space.x6
         /// A site's chip in front of the command bar's field while you search inside it; `chipHeightSmall` in the
         /// sidebar's address.

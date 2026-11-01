@@ -6,7 +6,7 @@ import AppKit
 // - a section label: small, gray, never bold, with room above it instead of a line;
 // - a glass tile: a see-through fill with a faint light edge, the card when chosen;
 // - a pill button and a pill field;
-// - a floating panel (`FloatingPanelView`): Liquid Glass on macOS 26, frosted before it.
+// - a floating panel (`FloatingPanelView`): opaque, leaning toward the space, one small shadow.
 
 // MARK: - Rows
 
@@ -433,7 +433,7 @@ final class PanelFrost: NSVisualEffectView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// What a floating panel is made of: Liquid Glass (regular) on macOS 26, a frosted popover material before it.
+/// Frost for a brand moment's glass (`GlassSurface`): Liquid Glass on macOS 26, a frosted popover material before it.
 /// `FloatingPanelView.isGlass` puts one behind a panel's content; this makes one for a surface of your own.
 enum PanelMaterial {
     /// A real blur on every macOS, with the panel's wash drawn over it. Liquid Glass draws above its sibling views,
