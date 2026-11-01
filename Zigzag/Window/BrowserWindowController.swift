@@ -943,9 +943,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Opened again quickly: one listener, never two.
             if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }
             self.readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                // A peek opened from the article is in front: Esc closes that first, and Reader stays.
-                guard event.keyCode == 53, event.window === self?.window, self?.reader != nil, self?.peek.isVisible == false else { return event }
-                self?.closeReader()
+                // A peek opened from the article is in front: Esc closes that first, and Reader stays. So does the
+                // command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
+                guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil, !self.peek.isVisible,
+                      !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
+                self.closeReader()
                 return nil
             }
             self.updateReaderButton()
