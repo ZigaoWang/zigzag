@@ -315,6 +315,7 @@ enum DebugBridge {
             let factor = max(1, Float(arg) ?? 1)
             controller.window?.contentView?.layer?.speed = 1 / factor
         case "quit": NSApp.terminate(nil)
+        case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
         case "newwindow": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false)
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
@@ -671,6 +672,7 @@ enum DebugBridge {
             }
         case "save": WindowManager.shared.saveNow()
         case "quit": NSApp.terminate(nil)
+        case "materials": MaterialsShowcase.debug(arg)
         default: break
         }
     }

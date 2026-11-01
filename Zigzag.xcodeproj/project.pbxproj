@@ -105,6 +105,7 @@
 		9D13ADE0196E39606D06C145 /* PageTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */; };
 		A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91506D36CD561CBD7E11897D /* ContentBlocker.swift */; };
 		A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111BB58676C39406F3B81A0E /* FavoriteTests.swift */; };
+		A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */; };
 		A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */; };
 		A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31A2391B831DAAD2A652FCA /* Onboarding.swift */; };
 		A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */; };
@@ -265,6 +266,7 @@
 		979ECE3AE8285E787E972E3E /* PageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCardView.swift; sourceTree = "<group>"; };
 		9875E3DF61E5A98363065101 /* PasswordCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordCapture.swift; sourceTree = "<group>"; };
 		98C36FF6B8E4B6DBFC1DF273 /* Zigzag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zigzag.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsShowcase.swift; sourceTree = "<group>"; };
 		98D9F429D6C84167482CCFC1 /* Tutorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial.swift; sourceTree = "<group>"; };
 		9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRXPackage.swift; sourceTree = "<group>"; };
 		9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineCompletionTests.swift; sourceTree = "<group>"; };
@@ -448,6 +450,7 @@
 				F7CEDF75CC1B9CA997C2CF1C /* Haptics.swift */,
 				D33639F712B0A57DBFC66DB5 /* IconChoice.swift */,
 				0C67092285DC153FB7BBDFCE /* Materials.swift */,
+				98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */,
 				4D065BFB53F6E46623C3C39E /* Page.swift */,
 				1AC14679F1BBD42EB63BB056 /* SpaceColor.swift */,
 				256245226DA14768B001589E /* Tokens.swift */,
@@ -896,6 +899,7 @@
 				B739E540C2AEA048EEC341DE /* LinkStatus.swift in Sources */,
 				75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */,
 				C98C23949C56DEB824D49CA7 /* Materials.swift in Sources */,
+				A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */,
 				EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */,
 				A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */,
 				6492B599ABBE44450D161D18 /* PDFViewer.swift in Sources */,
