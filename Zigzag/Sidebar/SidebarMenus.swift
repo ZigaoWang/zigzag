@@ -210,6 +210,7 @@ enum SidebarMenus {
         menu.addItem(Item("Copy Link") { controller.copyLink(favorite.url) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(favorite.id) })
+            menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(favorite.id) })
             menu.addItem(Item("Pin This Page Instead") {
                 controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(favorite.id, url: url) }
             })
