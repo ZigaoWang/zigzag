@@ -360,11 +360,18 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func closeOtherTabs(_ sender: Any?) {
         guard let tab = selectedTab else { return }
-        closeManyWithUndo(tabManager.currentTabs.filter { $0 !== tab })
+        closeManyWithUndoToast(tabManager.currentTabs.filter { $0 !== tab })
     }
     @objc func closeTabsBelow(_ sender: Any?) {
         guard let tab = selectedTab, let index = tabManager.currentTabs.firstIndex(where: { $0 === tab }) else { return }
-        closeManyWithUndo(Array(tabManager.currentTabs.dropFirst(index + 1)))
+        closeManyWithUndoToast(Array(tabManager.currentTabs.dropFirst(index + 1)))
+    }
+
+    /// Several tabs closing at once say how many, with the Undo that brings them back, as Clear does.
+    func closeManyWithUndoToast(_ tabs: [Tab]) {
+        guard !tabs.isEmpty else { return }
+        closeManyWithUndo(tabs)
+        showClosedToast(tabs.count, kind: "tab")
     }
 
     // MARK: Spaces

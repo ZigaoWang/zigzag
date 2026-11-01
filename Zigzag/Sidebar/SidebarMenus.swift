@@ -138,9 +138,9 @@ enum SidebarMenus {
         let tabs = manager.tabs(in: tab.spaceID)
         if let index = tabs.firstIndex(where: { $0 === tab }) {
             let below = Array(tabs.dropFirst(index + 1))
-            menu.addItem(Item("Close Tabs Below", enabled: !below.isEmpty) { controller.closeManyWithUndo(below) })
+            menu.addItem(Item("Close Tabs Below", enabled: !below.isEmpty) { controller.closeManyWithUndoToast(below) })
             let others = tabs.filter { $0 !== tab }
-            menu.addItem(Item("Close Other Tabs", enabled: !others.isEmpty) { controller.closeManyWithUndo(others) })
+            menu.addItem(Item("Close Other Tabs", enabled: !others.isEmpty) { controller.closeManyWithUndoToast(others) })
         }
         return menu
     }

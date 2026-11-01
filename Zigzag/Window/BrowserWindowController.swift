@@ -1469,9 +1469,12 @@ extension BrowserWindowController: SidebarDelegate {
         let (closing, faded) = tabManager.tabsToClear(in: tabManager.currentSpaceID)
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing, leavingSpaceEmpty: true)
-        let kind = faded ? "old tab" : "tab"
-        let what = closing.count == 1 ? "Closed 1 \(kind)" : "Closed \(closing.count) \(kind)s"
-        // Undo brings back these tabs, never whatever else was done since.
+        showClosedToast(closing.count, kind: faded ? "old tab" : "tab")
+    }
+
+    /// "Closed 3 tabs", with an Undo that brings back these tabs, never whatever else was done since.
+    func showClosedToast(_ count: Int, kind: String) {
+        let what = count == 1 ? "Closed 1 \(kind)" : "Closed \(count) \(kind)s"
         Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Close Tabs" else { return }
             undo.undo()
