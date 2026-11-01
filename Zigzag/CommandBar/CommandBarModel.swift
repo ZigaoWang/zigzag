@@ -91,26 +91,21 @@ enum CommandRanker {
         return text
     }
 
-    /// The bare host completion for inline autocomplete, e.g. "git" → "github.com".
-    static func inlineCompletion(for text: String, manager: TabManager) -> (completion: String, url: URL)? {
+    /// The address what you typed completes to, e.g. "wiki" → "wikipedia.org": sites from your history, weighed by
+    /// how often and how lately you went, and the ones you keep at hand (open tabs, favorites, pinned tabs).
+    static func inlineCompletion(for text: String, manager: TabManager) -> InlineCompletion.Match? {
         let lower = text.lowercased()
-        guard lower.count >= 1, !lower.contains(" "), !lower.contains("/") else { return nil }
-        func host(_ url: URL) -> String { HistoryStore.normalizedHost(url) }
-        // The site's own scheme and port come along: "loc" completes to localhost:3000 over http, as it was.
-        func root(_ url: URL) -> (String, URL)? {
-            guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
-            let h = host(url)
-            let shown = url.port.map { "\(h):\($0)" } ?? h
-            return URL(string: "\(scheme)://\(shown)").map { (shown, $0) }
+        let bare = lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
+        guard !bare.isEmpty, InlineCompletion.looksLikeHost(lower) else { return nil }
+        var sites: [InlineCompletion.Site] = HistoryStore.shared.completionSites(for: bare).compactMap { entry, score in
+            InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) }
         }
-        let candidates: [URL] = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
-        for url in candidates where host(url).hasPrefix(lower) {
-            if let found = root(url) { return (found.0, found.1) }
+        // Each place a site is kept at hand counts as much as a visit this week.
+        let kept = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
+        for url in kept where HistoryStore.normalizedHost(url).hasPrefix(bare) {
+            if let site = InlineCompletion.target(url, wholePage: false) { sites.append(InlineCompletion.Site(url: site, score: 1)) }
         }
-        if let entry = HistoryStore.shared.bestHostCompletion(for: lower), let found = root(entry.url) {
-            return (found.0, found.1)
-        }
-        return nil
+        return InlineCompletion.best(for: text, among: InlineCompletion.merge(sites))
     }
 
     struct Action {

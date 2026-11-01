@@ -100,8 +100,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private let fetcher = SuggestionFetcher()
     /// Text the user actually typed; the field may also hold an inline completion after it.
     private var typed = ""
-    private var completionURL: URL?
-    private var suppressCompletion = false
+    /// The site what you typed completes to. The rest of its address sits selected after what you typed, unless
+    /// you've typed it all; either way it's the first row and where Return goes.
+    private var completion: InlineCompletion.Match?
+    private var completionURL: URL? { completion?.url }
     private(set) var isVisible = false
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
@@ -203,7 +205,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         typed = field.stringValue
         // A site search hint from the last time the bar was open never carries over.
         refreshHint()
-        completionURL = nil
+        completion = nil
         suggestions = []
         refreshResults(animated: false)
         panel.frame = panelFrame()
@@ -471,7 +473,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             chip.layer?.borderColor = NSColor(white: 1, alpha: 0.22).cgColor
         }
         chipLabel.stringValue = site?.name ?? ""
-        completionURL = nil
+        completion = nil
         if site != nil {
             if entering { typedBeforeScope = typed }
             field.stringValue = ""
@@ -481,7 +483,6 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // Back to exactly what you'd typed, cursor at its end: Tab by mistake costs nothing.
             field.stringValue = typedBeforeScope
             typed = typedBeforeScope
-            suppressCompletion = true
             (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (typedBeforeScope as NSString).length, length: 0)
         }
         let font = field.font ?? Tokens.Font.large()
@@ -552,24 +553,28 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     // MARK: Typing
 
     func controlTextDidChange(_ obj: Notification) {
-        guard let editor = field.currentEditor() else { return }
+        guard let editor = field.currentEditor() as? NSTextView else { return }
         let text = field.stringValue
+        let length = (text as NSString).length
+        // What the field held before this change: what you'd typed, and the completion after it.
+        let shown = completion.map { typed + $0.text.dropFirst(typed.count) } ?? typed
+        let caretAtEnd = editor.selectedRange == NSRange(location: length, length: 0)
+        let previous = completion
+        let allowed = InlineCompletion.allowed(text, shown: shown, typed: typed, caretAtEnd: caretAtEnd, hasMarkedText: editor.hasMarkedText())
         typed = text
-        completionURL = nil
-        // Inline completion: only when typing forward at the end, never after deleting. Looked up once per keystroke.
-        if scope == nil, !suppressCompletion, let controller, mode != .history,
-           let (completion, url) = CommandRanker.inlineCompletion(for: text, manager: controller.tabManager) {
-            if editor.selectedRange.location == (text as NSString).length,
-               completion.lowercased().hasPrefix(text.lowercased()), completion.count > text.count {
-                let suffix = String(completion.dropFirst(text.count))
-                field.stringValue = text + suffix
-                editor.selectedRange = NSRange(location: (text as NSString).length, length: (suffix as NSString).length)
-                completionURL = url
-            } else if completion.lowercased() == text.lowercased() {
-                completionURL = url
+        completion = nil
+        // Not in a site search or history, and never while an input method is still composing.
+        if allowed, scope == nil, let controller, mode != .history {
+            // A letter that agrees with the completion keeps it; anything else looks again. One lookup per keystroke.
+            completion = previous.flatMap { InlineCompletion.kept($0, typed: text) }
+                ?? CommandRanker.inlineCompletion(for: text, manager: controller.tabManager)
+            if let completion, completion.text.count > text.count {
+                // What you typed stays as you typed it; the rest follows, selected, so the next letter replaces it.
+                let rest = String(completion.text.dropFirst(text.count))
+                editor.replaceCharacters(in: NSRange(location: length, length: 0), with: rest)
+                editor.selectedRange = NSRange(location: length, length: (rest as NSString).length)
             }
         }
-        suppressCompletion = false
         refreshHint()
         refreshResults(animated: true)
         // Searching history stays on this Mac: nothing you type there goes to the search engine.
@@ -598,9 +603,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             setScope(nil)
             return true
         case #selector(NSResponder.cancelOperation(_:)):
-            if completionURL != nil, field.stringValue != typed {
-                field.stringValue = typed
-                completionURL = nil
+            // The first Esc takes back the completion, leaving what you typed; the next closes the bar.
+            if completion != nil, field.stringValue != typed {
+                let end = (typed as NSString).length
+                textView.replaceCharacters(in: NSRange(location: end, length: (field.stringValue as NSString).length - end), with: "")
+                textView.selectedRange = NSRange(location: end, length: 0)
+                completion = nil
                 refreshResults(animated: true)
             } else {
                 dismiss()
@@ -610,9 +618,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // Tab on a site's name searches that site; otherwise it accepts the inline completion.
             if scope == nil, let site = hinted {
                 setScope(site)
-            } else if completionURL != nil {
-                textView.selectedRange = NSRange(location: (field.stringValue as NSString).length, length: 0)
-                typed = field.stringValue
+            } else if completion != nil {
+                acceptCompletion(textView)
             } else {
                 step(1)
             }
@@ -624,16 +631,22 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         case #selector(NSResponder.deleteBackward(_:)) where scope != nil && field.stringValue.isEmpty:
             setScope(nil)
             return true
-        case #selector(NSResponder.deleteBackward(_:)):
-            // Deleting removes the completion first, without re-completing.
-            if textView.selectedRange.length > 0, completionURL != nil {
-                suppressCompletion = true
-            }
-            suppressCompletion = true
-            return false
+        // → and End take the completion as typed, caret after it. (End scrolls a text view rather than moving the caret.)
+        case #selector(NSResponder.moveRight(_:)), #selector(NSResponder.moveToEndOfLine(_:)), #selector(NSResponder.moveToRightEndOfLine(_:)),
+             #selector(NSResponder.moveToEndOfDocument(_:)), #selector(NSResponder.moveToEndOfParagraph(_:)),
+             #selector(NSResponder.scrollToEndOfDocument(_:)):
+            guard completion != nil, field.stringValue != typed else { return false }
+            acceptCompletion(textView)
+            return true
         default:
             return false
         }
+    }
+
+    /// The completion becomes what you typed: the caret goes after it and it stays the first row.
+    private func acceptCompletion(_ textView: NSTextView) {
+        textView.selectedRange = NSRange(location: (field.stringValue as NSString).length, length: 0)
+        typed = field.stringValue
     }
 
     private func commit(modifiers: NSEvent.ModifierFlags) {

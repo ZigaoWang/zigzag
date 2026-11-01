@@ -10,13 +10,14 @@ struct HistoryEntry {
 
 /// Every page visited, kept locally in SQLite. Used by the command bar.
 final class HistoryStore {
-    static let shared = HistoryStore()
+    static let shared = HistoryStore(path: Paths.history.path)
 
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    private init() {
-        guard sqlite3_open(Paths.history.path, &db) == SQLITE_OK else { db = nil; return }
+    /// The one store is `shared`; tests open their own, ":memory:", so they never see your history.
+    init(path: String) {
+        guard sqlite3_open(path, &db) == SQLITE_OK else { db = nil; return }
         exec("PRAGMA journal_mode=WAL")
         // With WAL this is still safe across a crash, without a full disk sync on every page visited.
         exec("PRAGMA synchronous=NORMAL")
@@ -150,18 +151,32 @@ final class HistoryStore {
         return collect(statement)
     }
 
-    /// The most visited URL whose host starts with the typed text, for inline completion.
-    func bestHostCompletion(for prefix: String) -> HistoryEntry? {
+    /// Sites whose host starts with the typed text, for inline completion: the most used first, each with the page
+    /// you visit most there and a score that weighs visits by how recent they are, as `search` does.
+    func completionSites(for prefix: String, limit: Int = 8) -> [(entry: HistoryEntry, score: Double)] {
         let lower = prefix.lowercased()
         guard !lower.isEmpty, !lower.contains(" "), let statement = prepare("""
-        SELECT url, title, SUM(visit_count) AS c, MAX(last_visit) FROM visits
-        WHERE host >= ?1 AND host < ?2 GROUP BY host ORDER BY c DESC LIMIT 1
-        """) else { return nil }
+        SELECT url, title, visit_count, last_visit, score FROM (
+            SELECT url, title, visit_count, last_visit,
+                SUM(visit_count) OVER site * 1.0 / (1 + (strftime('%s','now') - MAX(last_visit) OVER site) / 604800.0) AS score,
+                ROW_NUMBER() OVER (PARTITION BY host ORDER BY visit_count DESC, last_visit DESC) AS rank
+            FROM visits WHERE host >= ?1 AND host < ?2
+            WINDOW site AS (PARTITION BY host)
+        ) WHERE rank = 1 ORDER BY score DESC LIMIT \(limit)
+        """) else { return [] }
         defer { sqlite3_finalize(statement) }
         // Hosts are stored lowercase, so a plain range finds the prefix through the index instead of a full scan.
         sqlite3_bind_text(statement, 1, lower, -1, transient)
         sqlite3_bind_text(statement, 2, lower + "\u{10FFFF}", -1, transient)
-        return collect(statement).first
+        var results: [(HistoryEntry, Double)] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let cURL = sqlite3_column_text(statement, 0), let url = URL(string: String(cString: cURL)) else { continue }
+            let title = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
+            results.append((HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 2)),
+                                         lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 3))),
+                            sqlite3_column_double(statement, 4)))
+        }
+        return results
     }
 
     func recent(limit: Int = 8) -> [HistoryEntry] {

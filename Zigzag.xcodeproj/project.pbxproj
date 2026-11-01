@@ -47,6 +47,7 @@
 		3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */; };
 		3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */; };
 		407F631827EF97F15F292C2B /* CommandBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */; };
+		41236E9E7BE28A49C8AF9479 /* InlineCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51954CD51F2344D8639115AB /* InlineCompletion.swift */; };
 		42203BB399B74F33790E1519 /* tour-switch.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 77F1ABEE017B46B497A8AD20 /* tour-switch.mp4 */; };
 		44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */; };
 		477BB8ED8D0C8DC49A0AFC15 /* PopupNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */; };
@@ -207,6 +208,7 @@
 		4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSheet.swift; sourceTree = "<group>"; };
 		4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Passkeys.swift; sourceTree = "<group>"; };
 		4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindowController.swift; sourceTree = "<group>"; };
+		51954CD51F2344D8639115AB /* InlineCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineCompletion.swift; sourceTree = "<group>"; };
 		53584D3A138EABED88285971 /* DialogPasswordFixesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogPasswordFixesTests.swift; sourceTree = "<group>"; };
 		5795B0D3216D1BBB137286B3 /* tlds.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = tlds.txt; sourceTree = "<group>"; };
 		58DD59DED7B66593D3CED57A /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCoordinator.swift; sourceTree = "<group>"; };
@@ -354,6 +356,7 @@
 			children = (
 				34BC528B8B1F2E0DEFAD281E /* CommandBarController.swift */,
 				CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */,
+				51954CD51F2344D8639115AB /* InlineCompletion.swift */,
 				9272B1C4212C3BF6B875E0DB /* SiteSearch.swift */,
 			);
 			path = CommandBar;
@@ -858,6 +861,7 @@
 				F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */,
 				E12D59946BA4DF7046EFE6F7 /* ImportCoordinator.swift in Sources */,
 				116CB32D6BD3C4918FCD3F1C /* ImportView.swift in Sources */,
+				41236E9E7BE28A49C8AF9479 /* InlineCompletion.swift in Sources */,
 				CF63705B985B423D3B9EC482 /* Library.swift in Sources */,
 				B739E540C2AEA048EEC341DE /* LinkStatus.swift in Sources */,
 				75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */,
