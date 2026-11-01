@@ -432,8 +432,11 @@ final class BrowserRootView: ColorView {
         return glass
     }()
 
-    func setGlass(_ on: Bool) {
+    /// `frost`: how much of the frosting covers what's behind, from 1 (all of it) down; the rest shows through
+    /// unblurred.
+    func setGlass(_ on: Bool, frost: CGFloat = 1) {
         glassView.isHidden = !on
+        glassView.alphaValue = frost
         if on { glassView.frame = bounds }
     }
 
