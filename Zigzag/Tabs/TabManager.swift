@@ -417,12 +417,6 @@ final class TabManager {
                 tab.close()
             }
         }
-        // A tab is in a list once, whatever brought it back: a second copy would only leave an empty row.
-        for (space, tabs) in tabsBySpace {
-            var seen = Set<ObjectIdentifier>()
-            let unique = tabs.filter { seen.insert(ObjectIdentifier($0)).inserted }
-            if unique.count != tabs.count { tabsBySpace[space] = unique }
-        }
         // Bookmarks moved to another space carry their live tab; one that became, or stopped being, a favorite
         // (undo, another window) says so.
         for (id, tab) in bookmarkTabs {
