@@ -13,8 +13,11 @@ enum WhatsNew {
     static var sections: [Section] {
         guard let url = Bundle.main.url(forResource: "CHANGELOG", withExtension: "md"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        return parse(text, version: version)
+        return parse(text, version: notesVersion)
     }
+
+    /// A beta (0.5.0-beta.2) shows the notes of the version it leads up to.
+    static var notesVersion: String { version.components(separatedBy: "-").first ?? version }
 
     /// One version's notes from a Keep a Changelog file: under "## [1.2.3] - date", each "### New" starts a section
     /// and its "- " lines are the items, up to the next version.
