@@ -1581,8 +1581,30 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate, let frame = window?.frame else { return }
         let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
         target.window?.setFrame(frame.offsetBy(dx: 30, dy: -30), display: true)
+        let undo = transferUndo([tab], to: target, closesTarget: true)
         transfer(tab, to: target, at: 0)
+        undo()
         target.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Ready to register ⌘Z in the window tabs are about to go to (where you'll be): it sends them back here, where they
+    /// were, and closes a window that was made just for them once it's empty. Call it before the move, then call
+    /// what it returns after.
+    private func transferUndo(_ tabs: [Tab], to target: BrowserWindowController, closesTarget: Bool) -> () -> Void {
+        let places = tabs.map { tab in (tab, tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0) }
+        return { [weak self, weak target] in
+            guard let target else { return }
+            target.sidebarUndo.registerUndo(withTarget: target) { target in
+                guard let self, WindowManager.shared.controllers.contains(where: { $0 === self }) else { return }
+                // Lowest first, so each goes back in at the place it left.
+                for (tab, index) in places.sorted(by: { $0.1 < $1.1 }) where target.tabManager.allTabs.contains(where: { $0 === tab }) {
+                    target.transfer(tab, to: self, at: index)
+                }
+                if closesTarget, target.tabManager.allTabs.isEmpty { target.window?.performClose(nil) }
+                self.window?.makeKeyAndOrderFront(nil)
+            }
+            target.sidebarUndo.setActionName("Move to Window")
+        }
     }
 
     /// A tab into another window's list. Half of a split of two tabs brings the other half: they arrive as one,
@@ -1606,9 +1628,11 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate, let tab = tabs.first else { return false }
         let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
         let target: BrowserWindowController
+        var isNew = false
         if let existing = others.first(where: { $0.window?.frame.contains(screenPoint) == true }) {
             target = existing
         } else {
+            isNew = true
             // A new window, roughly where the tab was let go.
             target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
             if let window = target.window {
@@ -1617,8 +1641,10 @@ extension BrowserWindowController: SidebarDelegate {
                 window.setFrame(frame, display: true)
             }
         }
+        let undo = transferUndo(tabs, to: target, closesTarget: isNew)
         // Each in at the top, last first, so they keep their order.
         for tab in tabs.reversed() { transfer(tab, to: target, at: 0) }
+        undo()
         target.window?.makeKeyAndOrderFront(nil)
         return true
     }
@@ -1721,7 +1747,9 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool {
         guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return false }
+        let undo = transferUndo(tabs, to: controller, closesTarget: false)
         for tab in tabs.reversed() { transfer(tab, to: controller, at: index) }
+        undo()
         controller.window?.makeKeyAndOrderFront(nil)
         return true
     }
