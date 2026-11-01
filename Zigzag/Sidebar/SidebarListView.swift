@@ -82,7 +82,7 @@ enum SidebarItem: Hashable {
 
     var height: CGFloat {
         switch self {
-        case .header: Tokens.Sidebar.labelHeight
+        case .header: Tokens.Sidebar.spaceNameHeight
         // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
         case .separator: Tokens.Sidebar.labelHeight
         case .placeholder, .bookmark, .folder, .newTab, .tab: Tokens.Sidebar.rowHeight
@@ -318,6 +318,7 @@ final class SidebarListView: NSView {
         for item in displayed { if let id = pageID(item) { shownPages[item] = id } }
         updateDocumentHeight()
         pinHeader()
+        slideCard()
     }
 
     /// The page each row showed at the last update.
@@ -699,6 +700,59 @@ final class SidebarListView: NSView {
     /// Refreshes selection, fading and content without changing layout.
     func refreshRows() {
         for (item, view) in rows { configure(view, for: item) }
+        slideCard()
+    }
+
+    // MARK: The sliding card
+
+    /// The tab you're on's card, while it slides from the row it was on to the one you picked. At rest each row
+    /// draws its own; this one only travels.
+    private lazy var travelingCard: SelectionCardView = {
+        let card = SelectionCardView()
+        card.isHidden = true
+        addSubview(card, positioned: .below, relativeTo: nil)
+        return card
+    }()
+    /// The row that had the card at the last update, and the one waiting for it to land.
+    private weak var cardRow: SidebarRowView?
+    private weak var waitingRow: SidebarRowView?
+    private var cardTrip = 0
+
+    /// When the selection moves from one row to another with the pointer, the card slides there (`Motion.selection`,
+    /// eased out) instead of one row going dark and another lighting up. From the keyboard, with Reduce Motion, or
+    /// while anything is being carried, it simply lands.
+    private func slideCard() {
+        let lit = rows.values.compactMap { $0 as? SidebarRowView }.filter(\.isSelected)
+        let now = lit.count == 1 ? lit[0] : nil
+        let from = cardRow
+        cardRow = now
+        guard let now, let from, from !== now, from.superview === self, drag == nil, window != nil,
+              !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion, abs(from.frame.minY - now.frame.minY) < 600 else { return }
+        waitingRow?.holdsCardBack = false
+        let card = travelingCard
+        // From wherever the card is now: a slide interrupted by another click carries on from there.
+        var start = from.frame
+        if !card.isHidden, let shown = card.layer?.presentation() {
+            start = card.frame.offsetBy(dx: shown.transform.m41, dy: shown.transform.m42)
+        }
+        Tokens.Motion.withoutAnimation { card.frame = start }
+        card.isHidden = false
+        card.refresh()
+        now.holdsCardBack = true
+        waitingRow = now
+        cardTrip += 1
+        let trip = cardTrip
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.cardTrip == trip else { return }
+                self.travelingCard.isHidden = true
+                self.waitingRow?.holdsCardBack = false
+                self.waitingRow = nil
+            }
+        }
+        Tokens.Motion.glide(card, to: now.frame, duration: Tokens.Motion.selection, timing: Tokens.Motion.easeOut)
+        CATransaction.commit()
     }
 
     /// Pinned pages show their icon as soon as one arrives, not only after a relaunch.
