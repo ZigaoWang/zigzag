@@ -574,6 +574,8 @@ final class Tab: NSObject {
     /// The page and icon links the tab's icon came from, so the second look at the same page (on commit, then on
     /// finish) doesn't fetch and save it again, which redraws every window's sidebar.
     private var iconSource: (page: URL, links: [[String: String]])?
+    /// The site whose page was last committed here, so a private tab keeps its zoom from page to page on it.
+    private var zoomHost: String?
     /// The title waiting to go into History, a moment after the page last changed it.
     private var titleWrite: DispatchWorkItem?
 
@@ -761,8 +763,13 @@ extension Tab: WKNavigationDelegate {
             changed.send(.snapshot)
         }
         if let url = webView.url {
-            let zoom = ZoomLevels.zoom(for: url)
-            if webView.pageZoom != zoom { webView.pageZoom = zoom }
+            // A private window's zoom isn't saved for the site, so it lasts while you stay on that site in this tab.
+            let host = HistoryStore.normalizedHost(url)
+            if !(isPrivate && host == zoomHost) {
+                let zoom = ZoomLevels.zoom(for: url)
+                if webView.pageZoom != zoom { webView.pageZoom = zoom }
+            }
+            zoomHost = host
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
             errorShownFor = ErrorPage.consume(webView) ? url : nil
             recordHistory(url, title: webView.title)
