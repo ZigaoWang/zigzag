@@ -89,7 +89,8 @@ final class Atmosphere: NSView {
                                 hsb(h - 0.08, 0.55, 1, 0.50), NSColor.white.withAlphaComponent(0.7)])
     }
 
-    private func applyColors(animated: Bool) {
+    /// Colors the fields and wash again, easing there over a second when `animated` (a custom palette changed).
+    func applyColors(animated: Bool) {
         let palette = palette(dark: effectiveAppearance.isDark)
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
