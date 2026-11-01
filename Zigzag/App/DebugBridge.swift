@@ -346,10 +346,12 @@ enum DebugBridge {
         case "passwordsshow":
             (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow(arg)
         case "passwordswindow":
-            // Unlocks without Touch ID and lets the window be captured, for checking it by script with test data.
+            // Unlocks without Touch ID and lets the window be captured, for checking it by script. Only on a test
+            // vault (ZIGZAG_TEST_VAULT): never the person's own passwords.
+            guard PasswordStore.isTestVault else { debugLog("passwordswindow refused: not a test vault"); break }
             PasswordAuthentication.unlockForTesting()
             PasswordsWindowController.show()
-            PasswordsWindowController.shared?.window?.sharingType = .readOnly
+            (PasswordsWindowController.shared?.window?.contentView as? PasswordsView)?.debugShow("open")
         case "key":
             // key <char> [cmd|shift|ctrl|opt...] — goes through the real event path, menus included.
             let f = arg.split(separator: " ").map(String.init)
@@ -406,7 +408,9 @@ enum DebugBridge {
                 walk(window.contentView)
             }
         case "pwseed":
-            // Five obviously fake logins for checking the Passwords window; remove them with pwclear.
+            // Five obviously fake logins for checking the Passwords window; remove them with pwclear. Only on a test
+            // vault, so they never mix with the person's own.
+            guard PasswordStore.isTestVault else { debugLog("pwseed refused: not a test vault"); break }
             Task {
                 let samples: [(String, String, String)] = [("https://github.com", "sam@example.com", "correct-horse-battery-staple"),
                                                            ("https://figma.com", "sam@example.com", "Password1!"),

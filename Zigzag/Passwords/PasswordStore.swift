@@ -65,7 +65,27 @@ nonisolated struct Credential: Identifiable, Hashable, Sendable {
 /// group of the data protection keychain, synced through iCloud Keychain unless the person turns that off.
 /// Listing reads only the details (site, username, dates); the password is read one at a time, on demand.
 actor PasswordStore {
-    static let shared = PasswordStore()
+    static let shared: PasswordStore = {
+        #if DEBUG
+        // A debug copy started with its own label keeps a vault of its own, never syncing, so its Passwords window
+        // can be looked at (and captured) with test logins only, never the person's.
+        if let label = testVaultLabel { return PasswordStore(label: label, synchronizable: false) }
+        #endif
+        return PasswordStore()
+    }()
+
+    /// Debug builds only: the label from `ZIGZAG_TEST_VAULT`, when this copy runs on a test vault.
+    nonisolated static var testVaultLabel: String? {
+        #if DEBUG
+        let label = ProcessInfo.processInfo.environment["ZIGZAG_TEST_VAULT"] ?? ""
+        return label.isEmpty || label == "Zigzag" ? nil : "Zigzag Test " + label
+        #else
+        return nil
+        #endif
+    }
+
+    /// Whether this copy shows a test vault rather than the person's passwords.
+    nonisolated static var isTestVault: Bool { testVaultLabel != nil }
 
     static let accessGroup = "432GL3WKY2.app.zigzag.passwords"
     /// "Never save for this site" choices, kept with the passwords so they sync too.
