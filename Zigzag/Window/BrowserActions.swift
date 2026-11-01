@@ -407,6 +407,12 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let tab = selectedTab
+        // ⌘← and ⌘→ (the hidden Back and Forward) in a text field or a page: BrowserWindow decides whether they move
+        // the cursor, and the menu mustn't take them first.
+        if item.isHidden, item.action == #selector(goBack(_:)) || item.action == #selector(goForward(_:)),
+           window?.firstResponder is NSText || window?.firstResponder is WKWebView {
+            return false
+        }
         switch item.action {
         case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
