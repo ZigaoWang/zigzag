@@ -380,12 +380,30 @@ enum PanelMaterial {
         frost.layer?.cornerRadius = radius
         frost.layer?.cornerCurve = .continuous
         frost.layer?.masksToBounds = true
+        // The effect view can redo its own layer, so the layer's corners alone don't reliably hold its blur: the
+        // mask is what it keeps to.
+        frost.maskImage = mask(radius: radius)
         return frost
     }
 
     static func setRadius(_ radius: CGFloat, of view: NSView) {
         if #available(macOS 26.0, *), let glass = view as? NSGlassEffectView { glass.cornerRadius = radius; return }
+        guard view.layer?.cornerRadius != radius else { return }
         view.layer?.cornerRadius = radius
+        (view as? NSVisualEffectView)?.maskImage = mask(radius: radius)
+    }
+
+    /// A rounded rectangle that stretches to any size, its corners kept at `radius`.
+    private static func mask(radius: CGFloat) -> NSImage {
+        let side = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 }
 
