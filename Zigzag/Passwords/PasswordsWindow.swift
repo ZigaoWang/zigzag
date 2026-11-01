@@ -658,7 +658,7 @@ private final class EmptyStateView: NSView {
 
 // MARK: - Detail
 
-private final class DetailView: NSView {
+private final class DetailView: NSView, NSTextFieldDelegate {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let subtitle = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
@@ -708,6 +708,7 @@ private final class DetailView: NSView {
         cancelButton.onClick = { [weak self] _ in self?.endEditing() }
         saveButton.onClick = { [weak self] _ in self?.saveEdits() }
         deleteButton.onClick = { [weak self] _ in self?.delete() }
+        [usernameField, passwordField, notesField].forEach { $0.field.delegate = self }
         allowButton.onClick = { [weak self] _ in if let origin = self?.neverOrigin { self?.onAllowSaving?(origin) } }
     }
 
@@ -887,6 +888,16 @@ private final class DetailView: NSView {
             } catch {
                 toast("Couldn’t save the changes. Try again.")
             }
+        }
+    }
+
+    /// While editing, Return saves and Esc cancels, from any of the fields.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard isEditing else { return false }
+        switch selector {
+        case #selector(NSResponder.insertNewline(_:)): saveEdits(); return true
+        case #selector(NSResponder.cancelOperation(_:)): endEditing(); return true
+        default: return false
         }
     }
 
