@@ -35,11 +35,11 @@ protocol SidebarListDelegate: AnyObject {
     func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool
     /// A tab dropped into another window's sidebar at an index. Returns true if handled.
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
-    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID)
     /// A tab or bookmark dragged over the favorites grid. Returns true while it's over it.
     func listDragOverFavorites(at windowPoint: NSPoint) -> Bool
     /// Dropped on the favorites grid. Returns true if it became a favorite.
+    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
     func listDropOnFavorites(_ tab: Tab) -> Bool
     /// A pinned page dropped on the favorites grid: it becomes a favorite, open or not.
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool
@@ -75,8 +75,7 @@ enum SidebarItem: Hashable {
         case .header: Tokens.Space.x6 + Tokens.Space.x1
         // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
         case .separator: Tokens.Space.x6
-        case .placeholder: Tokens.Space.x2
-        case .bookmark, .folder, .newTab, .tab, .bookmarkDropZone: Tokens.Metric.rowHeight
+        case .placeholder, .bookmark, .folder, .newTab, .tab, .bookmarkDropZone: Tokens.Metric.rowHeight
         }
     }
 
@@ -126,10 +125,13 @@ final class SidebarListView: NSView {
         var targetIndex: Int
         var hoverSpace: UUID?
         let panel: NSPanel
-        /// A tab row the dragged tab rests on: dropping opens them side by side.
-        var splitTarget: SplitDrop?
         /// A folder row the dragged page or tab rests on: dropping puts it in that folder.
         var folderTarget: UUID?
+        /// A tab row the dragged tab rests on: dropping opens them side by side.
+        var splitTarget: SplitDrop?
+        /// Where it was picked up from; dropping there changes nothing, so no line shows.
+        var originSection: Section? = nil
+        var originIndex = 0
         /// Where the pointer is across the list: set in past a folder's last page, a drop stays in the folder.
         var pointX: CGFloat = 0
         /// The other picked rows going along with this one.
@@ -473,7 +475,8 @@ final class SidebarListView: NSView {
             separator.showsClear = isPointerInside
             return separator
         case .placeholder:
-            return InsertionLineView()
+            // The room the carried row will land in: empty, the row's own size.
+            return NSView()
         case .bookmarkDropZone:
             return DropZoneView(text: "Drop here to pin")
         case .newTab:
@@ -755,11 +758,8 @@ final class SidebarListView: NSView {
     // within the list, across spaces (hold over a dot), into another Zigzag window, or out to make a new one.
 
     private func displayItems() -> [SidebarItem] {
-        if let drag {
-            return withPlaceholder(buildItems(includeEmptyBookmarkSection: bookmarkZoneOpen && drag.targetSection != nil).filter { $0 != drag.item },
-                                   section: drag.targetSection, index: drag.targetIndex)
-        }
-        if let externalIndex { return withPlaceholder(buildItems(), section: .tabs, index: externalIndex) }
+        // Nothing moves while something is carried over the list, as in Arc: a line says where it will land.
+        if let drag { return buildItems(includeEmptyBookmarkSection: bookmarkZoneOpen && drag.targetSection != nil) }
         return items
     }
 
@@ -840,7 +840,7 @@ final class SidebarListView: NSView {
         }
         guard index != externalIndex else { return }
         externalIndex = index
-        apply(items: displayItems(), animated: true)
+        placeLine()
     }
 
     private func liftedImage(of view: NSView) -> NSImage? {
@@ -908,7 +908,12 @@ final class SidebarListView: NSView {
             drag?.targetSection = landing.0
             drag?.targetIndex = landing.1
         }
-        view.alphaValue = 0
+        if let landing = drag {
+            drag?.originSection = landing.targetSection
+            drag?.originIndex = landing.targetIndex
+        }
+        // It stays in its place, faint, until it's dropped somewhere else.
+        view.alphaValue = 0.35
         panel.alphaValue = 1
         panel.orderFront(nil)
         // Picked up: it lifts a touch and stays solid, like a favorite does; the gap shows where it will land.
@@ -936,19 +941,93 @@ final class SidebarListView: NSView {
         let onRight: Bool
     }
 
-    /// The tab row whose middle the pointer is over, and which half: where a split would open.
-    /// The row's top and bottom edges stay free for reordering.
-    private func splitTarget(at point: NSPoint, dragging item: SidebarItem) -> SplitDrop? {
-        guard case .tab(let draggedID) = item, let manager else { return nil }
-        for (candidate, view) in rows {
-            guard case .tab(let id) = candidate, id != draggedID, let row = view as? TabRowView, row.partner == nil,
-                  view.frame.insetBy(dx: 0, dy: 7).contains(point), manager.tab(with: id)?.url != nil else { continue }
-            return SplitDrop(id: id, onRight: point.x > view.frame.midX)
+    /// Which slot the pointer is over, counted in the list without the carried row (which stays where it was
+    /// while you drag): below the carried row, every row sits one row lower than it will.
+    private func reorderTarget(pointerY y: CGFloat, dragging drag: DragState) -> (Section, Int) {
+        var y = y
+        if let view = rows[drag.item], view === drag.view {
+            if y > view.frame.maxY { y -= view.frame.height + rowGap } else if y >= view.frame.minY { y = view.frame.minY }
+        }
+        return target(at: y, dragging: drag.item)
+    }
+
+    /// Whether the carried row and a row it's over can open side by side: a tab with a tab, or a tab with a pinned
+    /// page (neither a favorite nor already half of a pinned split). Two pinned pages are a pinned split's to make.
+    private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
+        guard let manager, carried != target else { return false }
+        func freePin(_ id: UUID) -> Bool { !Library.shared.isFavorite(id) && Library.shared.pinnedSplit(containing: id) == nil }
+        switch (carried, target) {
+        case let (.tab(a), .tab(b)):
+            guard let t = manager.tab(with: a), let u = manager.tab(with: b), u.url != nil else { return false }
+            return manager.canSplit(t, with: u)
+        case let (.tab(a), .bookmark(b)), let (.bookmark(b), .tab(a)):
+            guard let t = manager.tab(with: a), t.url != nil, manager.split(for: t) == nil || target == .tab(a) || carried == .tab(a) else { return false }
+            return freePin(b)
+        default:
+            return false
+        }
+    }
+
+    /// The row whose middle the pointer is on: most of a row's height, so it's easy to hit and holds still. Its
+    /// top and bottom edges are for reordering.
+    private func splitTarget(pointer: NSPoint, dragging item: SidebarItem) -> SplitDrop? {
+        for (candidate, view) in rows where view !== drag?.view {
+            guard let row = view as? TabRowView, row.partner == nil else { continue }
+            let band = view.frame.insetBy(dx: 0, dy: view.frame.height * 0.22)
+            guard band.contains(pointer), canSplit(item, onto: candidate) else { continue }
+            switch candidate {
+            case .tab(let id), .bookmark(let id): return SplitDrop(id: id, onRight: pointer.x > view.frame.midX)
+            default: continue
+            }
         }
         return nil
     }
 
-    /// The row the pointer is resting on; it becomes a split target after a short pause.
+    private let insertionLine = InsertionLineView()
+
+    /// The line between the rows where the carried row (or a tab from elsewhere) would land, set in when it would
+    /// go into a folder. Hidden when it would land where it already is, or while a split is on offer.
+    private func placeLine() {
+        let section: Section?, index: Int, pointX: CGFloat
+        if let drag {
+            let home = drag.targetSection == drag.originSection && drag.targetIndex == drag.originIndex
+            section = home || drag.folderTarget != nil || splitCandidate != nil || drag.splitTarget != nil ? nil : drag.targetSection
+            index = drag.targetIndex
+            pointX = drag.pointX
+        } else if let externalIndex {
+            (section, index, pointX) = (.tabs, externalIndex, 0)
+        } else {
+            section = nil; index = 0; pointX = 0
+        }
+        let shown = displayItems().filter { $0 != drag?.item }
+        let placed = withPlaceholder(shown, section: section, index: index)
+        guard let section = section as Section?, let gap = placed.firstIndex(of: .placeholder),
+              !shown.contains(.bookmarkDropZone) || section != .bookmarks else {
+            insertionLine.isHidden = true
+            return
+        }
+        let before = placed[..<gap].last { rows[$0] != nil && $0 != .header }
+        let after = placed[(gap + 1)...].first { rows[$0] != nil }
+        var y: CGFloat
+        if let after, after != .separator, let next = rows[after] {
+            y = next.frame.minY - rowGap / 2
+        } else if let before, let previous = rows[before] {
+            y = previous.frame.maxY + rowGap / 2
+        } else {
+            insertionLine.isHidden = true
+            return
+        }
+        y = round(y)
+        let x = folderForGap(in: placed, pointX: pointX) != nil ? Self.folderIndent : 0
+        if insertionLine.superview !== self { addSubview(insertionLine) }
+        Tokens.Motion.withoutAnimation {
+            insertionLine.frame = NSRect(x: x, y: y - 3, width: bounds.width - x, height: 6)
+        }
+        insertionLine.isHidden = false
+        addSubview(insertionLine, positioned: .above, relativeTo: nil)
+    }
+
+    /// The row the carried tab is resting on, before it lights up as a split.
     private var splitCandidate: SplitDrop?
     private var splitWork: DispatchWorkItem?
 
@@ -956,14 +1035,11 @@ final class SidebarListView: NSView {
         if let target, target != lastSplitTarget { Haptics.snap() }
         lastSplitTarget = target
         drag?.splitTarget = target
-        // One hint at a time: the gap stays, its line hides while a split is on offer.
-        if let line = rows[.placeholder] {
-            Tokens.Motion.animate(Tokens.Motion.feedback) { line.animator().alphaValue = target == nil ? 1 : 0 }
-        }
         for (item, view) in rows {
             guard let row = view as? TabRowView else { continue }
-            row.splitDropSide = target.flatMap { item == .tab($0.id) ? ($0.onRight ? 1 : 0) : nil }
+            row.splitDropSide = target.flatMap { item == .tab($0.id) || item == .bookmark($0.id) ? ($0.onRight ? 1 : 0) : nil }
         }
+        placeLine()
     }
 
     private weak var externalTarget: SidebarListView?
@@ -1025,11 +1101,10 @@ final class SidebarListView: NSView {
             if !bookmarkZoneOpen, let newTab = rows[.newTab], point.y < newTab.frame.maxY {
                 bookmarkZoneOpen = true
             }
-            candidate = self.splitTarget(at: point, dragging: drag.item)
             drag.pointX = point.x
             // Resting on a folder row: it lights up to take the page, and the gap stays where it was.
             let isPage: Bool = { switch drag.item { case .bookmark, .tab: true; default: false } }()
-            let folderHit = isPage && candidate == nil ? folderRow(at: point) : nil
+            let folderHit = isPage ? folderRow(at: point) : nil
             if folderHit != drag.folderTarget {
                 drag.folderTarget = folderHit
                 showFolderTarget(folderHit)
@@ -1037,21 +1112,26 @@ final class SidebarListView: NSView {
             if folderHit != nil {
                 // No gap: the lit folder is where it goes.
                 section = nil
-            } else if candidate == nil {
-                (section, index) = target(at: point.y, dragging: drag.item)
             } else {
-                // Hold the gap still so the row under the pointer doesn't move away.
-                (section, index) = (drag.targetSection, drag.targetIndex)
+                // On a row's middle: offer to open the two side by side, the line out of the way. On its edges: the
+                // line shows where it would go.
+                candidate = splitTarget(pointer: point, dragging: drag.item)
+                if candidate == nil {
+                    (section, index) = reorderTarget(pointerY: point.y, dragging: drag)
+                } else {
+                    (section, index) = (drag.targetSection, drag.targetIndex)
+                }
             }
         } else if drag.folderTarget != nil {
             drag.folderTarget = nil
             showFolderTarget(nil)
         }
+
         if candidate != splitCandidate {
             splitCandidate = candidate
             splitWork?.cancel()
             if let active = drag.splitTarget, let candidate, active.id == candidate.id {
-                // Already split-targeting this row: switching halves is immediate.
+                // Already offered on this row: switching halves is immediate.
                 drag.splitTarget = candidate
                 self.drag = drag
                 showSplitTarget(candidate)
@@ -1067,7 +1147,7 @@ final class SidebarListView: NSView {
                         }
                     }
                     splitWork = work
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
                 }
             }
             guard let refreshed = self.drag else { return }
@@ -1115,7 +1195,9 @@ final class SidebarListView: NSView {
         drag.targetSection = section
         drag.targetIndex = index
         self.drag = drag
+        // Only the empty pinned section's drop zone ever appears; nothing else in the list moves.
         if changed { apply(items: displayItems(), animated: true) }
+        placeLine()
     }
 
     private func endDrag(with event: NSEvent) {
@@ -1153,6 +1235,7 @@ final class SidebarListView: NSView {
             : nil
         showFolderTarget(nil)
         self.drag = nil
+        insertionLine.isHidden = true
         for other in drag.group { rows[other]?.alphaValue = 1 }
         // The picked rows, in the order they were in the list; they land together, in that order.
         let together = drag.group.isEmpty ? [drag.item]
@@ -1164,6 +1247,25 @@ final class SidebarListView: NSView {
         splitWork?.cancel()
         splitCandidate = nil
         for view in rows.values { (view as? TabRowView)?.splitDropSide = nil }
+
+        // Onto the middle of a tab's or pinned page's row: the two open side by side. A pinned page that isn't
+        // open yet opens for it.
+        if let split = drag.splitTarget {
+            func page(_ item: SidebarItem) -> Tab? {
+                switch item {
+                case .tab(let id): manager.tab(with: id)
+                case .bookmark(let id): Library.shared.bookmark(id).map(manager.liveTab(for:))
+                default: nil
+                }
+            }
+            let target: SidebarItem = manager.tab(with: split.id) != nil ? .tab(split.id) : .bookmark(split.id)
+            if let carried = page(drag.item), let other = page(target), manager.canSplit(other, with: carried) {
+                drag.view.alphaValue = 1
+                delegate?.listSplit(other, with: carried, otherOnRight: split.onRight)
+                reload(animated: true)
+                return
+            }
+        }
 
         // Onto the favorites grid.
         if case .tab(let id) = drag.item, let tab = manager.tab(with: id), delegate?.listDropOnFavorites(tab) == true {
@@ -1179,13 +1281,6 @@ final class SidebarListView: NSView {
             return
         }
 
-        // Onto another tab's row: the two open side by side.
-        if case .tab(let id) = drag.item, let split = drag.splitTarget,
-           let tab = manager.tab(with: id), let target = manager.tab(with: split.id) {
-            delegate?.listSplit(target, with: tab, otherOnRight: split.onRight)
-            reload(animated: true)
-            return
-        }
         delegate?.listDragEnded()
         let mouse = window?.convertPoint(toScreen: event.locationInWindow) ?? NSEvent.mouseLocation
         let external = externalTarget

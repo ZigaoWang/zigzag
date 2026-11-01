@@ -392,7 +392,7 @@ final class TabManager {
     }
 
     /// A bookmark's live tab, made (not yet shown) if it isn't open.
-    private func liveTab(for bookmark: Bookmark) -> Tab {
+    func liveTab(for bookmark: Bookmark) -> Tab {
         if let tab = bookmarkTabs[bookmark.id] { return tab }
         let spaceID = Library.shared.spaceID(ofBookmark: bookmark.id) ?? currentSpaceID
         let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: spaceID)

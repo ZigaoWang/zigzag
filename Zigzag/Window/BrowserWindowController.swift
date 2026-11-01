@@ -1322,7 +1322,6 @@ extension BrowserWindowController: SidebarDelegate {
             showSelectedTab()
         }
     }
-    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
         libraryChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID) }
     }
@@ -1416,6 +1415,8 @@ extension BrowserWindowController: SidebarDelegate {
         }
         panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
     }
+
+    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
 
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
