@@ -1183,6 +1183,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.backButton.toolTip = "Back" + Shortcuts.hint(for: #selector(goBack(_:)))
         sidebar.forwardButton.toolTip = "Forward" + Shortcuts.hint(for: #selector(goForward(_:)))
         sidebar.reloadButton.toolTip = SidebarView.reloadTip(loading: selectedTab?.isLoading ?? false)
+        sidebar.downloadsButton.toolTip = "Downloads" + Shortcuts.hint(for: #selector(showDownloads(_:)))
+        sidebar.newSpaceButton.toolTip = "New Space" + Shortcuts.hint(for: #selector(newSpace(_:)))
         sidebar.sidebarButton.isSelected = false
     }
 

@@ -304,12 +304,12 @@ final class SidebarView: NSView {
     let nowPlaying = NowPlayingView()
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
-    private let downloadsButton: IconButton = {
+    let downloadsButton: IconButton = {
         let button = SidebarView.chromeButton("arrow.down.circle", toolTip: "Downloads")
         button.glyph = DownloadGlyph.image(.arrow)
         return button
     }()
-    private let newSpaceButton: IconButton = {
+    let newSpaceButton: IconButton = {
         let button = SidebarView.chromeButton("plus", toolTip: "New Space")
         button.glyph = LineGlyph.plus
         return button
