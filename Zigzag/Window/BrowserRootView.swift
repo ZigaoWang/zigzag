@@ -208,6 +208,10 @@ final class ResizeHandle: NSView {
 
 /// The window's content: one continuous tinted background, the sidebar, and the page card.
 final class BrowserRootView: ColorView {
+    /// The least a pane gets while you drag the line between two: room for its header's six buttons and some of its
+    /// address, or for its header and a little page when stacked.
+    static let minimumPaneWidth: CGFloat = 260
+    static let minimumPaneHeight: CGFloat = 160
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
     /// With no tab open, the page steps away and leaves the space's color, with one way to start.
@@ -299,12 +303,17 @@ final class BrowserRootView: ColorView {
         splitHandle.onDrag = { [weak self] value in
             guard let self else { return }
             let area = self.cardFrame
+            // Never so narrow (or short) that a pane's header loses its buttons: a share of the window, and points too.
+            func clamp(_ ratio: CGFloat, length: CGFloat, minimum: CGFloat) -> CGFloat {
+                let floor = max(0.2, minimum / max(length, 1)), ceiling = min(0.8, 1 - floor)
+                return floor < ceiling ? min(max(ratio, floor), ceiling) : 0.5
+            }
             if self.splitVertical {
                 // Window y runs bottom-up; this view is flipped.
                 let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
-                self.splitRatio = min(max((y - area.minY) / area.height, 0.2), 0.8)
+                self.splitRatio = clamp((y - area.minY) / area.height, length: area.height, minimum: Self.minimumPaneHeight)
             } else {
-                self.splitRatio = min(max((value - area.minX) / area.width, 0.2), 0.8)
+                self.splitRatio = clamp((value - area.minX) / area.width, length: area.width, minimum: Self.minimumPaneWidth)
             }
             self.layoutSubtreeIfNeeded()
             self.onSplitRatioChange?(self.splitRatio ?? 0.5, false)
