@@ -1728,7 +1728,7 @@ private final class ExtensionsPicker: StepContent {
                 case .success: row.state = .added
                 case .failure(let error):
                     failed = true
-                    row.state = .failed(error.message)
+                    row.state = .failed(error.reason)
                 }
             }
             self.installing = false
@@ -1777,7 +1777,11 @@ private final class ExtensionRow: InteractiveView {
     private let statusIcon = NSImageView()
     private let spinner = Spinner()
 
+    /// What the extension does, shown under its name until adding it fails and the reason takes its place.
+    private let detailText: String
+
     init(name text: String, kind detail: String) {
+        detailText = detail
         name = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
         kind = Label(detail, font: Tokens.Font.small(), color: Onboard.dim(0.62))
         super.init(frame: .zero)
@@ -1814,6 +1818,8 @@ private final class ExtensionRow: InteractiveView {
         layer?.backgroundColor = isHovered && state == .idle && !isLocked ? cgColor(Onboard.tint.withAlphaComponent(0.05)) : nil
         statusIcon.isHidden = true
         status.textColor = Onboard.ink
+        kind.stringValue = detailText
+        toolTip = nil
         switch state {
         case .idle: status.stringValue = ""
         case .waiting: status.stringValue = "Waiting"; status.textColor = Onboard.dim(0.55)
@@ -1826,6 +1832,8 @@ private final class ExtensionRow: InteractiveView {
         case .failed(let message):
             status.stringValue = "Couldn’t add"
             status.textColor = Tokens.Color.caution
+            // Why, where you're already looking, not only on hover.
+            kind.stringValue = message
             toolTip = message
         }
         state == .working ? spinner.startAnimation(nil) : spinner.stopAnimation(nil)

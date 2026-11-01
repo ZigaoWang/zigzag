@@ -174,6 +174,14 @@ enum ExtensionStore {
             case .unpack: "This extension’s package is damaged, so it wasn’t installed."
             }
         }
+        /// The same, short enough for one line beside the extension's name.
+        var reason: String {
+            switch self {
+            case .download: "Couldn’t download it. Check your connection."
+            case .verification: "Its package couldn’t be verified."
+            case .unpack: "Its package is damaged."
+            }
+        }
     }
 
     /// A verified package, downloaded and unpacked but not installed yet: what the install sheet shows.
