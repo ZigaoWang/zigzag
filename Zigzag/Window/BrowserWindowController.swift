@@ -544,7 +544,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let content = ExtensionSheet.Content(
                 icon: info.icon(for: NSSize(width: 40, height: 40)),
                 title: "\(name) wants more access",
-                subtitle: "Version \(info.version ?? "") is ready. Until you allow it, the current version keeps running.",
+                subtitle: (info.version.map { "Version \($0) is ready." } ?? "An update is ready.") + " Until you allow it, the current version keeps running.",
                 heading: "It would also be able to",
                 report: report,
                 confirm: "Allow and Update", cancel: "Not Now")
