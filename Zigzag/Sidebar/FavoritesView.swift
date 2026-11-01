@@ -14,7 +14,8 @@ final class FavoritesView: NSView {
             guard oldValue != isDropTarget else { return }
             dropTile.isHidden = !isDropTarget
             onHeightChange?()
-            needsLayout = true
+            // The tiles after the opening slide over to make room for it, and back when it closes.
+            relayout(gliding: true)
         }
     }
     var onHeightChange: (() -> Void)?
@@ -111,12 +112,7 @@ final class FavoritesView: NSView {
         panel.level = .floating
         panel.ignoresMouseEvents = true
         let image = NSImageView(frame: NSRect(origin: .zero, size: rect.size))
-        if let rep = tile.bitmapImageRepForCachingDisplay(in: tile.bounds) {
-            tile.cacheDisplay(in: tile.bounds, to: rep)
-            let picture = NSImage(size: tile.bounds.size)
-            picture.addRepresentation(rep)
-            image.image = picture
-        }
+        image.image = Self.picture(of: tile)
         panel.contentView = image
         let start = window.convertPoint(toScreen: event.locationInWindow)
         let grab = NSPoint(x: start.x - rect.minX, y: start.y - rect.minY)
@@ -133,13 +129,7 @@ final class FavoritesView: NSView {
             var order = tiles.filter { $0 !== tile }
             order.insert(tile, at: to)
             liveOrder = order
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
-                context.timingFunction = Tokens.Motion.easeInOut
-                context.allowsImplicitAnimation = true
-                self.needsLayout = true
-                self.layoutSubtreeIfNeeded()
-            }
+            relayout(gliding: true)
         }
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
@@ -147,8 +137,10 @@ final class FavoritesView: NSView {
             if event.type == .leftMouseUp { stop.pointee = true; return }
             panel.setFrameOrigin(NSPoint(x: last.x - grab.x, y: last.y - grab.y))
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
-            // Over the grid the others make room; off it, everything goes back to where it was.
-            arrange(self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local) ? self.slot(at: local, count: self.tiles.count) : from)
+            // Over the grid the others make room where the carried tile's middle is, wherever it was picked up by;
+            // off it, everything goes back to where it was.
+            let center = self.convert(window.convertPoint(fromScreen: NSPoint(x: panel.frame.midX, y: panel.frame.midY)), from: nil)
+            arrange(self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local) ? self.slot(at: center, count: self.tiles.count) : from)
             self.onDragMove?(favorite, last)
         }
 
@@ -180,6 +172,36 @@ final class FavoritesView: NSView {
         })
     }
 
+    /// While true, tiles already in place slide to their new places instead of jumping there.
+    private var glides = false
+
+    private func relayout(gliding: Bool) {
+        glides = gliding && window != nil
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        glides = false
+    }
+
+    /// The tile as it looks, from its layers, for the copy that follows the pointer.
+    private static func picture(of tile: NSView) -> NSImage? {
+        guard let layer = tile.layer else { return nil }
+        let scale = tile.window?.backingScaleFactor ?? 2
+        let size = tile.bounds.size
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        let cg = context.cgContext
+        cg.scaleBy(x: scale, y: scale)
+        // Layers draw flipped against the bitmap.
+        cg.translateBy(x: 0, y: size.height)
+        cg.scaleBy(x: 1, y: -1)
+        layer.render(in: cg)
+        let image = NSImage(size: size)
+        image.addRepresentation(rep)
+        return image
+    }
+
     override func layout() {
         super.layout()
         let all = (liveOrder ?? tiles) + (isDropTarget ? [dropTile] : [])
@@ -190,8 +212,13 @@ final class FavoritesView: NSView {
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
         for (i, tile) in all.enumerated() {
             let row = i / columns, column = i % columns
-            tile.frame = NSRect(x: (width + gap) * CGFloat(column), y: (Self.tileHeight + gap) * CGFloat(row),
-                                width: width, height: Self.tileHeight).integral
+            let frame = NSRect(x: (width + gap) * CGFloat(column), y: (Self.tileHeight + gap) * CGFloat(row),
+                               width: width, height: Self.tileHeight).integral
+            if glides, tile !== dropTile, tile.frame.width > 0, tile.frame.size == frame.size {
+                Tokens.Motion.glide(tile, to: frame)
+            } else {
+                tile.frame = frame
+            }
         }
     }
 }

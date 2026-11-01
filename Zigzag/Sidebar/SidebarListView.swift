@@ -267,13 +267,14 @@ final class SidebarListView: NSView {
         }
 
         var changes: [() -> Void] = []
+        var moves: [(NSView, NSRect)] = []
         var carried = false
         for (item, frame) in layout {
             if let view = rows[item] {
                 configure(view, for: item)
                 if view === drag?.view { continue }
                 if view.frame != frame {
-                    if animated { changes.append { view.animator().frame = frame } } else { view.frame = frame }
+                    if animated { moves.append((view, frame)) } else { view.frame = frame }
                 }
             } else {
                 let view = makeView(for: item)
@@ -293,18 +294,20 @@ final class SidebarListView: NSView {
                 }
             }
         }
-        if !changes.isEmpty {
-            if carried {
-                // The rest make room at the same pace as the page being carried.
-                NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.3
-                    ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
-                    changes.forEach { $0() }
-                }
+        // Rows slide on the render server, so a gap that moves again mid-slide carries on from where things are.
+        // The rest make room at the same pace as a page being carried.
+        for (view, frame) in moves {
+            if !carried, Tokens.Motion.isKeyboardDriven {
+                // From the keyboard (⌘W, ⌘T) the list simply is in its new order, as the rest of Zigzag answers keys.
+                view.layer?.removeAnimation(forKey: "glide")
+                Tokens.Motion.withoutAnimation { view.frame = frame }
+            } else if carried {
+                Tokens.Motion.glide(view, to: frame, duration: 0.3, timing: Self.carryCurve)
             } else {
-                Tokens.Motion.animate { changes.forEach { $0() } }
+                Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.easeInOut)
             }
         }
+        if !changes.isEmpty { Tokens.Motion.animate { changes.forEach { $0() } } }
         shownPages = [:]
         for item in displayed { if let id = pageID(item) { shownPages[item] = id } }
         updateDocumentHeight()
@@ -331,13 +334,10 @@ final class SidebarListView: NSView {
         lift.keyTimes = [0, 0.25, 0.7, 1]
         lift.duration = 0.3
         layer?.add(lift, forKey: "lift")
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
-            ctx.allowsImplicitAnimation = true
-            view.animator().frame = frame
-        }
+        Tokens.Motion.glide(view, to: frame, duration: 0.3, timing: Self.carryCurve)
     }
+
+    private static let carryCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
 
     private func updateDocumentHeight() {
         guard let clip = enclosingScrollView?.contentView else { return }

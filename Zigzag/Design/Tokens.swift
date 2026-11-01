@@ -260,6 +260,32 @@ enum Tokens {
             return animation.duration
         }
 
+        /// Moves a view to `frame` at once, so layout and clicks see the truth, and lets the render server show it
+        /// traveling there from wherever it's drawn right now. Smooth however busy the app is, and a move that
+        /// changes course mid-way carries on from where it is on screen, never jumping back. For rows and tiles
+        /// that make room for something being dragged.
+        static func glide(_ view: NSView, to frame: NSRect, duration: TimeInterval = standard,
+                          timing: CAMediaTimingFunction = easeInOut) {
+            guard let layer = view.layer else { view.frame = frame; return }
+            var shown = view.frame.origin
+            if layer.animation(forKey: "glide") != nil, let drawn = layer.presentation()?.transform {
+                shown.x += drawn.m41
+                shown.y += drawn.m42
+            }
+            withoutAnimation { view.frame = frame }
+            layer.removeAnimation(forKey: "glide")
+            // A layer's y runs the way its view's superview does, so the offset carries over as it is.
+            let dx = shown.x - frame.minX, dy = shown.y - frame.minY
+            guard !reduceMotion, abs(dx) > 0.5 || abs(dy) > 0.5 else { return }
+            let animation = CABasicAnimation(keyPath: "transform")
+            animation.fromValue = CATransform3DMakeTranslation(dx, dy, 0)
+            animation.toValue = CATransform3DIdentity
+            animation.duration = duration * debugSlowdown
+            animation.timingFunction = timing
+            animation.fillMode = .backwards
+            layer.add(animation, forKey: "glide")
+        }
+
         /// Applies changes immediately with no implicit animation.
         static func withoutAnimation(_ changes: () -> Void) {
             CATransaction.begin()

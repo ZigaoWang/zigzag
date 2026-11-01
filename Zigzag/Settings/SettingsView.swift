@@ -1250,7 +1250,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             var others = spaceRows.filter { $0 !== row }
             others.insert(row, at: target)
             for (i, other) in others.enumerated() where other !== row {
-                glide(other, toY: CGFloat(i) * rowHeight, duration: 0.2, timing: Tokens.Motion.easeInOut)
+                var frame = other.frame
+                frame.origin.y = CGFloat(i) * rowHeight
+                Tokens.Motion.glide(other, to: frame)
             }
         }
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
@@ -1259,7 +1261,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             place(self.spacesGroup.convert(event.locationInWindow, from: nil))
         }
         let spaceID = row.spaceID, moved = target != startIndex
-        glide(row, toY: CGFloat(target) * rowHeight, duration: 0.18, timing: Tokens.Motion.easeOut)
+        var landing = row.frame
+        landing.origin.y = CGFloat(target) * rowHeight
+        Tokens.Motion.glide(row, to: landing, duration: 0.18, timing: Tokens.Motion.easeOut)
         DispatchQueue.main.asyncAfter(deadline: .now() + (Tokens.Motion.reduceMotion ? 0 : 0.18)) { [weak self] in
             SpaceSettingsRow.isReordering = false
             row.isLifted = false
@@ -1282,26 +1286,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         for row in spaceRows {
             row.isHovered = row.window != nil && row.bounds.contains(row.convert(mouse, from: nil))
         }
-    }
-
-    /// Moves a row to `y` at once and lets the render server show the slide there, from wherever it's drawn now,
-    /// so the motion stays smooth however busy the app is and picks up mid-slide when the gap moves again.
-    private func glide(_ view: NSView, toY y: CGFloat, duration: TimeInterval, timing: CAMediaTimingFunction) {
-        guard let layer = view.layer else { view.frame.origin.y = y; return }
-        let shown = layer.animation(forKey: "glide") != nil
-            ? (layer.presentation()?.value(forKeyPath: "transform.translation.y") as? CGFloat ?? 0) : 0
-        let from = view.frame.minY + shown
-        Tokens.Motion.withoutAnimation { view.frame.origin.y = y }
-        layer.removeAnimation(forKey: "glide")
-        guard !Tokens.Motion.reduceMotion, abs(from - y) > 0.5 else { return }
-        let animation = CABasicAnimation(keyPath: "transform.translation.y")
-        // The group is flipped and so are its layers: a positive translation is downward, as y is.
-        animation.fromValue = from - y
-        animation.toValue = 0
-        animation.duration = duration
-        animation.timingFunction = timing
-        animation.fillMode = .backwards
-        layer.add(animation, forKey: "glide")
     }
 
     // MARK: Actions
