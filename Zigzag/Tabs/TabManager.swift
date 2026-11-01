@@ -1099,6 +1099,7 @@ final class TabManager {
             tabsBySpace[tab.spaceID] = list
             recentTabIDs.removeAll { $0 == tab.id }
             tabTokens[tab.id] = nil
+            if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
             tab.close()
         }
         changed.send(.structure)
