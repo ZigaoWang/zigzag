@@ -25,26 +25,32 @@ enum SidebarMenus {
         menu.autoenablesItems = false
         let tabs = items.compactMap { item -> Tab? in if case .tab(let id) = item { controller.tabManager.tab(with: id) } else { nil } }
         let count = items.count
-        menu.addItem(Item("Add \(count) to New Folder") { controller.sidebar.list.clearMarks(); controller.newFolder(with: controller.pinnedIDs(for: items)) })
-        let folders = Library.shared.folders(in: controller.tabManager.currentSpaceID)
-        if !folders.isEmpty {
-            let add = NSMenuItem(title: "Add \(count) to Folder", action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            for folder in folders {
-                sub.addItem(Item(folder.name) {
-                    controller.sidebar.list.clearMarks()
-                    for id in controller.pinnedIDs(for: items) { controller.listSetFolder(of: id, to: folder.id) }
-                })
+        // A private window's tabs never join the pins every window shares, in a folder or on their own.
+        let isPrivate = controller.tabManager.isPrivate
+        if !isPrivate || tabs.isEmpty {
+            menu.addItem(Item("Add \(count) to New Folder") { controller.sidebar.list.clearMarks(); controller.newFolder(with: controller.pinnedIDs(for: items)) })
+            let folders = Library.shared.folders(in: controller.tabManager.currentSpaceID)
+            if !folders.isEmpty {
+                let add = NSMenuItem(title: "Add \(count) to Folder", action: nil, keyEquivalent: "")
+                let sub = NSMenu()
+                for folder in folders {
+                    sub.addItem(Item(folder.name) {
+                        controller.sidebar.list.clearMarks()
+                        for id in controller.pinnedIDs(for: items) { controller.listSetFolder(of: id, to: folder.id) }
+                    })
+                }
+                add.submenu = sub
+                menu.addItem(add)
             }
-            add.submenu = sub
-            menu.addItem(add)
         }
         if !tabs.isEmpty {
-            menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") {
-                controller.sidebar.list.clearMarks()
-                for tab in tabs where tab.bookmarkID == nil { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
-            })
-            menu.addItem(.separator())
+            if !isPrivate {
+                menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") {
+                    controller.sidebar.list.clearMarks()
+                    for tab in tabs where tab.bookmarkID == nil { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+                })
+                menu.addItem(.separator())
+            }
             menu.addItem(Item(tabs.count == 1 ? "Close Tab" : "Close \(tabs.count) Tabs") {
                 controller.sidebar.list.clearMarks()
                 controller.closeManyWithUndo(tabs)
@@ -62,8 +68,11 @@ enum SidebarMenus {
         })
         // Half of a split pins with its other half, as a split.
         let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
-        menu.addItem(Item(pinsPair ? "Pin Split View" : "Pin Tab", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
-        menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
+        // Pins and favorites are shared by every window: a private one's tabs stay out of them.
+        if !manager.isPrivate {
+            menu.addItem(Item(pinsPair ? "Pin Split View" : "Pin Tab", enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
+            menu.addItem(Item("Add to Favorites", enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
+        }
         if manager.split(for: tab) != nil {
             menu.addItem(Item("Separate Tabs") { controller.unsplitWithUndo(tab) })
         } else if let current = manager.selectedTab, manager.canSplit(current, with: tab) {

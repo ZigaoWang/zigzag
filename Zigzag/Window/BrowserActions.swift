@@ -301,7 +301,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: Bookmarks
 
     @objc func addToFavorites(_ sender: Any?) {
-        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite else { return }
+        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, tab.bookmarkID != nil || !tabManager.isPrivate else { return }
         favoriteWithUndo(tab)
     }
     @objc func moveTabToNewWindow(_ sender: Any?) {
@@ -318,7 +318,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         } else if let bookmarkID = tab.bookmarkID {
             unbookmarkWithUndo(bookmarkID, to: 0)
             Toast.show("Unpinned", symbol: "pin.slash", in: self)
-        } else {
+        } else if !tabManager.isPrivate {
+            // Pins are shared by every window: a private one's tabs stay out of them.
             bookmarkWithUndo(tab, at: nil, in: tab.spaceID)
             Toast.show("Pinned", symbol: "pin.fill", in: self)
         }
@@ -425,8 +426,8 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(toggleBookmark(_:)):
             item.title = tab?.isFavorite == true ? "Remove from Favorites" : tab?.bookmarkID != nil ? "Unpin Tab" : "Pin Tab"
-            return tab?.url != nil
-        case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true
+            return tab?.url != nil && (tab?.bookmarkID != nil || !tabManager.isPrivate)
+        case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
         case #selector(newSpace(_:)): return !tabManager.isPrivate
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil

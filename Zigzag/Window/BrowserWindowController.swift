@@ -1424,7 +1424,11 @@ extension BrowserWindowController: SidebarDelegate {
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(made.id) }
     }
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
-    func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) { bookmarkWithUndo(tab, at: index, in: spaceID) }
+    func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {
+        // Pins are shared by every window: a private one's tabs stay out of them.
+        guard !tabManager.isPrivate else { return }
+        bookmarkWithUndo(tab, at: index, in: spaceID)
+    }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
     /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
     func moveToNewWindow(_ tab: Tab) {
@@ -1485,7 +1489,7 @@ extension BrowserWindowController: SidebarDelegate {
             let address = sidebar.address.convert(sidebar.address.bounds, to: nil)
             zone = NSRect(x: address.minX, y: address.minY - Tokens.Space.x10, width: address.width, height: Tokens.Space.x10)
         }
-        let over = zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
+        let over = !tabManager.isPrivate && zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
         favorites.isDropTarget = over
         if over { favorites.hoverDrop(at: windowPoint, carrying: carrying) }
         return over
