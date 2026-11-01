@@ -718,6 +718,101 @@ enum Tokens {
         static let onFrameChosenAlpha: CGFloat = 0.2
     }
 
+    // MARK: - Materials (the tactile kit in Materials.swift; Design/DESIGN.md, "Materials")
+
+    /// One light, straight above: highlights sit on top edges, shadows fall straight down and are tinted with the
+    /// navy, so they read as shade on a colored world rather than gray smudges.
+    enum Material {
+        /// A color for light and one for dark, resolved by the layer that draws it.
+        struct Tone {
+            let light: NSColor
+            let dark: NSColor
+            func cg(_ isDark: Bool) -> CGColor { (isDark ? dark : light).cgColor }
+        }
+
+        /// How far a thing stands off what's under it: a wide, soft ambient shadow and a tight contact one.
+        struct Elevation {
+            var ambientRadius: CGFloat, ambientDrop: CGFloat, ambientOpacity: Float
+            var contactRadius: CGFloat, contactDrop: CGFloat, contactOpacity: Float
+
+            /// The same elevation for a thing `factor` times the size it was drawn for.
+            func scaled(_ factor: CGFloat) -> Elevation {
+                Elevation(ambientRadius: ambientRadius * factor, ambientDrop: ambientDrop * factor, ambientOpacity: ambientOpacity,
+                          contactRadius: contactRadius * factor, contactDrop: contactDrop * factor, contactOpacity: contactOpacity)
+            }
+        }
+
+        private static func white(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
+        private static func ink(_ alpha: CGFloat) -> NSColor { Color.hex(0x0B1A2E, alpha: alpha) }
+
+        /// The color shadows are made of. Dark mode's are deeper (`darkShadowGain`), since dark surfaces need more to part.
+        static let shadowInk = Tone(light: Color.hex(0x0B1A2E), dark: Color.hex(0x000000))
+        static let darkShadowGain: Float = 2.2
+
+        /// The specular rim along a raised or glass thing's top edge, and the fainter light caught at its bottom edge.
+        static let rim = Tone(light: white(0.95), dark: white(0.30))
+        static let rimCatch = Tone(light: white(0.5), dark: white(0.08))
+        /// The darker bottom of a raised thing's bevel.
+        static let bevelShade = Tone(light: ink(0.16), dark: Color.hex(0x000000, alpha: 0.5))
+        /// A hairline just outside a raised or glass thing, so it parts from what's behind it.
+        static let outline = Tone(light: ink(0.10), dark: Color.hex(0x000000, alpha: 0.55))
+
+        /// Raised surfaces (a secondary button): lit at the top, a step deeper at the bottom.
+        static let raisedTop = Tone(light: Color.hex(0xFFFFFF), dark: Color.hex(0x464A54))
+        static let raisedBottom = Tone(light: Color.hex(0xEEF1F5), dark: Color.hex(0x30333B))
+        /// The same pressed in: the gradient turned over, so the light seems to fall into it.
+        static let pressedTop = Tone(light: Color.hex(0xE3E7ED), dark: Color.hex(0x2A2D34))
+        static let pressedBottom = Tone(light: Color.hex(0xF4F6F9), dark: Color.hex(0x3A3D46))
+        /// A tile's porcelain body, and a toggle's knob.
+        static let porcelainTop = Tone(light: Color.hex(0xFAFBFD), dark: Color.hex(0xE2E7EE))
+        static let porcelainBottom = Tone(light: Color.hex(0xE2E7EE), dark: Color.hex(0xB3BDCB))
+
+        /// Recessed things (a field, a toggle's track): darker at the top where the lip shades them, an inner
+        /// shadow under that lip, and the light caught on the lower lip outside.
+        static let recessTop = Tone(light: ink(0.10), dark: Color.hex(0x000000, alpha: 0.42))
+        static let recessBottom = Tone(light: ink(0.035), dark: Color.hex(0x000000, alpha: 0.26))
+        static let recessShade = Tone(light: ink(0.30), dark: Color.hex(0x000000, alpha: 0.9))
+        static let lip = Tone(light: white(0.9), dark: white(0.09))
+
+        /// Glass: the wash over the frost, top to bottom, the glow just inside its edge, and the specular hot spot.
+        static let glassWashTop = Tone(light: white(0.50), dark: white(0.07))
+        static let glassWashBottom = Tone(light: white(0.20), dark: white(0.02))
+        static let glassGlow = Tone(light: white(1), dark: white(0.5))
+        static let sheen = Tone(light: white(0.85), dark: white(0.22))
+        /// Grain over glass, so it reads as a material rather than a screen.
+        static let grainOpacity: Float = 0.05
+
+        /// Elevations: a raised control at rest, under the pointer and pressed; a 64pt tile at rest and lifted
+        /// (scale with its side); a floating glass surface.
+        static let raisedRest = Elevation(ambientRadius: 6, ambientDrop: 3, ambientOpacity: 0.12, contactRadius: 1, contactDrop: 1, contactOpacity: 0.2)
+        static let raisedHover = Elevation(ambientRadius: 10, ambientDrop: 5, ambientOpacity: 0.16, contactRadius: 1.5, contactDrop: 1.5, contactOpacity: 0.18)
+        static let raisedPressed = Elevation(ambientRadius: 2, ambientDrop: 1, ambientOpacity: 0.06, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.22)
+        static let tileRest = Elevation(ambientRadius: 12, ambientDrop: 10, ambientOpacity: 0.2, contactRadius: 1.5, contactDrop: 1.5, contactOpacity: 0.24)
+        static let tileLifted = Elevation(ambientRadius: 20, ambientDrop: 17, ambientOpacity: 0.24, contactRadius: 2.5, contactDrop: 2, contactOpacity: 0.16)
+        static let floating = Elevation(ambientRadius: 44, ambientDrop: 26, ambientOpacity: 0.16, contactRadius: 1.5, contactDrop: 1, contactOpacity: 0.12)
+
+        /// How far a raised thing rises under the pointer, how far a pressed one sinks, and a lifted tile's rise.
+        static let lift: CGFloat = 1
+        static let sink: CGFloat = 1
+        static let tileLift: CGFloat = 3
+        /// A pressed control shrinks a touch as it sinks, as a thing pushed away from you does.
+        static let pressScale: CGFloat = 0.97
+        /// The most a hero object turns toward the pointer, in degrees, and the depth it's seen from.
+        static let tilt: CGFloat = 5
+        static let perspective: CGFloat = -1 / 1100
+        /// A material object rising, sinking or settling: the one hover that moves rather than appears, since it's
+        /// a thing moving, not a fill changing. Pressing in is quicker than coming back.
+        static let settle: TimeInterval = Motion.standard
+        static let pressIn: TimeInterval = Motion.quick
+        /// Turning to follow the pointer: slow enough to feel like weight.
+        static let follow: TimeInterval = 0.6
+        /// A tile's corner as a share of its side, as app icons have it.
+        static let tileCorner: CGFloat = 0.2237
+        /// A large glass surface on a brand moment, and the height of its tactile controls.
+        static let heroRadius: CGFloat = 28
+        static let controlHeight: CGFloat = Space.x10
+    }
+
     // MARK: - Shadows (purposeful only)
 
     enum Shadow {
