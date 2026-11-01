@@ -1444,6 +1444,17 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
 
+    /// Sends a tab to another space. It leaves the screen, so a toast says where it went, with Undo to bring it back.
+    func moveToSpaceWithToast(_ tab: Tab, spaceID: UUID) {
+        guard let name = Library.shared.space(spaceID)?.name, spaceID != tab.spaceID else { return }
+        moveWithUndo(tab, to: 0, in: spaceID)
+        // Undo brings back this tab, never whatever else was done since.
+        Toast.show("Moved to \(name)", symbol: "arrow.right.square", action: ("Undo", { [weak self] in
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Move to Space" else { return }
+            undo.undo()
+        }), duration: 4, in: self)
+    }
+
     /// Turns a tab into a bookmark, undoably. Half of a split pins the pair.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
         Tutorial.complete("pin")

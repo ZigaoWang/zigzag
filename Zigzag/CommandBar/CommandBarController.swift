@@ -816,9 +816,7 @@ extension CommandBarController {
                 controller.tabManager.switchToSpace(space)
             } else if id.hasPrefix("move:"), let space = UUID(uuidString: String(id.dropFirst(5))), Library.shared.space(space) != nil,
                       let tab = controller.tabManager.selectedTab, tab.bookmarkID == nil {
-                controller.moveWithUndo(tab, to: 0, in: space)
-                // The page leaves the screen: say where it went.
-                Toast.show("Moved to \(Library.shared.space(space)?.name ?? "")", symbol: "arrow.right.square", in: controller)
+                controller.moveToSpaceWithToast(tab, spaceID: space)
             }
         }
     }

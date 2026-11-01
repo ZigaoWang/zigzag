@@ -128,7 +128,7 @@ enum SidebarMenus {
             let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
             let sub = NSMenu()
             for space in Library.shared.spaces where space.id != tab.spaceID {
-                sub.addItem(Item(space.name) { controller.moveWithUndo(tab, to: 0, in: space.id) })
+                sub.addItem(Item(space.name) { controller.moveToSpaceWithToast(tab, spaceID: space.id) })
             }
             move.submenu = sub
             menu.addItem(move)
