@@ -1044,11 +1044,30 @@ final class SidebarListView: NSView {
     private var edgeDirection: Int?
     private var edgeWork: DispatchWorkItem?
 
+    /// Carry a row or a favorite to the sidebar's left or right edge and hold: the space flips that way, and keeps
+    /// flipping while it's held there. Nil: the drag is over.
+    func carryToEdge(at screenPoint: NSPoint?) {
+        let container = (window?.windowController as? BrowserWindowController)?.root.sidebarContainer
+        var edge: Int?
+        if let screenPoint, let window, let container {
+            let local = container.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
+            if local.y >= 0, local.y <= container.bounds.height,
+               local.x > -Tokens.Space.x6, local.x < container.bounds.width + Tokens.Space.x12 {
+                let zone = Tokens.Space.x10
+                edge = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+            }
+        }
+        guard edge != edgeDirection else { return }
+        edgeDirection = edge
+        edgeWork?.cancel()
+        if let edge { scheduleEdgeFlip(edge) }
+    }
+
     /// Flips to the neighboring space after a short hold at the edge, and keeps flipping while held.
     private func scheduleEdgeFlip(_ direction: Int) {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.drag != nil, self.edgeDirection == direction, let manager = self.manager else { return }
+                guard let self, self.edgeDirection == direction, let manager = self.manager else { return }
                 let spaces = Library.shared.spaces
                 guard let index = spaces.firstIndex(where: { $0.id == manager.currentSpaceID }), spaces.indices.contains(index + direction) else { return }
                 self.delegate?.listSwitchSpaceDuringDrag(spaces[index + direction].id)
@@ -1140,22 +1159,7 @@ final class SidebarListView: NSView {
             drag = refreshed
         }
 
-        // Carry the row to the sidebar's left or right edge and hold: the space flips that way.
-        let container = (window.windowController as? BrowserWindowController)?.root.sidebarContainer
-        let local = container.map { $0.convert(window.convertPoint(fromScreen: mouse), from: nil) }
-        if let container, let local, local.y >= 0, local.y <= container.bounds.height,
-           local.x > -Tokens.Space.x6, local.x < container.bounds.width + Tokens.Space.x12 {
-            let zone = Tokens.Space.x10
-            let edge: Int? = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
-            if edge != edgeDirection {
-                edgeDirection = edge
-                edgeWork?.cancel()
-                if let edge { scheduleEdgeFlip(edge) }
-            }
-        } else if edgeDirection != nil {
-            edgeDirection = nil
-            edgeWork?.cancel()
-        }
+        carryToEdge(at: mouse)
 
         // Holding over another space's dot opens that space, so you can drop it in place there. Let go on a dot,
         // it goes into that space, shown or not.
@@ -1201,8 +1205,7 @@ final class SidebarListView: NSView {
         showFolderTarget(nil)
         insertionLine.isHidden = true
         springWork?.cancel()
-        edgeWork?.cancel()
-        edgeDirection = nil
+        carryToEdge(at: nil)
         splitWork?.cancel()
         splitCandidate = nil
         lastSplitTarget = nil

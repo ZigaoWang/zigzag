@@ -148,6 +148,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let over = !self.tabManager.isPrivate && self.isOverList(point)
             self.sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
             self.favoriteSpring(at: window.convertPoint(fromScreen: point))
+            self.sidebar.list.carryToEdge(at: point)
             return over
         }
         sidebar.favorites.onDrop = { [weak self] favorite, point in
@@ -177,6 +178,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             self.sidebar.list.externalHover(at: nil)
             self.favoriteSpring(at: nil)
+            self.sidebar.list.carryToEdge(at: nil)
             self.sidebar.clearDropTargets()
             // Called off: back to the space it started in, as if it had never moved.
             if cancelled, let origin = self.favoriteDragOrigin { self.tabManager.showSpaceKeepingPage(origin) }
