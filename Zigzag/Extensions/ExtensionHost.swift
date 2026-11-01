@@ -241,7 +241,7 @@ final class ExtensionHost: NSObject {
                     }
                 })
             }
-            Toast.show("\(attention.title): in its settings, choose Browser, then Add Browser.", symbol: "exclamationmark.circle",
+            Toast.show("\(attention.title): in its settings, choose Browser, then Add Browser", symbol: "exclamationmark.triangle",
                        action: open, duration: 6, in: controller)
         }
         // "When you click it": clicking gives it this site from now on.
@@ -300,8 +300,8 @@ final class ExtensionHost: NSObject {
         if type == "BrowserVerificationFailed", !Self.toldAboutVerification,
            let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
             Self.toldAboutVerification = true
-            Toast.show("1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag.",
-                       symbol: "exclamationmark.circle", action: ("Open 1Password", {
+            Toast.show("1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag",
+                       symbol: "exclamationmark.triangle", action: ("Open 1Password", {
                            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
                                NSWorkspace.shared.openApplication(at: app, configuration: .init())
                            }
@@ -859,7 +859,7 @@ final class NativeMessagingHost {
             guard id == ExtensionStore.onePasswordID, !Self.pointedAtApp,
                   let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
             Self.pointedAtApp = true
-            Toast.show("1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks.",
+            Toast.show("1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks",
                        symbol: "lock.open", action: ("Open 1Password", {
                            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
                                NSWorkspace.shared.openApplication(at: app, configuration: .init())

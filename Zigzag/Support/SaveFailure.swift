@@ -24,8 +24,8 @@ enum SaveFailure {
         }
     }
 
-    /// "Couldn’t save the page. Not enough space on your Mac."
+    /// "Couldn’t save the page. Not enough space on your Mac", a toast's words, so no period at the end.
     static func message(_ what: String, _ error: Error) -> String {
-        reason(for: error).map { "\(what). \($0)." } ?? what
+        reason(for: error).map { "\(what). \($0)" } ?? what
     }
 }

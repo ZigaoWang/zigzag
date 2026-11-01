@@ -45,7 +45,7 @@ final class Updater {
         } else {
             // A development build: say so where you're looking, not in a system alert.
             if let window = WindowManager.shared.keyController {
-                Toast.show("This build doesn’t update itself. Release builds of Zigzag update automatically.", symbol: "arrow.down.circle", duration: 3, in: window)
+                Toast.show("This build doesn’t update itself. Release builds of Zigzag update automatically", symbol: "arrow.down.circle", duration: 3, in: window)
             }
         }
     }

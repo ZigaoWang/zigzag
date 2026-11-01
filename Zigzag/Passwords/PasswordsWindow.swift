@@ -412,7 +412,7 @@ final class PasswordsView: NSView {
                     let written = try await PasswordExport.write(self.credentials, to: url)
                     Toast.show("Exported \(written) \(written == 1 ? "password" : "passwords")", symbol: "square.and.arrow.up", duration: 2, over: self, area: self.detail.frame)
                 } catch {
-                    Toast.show("Couldn’t write the file. Choose another folder and try again.", symbol: "exclamationmark.triangle", duration: 3, over: self, area: self.detail.frame)
+                    Toast.show("Couldn’t write the file. Choose another folder and try again", symbol: "exclamationmark.triangle", duration: 3, over: self, area: self.detail.frame)
                 }
             }
         }
@@ -853,7 +853,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
                         _ = try await store.save(origin: credential.origin, username: credential.username, password: kept, title: credential.title.isEmpty ? nil : credential.title,
                                                  notes: credential.notes, otpAuth: credential.otpAuth, created: credential.created)
                     } catch {
-                        if let host { Toast.show("Couldn’t put it back.", symbol: "exclamationmark.triangle", duration: 4, over: host, area: area) }
+                        if let host { Toast.show("Couldn’t put it back", symbol: "exclamationmark.triangle", duration: 4, over: host, area: area) }
                     }
                 }
             }), duration: 6, over: host, area: frame)

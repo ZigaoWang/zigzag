@@ -14,7 +14,7 @@ struct SaveFailureTests {
     @Test func theReasonBeneath() {
         let underlying = NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))
         let error = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError, userInfo: [NSUnderlyingErrorKey: underlying])
-        #expect(SaveFailure.message("Couldn’t save the page", error) == "Couldn’t save the page. Not enough space on your Mac.")
+        #expect(SaveFailure.message("Couldn’t save the page", error) == "Couldn’t save the page. Not enough space on your Mac")
     }
 
     @Test func nothingUsefulToSay() {
