@@ -236,12 +236,10 @@ final class SwipeNavigator {
         let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
         Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
         guard from != .identity, !Tokens.Motion.reduceMotion else { return }
-        let back = CASpringAnimation(keyPath: "transform")
+        // The app's critically damped spring, as stiff as before (a perceptual 0.35 s).
+        let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: 0.35)
         back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
         back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        back.stiffness = 320
-        back.damping = 2 * sqrt(320)
-        back.duration = back.settlingDuration
         layer.add(back, forKey: "swipe.settle")
     }
 
@@ -304,7 +302,15 @@ final class SwipeArrowView: NSView {
             self.circle.borderWidth = self.isArmed ? 0 : 1
             self.circle.borderColor = self.cgColor(Tokens.Color.separator)
         }
-        if animated { CATransaction.begin(); CATransaction.setAnimationDuration(0.15); apply(); CATransaction.commit() } else { Tokens.Motion.withoutAnimation(apply) }
+        if animated, !Tokens.Motion.reduceMotion {
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(Tokens.Motion.snap.duration)
+            CATransaction.setAnimationTimingFunction(Tokens.Motion.snap.timing)
+            apply()
+            CATransaction.commit()
+        } else {
+            Tokens.Motion.withoutAnimation(apply)
+        }
         symbol.contentTintColor = isArmed ? .white : Tokens.Color.textSecondary
         // Fades in as you swipe; once letting go will move, it fills.
         alphaValue = min(1, max(0, (progress - 0.1) * 2))
@@ -317,7 +323,8 @@ final class SwipeArrowView: NSView {
             isArmed = true
         }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = navigated ? 0.3 : 0.18
+            context.duration = Tokens.Motion.reduceMotion ? 0 : navigated ? 0.3 : 0.18
+            context.timingFunction = Tokens.Motion.easeOut
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in MainActor.assumeIsolated { self?.removeFromSuperview() } })
     }

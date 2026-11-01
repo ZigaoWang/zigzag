@@ -212,7 +212,7 @@ final class PeekController {
         panel.alphaValue = 1
         panel.layoutSubtreeIfNeeded()
         origin = clickPoint()
-        guard let layer = panel.layer, !Tokens.Motion.isKeyboardDriven, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+        guard let layer = panel.layer, !Tokens.Motion.isKeyboardDriven, !Tokens.Motion.reduceMotion else {
             panel.present()
             return
         }
@@ -234,7 +234,8 @@ final class PeekController {
 
     /// Steps back and fades.
     private func shrink(_ done: @escaping () -> Void) {
-        guard let layer = panel.layer, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+        // Esc puts it away at once, the way a key closes any panel; Reduce Motion just fades it.
+        guard let layer = panel.layer, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion else {
             panel.dismiss(completion: done)
             return
         }
@@ -276,7 +277,7 @@ final class PeekController {
         guard isVisible else { return }
         isVisible = false
         token = nil
-        scrim.hide()
+        if Tokens.Motion.isFromKey { scrim.removeFromSuperview() } else { scrim.hide() }
         let closing = tab
         tab = nil
         shrink { closing?.close() }
