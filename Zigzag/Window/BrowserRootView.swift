@@ -422,7 +422,9 @@ final class BrowserRootView: ColorView {
     private lazy var glassView: NSVisualEffectView = {
         let glass = NSVisualEffectView()
         glass.blendingMode = .behindWindow
-        glass.material = .underWindowBackground
+        // The sidebar's own material: the clearest frosting macOS has, so what's behind the window shows through as
+        // a soft blur rather than a gray wash.
+        glass.material = .sidebar
         glass.state = .active
         glass.isHidden = true
         addSubview(glass, positioned: .below, relativeTo: nil)
