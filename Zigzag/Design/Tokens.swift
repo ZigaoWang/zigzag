@@ -819,6 +819,27 @@ enum Tokens {
         static let onFrameChosenAlpha: CGFloat = 0.2
     }
 
+    // MARK: - The slide switch
+
+    /// `Toggle`, a slide switch: a recessed matte track (`Metric.toggleSize`, 34 by 20) with a hairline edge and shade
+    /// under its upper lip, and a small round knob (`Metric.toggleKnob`, 14) that is porcelain when off and the one
+    /// warm color (`Color.live`) when on. The track never lights up; on and off differ by the knob's place and color.
+    enum Switch {
+        private static func ink(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
+        static let track = Color.dynamic(light: ink(0.075), dark: ink(0.32))
+        static let trackHover = Color.dynamic(light: ink(0.095), dark: ink(0.36))
+        static let trackPressed = Color.dynamic(light: ink(0.115), dark: ink(0.4))
+        static let edge = Color.dynamic(light: ink(0.06), dark: Color.hex(0xFFFFFF, alpha: 0.06))
+        /// The shade under the track's upper lip, fading out by `recessDepth` of its height.
+        static let recess = Color.dynamic(light: ink(0.07), dark: ink(0.25))
+        static let recessDepth: CGFloat = 0.55
+        static let knob = Color.dynamic(light: Color.hex(0xFBFAF8), dark: Color.hex(0xE9E7E4))
+        static let knobEdge = Color.dynamic(light: ink(0.11), dark: ink(0.3))
+        static let knobShadow = Color.dynamic(light: ink(0.18), dark: ink(0.45))
+        static let knobShadowRadius: CGFloat = 1
+        static let knobShadowDrop: CGFloat = 0.5
+    }
+
     // MARK: - The frame and the chrome on it
 
     /// The space's color as the window wears it: a curated color's OKLCH lightness and chroma, by day and at night.

@@ -1036,23 +1036,20 @@ final class Toggle: InteractiveView {
     }
 
     private func paint(fading: Bool) {
-        // The recess: a matte track a step darker than what it's set in, deeper under the pointer.
-        let deeper = isPressed ? 0.04 : isHovered ? 0.02 : 0
-        let track = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.075 + deeper), dark: Tokens.Color.hex(0x000000, alpha: 0.32 + deeper * 2))
+        // The recess: a matte track a step darker than what it's set in, deeper under the pointer (`Switch`).
+        typealias S = Tokens.Switch
+        let track = isPressed ? S.trackPressed : isHovered ? S.trackHover : S.track
         layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.standard)
-        let porcelain = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFBFAF8), dark: Tokens.Color.hex(0xE9E7E4))
-        let face = isOn ? Tokens.Color.live : porcelain
-        knob.set(backgroundColor: cgColor(face), animated: fading, duration: Tokens.Motion.standard)
+        knob.set(backgroundColor: cgColor(isOn ? Tokens.Color.live : S.knob), animated: fading, duration: Tokens.Motion.standard)
         Tokens.Motion.withoutAnimation {
-            layer?.borderColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.06), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.06)))
-            recess.colors = [cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.07), dark: Tokens.Color.hex(0x000000, alpha: 0.25))),
-                             cgColor(NSColor.clear)]
+            layer?.borderColor = cgColor(S.edge)
+            recess.colors = [cgColor(S.recess), cgColor(NSColor.clear)]
             recess.startPoint = CGPoint(x: 0.5, y: isFlipped ? 0 : 1)
-            recess.endPoint = CGPoint(x: 0.5, y: isFlipped ? 0.55 : 0.45)
-            knob.borderColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: isOn ? 0.1 : 0.12), dark: Tokens.Color.hex(0x000000, alpha: 0.3)))
-            knob.shadowColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.18), dark: Tokens.Color.hex(0x000000, alpha: 0.45)))
-            knob.shadowRadius = 1
-            knob.shadowOffset = CGSize(width: 0, height: isFlipped ? 0.5 : -0.5)
+            recess.endPoint = CGPoint(x: 0.5, y: isFlipped ? S.recessDepth : 1 - S.recessDepth)
+            knob.borderColor = cgColor(S.knobEdge)
+            knob.shadowColor = cgColor(S.knobShadow)
+            knob.shadowRadius = S.knobShadowRadius
+            knob.shadowOffset = CGSize(width: 0, height: isFlipped ? S.knobShadowDrop : -S.knobShadowDrop)
         }
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
