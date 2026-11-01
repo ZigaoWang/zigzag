@@ -1580,25 +1580,42 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
 
-    func listDragOverPage(at windowPoint: NSPoint?, tab: Tab) {
-        guard let windowPoint, canDropBeside(tab) else { root.splitDropHint.show(nil); return }
+    func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
+        guard let windowPoint, canDropBeside(item) else { root.splitDropHint.show(nil); return }
         let side = root.splitDropHint.side(at: windowPoint)
         if let side, side != root.splitDropHint.side { Haptics.snap() }
         root.splitDropHint.show(side)
     }
 
-    func listDropOnPage(_ tab: Tab) -> Bool {
+    func listDropOnPage(_ item: SidebarItem) -> Bool {
         let side = root.splitDropHint.side
         root.splitDropHint.show(nil)
-        guard let side, canDropBeside(tab), let current = tabManager.selectedTab else { return false }
+        guard let side, canDropBeside(item), let current = tabManager.selectedTab else { return false }
+        let tab: Tab? = switch item {
+        case .tab(let id): tabManager.tab(with: id)
+        case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
+        default: nil
+        }
+        guard let tab else { return false }
         splitWithUndo(current, with: tab, otherOnRight: side == .right)
         return true
     }
 
-    /// Only another tab opens beside the page you're on, and neither may already be half of a split.
-    private func canDropBeside(_ tab: Tab) -> Bool {
-        guard let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { return false }
-        return TabManager.canSplit(tabManager.splitSide(of: tab), onto: tabManager.splitSide(of: current))
+    /// Only another tab, or a pinned page beside a tab, opens beside the page you're on, and neither may already be
+    /// half of a split.
+    private func canDropBeside(_ item: SidebarItem) -> Bool {
+        guard let current = tabManager.selectedTab else { return false }
+        switch item {
+        case .tab(let id):
+            guard let tab = tabManager.tab(with: id), tabManager.canSplit(current, with: tab) else { return false }
+            return TabManager.canSplit(tabManager.splitSide(of: tab), onto: tabManager.splitSide(of: current))
+        case .bookmark(let id):
+            // Not loaded yet, it opens at its pinned address.
+            guard current.bookmarkID == nil else { return false }
+            return TabManager.canSplit(tabManager.splitSide(ofBookmark: id), onto: tabManager.splitSide(of: current))
+        default:
+            return false
+        }
     }
 
     func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool {

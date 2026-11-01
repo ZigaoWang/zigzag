@@ -51,10 +51,10 @@ protocol SidebarListDelegate: AnyObject {
     func listDropOnFavorites(_ items: [SidebarItem], dragged: SidebarItem) -> Bool
     /// A favorite's tile, for a row that became one to land on.
     func listFavoriteTile(for bookmarkID: UUID) -> NSView?
-    /// A tab dragged over the page: show which half it would open in (nil: it's not over the page).
-    func listDragOverPage(at windowPoint: NSPoint?, tab: Tab)
+    /// A tab or pinned page dragged over the page: show which half it would open in (nil: it's not over the page).
+    func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem)
     /// Dropped on the page: open it in split view beside the current page. Returns true if it did.
-    func listDropOnPage(_ tab: Tab) -> Bool
+    func listDropOnPage(_ item: SidebarItem) -> Bool
 }
 
 enum SidebarItem: Hashable {
@@ -1106,9 +1106,9 @@ final class SidebarListView: NSView {
         if overFavorites, !wasOverFavorites { Haptics.snap() }
         wasOverFavorites = overFavorites
 
-        // Over this window's page (not the sidebar): offer to open the tab beside it.
-        if case .tab(let id) = drag.item, let tab = manager?.tab(with: id) {
-            delegate?.listDragOverPage(at: hit == nil && inWindow ? window.convertPoint(fromScreen: mouse) : nil, tab: tab)
+        // Over this window's page (not the sidebar): offer to open the tab or pinned page beside it.
+        if drag.item.canBeFavorite {
+            delegate?.listDragOverPage(at: hit == nil && inWindow ? window.convertPoint(fromScreen: mouse) : nil, item: drag.item)
         }
 
         var section: Section? = nil
@@ -1263,7 +1263,7 @@ final class SidebarListView: NSView {
         }
 
         // Onto this window's page: open it in split view beside what's showing.
-        if let tab, Self.list(at: mouse) == nil, Self.window(at: mouse) === window?.windowController, delegate?.listDropOnPage(tab) == true {
+        if Self.list(at: mouse) == nil, Self.window(at: mouse) === window?.windowController, delegate?.listDropOnPage(drag.item) == true {
             return nil
         }
 
