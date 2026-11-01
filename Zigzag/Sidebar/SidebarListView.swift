@@ -1323,7 +1323,8 @@ final class SidebarListView: NSView {
             return tab.map(landingView(for:)) ?? rows[drag.item]
         }
 
-        guard let section = drag.targetSection else { return carriedRowShown ? drag.view : nil }
+        // Nowhere new: back to its row, if that's on show. (Asked of this drag: the list's own has ended by now.)
+        guard let section = drag.targetSection else { return shownSpaceID == drag.originSpace ? drag.view : nil }
         var landing: NSView?
         switch (drag.item, section) {
         case (.tab, .tabs):
