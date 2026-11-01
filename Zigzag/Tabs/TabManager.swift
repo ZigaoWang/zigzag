@@ -747,7 +747,21 @@ final class TabManager {
     func move(_ tab: Tab, to index: Int, in spaceID: UUID? = nil) {
         guard tab.bookmarkID == nil else { return }
         let target = spaceID ?? tab.spaceID
-        // A split can't span two spaces: moving either half out ends it.
+        // A split of two tabs goes to another space as one, still side by side.
+        if target != tab.spaceID, let pair = split(for: tab), let other = partner(of: tab), other.bookmarkID == nil {
+            let halves = pair.left == tab.id ? [tab, other] : [other, tab]
+            halves.forEach { removeFromList($0) }
+            for half in halves {
+                half.spaceID = target
+                for (space, id) in selectedBySpace where id == half.id && space != target { selectedBySpace[space] = nil }
+            }
+            var list = tabsBySpace[target] ?? []
+            list.insert(contentsOf: halves, at: max(0, min(index, list.count)))
+            tabsBySpace[target] = list
+            changed.send(.structure)
+            return
+        }
+        // A split with a pinned page can't span two spaces: moving the tab out ends it.
         if target != tab.spaceID { splits.removeAll { $0.left == tab.id || $0.right == tab.id } }
         removeFromList(tab)
         tab.spaceID = target
@@ -761,7 +775,8 @@ final class TabManager {
 
     /// Into another space: at `index` where it was dropped, else at the top.
     func moveTabToSpace(_ tab: Tab, spaceID: UUID, at index: Int = 0) {
-        let wasSelected = selectedTab === tab
+        // Either half of a split moving together counts: the page you were on leaves with it.
+        let wasSelected = selectedTab === tab || (partner(of: tab).map { selectedTab === $0 } ?? false)
         let oldIndex = tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
         move(tab, to: index, in: spaceID)
         if wasSelected { selectAfterClosing(Tab(url: nil, spaceID: currentSpaceID), index: oldIndex) }
