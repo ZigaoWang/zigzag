@@ -139,15 +139,16 @@ enum Tokens {
     /// Zigzag's built-in pages (History, Settings) and, from here on, its other surfaces: one plain surface, the
     /// small wordmark and a semibold title at the top left, the search field and actions at the top right, quiet
     /// rows under it. History's CSS is generated from these values (`PageStyle`), so the two never drift.
-    /// The sidebar's own proportions, calm and roomy: bigger text than a page's lists, taller rows, three favorites
-    /// to a row, and room around everything. Its colors are the rest of the system's.
+    /// The sidebar's own proportions, calm and roomy: taller rows, three favorites to a row, and room around
+    /// everything. Its text is the app's one scale (`TypeSize.row`, `TypeSize.label`), so a row reads the same here
+    /// as in any other list. Its colors are the rest of the system's.
     enum Sidebar {
-        /// A row's title (tabs, pinned pages, New Tab) and the address.
-        static let rowText: CGFloat = 16
-        /// A section's label ("Personal", "Tabs"): quiet and gray, a step under the rows.
-        static let labelText: CGFloat = 14
+        /// A row's title (tabs, pinned pages, New Tab) and the address: the app's row size.
+        static let rowText: CGFloat = TypeSize.row
+        /// A section's label ("Personal", "Tabs"): the app's label size, quiet and gray.
+        static let labelText: CGFloat = TypeSize.label
         /// A row, and the gap between two.
-        static let rowHeight: CGFloat = Space.x10
+        static let rowHeight: CGFloat = Space.x8 + Space.x1
         static let rowGap: CGFloat = 2
         /// A section label's slot, the label low in it.
         static let labelHeight: CGFloat = Space.x8 + Space.x1

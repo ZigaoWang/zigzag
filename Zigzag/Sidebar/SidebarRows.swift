@@ -181,7 +181,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
-    private let partnerTitle = Label()
+    private let partnerTitle = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
     private let divider = ColorView(color: Tokens.Color.separator)
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()

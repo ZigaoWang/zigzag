@@ -11,7 +11,7 @@ final class PaneHeaderView: NSView {
     let swap = IconButton(symbol: "arrow.left.arrow.right", toolTip: "Swap Sides")
     let close = IconButton(symbol: "rectangle.split.2x1.slash", toolTip: "Separate Tabs")
     private let addressPill = ColorView(color: Tokens.Color.addressFill)
-    private let address = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let address = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private let line = ColorView(color: Tokens.Color.separator)
     private weak var tab: Tab?
     private var token: SignalToken?
