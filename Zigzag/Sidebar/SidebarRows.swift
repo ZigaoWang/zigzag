@@ -448,8 +448,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
                                        CATransform3DMakeTranslation(size.width / 2, size.height / 2, 0))
         if animated && !Tokens.Motion.reduceMotion {
             CATransaction.begin()
-            CATransaction.setAnimationDuration(0.2)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1))
+            CATransaction.setAnimationDuration(Tokens.Motion.standard)
+            CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
             layer.transform = turn
             CATransaction.commit()
         } else {

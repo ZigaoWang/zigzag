@@ -208,8 +208,8 @@ final class SpaceDotView: InteractiveView {
         dot.isHidden = icon != nil
         if changed && !Tokens.Motion.reduceMotion {
             CATransaction.begin()
-            CATransaction.setAnimationDuration(0.28)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1))
+            CATransaction.setAnimationDuration(Tokens.Motion.standard)
+            CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
             apply()
             CATransaction.commit()
         } else {
