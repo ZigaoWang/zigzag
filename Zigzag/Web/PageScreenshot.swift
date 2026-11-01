@@ -494,7 +494,7 @@ enum PageScreenshot {
                     try data.write(to: url)
                     Toast.show("Screenshot saved", symbol: "checkmark.circle", in: controller)
                 } catch {
-                    Toast.show("Couldn’t save the screenshot", symbol: "exclamationmark.triangle", in: controller)
+                    Toast.show(SaveFailure.message("Couldn’t save the screenshot", error), symbol: "exclamationmark.triangle", duration: 4, in: controller)
                 }
             }
         }

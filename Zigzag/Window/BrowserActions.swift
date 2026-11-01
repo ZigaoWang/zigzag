@@ -158,8 +158,12 @@ extension BrowserWindowController: NSMenuItemValidation {
             }
             webView.createWebArchiveData { result in
                 MainActor.assumeIsolated {
-                    let saved = (try? result.get().write(to: destination)) != nil
-                    Toast.show(saved ? "Page saved" : "Couldn’t save the page", symbol: saved ? "square.and.arrow.down" : "exclamationmark.triangle", in: self)
+                    do {
+                        try result.get().write(to: destination)
+                        Toast.show("Page saved", symbol: "square.and.arrow.down", in: self)
+                    } catch {
+                        Toast.show(SaveFailure.message("Couldn’t save the page", error), symbol: "exclamationmark.triangle", duration: 4, in: self)
+                    }
                 }
             }
         }

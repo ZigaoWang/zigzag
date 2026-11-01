@@ -415,9 +415,10 @@ final class PDFViewerView: NSView, PDFViewDelegate {
             guard response == .OK, let target = panel.url else { return }
             MainActor.assumeIsolated {
                 // A save that didn't happen says so, rather than leave you looking for a file that isn't there.
-                guard (try? data.write(to: target)) == nil,
-                      let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return }
-                Toast.show("Couldn’t save the PDF", symbol: "exclamationmark.triangle", in: controller)
+                do { try data.write(to: target) } catch {
+                    guard let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return }
+                    Toast.show(SaveFailure.message("Couldn’t save the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller)
+                }
             }
         }
     }
