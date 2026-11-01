@@ -165,6 +165,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func newTab(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .newTab) }
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
+    /// With no window open, the tab went with its window: that comes back instead.
+    @objc func reopenClosedTab(_ sender: Any?) {
+        if WindowManager.shared.controllers.isEmpty { WindowManager.shared.reopenClosedWindow() } else { frontBrowserWindow()?.tabManager.reopenClosedTab() }
+    }
     @objc func showHistory(_ sender: Any?) { frontBrowserWindow().map(HistoryPage.open) }
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
@@ -199,6 +203,10 @@ extension AppDelegate: NSMenuItemValidation {
     /// Reopen Closed Window is dimmed when there's nothing to bring back; Set as Default Browser hides once it is.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        if menuItem.action == #selector(reopenClosedTab(_:)) {
+            let manager = (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager
+            return manager?.canReopenClosedTab ?? WindowManager.shared.canReopenClosedWindow
+        }
         // Already your browser: nothing to offer, so it isn't there (as in Safari and Chrome).
         if menuItem.action == #selector(makeDefaultBrowser(_:)) { menuItem.isHidden = DefaultBrowser.isDefault; return true }
         if menuItem.action == #selector(closeTab(_:)) { return NSApp.keyWindow?.styleMask.contains(.closable) ?? false }
