@@ -1291,29 +1291,30 @@ final class IntoZigzag: NSView {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self, let layer = self.zigzag.layer else { return }
                 NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.5
+                    ctx.duration = Tokens.Motion.reduceMotion ? 0 : Tokens.Motion.large
+                    ctx.timingFunction = Tokens.Motion.easeOut
                     ctx.allowsImplicitAnimation = true
                     self.layoutSubtreeIfNeeded()
                 }
                 guard !Tokens.Motion.reduceMotion else { self.needsLayout = true; return }
-                let pop = CASpringAnimation(perceptualDuration: 0.4, bounce: 0.15)
-                pop.keyPath = "transform.scale"
+                let pop = CABasicAnimation(keyPath: "transform.scale")
                 pop.fromValue = 0.9
                 pop.toValue = 1
-                pop.duration = pop.settlingDuration
+                pop.duration = Tokens.Motion.large
+                pop.timingFunction = Tokens.Motion.easeOut
                 layer.add(pop, forKey: "pop")
                 self.needsLayout = true
             }
             return
         }
-        if new == .done, let layer = badge.layer {
-            // The check lands with a little give, once.
+        if new == .done, let layer = badge.layer, !Tokens.Motion.reduceMotion {
+            // The check lands once, eased out, no bounce.
             layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            let pop = CASpringAnimation(perceptualDuration: 0.4, bounce: 0.15)
-            pop.keyPath = "transform.scale"
+            let pop = CABasicAnimation(keyPath: "transform.scale")
             pop.fromValue = 0.6
             pop.toValue = 1
-            pop.duration = pop.settlingDuration
+            pop.duration = Tokens.Motion.large
+            pop.timingFunction = Tokens.Motion.easeOut
             layer.add(pop, forKey: "pop")
         }
         needsLayout = true
