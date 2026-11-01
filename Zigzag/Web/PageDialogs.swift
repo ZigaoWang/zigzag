@@ -172,27 +172,26 @@ enum ErrorPage {
                 """
             }
         }
+        // Zigzag's own page, in the shared design: the surface, type and button History and Settings use, under the
+        // wordmark drawn faint, as History's empty page has it.
         let html = """
         <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
         <title>\(escape(url.host() ?? title))</title>
         <style>
-        :root { color-scheme: light dark; }
-        html, body { height: 100%; margin: 0; }
-        body { font: 13px -apple-system, system-ui; display: flex; align-items: center; justify-content: center;
-               background: Canvas; color: color-mix(in srgb, CanvasText 86%, transparent); -webkit-user-select: none; }
+        \(PageStyle.css(theme: Brand.Theme.for(webView)))
+        html, body { height: 100%; }
+        body { display: flex; align-items: center; justify-content: center; }
         main { max-width: 360px; padding: 32px; text-align: center; }
-        h1 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
-        p { margin: 0 0 24px; line-height: 20px; color: color-mix(in srgb, CanvasText 54%, transparent); }
-        button { font: inherit; font-weight: 500; height: 28px; padding: 0 12px; border-radius: 6px; border: none;
-                 background: color-mix(in srgb, CanvasText 6%, transparent); color: inherit; }
-        button:hover { background: color-mix(in srgb, CanvasText 10%, transparent); }
-        button:active { background: color-mix(in srgb, CanvasText 14%, transparent); }
-        details { margin-top: 20px; } summary { cursor: default; color: color-mix(in srgb, CanvasText 54%, transparent); list-style: none; }
-        summary::-webkit-details-marker { display: none; } summary:hover { color: CanvasText; }
-        .why { margin: 12px 0; text-align: left; } .anyway { color: color-mix(in srgb, CanvasText 70%, transparent); }
+        main > svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto 24px; }
+        h1 { font-size: var(--heading); font-weight: 600; margin: 0 0 8px; }
+        p { margin: 0 0 24px; line-height: 20px; color: var(--muted); }
+        details { margin-top: 20px; } summary { cursor: default; color: var(--muted); list-style: none; }
+        summary::-webkit-details-marker { display: none; } summary:hover { color: var(--text); }
+        .why { margin: 12px 0; text-align: left; } .anyway { color: var(--muted); }
         </style></head><body><main>
+        \(WordmarkView.svg(class: "mark", label: nil))
         <h1>\(escape(title))</h1><p>\(escape(message))</p>
-        \(url.scheme == "webkit-extension" ? "" : #"<button onclick="location.reload()">Try Again</button>"#)
+        \(url.scheme == "webkit-extension" ? "" : #"<button class="button" onclick="location.reload()">Try Again</button>"#)
         \(proceed)
         \(error.code == NSURLErrorNotConnectedToInternet || error.code == NSURLErrorNetworkConnectionLost ? "<script>addEventListener('online', () => location.reload())</script>" : "")
         </main></body></html>
