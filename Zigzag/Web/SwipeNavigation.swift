@@ -263,12 +263,11 @@ final class SwipeNavigator {
     }
 }
 
-/// The round arrow at the page's edge during a swipe: a small glass button while you swipe, filled in the accent
-/// once letting go will navigate.
+/// The round arrow at the page's edge during a swipe: a small floating button in the panel's surface while you swipe,
+/// filled in the accent once letting go will navigate.
 final class SwipeArrowView: NSView {
     static let size = Tokens.Metric.floatingButton
-    private let material = PanelMaterial.make(radius: Tokens.Metric.floatingButton / 2)
-    /// The panel wash over the glass at rest; the accent once armed.
+    /// The panel's surface at rest; the accent once armed.
     private let fill = ColorView()
     private let symbol = NSImageView()
     var progress: CGFloat = 0 { didSet { refresh() } }
@@ -281,7 +280,7 @@ final class SwipeArrowView: NSView {
         fill.wantsLayer = true
         fill.layer?.cornerRadius = Self.size / 2
         fill.layer?.borderWidth = Tokens.Metric.hairline
-        [material, fill].forEach { addSubview($0) }
+        addSubview(fill)
         symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: Tokens.Symbol.glyph)
         symbol.imageScaling = .scaleNone
         addSubview(symbol)
@@ -292,7 +291,6 @@ final class SwipeArrowView: NSView {
 
     override func layout() {
         super.layout()
-        material.frame = bounds
         fill.frame = bounds
         symbol.frame = bounds
         layer?.shadowPath = CGPath(ellipseIn: bounds, transform: nil)
@@ -306,7 +304,7 @@ final class SwipeArrowView: NSView {
     private func refresh(animated: Bool = false) {
         let theme = Brand.Theme.for(self)
         let apply = {
-            self.fill.layer?.backgroundColor = self.cgColor(self.isArmed ? theme.accent : Tokens.Color.panelWash)
+            self.fill.layer?.backgroundColor = self.cgColor(self.isArmed ? theme.accent : theme.panel)
             self.fill.layer?.borderColor = self.cgColor(self.isArmed ? .clear : Tokens.Color.panelEdge)
             // The one panel shadow, as every floating thing has.
             self.layer?.shadowColor = self.cgColor(Tokens.Color.panelShadow)
