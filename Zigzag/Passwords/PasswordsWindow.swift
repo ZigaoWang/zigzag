@@ -449,7 +449,7 @@ private final class LockedView: NSView {
     private let badge = RibbonView()
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let body = Label(LockedView.prompt, font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-    private let button = PrimaryButton(title: "Unlock")
+    private let button = PillButton(title: "Unlock", style: .prominent)
     var onUnlock: (() -> Void)?
     var isBusy = false { didSet { button.isEnabled = !isBusy } }
 
@@ -499,7 +499,7 @@ private final class LockedView: NSView {
     override func layout() {
         super.layout()
         let side: CGFloat = 52
-        let total = side + Tokens.Space.x4 + title.lineHeight + Tokens.Space.x2 + body.lineHeight + Tokens.Space.x6 + Tokens.Space.x8
+        let total = side + Tokens.Space.x4 + title.lineHeight + Tokens.Space.x2 + body.lineHeight + Tokens.Space.x6 + Tokens.Page.controlHeight
         var y = round((bounds.height - total) / 2)
         badge.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
         y = badge.frame.maxY + Tokens.Space.x4
@@ -509,7 +509,7 @@ private final class LockedView: NSView {
         body.frame = NSRect(x: 0, y: y, width: bounds.width, height: body.lineHeight)
         y = body.frame.maxY + Tokens.Space.x6
         let w = max(button.fittingWidth, 120)
-        button.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Space.x8)
+        button.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Page.controlHeight)
     }
 }
 
@@ -583,7 +583,7 @@ private final class EmptyStateView: NSView {
     private let ribbon = RibbonView()
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let body = NSTextField(wrappingLabelWithString: "")
-    private let importButton = PrimaryButton(title: "Import Passwords")
+    private let importButton = PillButton(title: "Import Passwords", style: .prominent)
     var onImport: (() -> Void)?
 
     override init(frame: NSRect) {
@@ -641,7 +641,7 @@ private final class EmptyStateView: NSView {
         let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width, height: 200)).height)
         let side: CGFloat = 36
         let titleHeight = ceil(title.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 200)).height ?? title.lineHeight)
-        let total = side + Tokens.Space.x4 + titleHeight + Tokens.Space.x2 + bodyHeight + (importButton.isHidden ? 0 : Tokens.Space.x6 + Tokens.Space.x8)
+        let total = side + Tokens.Space.x4 + titleHeight + Tokens.Space.x2 + bodyHeight + (importButton.isHidden ? 0 : Tokens.Space.x6 + Tokens.Page.controlHeight)
         var y = round((bounds.height - total) / 2)
         let x = round((bounds.width - width) / 2)
         icon.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
@@ -652,7 +652,7 @@ private final class EmptyStateView: NSView {
         body.frame = NSRect(x: x, y: y, width: width, height: bodyHeight)
         y = body.frame.maxY + Tokens.Space.x6
         let w = importButton.fittingWidth
-        importButton.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Space.x8)
+        importButton.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Page.controlHeight)
     }
 }
 
@@ -668,15 +668,15 @@ private final class DetailView: NSView, NSTextFieldDelegate {
     private let passwordRow = FieldRow(name: "Password")
     private let websiteRow = FieldRow(name: "Website")
     private let notesRow = FieldRow(name: "Notes")
-    private let editButton = TextButton(title: "Edit", font: Tokens.Font.body(.medium))
-    private let deleteButton = TextButton(title: "Delete", font: Tokens.Font.body(.medium))
-    private let saveButton = PrimaryButton(title: "Save")
-    private let cancelButton = TextButton(title: "Cancel", font: Tokens.Font.body(.medium))
+    private let editButton = PillButton(title: "Edit", style: .plain)
+    private let deleteButton = PillButton(title: "Delete", style: .plain)
+    private let saveButton = PillButton(title: "Save", style: .prominent)
+    private let cancelButton = PillButton(title: "Cancel", style: .plain)
     private let usernameField = FilledField(placeholder: "Username")
     private let passwordField = FilledField(placeholder: "Password")
     private let notesField = FilledField(placeholder: "Notes")
     private let neverBody = NSTextField(wrappingLabelWithString: "")
-    private let allowButton = PrimaryButton(title: "Allow Saving")
+    private let allowButton = PillButton(title: "Allow Saving", style: .prominent)
 
     private var credential: Credential?
     private var neverOrigin: Origin?
@@ -695,9 +695,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         neverBody.isSelectable = false
         [icon, title, subtitle, warning, card, editButton, deleteButton, saveButton, cancelButton, neverBody, allowButton].forEach { addSubview($0) }
         [usernameRow, passwordRow, websiteRow, notesRow].forEach { card.addSubview($0) }
-        editButton.showsFillAtRest = true
-        deleteButton.showsFillAtRest = true
-        deleteButton.textColor = Tokens.Color.destructive
+        deleteButton.isDestructive = true
         passwordField.field.font = .monospacedSystemFont(ofSize: Tokens.TypeSize.body, weight: .regular)
 
         usernameRow.actions = [("doc.on.doc", "Copy Username", { [weak self] in self?.copyUsername() })]
@@ -939,7 +937,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
             let h = ceil(neverBody.sizeThatFits(NSSize(width: width, height: 200)).height)
             neverBody.frame = NSRect(x: x, y: y, width: width, height: h)
             y = neverBody.frame.maxY + Tokens.Space.x5
-            allowButton.frame = NSRect(x: x, y: y, width: allowButton.fittingWidth, height: Tokens.Space.x8)
+            allowButton.frame = NSRect(x: x, y: y, width: allowButton.fittingWidth, height: Tokens.Page.controlHeight)
             return
         }
         if !warning.isHidden {
@@ -955,7 +953,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         }
         card.frame = NSRect(x: x, y: y, width: width, height: cy)
         y = card.frame.maxY + Tokens.Space.x5
-        let h = Tokens.Space.x8
+        let h = Tokens.Page.controlHeight
         if isEditing {
             let sw = max(saveButton.fittingWidth, 80)
             saveButton.frame = NSRect(x: x + width - sw, y: y, width: sw, height: h)
