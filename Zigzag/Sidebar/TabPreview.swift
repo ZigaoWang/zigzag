@@ -2,13 +2,18 @@ import AppKit
 import WebKit
 
 /// The glass card that shows a tab's page when you hover it in the sidebar: the picture inset a little, its corners
-/// running with the panel's, and the title and address under it.
+/// running with the panel's, and the title and address under it. A split is one card, as in desk view: both pages
+/// where they sit on screen, and each one's title under its own side.
 final class TabPreviewView: FloatingPanelView {
-    private let imageView = NSImageView()
+    private let picture = PagePicture()
     private let placeholder = FaviconView()
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    private let detail2 = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let imageClip = NSView()
+    /// How a split's two pages share the picture; nil for one page.
+    private var split: (ratio: CGFloat, vertical: Bool)?
     static let footerHeight = Tokens.Metric.previewCaptionHeight
     /// From the panel's edge to the picture; the picture's corners are the panel's less this, so the two run together.
     private static let inset = Tokens.Space.x1
@@ -19,33 +24,39 @@ final class TabPreviewView: FloatingPanelView {
         imageClip.layer?.masksToBounds = true
         imageClip.layer?.cornerRadius = Tokens.Radius.panel - Self.inset
         imageClip.layer?.cornerCurve = .continuous
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.imageAlignment = .alignTop
-        imageClip.addSubview(imageView)
+        imageClip.layer?.addSublayer(picture.layer)
         addSubview(imageClip)
         addSubview(placeholder)
-        addSubview(title)
-        addSubview(detail)
+        [title, detail, title2, detail2].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func show(tab: Tab?, bookmark: Bookmark?) {
+    /// A page, or with `partner`, a split's two pages, sharing the picture as `split` says.
+    func show(tab: Tab?, bookmark: Bookmark?, partner: Tab? = nil, split: (ratio: CGFloat, vertical: Bool)? = nil) {
+        self.split = partner == nil ? nil : split ?? (0.5, false)
         title.stringValue = bookmark?.title ?? tab?.displayTitle ?? ""
         let url = tab?.url ?? bookmark?.url
         detail.stringValue = url.map(CommandRanker.displayURL) ?? ""
-        image = tab?.snapshot
+        title2.stringValue = partner?.displayTitle ?? ""
+        detail2.stringValue = partner?.url.map(CommandRanker.displayURL) ?? ""
+        title2.isHidden = partner == nil
+        detail2.isHidden = partner == nil
         placeholder.image = tab?.favicon ?? bookmark.flatMap { FaviconStore.shared.cachedIcon(for: $0.url) }
+        setImages(tab?.snapshot, partner?.snapshot)
         needsLayout = true
     }
 
-    var image: NSImage? {
-        get { imageView.image }
-        set {
-            imageView.image = newValue
-            imageView.isHidden = newValue == nil
-            placeholder.isHidden = newValue != nil
+    /// The first page's picture, and with a split, the second's.
+    func setImages(_ first: NSImage?, _ second: NSImage?) {
+        let second = split == nil ? nil : second
+        picture.show(first, second, split: split)
+        let empty = first == nil && second == nil
+        placeholder.isHidden = !empty
+        Tokens.Motion.withoutAnimation {
+            picture.layer.isHidden = empty
+            picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
             imageClip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
         }
     }
@@ -54,14 +65,21 @@ final class TabPreviewView: FloatingPanelView {
         let pad = Self.inset
         let footer = Self.footerHeight
         imageClip.frame = NSRect(x: pad, y: pad, width: bounds.width - pad * 2, height: bounds.height - footer - pad)
-        imageView.frame = imageClip.bounds
+        picture.layout(size: imageClip.bounds.size)
+        Tokens.Motion.withoutAnimation { picture.layer.position = CGPoint(x: imageClip.bounds.midX, y: imageClip.bounds.midY) }
         let icon = Tokens.Space.x8
         placeholder.frame = NSRect(x: imageClip.frame.midX - icon / 2, y: imageClip.frame.midY - icon / 2, width: icon, height: icon)
         let textX = Tokens.Space.x3 - Label.inset
         let titleH = title.lineHeight, detailH = detail.lineHeight
         let top = imageClip.frame.maxY + (footer - titleH - detailH) / 2
-        title.frame = NSRect(x: textX, y: top, width: bounds.width - textX * 2, height: titleH)
-        detail.frame = NSRect(x: textX, y: title.frame.maxY, width: bounds.width - textX * 2, height: detailH)
+        // One title, or with a split, each page's under its own side; stacked pages share the row half and half.
+        let share = split.map { $0.vertical ? 0.5 : $0.ratio } ?? 1
+        let firstWidth = split == nil ? bounds.width : round(imageClip.frame.minX + imageClip.frame.width * share)
+        title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
+        detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
+        let secondX = firstWidth + textX, secondWidth = max(0, bounds.width - firstWidth - textX * 2)
+        title2.frame = NSRect(x: secondX, y: top, width: secondWidth, height: titleH)
+        detail2.frame = NSRect(x: secondX, y: title2.frame.maxY, width: secondWidth, height: detailH)
     }
 }
 
@@ -74,7 +92,7 @@ final class TabPreviewController {
     private var refreshTimer: Timer?
     private weak var tab: Tab?
     private weak var row: NSView?
-    private var snapshotToken: SignalToken?
+    private var snapshotTokens: [SignalToken] = []
     /// Hover can end without a word: the row closes under the pointer, or you switch apps. This checks while a
     /// preview is up and takes it away once the pointer has really left.
     private var watchTimer: Timer?
@@ -91,8 +109,9 @@ final class TabPreviewController {
             return
         }
         hideWork?.cancel()
-        // No preview for the page you're already looking at.
-        if let tab, tab === controller?.tabManager.selectedTab {
+        // No preview for the page you're already looking at, or the split it's in.
+        if let tab, let selected = controller?.tabManager.selectedTab,
+           tab === selected || controller?.tabManager.partner(of: tab) === selected {
             scheduleHide(immediately: true)
             return
         }
@@ -118,18 +137,26 @@ final class TabPreviewController {
         let isNew = panel == nil
         let panel = self.panel ?? TabPreviewView()
         self.panel = panel
-        self.tab = tab
         self.row = row
-        panel.show(tab: tab, bookmark: bookmark)
+        // A split's row is one card: its first page, then the other, laid out as they share the window.
+        let manager = controller.tabManager
+        let pair = tab.flatMap { manager.split(for: $0) }
+        let first = pair.flatMap { manager.tab(with: $0.left) } ?? tab
+        let partner = pair.flatMap { manager.tab(with: $0.right) }
+        let pages = [first, partner].compactMap { $0 }
+        self.tab = first
+        panel.show(tab: first, bookmark: bookmark, partner: partner, split: pair.map { (CGFloat($0.ratio), $0.vertical) })
         if watchTimer == nil {
             watchTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.checkStillHovering() }
             }
             watchTimer?.tolerance = 0.1
         }
-        snapshotToken = tab?.changed.observe { [weak self, weak tab] change in
-            guard change == .snapshot, let tab, tab === self?.tab else { return }
-            self?.panel?.image = tab.snapshot
+        snapshotTokens = pages.map { page in
+            page.changed.observe { [weak self, weak first, weak partner] change in
+                guard change == .snapshot, let self, let first, first === self.tab else { return }
+                self.panel?.setImages(first.snapshot, partner?.snapshot)
+            }
         }
 
         let card = controller.root.cardFrame
@@ -151,10 +178,13 @@ final class TabPreviewController {
         }
         // Live pages refresh while you look at the preview.
         refreshTimer?.invalidate()
-        if let tab, !tab.isSuspended {
-            tab.captureSnapshot()
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak tab] _ in
-                MainActor.assumeIsolated { tab?.captureSnapshot() }
+        let live = pages.filter { !$0.isSuspended }
+        if !live.isEmpty {
+            live.forEach { $0.captureSnapshot() }
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak first, weak partner] _ in
+                MainActor.assumeIsolated {
+                    [first, partner].forEach { if let page = $0, !page.isSuspended { page.captureSnapshot() } }
+                }
             }
             // Roughly once a second is plenty; slack lets the system batch the wake-ups.
             refreshTimer?.tolerance = 0.3
@@ -187,7 +217,7 @@ final class TabPreviewController {
         watchTimer = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
-        snapshotToken = nil
+        snapshotTokens = []
         guard let panel else { return }
         self.panel = nil
         panel.dismiss()
