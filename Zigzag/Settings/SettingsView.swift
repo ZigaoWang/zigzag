@@ -1305,7 +1305,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         let cache = PillButton(title: "Clear Cache…")
         cache.onClick = { [weak self, weak cache] _ in
-            self?.confirm(title: "Clear the cache for every site?", message: "Pages load a little slower the first time you open them again. You stay signed in.", action: "Clear Cache") {
+            self?.confirm(title: "Clear the cache for every site?", message: "Pages load a little slower the first time you open them again. You stay signed in.", action: "Clear Cache", destructive: false) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cache)
                     cache?.flash("Cleared")
@@ -1382,8 +1382,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    private func confirm(title: String, message: String, action: String, then run: @escaping () -> Void) {
-        ConfirmSheet.show(in: self, title: title, message: message, confirmTitle: action, destructive: true) { confirmed in
+    private func confirm(title: String, message: String, action: String, destructive: Bool = true, then run: @escaping () -> Void) {
+        ConfirmSheet.show(in: self, title: title, message: message, confirmTitle: action, destructive: destructive) { confirmed in
             if confirmed { run() }
         }
     }
