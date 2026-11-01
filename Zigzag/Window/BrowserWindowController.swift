@@ -1120,6 +1120,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         peek.close()
         // So is a folder's icon picker, and the event monitor it holds.
         iconPicker?.close()
+        // Nor does Reader's key monitor outlive it.
+        closeReader()
         onClose?(self)
     }
 
