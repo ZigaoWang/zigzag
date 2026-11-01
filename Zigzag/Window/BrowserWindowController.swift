@@ -420,8 +420,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if window?.appearance?.name != name { window?.appearance = name.flatMap(NSAppearance.init(named:)) }
         }
         let clear = !tabManager.isPrivate && space.isSeeThrough
-        let color = SpaceColor.frame(tabManager.isPrivate ? SpaceColor.graphite.background : space.frameColor)
-        let end = tabManager.isPrivate ? nil : space.frameColor2.map(SpaceColor.frame)
+        let color = tabManager.isPrivate ? SpaceColor.graphite.background : space.frameColor
+        let end = tabManager.isPrivate ? nil : space.frameColor2
         // See-through: the window lets the frosted desktop through, and the space's color washes over it, thinner the
         // more shows.
         window?.isOpaque = !clear

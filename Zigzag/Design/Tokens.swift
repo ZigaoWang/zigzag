@@ -161,6 +161,9 @@ enum Tokens {
         static let rowGlyph: CGFloat = 11
         /// A section label's slot, the label low in it.
         static let labelHeight: CGFloat = 28
+        /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.
+        static let spaceNameText: CGFloat = 16
+        static let spaceNameHeight: CGFloat = 40
         /// Between the favorites and the list.
         static let sectionGap: CGFloat = Space.x3
 
@@ -334,13 +337,15 @@ enum Tokens {
         /// The sidebar's rows and address (13 regular), and its section labels (11 medium): `Tokens.Sidebar`.
         static func sidebarRow() -> NSFont { .systemFont(ofSize: Sidebar.rowText) }
         static func sidebarLabel() -> NSFont { .systemFont(ofSize: Sidebar.labelText, weight: .medium) }
+        /// The space's name in the sidebar: 16 light.
+        static func spaceName() -> NSFont { .systemFont(ofSize: Sidebar.spaceNameText, weight: .light) }
     }
 
     // MARK: - Symbols (one weight everywhere)
 
     enum Symbol {
-        /// Regular, not medium: icons sit as lightly as the text beside them.
-        static let weight: NSFont.Weight = .regular
+        /// Light: thin strokes that sit as lightly as the text beside them, never heavier than a row's title.
+        static let weight: NSFont.Weight = .light
         /// Four sizes, by where the symbol sits. In an icon button (`Metric.iconButton`): back, forward, reload,
         /// the bottom bar, a pane's header, the find bar, a panel's close. Big enough to be a pleasure to press.
         static let glyph: CGFloat = 17
@@ -678,16 +683,13 @@ enum Tokens {
         /// Row and button overlays drawn on top of the window background.
         static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06))
         static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
-        /// The selected row: a clear neutral fill the space's color shows through, with a 1px edge (`selectedEdge`),
-        /// seen at a glance. A chosen card on a panel adds a shadow-sm (`liftShadow`). Never a white slab.
+        /// A chosen row on a panel or a page: a clear neutral fill with a 1px edge (`selectedEdge`) and a shadow-sm
+        /// (`liftShadow`). The sidebar's own rows sit on the frame and use `Tokens.Chrome` instead.
         static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.11))
         static let selectedHoverFill = dynamic(light: hex(0x000000, alpha: 0.11), dark: hex(0xFFFFFF, alpha: 0.13))
-        /// The sidebar's rows under the pointer: half the selected fill.
-        static let quietHover = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.055))
         static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06))
         static let liftShadow = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0x000000, alpha: 0.28))
-        /// The sidebar's quiet surfaces, the address and the favorites: a faint fill and a 1px edge, always there, a
-        /// step deeper under the pointer. A favorite whose page is open takes the darker `openEdge`.
+        /// A split pane's address on the page card: a faint fill and a 1px edge, a step deeper under the pointer.
         static let chromeFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.07))
         static let chromeHover = dynamic(light: hex(0x000000, alpha: 0.075), dark: hex(0xFFFFFF, alpha: 0.10))
         static let chromeEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08))
@@ -696,9 +698,6 @@ enum Tokens {
         static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08))
         /// A tile whose page is open in the background: a fine darker edge in place of the usual one.
         static let openEdge = dynamic(light: hex(0x000000, alpha: 0.16), dark: hex(0xFFFFFF, alpha: 0.2))
-        /// How much of a space's saturation the window's frame keeps in light mode (`SpaceColor.frame`): toned toward
-        /// neutral so the chrome on it reads crisp.
-        static let frameChroma: CGFloat = 0.55
         /// The keyboard-selected row in floating lists (command bar, downloads).
         static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09))
         static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06))
@@ -729,16 +728,13 @@ enum Tokens {
         /// Only shadow in the window: lifts the page off the frame.
         static let cardShadow = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0x000000, alpha: 0.28))
 
-        /// Floating surfaces (command bar, previews, switcher), where they're solid.
+        /// A floating surface in a window with no space color (or a white, gray or black one): opaque. Panels in a
+        /// colored space lean toward it (`Brand.Theme.panel`).
         static let panelBackground = dynamic(light: hex(0xFCFCFC), dark: hex(0x2A2A2D))
-        /// The panel color washed over a floating panel's glass: enough to keep text calm and readable on any page,
-        /// little enough that the glass still reads as glass.
-        static let panelWash = dynamic(light: hex(0xFFFFFF, alpha: 0.8), dark: hex(0x1F1F22, alpha: 0.76))
-        static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0xFFFFFF, alpha: 0.10))
-        static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.13), dark: hex(0x000000, alpha: 0.42))
-        static let contactShadow = dynamic(light: hex(0x000000, alpha: 0.12), dark: hex(0x000000, alpha: 0.5))
-        /// A floating menu's lit top edge: a faint light line inside its upper rim, so it reads as an object above the page.
-        static let topHighlight = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.12))
+        /// A small floating thing over a page that has to stay light (the swipe arrows): the panel color, mostly opaque.
+        static let panelWash = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0x1F1F22, alpha: 0.88))
+        static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
+        static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.4))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
         /// Zigzag's one accent. The rule: UI in a browser window takes that window's space accent, so progress,
@@ -809,6 +805,48 @@ enum Tokens {
         static let onFrameSecondaryAlpha: CGFloat = 0.72
         static let onFrameFillAlpha: CGFloat = 0.1
         static let onFrameChosenAlpha: CGFloat = 0.2
+    }
+
+    // MARK: - The frame and the chrome on it
+
+    /// The space's color as the window wears it: a curated color's OKLCH lightness and chroma, by day and at night.
+    /// Soft enough to live with all day, colored enough that each space is unmistakably its own.
+    enum Frame {
+        static let lightness = 0.915
+        static let chroma = 0.045
+        static let darkLightness = 0.27
+        static let darkChroma = 0.04
+        /// A floating panel: near white with a breath of the space by day, a deep gray of it at night.
+        static let panelLightness = 0.985
+        static let panelChroma = 0.008
+        static let panelDarkLightness = 0.255
+        static let panelDarkChroma = 0.014
+        /// A page's quiet column (Settings' sections, Passwords' list): halfway between the frame and the white page.
+        static let washLightness = 0.962
+        static let washChroma = 0.016
+        static let washDarkLightness = 0.235
+        static let washDarkChroma = 0.016
+    }
+
+    /// What sits on the frame (the sidebar's rows, its address and favorites): washes of white, so whatever the
+    /// space's color, gradient or see-through, each is a lighter step of that same color, never a gray laid over it.
+    enum Chrome {
+        private static func white(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
+
+        /// The tab you're on: a soft, light card of the space's own color, a crisp quiet edge and a shadow-sm
+        /// (`cardShadow`, `Shadow.lift`). Seen at a glance on any color, never a slab.
+        static let card = Color.dynamic(light: white(0.8), dark: white(0.13))
+        static let cardHover = Color.dynamic(light: white(0.9), dark: white(0.16))
+        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.05), dark: white(0.08))
+        static let cardShadow = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: Color.hex(0x000000, alpha: 0.3))
+        /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
+        static let hover = Color.dynamic(light: white(0.38), dark: white(0.05))
+        static let pressed = Color.dynamic(light: white(0.55), dark: white(0.08))
+        /// The address and the favorites: a soft field of the space's color, no line around it.
+        static let field = Color.dynamic(light: white(0.45), dark: white(0.065))
+        static let fieldHover = Color.dynamic(light: white(0.62), dark: white(0.095))
+        /// A favorite whose page is open: a fine edge, the only line on a tile.
+        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16))
     }
 
     // MARK: - Materials (the tactile kit in Materials.swift; Design/DESIGN.md, "Materials")
@@ -921,9 +959,9 @@ enum Tokens {
         /// Card: barely there, separates page from frame.
         static let cardRadius: CGFloat = 2
         static let cardOffset = CGSize(width: 0, height: -1)
-        /// Floating panels sit just above the page: a soft, wide shadow that falls below them, never above.
-        static let panelRadius: CGFloat = 24
-        static let panelDrop: CGFloat = 4
+        /// Floating panels sit just above the page: one soft, small shadow that falls below them, never above.
+        static let panelRadius: CGFloat = 16
+        static let panelDrop: CGFloat = 3
         /// The selected row and a selected tile: a shadow-sm, tiny and crisp, just under them.
         static let liftRadius: CGFloat = 1
         static let liftDrop: CGFloat = 1
@@ -933,9 +971,6 @@ enum Tokens {
         /// A secondary button's faint shadow: just enough to sit on the white it's on.
         static let controlRadius: CGFloat = 1.5
         static let controlDrop: CGFloat = 0.5
-        /// A menu's depth, in two layers: a tight contact shadow right under its edge, and the wide panel shadow around it.
-        static let contactRadius: CGFloat = 1.5
-        static let contactDrop: CGFloat = 1
 
         /// The drop as a layer offset: flipped views measure y downward, so the sign follows the view.
         static func panelOffset(flipped: Bool) -> CGSize { CGSize(width: 0, height: flipped ? panelDrop : -panelDrop) }

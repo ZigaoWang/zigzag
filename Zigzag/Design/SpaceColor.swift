@@ -29,24 +29,47 @@ enum SpaceColor: String, Codable, CaseIterable {
         }
     }
 
-    private var pair: (light: UInt32, dark: UInt32) {
+    /// Where each curated color sits on the wheel (red at 0). Chosen so the set reads as a family: neighbors far
+    /// enough apart to tell at a glance, none of them loud.
+    private var wheelHue: Double? {
         switch self {
-        case .snow: (0xFFFFFF, 0x2C2C2E)
-        case .graphite: (0xE6E6E8, 0x1D1D20)
-        case .ink: (0x1C1C1E, 0x000000)
-        case .sky: (0xDAE5F2, 0x18212D)
-        case .sage: (0xDDE7DA, 0x1A231B)
-        case .sand: (0xEDE4D5, 0x262118)
-        case .rose: (0xF0DCE0, 0x2A1C20)
-        case .lavender: (0xE3DEF1, 0x211D2D)
-        case .mint: (0xD7EAE6, 0x162523)
-        case .peach: (0xF3DECF, 0x2B1F17)
+        case .snow, .graphite, .ink: nil
+        case .sky: 0.585
+        case .sage: 0.29
+        case .sand: 0.11
+        case .rose: 0.955
+        case .lavender: 0.765
+        case .mint: 0.46
+        case .peach: 0.055
         }
     }
 
-    /// The window frame color.
+    /// The window frame color: for the hues, one soft lightness and one gentle chroma in OKLCH (`Tokens.Frame`), so
+    /// every curated color weighs the same and any two of them sit well side by side; a deep, quiet tint of the same
+    /// hue at night.
     var background: NSColor {
-        Tokens.Color.dynamic(light: Tokens.Color.hex(pair.light), dark: Tokens.Color.hex(pair.dark))
+        switch self {
+        case .snow: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xFBFBFA), dark: Tokens.Color.hex(0x2A2A2C))
+        case .graphite: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xE4E4E2), dark: Tokens.Color.hex(0x1F1F21))
+        case .ink: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x101011))
+        default:
+            let h = wheelHue ?? 0.6
+            return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: Tokens.Frame.lightness, chroma: Tokens.Frame.chroma),
+                                        dark: Self.tone(hue: h, lightness: Tokens.Frame.darkLightness, chroma: Tokens.Frame.darkChroma))
+        }
+    }
+
+    /// A wheel hue at an OKLCH lightness and chroma, eased off where a screen can't show that much color.
+    static func tone(hue: Double, lightness: Double, chroma: Double) -> NSColor {
+        let angle = okHue(hue)
+        var c = chroma
+        var rgb = OKLab.rgb(l: lightness, a: c * cos(angle), b: c * sin(angle))
+        while !OKLab.inGamut(rgb), c > 0.002 {
+            c *= 0.94
+            rgb = OKLab.rgb(l: lightness, a: c * cos(angle), b: c * sin(angle))
+        }
+        let e = rgb.map { OKLab.encode(min(max($0, 0), 1)) }
+        return NSColor(srgbRed: e[0], green: e[1], blue: e[2], alpha: 1)
     }
 
     /// Any hue, at the same tuned lightness as the curated tints, so every choice looks right in both modes.
@@ -54,8 +77,10 @@ enum SpaceColor: String, Codable, CaseIterable {
 
     static func background(hue: Double, intensity: Double = defaultIntensity) -> NSColor {
         let t = min(max(intensity, 0), 1)
-        return Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.04 + 0.26 * t, brightness: 0.96 - 0.04 * t, alpha: 1),
-                                    dark: NSColor(hue: hue, saturation: 0.12 + 0.45 * t, brightness: 0.15 + 0.06 * t, alpha: 1))
+        // At the default strength, exactly a curated color's softness; stronger or fainter around it.
+        let k = 0.4 + 1.5 * t
+        return Tokens.Color.dynamic(light: tone(hue: hue, lightness: Tokens.Frame.lightness, chroma: Tokens.Frame.chroma * k),
+                                    dark: tone(hue: hue, lightness: Tokens.Frame.darkLightness, chroma: Tokens.Frame.darkChroma * k))
     }
 
     /// A space's color: `hue` (red at 0, as on any color wheel), `depth` from near white (0) to deep (1), and `tint`,
@@ -118,19 +143,6 @@ enum SpaceColor: String, Codable, CaseIterable {
         return atan2(lab.b, lab.a)
     }
 
-    /// A space's color as the window's frame wears it: in light mode toned toward neutral (`Tokens.Color.frameChroma`
-    /// of its saturation), so the sidebar reads as a calm surface with the color as an accent and the chrome on it stays
-    /// crisp; in dark mode as it is.
-    static func frame(_ color: NSColor) -> NSColor {
-        NSColor(name: nil) { appearance in
-            var resolved = color
-            appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) ?? color }
-            guard !appearance.isDark, resolved.alphaComponent > 0 else { return resolved }
-            return NSColor(colorSpace: .sRGB, hue: resolved.hueComponent, saturation: resolved.saturationComponent * Tokens.Color.frameChroma,
-                           brightness: resolved.brightnessComponent, alpha: resolved.alphaComponent)
-        }
-    }
-
     static func swatch(hue: Double) -> NSColor {
         Tokens.Color.dynamic(light: NSColor(hue: hue, saturation: 0.5, brightness: 0.8, alpha: 1),
                              dark: NSColor(hue: hue, saturation: 0.45, brightness: 0.85, alpha: 1))
@@ -138,23 +150,21 @@ enum SpaceColor: String, Codable, CaseIterable {
 
     /// The hue of this tint, for placing it on the slider.
     var hue: Double {
+        if let wheelHue { return wheelHue }
         let c = (swatch.usingColorSpace(.sRGB) ?? swatch)
         return Double(c.hueComponent)
     }
 
-    /// A saturated version used for small swatches and the space dot.
+    /// A stronger version of the color, for small swatches and the space dot: the same hue, deeper and richer.
     var swatch: NSColor {
         switch self {
-        case .snow: Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF), dark: Tokens.Color.hex(0xF2F2F7))
-        case .graphite: Tokens.Color.dynamic(light: Tokens.Color.hex(0x8E8E93), dark: Tokens.Color.hex(0x98989D))
-        case .ink: Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x000000))
-        case .sky: Tokens.Color.dynamic(light: Tokens.Color.hex(0x5B8FD0), dark: Tokens.Color.hex(0x6E9EDB))
-        case .sage: Tokens.Color.dynamic(light: Tokens.Color.hex(0x6E9A6A), dark: Tokens.Color.hex(0x7DAA78))
-        case .sand: Tokens.Color.dynamic(light: Tokens.Color.hex(0xB89A64), dark: Tokens.Color.hex(0xC6A970))
-        case .rose: Tokens.Color.dynamic(light: Tokens.Color.hex(0xC9707F), dark: Tokens.Color.hex(0xD6808F))
-        case .lavender: Tokens.Color.dynamic(light: Tokens.Color.hex(0x8A78C4), dark: Tokens.Color.hex(0x9887D2))
-        case .mint: Tokens.Color.dynamic(light: Tokens.Color.hex(0x4FA595), dark: Tokens.Color.hex(0x5DB4A3))
-        case .peach: Tokens.Color.dynamic(light: Tokens.Color.hex(0xD58A5C), dark: Tokens.Color.hex(0xE0976A))
+        case .snow: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF), dark: Tokens.Color.hex(0xF2F2F7))
+        case .graphite: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x8E8E93), dark: Tokens.Color.hex(0x98989D))
+        case .ink: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x000000))
+        default:
+            let h = wheelHue ?? 0.6
+            return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: 0.7, chroma: 0.105),
+                                        dark: Self.tone(hue: h, lightness: 0.76, chroma: 0.095))
         }
     }
 }
