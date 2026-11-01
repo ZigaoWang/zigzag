@@ -8,6 +8,8 @@ final class FormGroup: NSView {
     private(set) var rows: [NSView] = []
     private var lines: [NSView] = []
     private let background = ColorView(color: Tokens.Color.formGroup)
+    /// Off while a row is carried: the lines belong between rows at rest, not across ones in motion.
+    var showsDividers = true { didSet { needsLayout = true } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -69,7 +71,7 @@ final class FormGroup: NSView {
             if i < shown.count - 1 {
                 // The divider starts where the text does, past the icons, as the system's settings draw it.
                 let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Space.x3
-                lines[i].isHidden = false
+                lines[i].isHidden = !showsDividers
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
             }
         }
@@ -275,7 +277,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     private let editButton = TextButton.form("Edit")
     private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
     /// True while the row is being dragged; it draws as lifted.
-    var isLifted = false { didSet { stateDidChange(animated: true) } }
+    var isLifted = false { didSet { stateDidChange(animated: false) } }
 
     init(space: SpaceInfo) {
         spaceID = space.id
@@ -296,7 +298,6 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
         }
         deleteButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
-        toolTip = "Click to edit"
         setAccessibilityRole(.row)
         setAccessibilityLabel(space.name)
     }
@@ -367,7 +368,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         return menu
     }
 
-    override func resetCursorRects() { addCursorRect(bounds, cursor: isLifted ? .closedHand : .pointingHand) }
+    override func resetCursorRects() { if isLifted { addCursorRect(bounds, cursor: .closedHand) } }
 
     override func stateDidChange(animated: Bool) {
         // Delete shows on hover, or once Tab brings keyboard focus to it. With Full Keyboard Access on it stays in
@@ -376,14 +377,16 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         deleteButton.isHidden = !showsDelete && !(NSApp.isFullKeyboardAccessEnabled && !isLifted)
         deleteButton.alphaValue = showsDelete ? 1 : 0
         needsLayout = true
-        let fill: NSColor? = isLifted ? Tokens.Color.formGroup : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        // At rest a space reads like every other row in Settings: no fill of its own. Carried, it's a card above
+        // the others, solid at once so nothing shows through it.
+        layer?.backgroundColor = isLifted ? cgColor(Tokens.Color.formGroup) : nil
         layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
         layer?.shadowOpacity = isLifted ? 1 : 0
-        layer?.shadowRadius = 12
-        layer?.shadowOffset = CGSize(width: 0, height: -4)
-        layer?.borderWidth = isLifted ? 1 : 0
-        layer?.borderColor = cgColor(Brand.Theme.brand.accent.withAlphaComponent(0.5))
+        layer?.shadowRadius = 10
+        layer?.shadowOffset = CGSize(width: 0, height: -3)
+        layer?.borderWidth = isLifted ? Tokens.Metric.hairline : 0
+        layer?.borderColor = cgColor(Tokens.Color.formGroupEdge)
+        window?.invalidateCursorRects(for: self)
     }
 
     /// Settings, in the page it's on: what floats over a row (the editor, a confirmation) stays in that page.
@@ -1204,40 +1207,68 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // MARK: Reordering spaces
 
+    /// The space follows the pointer; the others slide aside to open the gap it will land in, and on release it
+    /// settles into that gap before the new order is saved, so nothing jumps.
     private func beginDrag(_ row: SpaceSettingsRow, event: NSEvent) -> Bool {
         guard let window, let startIndex = spaceRows.firstIndex(where: { $0 === row }) else { return false }
         let start = spacesGroup.convert(event.locationInWindow, from: nil)
         let rowHeight = row.frame.height
-        row.removeFromSuperview()
-        spacesGroup.addSubview(row)
         SpaceEditorPanel.current?.close()
+        spaceRows.forEach { $0.isHovered = false }
+        spacesGroup.addSubview(row, positioned: .above, relativeTo: nil)
+        spacesGroup.showsDividers = false
         row.isLifted = true
         let originY = row.frame.minY
         var target = startIndex
+        func place(_ point: NSPoint) {
+            let y = min(max(originY + point.y - start.y, 0), spacesGroup.bounds.height - rowHeight)
+            Tokens.Motion.withoutAnimation { row.frame.origin.y = y }
+            let newTarget = min(max(Int((y + rowHeight / 2) / rowHeight), 0), spaceRows.count - 1)
+            guard newTarget != target else { return }
+            target = newTarget
+            var others = spaceRows.filter { $0 !== row }
+            others.insert(row, at: target)
+            for (i, other) in others.enumerated() where other !== row {
+                glide(other, toY: CGFloat(i) * rowHeight, duration: 0.2, timing: Tokens.Motion.easeInOut)
+            }
+        }
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
             if event.type == .leftMouseUp { stop.pointee = true; return }
-            let point = self.spacesGroup.convert(event.locationInWindow, from: nil)
-            let y = min(max(originY + point.y - start.y, 0), self.spacesGroup.bounds.height - rowHeight)
-            Tokens.Motion.withoutAnimation { row.frame.origin.y = y }
-            let newTarget = min(max(Int((y + rowHeight / 2) / rowHeight), 0), self.spaceRows.count - 1)
-            if newTarget != target {
-                target = newTarget
-                var others = self.spaceRows.filter { $0 !== row }
-                others.insert(row, at: target)
-                Tokens.Motion.animate(Tokens.Motion.snappy) {
-                    for (i, other) in others.enumerated() where other !== row {
-                        other.animator().frame.origin.y = CGFloat(i) * rowHeight
-                    }
-                }
+            place(self.spacesGroup.convert(event.locationInWindow, from: nil))
+        }
+        let spaceID = row.spaceID, moved = target != startIndex
+        glide(row, toY: CGFloat(target) * rowHeight, duration: 0.18, timing: Tokens.Motion.easeOut)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Tokens.Motion.reduceMotion ? 0 : 0.18)) { [weak self] in
+            row.isLifted = false
+            self?.spacesGroup.showsDividers = true
+            if moved {
+                BrowserWindowController.undoTarget?.libraryChange("Move Space") { Library.shared.moveSpace(spaceID, to: target) }
+            } else {
+                self?.reloadSpaces()
             }
         }
-        if target != startIndex {
-            BrowserWindowController.undoTarget?.libraryChange("Move Space") { Library.shared.moveSpace(row.spaceID, to: target) }
-        } else {
-            reloadSpaces()
-        }
         return true
+    }
+
+    /// Moves a row to `y` at once and lets the render server show the slide there, from wherever it's drawn now,
+    /// so the motion stays smooth however busy the app is and picks up mid-slide when the gap moves again.
+    private func glide(_ view: NSView, toY y: CGFloat, duration: TimeInterval, timing: CAMediaTimingFunction) {
+        guard let layer = view.layer else { view.frame.origin.y = y; return }
+        let shown = layer.animation(forKey: "glide") != nil
+            ? (layer.presentation()?.value(forKeyPath: "transform.translation.y") as? CGFloat ?? 0) : 0
+        let from = view.frame.minY + shown
+        Tokens.Motion.withoutAnimation { view.frame.origin.y = y }
+        layer.removeAnimation(forKey: "glide")
+        guard !Tokens.Motion.reduceMotion, abs(from - y) > 0.5 else { return }
+        let animation = CABasicAnimation(keyPath: "transform.translation.y")
+        // The group is flipped and so are its layers: a positive translation is downward, as y is.
+        animation.fromValue = from - y
+        animation.toValue = 0
+        animation.duration = duration
+        animation.timingFunction = timing
+        animation.fillMode = .backwards
+        layer.add(animation, forKey: "glide")
     }
 
     // MARK: Actions
