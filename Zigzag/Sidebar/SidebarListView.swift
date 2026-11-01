@@ -339,6 +339,9 @@ final class SidebarListView: NSView {
         Tokens.Motion.glide(view, to: frame, duration: 0.3, timing: Self.carryCurve)
     }
 
+    /// How solid a carried row or favorite is: enough to read, light enough to see what's under it.
+    static let carriedOpacity: CGFloat = 0.7
+
     private static let carryCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
 
     private func updateDocumentHeight() {
@@ -931,9 +934,10 @@ final class SidebarListView: NSView {
         view.alphaValue = 0.35
         panel.alphaValue = 1
         panel.orderFront(nil)
-        // Picked up: it lifts a touch and stays solid, like a favorite does; the gap shows where it will land.
+        // Picked up: it lifts a touch and turns see-through, so the line and the row it's over show beneath it.
         Tokens.Motion.animate(Tokens.Motion.feedback) {
             panel.animator().setFrame(rowScreen.insetBy(dx: -3, dy: -1), display: true)
+            panel.animator().alphaValue = Self.carriedOpacity
         }
         apply(items: displayItems(), animated: true)
 

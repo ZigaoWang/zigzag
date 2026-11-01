@@ -111,6 +111,8 @@ final class FavoritesView: NSView {
         let carried = CarriedFavorite(tile: Self.picture(of: tile), tileSize: rect.size, grab: grab, favorite: favorite,
                                       icon: tile.iconImage, rowWidth: bounds.width, appearance: window.effectiveAppearance)
         carried.move(to: start)
+        // See-through while it's carried, so the slots and rows under it show; solid again as it lands.
+        carried.panel.alphaValue = SidebarListView.carriedOpacity
         carried.panel.orderFront(nil)
         let panel = carried.panel
         // Its place stays open (an empty slot) while it's carried.
@@ -161,6 +163,7 @@ final class FavoritesView: NSView {
             context.duration = Tokens.Motion.reduceMotion ? 0 : 0.18
             context.timingFunction = Tokens.Motion.easeOut
             panel.animator().setFrame(carried.panelFrame(placingTileAt: landing), display: true)
+            panel.animator().alphaValue = 1
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 finish()
