@@ -128,6 +128,10 @@ enum SidebarMenus {
             controller.libraryChange("Add to Favorites") { Library.shared.makeFavorite(bookmark.id) }
             live?.isFavorite = true
         })
+        // Beside the tab you're on, as a tab opens; not loaded yet, it opens at its pinned address.
+        if pinned == nil, let current = manager.selectedTab, current.bookmarkID == nil, live.map({ manager.split(for: $0) == nil }) ?? true {
+            menu.addItem(Item("Open in Split View") { controller.splitWithUndo(current, with: manager.pageTab(for: bookmark)) })
+        }
         // Folders of this space's pinned pages.
         let current = Library.shared.folderID(containing: bookmark.id)
         let spaceFolders = Library.shared.spaceID(ofBookmark: bookmark.id).map { Library.shared.folders(in: $0) } ?? []
