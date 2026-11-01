@@ -119,8 +119,8 @@ final class FavoritesView: NSView {
     /// A favorite dropped on another's middle: the two become one, side by side (`onRight`: the carried one right).
     var onJoin: ((Bookmark, UUID, Bool) -> Void)?
 
-    static let tileHeight = Tokens.Space.x10 + Tokens.Space.x2
-    static let maxColumns = 4
+    static let tileHeight = Tokens.Sidebar.favoriteHeight
+    static let maxColumns = Tokens.Sidebar.favoriteColumns
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -143,7 +143,7 @@ final class FavoritesView: NSView {
     var preferredHeight: CGFloat {
         guard tileCount > 0 else { return 0 }
         let rows = (tileCount + Self.maxColumns - 1) / Self.maxColumns
-        return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Space.x2
+        return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Sidebar.favoriteGap
     }
 
     /// One tile per favorite; a split favorite's two pages share one, each half opening its own page.
@@ -191,7 +191,7 @@ final class FavoritesView: NSView {
         guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
         let start = window.convertPoint(toScreen: event.locationInWindow)
         let row = CarriedRow(favorite, icon: tile.iconImage, partner: tile.partner, partnerIcon: tile.partnerIconImage)
-        let rowSize = NSSize(width: bounds.width, height: Tokens.Metric.rowHeight)
+        let rowSize = NSSize(width: bounds.width, height: Tokens.Sidebar.rowHeight)
         // As a row it's held just past its icon, as if it had been picked up there.
         let rowGrab = NSPoint(x: Tokens.Space.x2 + Tokens.Metric.favicon + Tokens.Space.x1, y: rowSize.height / 2)
         let copy = CarriedCopy(of: tile, picture: CarriedCopy.picture(of: tile), grabbedAt: start, ground: Tokens.Color.panelBackground,
@@ -250,8 +250,8 @@ final class FavoritesView: NSView {
         super.layout()
         var all = tiles
         if isDropTarget, tiles.isEmpty { all.append(dropTile) }
-        let gap = Tokens.Space.x2
-        // Up to four columns, every tile one size, a shorter last row from the left. A lone favorite is never
+        let gap = Tokens.Sidebar.favoriteGap
+        // Up to three columns, every tile one size, a shorter last row from the left. A lone favorite is never
         // wider than two would be: half the row, not a long bar around a small icon.
         let columns = max(2, min(Self.maxColumns, all.count))
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
@@ -268,7 +268,7 @@ final class FavoritesView: NSView {
     }
 }
 
-/// A favorite: a tile of glass (`GlassPlate`) with the site's icon crisp on it, or a split's two icons side by side.
+/// A favorite: a soft gray tile with the site's icon, or a split's two icons side by side.
 final class FavoriteTile: InteractiveView {
     let bookmark: Bookmark?
     /// A split favorite's right page, shown beside the left one in the same tile.
@@ -286,8 +286,7 @@ final class FavoriteTile: InteractiveView {
         }
     }
     /// Its page is open in the background: a fine edge, so you can tell at a glance which are loaded.
-    var isOpen = false { didSet { plate.showsOpenEdge = isOpen } }
-    private let plate = GlassPlate()
+    var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     var iconImage: NSImage? { icon.image }
     var partnerIconImage: NSImage? { partnerIcon.image }
     var onClose: (() -> Void)?
@@ -316,8 +315,6 @@ final class FavoriteTile: InteractiveView {
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.tile
         layer?.cornerCurve = .continuous
-        plate.radius = Tokens.Radius.tile
-        plate.install(in: self)
         addSubview(icon)
         partnerIcon.isHidden = partner == nil
         addSubview(partnerIcon)
@@ -398,20 +395,26 @@ final class FavoriteTile: InteractiveView {
     override func stateDidChange(animated: Bool) {
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
-            plate.set(.hidden, animated: false)
+            setLifted(false)
             layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha))
             layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
             layer?.borderWidth = Tokens.Metric.dropEdge
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Tiles are clear glass and stay put under the pointer; a press settles them. The one you're on is the same
-        // clearer card as the tab you're on.
-        let pose: GlassPlate.Pose = isPressed ? .pressed : .rest
-        plate.set(isEnabled ? pose : .rest, finish: isSelected ? .chosen : .clear, animated: animated || window != nil)
+        // Soft gray tiles, a step deeper under the pointer and pressed; the one you're on is the same plain card as
+        // the tab you're on.
+        let fill = isSelected ? (isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
+            : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.favoriteHover : Tokens.Color.favoriteFill
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
+        setLifted(isSelected)
+        guard !isSelected else { return }
+        // Its page open in the background: a fine darker edge, to tell at a glance which are loaded.
+        layer?.borderWidth = isOpen ? Tokens.Metric.hairline : 0
+        layer?.borderColor = cgColor(Tokens.Color.openEdge)
     }
 
-    private static let iconSide: CGFloat = 22
+    private static let iconSide = Tokens.Sidebar.favoriteIcon
 }
 
 /// The row a carried favorite turns into over the tab list: its page, or a split's two pages side by side with a

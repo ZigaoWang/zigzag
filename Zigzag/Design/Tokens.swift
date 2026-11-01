@@ -40,7 +40,7 @@ enum Tokens {
         /// A row in the sidebar or a floating list: soft enough that the selected one reads as a card.
         static let row: CGFloat = 10
         /// A favorite's tile.
-        static let tile: CGFloat = 12
+        static let tile: CGFloat = 14
         static let control: CGFloat = 6
         /// Fields, pills, menu buttons and filter segments: a step rounder than a plain control.
         static let field: CGFloat = 8
@@ -58,7 +58,7 @@ enum Tokens {
 
     enum Metric {
         static let cardInset: CGFloat = Space.x2
-        static let sidebarWidth: CGFloat = 240
+        static let sidebarWidth: CGFloat = 256
         /// The narrowest the sidebar gets: room for the traffic lights and the toolbar's four icon buttons.
         static let sidebarMinWidth: CGFloat = 216
         static let sidebarMaxWidth: CGFloat = 400
@@ -139,6 +139,27 @@ enum Tokens {
     /// Zigzag's built-in pages (History, Settings) and, from here on, its other surfaces: one plain surface, the
     /// small wordmark and a semibold title at the top left, the search field and actions at the top right, quiet
     /// rows under it. History's CSS is generated from these values (`PageStyle`), so the two never drift.
+    /// The sidebar's own proportions, calm and roomy: bigger text than a page's lists, taller rows, three favorites
+    /// to a row, and room around everything. Its colors are the rest of the system's.
+    enum Sidebar {
+        /// A row's title (tabs, pinned pages, New Tab) and the address.
+        static let rowText: CGFloat = 16
+        /// A section's label ("Personal", "Tabs"): quiet and gray, a step under the rows.
+        static let labelText: CGFloat = 14
+        /// A row, and the gap between two.
+        static let rowHeight: CGFloat = Space.x10
+        static let rowGap: CGFloat = 2
+        /// A section label's slot, the label low in it.
+        static let labelHeight: CGFloat = Space.x8 + Space.x1
+        /// Favorites: three to a row, a tile this tall, its icon this big, this far apart.
+        static let favoriteColumns = 3
+        static let favoriteHeight: CGFloat = Space.x12 + Space.x1
+        static let favoriteIcon: CGFloat = 22
+        static let favoriteGap: CGFloat = Space.x2
+        /// From the traffic lights to the sidebar toggle's glyph.
+        static let lightsGap: CGFloat = Space.x3
+    }
+
     enum Page {
         /// The page's edge to its content, and to the header's wordmark.
         static let gutter: CGFloat = Space.x6 + Space.x1
@@ -259,6 +280,9 @@ enum Tokens {
         static func detail() -> NSFont { .systemFont(ofSize: TypeSize.label) }
         /// What a button or a dropdown says.
         static func control() -> NSFont { .systemFont(ofSize: TypeSize.body, weight: .medium) }
+        /// The sidebar's rows and address, and its section labels (`Tokens.Sidebar`).
+        static func sidebarRow() -> NSFont { .systemFont(ofSize: Sidebar.rowText) }
+        static func sidebarLabel() -> NSFont { .systemFont(ofSize: Sidebar.labelText, weight: .medium) }
     }
 
     // MARK: - Symbols (one weight everywhere)
@@ -289,12 +313,21 @@ enum Tokens {
         /// keeps room for its neighbors in text, so a chevron leans toward the side it points to; a button
         /// moves it back so every icon in a row looks evenly spaced.
         @MainActor static func inkOffset(_ name: String, size: CGFloat = pointSize) -> CGSize {
+            let box = inkBox(name, size: size)
+            return CGSize(width: box.midX, height: box.midY)
+        }
+
+        /// The size of a symbol's ink, for lining it up by what you see rather than by its image's padding.
+        @MainActor static func inkSize(_ name: String, size: CGFloat = pointSize) -> CGSize { inkBox(name, size: size).size }
+
+        /// A symbol's ink, in points from the middle of its image (x right, y up).
+        @MainActor private static func inkBox(_ name: String, size: CGFloat) -> CGRect {
             let key = "\(name) \(size)"
-            if let known = inkOffsets[key] { return known }
+            if let known = inkBoxes[key] { return known }
             let image = Self.image(name, size: size)
             let scale: CGFloat = 4
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
-            var offset = CGSize.zero
+            var box = CGRect.zero
             if w > 0, h > 0, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,
                                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
@@ -312,17 +345,14 @@ enum Tokens {
                 }
                 if maxX >= minX {
                     // Bitmap rows run top down.
-                    offset = CGSize(width: (CGFloat(minX + maxX + 1) / 2 - CGFloat(w) / 2) / scale,
-                                    height: (CGFloat(h) / 2 - CGFloat(minY + maxY + 1) / 2) / scale)
+                    box = CGRect(x: (CGFloat(minX) - CGFloat(w) / 2) / scale, y: (CGFloat(h) / 2 - CGFloat(maxY + 1)) / scale,
+                                 width: CGFloat(maxX + 1 - minX) / scale, height: CGFloat(maxY + 1 - minY) / scale)
                 }
             }
-            // Reload's arrowhead pokes out above its circle, so centering the ink leaves the circle low; it's the
-            // circle that should line up with the chevrons beside it.
-            if name == "arrow.clockwise" { offset.height -= size * 0.1 }
-            inkOffsets[key] = offset
-            return offset
+            inkBoxes[key] = box
+            return box
         }
-        @MainActor private static var inkOffsets: [String: CGSize] = [:]
+        @MainActor private static var inkBoxes: [String: CGRect] = [:]
     }
 
     // MARK: - Motion (short, spring based)
@@ -599,11 +629,14 @@ enum Tokens {
         static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
         /// The selected row: a soft card floating on the sidebar, white or a lighter surface in dark mode, with a
         /// hairline edge (`selectedEdge`) and a faint shadow (`liftShadow`).
-        static let selectedFill = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.13))
+        static let selectedFill = dynamic(light: hex(0xFFFFFF, alpha: 0.97), dark: hex(0xFFFFFF, alpha: 0.13))
         static let selectedHoverFill = dynamic(light: hex(0xFFFFFF, alpha: 0.97), dark: hex(0xFFFFFF, alpha: 0.16))
         static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.07))
         static let liftShadow = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0x000000, alpha: 0.3))
         /// A favorite's tile: soft glass, a see-through fill with a faint light edge.
+        /// A favorite in the sidebar: a soft gray tile, a step deeper under the pointer.
+        static let favoriteFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.07))
+        static let favoriteHover = dynamic(light: hex(0x000000, alpha: 0.075), dark: hex(0xFFFFFF, alpha: 0.1))
         static let glassFill = dynamic(light: hex(0xFFFFFF, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.06))
         static let glassHover = dynamic(light: hex(0xFFFFFF, alpha: 0.5), dark: hex(0xFFFFFF, alpha: 0.1))
         static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08))
@@ -823,41 +856,6 @@ enum Tokens {
         static let largeText: CGFloat = 15
         /// A brand moment's headline: one line saying what Zigzag is.
         static let headline: CGFloat = 30
-
-        // MARK: The browser window (the same light, kept quiet: the page is what you read)
-
-        /// The frame's light falling from above: how bright at the top edge, and how far down (share of the height)
-        /// it has faded out.
-        static let frameLight = Tone(light: white(0.20), dark: white(0.045))
-        static let frameLightReach: CGFloat = 0.6
-        /// The fine highlight along the frame's top edge, under the traffic lights.
-        static let frameEdge = Tone(light: white(0.85), dark: white(0.10))
-        /// The frame's grain: the faintest, enough that it reads as a surface rather than paint.
-        static let frameGrain: Float = 0.022
-
-        /// Glass in the chrome (a favorite, the tab you're on, a toolbar button under the pointer), etched rather
-        /// than raised: a very faint wash the space's color shows through, almost gone but for its edges. The chosen
-        /// one is a step clearer, enough to read at a glance; pressed, the wash dims.
-        static let glassWash = Tone(light: white(0.26), dark: white(0.045))
-        static let chosenWash = Tone(light: white(0.62), dark: white(0.10))
-        static let glassPressed = Tone(light: white(0.14), dark: white(0.025))
-        /// Its one crisp, thin specular edge along the top, gone a little way down the sides.
-        static let specular = Tone(light: white(1), dark: white(0.24))
-        /// The hairline round it, so a faint pane still has an edge on a pale frame.
-        static let glassHairline = Tone(light: ink(0.07), dark: white(0.07))
-        /// A favorite whose page is open in the background: its hairline a step darker, to tell at a glance.
-        static let openHairline = Tone(light: ink(0.2), dark: white(0.24))
-        /// How far glass rises under the pointer and settles pressed: a point, no more, beside text. No shadow.
-        static let glassLift: CGFloat = 1
-        static let glassSink: CGFloat = 0.5
-
-        /// The address, glass set into the frame: a faint darker wash, a hairline, and its lower edge catching the
-        /// light. A row under the pointer is the same wash, fainter, with no edges.
-        static let well = Tone(light: ink(0.04), dark: Color.hex(0x000000, alpha: 0.16))
-        static let wellHairline = Tone(light: ink(0.06), dark: white(0.06))
-        static let wellLip = Tone(light: white(0.85), dark: white(0.07))
-        static let rowWell: Float = 0.6
-
         /// The keyboard focus ring's soft glow around a field.
         static let focusGlow: CGFloat = 4
     }

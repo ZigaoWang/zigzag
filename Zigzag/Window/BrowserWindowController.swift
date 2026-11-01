@@ -1150,7 +1150,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.trafficLightsHidden = sliding || !(docked || floating)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
-        let x = (docked ? 0 : container.minX) + Tokens.Metric.sidebarPadding + Tokens.Space.x2
+        let x = (docked ? 0 : container.minX) + SidebarView.trafficLightsX
         let y = (docked ? 0 : container.minY) + sidebar.trafficLightCenterY - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }

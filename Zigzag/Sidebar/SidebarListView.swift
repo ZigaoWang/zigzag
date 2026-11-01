@@ -82,10 +82,10 @@ enum SidebarItem: Hashable {
 
     var height: CGFloat {
         switch self {
-        case .header: Tokens.Space.x6 + Tokens.Space.x1
+        case .header: Tokens.Sidebar.labelHeight
         // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
-        case .separator: Tokens.Metric.sectionLabelHeight
-        case .placeholder, .bookmark, .folder, .newTab, .tab: Tokens.Metric.rowHeight
+        case .separator: Tokens.Sidebar.labelHeight
+        case .placeholder, .bookmark, .folder, .newTab, .tab: Tokens.Sidebar.rowHeight
         }
     }
 
@@ -125,7 +125,7 @@ final class SidebarListView: NSView {
     private var lastFolderTarget: UUID?
     private var lastSplitTarget: SplitDrop?
     var isDragging: Bool { drag != nil }
-    private let rowGap: CGFloat = Tokens.Metric.rowGap
+    private let rowGap: CGFloat = Tokens.Sidebar.rowGap
 
     struct DragState {
         let item: SidebarItem
@@ -614,6 +614,7 @@ final class SidebarListView: NSView {
             let away = manager.isAway(id)
             row.isAway = away
             row.fixedTitle = away ? nil : bookmark.title
+            row.pinName = away ? bookmark.title : nil
             row.configure(tab: tab)
             // A pinned split shows both its pages, open or not, the way a split among tabs does.
             let pinned = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? Library.shared.bookmark($0.right) : nil }

@@ -17,7 +17,7 @@ class SidebarRowView: InteractiveView {
         super.init(frame: frame)
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        title.font = Tokens.Font.row()
+        title.font = Tokens.Font.sidebarRow()
         addSubview(icon)
         addSubview(title)
         setAccessibilityRole(.button)
@@ -42,39 +42,27 @@ class SidebarRowView: InteractiveView {
         title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
     }
 
-    /// The tab you're on is a clear glass card; a row under the pointer, a faint well. Made when first needed, so
-    /// a long list of quiet rows carries no layers of its own.
-    private var card: GlassPlate?
-    private var well: GlassWell?
-
     override func stateDidChange(animated: Bool) {
-        let chosen = isSelected || isLifted
-        let fill: NSColor? = chosen ? nil : isMarked ? Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
-            : isPressed ? Tokens.Color.pressedFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        if chosen || card != nil {
-            let card = self.card ?? {
-                let plate = GlassPlate()
-                plate.radius = Tokens.Radius.row
-                plate.install(in: self)
-                self.card = plate
-                return plate
-            }()
-            card.tint = siteTint
-            // Carried, it stands up off the list; chosen, it rests on it.
-            card.set(chosen ? (isLifted ? .lifted : isPressed ? .pressed : .rest) : .hidden, finish: .chosen, animated: animated)
+        let base: NSColor?
+        if isSelected || isLifted {
+            base = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
+        } else if isMarked {
+            base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
+        } else if isPressed {
+            base = Tokens.Color.pressedFill
+        } else if isHovered {
+            base = Tokens.Color.hoverFill
+        } else {
+            base = nil
         }
-        let showsWell = isHovered && !chosen && !isMarked && !isPressed
-        if showsWell || well != nil {
-            let well = self.well ?? {
-                let well = GlassWell(opacity: Tokens.Material.rowWell, edges: false)
-                well.radius = Tokens.Radius.row
-                well.install(in: self)
-                self.well = well
-                return well
-            }()
-            well.isHidden = !showsWell
+        var fill = base.map { cgColor($0) }
+        // The site's color shows only on the tab you're on.
+        if let siteTint, isSelected || isLifted {
+            fill = cgColor(SidebarRowView.tinted(selectedFill: base ?? Tokens.Color.selectedFill, with: siteTint, appearance: effectiveAppearance))
         }
+        layer?.set(backgroundColor: fill, animated: animated && !isHovered)
+        // The tab you're on is a plain card: a hairline edge and a barely-there shadow under it.
+        setLifted(isSelected || isLifted)
         applyFreshness()
     }
 
@@ -148,12 +136,22 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         window?.makeFirstResponder(window?.contentView)
     }
 
+    /// The pinned page's own name, shown before the mark while it's away: "Apple / MacBook Pro".
+    var pinName: String? { didSet { pinLabel.stringValue = pinName ?? ""; needsLayout = true } }
+    private lazy var pinLabel: Label = {
+        let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
+        label.lineBreakMode = .byTruncatingTail
+        addSubview(label)
+        return label
+    }()
+
     /// A pinned tab showing a different page from its pinned one: the close button takes it back instead.
     var isAway = false {
         didSet {
             guard oldValue != isAway else { return }
             closeButton.symbol = isAway ? "arrow.uturn.backward" : "xmark"
             awayMark.isHidden = !isAway
+            pinLabel.isHidden = !isAway
             refreshAccessories()
             needsLayout = true
         }
@@ -349,8 +347,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     override func layout() {
         super.layout()
         if isAway {
-            // Make room for the mark: the title moves over by its width.
-            let x = icon.frame.maxX + Self.inset
+            // The pin's own name, then the mark, then the page it's on now. The name takes what it needs up to
+            // two fifths of the room, so the page's own title always shows too.
+            let room = title.frame.width - 6 - Tokens.Space.x1 * 2
+            let nameWidth = pinName == nil ? 0 : min(pinLabel.inkWidth, floor(room * 0.4))
+            pinLabel.frame = NSRect(x: title.frame.minX, y: title.frame.minY, width: nameWidth + Label.inset * 2, height: title.frame.height)
+            pinLabel.frame.origin.x -= Label.inset
+            pinLabel.isHidden = nameWidth == 0
+            let shift = nameWidth > 0 ? nameWidth + Tokens.Space.x1 : 0
+            title.frame.origin.x += shift
+            title.frame.size.width = max(0, title.frame.width - shift)
+            let x = title.frame.minX
             let h: CGFloat = 12
             Tokens.Motion.withoutAnimation {
                 awayMark.frame = CGRect(x: x, y: (bounds.height - h) / 2, width: 6, height: h)
@@ -532,7 +539,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// The space name above its bookmarks. Click the name to edit the space; click the chevron beside it to fold the
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
-    let label = Label("", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
+    let label = Label("", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     private let chevron = NSImageView()
     private let iconView = NSImageView()
     /// The space's icon, before its name. Nil: the name alone.
@@ -605,7 +612,7 @@ final class SpaceHeaderView: InteractiveView {
 /// as in Arc: on a line of its own, apart from New Tab and the pinned tabs it leaves alone, and only while the
 /// pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
-    private let label = Label("Tabs", font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
+    private let label = Label("Tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
@@ -722,7 +729,7 @@ final class InsertionLineView: NSView {
 final class ClearTabsButton: InteractiveView {
     /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
     private let arrow = NSImageView()
-    private let label = Label("Clear", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
+    private let label = Label("Clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     private static let arrowSide: CGFloat = 10
 
     override init(frame: NSRect) {

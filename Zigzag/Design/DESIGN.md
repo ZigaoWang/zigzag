@@ -144,17 +144,20 @@ something came from, answers at once, and can be interrupted.
 
 ## Surfaces
 
-- **Window frame**: the space's color or gradient, its grain, optionally see-through, under `FrameLight` (a soft
-  light from above, a fine top edge, the faintest grain). The sidebar and the gaps around the page are the frame.
-- **Sidebar**: on the frame. Top row: traffic lights, sidebar toggle, back, forward, reload (light, regular-weight
-  symbols in `Color.chromeIcon`, a small `GlassPlate` under the pointer). The address: a `GlassWell` pill (`row`
-  text, the host in `textPrimary`, compact buttons, a glowing ring from the keyboard). Favorites: `GlassPlate` tiles.
-  The tab you're on: a `.chosen` `GlassPlate`; a row under the pointer: a faint `GlassWell`. Then the space name
-  as a quiet section label, pinned rows, the "Tabs" label with Clear, New Tab, tabs. The bottom bar: downloads,
-  space dots, +.
+- **Window frame**: the space's color or gradient, its grain, optionally see-through. The sidebar and the gaps
+  around the page are the frame.
+- **Sidebar**: on the frame, calm and roomy, in its own proportions (`Tokens.Sidebar`): rows 40 tall with 16pt
+  titles (`Font.sidebarRow`), section labels at 14 in `textTertiary` (`Font.sidebarLabel`), lots of air and no
+  effects. Top row: traffic lights, `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload
+  at the trailing end, every glyph's ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`,
+  the usual quiet hover fill. The address: a quiet pill (`Color.addressFill`, `Font.sidebarRow`, the host in
+  `textPrimary`, compact buttons, a bright ring from the keyboard). Favorites: soft gray tiles three to a row
+  (`Color.favoriteFill`, `Radius.tile` 14, 22pt icons). The tab you're on: the plain white card (`selectedFill`, a
+  hairline, a barely-there shadow). A pinned page that has wandered reads "<its name> / <the page it's on>". Then
+  the bottom bar: downloads, space dots, +.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
-  meeting the window's edges it meets the frame cleanly: `Radius.attached` (20) corners and the faint `cardEdge`
-  hairline, no shadow and no rim.
+  meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
+  (`Radius.attached`), no outline, no shadow.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface`, `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
   quiet rows.
@@ -200,9 +203,8 @@ something came from, answers at once, and can be interrupted.
 
 ## Materials
 
-Things drawn as objects under one light straight above. The tactile objects below (`RaisedTile`, `TactileButton`,
-`GlassSurface`) are for brand moments (onboarding, Import, About) only; the browser window takes the same light as
-glass, never plastic (`FrameLight`, `GlassPlate`, `GlassWell`; see "The window as glass"). `Materials.swift` holds them; every value is in `Tokens.Material`.
+For brand moments (onboarding, Import, About) only, never for the browser's everyday chrome, which stays plain and
+calm: things drawn as objects under one light straight above. `Materials.swift` holds them; every value is in `Tokens.Material`.
 
 - **Light**: highlights on top edges, shadows straight down, tinted with the navy (`Material.shadowInk`), deeper in
   dark mode (`darkShadowGain`). Every lifted thing has two shadows, a tight contact one and a soft ambient one
@@ -233,16 +235,6 @@ glass, never plastic (`FrameLight`, `GlassPlate`, `GlassWell`; see "The window a
   is, one quiet line (`largeText`, `textSecondary`), then the one big action.
 - **Recipes**: `MaterialShape.rounded` (continuous corners as a path), `GradientStroke` (rims, bevels, lips),
   `InnerShadow` (recesses), `MaterialMotion` (the ease-out, poses, tilt), `OcclusionPause`.
-
-### The window as glass
-
-Etched glass, never plastic: crisp, thin, light and clean. A pane is a very faint wash the space's color shows
-through (`Material.glassWash`, a step clearer for the one you're on, `chosenWash`), one crisp half-point specular
-edge along its top that ends at the corners (`specular`), and a hairline (`glassHairline`). No shadows, bevels,
-glossy bodies or halos anywhere in the window: the page meets the frame with its corners alone. The address is a
-faint darker wash with a hairline and a lit lower edge (`well`, `wellLip`); a row under the pointer the same wash,
-fainter, with no edges. Glass rises `glassLift` (1pt) under the pointer and settles `glassSink` pressed. Rows at
-rest stay plain text, and a material is only made once a row needs it.
 
 Motion: the material ease-out (`Motion.easeOut`), no bounce, interruptible (each change starts where the last got
 to). A material object's hover moves (`settle`, 0.2) rather than appearing at once, because a thing is moving, not a

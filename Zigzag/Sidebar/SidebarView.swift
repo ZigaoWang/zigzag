@@ -10,9 +10,8 @@ protocol SidebarDelegate: SidebarListDelegate {
 
 /// The address at the top of the sidebar. Shows only the domain; clicking opens the command bar.
 final class AddressView: InteractiveView {
-    private let label = Label("", font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+    private let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
-    private let well = GlassWell()
     /// Shows while the page uses the camera or microphone; click for options.
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
     static let buttonSide: CGFloat = Tokens.Metric.compactIconButton
@@ -63,9 +62,7 @@ final class AddressView: InteractiveView {
         // Its buttons sit 4pt in, with 6pt corners: 10 here keeps the two curves running side by side.
         layer?.cornerRadius = Tokens.Radius.control + AddressView.buttonInset
         layer?.cornerCurve = .continuous
-        // A pill of glass set into the frame; keyboard focus rings it brightly.
-        well.radius = Tokens.Radius.control + AddressView.buttonInset
-        well.install(in: self)
+        // Keyboard focus rings it brightly, as a field.
         focusRingGlows = true
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textTertiary
@@ -137,9 +134,9 @@ final class AddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The well is the field at rest; the usual hover and press over it.
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        // A quiet fill at rest, a step deeper under the pointer and pressed.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.addressFill
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
     }
 }
 
@@ -147,7 +144,6 @@ final class AddressView: InteractiveView {
 final class SpaceDotView: InteractiveView {
     let spaceID: UUID
     private let dot = CALayer()
-    private let gloss = CAGradientLayer()
     /// A space with an icon shows it here instead of a dot, quiet until it's the space you're in.
     private let iconView = NSImageView()
     var icon: String? {
@@ -175,11 +171,6 @@ final class SpaceDotView: InteractiveView {
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Metric.iconButton, height: Tokens.Metric.iconButton))
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
-        // The space you're in is a lit bead of glass: a specular light along its top.
-        gloss.startPoint = CGPoint(x: 0.5, y: 0)
-        gloss.endPoint = CGPoint(x: 0.5, y: 1)
-        gloss.masksToBounds = true
-        dot.addSublayer(gloss)
         iconView.imageScaling = .scaleNone
         iconView.isHidden = true
         addSubview(iconView)
@@ -203,11 +194,6 @@ final class SpaceDotView: InteractiveView {
         let width = height + (Tokens.Metric.currentSpaceDot - height) * share
         let ink = Tokens.Color.textPrimary
         let resting: CGFloat = isHovered ? 0.5 : 0.28
-        let dark = effectiveAppearance.isDark
-        // A top light, as flipped layers count y down: bright at the bead's top edge, gone by its middle.
-        let spec = Tokens.Material.specular.cg(dark)
-        gloss.colors = [spec.copy(alpha: dark ? 0.9 : 0.45)!, spec.copy(alpha: 0)!]
-        gloss.locations = [0, 0.6]
         let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
         let changed = (wasSelected != nil && wasSelected != isSelected && swipeShare == nil) || settlesFromSwipe
         wasSelected = isSelected
@@ -217,10 +203,6 @@ final class SpaceDotView: InteractiveView {
             self.dot.position = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
             self.dot.cornerRadius = height / 2
             self.dot.backgroundColor = self.cgColor(tint)
-            let rect = CGRect(x: 0, y: 0, width: width, height: height)
-            self.gloss.frame = rect
-            self.gloss.cornerRadius = height / 2
-            self.gloss.opacity = Float(share)
         }
         iconView.frame = bounds
         iconView.isHidden = icon == nil
@@ -296,7 +278,7 @@ final class SidebarView: NSView {
         layer?.masksToBounds = true
 
         for button in [sidebarButton, backButton, forwardButton, reloadButton] {
-            button.isTactile = true
+            button.isChrome = true
             addSubview(button)
         }
         trafficLightsPicture.imageScaling = .scaleNone
@@ -336,8 +318,8 @@ final class SidebarView: NSView {
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
 
-        downloadsButton.isTactile = true
-        newSpaceButton.isTactile = true
+        downloadsButton.isChrome = true
+        newSpaceButton.isChrome = true
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
@@ -378,6 +360,9 @@ final class SidebarView: NSView {
 
     // MARK: Layout
 
+    /// Where the traffic lights start, from the sidebar's left edge.
+    static let trafficLightsX = Tokens.Metric.sidebarPadding + Tokens.Space.x2
+
     /// The y position (from the top) where the traffic lights should be centered.
     var trafficLightCenterY: CGFloat { Tokens.Metric.topRowHeight / 2 + Tokens.Space.x1 }
 
@@ -394,7 +379,10 @@ final class SidebarView: NSView {
         }
         // The sidebar toggle sits right after the traffic lights, where Arc and Safari put it.
         // Without traffic lights (full screen) the sidebar button starts the row.
-        let lead = trafficLightsWidth > 0 ? pad + Tokens.Space.x2 + trafficLightsWidth + Tokens.Space.x2 : pad
+        // Its glyph sits `Sidebar.lightsGap` after the lights (the button's own padding inside that), on their line.
+        let glyphWidth = Tokens.Symbol.inkSize(sidebarButton.symbol, size: Tokens.Symbol.glyph).width
+        let lead = trafficLightsWidth > 0
+            ? round(Self.trafficLightsX + trafficLightsWidth + Tokens.Sidebar.lightsGap - (button - glyphWidth) / 2) : pad
         sidebarButton.frame = NSRect(x: lead, y: rowCenter - button / 2, width: button, height: button)
         let topRowBottom = Tokens.Metric.topRowHeight + Tokens.Space.x2
         address.frame = NSRect(x: pad, y: topRowBottom, width: width - pad * 2, height: Tokens.Metric.addressHeight)
@@ -464,7 +452,7 @@ final class SidebarView: NSView {
         trafficLightsPicture.image = image
         trafficLightsPicture.isHidden = image == nil
         if let image {
-            let x = Tokens.Metric.sidebarPadding + Tokens.Space.x2
+            let x = Self.trafficLightsX
             trafficLightsPicture.frame = NSRect(x: x, y: trafficLightCenterY - image.size.height / 2, width: image.size.width, height: image.size.height)
         }
     }
