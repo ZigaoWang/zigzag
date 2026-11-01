@@ -41,6 +41,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverFavorites(at windowPoint: NSPoint) -> Bool
     /// Dropped on the favorites grid. Returns true if it became a favorite.
     func listDropOnFavorites(_ tab: Tab) -> Bool
+    /// A pinned page dropped on the favorites grid: it becomes a favorite, open or not.
+    func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool
     /// A tab dragged over the page: show which half it would open in.
     func listDragOverPage(at windowPoint: NSPoint, tab: Tab)
     /// Dropped on the page: open it in split view beside the current page. Returns true if it did.
@@ -58,6 +60,15 @@ enum SidebarItem: Hashable {
     case placeholder
     /// Shown while dragging a tab when there are no bookmarks yet: drop here to bookmark.
     case bookmarkDropZone
+
+    /// A tab, or a pinned page that isn't half of a pinned split: what the favorites grid takes.
+    var canBeFavorite: Bool {
+        switch self {
+        case .tab: true
+        case .bookmark(let id): Library.shared.pinnedSplit(containing: id) == nil
+        default: false
+        }
+    }
 
     var height: CGFloat {
         switch self {
@@ -990,7 +1001,7 @@ final class SidebarListView: NSView {
 
         // Over the favorites grid: it opens a slot for the tab, and the list closes its gap.
         var overFavorites = false
-        if case .tab = drag.item, Self.window(at: mouse) === window.windowController {
+        if drag.item.canBeFavorite, Self.window(at: mouse) === window.windowController {
             overFavorites = delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse)) ?? false
         }
         if overFavorites, !wasOverFavorites { Haptics.snap() }
@@ -1154,6 +1165,12 @@ final class SidebarListView: NSView {
 
         // Onto the favorites grid.
         if case .tab(let id) = drag.item, let tab = manager.tab(with: id), delegate?.listDropOnFavorites(tab) == true {
+            rows[drag.item] = nil
+            drag.view.removeFromSuperview()
+            reload(animated: true)
+            return
+        }
+        if case .bookmark(let id) = drag.item, drag.item.canBeFavorite, delegate?.listDropBookmarkOnFavorites(id) == true {
             rows[drag.item] = nil
             drag.view.removeFromSuperview()
             reload(animated: true)

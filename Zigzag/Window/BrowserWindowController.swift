@@ -1407,6 +1407,19 @@ extension BrowserWindowController: SidebarDelegate {
         return true
     }
 
+    func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
+        guard sidebar.favorites.isDropTarget else { return false }
+        sidebar.favorites.isDropTarget = false
+        if let tab = tabManager.bookmarkTab(for: bookmarkID) {
+            favoriteWithUndo(tab)
+        } else {
+            let before = Library.shared.snapshot
+            Library.shared.makeFavorite(bookmarkID)
+            recordLibraryUndo("Add to Favorites", before: before)
+        }
+        return true
+    }
+
     func listDragOverPage(at windowPoint: NSPoint, tab: Tab) {
         // Only another tab can open beside the current page.
         guard let current = tabManager.selectedTab, tabManager.canSplit(current, with: tab) else { root.splitDropHint.show(nil); return }
