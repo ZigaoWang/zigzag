@@ -163,6 +163,28 @@ final class PillButton: InteractiveView {
     private var hasIcon: Bool { !iconView.isHidden }
     private var hasTitle: Bool { !label.isHidden }
 
+    /// Its words, which can change ("Try Again"): the button keeps its place and the row around it lays out again.
+    var title: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            label.isHidden = newValue.isEmpty
+            setAccessibilityLabel(newValue)
+            invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
+        }
+    }
+
+    /// Says what just happened in place of the title for a moment ("Cleared"), then goes back.
+    func flash(_ text: String, for seconds: TimeInterval = 1.6) {
+        let original = title
+        title = text
+        isEnabled = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            self?.title = original
+            self?.isEnabled = true
+        }
+    }
+
     var fittingWidth: CGFloat {
         guard hasTitle else { return Tokens.Page.controlHeight }
         return ceil(Tokens.Space.x3 * 2 + label.inkWidth + (hasIcon ? Tokens.Space.x4 + Tokens.Space.x1 + 2 : 0))

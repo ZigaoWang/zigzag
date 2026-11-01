@@ -141,6 +141,12 @@ enum Tokens {
         static let searchWidth: CGFloat = 260
         /// A column of sections at the left (Settings).
         static let columnWidth: CGFloat = 232
+        /// A row in a group on a page (Settings): one line of text, or more with its explanation under it.
+        static let groupRowHeight: CGFloat = Space.x12
+        /// From a group's edge to the text and controls in its rows.
+        static let groupPad: CGFloat = Space.x4
+        /// Between one group on a page and the next section.
+        static let groupGap: CGFloat = Space.x6
     }
 
     // MARK: - Type (SF Pro, three sizes for text, plus the display heading and the badge)
