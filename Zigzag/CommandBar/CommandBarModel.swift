@@ -127,6 +127,102 @@ enum CommandRanker {
         Action(id: "feedback", title: "Send Feedback…", keywords: ["feedback", "send", "report", "bug", "issue", "problem", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
     ]
 
+    /// What the bar needs to know about the window to offer only the commands that would do something.
+    struct Context {
+        struct Space { let id: UUID; let name: String }
+        var isPrivate = false
+        /// The page you're on has an address (a blank new tab doesn't).
+        var hasPage = false
+        var isPinned = false
+        var isFavorite = false
+        var inSplit = false
+        /// Another tab, the last one you were on, can open beside this one.
+        var canSplitWithRecent = false
+        /// The page you're on is an ordinary tab, so it can move to another space.
+        var canMove = false
+        var hasOtherTabs = false
+        var hasTabsBelow = false
+        var canReopen = false
+        var spaces: [Space] = []
+        var currentSpaceID: UUID?
+    }
+
+    /// The commands about the page and window you're in, each named as in the menu bar, and only those that apply.
+    static func contextActions(_ c: Context) -> [Action] {
+        var list: [Action] = []
+        if c.hasPage, !c.isPrivate, !c.isFavorite {
+            list.append(c.isPinned
+                ? Action(id: "unpin", title: "Unpin Tab", keywords: ["unpin", "pin", "tab", "remove"], symbol: "pin.slash")
+                : Action(id: "pin", title: "Pin Tab", keywords: ["pin", "tab", "keep", "bookmark"], symbol: "pin"))
+        }
+        if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
+            list.append(Action(id: "favorite", title: "Add to Favorites", keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
+        }
+        if c.inSplit {
+            list.append(Action(id: "separate", title: "Separate Tabs", keywords: ["separate", "tabs", "split", "unsplit", "view", "close"], symbol: "rectangle.split.2x1.slash"))
+        } else if c.canSplitWithRecent {
+            list.append(Action(id: "split", title: "Open in Split View", keywords: ["open", "split", "view", "side", "two"], symbol: "rectangle.split.2x1"))
+        }
+        if c.hasOtherTabs {
+            list.append(Action(id: "close-others", title: "Close Other Tabs", keywords: ["close", "other", "tabs", "clean", "tidy"], symbol: "xmark.circle"))
+        }
+        if c.hasTabsBelow {
+            list.append(Action(id: "close-below", title: "Close Tabs Below", keywords: ["close", "tabs", "below", "under"], symbol: "xmark.circle"))
+        }
+        if c.canReopen {
+            list.append(Action(id: "reopen", title: "Reopen Closed Tab", keywords: ["reopen", "closed", "tab", "undo", "restore", "back"], symbol: "arrow.uturn.backward"))
+        }
+        // Spaces are kept for good; a private window keeps nothing and has one space.
+        guard !c.isPrivate else { return list }
+        list.append(Action(id: "new-space", title: "New Space", keywords: ["new", "space", "create", "add"], symbol: "plus.square"))
+        for space in c.spaces where space.id != c.currentSpaceID {
+            let name = space.name.lowercased().split(separator: " ").map(String.init)
+            list.append(Action(id: "space:\(space.id.uuidString)", title: "Switch to \(space.name)", keywords: ["switch", "go", "space"] + name, symbol: "square.on.square"))
+            if c.canMove {
+                list.append(Action(id: "move:\(space.id.uuidString)", title: "Move to \(space.name)", keywords: ["move", "tab", "space", "send"] + name, symbol: "arrow.right.square"))
+            }
+        }
+        return list
+    }
+
+    /// The commands every word you typed starts a keyword of. The ones about this page and window (Pin Tab, Close
+    /// Other Tabs) wait for three letters, so a site's first letter and Return never pins or closes anything.
+    static func commands(for query: String, context: Context) -> [Action] {
+        let words = query.lowercased().split(separator: " ").map(String.init)
+        guard !words.isEmpty else { return [] }
+        let candidates = (query.count >= 3 ? contextActions(context) : []) + actions
+        return candidates.filter { action in words.allSatisfy { word in action.keywords.contains { $0.hasPrefix(word) } } }
+    }
+
+    static func context(for manager: TabManager) -> Context {
+        var c = Context()
+        c.isPrivate = manager.isPrivate
+        c.canReopen = manager.canReopenClosedTab
+        c.spaces = Library.shared.spaces.map { Context.Space(id: $0.id, name: $0.name) }
+        c.currentSpaceID = manager.currentSpaceID
+        let tabs = manager.currentTabs
+        guard let tab = manager.selectedTab else { return c }
+        c.hasPage = tab.url != nil
+        c.isFavorite = tab.isFavorite
+        c.isPinned = tab.bookmarkID != nil && !tab.isFavorite
+        c.inSplit = manager.split(for: tab) != nil
+        c.canSplitWithRecent = splitPartner(for: tab, in: manager) != nil
+        c.canMove = tab.bookmarkID == nil && tab.url != nil
+        // On a pinned page or favorite, every tab is another tab, and all of them are below it.
+        let index = tabs.firstIndex { $0 === tab }
+        c.hasOtherTabs = tabs.contains { $0 !== tab }
+        c.hasTabsBelow = tabs.count > (index.map { $0 + 1 } ?? 0)
+        return c
+    }
+
+    /// The tab Open in Split View puts beside this one: the last other page you were on, in this space.
+    static func splitPartner(for tab: Tab, in manager: TabManager) -> Tab? {
+        guard tab.url != nil, manager.split(for: tab) == nil else { return nil }
+        return manager.recentTabs.first { other in
+            other !== tab && other.url != nil && other.spaceID == tab.spaceID && manager.split(for: other) == nil && manager.canSplit(tab, with: other)
+        }
+    }
+
     static func results(for text: String, manager: TabManager, suggestions: [String], editingCurrent: Bool, historyOnly: Bool) -> [CommandResult] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var results: [CommandResult] = []
@@ -165,8 +261,11 @@ enum CommandRanker {
 
         // Zigzag's own commands, when the words fit one. They come first: typing "import" means the command.
         if !historyOnly {
-            for action in actions where words.allSatisfy({ word in action.keywords.contains { $0.hasPrefix(word) } }) {
-                add(CommandResult(kind: .action(action.id), title: action.title, detail: "", symbol: action.symbol), key: "action:\(action.id)")
+            for action in commands(for: query, context: context(for: manager)) {
+                // Split View says which page it puts beside this one.
+                let partner = action.id == "split" ? manager.selectedTab.flatMap { splitPartner(for: $0, in: manager) } : nil
+                add(CommandResult(kind: .action(action.id), title: action.title, detail: partner.map { "with \($0.displayTitle)" } ?? "",
+                                  symbol: action.symbol), key: "action:\(action.id)")
             }
         }
 

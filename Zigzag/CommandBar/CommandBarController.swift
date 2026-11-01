@@ -799,7 +799,27 @@ extension CommandBarController {
         case "feedback": Feedback.show(in: controller)
         case "history": HistoryPage.open(in: controller)
         case "settings": SettingsPage.open(in: controller)
-        default: break
+        // The page and window commands do what the menu bar's items of the same name do.
+        case "pin", "unpin": controller.toggleBookmark(nil)
+        case "favorite": controller.addToFavorites(nil)
+        case "separate": controller.closeSplitView(nil)
+        case "split":
+            if let tab = controller.tabManager.selectedTab, let other = CommandRanker.splitPartner(for: tab, in: controller.tabManager) {
+                controller.splitWithUndo(tab, with: other)
+            }
+        case "close-others": controller.closeOtherTabs(nil)
+        case "close-below": controller.closeTabsBelow(nil)
+        case "reopen": controller.reopenClosedTab(nil)
+        case "new-space": controller.newSpace(nil)
+        default:
+            if id.hasPrefix("space:"), let space = UUID(uuidString: String(id.dropFirst(6))), Library.shared.space(space) != nil {
+                controller.tabManager.switchToSpace(space)
+            } else if id.hasPrefix("move:"), let space = UUID(uuidString: String(id.dropFirst(5))), Library.shared.space(space) != nil,
+                      let tab = controller.tabManager.selectedTab, tab.bookmarkID == nil {
+                controller.moveWithUndo(tab, to: 0, in: space)
+                // The page leaves the screen: say where it went.
+                Toast.show("Moved to \(Library.shared.space(space)?.name ?? "")", symbol: "arrow.right.square", in: controller)
+            }
         }
     }
 }
