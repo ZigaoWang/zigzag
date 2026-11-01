@@ -688,15 +688,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// With the sidebar hidden, its Downloads button stands in on its own, in the same bottom-left corner: a download
     /// flies into it and the panel opens above it, exactly as with the sidebar out. It goes once the panel closes.
     private(set) lazy var floatingDownloads: FloatingPanelView = {
+        // A round glass button, the button filling it so its hover is the same circle.
         let chip = FloatingPanelView()
-        chip.radius = Tokens.Metric.iconButton / 2 + 4
-        let button = IconButton(symbol: "arrow.down.circle", toolTip: "Downloads")
+        chip.radius = Tokens.Metric.floatingButton / 2
+        let button = IconButton(symbol: "arrow.down.circle", size: Tokens.Metric.floatingButton, toolTip: "Downloads")
         button.onClick = { [weak self] _ in self?.showDownloads(nil) }
         chip.addSubview(button)
         chip.onLayout = { [weak chip, weak button] in
             guard let chip, let button else { return }
-            let side = Tokens.Metric.iconButton
-            button.frame = NSRect(x: (chip.bounds.width - side) / 2, y: (chip.bounds.height - side) / 2, width: side, height: side)
+            button.frame = chip.bounds
+            button.radius = chip.bounds.height / 2
         }
         return chip
     }()
@@ -706,7 +707,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Shows the stand-in Downloads button where the sidebar's would be, if the sidebar is hidden.
     func showFloatingDownloads() {
         guard !(root.sidebarVisible || root.isSidebarFloatingVisible) else { return }
-        let side = Tokens.Metric.iconButton + 8
+        let side = Tokens.Metric.floatingButton
         let inset = Tokens.Metric.sidebarPadding
         floatingDownloads.frame = NSRect(x: inset, y: root.overlay.bounds.height - side - inset, width: side, height: side)
         guard floatingDownloads.superview == nil else { return }

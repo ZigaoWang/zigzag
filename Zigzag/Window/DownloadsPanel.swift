@@ -2,16 +2,17 @@ import AppKit
 import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
-/// One download: file icon, name, progress or size, and a reveal button.
+/// One download, a row in the panel's list: the file's icon or a picture of it, its name, progress or size in quiet
+/// text, and its buttons at the trailing end. Rows take the one row look (`applyRowStyle`).
 final class DownloadRowView: InteractiveView, NSDraggingSource {
     private let icon = NSImageView()
     private let name = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let status = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let bar = ColorView(color: Tokens.Color.fieldFill)
     private let fill = ColorView(color: Tokens.Color.accent)
-    let actionButton = IconButton(symbol: "magnifyingglass", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Show in Finder")
+    let actionButton = IconButton(symbol: "magnifyingglass", size: Tokens.Metric.paneButton, symbolSize: Tokens.TypeSize.small, toolTip: "Show in Finder")
     /// Pause or resume, beside Cancel, while a download is under way or paused.
-    let pauseButton = IconButton(symbol: "pause.fill", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Pause")
+    let pauseButton = IconButton(symbol: "pause.fill", size: Tokens.Metric.paneButton, symbolSize: Tokens.TypeSize.small, toolTip: "Pause")
     private(set) var item: DownloadItem?
     /// The newest download, finished in the last few minutes: the one you're looking for. Its status says so, in
     /// the space's accent; nothing else about the row changes.
@@ -27,13 +28,14 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         layer?.cornerCurve = .continuous
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.wantsLayer = true
-        icon.layer?.cornerRadius = 4
+        icon.layer?.cornerRadius = Tokens.Radius.small
+        icon.layer?.cornerCurve = .continuous
         icon.layer?.masksToBounds = true
         name.lineBreakMode = .byTruncatingMiddle
         bar.wantsLayer = true
-        bar.layer?.cornerRadius = 1.5
+        bar.layer?.cornerRadius = Self.barHeight / 2
         fill.wantsLayer = true
-        fill.layer?.cornerRadius = 1.5
+        fill.layer?.cornerRadius = Self.barHeight / 2
         bar.addSubview(fill)
         [icon, name, status, bar, actionButton, pauseButton].forEach { addSubview($0) }
         // A finished file drags out of the list, into Finder, Mail or any app, like a file in Finder.
@@ -152,27 +154,29 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         needsLayout = true
     }
 
+    /// The progress line under a download that's under way.
+    private static let barHeight: CGFloat = 3
+
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x2
+        // The icon sits as far from the row's edge as a sidebar row's does; the buttons as far from the other end.
+        let pad = CardRow.inset - 2
         let iconSize = Tokens.Space.x8
         icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let b = actionButton.frame.size
         actionButton.frame.origin = NSPoint(x: bounds.width - pad - b.width, y: (bounds.height - b.height) / 2)
-        pauseButton.frame.origin = NSPoint(x: actionButton.frame.minX - Tokens.Space.x1 - pauseButton.frame.width, y: actionButton.frame.minY)
-        let x = icon.frame.maxX + Tokens.Space.x2
+        pauseButton.frame.origin = NSPoint(x: actionButton.frame.minX - pauseButton.frame.width, y: actionButton.frame.minY)
+        let x = icon.frame.maxX + CardRow.inset - Label.inset
         let right = !pauseButton.isHidden ? pauseButton.frame.minX : !actionButton.isHidden ? actionButton.frame.minX : bounds.width - pad
-        let width = right - Tokens.Space.x2 - x
+        let width = max(0, right - Tokens.Space.x2 - x)
         let nameH = name.lineHeight, statusH = status.lineHeight
-        let top = (bounds.height - nameH - statusH - Tokens.Space.x1) / 2
+        let top = (bounds.height - nameH - statusH - 2) / 2
         name.frame = NSRect(x: x, y: top, width: width, height: nameH)
-        if bar.isHidden {
-            status.frame = NSRect(x: x, y: name.frame.maxY + Tokens.Space.x1, width: width, height: statusH)
-        } else {
-            status.frame = NSRect(x: x, y: name.frame.maxY + Tokens.Space.x1, width: width, height: statusH)
-            status.isHidden = false
-            bar.frame = NSRect(x: x, y: bounds.height - Tokens.Space.x2, width: width, height: 3)
-            fill.frame = NSRect(x: 0, y: 0, width: bar.bounds.width * CGFloat(item?.fractionCompleted ?? 0), height: 3)
+        status.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: statusH)
+        if !bar.isHidden {
+            // Under the text, lined up with it, as long as the name may run.
+            bar.frame = NSRect(x: x + Label.inset, y: bounds.height - Tokens.Space.x2 + 1, width: max(0, width - Label.inset * 2), height: Self.barHeight)
+            fill.frame = NSRect(x: 0, y: 0, width: bar.bounds.width * CGFloat(item?.fractionCompleted ?? 0), height: Self.barHeight)
         }
     }
 
@@ -184,8 +188,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     }
 
     override func stateDidChange(animated: Bool) {
-        let color: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: color.map { cgColor($0) }, animated: animated && !isHovered)
+        applyRowStyle(animated: animated)
         refreshAction()
         needsLayout = true
     }
@@ -232,21 +235,24 @@ final class DownloadsPanelView: FloatingPanelView {
     fileprivate var focused: DownloadItem?
     /// How many it lists when you open it yourself; the rest are in the folder.
     private static let recentCount = 5
-    private let title = Label("Downloads", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let clearButton = TextButton(title: "Clear", font: Tokens.Font.body(.medium))
-    private let folderButton = TextButton(title: "Open Downloads Folder", font: Tokens.Font.body(.medium))
+    private let title = Label("Downloads", font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+    private let clearButton = PillButton(title: "Clear", style: .quiet)
+    /// The last row: the folder, or the whole list when the panel opened on one download.
+    private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
-    private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: 24))
+    private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.title))
     private let emptyNote = Label("Your downloads show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     /// More: where new downloads are saved (the same choice as in Settings), in a menu rather than on the panel.
-    private let more = IconButton(symbol: "ellipsis", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "More")
+    private let more = IconButton(symbol: "ellipsis", size: Tokens.Page.controlHeight, toolTip: "More")
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
-    /// Between rows, so two highlighted ones never run together into one block.
-    private let rowGap: CGFloat = 2
-    private let footer = Tokens.Space.x12
+    private let rowGap = Tokens.Metric.rowGap
+    /// The title's strip, the rows inset `Space.x1` from the panel's sides so their corners run with its corners.
+    private let header = Tokens.Space.x10 + Tokens.Space.x1
+    private let inset = Tokens.Space.x1
+    private var footer: CGFloat { Tokens.Space.x1 + Tokens.Metric.rowHeight + inset }
     private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
     /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
     private var sidebarLane: (x: CGFloat, width: CGFloat)? {
@@ -263,12 +269,10 @@ final class DownloadsPanelView: FloatingPanelView {
         more.onClick = { [weak self] _ in self?.showMoreMenu() }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary
         emptyNote.alignment = .center
-        // Quiet, like Clear: a line of text that lights up under the pointer, not a slab across the panel.
-        folderButton.showsFillAtRest = false
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             guard let self else { return }
-            if self.focused != nil, self.folderButton.title == "Show All Downloads" {
+            if self.focused != nil, self.folderButton.title.stringValue == "Show All Downloads" {
                 self.focused = nil
                 self.touched = true
                 self.reload()
@@ -308,14 +312,9 @@ final class DownloadsPanelView: FloatingPanelView {
     func show(from anchor: NSView, arrival: Arrival = .pop) {
         guard let controller else { return }
         self.anchor = anchor
-        // In the sidebar it's part of the sidebar, exactly like the site panel under the address bar: the address
-        // bar's width and corners, flat, in the space's color lifted like a selected tab, with the tabs under it
-        // faded back. Over the page it stays a card.
+        // A glass panel over the sidebar's lane, with the tabs under it faded back so nothing shows around it.
         if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
-            liftedFrom = controller.tabManager.isPrivate ? SpaceColor.graphite.background : controller.tabManager.currentSpace.background
             recedes = [controller.sidebar.list]
-            isElevated = false
-            radius = controller.sidebar.address.layer?.cornerRadius ?? Tokens.Radius.panel
         }
         controller.root.overlay.addSubview(self)
         reload()
@@ -383,7 +382,9 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
         let more = focused != nil && all.count > items.count
-        folderButton.title = more ? "Show All Downloads" : "Open Downloads Folder"
+        folderButton.title.stringValue = more ? "Show All Downloads" : "Open Downloads Folder"
+        folderButton.symbol = more ? "list.bullet" : "folder"
+        folderButton.setAccessibilityLabel(folderButton.title.stringValue)
         while rows.count < items.count {
             let row = DownloadRowView()
             row.onClick = { [weak row] _ in if let item = row?.item { DownloadManager.shared.open(item) } }
@@ -422,7 +423,6 @@ final class DownloadsPanelView: FloatingPanelView {
 
     private func reposition() {
         guard let controller, let anchor else { return }
-        let header = Tokens.Space.x10
         let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * (rowHeight + rowGap) - rowGap
         let height = header + body + footer
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.
@@ -438,27 +438,29 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     private func layoutContent() {
-        let pad = Tokens.Space.x2
-        let header = Tokens.Space.x10
-        let h = title.lineHeight
-        let side = Tokens.Space.x6
-        more.frame = NSRect(x: bounds.width - pad - side, y: (header - side) / 2, width: side, height: side)
+        let control = Tokens.Page.controlHeight
+        // The buttons sit as far from the top as from the side, so More's corner runs with the panel's.
+        let edge = Tokens.Space.x2
+        more.frame = NSRect(x: bounds.width - edge - control, y: edge, width: control, height: control)
         let cw = clearButton.fittingWidth
-        clearButton.frame = NSRect(x: more.frame.minX - Tokens.Space.x1 - cw, y: (header - Tokens.Space.x6) / 2, width: cw, height: Tokens.Space.x6)
-        title.frame = NSRect(x: pad + Tokens.Space.x2, y: (header - h) / 2, width: clearButton.frame.minX - pad * 2 - Tokens.Space.x2, height: h)
+        clearButton.frame = NSRect(x: more.frame.minX - Tokens.Space.x1 - cw, y: edge, width: cw, height: control)
+        // The title lines up with the rows' icons below it.
+        let h = title.lineHeight
+        let x = inset + CardRow.inset - 2 - Label.inset
+        title.frame = NSRect(x: x, y: more.frame.midY - h / 2, width: max(0, clearButton.frame.minX - x - Tokens.Space.x2), height: h)
         var y = header
         if rows.isEmpty {
-            let icon: CGFloat = 28
-            emptyIcon.frame = NSRect(x: (bounds.width - icon) / 2, y: y + Tokens.Space.x3, width: icon, height: icon)
-            emptyNote.frame = NSRect(x: pad, y: emptyIcon.frame.maxY + Tokens.Space.x2, width: bounds.width - pad * 2, height: emptyNote.lineHeight)
+            let icon = Tokens.Space.x8
+            emptyIcon.frame = NSRect(x: (bounds.width - icon) / 2, y: y + Tokens.Space.x2, width: icon, height: icon)
+            emptyNote.frame = NSRect(x: Tokens.Space.x3, y: emptyIcon.frame.maxY + Tokens.Space.x2, width: bounds.width - Tokens.Space.x6, height: emptyNote.lineHeight)
             y += emptyHeight
         }
         for row in rows {
-            row.frame = NSRect(x: pad, y: y, width: bounds.width - pad * 2, height: rowHeight)
+            row.frame = NSRect(x: inset, y: y, width: bounds.width - inset * 2, height: rowHeight)
             y += rowHeight + rowGap
         }
         if !rows.isEmpty { y -= rowGap }
-        folderButton.frame = NSRect(x: pad, y: y + (footer - Tokens.Space.x8) / 2 - 2, width: bounds.width - pad * 2, height: Tokens.Space.x8)
+        folderButton.frame = NSRect(x: inset, y: y + Tokens.Space.x1, width: bounds.width - inset * 2, height: Tokens.Metric.rowHeight)
     }
 }
 
