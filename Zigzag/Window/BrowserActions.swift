@@ -303,6 +303,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func addToFavorites(_ sender: Any?) {
         guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, tab.bookmarkID != nil || !tabManager.isPrivate else { return }
         favoriteWithUndo(tab)
+        Toast.show("Added to Favorites", symbol: "star.fill", in: self)
     }
     @objc func moveTabToNewWindow(_ sender: Any?) {
         guard let tab = selectedTab else { return }
@@ -315,7 +316,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let bookmarkID = tab.bookmarkID, tab.isFavorite {
             // A favorite stays open as a tab; ⌘Z puts it back in Favorites.
             unfavoriteWithUndo(bookmarkID, to: 0)
-            Toast.show("Removed from Favorites", symbol: "star.slash", in: self)
+            Toast.show("Moved to Tabs", symbol: "star.slash", in: self)
         } else if let bookmarkID = tab.bookmarkID {
             unbookmarkWithUndo(bookmarkID, to: 0)
             Toast.show("Unpinned", symbol: "pin.slash", in: self)
@@ -445,7 +446,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
             return true
         case #selector(toggleBookmark(_:)):
-            item.title = tab?.isFavorite == true ? "Remove from Favorites" : tab?.bookmarkID != nil ? "Unpin Tab" : "Pin Tab"
+            // As the sidebar names them: a favorite moves back to the tabs, and half of a split pins with its other half.
+            let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            item.title = tab?.isFavorite == true ? "Move to Tabs" : tab?.bookmarkID != nil ? "Unpin Tab" : pinsPair ? "Pin Split View" : "Pin Tab"
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
