@@ -23,17 +23,18 @@ enum InlineCompletion {
         return text.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 
-    /// Whether a change took text away rather than adding it: backspace, forward delete or cut leave a beginning of
-    /// what was there and no more than you'd typed. Taking away never completes, or the completion you just
-    /// deleted would come straight back.
-    static func isDeletion(_ text: String, shown: String, typed: String) -> Bool {
-        text.utf16.count <= typed.utf16.count && shown.hasPrefix(text)
+    /// Whether a change took text away rather than adding it: a delete key (or Undo) did it, or a cut took the
+    /// completion and left exactly what you'd typed. The text alone can't tell: "h" typed over a whole selected
+    /// "https://…" looks like deleting all but its first letter. Taking away never completes, or the completion you
+    /// just deleted would come straight back.
+    static func isDeletion(_ text: String, shown: String, typed: String, deleting: Bool) -> Bool {
+        deleting || (text == typed && shown != typed)
     }
 
     /// Whether the field may complete what's in it now: typing forward at the very end, nothing being composed in
     /// an input method, and the text the start of an address.
-    static func allowed(_ text: String, shown: String, typed: String, caretAtEnd: Bool, hasMarkedText: Bool) -> Bool {
-        caretAtEnd && !hasMarkedText && looksLikeHost(text) && !isDeletion(text, shown: shown, typed: typed)
+    static func allowed(_ text: String, shown: String, typed: String, deleting: Bool, caretAtEnd: Bool, hasMarkedText: Bool) -> Bool {
+        caretAtEnd && !hasMarkedText && looksLikeHost(text) && !isDeletion(text, shown: shown, typed: typed, deleting: deleting)
     }
 
     /// The address as it completes: host, its port, and the path when there is one, with no "www." and no trailing slash.

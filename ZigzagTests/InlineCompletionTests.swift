@@ -97,27 +97,34 @@ struct InlineCompletionTests {
     }
 
     @Test func typingForwardCompletes() {
-        #expect(InlineCompletion.allowed("w", shown: "", typed: "", caretAtEnd: true, hasMarkedText: false))
+        #expect(InlineCompletion.allowed("w", shown: "", typed: "", deleting: false, caretAtEnd: true, hasMarkedText: false))
         // A letter that replaces the selected completion.
-        #expect(InlineCompletion.allowed("wikip", shown: "wikipedia.org", typed: "wiki", caretAtEnd: true, hasMarkedText: false))
+        #expect(InlineCompletion.allowed("wikip", shown: "wikipedia.org", typed: "wiki", deleting: false, caretAtEnd: true, hasMarkedText: false))
         // A new address over the whole old one.
-        #expect(InlineCompletion.allowed("g", shown: "https://example.com/", typed: "https://example.com/", caretAtEnd: true, hasMarkedText: false))
+        #expect(InlineCompletion.allowed("g", shown: "https://example.com/", typed: "https://example.com/", deleting: false, caretAtEnd: true, hasMarkedText: false))
     }
 
     @Test func deletingNeverCompletes() {
-        // Backspace, forward delete or cut on the selected completion leaves what you typed.
-        #expect(!InlineCompletion.allowed("wiki", shown: "wikipedia.org", typed: "wiki", caretAtEnd: true, hasMarkedText: false))
-        // And again, a letter of what you typed.
-        #expect(!InlineCompletion.allowed("wik", shown: "wiki", typed: "wiki", caretAtEnd: true, hasMarkedText: false))
-        #expect(InlineCompletion.isDeletion("", shown: "w", typed: "w"))
-        #expect(!InlineCompletion.isDeletion("wikix", shown: "wikipedia.org", typed: "wiki"))
+        // A cut of the selected completion leaves exactly what you typed.
+        #expect(!InlineCompletion.allowed("wiki", shown: "wikipedia.org", typed: "wiki", deleting: false, caretAtEnd: true, hasMarkedText: false))
+        // Backspace on a letter of what you typed.
+        #expect(!InlineCompletion.allowed("wik", shown: "wiki", typed: "wiki", deleting: true, caretAtEnd: true, hasMarkedText: false))
+        #expect(InlineCompletion.isDeletion("", shown: "w", typed: "w", deleting: true))
+        #expect(!InlineCompletion.isDeletion("wikix", shown: "wikipedia.org", typed: "wiki", deleting: false))
+    }
+
+    @Test func aFirstLetterOverTheWholeAddressCompletes() {
+        // ⌘L selects the address; "h" replaces it, and is a beginning of it, but nothing was deleted.
+        #expect(InlineCompletion.allowed("h", shown: "https://example.com/", typed: "https://example.com/", deleting: false,
+                                         caretAtEnd: true, hasMarkedText: false))
+        #expect(!InlineCompletion.isDeletion("w", shown: "wiki", typed: "wiki", deleting: false))
     }
 
     @Test func holdsBackMidTextWithSpacesAndWhileComposing() {
-        #expect(!InlineCompletion.allowed("wiki", shown: "wik", typed: "wik", caretAtEnd: false, hasMarkedText: false))
-        #expect(!InlineCompletion.allowed("wiki p", shown: "wiki ", typed: "wiki ", caretAtEnd: true, hasMarkedText: false))
+        #expect(!InlineCompletion.allowed("wiki", shown: "wik", typed: "wik", deleting: false, caretAtEnd: false, hasMarkedText: false))
+        #expect(!InlineCompletion.allowed("wiki p", shown: "wiki ", typed: "wiki ", deleting: false, caretAtEnd: true, hasMarkedText: false))
         // An input method still composing (pinyin, kana): its text isn't settled, so nothing is filled in after it.
-        #expect(!InlineCompletion.allowed("wiki", shown: "wik", typed: "wik", caretAtEnd: true, hasMarkedText: true))
+        #expect(!InlineCompletion.allowed("wiki", shown: "wik", typed: "wik", deleting: false, caretAtEnd: true, hasMarkedText: true))
     }
 
     @Test func aMatchingLetterKeepsTheCompletion() {

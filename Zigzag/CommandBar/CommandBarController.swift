@@ -106,6 +106,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var completionURL: URL? { completion?.url }
     /// Takes the completion back before a letter replaces it, so the completion never enters Undo.
     private var typingMonitor: Any?
+    /// The key event of the last delete command, so the change it makes is known to take away, not type.
+    private weak var deleteEvent: NSEvent?
     private(set) var isVisible = false
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
@@ -573,7 +575,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let shown = completion.map { typed + $0.text.dropFirst(typed.count) } ?? typed
         let caretAtEnd = editor.selectedRange == NSRange(location: length, length: 0)
         let previous = completion
-        let allowed = InlineCompletion.allowed(text, shown: shown, typed: typed, caretAtEnd: caretAtEnd, hasMarkedText: editor.hasMarkedText())
+        let deleting = (deleteEvent != nil && NSApp.currentEvent === deleteEvent)
+            || editor.undoManager?.isUndoing == true || editor.undoManager?.isRedoing == true
+        let allowed = InlineCompletion.allowed(text, shown: shown, typed: typed, deleting: deleting,
+                                               caretAtEnd: caretAtEnd, hasMarkedText: editor.hasMarkedText())
         typed = text
         completion = nil
         // Not in a site search or history, and never while an input method is still composing.
@@ -648,11 +653,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             acceptCompletion(textView)
             return true
         default:
+            guard NSStringFromSelector(selector).hasPrefix("delete") else { return false }
             // Deleting the selected completion takes it back, the way Esc does, so Undo never brings it back as text.
-            if NSStringFromSelector(selector).hasPrefix("delete"), completionIsSelected(textView), takeBackCompletion() {
+            if completionIsSelected(textView), takeBackCompletion() {
                 refreshResults(animated: true)
                 return true
             }
+            deleteEvent = NSApp.currentEvent
             return false
         }
     }
