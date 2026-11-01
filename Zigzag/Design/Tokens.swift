@@ -92,6 +92,10 @@ enum Tokens {
         /// Zigzag's switch (`Toggle`): track and knob.
         static let toggleSize = NSSize(width: 34, height: 20)
         static let toggleKnob: CGFloat = 14
+        /// A field being typed in or recording: the accent ring's width.
+        static let fieldRing: CGFloat = 1.5
+        /// A list's bullet (What's New).
+        static let bullet: CGFloat = 5
         static let commandBarWidth: CGFloat = 640
         static let commandBarFieldHeight: CGFloat = Space.x12 + Space.x2
         static let commandBarRowHeight: CGFloat = Space.x10
@@ -306,6 +310,13 @@ enum Tokens {
         static let cardPadding: CGFloat = Space.x5
         /// A step's big title, in display weight: the one place type is this large.
         static let titleSize: CGFloat = 30
+        /// The count of what came over in an import: the one number set this large.
+        static let countSize: CGFloat = 60
+        /// A brand moment's card (onboarding's import card).
+        static let cardRadius: CGFloat = 22
+        /// The About window: its width and height, the app icon and the wordmark under it.
+        static let aboutSize = NSSize(width: 300, height: 340)
+        static let aboutIcon: CGFloat = 96
         /// The progress dots: the dot, and the long one for the step you're on.
         static let dot: CGFloat = 6
         static let currentDot: CGFloat = Space.x5 + 2

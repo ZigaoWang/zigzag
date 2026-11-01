@@ -209,7 +209,7 @@ private final class StepPage: NSView {
     init(count: Int) {
         super.init(frame: .zero)
         card.wantsLayer = true
-        card.layer?.cornerRadius = 22
+        card.layer?.cornerRadius = Tokens.Welcome.cardRadius
         card.layer?.cornerCurve = .continuous
         card.shadow = {
             let shadow = NSShadow()
@@ -398,7 +398,7 @@ private enum Onboard {
     static func title(_ text: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.isSelectable = false
-        field.font = .systemFont(ofSize: 30, weight: .bold)
+        field.font = .systemFont(ofSize: Tokens.Welcome.titleSize, weight: .bold)
         field.textColor = Brand.ribbon
         field.alignment = .center
         return field
@@ -641,8 +641,8 @@ private final class BrowserRow: InteractiveView {
         name = Label(source.name, font: Tokens.Font.body(.semibold), color: Onboard.ink)
         super.init(frame: .zero)
         box.wantsLayer = true
-        box.layer?.cornerRadius = 6
-        box.layer?.borderWidth = 1.5
+        box.layer?.cornerRadius = Tokens.Radius.control
+        box.layer?.borderWidth = Tokens.Metric.fieldRing
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
         tick.contentTintColor = NSColor.white
         box.addSubview(tick)
@@ -901,7 +901,7 @@ private final class BringPicker: StepContent {
     override init(frame: NSRect) {
         super.init(frame: frame)
         scroll.wantsLayer = true
-        scroll.layer?.cornerRadius = 12
+        scroll.layer?.cornerRadius = Tokens.Radius.tile
         scroll.layer?.cornerCurve = .continuous
         scroll.layer?.borderWidth = 0
         scroll.layer?.masksToBounds = true
@@ -1385,7 +1385,7 @@ private final class PickTile: InteractiveView {
         name = Label(text, font: Tokens.Font.body(.medium), color: Onboard.ink)
         self.horizontal = horizontal
         super.init(frame: .zero)
-        layer?.cornerRadius = 14
+        layer?.cornerRadius = Tokens.Radius.panel
         layer?.cornerCurve = .continuous
         icon.imageScaling = .scaleProportionallyUpOrDown
         name.alignment = horizontal ? .left : .center
@@ -1674,7 +1674,7 @@ private final class ExtensionsPicker: StepContent {
     override init(frame: NSRect) {
         super.init(frame: frame)
         list.wantsLayer = true
-        list.layer?.cornerRadius = 12
+        list.layer?.cornerRadius = Tokens.Radius.tile
         list.layer?.cornerCurve = .continuous
         list.layer?.borderWidth = 0
         addSubview(list)
@@ -1786,8 +1786,8 @@ private final class ExtensionRow: InteractiveView {
         kind = Label(detail, font: Tokens.Font.small(), color: Onboard.dim(0.62))
         super.init(frame: .zero)
         box.wantsLayer = true
-        box.layer?.cornerRadius = 6
-        box.layer?.borderWidth = 1.5
+        box.layer?.cornerRadius = Tokens.Radius.control
+        box.layer?.borderWidth = Tokens.Metric.fieldRing
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
         tick.contentTintColor = NSColor.white
         box.addSubview(tick)
@@ -1911,7 +1911,7 @@ private final class ChoiceCard: InteractiveView {
         title = Label(text, font: Tokens.Font.body(.semibold), color: Onboard.ink)
         detail = Label(line, font: Tokens.Font.small(), color: Onboard.dim(0.65))
         super.init(frame: .zero)
-        layer?.cornerRadius = 14
+        layer?.cornerRadius = Tokens.Radius.panel
         layer?.cornerCurve = .continuous
         ring.wantsLayer = true
         ring.layer?.cornerRadius = 10
