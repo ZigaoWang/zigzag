@@ -63,6 +63,7 @@ enum SidebarMenus {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let manager = controller.tabManager
+        menu.addItem(Item("Rename…") { controller.sidebar.list.beginRenaming(tab: tab.id) })
         menu.addItem(Item("Copy Link", enabled: tab.url != nil) {
             if let url = tab.url { controller.copyLink(url) }
         })

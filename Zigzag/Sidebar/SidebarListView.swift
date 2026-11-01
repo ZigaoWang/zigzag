@@ -731,6 +731,11 @@ final class SidebarListView: NSView {
         return true
     }
 
+    /// A tab's row turns into a field for its name, as a double-click does.
+    func beginRenaming(tab id: UUID) {
+        (rows[.tab(id)] as? TabRowView)?.beginRename()
+    }
+
 
     /// The space's name scrolls with the list like any row: a block of flat color pinned over the grain and
     /// gradient read as a smudge, and the line under the favorites already marks where the list begins.
