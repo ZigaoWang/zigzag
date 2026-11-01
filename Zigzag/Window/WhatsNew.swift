@@ -72,7 +72,7 @@ enum WhatsNew {
 final class WhatsNewSheet: NSView {
     private let panel = FloatingPanelView()
     private let icon = NSImageView(image: NSApp.applicationIconImage)
-    private let titleLabel = Label("What’s New in Zigzag", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let titleLabel = Label("What’s New in Zigzag", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
     private let versionLabel = Label("Version \(WhatsNew.version)", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var headings: [Label] = []
     private var points: [(dot: ColorView, text: NSTextField)] = []

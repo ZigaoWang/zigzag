@@ -33,7 +33,7 @@ final class CommandRowView: InteractiveView {
         } else {
             icon.isHidden = true
             symbolView.isHidden = false
-            symbolView.image = Tokens.Symbol.image(result.symbol ?? "globe", size: Tokens.TypeSize.row)
+            symbolView.image = Tokens.Symbol.image(result.symbol ?? "globe", size: Tokens.Symbol.row)
         }
         setAccessibilityRole(result.isActionable ? .button : .staticText)
         setAccessibilityLabel(result.detail.isEmpty ? result.title : "\(result.title), \(result.detail)")
@@ -90,7 +90,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private let panel = FloatingPanelView()
     /// The bar itself, for pointing at it (the Getting started guide).
     var panelView: NSView { panel }
-    private let field = PlainTextField(font: Tokens.Font.large(), placeholder: "Search or enter address")
+    private let field = PlainTextField(font: Tokens.Font.title(), placeholder: "Search or enter address")
     private let fieldIcon = NSImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
     private var rows: [CommandRowView] = []
@@ -133,7 +133,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         field.delegate = self
         field.textInset = 2
         field.centersText = true
-        fieldIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.large)
+        fieldIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.title)
         fieldIcon.contentTintColor = Tokens.Color.textTertiary
         fieldIcon.imageScaling = .scaleNone
         panel.addSubview(fieldIcon)
@@ -205,7 +205,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         applySpaceTheme()
         // From the address: a size up from the sidebar's, easy to read across the wide field; the centered bar for a
         // new tab is large.
-        let font = isAnchored ? Tokens.Font.heading(.regular) : Tokens.Font.large()
+        let font = isAnchored ? Tokens.Font.heading(.regular) : Tokens.Font.title()
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
@@ -506,7 +506,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             typed = typedBeforeScope
             (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (typedBeforeScope as NSString).length, length: 0)
         }
-        let font = field.font ?? Tokens.Font.large()
+        let font = field.font ?? Tokens.Font.title()
         field.placeholderAttributedString = NSAttributedString(string: site.map { "Search \($0.name)" } ?? (mode == .history ? "Search history" : "Search or enter address"),
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
         if let site { FaviconStore.shared.prefetch(for: site.home) }

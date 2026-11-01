@@ -186,7 +186,7 @@ final class PermissionPrompt: FloatingPanelView {
     private let badge = ColorView(color: .clear)
     private let request = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Not Now")
+    private let closeButton = IconButton(symbol: "xmark", toolTip: "Not Now")
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
     private var askingHost = ""
     private var urlToken: SignalToken?
@@ -272,7 +272,7 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.image = icon
                 prompt.badge.isHidden = true
             } else {
-                prompt.picture.image = Tokens.Symbol.image(symbol, size: 15)
+                prompt.picture.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.heading)
                 prompt.picture.imageScaling = .scaleNone
                 prompt.picture.contentTintColor = accent
                 prompt.badge.color = accent.withAlphaComponent(0.16)
@@ -454,7 +454,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     private var textX: CGFloat { Self.pad + Self.iconSide + Tokens.Space.x3 }
     /// Room kept at the right of the text for the close button.
-    private var closeRoom: CGFloat { Tokens.Space.x6 }
+    private var closeRoom: CGFloat { Tokens.Metric.iconButton }
 
     private func requestHeight(for width: CGFloat) -> CGFloat {
         let textWidth = width - textX - Self.pad - closeRoom

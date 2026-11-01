@@ -300,7 +300,8 @@ class InteractiveView: NSView {
     func stateDidChange(animated: Bool) {}
 }
 
-/// A square icon button: back, forward, reload, close, and friends.
+/// A square icon button: back, forward, reload, close, and friends. `Metric.iconButton` with a `Symbol.glyph` by
+/// default; inside a row or a field, `.compact` (`Metric.compactIconButton`, `Symbol.compactGlyph`).
 final class IconButton: InteractiveView {
     private let imageView = NSImageView()
     var symbol: String { didSet { imageView.image = Tokens.Symbol.image(symbol, size: symbolSize); needsLayout = true } }
@@ -324,7 +325,21 @@ final class IconButton: InteractiveView {
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
     private let symbolSize: CGFloat
 
-    init(symbol: String, size: CGFloat = Tokens.Metric.iconButton, symbolSize: CGFloat = Tokens.Symbol.pointSize, toolTip: String? = nil) {
+    /// The two sizes an icon button comes in.
+    enum Size {
+        /// The toolbar, the bottom bar, a pane's header, the find bar, a panel's close: big and easy to press.
+        case regular
+        /// Inside a row or a field: a tab's close and mute, the address's Reader and extensions.
+        case compact
+        var side: CGFloat { self == .regular ? Tokens.Metric.iconButton : Tokens.Metric.compactIconButton }
+        var glyph: CGFloat { self == .regular ? Tokens.Symbol.glyph : Tokens.Symbol.compactGlyph }
+    }
+
+    convenience init(symbol: String, size: Size = .regular, toolTip: String? = nil) {
+        self.init(symbol: symbol, size: size.side, symbolSize: size.glyph, toolTip: toolTip)
+    }
+
+    init(symbol: String, size: CGFloat, symbolSize: CGFloat, toolTip: String? = nil) {
         self.symbol = symbol
         self.symbolSize = symbolSize
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
@@ -653,7 +668,7 @@ final class FilledField: NSView {
 
     init(placeholder: String, secure: Bool = false, font: NSFont = Tokens.Font.body(), symbol: String? = nil) {
         symbolView = symbol.map { name in
-            let view = NSImageView(image: Tokens.Symbol.image(name, size: Tokens.TypeSize.small))
+            let view = NSImageView(image: Tokens.Symbol.image(name, size: Tokens.Symbol.inline))
             view.contentTintColor = Tokens.Color.textTertiary
             view.imageScaling = .scaleNone
             return view
@@ -782,7 +797,7 @@ final class ChoicePill: InteractiveView {
             : (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.fieldFill)
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         label.textColor = isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
-        check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.TypeSize.small)
+        check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.Symbol.inline)
         check.contentTintColor = isOn ? tint : Tokens.Color.textTertiary
     }
 }
@@ -1063,7 +1078,7 @@ final class DropdownButton: InteractiveView {
         pressScales = true
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)
+        chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.Symbol.inline)
         chevron.imageScaling = .scaleNone
         icon.imageScaling = .scaleProportionallyUpOrDown
         [icon, label, chevron].forEach { addSubview($0) }
@@ -1297,7 +1312,7 @@ final class MenuPanel: FloatingPanelView {
     }
 
     private var fittingWidth: CGFloat {
-        let font = Tokens.Font.pageRow(.regular)
+        let font = Tokens.Font.body()
         let widest = rows.map { ceil(($0.item.title as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
         let icon: CGFloat = rows.first?.reservesIcon == true ? DropdownButton.iconSide + Tokens.Space.x2 : 0
         return Self.pad * 2 + Self.rowInset + icon + widest + Tokens.Space.x6 + Row.checkSide + Self.rowInset
@@ -1627,7 +1642,7 @@ final class MenuPanel: FloatingPanelView {
         init(_ item: Item, reservesIcon: Bool) {
             self.item = item
             self.reservesIcon = reservesIcon
-            label = Label(item.title, font: Tokens.Font.pageRow(.regular), color: item.isDestructive ? Tokens.Color.destructive : Tokens.Color.textPrimary)
+            label = Label(item.title, font: Tokens.Font.body(), color: item.isDestructive ? Tokens.Color.destructive : Tokens.Color.textPrimary)
             super.init(frame: .zero)
             layer?.cornerRadius = Tokens.Radius.row
             layer?.cornerCurve = .continuous
@@ -1644,8 +1659,7 @@ final class MenuPanel: FloatingPanelView {
                 icon.imageScaling = .scaleNone
                 icon.contentTintColor = Tokens.Color.icon
             }
-            check.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: Tokens.TypeSize.body, weight: .semibold))
+            check.image = Tokens.Symbol.image("checkmark", size: Tokens.Symbol.inline)
             check.imageScaling = .scaleNone
             check.isHidden = !item.isChecked
             [icon, label, check].forEach { addSubview($0) }
@@ -1745,7 +1759,7 @@ final class SlidingSwitch: NSView {
                 labels.append(label)
                 addSubview(label)
             case .symbol(let name, let tip):
-                let icon = NSImageView(image: Tokens.Symbol.image(name, size: 13))
+                let icon = NSImageView(image: Tokens.Symbol.image(name))
                 icon.imageScaling = .scaleNone
                 icon.toolTip = tip
                 icons.append(icon)

@@ -81,10 +81,10 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         self.noneSymbol = noneSymbol
         self.selected = selected
         super.init(frame: .zero)
-        let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.TypeSize.body, toolTip: "No Icon")
+        let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: "No Icon")
         none.onClick = { [weak self] _ in self?.pick(nil) }
         cells = [none] + IconChoice.symbols.map { name in
-            let button = IconButton(symbol: name, size: Self.cell, symbolSize: Tokens.TypeSize.body, toolTip: nil)
+            let button = IconButton(symbol: name, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: nil)
             button.onClick = { [weak self] _ in self?.pick(name) }
             return button
         }

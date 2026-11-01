@@ -98,8 +98,8 @@ class SidebarRowView: InteractiveView {
 final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
-    let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x5, symbolSize: Tokens.TypeSize.small, toolTip: "Close Tab")
-    let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: Tokens.Space.x5, symbolSize: Tokens.TypeSize.small, toolTip: "Mute Tab")
+    let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Close Tab")
+    let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: .compact, toolTip: "Mute Tab")
     var onClose: (() -> Void)?
     /// Bookmarks keep their own title; only the icon and state follow the page.
     var fixedTitle: String? { didSet { refresh() } }
@@ -388,7 +388,7 @@ final class NewTabRowView: SidebarRowView {
         title.stringValue = "New Tab"
         title.textColor = Tokens.Color.textSecondary
         icon.isHidden = true
-        plus.image = Tokens.Symbol.image("plus")
+        plus.image = Tokens.Symbol.image("plus", size: Tokens.Symbol.row)
         plus.contentTintColor = Tokens.Color.textSecondary
         plus.imageScaling = .scaleNone
         addSubview(plus)
@@ -416,7 +416,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.TypeSize.small - 1)
+        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
         chevron.contentTintColor = Tokens.Color.textTertiary
         chevron.imageScaling = .scaleNone
         chevron.wantsLayer = true
@@ -523,7 +523,7 @@ final class SpaceHeaderView: InteractiveView {
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.label) }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.Symbol.inline) }
             iconView.isHidden = icon == nil
             needsLayout = true
         }
@@ -569,7 +569,7 @@ final class SpaceHeaderView: InteractiveView {
     override func stateDidChange(animated: Bool) {
         label.textColor = isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
         iconView.contentTintColor = label.textColor
-        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.small)
+        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.Symbol.inline)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
         setAccessibilityLabel(label.stringValue + (isCollapsed ? ", pinned tabs hidden" : ""))

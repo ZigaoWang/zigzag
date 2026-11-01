@@ -53,7 +53,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         siteLabel.lineBreakMode = .byTruncatingMiddle
         siteLabel.toolTip = origin.displayName
         let site = URL(string: "\(origin.scheme)://\(origin.host)")
-        icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill", size: 14)
+        icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill", size: Tokens.Symbol.row)
         usernameBox.wantsLayer = true
         usernameBox.layer?.cornerRadius = Tokens.Radius.field
         usernameBox.layer?.cornerCurve = .continuous

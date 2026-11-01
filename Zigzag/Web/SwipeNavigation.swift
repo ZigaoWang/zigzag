@@ -282,7 +282,7 @@ final class SwipeArrowView: NSView {
         fill.layer?.cornerRadius = Self.size / 2
         fill.layer?.borderWidth = Tokens.Metric.hairline
         [material, fill].forEach { addSubview($0) }
-        symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: Tokens.TypeSize.heading)
+        symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: Tokens.Symbol.glyph)
         symbol.imageScaling = .scaleNone
         addSubview(symbol)
         refresh()

@@ -90,7 +90,7 @@ final class FormRow: NSView, SettingsSearchable {
     var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
-    private let title = Label("", font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
     let control: NSView
@@ -104,7 +104,7 @@ final class FormRow: NSView, SettingsSearchable {
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         self.title.stringValue = title
         self.detail.stringValue = detail ?? ""
-        self.detail.font = Tokens.Font.pageDetail()
+        self.detail.font = Tokens.Font.detail()
         self.detail.textColor = Tokens.Color.textSecondary
         self.detail.isSelectable = false
         self.detail.isHidden = (detail ?? "").isEmpty
@@ -120,7 +120,7 @@ final class FormRow: NSView, SettingsSearchable {
 
     private let pad = Tokens.Page.groupPad
     /// A picture's side: an extension's icon, a site's favicon.
-    private static let iconSide = Tokens.Space.x6
+    private static let iconSide = Tokens.Metric.favicon
     /// Between a row's title and its explanation.
     private static let lineGap: CGFloat = 2
 
@@ -223,7 +223,7 @@ enum SettingsVersionRow {
 /// A symbol in a settings row, where a picture is missing (a site with no favicon): the app's icon color.
 enum SettingsIcon {
     static func symbol(_ name: String) -> NSImage {
-        let image = Tokens.Symbol.image(name, size: Tokens.TypeSize.row)
+        let image = Tokens.Symbol.image(name, size: Tokens.Symbol.row)
         image.isTemplate = true
         return image
     }
@@ -238,9 +238,9 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     /// Its color as a tile with its first letter, the same size and shape as the icons on every other row.
     private let tile = NSImageView()
     private let name: Label
-    private let detail = Label("", font: Tokens.Font.pageDetail(), color: Tokens.Color.textSecondary)
+    private let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
     private let editButton = PillButton(title: "Edit")
-    private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
+    private let deleteButton = IconButton(symbol: "trash", size: .compact, toolTip: "Delete Space")
     /// True while the row is being dragged; it draws as lifted.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
     /// True while any space is carried: rows sliding under the pointer don't count as hovered.
@@ -248,8 +248,8 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
     init(space: SpaceInfo) {
         spaceID = space.id
-        name = Label(space.name, font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
-        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight + Tokens.Space.x2))
+        name = Label(space.name, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight))
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         tile.image = Self.tile(for: space)
@@ -274,7 +274,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     override func layout() {
         super.layout()
         let pad = Tokens.Page.groupPad
-        let d = Tokens.Space.x6
+        let d = Tokens.Metric.favicon
         tile.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
         let ew = editButton.fittingWidth, eh = Tokens.Page.controlHeight
         editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - eh) / 2, width: ew, height: eh)
@@ -294,10 +294,10 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     }
 
     /// Where the row's text starts, for the divider under it.
-    var textInset: CGFloat { Tokens.Page.groupPad + Tokens.Space.x6 + Tokens.Space.x3 }
+    var textInset: CGFloat { Tokens.Page.groupPad + Tokens.Metric.favicon + Tokens.Space.x3 }
 
     private static func tile(for space: SpaceInfo) -> NSImage {
-        let side: CGFloat = 24
+        let side = Tokens.Metric.favicon
         let letter = space.name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? ""
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
             let radius = Tokens.Radius.control
@@ -314,7 +314,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             let ink = light ? NSColor(white: 0.2, alpha: 1) : NSColor.white
             // Its icon if it has one, white on the color like the letter; an emoji in its own colors.
             if let icon = space.icon {
-                let image = IconChoice.image(icon, size: 12)
+                let image = IconChoice.image(icon, size: Tokens.Symbol.inline)
                 let size = image.size
                 let spot = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
                 if IconChoice.isSymbol(icon), let tinted = image.copy() as? NSImage {
@@ -328,7 +328,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
                 }
                 return true
             }
-            let text = NSAttributedString(string: letter, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: ink])
+            let text = NSAttributedString(string: letter, attributes: [.font: Tokens.Font.small(.bold), .foregroundColor: ink])
             let size = text.size()
             text.draw(at: NSPoint(x: (side - size.width) / 2, y: (side - size.height) / 2))
             return true
@@ -859,11 +859,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.append(review)
         }
         if ExtensionStore.isUnpacked(id) {
-            let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Reload from Its Folder")
+            let reload = IconButton(symbol: "arrow.clockwise", size: .compact, toolTip: "Reload from Its Folder")
             reload.onClick = { _ in Task { await ExtensionStore.reloadUnpacked(id) } }
             controls.append(reload)
         }
-        let remove = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Remove from Zigzag")
+        let remove = IconButton(symbol: "trash", size: .compact, toolTip: "Remove from Zigzag")
         remove.onClick = { [weak self] _ in self?.confirmRemove(id: id, name: ext.displayName ?? "this extension") }
         controls.append(remove)
         let toggle = Toggle(isOn: ExtensionStore.isEnabled(id))
@@ -1099,7 +1099,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let shown = groups(of: pane).filter { $0.group.rows.contains { !$0.isHidden } }
                 guard !shown.isEmpty else { continue }
                 found = true
-                let heading = Label(pane.title, font: Tokens.Font.pageTitle(), color: Tokens.Color.textPrimary)
+                let heading = Label(pane.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
                 heading.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: heading.lineHeight)
                 documentView.addSubview(heading)
                 y = heading.frame.maxY + Tokens.Space.x3
@@ -1107,7 +1107,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 y += Tokens.Space.x2
             }
             if !found {
-                let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.pageRow(.regular), color: Tokens.Color.textSecondary)
+                let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
                 none.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: none.lineHeight)
                 documentView.addSubview(none)
                 y = none.frame.maxY + Tokens.Space.x6
@@ -1128,7 +1128,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
-                let hint = Label("Drag a space to change its order.", font: Tokens.Font.pageDetail(), color: Tokens.Color.textTertiary)
+                let hint = Label("Drag a space to change its order.", font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
                 hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
                                     width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
                 documentView.addSubview(hint)
@@ -1163,7 +1163,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
-            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.pageDetail(), color: Tokens.Color.textSecondary)
+            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
             hint.lineBreakMode = .byTruncatingTail
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
                                 width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad), height: hint.lineHeight)
@@ -1412,11 +1412,11 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private var keys: [String] = []
     private let item: NSMenuItem?
     private let title: Label
-    private let note = Label("", font: Tokens.Font.pageDetail(), color: Tokens.Color.textSecondary)
+    private let note = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
     private var caps: [KeyHint] = []
     private let field = ColorView(color: .clear)
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
-    private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small - 1, toolTip: "Back to Zigzag’s Shortcut")
+    private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: .compact, toolTip: "Back to Zigzag’s Shortcut")
     private var monitor: Any?
     private var isRecording = false { didSet { refresh() } }
     /// Called after the keys change, so the list can redraw rows that lost theirs.
@@ -1426,7 +1426,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// A row for a menu item, which you can change.
     init(title text: String, item: NSMenuItem) {
         self.item = item
-        title = Label(text, font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
+        title = Label(text, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: Shortcuts.caps(item))
         toolTip = "Click to change"
@@ -1441,7 +1441,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// A fixed row, like ⌘1–9, which can't be changed.
     init(title text: String, keys: [String]) {
         item = nil
-        title = Label(text, font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
+        title = Label(text, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: keys)
     }

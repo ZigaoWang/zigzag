@@ -5,8 +5,8 @@ import AppKit
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    let playButton = IconButton(symbol: "pause.fill", size: Tokens.Space.x6, toolTip: "Pause")
-    let muteButton = IconButton(symbol: "speaker.wave.2.fill", size: Tokens.Space.x6, toolTip: "Mute")
+    let playButton = IconButton(symbol: "pause.fill", size: .compact, toolTip: "Pause")
+    let muteButton = IconButton(symbol: "speaker.wave.2.fill", size: .compact, toolTip: "Mute")
     private(set) weak var tab: Tab?
     var isPaused = false { didSet { refresh() } }
 
@@ -42,7 +42,7 @@ final class NowPlayingView: InteractiveView {
         let pad = Tokens.Space.x2
         let size = Tokens.Metric.favicon
         icon.frame = NSRect(x: pad, y: (bounds.height - size) / 2, width: size, height: size)
-        let b = Tokens.Space.x6
+        let b = Tokens.Metric.compactIconButton
         muteButton.frame = NSRect(x: bounds.width - Tokens.Space.x1 - b, y: (bounds.height - b) / 2, width: b, height: b)
         playButton.frame = NSRect(x: muteButton.frame.minX - b, y: muteButton.frame.minY, width: b, height: b)
         let x = icon.frame.maxX + Tokens.Space.x2

@@ -205,7 +205,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
    line. Its label stays in view while its pages scroll. */
 .session { margin-bottom: var(--group-gap); }
 .session-head { position: sticky; top: var(--header, 56px); z-index: 2; background: var(--bg); display: flex; align-items: baseline;
-                gap: var(--space-2); padding: var(--space-3) var(--row-inset) var(--space-1); color: var(--faint); font-size: var(--page-label); font-weight: 500; }
+                gap: var(--space-2); padding: var(--space-3) var(--row-inset) var(--space-1); color: var(--faint); font-size: var(--label); font-weight: 500; }
 .session-head h2 { font-size: inherit; font-weight: inherit; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-head .range { white-space: nowrap; }
 .session-head .count { margin-left: auto; color: var(--faint); font-size: var(--small); white-space: nowrap; }
@@ -218,25 +218,25 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 
 /* One grid for every row, so titles, addresses and times line up down the whole page at any width:
    disclosure, icon, title, address, time, remove. */
-.row { display: grid; grid-template-columns: 12px 16px minmax(0, 1fr) minmax(0, 34%) 120px 20px; align-items: center; column-gap: 10px;
+.row { display: grid; grid-template-columns: 12px var(--favicon) minmax(0, 1fr) minmax(0, 34%) 120px 20px; align-items: center; column-gap: 10px;
        min-height: var(--row); padding: 0 var(--row-inset); border-radius: var(--radius-row); color: inherit; text-decoration: none;
        width: 100%; text-align: left; }
 .row:hover { background: var(--hover); }
 .row:active { background: var(--pressed); }
 /* Reached with the keyboard: chosen, as a section is in Settings. */
 .row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
-.row img, .row .dot { grid-column: 2; width: 16px; height: 16px; border-radius: var(--radius-small); }
-.row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 15px no-repeat; }
+.row img, .row .dot { grid-column: 2; width: var(--favicon); height: var(--favicon); border-radius: var(--radius-small); }
+.row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 17px no-repeat; }
 /* Dark: icons drawn in black (GitHub, Wikipedia) sit on a light tile, as in the sidebar. */
 @media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; } }
-.row .title { grid-column: 3; font-size: var(--page-row); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .where { grid-column: 4; color: var(--faint); font-size: var(--page-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .title { grid-column: 3; font-size: var(--row-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .where { grid-column: 4; color: var(--faint); font-size: var(--label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row time { grid-column: 5; color: var(--faint); font-size: var(--small); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .row .remove { grid-column: 6; }
 /* Out of sight until the pointer or keyboard focus reaches the row, but still in the Tab order. */
 .row:not(:hover):not(:focus-within) .remove { opacity: 0; }
 @media (max-width: 640px) {
-  .row { grid-template-columns: 12px 16px minmax(0, 1fr) auto 20px; }
+  .row { grid-template-columns: 12px var(--favicon) minmax(0, 1fr) auto 20px; }
   .row .where { display: none; }
   .row time { grid-column: 4; }
   .row .remove { grid-column: 5; }
@@ -247,10 +247,10 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .cluster > .head .chevron { grid-column: 1; width: 12px; height: 12px; color: var(--muted); transition: transform .15s; }
 .cluster.open > .head .chevron { transform: rotate(90deg); }
 /* Indented by a wider first column rather than padding, so the address and time columns still line up with the rows above. */
-.pages .row { grid-template-columns: 38px 16px minmax(0, 1fr) minmax(0, 34%) 120px 20px; }
-.pages .more { display: block; color: var(--accent); padding: 6px 8px 6px 82px; font-size: var(--page-label); }
+.pages .row { grid-template-columns: 38px var(--favicon) minmax(0, 1fr) minmax(0, 34%) 120px 20px; }
+.pages .more { display: block; color: var(--accent); padding: 6px 8px 6px 84px; font-size: var(--label); }
 .pages .more:hover { text-decoration: underline; }
-@media (max-width: 640px) { .pages .row { grid-template-columns: 38px 16px minmax(0, 1fr) auto 20px; } }
+@media (max-width: 640px) { .pages .row { grid-template-columns: 38px var(--favicon) minmax(0, 1fr) auto 20px; } }
 @media (prefers-reduced-motion: reduce) { .chevron, .page-header { transition: none; } }
 
 .empty { text-align: center; padding: 96px 0; color: var(--muted); }

@@ -1204,7 +1204,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let editor: SpaceLookEditor
     /// The space's icon, at the start of its name; click it to choose one in place of the colors.
-    private let iconButton = IconButton(symbol: "circle.dashed", size: 26, symbolSize: Tokens.TypeSize.body, toolTip: "Choose Icon")
+    private let iconButton = IconButton(symbol: "circle.dashed", size: .compact, toolTip: "Choose Icon")
     private var iconGrid: IconGrid?
     private var monitor: Any?
     static let width: CGFloat = 300
@@ -1249,7 +1249,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
 
     private func refreshIconButton(_ icon: String?) {
-        iconButton.glyph = icon.map { IconChoice.image($0, size: Tokens.TypeSize.body + 1) }
+        iconButton.glyph = icon.map { IconChoice.image($0, size: Tokens.Symbol.compactGlyph) }
         iconButton.isSelected = iconGrid != nil
     }
 

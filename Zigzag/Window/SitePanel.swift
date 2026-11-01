@@ -28,7 +28,7 @@ final class SitePanel: FloatingPanelView {
     private let siteName = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let security = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let securityIcon = NSImageView()
-    private let moreButton = IconButton(symbol: "ellipsis", size: Tokens.Space.x7Height, toolTip: "More")
+    private let moreButton = IconButton(symbol: "ellipsis", toolTip: "More")
     private var actionTiles: [PanelTile] = []
     private let extensionsLabel = Label.section("Extensions")
     private var extensionTiles: [PanelTile] = []
@@ -62,11 +62,11 @@ final class SitePanel: FloatingPanelView {
         if page.scheme == "webkit-extension" {
             // An extension's own page never crosses the network: there's no connection to judge.
             security.stringValue = "Extension page"
-            securityIcon.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.TypeSize.small)
+            securityIcon.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
             securityIcon.contentTintColor = Tokens.Color.textSecondary
         } else {
             security.stringValue = secure ? "Secure connection" : page.scheme == "https" ? "Some content isn’t secure" : Self.notSecure
-            securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : Self.notSecureSymbol, size: Tokens.TypeSize.small)
+            securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : Self.notSecureSymbol, size: Tokens.Symbol.inline)
             securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
         }
         [icon, siteName, security, securityIcon, moreButton].forEach { addSubview($0) }
@@ -79,7 +79,7 @@ final class SitePanel: FloatingPanelView {
         moreButton.isHidden = !canClear
         if isBlank {
             [security, securityIcon, moreButton].forEach { $0.isHidden = true }
-            icon.image = Tokens.Symbol.image("plus.square.on.square", size: 16)
+            icon.image = Tokens.Symbol.image("plus.square.on.square", size: Tokens.Symbol.row)
         } else {
             buildTiles()
             buildRows()
@@ -339,7 +339,7 @@ final class SitePanel: FloatingPanelView {
         var y = pad
         // Header: the site, whether the connection is private, and ⋯.
         let iconSide = Tokens.Space.x6
-        let moreSide = Tokens.Space.x7Height
+        let moreSide = Tokens.Metric.iconButton
         let headerHeight = siteName.lineHeight + security.lineHeight + 4
         place(moreButton, NSRect(x: width - pad - moreSide + Tokens.Space.x1, y: y + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
@@ -420,7 +420,7 @@ final class PanelTile: GlassTile {
     init(image: NSImage? = nil, symbol: String, caption text: String?) {
         caption = text.map { Label($0, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
-        iconView.image = image ?? Tokens.Symbol.image(symbol, size: text == nil ? Tokens.TypeSize.body : Tokens.TypeSize.large)
+        iconView.image = image ?? Tokens.Symbol.image(symbol, size: text == nil ? Tokens.TypeSize.body : Tokens.TypeSize.title)
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.contentTintColor = Tokens.Color.icon
         addSubview(iconView)

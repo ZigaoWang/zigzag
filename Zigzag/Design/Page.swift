@@ -11,7 +11,7 @@ import AppKit
 final class PageTitleView: NSView {
     private let wordmark = WordmarkView()
     private let divider = ColorView(color: Tokens.Color.separator)
-    private let label = Label("", font: Tokens.Font.pageTitle(), color: Tokens.Color.textPrimary)
+    private let label = Label("", font: Tokens.Font.title(), color: Tokens.Color.textPrimary)
     private var themeToken: SignalToken?
 
     var title: String {
@@ -137,10 +137,10 @@ final class PageHeader: NSView {
 }
 
 extension Label {
-    /// A group's heading on a page ("Tabs", "Browsing data"): quiet gray, a size up from a panel's section label,
-    /// over the group with room above it in place of a line.
+    /// A group's heading on a page ("Tabs", "Browsing data"): quiet gray, the same as a section's label in the
+    /// sidebar or a panel, over the group with room above it in place of a line.
     static func groupHeading(_ text: String) -> Label {
-        let label = Label(text, font: Tokens.Font.pageLabel(), color: Tokens.Color.textTertiary)
+        let label = Label(text, font: Tokens.Font.label(), color: Tokens.Color.textTertiary)
         label.setAccessibilityRole(.staticText)
         return label
     }
@@ -172,13 +172,13 @@ class ListItem: InteractiveView {
 
     init(title: String, symbol: String) {
         self.title = title
-        label = Label(title, font: Tokens.Font.pageRow(.regular), color: Tokens.Color.textPrimary)
+        label = Label(title, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
         pressScales = true
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        // Monochrome outline symbols, the size of the text beside them.
-        icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.pageRow)
+        // Monochrome outline symbols in a favicon's slot, as the sidebar's rows have them.
+        icon.image = Tokens.Symbol.image(symbol, size: Tokens.Symbol.row)
         icon.imageScaling = .scaleNone
         count.alignment = .right
         count.isHidden = true
@@ -191,13 +191,13 @@ class ListItem: InteractiveView {
 
     override func layout() {
         super.layout()
-        let side: CGFloat = 20
+        let side = Tokens.Metric.favicon
         if isCompact {
             icon.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
         } else {
             // The symbol's ink, not its box, starts at the row's inset, so it lines up with text above and below.
-            icon.frame = NSRect(x: Tokens.Page.rowInset - 2, y: (bounds.height - side) / 2, width: side, height: side)
-            let x = icon.frame.maxX + Tokens.Space.x2 + 2 - Label.inset
+            icon.frame = NSRect(x: Tokens.Page.rowInset - 1, y: (bounds.height - side) / 2, width: side, height: side)
+            let x = icon.frame.maxX + Tokens.Space.x2 + 1 - Label.inset
             let countWidth = count.isHidden ? 0 : count.inkWidth + Label.inset * 2
             count.frame = NSRect(x: bounds.width - Tokens.Page.rowInset + Label.inset - countWidth, y: (bounds.height - count.lineHeight) / 2,
                                  width: countWidth, height: count.lineHeight)
@@ -298,8 +298,8 @@ enum PageStyle {
             "--radius-small: \(px(radius.small))", "--radius-control: \(px(radius.control))", "--radius-field: \(px(radius.field))", "--radius-row: \(px(radius.row))",
             "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--label: \(px(size.label))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
             "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%", "--group-gap: \(px(page.groupGap))",
-            "--page-row: \(px(size.pageRow))", "--page-label: \(px(size.pageLabel))", "--page-title: \(px(size.pageTitle))",
-            "--control-text: \(px(size.row))", "--focus: \(Int(Tokens.Color.focusAlpha * 100))%",
+            "--row-text: \(px(size.row))", "--title: \(px(size.title))", "--favicon: \(px(Tokens.Metric.favicon))",
+            "--control-text: \(px(size.body))", "--focus: \(Int(Tokens.Color.focusAlpha * 100))%",
             "--disabled: \(Tokens.Opacity.disabled)", "--space-1: \(px(Tokens.Space.x1))", "--space-2: \(px(Tokens.Space.x2))", "--space-3: \(px(Tokens.Space.x3))", "--space-4: \(px(Tokens.Space.x4))", "--space-5: \(px(Tokens.Space.x5))",
             "--space-6: \(px(Tokens.Space.x6))", "--space-8: \(px(Tokens.Space.x8))",
             "--panel-blur: \(px(Tokens.Shadow.panelRadius))", "--panel-drop: \(px(Tokens.Shadow.panelDrop))",
@@ -329,7 +329,7 @@ enum PageStyle {
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control); margin-right: auto; min-width: 0; }
     .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
     .page-title .divider { width: 1px; height: 20px; background: var(--line); flex: none; }
-    .page-title h1 { font-size: var(--page-title); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page-title h1 { font-size: var(--title); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
     .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control) / 2); padding: 0 14px 0 10px;
@@ -359,7 +359,7 @@ enum PageStyle {
     .button:disabled { opacity: var(--disabled); }
 
     /* A menu, drawn as Zigzag's menus are (MenuPanel): a solid panel with a hairline edge and the one panel shadow,
-       15px items, a soft gray row under the pointer. It arrives with a quick fade from a touch smaller. */
+       body-size items, a soft gray row under the pointer. It arrives with a quick fade from a touch smaller. */
     .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 5; min-width: 200px; padding: var(--space-1); border-radius: var(--radius-float);
             background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
     .menu.open { display: block; animation: menu-in .14s cubic-bezier(.23, 1, .32, 1); transform-origin: top right; }
@@ -367,7 +367,7 @@ enum PageStyle {
     @media (prefers-reduced-motion: reduce) { .menu.open { animation-name: menu-fade; } }
     @keyframes menu-fade { from { opacity: 0; } }
     .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-row);
-                              font-size: var(--page-row); }
+                              font-size: var(--body); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
     .menu [role="menuitem"].destructive { color: var(--destructive); }

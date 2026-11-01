@@ -5,8 +5,8 @@ import WebKit
 final class PeekHeaderView: NSView {
     let icon = FaviconView()
     let host = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", size: Tokens.Page.controlHeight, toolTip: "Open as Tab")
-    let closeButton = IconButton(symbol: "xmark", size: Tokens.Page.controlHeight, toolTip: "Close")
+    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: "Open as Tab")
+    let closeButton = IconButton(symbol: "xmark", toolTip: "Close")
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -28,7 +28,7 @@ final class PeekHeaderView: NSView {
         // Close sits as far from the panel's top and side as the page below sits from its sides, so its corner runs
         // with the panel's (`FloatingPanelView` fits it).
         let edge = PeekController.inset + 2
-        let b = Tokens.Page.controlHeight
+        let b = Tokens.Metric.iconButton
         let y = (bounds.height - b) / 2
         closeButton.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
         expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: y, width: b, height: b)

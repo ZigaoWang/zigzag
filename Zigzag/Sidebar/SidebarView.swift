@@ -14,11 +14,11 @@ final class AddressView: InteractiveView {
     private let lock = NSImageView()
     /// Shows while the page uses the camera or microphone; click for options.
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
-    static let buttonSide: CGFloat = Tokens.Space.x7Height
-    static let buttonInset: CGFloat = 4
-    let captureButton = IconButton(symbol: "video.fill", size: AddressView.buttonSide, toolTip: "Camera and Microphone")
+    static let buttonSide: CGFloat = Tokens.Metric.compactIconButton
+    static let buttonInset: CGFloat = (Tokens.Metric.addressHeight - buttonSide) / 2
+    let captureButton = IconButton(symbol: "video.fill", size: .compact, toolTip: "Camera and Microphone")
     /// Shown on articles: opens Reader.
-    let readerButton = IconButton(symbol: "doc.plaintext", size: AddressView.buttonSide, toolTip: "Show Reader")
+    let readerButton = IconButton(symbol: "doc.plaintext", size: .compact, toolTip: "Show Reader")
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
@@ -45,7 +45,7 @@ final class AddressView: InteractiveView {
     func setActions(_ items: [ActionButton]) {
         actionButtons.forEach { $0.removeFromSuperview() }
         actionButtons = items.map { item in
-            let button = IconButton(symbol: item.symbol, size: AddressView.buttonSide, toolTip: item.label)
+            let button = IconButton(symbol: item.symbol, size: .compact, toolTip: item.label)
             if let image = item.image { button.image = image }
             button.onClick = { [weak button] _ in if let button { item.action(button) } }
             button.onRightClick = { _ in item.menu() }
@@ -102,7 +102,7 @@ final class AddressView: InteractiveView {
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textSecondary
         if label.stringValue.isEmpty { label.stringValue = "Search or enter address" }
         let insecure = url?.scheme == "http"
-        lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.TypeSize.small) : nil
+        lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
         lock.isHidden = !insecure
         lock.toolTip = insecure ? SitePanel.notSecure : nil
         setAccessibilityLabel(insecure ? "\(label.stringValue), \(SitePanel.notSecure)" : label.stringValue)
@@ -146,7 +146,7 @@ final class SpaceDotView: InteractiveView {
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.TypeSize.small) }
+            iconView.image = icon.map { IconChoice.image($0, size: Tokens.Symbol.compactGlyph) }
             stateDidChange(animated: false)
         }
     }
@@ -165,7 +165,7 @@ final class SpaceDotView: InteractiveView {
 
     init(spaceID: UUID) {
         self.spaceID = spaceID
-        super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Space.x6, height: Tokens.Space.x6))
+        super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Metric.iconButton, height: Tokens.Metric.iconButton))
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         iconView.imageScaling = .scaleNone
@@ -186,9 +186,9 @@ final class SpaceDotView: InteractiveView {
     private var wasSelected: Bool?
 
     override func stateDidChange(animated: Bool) {
-        let height: CGFloat = 6
+        let height = Tokens.Metric.spaceDot
         let share = swipeShare ?? (isSelected ? 1 : 0)
-        let width: CGFloat = 6 + 10 * share
+        let width = height + (Tokens.Metric.currentSpaceDot - height) * share
         let ink = Tokens.Color.textPrimary
         let resting: CGFloat = isHovered ? 0.5 : 0.28
         let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
@@ -227,15 +227,14 @@ final class SidebarView: NSView {
         didSet { list.delegate = delegate; neighborList.delegate = delegate }
     }
 
-    /// The top row's buttons are a size up from the rest, level with the traffic lights, so they're easy to hit.
-    static let toolbarButton: CGFloat = 30
-    static let toolbarSymbol: CGFloat = 15
-    let backButton = IconButton(symbol: "chevron.left", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Back")
-    let forwardButton = IconButton(symbol: "chevron.right", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Forward")
-    let reloadButton = IconButton(symbol: "arrow.clockwise", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Reload")
+    /// The top row's buttons, level with the traffic lights: regular icon buttons, easy to hit.
+    static let toolbarButton: CGFloat = Tokens.Metric.iconButton
+    let backButton = IconButton(symbol: "chevron.left", toolTip: "Back")
+    let forwardButton = IconButton(symbol: "chevron.right", toolTip: "Forward")
+    let reloadButton = IconButton(symbol: "arrow.clockwise", toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = IconButton(symbol: "sidebar.left", size: toolbarButton, symbolSize: toolbarSymbol, toolTip: "Hide Sidebar")
+    let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Hide Sidebar")
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
@@ -426,7 +425,7 @@ final class SidebarView: NSView {
         downloadsButton.frame = NSRect(x: pad, y: (h - button) / 2, width: button, height: button)
         newSpaceButton.frame = NSRect(x: bottomBar.bounds.width - pad - button, y: (h - button) / 2, width: button, height: button)
         let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
-        let dotSize = min(Tokens.Space.x6, floor(available / CGFloat(max(dots.count, 1))))
+        let dotSize = min(Tokens.Metric.iconButton, floor(available / CGFloat(max(dots.count, 1))))
         let total = CGFloat(dots.count) * dotSize
         var x = downloadsButton.frame.maxX + Tokens.Space.x1 + (available - total) / 2
         for dot in dots {
@@ -1120,11 +1119,15 @@ final class BadgeView: NSView {
 /// arrow or (for a moment, when downloads finish) a check in it.
 enum DownloadGlyph {
     enum Mark { case arrow, check }
-    /// The circle's diameter, through the middle of its line.
-    static let circle: CGFloat = 13.6
-    static let line: CGFloat = 1.4
+    /// Drawn to the size of the bottom bar's other symbols (`Symbol.glyph`): the circle's diameter through the middle
+    /// of its line, and the line, as SF's arrow.down.circle has them.
+    static let circle: CGFloat = (Tokens.Symbol.glyph * 1.046 * 10).rounded() / 10
+    static let line: CGFloat = 1.6
+    /// The arrow and the check were drawn for a 13.6pt circle; they grow with it.
+    private static let k = circle / 13.6
 
     static func image(_ mark: Mark) -> NSImage {
+        let line = Self.line, k = Self.k
         let side = circle + line
         let image = NSImage(size: NSSize(width: side, height: side), flipped: true) { rect in
             NSColor.black.setStroke()
@@ -1136,17 +1139,18 @@ enum DownloadGlyph {
             path.lineWidth = line
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
+            func p(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: c.x + x * k, y: c.y + y * k) }
             switch mark {
             case .arrow:
-                path.move(to: NSPoint(x: c.x, y: c.y - 3.6))
-                path.line(to: NSPoint(x: c.x, y: c.y + 3.4))
-                path.move(to: NSPoint(x: c.x - 2.9, y: c.y + 0.6))
-                path.line(to: NSPoint(x: c.x, y: c.y + 3.5))
-                path.line(to: NSPoint(x: c.x + 2.9, y: c.y + 0.6))
+                path.move(to: p(0, -3.6))
+                path.line(to: p(0, 3.4))
+                path.move(to: p(-2.9, 0.6))
+                path.line(to: p(0, 3.5))
+                path.line(to: p(2.9, 0.6))
             case .check:
-                path.move(to: NSPoint(x: c.x - 3.1, y: c.y + 0.2))
-                path.line(to: NSPoint(x: c.x - 0.9, y: c.y + 2.5))
-                path.line(to: NSPoint(x: c.x + 3.3, y: c.y - 2.4))
+                path.move(to: p(-3.1, 0.2))
+                path.line(to: p(-0.9, 2.5))
+                path.line(to: p(3.3, -2.4))
             }
             path.stroke()
             return true

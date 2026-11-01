@@ -930,7 +930,7 @@ enum AttentionHint {
             y = image.frame.maxY + Tokens.Space.x3
         }
         let title = NSTextField(wrappingLabelWithString: "")
-        title.attributedStringValue = Brand.display(attention.title, size: 17, color: Tokens.Color.textPrimary, wraps: true)
+        title.attributedStringValue = Brand.display(attention.title, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, wraps: true)
         title.isSelectable = false
         let titleHeight = ceil(title.sizeThatFits(NSSize(width: inner, height: 200)).height)
         title.frame = NSRect(x: pad, y: y, width: inner, height: titleHeight)

@@ -36,7 +36,7 @@ final class FaviconView: NSView {
         spinner.alphaValue = 0
         addSubview(spinner)
 
-        fallback.image = Tokens.Symbol.image("globe", size: Tokens.TypeSize.body)
+        fallback.image = Tokens.Symbol.image("globe", size: Tokens.Symbol.row)
         fallback.contentTintColor = Tokens.Color.textTertiary
         fallback.imageScaling = .scaleNone
         addSubview(fallback)

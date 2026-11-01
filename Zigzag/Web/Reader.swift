@@ -531,7 +531,7 @@ private final class ReaderSizeButtons: NSView {
     var canGrow = true { didSet { setEnabled(larger, canGrow) } }
     private let smaller = InteractiveView(), larger = InteractiveView()
     private let smallLabel = Label("A", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let largeLabel = Label("A", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let largeLabel = Label("A", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
     private let divider = ColorView(color: Tokens.Color.separator)
     /// The same gap as `SlidingSwitch`'s, so the corners are concentric with the track's.
     private let inset: CGFloat = 3

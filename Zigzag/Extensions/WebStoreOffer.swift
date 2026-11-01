@@ -9,10 +9,10 @@ final class WebStoreOffer: FloatingPanelView {
     private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let line = Label("Works in Zigzag", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let add = PillButton(title: "Add to Zigzag", style: .prominent)
-    private let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Not Now")
+    private let close = IconButton(symbol: "xmark", toolTip: "Not Now")
     private let id: String
     private let spinner = Spinner()
-    private let done = NSImageView(image: Tokens.Symbol.image("checkmark.circle.fill", size: 22))
+    private let done = NSImageView(image: Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display))
     private var tabToken: SignalToken?
 
     static let size = NSSize(width: 400, height: 64)
@@ -41,7 +41,7 @@ final class WebStoreOffer: FloatingPanelView {
         self.controller = controller
         super.init(frame: NSRect(origin: .zero, size: Self.size))
         radius = Tokens.Radius.panel
-        icon.image = Tokens.Symbol.image("puzzlepiece.extension", size: 22)
+        icon.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.TypeSize.display)
         icon.contentTintColor = Tokens.Color.textSecondary
         icon.imageScaling = .scaleProportionallyUpOrDown
         refreshName()

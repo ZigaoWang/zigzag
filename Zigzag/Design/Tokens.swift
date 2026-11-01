@@ -56,7 +56,8 @@ enum Tokens {
     enum Metric {
         static let cardInset: CGFloat = Space.x2
         static let sidebarWidth: CGFloat = 240
-        static let sidebarMinWidth: CGFloat = 192
+        /// The narrowest the sidebar gets: room for the traffic lights and the toolbar's four icon buttons.
+        static let sidebarMinWidth: CGFloat = 216
         static let sidebarMaxWidth: CGFloat = 400
         static let sidebarPadding: CGFloat = Space.x2
         /// Height of the sidebar's top row (traffic lights + navigation).
@@ -67,8 +68,16 @@ enum Tokens {
         /// A section's quiet label (the space's name, Tabs): the label sits low, with generous room above it.
         static let sectionLabelHeight: CGFloat = Space.x8
         static let addressHeight: CGFloat = Space.x8 + Space.x1
-        static let iconButton: CGFloat = Space.x6 + Space.x1
-        static let favicon: CGFloat = Space.x4
+        /// Hit targets: one size for every icon button you reach for (the toolbar, the bottom bar, a pane's header,
+        /// the find bar, a panel's close), and a compact one for buttons inside a row or a field (a tab's close, the
+        /// address's Reader). The hover fill shows the whole target.
+        static let iconButton: CGFloat = Space.x8
+        static let compactIconButton: CGFloat = Space.x6
+        /// One control height on pages and in panels: pill buttons, dropdowns, the search field, a menu's rows.
+        static let controlHeight: CGFloat = Space.x7Height
+        /// A row's picture: a favicon, or a symbol (`Symbol.row`) in its place. The same in the sidebar, on pages,
+        /// in panels and in the command bar, so rows line up wherever they are.
+        static let favicon: CGFloat = 18
         static let sectionGap: CGFloat = Space.x4
         static let edgeRevealWidth: CGFloat = Space.x2
         static let resizeHandleWidth: CGFloat = Space.x2
@@ -87,6 +96,9 @@ enum Tokens {
         static let switcherThumbWidth: CGFloat = 224
         static let peekInsetRatio: CGFloat = 0.08
         static let bottomBarHeight: CGFloat = Space.x10
+        /// A space's dot in the bottom bar, and the longer one for the space you're in.
+        static let spaceDot: CGFloat = 8
+        static let currentSpaceDot: CGFloat = Space.x5
         static let findBarWidth: CGFloat = 320
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         static let windowDefaultSize = NSSize(width: 1280, height: 820)
@@ -95,8 +107,6 @@ enum Tokens {
         static let deskCardMaxWidth: CGFloat = 440
         /// The find bar, a glass capsule over the page's top right.
         static let findBarHeight: CGFloat = Space.x10
-        /// The find bar's round buttons (previous, next, done), concentric with its ends.
-        static let findButton: CGFloat = Space.x7Height
         /// A toast, a glass capsule at the page's top; its action is a pill this tall, inset evenly.
         static let toastHeight: CGFloat = Space.x8 + Space.x1
         static let toastButtonHeight: CGFloat = Space.x7Height
@@ -110,9 +120,8 @@ enum Tokens {
         static let keyCapHeight: CGFloat = Space.x5 - 2
         /// A small round button floating over a page edge on its own (swipe arrows, the stand-in Downloads button).
         static let floatingButton: CGFloat = Space.x8 + Space.x1
-        /// The split pane's header strip, and the buttons in it.
-        static let paneHeaderHeight: CGFloat = Space.x8 + Space.x1
-        static let paneButton: CGFloat = Space.x6
+        /// The split pane's header strip: an icon button with 4pt around it.
+        static let paneHeaderHeight: CGFloat = Space.x10
         /// A tab preview's caption under the picture, and Peek's top strip.
         static let previewCaptionHeight: CGFloat = Space.x12
         static let peekHeaderHeight: CGFloat = Space.x10
@@ -133,13 +142,12 @@ enum Tokens {
         /// The header: its top and bottom padding, and the height of what's in it (title, search, buttons).
         static let headerTop: CGFloat = Space.x4
         static let headerBottom: CGFloat = Space.x3
-        /// One control height on pages and in panels: pill buttons, dropdowns, the search field, a menu's rows.
-        static let controlHeight: CGFloat = Space.x8
+        static let controlHeight: CGFloat = Metric.controlHeight
         static var headerHeight: CGFloat { headerTop + controlHeight + headerBottom }
         /// The widest the content gets; past it the page centers it.
         static let maxWidth: CGFloat = 880
-        /// A row in a list: History's pages, Settings' sections. Roomier than the sidebar's, for 15pt text.
-        static let rowHeight: CGFloat = Space.x10 - 2
+        /// A row in a list: History's pages, Settings' sections. The sidebar's row, so the two read alike.
+        static let rowHeight: CGFloat = Metric.rowHeight
         /// How far a row's hover fill reaches past its text, on each side.
         static let rowInset: CGFloat = Space.x2 + 2
         /// The wordmark in the header: about the title's cap height, so the two read as one line.
@@ -149,10 +157,10 @@ enum Tokens {
         /// A column of sections at the left (Settings).
         static let columnWidth: CGFloat = 240
         /// A row in a group on a page (Settings): one line of text, or more with its explanation under it.
-        static let groupRowHeight: CGFloat = Space.x12 + Space.x2
+        static let groupRowHeight: CGFloat = Space.x10 + Space.x1
         /// From a group's edge to the text and controls in its rows, and above and below a row's two lines.
-        static let groupPad: CGFloat = Space.x5
-        static let groupRowPad: CGFloat = Space.x4
+        static let groupPad: CGFloat = Space.x4
+        static let groupRowPad: CGFloat = Space.x3
         /// Between one group on a page and the next section.
         static let groupGap: CGFloat = Space.x6
         /// A page in a window of its own (Passwords): the strip its traffic lights sit in, above the header.
@@ -160,7 +168,7 @@ enum Tokens {
         /// The middle column of a three-part page: the list of things in the chosen section (Passwords' logins).
         static let listWidth: CGFloat = 300
         /// A row of the middle list: a title over a quiet second line.
-        static let tallRowHeight: CGFloat = Space.x12
+        static let tallRowHeight: CGFloat = Space.x10 + Space.x1
         /// The text column of a detail pane, so a wide window doesn't stretch its lines.
         static let detailWidth: CGFloat = 520
     }
@@ -209,48 +217,41 @@ enum Tokens {
         static let groupGap: CGFloat = Space.x6 + Space.x1
     }
 
-    // MARK: - Type (SF Pro, three sizes for text, plus the display heading and the badge)
+    // MARK: - Type (SF Pro: six roles, one scale for the whole app)
 
+    /// Every text in Zigzag is one of these. Pages, panels and the sidebar share them: the same role is the same size
+    /// everywhere. DESIGN.md has the table.
     enum TypeSize {
+        /// Small print, captions, counts, a keycap.
         static let small: CGFloat = 11
-        static let body: CGFloat = 13
-        static let large: CGFloat = 18
-        /// A page's or panel's own title, in semibold: History, Settings, a section of Settings.
-        static let heading: CGFloat = 15
-        /// The sidebar's rows and address: a size up from body, for a relaxed list that reads at a glance.
-        static let row: CGFloat = 14
-        /// A section's label: small, gray, never bold.
+        /// A section's label and a group's heading (medium, gray); a row's explanation (regular).
         static let label: CGFloat = 12
+        /// Panels, forms, menus, what a button or dropdown says.
+        static let body: CGFloat = 13
+        /// A row's title in any list: the sidebar's rows and address, Settings' sections and rows, History's pages.
+        static let row: CGFloat = 14
+        /// A panel's title, a section's title on a page.
+        static let heading: CGFloat = 15
+        /// A page's title in its header, a big panel's title, the command bar's field.
+        static let title: CGFloat = 17
         /// Display headings in heavy type (`Brand.display`): a window's or a card's one big line.
-        static let title: CGFloat = 22
+        static let display: CGFloat = 22
         /// The count on an extension's button: the one place text has to fit a 10pt capsule.
         static let badge: CGFloat = 8
-        /// Pages (Settings, History, Passwords) read a size up from panels: a row's title, the column of sections,
-        /// a menu's items.
-        static let pageRow: CGFloat = 15
-        /// A page's title in its header.
-        static let pageTitle: CGFloat = 17
-        /// A group's heading on a page, and a row's explanation under its title.
-        static let pageLabel: CGFloat = 13
     }
 
     enum Font {
         static func small(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.small, weight: weight) }
         static func body(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.body, weight: weight) }
-        static func large(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.large, weight: weight) }
-        static func heading(_ weight: NSFont.Weight = .semibold) -> NSFont { .systemFont(ofSize: TypeSize.heading, weight: weight) }
         static func row(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.row, weight: weight) }
-        /// A quiet section label: "Tabs", the space's name over its pinned tabs.
+        static func heading(_ weight: NSFont.Weight = .semibold) -> NSFont { .systemFont(ofSize: TypeSize.heading, weight: weight) }
+        static func title(_ weight: NSFont.Weight = .semibold) -> NSFont { .systemFont(ofSize: TypeSize.title, weight: weight) }
+        /// A quiet section label: "Tabs", the space's name over its pinned tabs, a group's heading on a page.
         static func label() -> NSFont { .systemFont(ofSize: TypeSize.label, weight: .medium) }
-        /// A row's title on a page (medium), the column of sections and a menu's items (regular).
-        static func pageRow(_ weight: NSFont.Weight = .medium) -> NSFont { .systemFont(ofSize: TypeSize.pageRow, weight: weight) }
-        /// A row's explanation on a page, in `textSecondary`.
-        static func pageDetail() -> NSFont { .systemFont(ofSize: TypeSize.pageLabel) }
-        /// A group's heading on a page, in `textTertiary`.
-        static func pageLabel() -> NSFont { .systemFont(ofSize: TypeSize.pageLabel, weight: .medium) }
-        static func pageTitle() -> NSFont { .systemFont(ofSize: TypeSize.pageTitle, weight: .semibold) }
+        /// A row's explanation under its title, in `textSecondary`.
+        static func detail() -> NSFont { .systemFont(ofSize: TypeSize.label) }
         /// What a button or a dropdown says.
-        static func control() -> NSFont { .systemFont(ofSize: TypeSize.row, weight: .medium) }
+        static func control() -> NSFont { .systemFont(ofSize: TypeSize.body, weight: .medium) }
     }
 
     // MARK: - Symbols (one weight everywhere)
@@ -258,6 +259,16 @@ enum Tokens {
     enum Symbol {
         /// Regular, not medium: icons sit as lightly as the text beside them.
         static let weight: NSFont.Weight = .regular
+        /// Four sizes, by where the symbol sits. In an icon button (`Metric.iconButton`): back, forward, reload,
+        /// the bottom bar, a pane's header, the find bar, a panel's close. Big enough to be a pleasure to press.
+        static let glyph: CGFloat = 17
+        /// In a compact icon button (`Metric.compactIconButton`), inside a row or a field.
+        static let compactGlyph: CGFloat = 14
+        /// A row's picture where it's a symbol rather than a favicon: it fills the favicon's slot (`Metric.favicon`).
+        static let row: CGFloat = 16
+        /// A tiny mark inline with text: a lock, a disclosure chevron, a dropdown's arrows.
+        static let inline: CGFloat = 11
+        /// Beside body text (a pill button's symbol, a panel's line): the text's own size.
         static let pointSize: CGFloat = TypeSize.body
 
         static func image(_ name: String, size: CGFloat = pointSize) -> NSImage {

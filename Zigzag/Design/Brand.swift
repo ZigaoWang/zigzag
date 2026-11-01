@@ -695,7 +695,7 @@ final class WordmarkView: NSView {
 final class BrandBanner: NSView {
     private let wash = CAGradientLayer()
     let ribbonMark = RibbonView()
-    private let titleLabel = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let titleLabel = Label("", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
     private let subtitleLabel: NSTextField = {
         let label = NSTextField(wrappingLabelWithString: "")
         label.font = Tokens.Font.body()

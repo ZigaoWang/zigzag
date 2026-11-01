@@ -73,7 +73,7 @@ final class TabThumbnailView: InteractiveView {
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let ring = CALayer()
     /// A page playing sound: a speaker after its title, as in the sidebar. Clicking it mutes the page, or unmutes it.
-    private let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: Tokens.Space.x5, symbolSize: Tokens.TypeSize.small, toolTip: "Mute Tab")
+    private let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: .compact, toolTip: "Mute Tab")
     var showsTitle = true { didSet { needsLayout = true } }
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
     var showsRing = false
@@ -84,7 +84,7 @@ final class TabThumbnailView: InteractiveView {
     var isFocused = false { didSet { if oldValue != isFocused { refreshColors() } } }
     /// Desk view: an × on the card while the pointer is over it.
     var onClose: (() -> Void)? { didSet { closeButton.isHidden = true } }
-    private let closeButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Close Tab")
+    private let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Close Tab")
     /// A page with no picture yet, or only a blank one (asleep, or caught before it drew): its site instead.
     private let siteName = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     static let titleHeight = Tokens.Space.x8
@@ -222,7 +222,7 @@ final class TabThumbnailView: InteractiveView {
         let bottom = (imageClip.bounds.height - block) / 2
         placeholder.frame = NSRect(x: (imageClip.bounds.width - p) / 2, y: bottom + nameHeight + Tokens.Space.x2, width: p, height: p)
         siteName.frame = NSRect(x: Tokens.Space.x2, y: bottom, width: imageClip.bounds.width - Tokens.Space.x4, height: nameHeight)
-        let cs = Tokens.Space.x6
+        let cs = Tokens.Metric.compactIconButton
         closeButton.frame = NSRect(x: imageClip.frame.maxX - cs - Tokens.Space.x1, y: imageClip.frame.minY + Tokens.Space.x1, width: cs, height: cs)
         closeButton.radius = cs / 2
         icon.isHidden = !showsTitle
@@ -252,7 +252,7 @@ final class TabThumbnailView: InteractiveView {
     /// An icon and title, centered together in `area`, with the speaker after them when `audio`.
     private func place(_ icon: FaviconView, _ title: Label, in area: NSRect, audio: Bool = false) {
         let iconSize = Tokens.Metric.favicon
-        let speaker = audio ? Tokens.Space.x1 + Tokens.Space.x5 : 0
+        let speaker = audio ? Tokens.Space.x1 + Tokens.Metric.compactIconButton : 0
         let textWidth = max(0, min(title.textWidth, area.width - iconSize - Tokens.Space.x2 - Tokens.Space.x2 - speaker))
         let total = iconSize + Tokens.Space.x2 + textWidth + speaker
         let x = area.minX + max(Tokens.Space.x1, (area.width - total) / 2)
@@ -260,7 +260,7 @@ final class TabThumbnailView: InteractiveView {
         let h = title.lineHeight
         title.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x2, y: area.minY + (area.height - h) / 2, width: textWidth, height: h)
         if audio {
-            let size = Tokens.Space.x5
+            let size = Tokens.Metric.compactIconButton
             audioButton.frame = NSRect(x: title.frame.maxX + Tokens.Space.x1, y: area.minY + (area.height - size) / 2, width: size, height: size)
         }
     }

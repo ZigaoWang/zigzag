@@ -646,7 +646,7 @@ private enum SiteIcon {
 
 private final class DetailView: NSView, NSTextFieldDelegate {
     private let icon = FaviconView()
-    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
     private let subtitle = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let warning = WarningBanner()
     /// The login's details as quiet grouped rows, as Settings groups its own.
@@ -977,7 +977,7 @@ private final class FieldRow: NSView {
     }
     var isPlaceholder = false { didSet { valueLabel.textColor = isPlaceholder ? Tokens.Color.textTertiary : Tokens.Color.textPrimary } }
     var isMonospaced = false {
-        didSet { valueLabel.font = isMonospaced ? .monospacedSystemFont(ofSize: Tokens.TypeSize.body - 1, weight: .regular) : Tokens.Font.body() }
+        didSet { valueLabel.font = isMonospaced ? .monospacedSystemFont(ofSize: Tokens.TypeSize.body, weight: .regular) : Tokens.Font.body() }
     }
     var showsActions = true { didSet { buttons.forEach { $0.isHidden = !showsActions || editor != nil } } }
     /// While editing, a field takes the value's place; the name stays.
@@ -994,7 +994,7 @@ private final class FieldRow: NSView {
         didSet {
             buttons.forEach { $0.removeFromSuperview() }
             buttons = actions.map { action in
-                let button = IconButton(symbol: action.symbol, size: (Tokens.Space.x6 + Tokens.Space.x1), toolTip: action.tip)
+                let button = IconButton(symbol: action.symbol, size: .compact, toolTip: action.tip)
                 button.onClick = { _ in action.run() }
                 addSubview(button)
                 return button
@@ -1020,7 +1020,7 @@ private final class FieldRow: NSView {
         nameLabel.frame = NSRect(x: pad, y: (bounds.height - nameLabel.lineHeight) / 2, width: nameWidth, height: nameLabel.lineHeight)
         var right = bounds.width - Tokens.Space.x2
         for button in buttons.reversed() where !button.isHidden {
-            let side = (Tokens.Space.x6 + Tokens.Space.x1)
+            let side = Tokens.Metric.compactIconButton
             button.frame = NSRect(x: right - side, y: (bounds.height - side) / 2, width: side, height: side)
             right = button.frame.minX - 2
         }

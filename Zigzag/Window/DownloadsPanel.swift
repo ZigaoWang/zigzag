@@ -10,9 +10,9 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     private let status = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let bar = ColorView(color: Tokens.Color.fieldFill)
     private let fill = ColorView(color: Tokens.Color.accent)
-    let actionButton = IconButton(symbol: "magnifyingglass", size: Tokens.Metric.paneButton, symbolSize: Tokens.TypeSize.small, toolTip: "Show in Finder")
+    let actionButton = IconButton(symbol: "magnifyingglass", size: .compact, toolTip: "Show in Finder")
     /// Pause or resume, beside Cancel, while a download is under way or paused.
-    let pauseButton = IconButton(symbol: "pause.fill", size: Tokens.Metric.paneButton, symbolSize: Tokens.TypeSize.small, toolTip: "Pause")
+    let pauseButton = IconButton(symbol: "pause.fill", size: .compact, toolTip: "Pause")
     private(set) var item: DownloadItem?
     /// The newest download, finished in the last few minutes: the one you're looking for. Its status says so, in
     /// the space's accent; nothing else about the row changes.
@@ -240,10 +240,10 @@ final class DownloadsPanelView: FloatingPanelView {
     /// The last row: the folder, or the whole list when the panel opened on one download.
     private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
-    private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.title))
+    private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.display))
     private let emptyNote = Label("Your downloads show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     /// More: where new downloads are saved (the same choice as in Settings), in a menu rather than on the panel.
-    private let more = IconButton(symbol: "ellipsis", size: Tokens.Page.controlHeight, toolTip: "More")
+    private let more = IconButton(symbol: "ellipsis", toolTip: "More")
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
@@ -435,12 +435,12 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     private func layoutContent() {
-        let control = Tokens.Page.controlHeight
-        // The buttons sit as far from the top as from the side, so More's corner runs with the panel's.
+        let control = Tokens.Page.controlHeight, b = Tokens.Metric.iconButton
+        // More sits as far from the top as from the side, so its corner runs with the panel's.
         let edge = Tokens.Space.x2
-        more.frame = NSRect(x: bounds.width - edge - control, y: edge, width: control, height: control)
+        more.frame = NSRect(x: bounds.width - edge - b, y: edge, width: b, height: b)
         let cw = clearButton.fittingWidth
-        clearButton.frame = NSRect(x: more.frame.minX - Tokens.Space.x1 - cw, y: edge, width: cw, height: control)
+        clearButton.frame = NSRect(x: more.frame.minX - Tokens.Space.x1 - cw, y: more.frame.midY - control / 2, width: cw, height: control)
         // The title lines up with the rows' icons below it.
         let h = title.lineHeight
         let x = inset + CardRow.inset - 2 - Label.inset

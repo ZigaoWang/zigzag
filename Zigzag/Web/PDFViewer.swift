@@ -27,13 +27,13 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     private let contents = PDFContentsView()
 
     private let bar = FloatingPanelView()
-    private let sidebarButton = IconButton(symbol: "sidebar.left", size: Tokens.Space.x7Height, toolTip: "Pages and Contents")
+    private let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Pages and Contents")
     private let pageButton = PageNumberButton()
-    private let zoomOutButton = IconButton(symbol: "minus.magnifyingglass", size: Tokens.Space.x7Height, toolTip: "Zoom Out")
-    private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", size: Tokens.Space.x7Height, toolTip: "Zoom In")
-    private let twoPagesButton = IconButton(symbol: "book", size: Tokens.Space.x7Height, toolTip: "Two Pages")
-    private let darkButton = IconButton(symbol: "moon", size: Tokens.Space.x7Height, toolTip: "Dark Pages")
-    private let saveButton = IconButton(symbol: "arrow.down.circle", size: Tokens.Space.x7Height, toolTip: "Save PDF")
+    private let zoomOutButton = IconButton(symbol: "minus.magnifyingglass", toolTip: "Zoom Out")
+    private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", toolTip: "Zoom In")
+    private let twoPagesButton = IconButton(symbol: "book", toolTip: "Two Pages")
+    private let darkButton = IconButton(symbol: "moon", toolTip: "Dark Pages")
+    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: "Save PDF")
     private var showsSidebar = false
     private var saveWork: DispatchWorkItem?
 
@@ -183,11 +183,11 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     }
 
     private var barWidth: CGFloat {
-        Tokens.Space.x2 * 2 + Tokens.Space.x7Height * 6 + pageButton.fittingWidth(pages: pdfView.document?.pageCount ?? 0) + Tokens.Space.x1 * 2
+        Tokens.Space.x2 * 2 + Tokens.Metric.iconButton * 6 + pageButton.fittingWidth(pages: pdfView.document?.pageCount ?? 0) + Tokens.Space.x1 * 2
     }
 
     private func layoutBar() {
-        let b = Tokens.Space.x7Height, h = bar.bounds.height, y = (h - b) / 2
+        let b = Tokens.Metric.iconButton, h = bar.bounds.height, y = (h - b) / 2
         var x = Tokens.Space.x2
         func place(_ view: NSView, _ width: CGFloat) { view.frame = NSRect(x: x, y: y, width: width, height: b); x += width }
         place(sidebarButton, b)

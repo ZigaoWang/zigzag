@@ -32,7 +32,7 @@ class CardRow: InteractiveView {
 
     /// A symbol, tinted like the rest of the app's icons.
     var symbol: String? {
-        didSet { iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.row) }; needsLayout = true }
+        didSet { iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.row) }; needsLayout = true }
     }
     /// A picture (a favicon) in place of a symbol.
     var image: NSImage? {
@@ -324,7 +324,7 @@ final class KeyCap: NSView {
         layer?.borderWidth = Tokens.Metric.hairline
         label.stringValue = key
         label.alignment = .center
-        iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.small - 1) }
+        iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.inline) }
         iconView.imageScaling = .scaleNone
         iconView.contentTintColor = Tokens.Color.textSecondary
         label.isHidden = symbol != nil

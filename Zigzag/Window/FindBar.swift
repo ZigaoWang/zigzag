@@ -68,9 +68,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private let glass = NSImageView(image: Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body))
     private let field = PlainTextField(font: Tokens.Font.body(), placeholder: "Find on page")
     private let countLabel = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let previousButton = IconButton(symbol: "chevron.up", size: Tokens.Metric.findButton, toolTip: "Previous")
-    private let nextButton = IconButton(symbol: "chevron.down", size: Tokens.Metric.findButton, toolTip: "Next")
-    private let doneButton = IconButton(symbol: "xmark", size: Tokens.Metric.findButton, symbolSize: Tokens.TypeSize.small, toolTip: "Done")
+    private let previousButton = IconButton(symbol: "chevron.up", toolTip: "Previous")
+    private let nextButton = IconButton(symbol: "chevron.down", toolTip: "Next")
+    private let doneButton = IconButton(symbol: "xmark", toolTip: "Done")
     private(set) var isVisible = false
     private var query = ""
     var hasQuery: Bool { !query.isEmpty }
@@ -112,7 +112,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 
     private func layoutPanel() {
         let b = panel.bounds
-        let button = Tokens.Metric.findButton
+        let button = Tokens.Metric.iconButton
         // As far in from the end as from the top and bottom, so Done's circle runs with the capsule's.
         let inset = (b.height - button) / 2
         doneButton.frame = NSRect(x: b.width - inset - button, y: inset, width: button, height: button)

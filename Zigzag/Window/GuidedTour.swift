@@ -12,7 +12,7 @@ final class GuidedTour: NSView {
     private let card = FloatingPanelView()
     private let step = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
     private let check = NSImageView()
-    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
@@ -75,7 +75,7 @@ final class GuidedTour: NSView {
         ring.lineWidth = 2.5
         layer?.addSublayer(ring)
         applyColors()
-        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 20)
+        check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
         skip.textColor = Tokens.Color.textTertiary
         card.radius = Tokens.Radius.large
         header.cornerRadius = 0
@@ -416,7 +416,7 @@ final class GuidedTour: NSView {
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
-        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.title) : Tokens.Font.large(.semibold)
+        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : Tokens.Font.title(.semibold)
         if animated {
             let fade = CATransition()
             fade.type = .fade

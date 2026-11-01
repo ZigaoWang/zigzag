@@ -4,12 +4,12 @@ import AppKit
 /// leading end, the page's address centered in a quiet pill, and the split's own buttons at the trailing end. A
 /// hairline under it keeps it apart from the page. The pane you're not in dims it (`PageCardView`).
 final class PaneHeaderView: NSView {
-    let back = IconButton(symbol: "chevron.left", size: Tokens.Metric.paneButton, toolTip: "Back")
-    let forward = IconButton(symbol: "chevron.right", size: Tokens.Metric.paneButton, toolTip: "Forward")
-    let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Metric.paneButton, toolTip: "Reload")
-    let orientation = IconButton(symbol: "rectangle.split.1x2", size: Tokens.Metric.paneButton, toolTip: "Stack Vertically")
-    let swap = IconButton(symbol: "arrow.left.arrow.right", size: Tokens.Metric.paneButton, symbolSize: Tokens.TypeSize.small, toolTip: "Swap Sides")
-    let close = IconButton(symbol: "rectangle.split.2x1.slash", size: Tokens.Metric.paneButton, toolTip: "Separate Tabs")
+    let back = IconButton(symbol: "chevron.left", toolTip: "Back")
+    let forward = IconButton(symbol: "chevron.right", toolTip: "Forward")
+    let reload = IconButton(symbol: "arrow.clockwise", toolTip: "Reload")
+    let orientation = IconButton(symbol: "rectangle.split.1x2", toolTip: "Stack Vertically")
+    let swap = IconButton(symbol: "arrow.left.arrow.right", toolTip: "Swap Sides")
+    let close = IconButton(symbol: "rectangle.split.2x1.slash", toolTip: "Separate Tabs")
     private let addressPill = ColorView(color: Tokens.Color.addressFill)
     private let address = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let line = ColorView(color: Tokens.Color.separator)
@@ -62,7 +62,7 @@ final class PaneHeaderView: NSView {
 
     override func layout() {
         super.layout()
-        let b = Tokens.Metric.paneButton
+        let b = Tokens.Metric.iconButton
         let edge = (bounds.height - Tokens.Metric.hairline - b) / 2
         let y = edge
         var x = edge

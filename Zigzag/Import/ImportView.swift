@@ -29,7 +29,7 @@ final class ImportView: NSView {
     private let banner = BrandBanner()
     private(set) var summaries: [ImportCoordinator.Summary] = []
 
-    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
     private let subtitle = NSTextField(wrappingLabelWithString: "")
     private var sources: [ImportCoordinator.Source] = []
     private var rows: [SourceRow] = []
@@ -311,7 +311,7 @@ final class ImportView: NSView {
             y = hero.frame.maxY + Tokens.Space.x6
         }
         title.alignment = .left
-        title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary)
+        title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.display, color: Tokens.Color.textPrimary)
         if !title.stringValue.isEmpty { place(title, height: titleHeight, gap: Tokens.Space.x2) }
         if !subtitle.stringValue.isEmpty { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
         if emptyHeight > 0 { place(emptyNote, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
@@ -465,7 +465,7 @@ private final class SourceRow: InteractiveView {
         case .idle:
             detail.stringValue = preview
             check.isHidden = !isChosen
-            check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.large)
+            check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.title)
             check.contentTintColor = Brand.Theme.brand.accent
         case .waiting:
             detail.stringValue = "Waiting…"
@@ -477,7 +477,7 @@ private final class SourceRow: InteractiveView {
             detail.stringValue = ([summary.sentence] + summary.problems.map(\.message)).joined(separator: "\n")
             check.isHidden = false
             let clean = summary.problems.isEmpty
-            check.image = Tokens.Symbol.image(clean ? "checkmark.circle.fill" : "exclamationmark.circle.fill", size: Tokens.TypeSize.large)
+            check.image = Tokens.Symbol.image(clean ? "checkmark.circle.fill" : "exclamationmark.circle.fill", size: Tokens.TypeSize.title)
             check.contentTintColor = clean ? Tokens.Color.success : Tokens.Color.warning
             for problem in summary.problems { addFix(problem.fix) }
             if let exportFile, summary.passwords + summary.updatedPasswords > 0, FileManager.default.fileExists(atPath: exportFile.path) {
@@ -608,7 +608,7 @@ private final class ImportHero: NSView {
     private let surface = BrandSurface()
     private let wordmark = WordmarkView()
     private let count = Label("", font: .systemFont(ofSize: 60, weight: .heavy), color: Brand.ribbon)
-    private let caption = Label("", font: Tokens.Font.large(.semibold), color: Brand.ribbon)
+    private let caption = Label("", font: Tokens.Font.title(.semibold), color: Brand.ribbon)
     private let detail = Label("", font: Tokens.Font.body(), color: Brand.ribbon.withAlphaComponent(0.7))
 
     override init(frame: NSRect) {

@@ -37,7 +37,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.contentView = root
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
-        root.sidebarWidth = sidebarWidth
+        // A width saved before the toolbar's buttons grew can be narrower than they now need.
+        root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
             self.layoutTrafficLights()
@@ -690,7 +691,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A round glass button, the button filling it so its hover is the same circle.
         let chip = FloatingPanelView()
         chip.radius = Tokens.Metric.floatingButton / 2
-        let button = IconButton(symbol: "arrow.down.circle", size: Tokens.Metric.floatingButton, toolTip: "Downloads")
+        let button = IconButton(symbol: "arrow.down.circle", size: Tokens.Metric.floatingButton, symbolSize: Tokens.Symbol.glyph, toolTip: "Downloads")
         button.onClick = { [weak self] _ in self?.showDownloads(nil) }
         chip.addSubview(button)
         chip.onLayout = { [weak chip, weak button] in
