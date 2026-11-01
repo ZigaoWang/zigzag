@@ -181,17 +181,17 @@ enum ErrorPage {
         \(PageStyle.css(theme: Brand.Theme.for(webView)))
         html, body { height: 100%; }
         body { display: flex; align-items: center; justify-content: center; }
-        main { max-width: 360px; padding: 32px; text-align: center; }
-        main > svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto 24px; }
-        h1 { font-size: var(--heading); font-weight: 600; margin: 0 0 8px; }
-        p { margin: 0 0 24px; line-height: 20px; color: var(--muted); }
-        details { margin-top: 20px; } summary { cursor: default; color: var(--muted); list-style: none; }
+        main { max-width: 360px; padding: var(--space-8); text-align: center; }
+        main > svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto var(--space-6); }
+        h1 { font-size: var(--heading); font-weight: 600; margin: 0 0 var(--space-2); }
+        p { margin: 0 0 var(--space-6); line-height: var(--space-5); color: var(--muted); }
+        details { margin-top: var(--space-5); } summary { cursor: default; color: var(--muted); list-style: none; }
         summary::-webkit-details-marker { display: none; } summary:hover { color: var(--text); }
-        .why { margin: 12px 0; text-align: left; } .anyway { color: var(--muted); }
+        .why { margin: var(--space-3) 0; text-align: left; } .anyway { color: var(--muted); }
         </style></head><body><main>
         \(WordmarkView.svg(class: "mark", label: nil))
         <h1>\(escape(title))</h1><p>\(escape(message))</p>
-        \(url.scheme == "webkit-extension" ? "" : #"<button class="button" onclick="location.reload()">Try Again</button>"#)
+        \(url.scheme == "webkit-extension" ? "" : #"<button class="button prominent" onclick="location.reload()">Try Again</button>"#)
         \(proceed)
         \(error.code == NSURLErrorNotConnectedToInternet || error.code == NSURLErrorNetworkConnectionLost ? "<script>addEventListener('online', () => location.reload())</script>" : "")
         </main></body></html>
