@@ -394,8 +394,8 @@ final class IconButton: InteractiveView {
     /// in a grid.
     var selectsAsCard = false { didSet { stateDidChange(animated: false) } }
 
-    /// The window's own toolbar and bottom bar: a crisp glyph at rest, a small pane of glass under the pointer that
-    /// settles in when pressed, in place of the hover fill.
+    /// The window's own toolbar and bottom bar: a crisp glyph at rest, a quiet fill under the pointer, and a pane of
+    /// glass that settles in when pressed.
     var isTactile = false {
         didSet {
             guard isTactile != oldValue else { return }
@@ -413,10 +413,11 @@ final class IconButton: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         if isTactile, let plate {
-            layer?.set(backgroundColor: nil, animated: false)
             plate.radius = radius
-            let pose: GlassPlate.Pose = !isEnabled ? .hidden : isPressed ? .pressed : isHovered || isSelected ? .lifted : .hidden
-            plate.set(pose, animated: window != nil)
+            // No pane rising under the pointer: a quiet fill, as on any other button, and the glass only when pressed.
+            plate.set(isEnabled && isPressed ? .pressed : .hidden, animated: false)
+            let fill: NSColor? = isEnabled && !isPressed && (isHovered || isSelected) ? Tokens.Color.hoverFill : nil
+            layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
             imageView.contentTintColor = image == nil ? tint : nil
             imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
             return

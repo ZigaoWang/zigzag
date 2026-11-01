@@ -405,9 +405,9 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Resting tiles are clear glass, rising a point under the pointer; the one you're on is the same clearer
-        // card as the tab you're on.
-        let pose: GlassPlate.Pose = isPressed ? .pressed : isHovered ? .lifted : .rest
+        // Tiles are clear glass and stay put under the pointer; a press settles them. The one you're on is the same
+        // clearer card as the tab you're on.
+        let pose: GlassPlate.Pose = isPressed ? .pressed : .rest
         plate.set(isEnabled ? pose : .rest, finish: isSelected ? .chosen : .clear, animated: animated || window != nil)
     }
 
