@@ -77,7 +77,9 @@ nonisolated enum ProfileBackup {
     /// The backups, newest first.
     static func all(in root: URL = Paths.support) -> [URL] {
         let found = (try? FileManager.default.contentsOfDirectory(at: folder(in: root), includingPropertiesForKeys: nil)) ?? []
-        return found.filter(\.hasDirectoryPath).sorted { $0.lastPathComponent > $1.lastPathComponent }
+        return found.filter(\.hasDirectoryPath).sorted {
+            (date(of: $0.lastPathComponent) ?? .distantPast) > (date(of: $1.lastPathComponent) ?? .distantPast)
+        }
     }
 
     /// The backups made at updates, newest first: the ones a restore puts back.
@@ -89,10 +91,24 @@ nonisolated enum ProfileBackup {
 
     /// When the newest backup was made, from its name.
     static var latestDate: Date? {
-        latest.flatMap { stamp.date(from: String($0.lastPathComponent.prefix(19))) }
+        latest.flatMap { date(of: $0.lastPathComponent) }
+    }
+
+    /// When a backup was made, from its name: in UTC, so a change of time zone or clocks can't reorder them.
+    /// Older backups were named in local time, without the Z.
+    static func date(of name: String) -> Date? {
+        stamp.date(from: String(name.prefix(20))) ?? localStamp.date(from: String(name.prefix(19)))
     }
 
     private static let stamp: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH-mm-ss'Z'"
+        return formatter
+    }()
+
+    private static let localStamp: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd'T'HH-mm-ss"
