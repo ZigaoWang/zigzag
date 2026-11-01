@@ -1501,8 +1501,8 @@ extension BrowserWindowController: SidebarDelegate {
         target.tabManager.restoreSplit(pair)
     }
 
-    func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool {
-        guard !tabManager.isPrivate else { return false }
+    func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool {
+        guard !tabManager.isPrivate, let tab = tabs.first else { return false }
         let others = WindowManager.shared.controllers.filter { $0 !== self && !$0.tabManager.isPrivate }
         let target: BrowserWindowController
         if let existing = others.first(where: { $0.window?.frame.contains(screenPoint) == true }) {
@@ -1516,7 +1516,8 @@ extension BrowserWindowController: SidebarDelegate {
                 window.setFrame(frame, display: true)
             }
         }
-        transfer(tab, to: target, at: 0)
+        // Each in at the top, last first, so they keep their order.
+        for tab in tabs.reversed() { transfer(tab, to: target, at: 0) }
         target.window?.makeKeyAndOrderFront(nil)
         return true
     }
@@ -1540,14 +1541,29 @@ extension BrowserWindowController: SidebarDelegate {
         return over
     }
 
-    func listDropOnFavorites(_ tab: Tab) -> Bool {
+    func listDropOnFavorites(_ items: [SidebarItem], dragged: SidebarItem) -> Bool {
         guard sidebar.favorites.isDropTarget, !tabManager.isPrivate else { return false }
         let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
         if let split {
-            joinFavoriteWithUndo(tab, onto: split.id, onRight: split.onRight)
-        } else {
-            favoriteWithUndo(tab, at: index)
+            let tab: Tab? = switch dragged {
+            case .tab(let id): tabManager.tab(with: id)
+            case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
+            default: nil
+            }
+            if let tab { joinFavoriteWithUndo(tab, onto: split.id, onRight: split.onRight) }
+            return true
+        }
+        // Each a tile after the one before (a split's two pages make one), in list order.
+        var slot = index
+        for item in items {
+            let tiles = Library.shared.favoriteTiles.count, at = slot
+            switch item {
+            case .tab(let id): if let tab = tabManager.tab(with: id) { favoriteWithUndo(tab, at: at) }
+            case .bookmark(let id): pageChange("Add to Favorites") { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
+            default: break
+            }
+            slot = slot.map { $0 + Library.shared.favoriteTiles.count - tiles }
         }
         return true
     }
@@ -1563,18 +1579,6 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
-
-    func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
-        guard sidebar.favorites.isDropTarget, !tabManager.isPrivate else { return false }
-        let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
-        sidebar.favorites.isDropTarget = false
-        if let split, let pinned = Library.shared.bookmark(bookmarkID) {
-            joinFavoriteWithUndo(tabManager.pageTab(for: pinned), onto: split.id, onRight: split.onRight)
-        } else {
-            pageChange("Add to Favorites") { [tabManager] in tabManager.favoriteBookmark(bookmarkID, at: index) }
-        }
-        return true
-    }
 
     func listDragOverPage(at windowPoint: NSPoint?, tab: Tab) {
         guard let windowPoint, canDropBeside(tab) else { root.splitDropHint.show(nil); return }
@@ -1597,9 +1601,9 @@ extension BrowserWindowController: SidebarDelegate {
         return TabManager.canSplit(tabManager.splitSide(of: tab), onto: tabManager.splitSide(of: current))
     }
 
-    func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool {
+    func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool {
         guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return false }
-        transfer(tab, to: controller, at: index)
+        for tab in tabs.reversed() { transfer(tab, to: controller, at: index) }
         controller.window?.makeKeyAndOrderFront(nil)
         return true
     }

@@ -32,10 +32,10 @@ protocol SidebarListDelegate: AnyObject {
     func listUnbookmark(_ bookmarkID: UUID, to index: Int)
     /// While dragging, hovering a space's dot opens that space so the tab can be dropped into place.
     func listSwitchSpaceDuringDrag(_ spaceID: UUID)
-    /// A tab dropped outside the window: into another window, or a new one. Returns true if handled.
-    func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool
-    /// A tab dropped into another window's sidebar at an index. Returns true if handled.
-    func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool
+    /// Tabs dropped outside the window: into another window, or a new one, in order. Returns true if handled.
+    func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool
+    /// Tabs dropped into another window's sidebar at an index, in order. Returns true if handled.
+    func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID)
     /// A tab or bookmark dragged over the favorites grid (nil: it's not over this window). Returns true while it's
     /// over the grid.
@@ -46,10 +46,9 @@ protocol SidebarListDelegate: AnyObject {
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool)
     /// A pinned page dropped on a tab's middle: a split of tabs.
     func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool)
-    /// Dropped on the favorites grid. Returns true if it became a favorite.
-    func listDropOnFavorites(_ tab: Tab) -> Bool
-    /// A pinned page dropped on the favorites grid: it becomes a favorite, open or not.
-    func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool
+    /// Tabs and pinned pages dropped on the favorites grid: each a favorite, open or not, in order where the grid
+    /// showed; on a favorite's middle, the dragged one alone joins it. Returns true if the grid took them.
+    func listDropOnFavorites(_ items: [SidebarItem], dragged: SidebarItem) -> Bool
     /// A favorite's tile, for a row that became one to land on.
     func listFavoriteTile(for bookmarkID: UUID) -> NSView?
     /// A tab dragged over the page: show which half it would open in (nil: it's not over the page).
@@ -1256,23 +1255,29 @@ final class SidebarListView: NSView {
             }
         }
 
-        // Onto the favorites grid.
-        if let tab, delegate?.listDropOnFavorites(tab) == true { return landingView(for: tab) }
-        if case .bookmark(let id) = drag.item, delegate?.listDropBookmarkOnFavorites(id) == true { return delegate?.listFavoriteTile(for: id) }
+        // Onto the favorites grid, picked rows and all.
+        if drag.item.canBeFavorite, delegate?.listDropOnFavorites(drag.together.filter(\.canBeFavorite), dragged: drag.item) == true {
+            if let tab { return landingView(for: tab) }
+            if case .bookmark(let id) = drag.item { return delegate?.listFavoriteTile(for: id) }
+            return nil
+        }
 
         // Onto this window's page: open it in split view beside what's showing.
         if let tab, Self.list(at: mouse) == nil, Self.window(at: mouse) === window?.windowController, delegate?.listDropOnPage(tab) == true {
             return nil
         }
 
+        // Picked tabs go along to another window; pinned pages are every window's already.
+        let tabs = drag.together.compactMap { item -> Tab? in if case .tab(let id) = item { manager.tab(with: id) } else { nil } }
+
         // Into another window's sidebar, where its line showed.
         if let tab, let external, let (controller, list) = Self.list(at: mouse), list === external, controller.tabManager !== manager,
-           delegate?.listMoveToWindow(tab, controller: controller, index: list.dropIndex(at: mouse)) == true {
+           delegate?.listMoveToWindow(tabs, controller: controller, index: list.dropIndex(at: mouse)) == true {
             return list.row(for: tab)
         }
 
-        // Somewhere that isn't any Zigzag window: the tab becomes a new window there.
-        if let tab, Self.window(at: mouse) == nil, delegate?.listDropOutside(tab, at: mouse) == true { return nil }
+        // Somewhere that isn't any Zigzag window: the tabs become a new window there.
+        if let tab, Self.window(at: mouse) == nil, delegate?.listDropOutside(tabs, at: mouse) == true { return nil }
 
         // Onto a space's dot: into that space, whichever one is showing.
         if let space = drag.hoverSpace {
