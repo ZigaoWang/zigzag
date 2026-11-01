@@ -34,9 +34,9 @@ enum Tokens {
         static let card: CGFloat = 8
         /// The window's own corner. A page that meets the window's edges takes it, so the two curves match.
         static let window: CGFloat = 16
-        /// The page's corners beside the sidebar when it meets the window's edges: rounder than the window's own, so
-        /// the page reads as a sheet laid on the frame rather than a notch cut out of it.
-        static let attached: CGFloat = 20
+        /// The page's corners beside the sidebar when it meets the window's edges: the window's own curve, so all four
+        /// of the page's corners match.
+        static let attached: CGFloat = window
         /// A row in the sidebar or a floating list: soft enough that the selected one reads as a card.
         static let row: CGFloat = 10
         /// A favorite's tile.

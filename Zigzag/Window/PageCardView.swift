@@ -191,7 +191,9 @@ final class PageCardView: NSView {
             clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
             progressLine.backgroundColor = cgColor(Brand.Theme.current.accent)
             edge.borderColor = cgColor(Tokens.Color.cardEdge)
-            edge.borderWidth = Tokens.Metric.hairline
+            // Meeting the window's edges, the page's own edge is its outline: a drawn one runs along the window's edge
+            // and round the corners as an extra line.
+            edge.borderWidth = isAttached ? 0 : Tokens.Metric.hairline
             header.alphaValue = isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1
             layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
             layer?.shadowOpacity = castsShadow ? 1 : 0
