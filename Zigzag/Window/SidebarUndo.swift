@@ -18,6 +18,12 @@ extension BrowserWindowController {
     /// The window whose ⌘Z takes changes made from elsewhere (settings, menus without a window).
     static var undoTarget: BrowserWindowController? { WindowManager.shared.keyController ?? WindowManager.shared.controllers.first }
 
+    /// A change made from outside any browser window (Settings): undoable from the front one, made all the same
+    /// when there's none.
+    static func changeLibrary(_ name: String, _ change: () -> Void) {
+        if let undoTarget { undoTarget.libraryChange(name, change) } else { change() }
+    }
+
     /// Runs a change to spaces, bookmarks or favorites; ⌘Z puts the library back exactly as it was.
     func libraryChange(_ name: String, _ change: () -> Void) {
         let before = Library.shared.snapshot

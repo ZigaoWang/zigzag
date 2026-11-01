@@ -436,7 +436,8 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         ConfirmSheet.show(in: host, title: "Delete “\(space.name)”?",
                           message: "Its tabs and pinned tabs close. You can bring them back with Undo.",
                           confirmTitle: "Delete Space", destructive: true) { confirmed in
-            if confirmed { BrowserWindowController.undoTarget?.removeSpaceWithUndo(id) }
+            guard confirmed else { return }
+            if let controller = BrowserWindowController.undoTarget { controller.removeSpaceWithUndo(id) } else { Library.shared.removeSpace(id) }
         }
     }
 }
@@ -1295,7 +1296,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(); self?.layoutDocument() }
     }
 
-    private func addSpace() { BrowserWindowController.undoTarget?.libraryChange("New Space") { Library.shared.addSpace() } }
+    private func addSpace() { BrowserWindowController.changeLibrary("New Space") { Library.shared.addSpace() } }
 
     // MARK: Privacy
 
