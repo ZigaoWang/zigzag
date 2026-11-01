@@ -492,6 +492,13 @@ final class SidebarView: NSView {
 
     func dot(for spaceID: UUID) -> NSView? { dots.first { $0.spaceID == spaceID } }
 
+    #if DEBUG
+    func debugDots() -> [(String, NSRect)] {
+        guard let window else { return [] }
+        return dots.filter { !$0.isHidden }.map { ("dot:" + (Library.shared.space($0.spaceID)?.name ?? ""), $0.convert($0.bounds, to: nil).flippedIn(window)) }
+    }
+    #endif
+
     /// The row of space dots.
     var dotsAnchor: NSView { bottomBar }
     /// The first space's dot, or the row when there's only one.

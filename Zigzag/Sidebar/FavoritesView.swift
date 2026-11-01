@@ -7,6 +7,16 @@ final class FavoritesView: NSView {
     /// The × on an open favorite: unloads its page, the favorite stays.
     var onClose: ((Bookmark) -> Void)?
     private var tiles: [FavoriteTile] = []
+    #if DEBUG
+    func debugTiles() -> [(String, NSRect)] {
+        guard let window else { return [] }
+        return tiles.map { tile in
+            ("fav:" + [tile.bookmark?.title, tile.partner?.title].compactMap { $0 }.joined(separator: "|"),
+             tile.convert(tile.bounds, to: nil).flippedIn(window))
+        }
+    }
+    #endif
+
     /// The first favorite: an empty tile in the empty grid shows where it will be.
     private let dropTile = FavoriteTile(bookmark: nil)
     /// Where a tab carried over the grid would go between tiles, as the tab list shows it with a line.

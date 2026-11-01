@@ -714,6 +714,29 @@ final class SidebarListView: NSView {
     }
 
     var headerView: NSView? { rows[.header] }
+
+    #if DEBUG
+    /// Every row as it's laid out: a name a test can find it by, and where it is in the window.
+    func debugRows() -> [(String, NSRect)] {
+        guard let manager else { return [] }
+        return rows.compactMap { item, view in
+            guard view.superview === self, !view.isHidden, let window else { return nil }
+            let name: String
+            switch item {
+            case .tab(let id): name = "tab:" + (manager.tab(with: id).map { tab in [tab] + (manager.partner(of: tab).map { [$0] } ?? []) }?.map(\.displayTitle).joined(separator: "|") ?? "")
+            case .bookmark(let id):
+                let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+                name = "pin:" + ids.compactMap { Library.shared.bookmark($0)?.title }.joined(separator: "|")
+            case .folder(let id): name = "folder:" + (Library.shared.folder(id)?.name ?? "")
+            case .newTab: name = "newtab"
+            case .header: name = "header"
+            case .separator: name = "separator"
+            default: return nil
+            }
+            return (name, view.convert(view.bounds, to: nil).offsetBy(dx: 0, dy: 0).flippedIn(window))
+        }
+    }
+    #endif
     func folderRow(_ id: UUID) -> NSView? { rows[.folder(id)] }
 
     /// Starts renaming a pinned page right in its row.

@@ -134,6 +134,37 @@ enum DebugBridge {
                 let info = "\(window.windowNumber) \(ProcessInfo.processInfo.processIdentifier) \(Int(window.frame.minX)) \(Int(topLeftY))"
                 try? info.write(toFile: arg, atomically: true, encoding: .utf8)
             }
+        case "layout":
+            // layout <path>: every sidebar row, favorite and space dot, with its frame (window points, top left).
+            let items = controller.sidebar.favorites.debugTiles() + controller.sidebar.list.debugRows() + controller.sidebar.debugDots()
+            let json = items.map { ["name": $0.0, "x": $0.1.minX, "y": $0.1.minY, "w": $0.1.width, "h": $0.1.height] as [String: Any] }
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "state":
+            // state <path>: each space's tabs and pinned tabs, the favorites, splits shown as "A|B".
+            let m = controller.tabManager
+            func pair(_ tab: Tab) -> String { ([tab] + (m.partner(of: tab).map { [$0] } ?? [])).map(\.displayTitle).joined(separator: "|") }
+            func pinned(_ ids: [UUID]) -> [String] {
+                var out: [String] = [], seen = Set<UUID>()
+                for id in ids where !seen.contains(id) {
+                    let both = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+                    both.forEach { seen.insert($0) }
+                    out.append(both.compactMap { Library.shared.bookmark($0)?.title }.joined(separator: "|"))
+                }
+                return out
+            }
+            let spaces: [[String: Any]] = Library.shared.spaces.map { space in
+                var seen = Set<UUID>()
+                let tabs = m.tabs(in: space.id).compactMap { tab -> String? in
+                    if seen.contains(tab.id) { return nil }
+                    seen.insert(tab.id); if let p = m.partner(of: tab) { seen.insert(p.id) }
+                    return pair(tab)
+                }
+                return ["name": space.name, "tabs": tabs, "pinned": pinned(space.bookmarks.map(\.id)),
+                        "folders": (space.folders ?? []).map { f in ["name": f.name, "pages": f.bookmarkIDs.compactMap { Library.shared.bookmark($0)?.title }] }]
+            }
+            let json: [String: Any] = ["spaces": spaces, "favorites": pinned(Library.shared.favorites.map(\.id)),
+                                       "current": Library.shared.space(m.currentSpaceID)?.name ?? ""]
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dump":
             var out = ""
             func walk(_ v: NSView, _ depth: Int) {
@@ -612,3 +643,12 @@ enum DebugBridge {
     static func cpuTime(_ pid: Int32) -> Double { ProcessCPU.seconds(pid) }
     #endif
 }
+
+#if DEBUG
+extension NSRect {
+    /// From window coordinates (bottom left) to the top-left ones the debug commands use.
+    func flippedIn(_ window: NSWindow) -> NSRect {
+        NSRect(x: minX, y: window.frame.height - maxY, width: width, height: height)
+    }
+}
+#endif
