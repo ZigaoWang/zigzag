@@ -54,7 +54,7 @@ final class PageCardView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(duration == 0)
         CATransaction.setAnimationDuration(duration)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1))
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         clip.layer?.cornerRadius = radius
         edge.cornerRadius = radius
         edge.opacity = on ? 0 : 1
@@ -82,9 +82,20 @@ final class PageCardView: NSView {
                 self.setLoading(tab.isLoading, progress: tab.progress)
             }
         }
-        // A different page: no line carried over from the last one.
-        setLoading(false, progress: 1)
+        // A different page: no line carried over from the last one, and nothing of it sweeping across this one.
+        resetLoading()
         if let tab, tab.isLoading { setLoading(true, progress: tab.progress) }
+    }
+
+    /// The line gone at once, wherever it was.
+    private func resetLoading() {
+        progressLine.removeAllAnimations()
+        isShowingProgress = false
+        progress = 0
+        Tokens.Motion.withoutAnimation {
+            progressLine.opacity = 0
+            if progressLine.superlayer != nil { Tokens.Motion.withoutAnimation { layoutProgress() } }
+        }
     }
 
     private func setLoading(_ loading: Bool, progress value: Double) {
@@ -107,14 +118,15 @@ final class PageCardView: NSView {
         guard target >= progress || !loading else { return }
         progress = target
         CATransaction.begin()
-        CATransaction.setAnimationDuration(loading ? 0.3 : 0.18)
+        CATransaction.setAnimationDuration(loading ? Tokens.Motion.large : Tokens.Motion.standard)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         layoutProgress()
         CATransaction.commit()
         guard !loading else { return }
         isShowingProgress = false
         CATransaction.begin()
-        CATransaction.setAnimationDuration(0.35)
+        CATransaction.setAnimationDuration(Tokens.Motion.large)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         progressLine.opacity = 0
         CATransaction.commit()
     }
