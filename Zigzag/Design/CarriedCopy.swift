@@ -186,7 +186,8 @@ final class CarriedCopy {
             panel.animator().setFrame(target, display: true)
             panel.animator().alphaValue = 1
         }, completion: {
-            view.alphaValue = 1
+            // Only if nothing else has set it since: picked up again mid-landing, the row stays faint for that drag.
+            if view.alphaValue == 0 { view.alphaValue = 1 }
             panel.orderOut(nil)
             completion?()
         })
