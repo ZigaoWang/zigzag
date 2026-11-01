@@ -152,15 +152,18 @@ final class HistoryStore {
     }
 
     /// Sites whose host starts with the typed text, for inline completion: the most used first, each with the page
-    /// you visit most there and a score that weighs visits by how recent they are, as `search` does.
-    func completionSites(for prefix: String, limit: Int = 8) -> [(entry: HistoryEntry, score: Double)] {
+    /// you visit most there and a score that weighs visits by how recent they are, as `search` does. With
+    /// `afterSubdomain`, hosts where it starts a later label instead ("wiki" in en.wikipedia.org); that can't use the
+    /// index, so it's only asked when no host starts with it.
+    func completionSites(for prefix: String, afterSubdomain: Bool = false, limit: Int = 8) -> [(entry: HistoryEntry, score: Double)] {
         let lower = prefix.lowercased()
+        let match = afterSubdomain ? "host LIKE ?3 ESCAPE '\\'" : "host >= ?1 AND host < ?2"
         guard !lower.isEmpty, !lower.contains(" "), let statement = prepare("""
         SELECT url, title, visit_count, last_visit, score FROM (
             SELECT url, title, visit_count, last_visit,
                 SUM(visit_count) OVER site * 1.0 / (1 + (strftime('%s','now') - MAX(last_visit) OVER site) / 604800.0) AS score,
                 ROW_NUMBER() OVER (PARTITION BY host ORDER BY visit_count DESC, last_visit DESC) AS rank
-            FROM visits WHERE host >= ?1 AND host < ?2
+            FROM visits WHERE \(match)
             WINDOW site AS (PARTITION BY host)
         ) WHERE rank = 1 ORDER BY score DESC LIMIT \(limit)
         """) else { return [] }
@@ -168,6 +171,8 @@ final class HistoryStore {
         // Hosts are stored lowercase, so a plain range finds the prefix through the index instead of a full scan.
         sqlite3_bind_text(statement, 1, lower, -1, transient)
         sqlite3_bind_text(statement, 2, lower + "\u{10FFFF}", -1, transient)
+        let escaped = lower.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
+        sqlite3_bind_text(statement, 3, "%.\(escaped)%", -1, transient)
         var results: [(HistoryEntry, Double)] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let cURL = sqlite3_column_text(statement, 0), let url = URL(string: String(cString: cURL)) else { continue }

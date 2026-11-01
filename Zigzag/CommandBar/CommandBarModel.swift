@@ -97,12 +97,15 @@ enum CommandRanker {
         let lower = text.lowercased()
         let bare = lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
         guard !bare.isEmpty, InlineCompletion.looksLikeHost(lower) else { return nil }
-        var sites: [InlineCompletion.Site] = HistoryStore.shared.completionSites(for: bare).compactMap { entry, score in
+        var found = HistoryStore.shared.completionSites(for: bare)
+        if found.isEmpty { found = HistoryStore.shared.completionSites(for: bare, afterSubdomain: true) }
+        var sites: [InlineCompletion.Site] = found.compactMap { entry, score in
             InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) }
         }
         // Each place a site is kept at hand counts as much as a visit this week.
         let kept = manager.allTabs.compactMap(\.url) + Library.shared.favorites.map(\.url) + Library.shared.allBookmarks.map(\.0.url)
-        for url in kept where HistoryStore.normalizedHost(url).hasPrefix(bare) {
+        // Whether its host or a shorter form of it matches is for `best` to say.
+        for url in kept where HistoryStore.normalizedHost(url).contains(bare) {
             if let site = InlineCompletion.target(url, wholePage: false) { sites.append(InlineCompletion.Site(url: site, score: 1)) }
         }
         return InlineCompletion.best(for: text, among: InlineCompletion.merge(sites))

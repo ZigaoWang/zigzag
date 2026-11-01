@@ -57,24 +57,51 @@ enum InlineCompletion {
         return parts.url
     }
 
-    /// The best site whose host starts with what you typed, with or without "www.". The most used wins; on a tie the
+    /// A host with its leading subdomains dropped, one at a time, down to the site itself: en.wikipedia.org gives
+    /// wikipedia.org, a.b.example.co.uk gives b.example.co.uk and example.co.uk. Never past the site to a public
+    /// suffix ("co.uk"), and nothing for an address or a name that has no site, like localhost.
+    static func shortenedHosts(_ host: String) -> [String] {
+        guard let site = PublicSuffix.registrableDomain(host), site != host, host.hasSuffix("." + site) else { return [] }
+        var labels = host.split(separator: ".").map(String.init)
+        var hosts: [String] = []
+        while labels.count > site.split(separator: ".").count {
+            labels.removeFirst()
+            hosts.append(labels.joined(separator: "."))
+        }
+        return hosts
+    }
+
+    /// The best site whose host starts with what you typed, with or without "www.", or failing that whose host does
+    /// without its subdomains: "wiki" finds en.wikipedia.org as wikipedia.org. The most used wins; on a tie the
     /// shorter address, so "git" means github.com before gist.github.com.
     static func best(for typed: String, among sites: [Site]) -> Match? {
         let lower = typed.lowercased()
         let www = lower.hasPrefix("www.")
         let bare = www ? String(lower.dropFirst(4)) : lower
         guard !bare.isEmpty, looksLikeHost(lower) else { return nil }
-        var best: (site: Site, address: String)?
+        // A whole host that matches always beats one only matched once shortened.
+        var best: (site: Site, address: String, whole: Bool)?
+        func consider(_ site: Site, _ address: String, whole: Bool) {
+            if let current = best {
+                if current.whole && !whole { return }
+                if current.whole == whole {
+                    if site.score < current.site.score { return }
+                    if site.score == current.site.score, (address.count, address) >= (current.address.count, current.address) { return }
+                }
+            }
+            best = (site, address, whole)
+        }
         for site in sites {
             let address = address(site.url)
             // The host (and port) alone has to start with what you typed; a path never does.
             let host = String(address.prefix { $0 != "/" })
-            guard host.hasPrefix(bare) else { continue }
-            if let current = best {
-                if site.score < current.site.score { continue }
-                if site.score == current.site.score, (address.count, address) >= (current.address.count, current.address) { continue }
+            if host.hasPrefix(bare) {
+                consider(site, address, whole: true)
+            } else if let short = shortenedHosts(host).last(where: { $0.hasPrefix(bare) }) {
+                // Shown and opened as the shorter host itself; the site sends you on from there as it likes.
+                guard let url = URL(string: "https://" + (www ? "www." : "") + short) else { continue }
+                consider(Site(url: url, score: site.score), short, whole: false)
             }
-            best = (site, address)
         }
         guard let best else { return nil }
         return Match(text: (www ? "www." : "") + best.address, url: best.site.url)
