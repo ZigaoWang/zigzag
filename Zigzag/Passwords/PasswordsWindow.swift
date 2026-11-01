@@ -789,8 +789,12 @@ private final class DetailView: NSView {
 
     private func toggleReveal() {
         if revealed != nil { revealed = nil; updatePasswordRow(); return }
+        let id = credential?.id
         Task { @MainActor in
-            revealed = await password()
+            let secret = await password()
+            // Another login chosen while Touch ID was up: its password isn't the one asked for.
+            guard credential?.id == id else { return }
+            revealed = secret
             updatePasswordRow()
         }
     }
@@ -847,7 +851,8 @@ private final class DetailView: NSView {
     private func beginEditing() {
         guard let credential else { return }
         Task { @MainActor in
-            guard let secret = await password() else { return }
+            // Another login chosen while Touch ID was up: this one isn't on screen to edit any more.
+            guard let secret = await password(), self.credential?.id == credential.id else { return }
             usernameField.stringValue = credential.username
             passwordField.stringValue = secret.withUnsafeString { $0 }
             notesField.stringValue = credential.notes
@@ -873,8 +878,11 @@ private final class DetailView: NSView {
         Task { @MainActor in
             do {
                 try await PasswordStore.shared.update(edited, password: newPassword)
-                revealed = nil
-                endEditing()
+                // Still showing the login that was saved: its fields close. Another one chosen meanwhile is left as it is.
+                if credential?.id == edited.id {
+                    revealed = nil
+                    endEditing()
+                }
                 toast("Saved")
             } catch {
                 toast("Couldn’t save the changes. Try again.")
