@@ -48,6 +48,12 @@ final class TabManager {
     }
     private var suspendTimer: Timer?
 
+    /// A tab closed by a change elsewhere (a space or pinned page deleted): no longer watched or among the recent.
+    private func forget(_ tab: Tab) {
+        tabTokens[tab.id] = nil
+        recentTabIDs.removeAll { $0 == tab.id }
+    }
+
     struct ClosedTab {
         /// The closed tab's own id, so undo brings back that tab, not just the latest closed one.
         var id = UUID()
@@ -424,7 +430,7 @@ final class TabManager {
         let spaceIDs = Set(Library.shared.spaces.map(\.id))
         // A removed space takes its tabs with it.
         for (id, tabs) in tabsBySpace where !spaceIDs.contains(id) {
-            tabs.forEach { $0.close() }
+            tabs.forEach { $0.close(); forget($0) }
             tabsBySpace[id] = nil
         }
         // A removed bookmark keeps its page around as a normal tab, so nothing disappears unexpectedly.
@@ -436,6 +442,7 @@ final class TabManager {
                 if tabsBySpace[tab.spaceID]?.contains(where: { $0 === tab }) != true { tabsBySpace[tab.spaceID, default: []].insert(tab, at: 0) }
             } else {
                 tab.close()
+                forget(tab)
             }
         }
         // Bookmarks moved to another space carry their live tab; one that became, or stopped being, a favorite
