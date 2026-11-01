@@ -12,7 +12,7 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
             shared.window?.makeKeyAndOrderFront(nil)
             return
         }
-        let view = AboutView(frame: NSRect(x: 0, y: 0, width: 300, height: AboutView.height))
+        let view = AboutView(frame: NSRect(x: 0, y: 0, width: Tokens.Welcome.aboutSize.width, height: AboutView.height))
         let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
         window.title = "About Zigzag"
@@ -35,7 +35,7 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
 
 /// The icon, the wordmark, the version (its build in the tooltip), then the credits and the copyright.
 private final class AboutView: NSView {
-    static let height: CGFloat = 340
+    static let height = Tokens.Welcome.aboutSize.height
     private let icon = NSImageView(image: NSApp.applicationIconImage)
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
@@ -64,9 +64,9 @@ private final class AboutView: NSView {
     override func layout() {
         super.layout()
         let width = bounds.width
-        let iconSide: CGFloat = 96
+        let iconSide = Tokens.Welcome.aboutIcon
         icon.frame = NSRect(x: round((width - iconSide) / 2), y: Tokens.Space.x10, width: iconSide, height: iconSide)
-        let markHeight: CGFloat = 22
+        let markHeight = Tokens.Welcome.smallWordmarkHeight
         let markWidth = ceil(markHeight * WordmarkView.aspect)
         wordmark.frame = NSRect(x: round((width - markWidth) / 2), y: icon.frame.maxY + Tokens.Space.x4, width: markWidth, height: markHeight)
         version.frame = NSRect(x: 0, y: wordmark.frame.maxY + Tokens.Space.x2, width: width, height: version.lineHeight)
