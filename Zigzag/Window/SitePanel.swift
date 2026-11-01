@@ -30,9 +30,9 @@ final class SitePanel: FloatingPanelView {
     private let securityIcon = NSImageView()
     private let moreButton = IconButton(symbol: "ellipsis", size: Tokens.Space.x7Height, toolTip: "More")
     private var actionTiles: [PanelTile] = []
-    private let extensionsLabel = Label("Extensions", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
+    private let extensionsLabel = Label.section("Extensions")
     private var extensionTiles: [PanelTile] = []
-    private let siteLabel = Label("This site", font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
+    private let siteLabel = Label.section("This site")
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
 
@@ -239,7 +239,7 @@ final class SitePanel: FloatingPanelView {
         rows = []
         if ContentBlocker.isEnabled {
             let blocked = !ContentBlocker.isAllowed(on: url)
-            rows.append(.toggle("Ad blocking", symbol: "shield.lefthalf.filled", on: blocked, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
+            rows.append(.toggle("Ad blocking", on: blocked, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
                 guard let self else { return }
                 ContentBlocker.setAllowed(!on, on: self.url)
                 self.tab.reload()
@@ -247,7 +247,7 @@ final class SitePanel: FloatingPanelView {
         }
         if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
             let off = ExtensionStore.extensionsOffSites.contains(site)
-            rows.append(.toggle("Extensions", symbol: "puzzlepiece.extension", on: !off, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
+            rows.append(.toggle("Extensions", on: !off, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
                 guard let self else { return }
                 var sites = ExtensionStore.extensionsOffSites
                 if on { sites.remove(self.site) } else { sites.insert(self.site) }
@@ -257,7 +257,7 @@ final class SitePanel: FloatingPanelView {
         }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
-            rows.append(.toggle(name, symbol: "translate", status: { $0 ? "Always translated" : "Translated when you ask" }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
+            rows.append(.toggle(name, status: { $0 ? "Always translated" : "Translated when you ask" }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
                 PageTranslator.setTranslatesAlways(on, language)
                 if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
             })
@@ -267,26 +267,26 @@ final class SitePanel: FloatingPanelView {
         let media = [WKMediaCaptureType.camera, .microphone, .cameraAndMicrophone].compactMap { SitePermissions.decision(host: host, type: $0) }
         if !media.isEmpty {
             let allowed = media.allSatisfy { $0 }
-            rows.append(.value("Camera and microphone", symbol: "video", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+            rows.append(.value("Camera and microphone", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
                 SitePermissions.forget(host: host)
                 self?.rebuildRows()
             })
         }
         if let allowed = SitePermissions.location(host: host) {
-            rows.append(.value("Location", symbol: "location", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+            rows.append(.value("Location", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
                 SitePermissions.forgetLocation(host: host)
                 self?.rebuildRows()
             })
         }
         if !tab.isPrivate, let allowed = SitePermissions.notifications(host: host.lowercased()) {
-            rows.append(.toggle("Notifications", symbol: "bell", on: allowed, status: { $0 ? "Allowed" : "Blocked" }) { on in
+            rows.append(.toggle("Notifications", on: allowed, status: { $0 ? "Allowed" : "Blocked" }) { on in
                 SitePermissions.setNotifications(on, host: host.lowercased())
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
         }
         let zoom = ZoomLevels.zoom(for: url)
         if abs(zoom - 1) > 0.001 {
-            rows.append(.value("Zoom", symbol: "plus.magnifyingglass", "\(Int((zoom * 100).rounded()))%", action: "Reset") { [weak self] in
+            rows.append(.value("Zoom", "\(Int((zoom * 100).rounded()))%", action: "Reset") { [weak self] in
                 guard let self else { return }
                 ZoomLevels.set(1, for: self.url)
                 self.tab.webView?.pageZoom = 1
@@ -353,7 +353,7 @@ final class SitePanel: FloatingPanelView {
         y += headerHeight + Tokens.Space.x4
 
         // Actions are named tiles, as many to a row as fit; extensions are icons on the same rhythm below.
-        let gap: CGFloat = 6
+        let gap = Tokens.Space.x2
         func grid(_ tiles: [PanelTile], columns: Int, height: ((CGFloat) -> CGFloat)? = nil) {
             let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
             let h = height?(side) ?? side
@@ -369,7 +369,7 @@ final class SitePanel: FloatingPanelView {
             let needed = actionTiles.map(\.captionWidth).max() ?? 0
             var across = max(2, min(4, Int((inner + gap) / (needed + gap))))
             if actionTiles.count % across == 1, across > 2, actionTiles.count > 1 { across -= 1 }
-            grid(actionTiles, columns: min(across, actionTiles.count)) { _ in 54 }
+            grid(actionTiles, columns: min(across, actionTiles.count)) { _ in PanelTile.captionedHeight }
             y += Tokens.Space.x5
         }
         if !extensionTiles.isEmpty {
@@ -393,52 +393,13 @@ final class SitePanel: FloatingPanelView {
     }
 }
 
-/// A small action with its name: a symbol and a word on a quiet pill. On (Reader open) takes the space's accent.
-final class ActionChip: InteractiveView {
-    private let icon = NSImageView()
-    private let label: Label
-    var isOn = false { didSet { stateDidChange(animated: false) } }
-
-    init(symbol: String, title: String) {
-        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-        super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.field
-        layer?.cornerCurve = .continuous
-        icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
-        [icon, label].forEach { addSubview($0) }
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(title)
-        stateDidChange(animated: false)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    var fittingWidth: CGFloat { ceil(Tokens.Space.x2 + 2 + 16 + Tokens.Space.x1 + 2 + label.inkWidth + Tokens.Space.x3) }
-
-    override func layout() {
-        super.layout()
-        icon.frame = NSRect(x: Tokens.Space.x2 + 2, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        label.frame = NSRect(x: icon.frame.maxX + Tokens.Space.x1 + 2 - Label.inset, y: (bounds.height - label.lineHeight) / 2,
-                             width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
-    }
-
-    override func stateDidChange(animated: Bool) {
-        let accent = Tokens.Color.accent
-        let fill = isOn ? accent.withAlphaComponent(isPressed ? 0.26 : 0.16) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
-        icon.contentTintColor = isOn ? accent : Tokens.Color.icon
-    }
-}
-
-/// A square action in the site panel: a symbol (or an extension's icon), an optional caption, and states for
-/// hover, on (in the space's accent), unavailable, and a badge.
-final class PanelTile: InteractiveView {
+/// A square action in the site panel: a glass tile (`GlassTile`) with a symbol (or an extension's icon), an optional
+/// caption, and a badge. On (Reader open) is the window's accent at the selection opacity.
+final class PanelTile: GlassTile {
     private let iconView = NSImageView()
     private let caption: Label?
     private var badgeView: BadgeView?
     var isOn = false { didSet { stateDidChange(animated: false) } }
-    /// No fill until hovered, for rows of icons.
-    var restsPlain = false { didSet { stateDidChange(animated: false) } }
     var isAttention = false
     var badge = "" {
         didSet {
@@ -452,14 +413,15 @@ final class PanelTile: InteractiveView {
     }
 
     /// How wide the tile must be for its name to show whole.
-    var captionWidth: CGFloat { caption.map { ceil($0.textWidth) + 8 } ?? 0 }
+    var captionWidth: CGFloat { caption.map { ceil($0.textWidth) + Tokens.Space.x2 } ?? 0 }
+
+    /// A tile with a caption: the icon over its name.
+    static let captionedHeight = Tokens.Space.x12 + Tokens.Space.x2
 
     init(image: NSImage? = nil, symbol: String, caption text: String?) {
         caption = text.map { Label($0, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.group
-        layer?.cornerCurve = .continuous
-        iconView.image = image ?? Tokens.Symbol.image(symbol, size: text == nil ? Tokens.TypeSize.body : 17)
+        iconView.image = image ?? Tokens.Symbol.image(symbol, size: text == nil ? Tokens.TypeSize.body : Tokens.TypeSize.large)
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.contentTintColor = Tokens.Color.icon
         addSubview(iconView)
@@ -478,7 +440,7 @@ final class PanelTile: InteractiveView {
     override func layout() {
         super.layout()
         // One size for every icon, whatever its artwork, so a row of them reads as a set.
-        let side: CGFloat = caption == nil ? 22 : 20
+        let side: CGFloat = caption == nil ? Tokens.Space.x5 + 2 : Tokens.Space.x5
         if let caption {
             let total = side + Tokens.Space.x1 + caption.lineHeight
             let top = (bounds.height - total) / 2
@@ -497,11 +459,15 @@ final class PanelTile: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let accent = Tokens.Color.accent
-        let rest: NSColor? = restsPlain ? nil : Tokens.Color.fieldFill
-        let fill: NSColor? = isOn ? accent.withAlphaComponent(isPressed ? 0.26 : 0.18)
-            : isPressed ? Tokens.Color.pressedFill : isHovered ? (restsPlain ? Tokens.Color.hoverFill : Tokens.Color.highlight) : rest
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        let accent = Brand.Theme.for(self).accent
+        if isOn {
+            let alpha = Tokens.Color.selectionAlpha + (isPressed ? 0.08 : isHovered ? 0.04 : 0)
+            layer?.set(backgroundColor: cgColor(accent.withAlphaComponent(alpha)), animated: animated && !isHovered, duration: Tokens.Motion.selection)
+            layer?.borderWidth = 0
+            setLifted(false)
+        } else {
+            super.stateDidChange(animated: animated)
+        }
         iconView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
         iconView.contentTintColor = isOn ? accent : Tokens.Color.icon
         caption?.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
@@ -509,7 +475,8 @@ final class PanelTile: InteractiveView {
     }
 }
 
-/// "This site"'s settings as one card, the way Settings groups its rows: a quiet fill, hairlines between.
+/// "This site"'s settings as one card, the way Settings groups its rows: a quiet fill, hairlines between that start
+/// where the text does.
 final class PanelGroup: NSView {
     var rows: [PanelRow] = [] {
         didSet {
@@ -543,33 +510,28 @@ final class PanelGroup: NSView {
         for (i, row) in rows.enumerated() {
             row.frame = NSRect(x: inset, y: CGFloat(i) * PanelRow.height, width: bounds.width - inset * 2, height: PanelRow.height)
         }
-        // Each line starts where the titles do, under the icons' column, as in Settings.
         for (i, line) in lines.enumerated() {
-            let x = inset + PanelRow.titleX
+            let x = inset
             line.frame = NSRect(x: x, y: CGFloat(i + 1) * PanelRow.height, width: bounds.width - x, height: Tokens.Metric.hairline)
         }
     }
 }
 
-/// One line of "This site": an icon, a name and a switch, or a name, its value and a small action.
+/// One line of "This site", as Settings draws its rows: a name with what it's set to under it, and a switch or a
+/// pill button at the right. No symbols: the names say what each is.
 final class PanelRow: NSView {
-    static let height: CGFloat = 46
-    /// Where the title starts, after the icon.
-    static let titleX: CGFloat = 16 + Tokens.Space.x2 + 2
-    private let icon = NSImageView()
+    static let height = Tokens.Page.groupRowHeight
     private let title: Label
     private let control: NSView
     private let value: Label?
 
-    private init(_ title: String, symbol: String, control: NSView, value: String? = nil) {
+    private init(_ title: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         self.control = control
         // What was chosen sits under the name, so neither is cut short beside the button.
         self.value = value.map { Label($0, font: Tokens.Font.small(), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
-        icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
-        icon.contentTintColor = Tokens.Color.icon
-        [icon, self.title, control].forEach { addSubview($0) }
+        [self.title, control].forEach { addSubview($0) }
         if let label = self.value { addSubview(label) }
     }
 
@@ -577,14 +539,14 @@ final class PanelRow: NSView {
     override var isFlipped: Bool { true }
 
     /// A short name, a switch, and under the name what the switch means right now ("Allowed on this site").
-    static func toggle(_ title: String, symbol: String, on: Bool, status: @escaping (Bool) -> String, changed: @escaping (Bool) -> Void) -> PanelRow {
-        toggle(title, symbol: symbol, status: status, on: on, changed: changed)
+    static func toggle(_ title: String, on: Bool, status: @escaping (Bool) -> String, changed: @escaping (Bool) -> Void) -> PanelRow {
+        toggle(title, status: status, on: on, changed: changed)
     }
 
-    static func toggle(_ title: String, symbol: String, status: @escaping (Bool) -> String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
+    static func toggle(_ title: String, status: @escaping (Bool) -> String, on: Bool, changed: @escaping (Bool) -> Void) -> PanelRow {
         let toggle = Toggle(isOn: on)
         toggle.setAccessibilityLabel(title)
-        let row = PanelRow(title, symbol: symbol, control: toggle, value: status(on))
+        let row = PanelRow(title, control: toggle, value: status(on))
         toggle.onChange = { [weak row] on in
             row?.value?.stringValue = status(on)
             changed(on)
@@ -592,18 +554,18 @@ final class PanelRow: NSView {
         return row
     }
 
-    static func value(_ title: String, symbol: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
-        let button = TextButton(title: action, font: Tokens.Font.body(.medium))
+    static func value(_ title: String, _ value: String, action: String, run: @escaping () -> Void) -> PanelRow {
+        let button = PillButton(title: action)
         button.onClick = { _ in run() }
-        return PanelRow(title, symbol: symbol, control: button, value: value)
+        return PanelRow(title, control: button, value: value)
     }
 
     override func layout() {
         super.layout()
-        icon.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        let size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
+        var size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
+        if let pill = control as? PillButton { size = NSSize(width: pill.fittingWidth, height: Tokens.Page.controlHeight) }
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
-        let x = Self.titleX
+        let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value else {
             title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2, width: right, height: title.lineHeight)
