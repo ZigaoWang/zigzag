@@ -1398,13 +1398,15 @@ extension BrowserWindowController: SidebarDelegate {
         }
         let over = zone.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(windowPoint)
         favorites.isDropTarget = over
+        if over { favorites.hoverDrop(at: windowPoint) }
         return over
     }
 
     func listDropOnFavorites(_ tab: Tab) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
+        let index = sidebar.favorites.dropIndex
         sidebar.favorites.isDropTarget = false
-        favoriteWithUndo(tab)
+        favoriteWithUndo(tab, at: index)
         return true
     }
 
@@ -1422,12 +1424,14 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool {
         guard sidebar.favorites.isDropTarget else { return false }
+        let index = sidebar.favorites.dropIndex
         sidebar.favorites.isDropTarget = false
         if let tab = tabManager.bookmarkTab(for: bookmarkID) {
-            favoriteWithUndo(tab)
+            favoriteWithUndo(tab, at: index)
         } else {
             let before = Library.shared.snapshot
             Library.shared.makeFavorite(bookmarkID)
+            if let index { Library.shared.moveFavorite(bookmarkID, to: index) }
             recordLibraryUndo("Add to Favorites", before: before)
         }
         return true

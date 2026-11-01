@@ -13,11 +13,24 @@ final class FavoritesView: NSView {
         didSet {
             guard oldValue != isDropTarget else { return }
             dropTile.isHidden = !isDropTarget
+            if !isDropTarget { dropIndex = nil }
             onHeightChange?()
             // The tiles after the opening slide over to make room for it, and back when it closes.
             relayout(gliding: true)
         }
     }
+    /// Where among the tiles a tab carried over the grid would land; nil: at the end.
+    private(set) var dropIndex: Int?
+
+    /// A tab carried over the grid at this point (in window coordinates): the empty tile opens in the slot under it.
+    func hoverDrop(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        let index = tiles.isEmpty ? 0 : slot(at: point, count: tiles.count + 1)
+        guard index != dropIndex else { return }
+        dropIndex = index
+        relayout(gliding: true)
+    }
+
     var onHeightChange: (() -> Void)?
     /// A tile is being carried: where the pointer is, in screen points. Returns true while it's over the tab list,
     /// where it would become a tab again.
@@ -205,7 +218,8 @@ final class FavoritesView: NSView {
 
     override func layout() {
         super.layout()
-        let all = (liveOrder ?? tiles) + (isDropTarget ? [dropTile] : [])
+        var all = liveOrder ?? tiles
+        if isDropTarget { all.insert(dropTile, at: min(dropIndex ?? all.count, all.count)) }
         let gap = Tokens.Space.x2
         // Up to four columns, every tile one size, a shorter last row from the left. A lone favorite is never
         // wider than two would be: half the row, not a long bar around a small icon.
