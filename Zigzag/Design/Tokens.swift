@@ -260,6 +260,20 @@ enum Tokens {
         static let detailWidth: CGFloat = 520
     }
 
+    // MARK: - Empty states
+
+    /// A page with nothing to show yet (History, Passwords, the error page): the wordmark faded almost away, a quiet
+    /// line under it, maybe one action. The same on every page, native or HTML (`PageStyle` passes these on).
+    enum EmptyState {
+        static let markWidth: CGFloat = 120
+        static let markOpacity: CGFloat = 0.08
+        /// Mark to text, and text to the action.
+        static let markGap: CGFloat = Space.x4
+        static let actionGap: CGFloat = Space.x6
+        /// The widest the text runs.
+        static let textWidth: CGFloat = 360
+    }
+
     // MARK: - Dialogs
 
     /// Every question Zigzag asks over a window or a page (a confirmation, saving a password, a permission, adding

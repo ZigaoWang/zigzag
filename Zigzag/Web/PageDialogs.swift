@@ -181,10 +181,10 @@ enum ErrorPage {
         \(PageStyle.css(theme: Brand.Theme.for(webView)))
         html, body { height: 100%; }
         body { display: flex; align-items: center; justify-content: center; }
-        main { max-width: 360px; padding: var(--space-8); text-align: center; }
-        main > svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto var(--space-6); }
+        main { max-width: var(--empty-width); padding: var(--space-8); text-align: center; }
+        main > svg { width: var(--empty-mark); height: auto; color: var(--text); opacity: var(--empty-mark-opacity); display: block; margin: 0 auto var(--empty-gap); }
         h1 { font-size: var(--heading); font-weight: 600; margin: 0 0 var(--space-2); }
-        p { margin: 0 0 var(--space-6); line-height: var(--space-5); color: var(--muted); }
+        p { margin: 0 0 var(--empty-action-gap); line-height: var(--space-5); color: var(--muted); }
         details { margin-top: var(--space-5); } summary { cursor: default; color: var(--muted); list-style: none; }
         summary::-webkit-details-marker { display: none; } summary:hover { color: var(--text); }
         .why { margin: var(--space-3) 0; text-align: left; } .anyway { color: var(--muted); }

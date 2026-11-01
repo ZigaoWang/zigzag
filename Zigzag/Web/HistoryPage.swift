@@ -264,7 +264,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 @media (prefers-reduced-motion: reduce) { .chevron, .page-header { transition: none; } }
 
 .empty { text-align: center; padding: 96px 0; color: var(--muted); }
-.empty svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto 16px; }
+.empty svg { width: var(--empty-mark); height: auto; color: var(--text); opacity: var(--empty-mark-opacity); display: block; margin: 0 auto var(--empty-gap); }
 #more { height: 1px; }
 </style>
 </head>

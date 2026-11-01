@@ -548,7 +548,7 @@ private final class PageEmptyView: NSView {
         label.isSelectable = false
         // Faded as one piece, as History's is, so its strokes don't darken where they cross.
         markHolder.wantsLayer = true
-        markHolder.alphaValue = 0.08
+        markHolder.alphaValue = Tokens.EmptyState.markOpacity
         markHolder.addSubview(mark)
         [markHolder, label].forEach { addSubview($0) }
         refreshColors()
@@ -580,22 +580,22 @@ private final class PageEmptyView: NSView {
         appear()
     }
 
-    static let markWidth: CGFloat = 120
+    static let markWidth = Tokens.EmptyState.markWidth
 
     override func layout() {
         super.layout()
-        let width = min(bounds.width - Tokens.Space.x8 * 2, 360)
+        let width = min(bounds.width - Tokens.Space.x8 * 2, Tokens.EmptyState.textWidth)
         let markHeight = ceil(Self.markWidth / WordmarkView.aspect)
         let textHeight = ceil(label.sizeThatFits(NSSize(width: width, height: 400)).height)
         let showsButton = action != nil && showsAction
-        let total = markHeight + Tokens.Space.x4 + textHeight + (showsButton ? Tokens.Space.x6 + Tokens.Page.controlHeight : 0)
+        let total = markHeight + Tokens.EmptyState.markGap + textHeight + (showsButton ? Tokens.EmptyState.actionGap + Tokens.Page.controlHeight : 0)
         // A little above the middle, where the eye rests.
         var y = round((bounds.height - total) / 2.3)
         markHolder.frame = NSRect(x: round((bounds.width - Self.markWidth) / 2), y: y, width: Self.markWidth, height: markHeight)
         mark.frame = markHolder.bounds
-        y = markHolder.frame.maxY + Tokens.Space.x4
+        y = markHolder.frame.maxY + Tokens.EmptyState.markGap
         label.frame = NSRect(x: round((bounds.width - width) / 2), y: y, width: width, height: textHeight)
-        y = label.frame.maxY + Tokens.Space.x6
+        y = label.frame.maxY + Tokens.EmptyState.actionGap
         if let action {
             let w = max(action.fittingWidth, Tokens.Dialog.minButtonWidth)
             action.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Page.controlHeight)
