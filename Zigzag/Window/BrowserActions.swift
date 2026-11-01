@@ -450,7 +450,12 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)):
             return tab != nil && findBar.hasQuery
         case #selector(stopLoading(_:)): return tab?.isLoading ?? false
-        case #selector(closeSplitView(_:)), #selector(toggleSplitOrientation(_:)): return tab.map { tabManager.split(for: $0) != nil } ?? false
+        case #selector(closeSplitView(_:)): return tab.map { tabManager.split(for: $0) != nil } ?? false
+        case #selector(toggleSplitOrientation(_:)):
+            // Named for what it does, as the pane's own button is.
+            let split = tab.flatMap { tabManager.split(for: $0) }
+            item.title = split?.vertical == true ? "Side by Side" : "Stack Vertically"
+            return split != nil
         case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
         case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"

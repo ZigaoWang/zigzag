@@ -121,7 +121,7 @@ enum MainMenu {
         var viewItems: [NSMenuItem] = [
             item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
             item("Show All Tabs", #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
-            item("Rotate Split View", #selector(C.toggleSplitOrientation(_:)), ""),
+            item("Stack Vertically", #selector(C.toggleSplitOrientation(_:)), ""),
             item("Separate Tabs", #selector(C.closeSplitView(_:)), "\\", [.command, .option]),
             .separator(),
             item("Back", #selector(C.goBack(_:)), "["),
