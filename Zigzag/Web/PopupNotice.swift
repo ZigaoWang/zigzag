@@ -38,8 +38,23 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
               let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) else { return }
         // It did open, the page just doesn't get it back (noopener).
         if let opened = tab.lastOpenedWindow, Date().timeIntervalSince(opened) < 2 { return }
-        Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: ("Open", { [weak controller, weak tab] in
-            controller?.open(url, disposition: .foregroundTab, opener: tab, allowSwitch: false)
+        Self.blocked(url, from: tab.url, opener: tab, in: controller)
+    }
+
+    /// A pop-up the page opened on its own: on a site you've allowed, it opens; elsewhere a toast offers to allow
+    /// the site's pop-ups from now on, this one included. Site Controls takes it back.
+    static func blocked(_ url: URL, from page: URL?, opener: Tab?, in controller: BrowserWindowController) {
+        let host = page?.host()?.lowercased() ?? ""
+        let isPrivate = controller.tabManager.isPrivate
+        if !host.isEmpty, !isPrivate, SitePermissions.popups(host: host) {
+            controller.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false)
+            return
+        }
+        // A private window remembers nothing about a site, so it only offers to open this one.
+        let allow = !host.isEmpty && !isPrivate
+        Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: (allow ? "Always Allow" : "Open", { [weak controller, weak opener] in
+            if allow { SitePermissions.setPopups(true, host: host) }
+            controller?.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false)
         }), duration: 6, in: controller)
     }
 }

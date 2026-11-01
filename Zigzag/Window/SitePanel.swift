@@ -280,6 +280,11 @@ final class SitePanel: FloatingPanelView {
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
         }
+        if !tab.isPrivate, SitePermissions.popups(host: host.lowercased()) {
+            rows.append(.toggle("Pop-ups", on: true, status: { $0 ? "Allowed" : "Blocked" }) { on in
+                SitePermissions.setPopups(on ? true : nil, host: host.lowercased())
+            })
+        }
         // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
         let zoom = tab.webView?.pageZoom ?? ZoomLevels.zoom(for: url)
         if abs(zoom - 1) > 0.001 {

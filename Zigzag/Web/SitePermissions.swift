@@ -92,6 +92,17 @@ enum SitePermissions {
         UserDefaults.standard.set(all, forKey: key)
     }
 
+    /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil) otherwise.
+    static func popups(host: String) -> Bool {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: Bool])?["\(host)|popups"] == true
+    }
+
+    static func setPopups(_ allowed: Bool?, host: String) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
+        all["\(host)|popups"] = allowed
+        UserDefaults.standard.set(all, forKey: key)
+    }
+
     /// Every site's notification choice, for the page script: it knows the answer before the page asks.
     static var notificationDecisions: [String: Bool] {
         let all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]

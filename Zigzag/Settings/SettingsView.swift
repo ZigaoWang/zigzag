@@ -1352,7 +1352,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             var said: [String] = []
             let choices = SitePermissions.choices(host: site)
             for (kind, name) in [("camera", "camera"), ("microphone", "microphone"), ("cameraAndMicrophone", "camera and microphone"),
-                                 ("location", "location"), ("notifications", "notifications")] {
+                                 ("location", "location"), ("notifications", "notifications"), ("popups", "pop-ups")] {
                 if let allowed = choices[kind] { said.append("\(name) \(allowed ? "allowed" : "blocked")") }
             }
             for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
