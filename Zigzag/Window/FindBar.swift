@@ -360,6 +360,11 @@ class FloatingPanelView: NSView {
         super.layout()
         surface.frame = bounds
         surface.layer?.cornerRadius = radius
+        if showsGlass, material == nil {
+            let glass = PanelMaterial.make(radius: radius)
+            super.addSubview(glass, positioned: .below, relativeTo: surface)
+            material = glass
+        }
         if let material {
             material.frame = bounds
             PanelMaterial.setRadius(radius, of: material)
@@ -419,12 +424,8 @@ class FloatingPanelView: NSView {
             } else {
                 surface.color = showsGlass ? Tokens.Color.panelWash : Tokens.Color.panelBackground
             }
-            if showsGlass, material == nil {
-                let glass = PanelMaterial.make(radius: radius)
-                glass.frame = bounds
-                super.addSubview(glass, positioned: .below, relativeTo: surface)
-                material = glass
-            }
+            // The glass itself is made at layout, once the panel's settings are in: a solid panel never makes one.
+            if showsGlass, material == nil { needsLayout = true }
             material?.isHidden = !showsGlass
             surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
             surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
