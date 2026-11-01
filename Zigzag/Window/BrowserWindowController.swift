@@ -56,7 +56,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             PermissionPrompt.reposition(in: self, slide: duration)
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
-        root.keepsRevealed = { [weak self] in SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) }
+        // So does the guide while it points at something in it.
+        root.keepsRevealed = { [weak self] in
+            SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
+        }
         root.onSplitRatioChange = { [weak self] ratio, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
             self.tabManager.setSplitRatio(Double(ratio), for: tab)

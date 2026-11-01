@@ -42,6 +42,14 @@ final class GuidedTour: NSView {
     private var shown = ""
     /// The step the pill was last showing, so its note follows it.
     private var lastStepID: String?
+    /// The step points at something in the sidebar: with the sidebar hidden, it slides out and stays out meanwhile.
+    private var pointsIntoSidebar = false
+
+    /// Whether the guide in this window keeps the hidden sidebar slid out, to point at something in it.
+    static func holdsSidebar(in window: NSWindow?) -> Bool {
+        guard let current, current.pointsIntoSidebar, !current.ending else { return false }
+        return window != nil && current.window === window
+    }
 
     /// Starts, or picks up at the step you're on. Nothing happens once every step is done or it was ended.
     static func start(in controller: BrowserWindowController) {
@@ -442,6 +450,9 @@ final class GuidedTour: NSView {
 
     private func layoutTour(_ d: Display, animated: Bool) {
         let target = view(for: d.target)
+        // Out first, so the ring goes where the sidebar is, not where it hides.
+        pointsIntoSidebar = !d.isFinal && controller.map { target?.isDescendant(of: $0.sidebar) == true } ?? false
+        if pointsIntoSidebar { controller?.root.reveal(true) }
         let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -5, dy: -5) : nil } ?? .zero
         // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
         // The tab to drag keeps its ring, so you know which one.
