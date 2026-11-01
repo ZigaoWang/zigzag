@@ -396,7 +396,9 @@ final class FavoriteTile: InteractiveView {
             icon.frame = NSRect(x: x, y: y, width: size, height: size).integral
             partnerIcon.frame = NSRect(x: x + size + gap, y: y, width: size, height: size).integral
         } else {
-            let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Metric.favicon
+            // Every favorite at one size: a site's own 32px icon is drawn up to it with the best filtering, only a
+            // 16px one stays at a tab's size rather than blur.
+            let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Tokens.Metric.favicon } == true ? Self.iconSide : Tokens.Metric.favicon
             icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         }
         let side = Self.closeSide

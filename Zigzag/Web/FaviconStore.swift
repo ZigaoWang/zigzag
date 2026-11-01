@@ -36,10 +36,10 @@ final class FaviconStore {
             UserDefaults.standard.set(true, forKey: "faviconGoogleApps")
         }
         // Icons used to be stretched to 64 pixels, small ones blurred; they're fetched again at their own size.
-        if !UserDefaults.standard.bool(forKey: "faviconNativeSize") {
+        if !UserDefaults.standard.bool(forKey: "faviconNativeSize2") {
             try? FileManager.default.removeItem(at: Paths.favicons)
             try? FileManager.default.createDirectory(at: Paths.favicons, withIntermediateDirectories: true)
-            UserDefaults.standard.set(true, forKey: "faviconNativeSize")
+            UserDefaults.standard.set(true, forKey: "faviconNativeSize2")
         }
     }
 
@@ -128,7 +128,8 @@ final class FaviconStore {
     }
 
     /// Without `save`, the icon is only handed back, for the one page that declared it.
-    /// An icon too small to stay sharp on a favorite is kept only until a larger one turns up further down the list.
+    /// A 16px icon (too small to stay sharp anywhere bigger than a tab) is kept only until a larger one turns up
+    /// further down the list; 32px and up is the site's own icon, and wins over a home-screen one on a square.
     private func fetchFirst(_ candidates: [URL], key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
         func finish(_ image: NSImage) {
             if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
@@ -140,7 +141,7 @@ final class FaviconStore {
                 return
             }
             let pixels = image.representations.map(\.pixelsWide).max() ?? 0
-            if pixels > 0, pixels < 44, !rest.isEmpty {
+            if pixels > 0, pixels < 32, !rest.isEmpty {
                 fetchFirst(rest, key: key, save: save, small: small ?? image, completion: completion)
             } else {
                 finish(image)
