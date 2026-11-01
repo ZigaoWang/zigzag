@@ -250,16 +250,28 @@ final class WindowManager {
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
     private var closedWindows: [(state: SessionState.WindowState, history: [UUID: Data])] = []
-    var canReopenClosedWindow: Bool { !closedWindows.isEmpty }
+    var canReopenClosedWindow: Bool {
+        let open = openTabIDs
+        return closedWindows.contains { !isBack($0.state, open: open) }
+    }
 
     /// Brings back the last closed window, its spaces, tabs, history and place on screen.
     func reopenClosedWindow() {
-        guard let closed = closedWindows.popLast() else { return }
-        // Already back (the Dock icon restored it after the last window closed): never a second copy of the same tabs.
-        let open = Set(controllers.flatMap { $0.tabManager.allTabs.map(\.id) })
-        let ids = closed.state.spaces.flatMap { $0.tabs.map(\.id) } + closed.state.bookmarkTabs.map(\.tab.id)
-        guard !ids.contains(where: open.contains) else { return }
-        restoreWindow(closed.state, history: closed.history)
+        // Already back (the Dock icon restored it after the last window closed): never a second copy of the same tabs,
+        // so it's passed over for the one closed before it.
+        let open = openTabIDs
+        while let closed = closedWindows.popLast() {
+            guard !isBack(closed.state, open: open) else { continue }
+            restoreWindow(closed.state, history: closed.history)
+            return
+        }
+    }
+
+    private var openTabIDs: Set<UUID> { Set(controllers.flatMap { $0.tabManager.allTabs.map(\.id) }) }
+
+    private func isBack(_ state: SessionState.WindowState, open: Set<UUID>) -> Bool {
+        let ids = state.spaces.flatMap { $0.tabs.map(\.id) } + state.bookmarkTabs.map(\.tab.id)
+        return ids.contains(where: open.contains)
     }
 
     /// One window from saved state; returns its tabs' ids. `history` stands in for back/forward lists not on disk.
