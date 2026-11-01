@@ -18,6 +18,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     private var observations: [NSKeyValueObservation] = []
     private let header = PopupHeaderView()
     private var parentObserver: Any?
+    /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
+    private(set) weak var parentWindow: NSWindow?
     private var lastCrash: Date?
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
@@ -53,6 +55,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if parent?.styleMask.contains(.fullScreen) == true { window.collectionBehavior.insert(.fullScreenAuxiliary) }
         window.setFrameOrigin(origin)
         super.init(window: window)
+        parentWindow = parent
         window.delegate = self
         // Extensions' shortcuts (1Password's fill) work here too, before the page gets the keys.
         window.commandHandler = { [weak self] event in

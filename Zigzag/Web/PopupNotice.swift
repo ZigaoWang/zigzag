@@ -33,8 +33,14 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let text = message.body as? String, let url = URL(string: text),
-              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-              let webView = message.webView as? BrowserWebView, let tab = webView.owner,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+        // From a sign-in popup's own page: said in the browser window behind it, the one that opened it.
+        if let popup = PopupWindowController.all.first(where: { $0.webView === message.webView }) {
+            guard let browser = popup.parentWindow?.windowController as? BrowserWindowController else { return }
+            Self.blocked(url, from: popup.webView.url, opener: nil, in: browser)
+            return
+        }
+        guard let webView = message.webView as? BrowserWebView, let tab = webView.owner,
               let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) else { return }
         // It did open, the page just doesn't get it back (noopener).
         if let opened = tab.lastOpenedWindow, Date().timeIntervalSince(opened) < 2 { return }
