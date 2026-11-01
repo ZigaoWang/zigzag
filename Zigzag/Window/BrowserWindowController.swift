@@ -1724,7 +1724,8 @@ extension BrowserWindowController: SidebarDelegate {
     func listDropOnPage(_ item: SidebarItem) -> Bool {
         let side = root.splitDropHint.side
         root.splitDropHint.show(nil)
-        guard let side, canDropBeside(item), let current = tabManager.selectedTab else { return false }
+        // The page showing, which after a space flip mid-drag isn't that space's selected tab.
+        guard let side, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { return false }
         // A pinned page not loaded yet opens as part of the change, so ⌘Z puts it back unloaded.
         pageChange("Split View") { [weak self] in
             guard let self else { return }
@@ -1741,7 +1742,7 @@ extension BrowserWindowController: SidebarDelegate {
     /// Only another tab, or a pinned page beside a tab, opens beside the page you're on, and neither may already be
     /// half of a split.
     private func canDropBeside(_ item: SidebarItem) -> Bool {
-        guard let current = tabManager.selectedTab else { return false }
+        guard let current = shownTab ?? tabManager.selectedTab else { return false }
         switch item {
         case .tab(let id):
             guard let tab = tabManager.tab(with: id), tabManager.canSplit(current, with: tab) else { return false }
