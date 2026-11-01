@@ -244,6 +244,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var lastSpaceID: UUID?
+    private var handoff: NSUserActivity?
 
     private func spaceChanged() {
         let spaces = Library.shared.spaces
@@ -420,6 +421,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
 
+    /// Handoff, as in Safari: the web page you're on, offered to your iPhone, iPad or other Mac. Never a private
+    /// window's, and never Zigzag's own pages or a local file.
+    private func updateHandoff() {
+        guard !tabManager.isPrivate, let url = tabManager.selectedTab?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+            handoff?.invalidate()
+            handoff = nil
+            return
+        }
+        if handoff == nil { handoff = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb) }
+        handoff?.webpageURL = url
+        handoff?.title = tabManager.selectedTab?.displayTitle
+        if window?.isKeyWindow == true { handoff?.becomeCurrent() }
+    }
+
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
         render(tabManager.currentSpace, animated: animated)
@@ -468,6 +483,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let tab = tabManager.selectedTab
         // The site panel describes one page; another tab coming forward takes it away.
         if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
+        updateHandoff()
         if tab !== shownTab {
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && tab.flatMap { tabManager.partner(of: $0) } === readerTab
@@ -868,6 +884,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .url, .navigation, .loading:
             if change == .url {
                 refreshExtensionActions()
+                updateHandoff()
                 // A pinned tab that moved on shows it right away.
                 if tab.bookmarkID != nil { sidebar.list.refreshRows() }
             }
@@ -1242,6 +1259,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) { switcher.windowResignedKey() }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        updateHandoff()
         // Brand moments in other windows (Settings, Passwords) follow the space in front.
         Brand.themeChanged.send(())
         layoutTrafficLights()
@@ -1262,6 +1280,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         if DownloadsPanel.isOpen(in: window) { DownloadsPanel.closeCurrent() }
         if let editor = SpaceEditorPanel.current, editor.window === window { editor.close() }
+        // Its page is no longer on offer to your other devices.
+        handoff?.invalidate()
         onClose?(self)
     }
 
