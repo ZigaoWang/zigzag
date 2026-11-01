@@ -18,9 +18,12 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
   script a page title can be in, and its display cut is the Univers-like grotesque this direction wants. What makes it
   ours is how it's set: light weights, one large display size against small text, display type tracked tight
   (`Sidebar.spaceNameKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
-- **Lowercase voice.** The app's own words are lowercase: the space's name in the sidebar, "tabs", "new tab", "clear",
-  every pill button's title (`PillButton` shows it lowercase; VoiceOver reads it as written), the space editor's
-  labels. What isn't ours keeps its case: page titles, site names, what you typed in a field, menu items.
+- **Case, decided once.** Words Zigzag says itself, in the window's chrome, are lowercase: the space's name in the
+  sidebar, "tabs", "new tab", "clear", every pill button's title (`PillButton` shows it lowercase; VoiceOver reads it
+  as written), the space editor's labels, and the names of Zigzag's own pages wherever the chrome names them
+  ("settings", "history" in a tab's row and the address, `Tab.displayTitle`). Everything else keeps its case:
+  content (a web page's title, a site's name, what you typed: the space's name in its own field reads as you wrote
+  it), the headings inside a page (a built-in page's title and its sections), and the system's menus.
 - **Confident contrast.** The space's name is 26 light against 13pt rows and 11pt labels, nothing in between.
 - **Line drawings** (`LineGlyph`): where a stock symbol says too little, Zigzag draws its own on a 16pt square with
   one 1.1pt stroke, round caps and joins, 1.5pt margins: the sidebar toggle, the plus for new tab and new space,
@@ -49,8 +52,10 @@ night (`SpaceColor`, `Tokens.Frame`).
 - **Custom**: any hue and depth from the wheel, mixed in OKLCH (`SpaceColor.paint`); a deep one turns the window dark.
 - **Effects**, all optional: a second color for a gradient and its direction, see-through (the frosted desktop under
   a thinner coat of the color), and grain.
-- **Ink**: text and icons are near-black or near-white with a little alpha, so the color shows through them a touch;
-  the window's mode follows the color's lightness, so they always pass AA on it.
+- **Ink**: on the frame, row titles and quiet words take the space's own ink (`Theme.rowInk`, `quietInk`), a deep or
+  pale tone of its hue, checked against every curated color under the hover and card washes: titles at least 11.7:1
+  by day and 7.5:1 at night, quiet words 5.2:1 and 4.8:1. On frames where that can't be promised (see-through, or a
+  custom shade in the middle of the scale) they fall back to the plain near-black and near-white.
 - **Switching spaces** cross-fades the frame's color (`Motion.standard`, eased out); from the keyboard too, since the
   layout of the window should move so you see where you went.
 - Everything on the frame derives from the color (`Tokens.Chrome`): washes of white over it, so in any space, on a
@@ -68,17 +73,17 @@ Four layers, front to back. Each has one material and one depth cue; nothing els
 | Layer | What | Material | Depth |
 |---|---|---|---|
 | 0. Frame | The window behind everything: the space's color, gradient, grain, or the desktop through it | Space color (`SpaceColor`), clear glass when see-through | None |
-| 1. Surfaces | The page card; Settings, History, Passwords pages | Opaque `Color.surface`; Settings' column a light tint of the space (`Theme.wash`) | `Color.cardShadow`, barely there |
+| 1. Surfaces | The page card; Settings, History, Passwords pages | Opaque `Color.surface`; Settings' and Passwords' column of places a light tint of their window's space (`Theme.wash`); History has no column and stays plain | `Color.cardShadow`, barely there |
 | 2. Cards | The selected tab, a selected favorite; grouped rows and chosen rows on pages and panels | On the frame `Chrome.card`; elsewhere `Color.selectedFill` / `surfaceGroup` | A quiet edge and a shadow-sm (`Chrome.cardEdge`, `cardShadow`; `setLifted`) |
 | 3. Floating | Panels, popovers, menus, the command bar, find, downloads, Peek, the switcher | Opaque, leaning toward the space (`Brand.Theme.panel`) | Hairline `panelEdge` and one soft small shadow (`Shadow.panelRadius` 16, `panelDrop` 3) |
 
 The sidebar has no surface of its own: it is the frame, in the space's full color. What sits on it is quiet (rows at
 rest, labels) or a soft wash of that color: the address and the favorites are soft fields (`Chrome.field`) with no
-line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 80% by day, 13% at night)
+line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 72% by day, 16% at night)
 with a crisp quiet edge and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
 No bevels, no puffy shadows, no boxes.
 
-No glass gimmicks: see-through spaces frost the desktop under the frame, and that is the only blur.
+No glass gimmicks: in the browser, see-through spaces frost the desktop under the frame, and that is the only blur (brand moments keep their `GlassSurface`, under Materials).
 
 ## Size scale
 
@@ -143,8 +148,8 @@ A 4pt grid (`Space.x1`...`x16`). Rhythm:
   edge to its 16pt icon and 8pt from the icon to its title, so one left edge runs down the sidebar: the traffic
   lights and every icon at 12, every title and section label at 36. The address 40pt from the top, the favorites 8pt
   under it, the list 12pt (`Sidebar.sectionGap`) under them.
-- Sections are separated by space and a quiet label (`Label.section`, in a `Metric.sectionLabelHeight` slot with the
-  label low in it), never by divider lines.
+- Sections are separated by space and a quiet label, low in its slot (`Metric.sectionLabelHeight`, 32, on pages and
+  panels; `Sidebar.labelHeight`, 28, in the sidebar's compact scale), never by divider lines.
 - Panels: 12pt padding (`Space.x3`), 4pt inset for rows inside them so a row's corners run with the panel's.
 - Pages: `Tokens.Page` (gutter 28, header 16 + 28 + 12, max width 880). Grouped rows are at least 44 tall with 16pt
   (`groupPad`) from the group's edge and 12pt (`groupRowPad`) above and below their two lines; list rows are 34.
@@ -177,10 +182,13 @@ One look for each state, everywhere:
 - Hover: on the frame `Chrome.hover` (rows, the toolbar's buttons, the space dots); elsewhere `Color.hoverFill`
   (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
   dark primary. Instant, both ways: a fade on something you sweep past all day reads as lag.
-- Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`) at once, and buttons and rows give
-  under the finger (`InteractiveView.pressScales`, `showPress`): down to `Motion.pressScale` (0.97) around their
-  middle, eased out in `pressIn` (80ms), and a critically damped spring back in `pressOut` (200ms) when let go, from
-  wherever they are. No bounce, and the action never waits on it. Not from the keyboard, not with Reduce Motion.
+- Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
+  once. Things that read as objects (space keys, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
+  `Motion.pressSink` (1pt) in `pressIn` (80ms), eased out, and back over `pressSettle` (180ms), eased out, with
+  weight and no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
+  `Motion.pressScale` (0.97) and a critically damped spring back. Both start from wherever they are, and the action
+  never waits on them. Not from the keyboard, not with Reduce Motion. The switch's knob travels its short way in
+  `pressSettle`, eased out.
 - Selected / current: in the sidebar the light card of the space's color (`Chrome.card`, `cardEdge`, a shadow-sm);
   on a panel a clear neutral fill, `selectedFill`, with a 1px `selectedEdge` and `setLifted(true)`'s shadow-sm
   (`applyRowStyle`). In a list of places
@@ -219,8 +227,12 @@ something came from, answers at once, and can be interrupted.
 - Durations: hover and press 0 (instant); `quick` 0.1 for small feedback; `selection` 0.15 for the card moving to a
   new row; `standard` 0.2 for most transitions; panels arrive in 0.18 growing from 97% of their size out of what
   opened them (`FloatingPanelView.present`); `large` 0.3 is the ceiling.
-- Anything opened or changed from the keyboard is instant (`Motion.isFromKey`, `isKeyboardDriven`); layout of the
-  window (sidebar, splits) still moves so you see where things went.
+- Anything opened or changed from the keyboard is instant (`Motion.isFromKey`, `Motion.animate`); only the window's
+  layout (the sidebar, splits, switching spaces) still moves so you see where things went (`evenFromKeyboard`).
+  Letting go of Control after ⌃Tab closes the switcher at once.
+- Light and dark cross-fade with the space's color when a space changes the window's mode: one fade, no flicker.
+- A closed tab's row folds away: it takes no more clicks, and its height closes as it fades, in step with the rows
+  below gliding up.
 - Reduce Motion: nothing slides or scales; things fade or simply appear.
 
 ## Surfaces
@@ -241,8 +253,8 @@ something came from, answers at once, and can be interrupted.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
-- **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (Settings' column of sections in a
-  light tint of the space, `Brand.Theme.wash`), `PageTitleView` (wordmark, hairline,
+- **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
+  Passwords in a light tint of their window's space, `Brand.Theme.for(view).wash`), `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
   quiet rows.
 - **Floating panel** (`FloatingPanelView`): opaque, near white by day and a deep gray at night, each leaning just
