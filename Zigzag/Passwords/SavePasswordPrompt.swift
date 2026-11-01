@@ -103,7 +103,7 @@ final class SavePasswordPrompt: FloatingPanelView {
                     }
                     Toast.show(done, symbol: "key", duration: 1.6, in: controller)
                 } catch {
-                    Toast.show("Couldn’t save the password. Try again from the Passwords window", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    Toast.show("Couldn’t save the password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }
             }
         }

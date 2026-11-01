@@ -219,7 +219,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let result = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
             let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
             guard let index = result?["index"] as? Int, candidates.indices.contains(index) else {
-                if let controller { Toast.show("This site’s password rules didn’t fit a strong password. Type one yourself", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                if let controller { Toast.show("This site’s password rules didn’t fit a strong password. Type one yourself.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
                 return
             }
             let password = candidates[index]
@@ -228,7 +228,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password)
                 if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key", duration: 2, in: controller) }
             } catch {
-                if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
             }
         }
     }
@@ -247,7 +247,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         Task {
             guard let values = await ContactCard.values() else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
-                    Toast.show("Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts",
+                    Toast.show("Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts.",
                                symbol: "person.crop.circle.badge.exclamationmark", duration: 5, in: controller)
                 }
                 return
@@ -269,7 +269,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         Task {
             guard let password = try? await PasswordStore.shared.password(for: login.id) else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
-                    Toast.show("Couldn’t open that password. Try again from the Passwords window", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    Toast.show("Couldn’t open that password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }
                 return
             }

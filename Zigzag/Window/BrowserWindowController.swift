@@ -538,7 +538,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             Task { @MainActor in
                 await WebsiteData.clear(.cookies)
                 self?.tabManager.selectedTab?.reload()
-                if let self { Toast.show("Cookies cleared. You’re signed out everywhere", symbol: "trash", duration: 2.4, in: self) }
+                if let self { Toast.show("Cookies cleared. You’re signed out everywhere.", symbol: "trash", duration: 2.4, in: self) }
             }
         }
     }
@@ -923,7 +923,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 Toast.show("Translated from \(name)", symbol: "translate",
                            action: (title: "Show Original", run: { [weak self] in self?.translatePage() }), duration: 4, in: self)
             case .failure:
-                Toast.show("Couldn’t translate this page. Try again in a moment", symbol: "exclamationmark.triangle", duration: 3, in: self)
+                Toast.show("Couldn’t translate this page. Try again in a moment.", symbol: "exclamationmark.triangle", duration: 3, in: self)
             }
         })
     }
