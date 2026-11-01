@@ -214,17 +214,17 @@ enum Reader {
           :root[data-theme="auto"] { --text: #e8e6e1; --soft: #9d9b97; --faint: rgba(255,255,255,.4); --rule: rgba(255,255,255,.12); --bg: #161618;
                 --link: #9cbcec; --code: rgba(255,255,255,.07); --select: rgba(156,188,236,.25); color-scheme: dark; }
         }
-        html { background: var(--bg); transition: background .25s ease; }
+        html { background: var(--bg); transition: background .2s cubic-bezier(.23, 1, .32, 1); }
         ::selection { background: var(--select); }
         body { margin: 0; padding: 112px 48px 160px; color: var(--text); font-family: var(--serif); font-size: var(--size); line-height: 1.65;
                -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-kerning: normal; hanging-punctuation: first;
-               transition: color .25s ease; animation: rise .5s cubic-bezier(.2,.85,.25,1) both; }
+               transition: color .2s cubic-bezier(.23, 1, .32, 1); animation: rise .3s cubic-bezier(.23, 1, .32, 1) both; }
         :root[data-face="sans"] body { font-family: var(--sans); line-height: 1.6; letter-spacing: -0.003em; }
         @keyframes rise { from { transform: translateY(14px); } to { transform: none; } }
         @media (prefers-reduced-motion: reduce) { body { animation: none; } html, body { transition: none; } }
 
         /* One centered column at a book's measure: nothing to the side, nothing competing. */
-        main { max-width: var(--measure, 40em); margin: 0 auto; transition: max-width .25s ease; }
+        main { max-width: var(--measure, 40em); margin: 0 auto; transition: max-width .2s cubic-bezier(.23, 1, .32, 1); }
 
         /* The title page: the headline, the site's summary, then where it's from in small type. */
         header { margin: 0 0 3em; }
@@ -248,7 +248,7 @@ enum Reader {
 
         /* Links read as part of the sentence; the underline is barely there until you point at it. */
         a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .22em;
-            text-decoration-color: color-mix(in srgb, var(--text) 22%, transparent); transition: color .15s, text-decoration-color .15s; }
+            text-decoration-color: color-mix(in srgb, var(--text) 22%, transparent); }
         a:hover { color: var(--link); text-decoration-color: currentColor; }
         h1 a, h2 a, h3 a, figcaption a { text-decoration: none; }
 

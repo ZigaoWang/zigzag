@@ -244,7 +244,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 
 /* A cluster: one site, several pages in a row. Its pages sit under it, indented past the icon. */
 .cluster > .head .title { font-weight: 500; }
-.cluster > .head .chevron { grid-column: 1; width: 12px; height: 12px; color: var(--muted); transition: transform .15s; }
+.cluster > .head .chevron { grid-column: 1; width: 12px; height: 12px; color: var(--muted); transition: transform .15s cubic-bezier(.23, 1, .32, 1); }
 .cluster.open > .head .chevron { transform: rotate(90deg); }
 /* Indented by a wider first column rather than padding, so the address and time columns still line up with the rows above. */
 .pages .row { grid-template-columns: 38px var(--favicon) minmax(0, 1fr) minmax(0, 34%) 120px 20px; }
