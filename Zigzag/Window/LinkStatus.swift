@@ -7,16 +7,18 @@ final class LinkStatusController {
     private let label = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let hideDebouncer = Debouncer(delay: 0.15)
     private var visible = false
+    /// From the capsule's ends to the text: about half its height, so the round ends never crowd a letter.
+    private static let padding = Tokens.Metric.linkStatusHeight / 2 - 2
 
     init(overlay: NSView) {
         self.overlay = overlay
-        pill.radius = Tokens.Radius.control
+        pill.radius = Tokens.Metric.linkStatusHeight / 2
         pill.addSubview(label)
         label.lineBreakMode = .byTruncatingMiddle
         pill.onLayout = { [weak self] in
             guard let self else { return }
             let h = self.label.lineHeight
-            self.label.frame = NSRect(x: Tokens.Space.x2, y: (self.pill.bounds.height - h) / 2, width: self.pill.bounds.width - Tokens.Space.x4, height: h)
+            self.label.frame = NSRect(x: Self.padding, y: (self.pill.bounds.height - h) / 2, width: self.pill.bounds.width - Self.padding * 2, height: h)
         }
     }
 
@@ -28,9 +30,9 @@ final class LinkStatusController {
         hideDebouncer.cancel()
         label.stringValue = Self.describe(url)
         label.lineBreakMode = .byTruncatingMiddle
-        let height = Tokens.Space.x6
-        // The label sits 8pt in on each side: the pill is that much wider than the text, so a short address is whole.
-        let width = min(label.textWidth + Tokens.Space.x4, area.width * 0.6)
+        let height = Tokens.Metric.linkStatusHeight
+        // The pill is the padding wider than the text on each side, so a short address is whole.
+        let width = min(label.textWidth + Self.padding * 2, area.width * 0.6)
         pill.frame = NSRect(x: area.minX + Tokens.Space.x2, y: area.maxY - height - Tokens.Space.x2, width: ceil(width), height: height)
         pill.needsLayout = true
         if !visible {

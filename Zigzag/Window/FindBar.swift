@@ -60,15 +60,17 @@ private final class PaddedTextFieldCell: NSTextFieldCell {
 
 }
 
-/// Find in page. Sits at the top right of the page card.
+/// Find in page: a glass capsule at the top right of the page card holding a magnifying glass, the field, the count,
+/// and round buttons whose circles run with the capsule's end.
 final class FindBarController: NSObject, NSTextFieldDelegate {
     private weak var window: BrowserWindowController?
     private let panel = FloatingPanelView()
+    private let glass = NSImageView(image: Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body))
     private let field = PlainTextField(font: Tokens.Font.body(), placeholder: "Find on page")
     private let countLabel = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let previousButton = IconButton(symbol: "chevron.up", size: Tokens.Space.x6, toolTip: "Previous")
-    private let nextButton = IconButton(symbol: "chevron.down", size: Tokens.Space.x6, toolTip: "Next")
-    private let doneButton = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Done")
+    private let previousButton = IconButton(symbol: "chevron.up", size: Tokens.Metric.findButton, toolTip: "Previous")
+    private let nextButton = IconButton(symbol: "chevron.down", size: Tokens.Metric.findButton, toolTip: "Next")
+    private let doneButton = IconButton(symbol: "xmark", size: Tokens.Metric.findButton, symbolSize: Tokens.TypeSize.small, toolTip: "Done")
     private(set) var isVisible = false
     private var query = ""
     var hasQuery: Bool { !query.isEmpty }
@@ -77,6 +79,10 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         self.window = window
         super.init()
         field.delegate = self
+        panel.radius = Tokens.Metric.findBarHeight / 2
+        glass.contentTintColor = Tokens.Color.textTertiary
+        glass.imageScaling = .scaleNone
+        panel.addSubview(glass)
         panel.addSubview(field)
         panel.addSubview(countLabel)
         panel.addSubview(previousButton)
@@ -99,23 +105,28 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private var frame: NSRect {
         guard let window else { return .zero }
         let card = window.focusedPaneFrame
-        let height = Tokens.Space.x10
+        let height = Tokens.Metric.findBarHeight
         let width = Tokens.Metric.findBarWidth
         return NSRect(x: card.maxX - width - Tokens.Space.x3, y: card.minY + Tokens.Space.x3, width: width, height: height)
     }
 
     private func layoutPanel() {
         let b = panel.bounds
-        let button = Tokens.Space.x6
-        let y = (b.height - button) / 2
-        doneButton.frame = NSRect(x: b.width - Tokens.Space.x2 - button, y: y, width: button, height: button)
-        nextButton.frame = NSRect(x: doneButton.frame.minX - button, y: y, width: button, height: button)
-        previousButton.frame = NSRect(x: nextButton.frame.minX - button, y: y, width: button, height: button)
+        let button = Tokens.Metric.findButton
+        // As far in from the end as from the top and bottom, so Done's circle runs with the capsule's.
+        let inset = (b.height - button) / 2
+        doneButton.frame = NSRect(x: b.width - inset - button, y: inset, width: button, height: button)
+        nextButton.frame = NSRect(x: doneButton.frame.minX - button, y: inset, width: button, height: button)
+        previousButton.frame = NSRect(x: nextButton.frame.minX - button, y: inset, width: button, height: button)
+        [previousButton, nextButton, doneButton].forEach { $0.radius = button / 2 }
         let countWidth = countLabel.textWidth
-        let countHeight = ceil(countLabel.intrinsicContentSize.height)
-        countLabel.frame = NSRect(x: previousButton.frame.minX - Tokens.Space.x2 - countWidth, y: (b.height - countHeight) / 2, width: countWidth, height: countHeight)
+        let countHeight = countLabel.lineHeight
+        countLabel.frame = NSRect(x: previousButton.frame.minX - Tokens.Space.x1 - countWidth, y: (b.height - countHeight) / 2, width: countWidth, height: countHeight)
+        let side = Tokens.Metric.favicon
+        glass.frame = NSRect(x: Tokens.Space.x3 + 2, y: (b.height - side) / 2, width: side, height: side)
         let fieldHeight = ceil(field.intrinsicContentSize.height)
-        field.frame = NSRect(x: Tokens.Space.x3, y: (b.height - fieldHeight) / 2, width: countLabel.frame.minX - Tokens.Space.x3 - Tokens.Space.x2, height: fieldHeight)
+        let x = glass.frame.maxX + Tokens.Space.x1 + 2
+        field.frame = NSRect(x: x, y: (b.height - fieldHeight) / 2, width: max(0, countLabel.frame.minX - x - Tokens.Space.x2), height: fieldHeight)
     }
 
     /// ⌘F: opens the bar, or puts you back in it; pressed again while you're typing in it, closes it.
@@ -605,7 +616,7 @@ class FloatingPanelView: NSView {
 final class ToastView: FloatingPanelView {
     let icon = NSImageView()
     let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-    let actionButton = TextButton(title: "", font: Tokens.Font.body(.semibold))
+    let actionButton = PillButton(style: .plain)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -614,19 +625,17 @@ final class ToastView: FloatingPanelView {
         addSubview(icon)
         addSubview(label)
         addSubview(actionButton)
-        actionButton.textColor = Tokens.Color.accent
-        actionButton.showsFillAtRest = true
         actionButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    static let height = Tokens.Space.x8 + Tokens.Space.x1
+    static let height = Tokens.Metric.toastHeight
 
     var fittingWidth: CGFloat {
-        Tokens.Space.x3 + (icon.image == nil ? 0 : Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth
-            + (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x3 + actionButton.fittingWidth + Tokens.Space.x2)
+        (icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth
+            + (actionButton.isHidden ? Tokens.Space.x4 : Tokens.Space.x3 + actionButton.fittingWidth + (Self.height - Tokens.Metric.toastButtonHeight) / 2)
     }
 
     /// The space around the text: the icon on the left, the action (or padding) on the right.
@@ -648,15 +657,15 @@ final class ToastView: FloatingPanelView {
     }
 
     private func layoutContent() {
-        var x = Tokens.Space.x3
+        var x = icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3
         if icon.image != nil {
             icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
             x = icon.frame.maxX + Tokens.Space.x2
         }
         let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
         if !actionButton.isHidden {
-            // Inset evenly from the toast's edge, top, bottom and right alike.
-            let h = Tokens.Space.x7Height
+            // Inset evenly from the toast's edge, top, bottom and right alike, so the pill runs with the capsule.
+            let h = Tokens.Metric.toastButtonHeight
             actionButton.frame = NSRect(x: bounds.width - (bounds.height - h) / 2 - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
         }
         let textWidth = bounds.width - chromeWidth
