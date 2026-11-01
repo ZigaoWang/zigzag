@@ -161,14 +161,20 @@ extension BrowserWindowController {
     /// Deletes a space; ⌘Z brings back the space, its bookmarks and its tabs, history and all.
     func removeSpaceWithUndo(_ id: UUID) {
         guard Library.shared.spaces.count > 1, let index = Library.shared.index(of: id), let space = Library.shared.space(id) else { return }
+        struct Closed {
+            weak var window: BrowserWindowController?
+            let isPrivate: Bool
+            let selected: UUID?
+            let tabs: [(id: UUID, url: URL?, title: String)]
+        }
         // The space's tabs in every window close first, as closed tabs, so ⌘Z can reopen each where it was.
         let closed = WindowManager.shared.controllers.map { window in
             let list = window.tabManager.tabs(in: id)
             let info = Dictionary(uniqueKeysWithValues: list.map { ($0.id, (url: $0.url, title: $0.displayTitle)) })
             let selected = window.tabManager.selectedTab(in: id)?.id
             let order = window.tabManager.close(list)
-            return (window: ObjectIdentifier(window), selected: selected,
-                    tabs: order.compactMap { tabID in info[tabID].map { (id: tabID, url: $0.url, title: $0.title) } })
+            return Closed(window: window, isPrivate: window.tabManager.isPrivate, selected: selected,
+                          tabs: order.compactMap { tabID in info[tabID].map { (id: tabID, url: $0.url, title: $0.title) } })
         }
         Library.shared.removeSpace(id)
         sidebarUndo.registerUndo(withTarget: self) { controller in
@@ -176,8 +182,15 @@ extension BrowserWindowController {
             Library.shared.insertSpace(space, at: index)
             var shown: Tab?
             for entry in closed {
-                // A window closed since: its tabs come back here.
-                let target = WindowManager.shared.controllers.first { ObjectIdentifier($0) == entry.window } ?? controller
+                // A window closed since: its tabs come back here, unless they were private.
+                let target: BrowserWindowController
+                if let window = entry.window, WindowManager.shared.controllers.contains(where: { $0 === window }) {
+                    target = window
+                } else if !entry.isPrivate {
+                    target = controller
+                } else {
+                    continue
+                }
                 for tab in entry.tabs.reversed() {
                     // Too long ago to still be among the closed tabs: back as a fresh one.
                     let reopened = target.tabManager.reopenClosedTab(tab.id, select: false)
