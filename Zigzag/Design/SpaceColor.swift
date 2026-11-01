@@ -37,7 +37,7 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .sky: 0.585
         case .sage: 0.29
         case .sand: 0.11
-        case .rose: 0.955
+        case .rose: 0.935
         case .lavender: 0.765
         case .mint: 0.46
         case .peach: 0.055
@@ -54,8 +54,10 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .ink: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x101011))
         default:
             let h = wheelHue ?? 0.6
-            return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: Tokens.Frame.lightness, chroma: Tokens.Frame.chroma),
-                                        dark: Self.tone(hue: h, lightness: Tokens.Frame.darkLightness, chroma: Tokens.Frame.darkChroma))
+            // Blue reads louder than the others at the same chroma on a screen: sky is a step dustier.
+            let k = self == .sky ? 0.78 : 1
+            return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: Tokens.Frame.lightness, chroma: Tokens.Frame.chroma * k),
+                                        dark: Self.tone(hue: h, lightness: Tokens.Frame.darkLightness, chroma: Tokens.Frame.darkChroma * k))
         }
     }
 
