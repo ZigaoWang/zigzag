@@ -1557,7 +1557,7 @@ final class SidebarListView: NSView {
                         neighbor = tab
                     case .bookmark(let id):
                         let at = neighbor.flatMap { n in tabs.firstIndex { $0 === n } }.map { after ? $0 + 1 : $0 } ?? tabs.count
-                        rows[.bookmark(id)] = nil
+                        rows.removeValue(forKey: .bookmark(id))?.removeFromSuperview()
                         delegate?.listUnbookmark(id, to: at)
                         let now = manager.tabs(in: space)
                         neighbor = now.indices.contains(at) ? now[at] : neighbor
