@@ -88,9 +88,6 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
     /// never below two fifths, so the space keeps its color all the way up.
     var coverage: CGFloat { CGFloat(1 - 0.6 * seeThrough) }
-    /// How much the frosting covers what's behind: always all of it. Anything thinner lets what's behind through
-    /// sharp, and its text then reads under the sidebar's own; see-through thins the color over the blur instead.
-    var frost: CGFloat { 1 }
 
     /// The window frame color for this space, solid.
     var background: NSColor {

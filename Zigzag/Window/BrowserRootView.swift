@@ -455,11 +455,10 @@ final class BrowserRootView: ColorView {
         return glass
     }()
 
-    /// `frost`: how much of the frosting covers what's behind, from 1 (all of it) down; the rest shows through
-    /// unblurred.
-    func setGlass(_ on: Bool, frost: CGFloat = 1) {
+    /// The frosting always covers all of what's behind: anything thinner lets it through sharp, and its text then
+    /// reads under the sidebar's own. See-through spaces thin their color over the blur instead.
+    func setGlass(_ on: Bool) {
         glassView.isHidden = !on
-        glassView.alphaValue = frost
         if on { glassView.frame = bounds }
     }
 
