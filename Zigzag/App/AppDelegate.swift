@@ -57,7 +57,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { WindowManager.shared.reopen() }
+        guard !flag else { return true }
+        // Only minimized: the window comes back (the last one you used first), rather than another opening beside it.
+        let windows = ([WindowManager.shared.keyController] + WindowManager.shared.controllers.reversed()).compactMap { $0?.window }
+        if let minimized = windows.first(where: \.isMiniaturized) {
+            minimized.deminiaturize(nil)
+        } else {
+            WindowManager.shared.reopen()
+        }
         return true
     }
 
