@@ -144,13 +144,17 @@ something came from, answers at once, and can be interrupted.
 
 ## Surfaces
 
-- **Window frame**: the space's color or gradient, its grain, optionally see-through. The sidebar and the gaps
-  around the page are the frame.
+- **Window frame**: the space's color or gradient, its grain, optionally see-through, under `FrameLight` (a soft
+  light from above, a fine top edge, the faintest grain). The sidebar and the gaps around the page are the frame.
 - **Sidebar**: on the frame. Top row: traffic lights, sidebar toggle, back, forward, reload (light, regular-weight
-  symbols). The address: a quiet pill (`Color.addressFill`, `row` text, compact buttons). Favorites: glass tiles. Then the space name
+  symbols in `Color.chromeIcon`, a small `GlassPlate` under the pointer). The address: a `GlassWell` pill (`row`
+  text, the host in `textPrimary`, compact buttons, a glowing ring from the keyboard). Favorites: `GlassPlate` tiles.
+  The tab you're on: a `.chosen` `GlassPlate`; a row under the pointer: a faint `GlassWell`. Then the space name
   as a quiet section label, pinned rows, the "Tabs" label with Clear, New Tab, tabs. The bottom bar: downloads,
   space dots, +.
-- **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window.
+- **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
+  meeting the window's edges, a sheet: `Radius.attached` (20) corners, a large faint shade on the frame by the
+  sidebar (`Material.pageAmbient`) and a light rim along that edge (`pageRim`).
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface`, `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
   quiet rows.
@@ -196,8 +200,9 @@ something came from, answers at once, and can be interrupted.
 
 ## Materials
 
-For brand moments (onboarding, Import, About) only, never for the browser's everyday chrome: things drawn as
-objects under one light straight above. `Materials.swift` holds them; every value is in `Tokens.Material`.
+Things drawn as objects under one light straight above. The tactile objects below (`RaisedTile`, `TactileButton`,
+`GlassSurface`) are for brand moments (onboarding, Import, About) only; the browser window takes the same light as
+glass, never plastic (`FrameLight`, `GlassPlate`, `GlassWell`; see "The window as glass"). `Materials.swift` holds them; every value is in `Tokens.Material`.
 
 - **Light**: highlights on top edges, shadows straight down, tinted with the navy (`Material.shadowInk`), deeper in
   dark mode (`darkShadowGain`). Every lifted thing has two shadows, a tight contact one and a soft ambient one
@@ -228,6 +233,15 @@ objects under one light straight above. `Materials.swift` holds them; every valu
   is, one quiet line (`largeText`, `textSecondary`), then the one big action.
 - **Recipes**: `MaterialShape.rounded` (continuous corners as a path), `GradientStroke` (rims, bevels, lips),
   `InnerShadow` (recesses), `MaterialMotion` (the ease-out, poses, tilt), `OcclusionPause`.
+
+### The window as glass
+
+Light, not paint: the chrome is see-through, so the space's color (or the desktop) shows through it. Edges carry
+the glass: a thin specular rim brightest along the top and fading down the sides (`Material.specular`), a faint
+refraction line inside the bottom edge (`refraction`), the faintest hairline (`glassHairline`). No bevels, no glossy
+bodies, no puffy shadows: under glass the shadow is large, soft and faint (`glassRest`, `glassLifted`). Glass rises
+`glassLift` (1pt) under the pointer and settles `glassSink` pressed. Rows at rest stay plain text; only the chosen
+row, a hovered row and the things you press take a material, and each draws its layers only once it's needed.
 
 Motion: the material ease-out (`Motion.easeOut`), no bounce, interruptible (each change starts where the last got
 to). A material object's hover moves (`settle`, 0.2) rather than appearing at once, because a thing is moving, not a
