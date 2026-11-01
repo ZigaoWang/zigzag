@@ -591,6 +591,25 @@ final class WordmarkView: NSView {
         return (width + strokeWeight) / (60 + strokeWeight)
     }
 
+    /// The same drawing as SVG, for Zigzag's HTML pages: one path per stroke, in `currentColor`, on a viewBox the
+    /// cap line plus stroke high. Generated from the letters above, so the page and the app can never differ.
+    static func svg(class name: String, label: String? = "Zigzag") -> String {
+        let height = 60 + strokeWeight, inset = strokeWeight / 2
+        var x = inset, paths: [String] = []
+        func n(_ v: CGFloat) -> String { String(format: "%.2f", v) }
+        for letter in letters {
+            for skeleton in letter.strokes {
+                let points = skeleton.map { "\(n(x + $0.x)),\(n(height - inset - $0.y))" }
+                paths.append("<path d=\"M\(points.joined(separator: " L"))\"/>")
+            }
+            x += letter.width + gap
+        }
+        let width = aspect * height
+        let a11y = label.map { "role=\"img\" aria-label=\"\($0)\"" } ?? "aria-hidden=\"true\""
+        return "<svg class=\"\(name)\" viewBox=\"0 0 \(n(width)) \(n(height))\" \(a11y)><g fill=\"none\" stroke=\"currentColor\" "
+            + "stroke-width=\"\(n(strokeWeight))\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\(paths.joined())</g></svg>"
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true

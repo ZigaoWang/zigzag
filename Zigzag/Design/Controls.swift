@@ -487,7 +487,23 @@ final class FilledField: NSView {
     /// The focus ring's color; nil takes its window's accent.
     var tint: NSColor? { didSet { updateColors() } }
 
-    init(placeholder: String, secure: Bool = false, font: NSFont = Tokens.Font.body()) {
+    /// A symbol before the text (the magnifying glass on a search field), or nil.
+    private let symbolView: NSImageView?
+
+    /// A search field, as every page and panel has it: the magnifying glass, then the text.
+    static func search(_ placeholder: String) -> FilledField {
+        let field = FilledField(placeholder: placeholder, symbol: "magnifyingglass")
+        field.field.setAccessibilityLabel(placeholder)
+        return field
+    }
+
+    init(placeholder: String, secure: Bool = false, font: NSFont = Tokens.Font.body(), symbol: String? = nil) {
+        symbolView = symbol.map { name in
+            let view = NSImageView(image: Tokens.Symbol.image(name, size: Tokens.TypeSize.small))
+            view.contentTintColor = Tokens.Color.textTertiary
+            view.imageScaling = .scaleNone
+            return view
+        }
         if secure {
             let secureField = NSSecureTextField()
             secureField.font = font
@@ -509,6 +525,7 @@ final class FilledField: NSView {
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1.5
         addSubview(field)
+        symbolView.map { addSubview($0) }
         NotificationCenter.default.addObserver(self, selector: #selector(editingChanged), name: NSControl.textDidBeginEditingNotification, object: field)
         NotificationCenter.default.addObserver(self, selector: #selector(editingChanged), name: NSControl.textDidEndEditingNotification, object: field)
         updateColors()
@@ -537,7 +554,13 @@ final class FilledField: NSView {
     override func layout() {
         super.layout()
         let h = ceil(field.intrinsicContentSize.height)
-        field.frame = NSRect(x: Tokens.Space.x2 + 2, y: round((bounds.height - h) / 2), width: bounds.width - Tokens.Space.x5, height: h)
+        var x = Tokens.Space.x2 + 2
+        if let symbolView {
+            let side = Tokens.Space.x4
+            symbolView.frame = NSRect(x: Tokens.Space.x2, y: round((bounds.height - side) / 2), width: side, height: side)
+            x = symbolView.frame.maxX + Tokens.Space.x1
+        }
+        field.frame = NSRect(x: x, y: round((bounds.height - h) / 2), width: bounds.width - x - Tokens.Space.x3, height: h)
     }
 }
 

@@ -80,12 +80,45 @@ enum Tokens {
         static let deskCardMaxWidth: CGFloat = 440
     }
 
+    // MARK: - Pages
+
+    /// Zigzag's built-in pages (History, Settings) and, from here on, its other surfaces: one plain surface, the
+    /// small wordmark and a semibold title at the top left, the search field and actions at the top right, quiet
+    /// rows under it. History's CSS is generated from these values (`PageStyle`), so the two never drift.
+    enum Page {
+        /// The page's edge to its content, and to the header's wordmark.
+        static let gutter: CGFloat = Space.x6 + Space.x1
+        /// The same, when the page is narrow (half of a split, a small window).
+        static let narrowGutter: CGFloat = Space.x4
+        /// Narrower than this, a page uses `narrowGutter`.
+        static let narrowWidth: CGFloat = 640
+        /// The header: its top and bottom padding, and the height of what's in it (title, search, buttons).
+        static let headerTop: CGFloat = Space.x4
+        static let headerBottom: CGFloat = Space.x3
+        static let controlHeight: CGFloat = Space.x7Height
+        static var headerHeight: CGFloat { headerTop + controlHeight + headerBottom }
+        /// The widest the content gets; past it the page centers it.
+        static let maxWidth: CGFloat = 880
+        /// A row in a list: History's pages, Settings' sections.
+        static let rowHeight: CGFloat = Metric.rowHeight
+        /// How far a row's hover fill reaches past its text, on each side.
+        static let rowInset: CGFloat = Space.x2
+        /// The wordmark in the header: about the title's cap height, so the two read as one line.
+        static let wordmarkHeight: CGFloat = 11
+        /// The search field in the header.
+        static let searchWidth: CGFloat = 260
+        /// A column of sections at the left (Settings).
+        static let columnWidth: CGFloat = 232
+    }
+
     // MARK: - Type (SF Pro, three sizes for text, plus the display heading and the badge)
 
     enum TypeSize {
         static let small: CGFloat = 11
         static let body: CGFloat = 13
         static let large: CGFloat = 18
+        /// A page's or panel's own title, in semibold: History, Settings, a section of Settings.
+        static let heading: CGFloat = 15
         /// Display headings in heavy type (`Brand.display`): a window's or a card's one big line.
         static let title: CGFloat = 22
         /// The count on an extension's button: the one place text has to fit a 10pt capsule.
@@ -96,6 +129,7 @@ enum Tokens {
         static func small(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.small, weight: weight) }
         static func body(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.body, weight: weight) }
         static func large(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.large, weight: weight) }
+        static func heading(_ weight: NSFont.Weight = .semibold) -> NSFont { .systemFont(ofSize: TypeSize.heading, weight: weight) }
     }
 
     // MARK: - Symbols (one weight everywhere)
@@ -423,6 +457,14 @@ enum Tokens {
         @MainActor static var accent: NSColor { Brand.Theme.current.accent }
         /// Counts on extension buttons: quiet, never competing with the page.
         static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
+
+        /// A page's one surface (History, Settings), the same as the page card's.
+        static let surface = cardBackground
+        /// A group of rows on the surface, and its hairline edge.
+        static let surfaceGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
+        static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06))
+        /// Something chosen in a list (a section, a row reached with the keyboard), drawn in the accent at this opacity.
+        static let selectionAlpha: CGFloat = 0.14
 
         /// Settings: the window behind grouped rows, and the groups themselves (System Settings proportions).
         static let formBackground = dynamic(light: hex(0xF2F2F4), dark: hex(0x1E1E20))

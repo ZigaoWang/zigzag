@@ -172,34 +172,20 @@ enum HistoryPage {
 
     // MARK: The page
 
-    /// The space's accent, as the page's CSS color, for light and dark.
-    private static func accents(for webView: WKWebView) -> (light: String, dark: String) {
+    /// The space this page is in, for its accent and the wordmark's color.
+    private static func theme(for webView: WKWebView) -> Brand.Theme {
         let controller = WindowManager.shared.controllers.first { $0.window === webView.window } ?? WindowManager.shared.keyController
-        let theme = controller.map { Brand.Theme.of($0.tabManager.currentSpace) } ?? .brand
-        func css(_ color: NSColor, _ name: NSAppearance.Name) -> String {
-            var out = "#3366cc"
-            NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
-                if let c = color.usingColorSpace(.sRGB) {
-                    out = String(format: "#%02x%02x%02x", Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255))
-                }
-            }
-            return out
-        }
-        return (css(theme.accent, .aqua), css(theme.accent, .darkAqua))
+        return controller.map { Brand.Theme.of($0.tabManager.currentSpace) } ?? .brand
     }
 
     static func html(for webView: WKWebView) -> String {
-        let accent = accents(for: webView)
-        return template
-            .replacingOccurrences(of: "%ACCENT_LIGHT%", with: accent.light)
-            .replacingOccurrences(of: "%ACCENT_DARK%", with: accent.dark)
-            .replacingOccurrences(of: "%MARK%", with: mark)
+        template
+            .replacingOccurrences(of: "%STYLE%", with: PageStyle.css(theme: theme(for: webView)))
+            .replacingOccurrences(of: "%TITLE%", with: PageStyle.title("History"))
+            .replacingOccurrences(of: "%SEARCH%", with: PageStyle.search(id: "query", placeholder: "Search history"))
+            .replacingOccurrences(of: "%MARK%", with: WordmarkView.svg(class: "mark", label: nil))
             .replacingOccurrences(of: "%GLOBE%", with: globe?.base64EncodedString() ?? "")
     }
-
-    private static let mark = #"""
-<svg class="mark" viewBox="0 0 372 73" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path d="M6.50,6.50 L56.50,6.50 L11.12,36.50 L51.88,36.50 L6.50,66.50 L56.50,66.50"/><path d="M77.50,66.50 L77.50,6.50"/><path d="M145.62,13.38 L142.35,11.03 L138.79,9.13 L135.00,7.73 L131.07,6.85 L127.05,6.50 L123.02,6.70 L119.05,7.44 L115.22,8.70 L111.59,10.47 L108.23,12.70 L105.20,15.37 L102.56,18.42 L100.35,21.79 L98.61,25.44 L97.38,29.28 L96.68,33.25 L96.51,37.28 L96.89,41.30 L97.80,45.23 L99.23,49.00 L101.15,52.55 L103.54,55.80 L106.33,58.71 L109.50,61.22 L112.97,63.27 L116.68,64.85 L120.57,65.91 L124.57,66.44 L128.61,66.43 L132.60,65.87 L136.49,64.79 L140.20,63.19 L143.65,61.11 L146.80,58.59 L149.58,55.66 L151.94,52.39 L153.85,48.84 L155.25,45.05 L156.14,41.12 L156.49,37.10 L156.50,36.50 L135.50,36.50"/><path d="M170.50,6.50 L220.50,6.50 L175.12,36.50 L215.88,36.50 L170.50,66.50 L220.50,66.50"/><path d="M237.50,66.50 L263.50,6.50 L289.50,66.50"/><path d="M249.50,46.50 L277.50,46.50"/><path d="M352.62,13.38 L349.35,11.03 L345.79,9.13 L342.00,7.73 L338.07,6.85 L334.05,6.50 L330.02,6.70 L326.05,7.44 L322.22,8.70 L318.59,10.47 L315.23,12.70 L312.20,15.37 L309.56,18.42 L307.35,21.79 L305.61,25.44 L304.38,29.28 L303.68,33.25 L303.51,37.28 L303.89,41.30 L304.80,45.23 L306.23,49.00 L308.15,52.55 L310.54,55.80 L313.33,58.71 L316.50,61.22 L319.97,63.27 L323.68,64.85 L327.57,65.91 L331.57,66.44 L335.61,66.43 L339.60,65.87 L343.49,64.79 L347.20,63.19 L350.65,61.11 L353.80,58.59 L356.58,55.66 L358.94,52.39 L360.85,48.84 L362.25,45.05 L363.14,41.12 L363.49,37.10 L363.50,36.50 L342.50,36.50"/></g></svg>
-"""#
 
     private static let template = #"""
 <!doctype html>
@@ -209,77 +195,46 @@ enum HistoryPage {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>History</title>
 <style>
-:root {
-  color-scheme: light dark;
-  --accent: %ACCENT_LIGHT%;
-  --bg: #ffffff; --text: rgba(0,0,0,.86); --muted: rgba(0,0,0,.54); --faint: rgba(0,0,0,.36);
-  --hover: rgba(0,0,0,.045); --field: rgba(0,0,0,.05); --line: rgba(0,0,0,.08);
-  --gutter: 28px;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --accent: %ACCENT_DARK%; --bg: #1e1e20; --text: rgba(255,255,255,.92); --muted: rgba(255,255,255,.56);
-          --faint: rgba(255,255,255,.36); --hover: rgba(255,255,255,.06); --field: rgba(255,255,255,.07); --line: rgba(255,255,255,.08); }
-}
-/* A split pane or a small window: tighter edges, and the address column steps aside for the title. */
-@media (max-width: 640px) { :root { --gutter: 16px; } }
-* { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
-             -webkit-font-smoothing: antialiased; -webkit-user-select: none; cursor: default; }
-::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
-button { appearance: none; border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: default; }
-:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
-
-/* The toolbar stays put while the sessions scroll under it, like a window's own. */
-header { position: sticky; top: 0; z-index: 4; background: var(--bg); display: flex; flex-wrap: wrap; align-items: center;
-         gap: 8px 12px; padding: 16px var(--gutter) 12px; box-shadow: 0 1px 0 transparent; transition: box-shadow .15s; }
-header.scrolled { box-shadow: 0 1px 0 var(--line); }
-h1 { font-size: 15px; font-weight: 600; margin: 0 auto 0 0; }
-.search { display: flex; align-items: center; gap: 6px; background: var(--field); border-radius: 8px; padding: 0 8px; height: 28px;
-          width: clamp(220px, 36vw, 420px); }
-.search svg { flex: none; opacity: .45; }
-.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent);
-                -webkit-user-select: text; }
-.search input::-webkit-search-cancel-button { display: none; }
-@media (max-width: 520px) { .search { order: 3; width: 100%; } }
+%STYLE%
+/* History's own: sessions of pages, in one grid, under the shared header. */
+main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .clear { position: relative; }
-.clear > button { color: var(--muted); padding: 4px 8px; border-radius: 6px; }
-.clear > button:hover { background: var(--hover); color: var(--text); }
-.menu { position: absolute; right: 0; top: calc(100% + 4px); background: var(--bg); border-radius: 8px; padding: 4px; min-width: 200px;
-        box-shadow: 0 0 0 .5px var(--line), 0 8px 24px rgba(0,0,0,.16); display: none; z-index: 5; }
-.menu.open { display: block; }
-.menu button { display: block; width: 100%; text-align: left; padding: 4px 9px; border-radius: 5px; }
-.menu button:hover { background: var(--accent); color: #fff; }
 
-#list { padding: 4px calc(var(--gutter) - 8px) 48px; }
+#list { padding: 4px calc(var(--gutter) - var(--row-inset)) 48px; }
 /* A session: one sitting, from the first page to a break. Its heading stays in view while its pages scroll. */
 .session { margin-bottom: 16px; }
 .session + .session { border-top: 1px solid var(--line); padding-top: 8px; }
 .session-head { position: sticky; top: var(--header, 56px); z-index: 2; background: var(--bg); display: flex; align-items: baseline;
-                gap: 8px; padding: 8px 8px 6px; }
-.session-head h2 { font-size: 13px; font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                gap: 8px; padding: 8px var(--row-inset) 6px; }
+.session-head h2 { font-size: var(--body); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-head .range { color: var(--muted); white-space: nowrap; }
-.session-head .count { margin-left: auto; color: var(--faint); font-size: 11px; white-space: nowrap; }
-.session-head .remove { flex: none; align-self: center; width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 20px; }
+.session-head .count { margin-left: auto; color: var(--faint); font-size: var(--small); white-space: nowrap; }
+.remove { flex: none; width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
+.remove:hover { background: var(--hover); color: var(--text); }
+.remove:active { background: var(--pressed); }
+.session-head .remove { align-self: center; }
 .session-head:not(:hover):not(:focus-within) .remove { opacity: 0; }
-.session-head .remove:hover { background: var(--field); color: var(--text); }
 @media (max-width: 520px) { .session-head .count { display: none; } .session-head .remove { margin-left: auto; } }
 
 /* One grid for every row, so titles, addresses and times line up down the whole page at any width:
    disclosure, icon, title, address, time, remove. */
 .row { display: grid; grid-template-columns: 12px 16px minmax(0, 1fr) minmax(0, 34%) 120px 20px; align-items: center; column-gap: 10px;
-       min-height: 30px; padding: 0 8px; border-radius: 6px; color: inherit; text-decoration: none; width: 100%; text-align: left; }
+       min-height: var(--row); padding: 0 var(--row-inset); border-radius: var(--radius-row); color: inherit; text-decoration: none;
+       width: 100%; text-align: left; }
 .row:hover { background: var(--hover); }
+.row:active { background: var(--pressed); }
+/* Reached with the keyboard: chosen, as a section is in Settings. */
+.row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
 .row img, .row .dot { grid-column: 2; width: 16px; height: 16px; border-radius: 3px; }
 .row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 15px no-repeat; }
 /* Dark: icons drawn in black (GitHub, Wikipedia) sit on a light tile, as in the sidebar. */
 @media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; border-radius: 4px; } }
 .row .title { grid-column: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .where { grid-column: 4; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row time { grid-column: 5; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.row .remove { grid-column: 6; width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
+.row time { grid-column: 5; color: var(--faint); font-size: var(--small); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.row .remove { grid-column: 6; }
 /* Out of sight until the pointer or keyboard focus reaches the row, but still in the Tab order. */
 .row:not(:hover):not(:focus-within) .remove { opacity: 0; }
-.row .remove:hover { background: var(--field); color: var(--text); }
 @media (max-width: 640px) {
   .row { grid-template-columns: 12px 16px minmax(0, 1fr) auto 20px; }
   .row .where { display: none; }
@@ -296,31 +251,28 @@ h1 { font-size: 15px; font-weight: 600; margin: 0 auto 0 0; }
 .pages .more { display: block; color: var(--accent); padding: 6px 8px 6px 82px; font-size: 12px; }
 .pages .more:hover { text-decoration: underline; }
 @media (max-width: 640px) { .pages .row { grid-template-columns: 38px 16px minmax(0, 1fr) auto 20px; } }
-@media (prefers-reduced-motion: reduce) { .chevron, header { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .chevron, .page-header { transition: none; } }
 
 .empty { text-align: center; padding: 96px 0; color: var(--muted); }
 .empty svg { width: 120px; height: auto; color: var(--text); opacity: .08; display: block; margin: 0 auto 16px; }
-.empty svg path { stroke: currentColor; }
 #more { height: 1px; }
 </style>
 </head>
 <body>
-<header id="bar">
-  <h1>History</h1>
-  <label class="search">
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-    <input id="query" type="search" placeholder="Search history" autocomplete="off" autofocus>
-  </label>
+<header class="page-header" id="bar"><div class="inner">
+  %TITLE%
+  %SEARCH%
   <div class="clear">
-    <button id="clearButton" aria-haspopup="menu">Clear History…</button>
-    <div class="menu" id="clearMenu" role="menu">
-      <button data-range="hour">The Last Hour</button>
-      <button data-range="today">Today</button>
-      <button data-range="yesterday">Today and Yesterday</button>
-      <button data-range="all">All History</button>
+    <button class="button" id="clearButton" aria-haspopup="menu" aria-expanded="false" aria-controls="clearMenu">Clear History…</button>
+    <div class="menu" id="clearMenu" role="menu" aria-label="Clear History">
+      <button role="menuitem" data-range="hour">The Last Hour</button>
+      <button role="menuitem" data-range="today">Today</button>
+      <button role="menuitem" data-range="yesterday">Today and Yesterday</button>
+      <hr role="separator">
+      <button role="menuitem" class="destructive" data-range="all">All History</button>
     </div>
   </div>
-</header>
+</div></header>
 <main>
   <div id="list"></div>
   <div class="empty" id="empty" hidden>%MARK%<div id="emptyText"></div></div>
@@ -377,7 +329,14 @@ function clusterElement(cluster, session) {
   head.append(chevron, icon(cluster.items[0].url), el('span', 'title', cluster.host), el('span', 'where', count + ' pages'),
               el('time', null, span(cluster.items)),
               removeButton('Remove ' + count + ' Pages from History', () => forget(cluster.items.map((i) => i.url), session)));
-  head.onclick = () => { cluster.open = !cluster.open; box.replaceWith(clusterElement(cluster, session)); };
+  head.onclick = () => {
+    // Opened or closed from the keyboard, the new heading keeps the focus, so the arrows carry on from it.
+    const focused = document.activeElement === head;
+    cluster.open = !cluster.open;
+    const fresh = clusterElement(cluster, session);
+    box.replaceWith(fresh);
+    if (focused) fresh.firstChild.focus();
+  };
   box.append(head);
   if (cluster.open) {
     // A long afternoon on one site can be hundreds of pages: draw them a hundred at a time.
@@ -472,12 +431,45 @@ query.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && query.value) { query.value = ''; query.dispatchEvent(new Event('input')); e.preventDefault(); }
 });
 
+// The arrow keys walk the rows, from the search field down and back up to it.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  if (menu.classList.contains('open')) return;
+  const rows = [...list.querySelectorAll('.row')];
+  const at = rows.indexOf(document.activeElement);
+  if (document.activeElement === query && e.key === 'ArrowDown' && rows.length) { rows[0].focus(); e.preventDefault(); return; }
+  if (at < 0) return;
+  e.preventDefault();
+  if (e.key === 'ArrowDown') rows[Math.min(at + 1, rows.length - 1)].focus();
+  else if (at === 0) query.focus(); else rows[at - 1].focus();
+});
+
+// Clear History…: a menu as Zigzag's panels draw it, opened by click, Return or the arrow keys, walked with the arrows.
 const menu = document.getElementById('clearMenu');
-document.getElementById('clearButton').onclick = (e) => { e.stopPropagation(); menu.classList.toggle('open'); };
-document.addEventListener('click', () => menu.classList.remove('open'));
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menu.classList.remove('open'); });
-menu.querySelectorAll('button').forEach((b) => b.onclick = async (e) => {
-  e.stopPropagation(); menu.classList.remove('open');
+const clearButton = document.getElementById('clearButton');
+const items = [...menu.querySelectorAll('[role="menuitem"]')];
+const setMenu = (open, focusFirst) => {
+  menu.classList.toggle('open', open);
+  clearButton.setAttribute('aria-expanded', open);
+  if (open && focusFirst) items[0].focus();
+};
+clearButton.onclick = (e) => { e.stopPropagation(); setMenu(!menu.classList.contains('open'), e.detail === 0); };
+clearButton.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setMenu(true, true); } });
+menu.addEventListener('keydown', (e) => {
+  const at = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') { e.preventDefault(); items[(at + 1) % items.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); items[(at - 1 + items.length) % items.length].focus(); }
+  else if (e.key === 'Tab') setMenu(false);
+});
+document.addEventListener('click', () => setMenu(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !menu.classList.contains('open')) return;
+  const inside = menu.contains(document.activeElement);
+  setMenu(false);
+  if (inside) clearButton.focus();
+});
+items.forEach((b) => b.onclick = async (e) => {
+  e.stopPropagation(); setMenu(false);
   if (await ask({ action: 'clear', range: b.dataset.range })) { searching = ''; query.value = ''; await reload(); }
 });
 
