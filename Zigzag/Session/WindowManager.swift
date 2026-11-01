@@ -70,9 +70,10 @@ final class WindowManager {
     func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false) -> BrowserWindowController {
         let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate)
         var frame: NSRect?
-        if let key = keyController?.window {
-            // Cascade from the current window, like every Mac app.
-            frame = key.frame.offsetBy(dx: Tokens.Space.x6, dy: -Tokens.Space.x6)
+        if let key = keyController, let window = key.window {
+            // Cascade from the current window, like every Mac app. From full screen, from where it was before.
+            let fullScreen = window.styleMask.contains(.fullScreen)
+            frame = (fullScreen ? key.windowedFrame : window.frame)?.offsetBy(dx: Tokens.Space.x6, dy: -Tokens.Space.x6)
         }
         let controller = makeController(manager: manager, frame: frame, sidebarVisible: keyController?.root.sidebarVisible ?? true,
                                         sidebarWidth: keyController?.root.sidebarWidth ?? Tokens.Metric.sidebarWidth)
