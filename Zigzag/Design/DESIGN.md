@@ -54,8 +54,9 @@ night (`SpaceColor`, `Tokens.Frame`).
   a thinner coat of the color), and grain.
 - **Ink**: on the frame, row titles and quiet words take the space's own ink (`Theme.rowInk`, `quietInk`), a deep or
   pale tone of its hue, checked against every curated color under the hover and card washes: titles at least 11.7:1
-  by day and 7.5:1 at night, quiet words 5.2:1 and 4.8:1. On frames where that can't be promised (see-through, or a
-  custom shade in the middle of the scale) they fall back to the plain near-black and near-white.
+  by day and 7.5:1 at night, quiet words 5.2:1 and 4.8:1. Each space's inks are checked against its own frame (both
+  ends of a gradient, bare and under the washes) in each mode, and only a mode that would miss AA falls back to the
+  plain near-black or near-white. See-through frames, over a desktop no one can know, always take the plain ones.
 - **Switching spaces** cross-fades the frame's color (`Motion.standard`, eased out); from the keyboard too, since the
   layout of the window should move so you see where you went.
 - Everything on the frame derives from the color (`Tokens.Chrome`): washes of white over it, so in any space, on a
@@ -233,7 +234,15 @@ something came from, answers at once, and can be interrupted.
 - Light and dark cross-fade with the space's color when a space changes the window's mode: one fade, no flicker.
 - A closed tab's row folds away: it takes no more clicks, and its height closes as it fades, in step with the rows
   below gliding up.
-- Reduce Motion: nothing slides or scales; things fade or simply appear.
+- Reduce Motion: nothing slides, scales or travels; fades and color changes still play (`Motion.animate(moves:)`),
+  and a space switch cross-fades the list in place instead of sliding it.
+- Arrivals and departures in lists: a new tab's row opens its height from nothing as it fades in; a closed one folds
+  away. Favorites keep their tiles by id and glide to new places; a new one fades in, a removed one fades out.
+  A favicon that swaps for another cross-fades (`selection`). A split opens at `standard`, a closed pane fades where it
+  was as the other grows over it, and double-clicking the divider glides the panes back to even.
+- The one movement past `large`: a download thrown into its button, `Motion.flight` (0.45s), eased out along its arc.
+- Moves whose completion must land on time (the Desk's zoom) use `Motion.easeAnimation`, not a spring, which settles
+  well after it looks done.
 
 ## Surfaces
 
@@ -253,6 +262,8 @@ something came from, answers at once, and can be interrupted.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
+- **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
+  to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
   Passwords in a light tint of their window's space, `Brand.Theme.for(view).wash`), `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
