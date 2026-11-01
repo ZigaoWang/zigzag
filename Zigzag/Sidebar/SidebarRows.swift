@@ -46,6 +46,7 @@ class SidebarRowView: InteractiveView {
         let titleHeight = ceil(title.intrinsicContentSize.height)
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
         title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
+        if layer?.sublayers?.contains(where: { $0.name == "rim" && !$0.isHidden }) == true { setCardRim(true) }
     }
 
     override func stateDidChange(animated: Bool) {
@@ -74,6 +75,7 @@ class SidebarRowView: InteractiveView {
                 layer?.borderColor = cgColor(Tokens.Chrome.cardEdge)
                 setCardShadow(showsCard)
             }
+            setCardRim(showsCard)
         }
         applyFreshness()
     }
@@ -114,6 +116,7 @@ final class SelectionCardView: NSView {
             layer?.borderColor = cgColor(Tokens.Chrome.cardEdge)
             setCardShadow(true)
         }
+        setCardRim(true)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -476,10 +479,10 @@ final class NewTabRowView: SidebarRowView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        title.stringValue = "New Tab"
+        title.stringValue = "new tab"
         title.textColor = Tokens.Color.textSecondary
         icon.isHidden = true
-        plus.image = Tokens.Symbol.image("plus", size: Tokens.Symbol.row)
+        plus.image = LineGlyph.plus
         plus.contentTintColor = Tokens.Color.textSecondary
         plus.imageScaling = .scaleNone
         addSubview(plus)
@@ -612,6 +615,15 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
+    /// The space's name, set large, light and lowercase, a little tight, in the space's own ink.
+    var name = "" {
+        didSet {
+            guard name != oldValue else { return }
+            label.stringValue = name.lowercased()
+            stateDidChange(animated: false)
+            needsLayout = true
+        }
+    }
     private let chevron = NSImageView()
     private let iconView = NSImageView()
     /// The space's icon, before its name. Nil: the name alone.
@@ -648,7 +660,10 @@ final class SpaceHeaderView: InteractiveView {
         super.layout()
         let h = label.lineHeight
         // In the rows' text column, its icon (if any) in their icon column.
-        let x = SidebarRowView.textX - Label.inset
+        // Large, it stands flush with the icons' edge, the way a heading does; with an icon of its own, beside it.
+        // At 26pt the first letter's own side bearing sets its ink a point in: pulled back so the ink, not the box,
+        // meets the icons' edge.
+        let x = icon == nil ? SidebarRowView.inset - Label.inset - Tokens.Sidebar.spaceNameBearing : SidebarRowView.textX - Label.inset
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
         let y = isFlipped ? bounds.height - h - pad : pad
@@ -667,8 +682,12 @@ final class SpaceHeaderView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The name in light type, quietly darker under the pointer; its icon a step back from it.
-        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textPrimary.withAlphaComponent(0.78)
+        // The name in light type and the space's own ink, quietly fuller under the pointer; its icon a step back.
+        let ink = Brand.Theme.for(self).ink
+        label.attributedStringValue = NSAttributedString(string: label.stringValue, attributes: [
+            .font: Tokens.Font.spaceName(), .kern: Tokens.Sidebar.spaceNameKern,
+            .foregroundColor: isHovered ? ink : ink.withAlphaComponent(0.86),
+        ])
         iconView.contentTintColor = Tokens.Color.textSecondary
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.Symbol.inline)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
@@ -688,7 +707,7 @@ final class SpaceHeaderView: InteractiveView {
 /// as in Arc: on a line of its own, apart from New Tab and the pinned tabs it leaves alone, and only while the
 /// pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
-    private let label = Label("Tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    private let label = Label("tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
@@ -805,7 +824,7 @@ final class InsertionLineView: NSView {
 final class ClearTabsButton: InteractiveView {
     /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
     private let arrow = NSImageView()
-    private let label = Label("Clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    private let label = Label("clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     private static let arrowSide: CGFloat = 10
 
     override init(frame: NSRect) {
@@ -827,10 +846,10 @@ final class ClearTabsButton: InteractiveView {
         didSet {
             switch step {
             case .old(let n):
-                label.stringValue = "Clear old"
+                label.stringValue = "clear old"
                 toolTip = n == 1 ? "Close the tab you haven’t used in a while" : "Close the \(n) tabs you haven’t used in a while"
             case .others(let n):
-                label.stringValue = "Clear"
+                label.stringValue = "clear"
                 toolTip = n == 1 ? "Close the other tab" : "Close the other \(n) tabs"
             }
             setAccessibilityLabel(toolTip)

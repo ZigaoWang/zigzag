@@ -417,6 +417,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderColor = cgColor(isSelected ? Tokens.Chrome.cardEdge : Tokens.Chrome.openEdge)
             setCardShadow(isSelected)
         }
+        setCardRim(isSelected)
     }
 
     private static let iconSide = Tokens.Sidebar.favoriteIcon
