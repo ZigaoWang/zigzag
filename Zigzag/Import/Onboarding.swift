@@ -35,6 +35,30 @@ final class OnboardingView: NSView {
     override var isFlipped: Bool { true }
 
     private var shell: StepPage?
+    private var keyMonitor: Any?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+        guard window != nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKey(event) == true ? nil : event
+        }
+    }
+
+    /// Return presses Get Started or Continue, and Esc goes Back where there's a Back. Not while you type in a
+    /// field or an input method is mid-word, nor from a control you've tabbed to, which presses itself.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard let window, event.window === window, event.modifierFlags.intersection([.command, .option, .control]).isEmpty else { return false }
+        let responder = window.firstResponder
+        if responder is NSText || responder is InteractiveView || (responder as? NSTextInputClient)?.hasMarkedText() == true { return false }
+        switch event.keyCode {
+        case 36, 76: return (page as? HelloPage)?.pressStart() ?? shell?.pressNext() ?? false
+        case 53: return shell?.pressBack() ?? false
+        default: return false
+        }
+    }
 
     func show(_ next: Step, animated: Bool) {
         let forward = next.rawValue >= step.rawValue
@@ -248,6 +272,10 @@ private final class StepPage: NSView {
         for view in [old.title, old.body, old.content] { Motion.fade(view, from: 1, to: 0, duration: 0.15, remove: true) }
         for view in [title, body, newContent] as [NSView] { Motion.fade(view, from: 0, to: 1, duration: 0.25, delay: 0.1) }
     }
+
+    /// Return and Esc: the main button, and Back, as a click on them would.
+    func pressNext() -> Bool { next.accessibilityPerformPress() }
+    func pressBack() -> Bool { back.accessibilityPerformPress() }
 
     /// Arriving from the welcome: everything fades in together.
     func rise() {
@@ -476,6 +504,9 @@ private final class HelloPage: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    /// Return: as a click on Get Started.
+    func pressStart() -> Bool { start.accessibilityPerformPress() }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
