@@ -66,9 +66,14 @@ final class Atmosphere: NSView {
 
     // MARK: Colors
 
-    private struct Palette { var top: NSColor; var bottom: NSColor; var fields: [NSColor] }
+    /// A wash from top to bottom and the four fields' colors.
+    struct Palette { var top: NSColor; var bottom: NSColor; var fields: [NSColor] }
+
+    /// A palette of its own in place of the hue's (a sky), for light and for dark.
+    var customPalette: ((_ dark: Bool) -> Palette)? { didSet { applyColors(animated: false) } }
 
     private func palette(dark: Bool) -> Palette {
+        if let customPalette { return customPalette(dark) }
         func hsb(_ h: Double, _ s: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> NSColor {
             NSColor(calibratedHue: CGFloat((h + 1).truncatingRemainder(dividingBy: 1)), saturation: s, brightness: b, alpha: a)
         }
