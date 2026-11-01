@@ -226,7 +226,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let username = result?["username"] as? String
             do {
                 try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password)
-                if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key.fill", duration: 2, in: controller) }
+                if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key", duration: 2, in: controller) }
             } catch {
                 if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
             }
@@ -586,7 +586,7 @@ private final class AutofillRow: InteractiveView {
             name = Label(login.username.isEmpty ? "No username" : login.username, font: Tokens.Font.body(.medium),
                          color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
             detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-            icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill")
+            icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key")
             icon.contentTintColor = Tokens.Color.textSecondary
         case .importFrom(let browser):
             name = Label("Bring your passwords from \(browser)", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)

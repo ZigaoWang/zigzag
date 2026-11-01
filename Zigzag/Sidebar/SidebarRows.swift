@@ -843,13 +843,12 @@ final class ClearTabsButton: InteractiveView {
     /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
     private let arrow = NSImageView()
     private let label = Label("clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
-    private static let arrowSide: CGFloat = 10
+    private static let arrowSide: CGFloat = Tokens.Symbol.inline
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         layer?.cornerCurve = .continuous
-        arrow.image = NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: Tokens.TypeSize.small - 2, weight: .semibold))
+        arrow.image = Tokens.Symbol.image("arrow.down", size: Tokens.Symbol.inline)
         arrow.imageScaling = .scaleNone
         [arrow, label].forEach { addSubview($0) }
         setAccessibilityRole(.button)

@@ -86,14 +86,14 @@ final class EnergyWatch {
         // An extension's own page: name the extension, and offer to close the page.
         if url.scheme == "webkit-extension", #available(macOS 15.4, *) {
             let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName ?? "An extension"
-            Toast.show("\(name)’s page is using a lot of energy", symbol: "bolt.fill",
+            Toast.show("\(name)’s page is using a lot of energy", symbol: "bolt",
                        action: ("Close Tab", { [weak controller, weak tab] in
                            guard let controller, let tab else { return }
                            controller.closeWithUndo(tab)
                        }), duration: 15, in: controller)
             return
         }
-        Toast.show("A tab on \(site) is using a lot of energy in the background", symbol: "bolt.fill",
+        Toast.show("A tab on \(site) is using a lot of energy in the background", symbol: "bolt",
                    action: ("Close Tab", { [weak controller, weak tab] in
                        guard let controller, let tab else { return }
                        controller.closeWithUndo(tab)

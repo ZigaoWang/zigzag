@@ -53,7 +53,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         siteLabel.lineBreakMode = .byTruncatingMiddle
         siteLabel.toolTip = origin.displayName
         let site = URL(string: "\(origin.scheme)://\(origin.host)")
-        icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key.fill", size: Tokens.Symbol.row)
+        icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key", size: Tokens.Symbol.row)
         usernameBox.wantsLayer = true
         usernameBox.layer?.cornerRadius = Tokens.Radius.field
         usernameBox.layer?.cornerCurve = .continuous
@@ -101,7 +101,7 @@ final class SavePasswordPrompt: FloatingPanelView {
                         try await store.update(credential, password: password)
                         done = "Password updated"
                     }
-                    Toast.show(done, symbol: "key.fill", duration: 1.6, in: controller)
+                    Toast.show(done, symbol: "key", duration: 1.6, in: controller)
                 } catch {
                     Toast.show("Couldn’t save the password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }

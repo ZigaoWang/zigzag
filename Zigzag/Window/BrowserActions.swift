@@ -321,7 +321,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             Toast.show("Unpinned", symbol: "pin.slash", in: self)
         } else {
             bookmarkWithUndo(tab, at: nil, in: tab.spaceID)
-            Toast.show("Pinned", symbol: "pin.fill", in: self)
+            Toast.show("Pinned", symbol: "pin", in: self)
         }
     }
 

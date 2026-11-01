@@ -122,7 +122,7 @@ enum CommandRanker {
         Action(id: "clear-cache", title: "Clear Cache…", keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
         Action(id: "clear-cookies", title: "Clear Cookies…", keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
         Action(id: "settings", title: "Settings", keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
-        Action(id: "passwords", title: "Passwords", keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key.fill"),
+        Action(id: "passwords", title: "Passwords", keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key"),
         Action(id: "import", title: "Import from Another Browser…", keywords: ["import", "bring", "move", "switch", "passwords", "bookmarks", "arc", "chrome", "safari", "firefox"], symbol: "square.and.arrow.down"),
         Action(id: "feedback", title: "Send Feedback…", keywords: ["feedback", "send", "report", "bug", "issue", "problem", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
     ]

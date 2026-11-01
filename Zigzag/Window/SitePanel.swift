@@ -66,7 +66,7 @@ final class SitePanel: FloatingPanelView {
             securityIcon.contentTintColor = Tokens.Color.textSecondary
         } else {
             security.stringValue = secure ? "Secure connection" : page.scheme == "https" ? "Some content isn’t secure" : Self.notSecure
-            securityIcon.image = Tokens.Symbol.image(secure ? "lock.fill" : Self.notSecureSymbol, size: Tokens.Symbol.inline)
+            securityIcon.image = Tokens.Symbol.image(secure ? "lock" : Self.notSecureSymbol, size: Tokens.Symbol.inline)
             securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
         }
         [icon, siteName, security, securityIcon, moreButton].forEach { addSubview($0) }
