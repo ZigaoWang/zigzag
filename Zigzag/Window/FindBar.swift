@@ -480,7 +480,11 @@ class FloatingPanelView: NSView {
     func present(always: Bool = false, arrival: Arrival = .pop) {
         layoutSubtreeIfNeeded()
         recede(true)
+        // Shown again while it was leaving: everything the exit left behind goes, so it never stays shrunk or
+        // off-screen. The shrink fills forwards, so it has to be taken off by hand.
         layer?.removeAnimation(forKey: "dismiss")
+        layer?.removeAnimation(forKey: "dismiss.shrink")
+        Tokens.Motion.withoutAnimation { layer?.opacity = 1; layer?.transform = CATransform3DIdentity }
         alphaValue = 1
         dismissing = false
         // Opened from the keyboard it's simply there: something you summon with a key, often many times a day, should
@@ -564,7 +568,7 @@ class FloatingPanelView: NSView {
 
     private var isFlippedInSuperview: Bool { superview?.isFlipped ?? true }
 
-    private var dismissing = false
+    private(set) var dismissing = false
 
     /// The one way a panel leaves: a quick fade as it eases a touch smaller, back toward where it came from.
     func dismiss(always: Bool = false, instantly: Bool = false, completion: (() -> Void)? = nil) {
@@ -733,9 +737,11 @@ enum Toast {
             // Springs down out of the top of the page, as a notice does, and eases back up when it goes.
             toast.slidesFromTop = true
             toast.present(always: true, arrival: .pop)
-        } else if !Tokens.Motion.reduceMotion {
-            // A repeat (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
+        } else if toast.dismissing {
+            // Caught on its way out: it comes back rather than finishing the exit and vanishing.
+            toast.present(always: true, arrival: .instant)
         }
+        // A repeat that's still up (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         state.toast = toast
         state.hideWork?.cancel()
         // Toasts with an action wait for the pointer to leave before going.
