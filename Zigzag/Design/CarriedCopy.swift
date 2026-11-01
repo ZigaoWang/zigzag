@@ -175,6 +175,9 @@ final class CarriedCopy {
             })
             return
         }
+        // Whatever the drop changed (a favorite's new row, a row's new place) settles first, so it flies to where the
+        // item really ends up instead of to where it was a moment before and then dropping with the layout.
+        window.contentView?.layoutSubtreeIfNeeded()
         let rect = window.convertToScreen(view.convert(view.bounds, to: nil))
         let card = card.frame
         let target = NSRect(x: rect.minX - card.minX, y: rect.minY - card.minY, width: panel.frame.width, height: panel.frame.height)
