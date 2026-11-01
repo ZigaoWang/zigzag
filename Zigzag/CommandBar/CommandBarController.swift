@@ -168,8 +168,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     }
 
 
-    func show(mode: Mode) {
+    /// Where the bar opens while editing an address: the sidebar's address, or a split pane's (`show(anchor:)`).
+    private weak var anchor: NSView?
+
+    /// `anchor`: open over this address instead of the sidebar's (a split pane's), whether or not the sidebar shows.
+    func show(mode: Mode, anchor: NSView? = nil) {
         guard let controller else { return }
+        // A different place to open from is a fresh bar: it moves there.
+        if isVisible, anchor !== self.anchor { dismiss(restoringFocus: false) }
+        self.anchor = mode == .editCurrent ? anchor : nil
         // A fresh bar, or a different one (⌘L over ⌘T): no leftover site scope, and no hint from the last thing typed.
         if !isVisible || mode != self.mode {
             typed = ""
@@ -257,20 +264,30 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// Editing the address you're on opens right where it is: over the address field in the sidebar, reaching
     /// into the page, like a dropdown. New tabs and history keep the bar centered over the page.
     private var isAnchored: Bool {
-        guard let controller else { return false }
-        return mode == .editCurrent && controller.root.sidebarVisible && !controller.root.isSidebarFloatingVisible
+        guard let controller, mode == .editCurrent else { return false }
+        if let anchor, anchor.window != nil { return true }
+        return controller.root.sidebarVisible && !controller.root.isSidebarFloatingVisible
+    }
+
+    /// The address the bar opens over, in the overlay's coordinates.
+    private func anchorFrame(in controller: BrowserWindowController) -> NSRect {
+        let view = anchor.flatMap { $0.window != nil ? $0 : nil } ?? controller.sidebar.address
+        return view.convert(view.bounds, to: controller.root.overlay)
     }
 
     private func panelFrame() -> NSRect {
         guard let controller else { return .zero }
         if isAnchored {
-            let address = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay)
+            let address = anchorFrame(in: controller)
             // From the address's own corner, wide enough for the whole address at once, reaching over the page;
-            // suggestions continue below in the same panel.
-            let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), controller.root.bounds.width - address.minX - Tokens.Space.x4)
+            // suggestions continue below in the same panel. Never past the window's right edge: a pane's address
+            // on the right opens toward the left.
+            let bounds = controller.root.bounds
+            let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
+            let x = max(Tokens.Space.x2, min(address.minX, bounds.maxX - Tokens.Space.x4 - wide))
             // Taller than the address, it grows evenly above and below it, so the text stays on the address's line.
-            let top = address.minY - floor((fieldHeight - address.height) / 2)
-            return NSRect(x: address.minX, y: top, width: wide, height: fieldHeight + listHeight)
+            let top = max(Tokens.Space.x1, address.minY - floor((fieldHeight - address.height) / 2))
+            return NSRect(x: x, y: top, width: wide, height: fieldHeight + listHeight)
         }
         let card = controller.root.cardFrame
         // Room to breathe on both sides of the page, however narrow the window.
@@ -290,7 +307,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         guard let controller else { return Tokens.Metric.commandBarMaxRows }
         let top: CGFloat, bottom: CGFloat
         if isAnchored {
-            top = controller.sidebar.address.convert(controller.sidebar.address.bounds, to: controller.root.overlay).minY
+            top = anchorFrame(in: controller).minY
             bottom = controller.root.bounds.maxY
         } else {
             let card = controller.root.cardFrame

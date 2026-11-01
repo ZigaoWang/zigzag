@@ -662,13 +662,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.isUnfocusedPane = right !== tab
             root.card.showsHeader = true
             root.secondCard.showsHeader = true
-            // Each pane's header and loading line are its own page's, whichever of the two you're in.
+            // Each pane's header, line and address are its own page's, whichever of the two you're in.
             root.card.header.show(left)
             root.secondCard.header.show(right)
             root.card.showLoading(of: left)
             root.secondCard.showLoading(of: right)
             root.card.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(left, keep: right) }
             root.secondCard.header.close.onClick = { [weak self] _ in self?.unsplitWithUndo(right, keep: left) }
+            for card in [root.card, root.secondCard] {
+                card.header.onEditAddress = { [weak self, weak card] tab in
+                    guard let self, let card else { return }
+                    self.editAddress(of: tab, from: card.header.address)
+                }
+            }
         } else {
             root.setSplit(ratio: nil, vertical: false, animated: true)
             root.isEmpty = tab == nil
@@ -739,6 +745,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.splitRatio != nil else { return root.cardFrame }
         let panes = root.paneFrames
         return pair.left == tab.id ? panes.left : (panes.right ?? panes.left)
+    }
+
+    /// A split pane's address clicked: that pane becomes the one you're in, and its address opens for editing right
+    /// over the pill, as the sidebar's does for the page you're in.
+    func editAddress(of tab: Tab, from anchor: NSView) {
+        if tabManager.selectedTab !== tab { tabManager.select(tab) }
+        commandBar.show(mode: .editCurrent, anchor: anchor)
     }
 
     /// In split view, clicking a pane makes its tab the one you're working in.
