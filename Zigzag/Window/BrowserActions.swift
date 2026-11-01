@@ -329,9 +329,16 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func selectNextTab(_ sender: Any?) { tabManager.selectNext(offset: 1) }
     @objc func selectPreviousTab(_ sender: Any?) { tabManager.selectNext(offset: -1) }
+    /// ⌘1–⌘9: numbered as the sidebar shows them, each favorite tile, then each pinned and tab row, open or not.
     @objc func selectTabByNumber(_ sender: NSMenuItem) {
-        // Cmd+9 always means the last tab, like every browser.
-        if sender.tag == 9 { tabManager.selectByNumber(Int.max) } else { tabManager.selectByNumber(sender.tag - 1) }
+        let rows = Library.shared.favoriteTiles.map { SidebarItem.bookmark($0.0.id) } + sidebar.list.pageRows
+        guard !rows.isEmpty else { return }
+        // Cmd+9 always means the last tab, like every browser. An index past the end means the last too.
+        switch rows[sender.tag == 9 ? rows.count - 1 : min(sender.tag - 1, rows.count - 1)] {
+        case .bookmark(let id): if let bookmark = Library.shared.bookmark(id) { tabManager.openBookmark(bookmark) }
+        case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.select(tab) }
+        default: break
+        }
     }
     @objc func duplicateTab(_ sender: Any?) {
         guard let tab = selectedTab else { return }

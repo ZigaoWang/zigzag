@@ -109,6 +109,8 @@ final class SidebarListView: NSView {
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
+    /// The pinned and tab rows showing, top to bottom, a split's one row once: what ⌘1–⌘9 count after the favorites.
+    var pageRows: [SidebarItem] { items.filter(\.isPickable) }
 
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
