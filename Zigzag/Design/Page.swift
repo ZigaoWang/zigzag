@@ -7,7 +7,7 @@ import AppKit
 
 // MARK: - Native
 
-/// The top left of a page: the drawn wordmark, small, in the space's color, a hairline, and the page's title.
+/// The top left of a page: the drawn wordmark in the space's accent, a hairline, and the page's title.
 final class PageTitleView: NSView {
     private let wordmark = WordmarkView()
     private let divider = ColorView(color: Tokens.Color.separator)
@@ -47,7 +47,7 @@ final class PageTitleView: NSView {
         refreshTheme()
     }
 
-    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).mark }
+    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).accent }
 
     override func layout() {
         super.layout()
@@ -56,7 +56,7 @@ final class PageTitleView: NSView {
             let h = Tokens.Page.wordmarkHeight
             wordmark.frame = NSRect(x: 0, y: round((bounds.height - h) / 2), width: Self.wordmarkWidth, height: h)
             x = wordmark.frame.maxX + Tokens.Space.x3
-            let lineHeight: CGFloat = 14
+            let lineHeight: CGFloat = 18
             divider.frame = NSRect(x: x, y: round((bounds.height - lineHeight) / 2), width: Tokens.Metric.hairline, height: lineHeight)
             x = divider.frame.maxX + Tokens.Space.x3
         }
@@ -242,8 +242,8 @@ enum PageStyle {
     .page-header > .inner { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control); margin-right: auto; min-width: 0; }
-    .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--mark); display: block; }
-    .page-title .divider { width: 1px; height: 14px; background: var(--line); flex: none; }
+    .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
+    .page-title .divider { width: 1px; height: 18px; background: var(--line); flex: none; }
     .page-title h1 { font-size: var(--heading); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .search { display: flex; align-items: center; gap: 4px; background: var(--field); border-radius: var(--radius-field); padding: 0 12px 0 8px;

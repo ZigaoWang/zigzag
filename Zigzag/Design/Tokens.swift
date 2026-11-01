@@ -104,7 +104,7 @@ enum Tokens {
         /// How far a row's hover fill reaches past its text, on each side.
         static let rowInset: CGFloat = Space.x2
         /// The wordmark in the header: about the title's cap height, so the two read as one line.
-        static let wordmarkHeight: CGFloat = 11
+        static let wordmarkHeight: CGFloat = 15
         /// The search field in the header.
         static let searchWidth: CGFloat = 260
         /// A column of sections at the left (Settings).
