@@ -216,7 +216,7 @@ enum PageStyle {
             "--control: \(px(page.controlHeight))", "--max: \(px(page.maxWidth))", "--row: \(px(page.rowHeight))",
             "--row-inset: \(px(page.rowInset))", "--wordmark: \(px(page.wordmarkHeight))", "--search: \(px(page.searchWidth))",
             "--radius-control: \(px(radius.control))", "--radius-field: \(px(radius.field))", "--radius-row: \(px(radius.row))",
-            "--radius-panel: \(px(radius.group))", "--small: \(px(size.small))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
+            "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
             "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%",
             "--panel-blur: \(px(Tokens.Shadow.panelRadius))", "--panel-drop: \(px(Tokens.Shadow.panelDrop))",
         ].joined(separator: "; ")
@@ -263,10 +263,10 @@ enum PageStyle {
     .button:active { background: var(--pressed); }
 
     /* A menu, as Zigzag's panels float: the panel's surface, a hairline edge and a soft drop. */
-    .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 200px; padding: 4px; border-radius: var(--radius-panel);
+    .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 200px; padding: 4px; border-radius: var(--radius-float);
             background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
     .menu.open { display: block; }
-    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 8px; border-radius: var(--radius-control); }
+    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 8px; border-radius: var(--radius-row); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
     .menu [role="menuitem"].destructive { color: var(--destructive); }
