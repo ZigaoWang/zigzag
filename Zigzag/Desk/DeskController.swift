@@ -1,16 +1,19 @@
 import AppKit
 
-/// A space's heading in desk view. Clicking it selects every tab in the space.
+/// A space's heading in desk view, a row on the frame: the space's dot, its name, and a quiet count. Clicking it
+/// selects every tab in the space.
 final class DeskHeaderView: InteractiveView {
     let dot = ColorView()
-    let label = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    let count = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    let label = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
+    let count = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    private static let dotSize = Tokens.Space.x2
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.control
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
         dot.wantsLayer = true
-        dot.layer?.cornerRadius = 4
+        dot.layer?.cornerRadius = Self.dotSize / 2
         [dot, label, count].forEach { addSubview($0) }
         setAccessibilityRole(.button)
     }
@@ -19,18 +22,17 @@ final class DeskHeaderView: InteractiveView {
 
     override func layout() {
         super.layout()
-        let h = label.lineHeight
-        dot.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - 8) / 2, width: 8, height: 8)
-        label.frame = NSRect(x: dot.frame.maxX + Tokens.Space.x2, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
-        count.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: (bounds.height - h) / 2, width: count.textWidth, height: h)
+        let d = Self.dotSize
+        dot.frame = NSRect(x: CardRow.inset, y: (bounds.height - d) / 2, width: d, height: d)
+        let h = label.lineHeight, ch = count.lineHeight
+        label.frame = NSRect(x: dot.frame.maxX + Tokens.Space.x2 - Label.inset, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        // The count sits on the name's baseline, not centered against it.
+        count.frame = NSRect(x: label.frame.maxX + 2, y: label.frame.maxY - ch - 1, width: count.textWidth, height: ch)
     }
 
-    var fittingWidth: CGFloat { Tokens.Space.x2 * 3 + 8 + label.textWidth + Tokens.Space.x1 + count.textWidth }
+    var fittingWidth: CGFloat { CardRow.inset * 2 + Self.dotSize + Tokens.Space.x2 - Label.inset + label.textWidth + 2 + count.textWidth }
 
-    override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-    }
+    override func stateDidChange(animated: Bool) { applyRowStyle(animated: animated) }
 }
 
 /// The desk's content: every tab as a card, grouped by space, in sidebar order.
@@ -44,9 +46,10 @@ final class DeskCanvasView: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
 }
 
-/// Stands in a space with no tabs, where its first card would be: says so, with a way to start one there.
+/// Stands in a space with no tabs, where its first card would be: a tile of soft glass that says so, with a way to
+/// start one there.
 final class DeskEmptySpaceView: NSView {
-    let newTab = TextButton.form("New Tab")
+    let newTab = PillButton(title: "New Tab", symbol: "plus", style: .plain)
     private let label = Label("No tabs", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     /// Room left under the box for a title, as a card has, so the two line up.
     var titleArea: CGFloat = 0 { didSet { needsLayout = true } }
@@ -54,6 +57,7 @@ final class DeskEmptySpaceView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        // The picture's corners, as a card's picture has, so the empty spot lines up with the cards beside it.
         box.layer?.cornerRadius = Tokens.Radius.thumbnail
         box.layer?.cornerCurve = .continuous
         box.layer?.borderWidth = Tokens.Metric.hairline
@@ -84,8 +88,8 @@ final class DeskEmptySpaceView: NSView {
     }
 
     private func refreshColors() {
-        box.color = Tokens.Color.hoverFill
-        Tokens.Motion.withoutAnimation { box.layer?.borderColor = cgColor(Tokens.Color.cardEdge) }
+        box.color = Tokens.Color.glassFill
+        Tokens.Motion.withoutAnimation { box.layer?.borderColor = cgColor(Tokens.Color.glassEdge) }
     }
 }
 
@@ -111,8 +115,8 @@ final class DeskController {
     private let scrollView = NSScrollView()
     private let canvas = DeskCanvasView()
     private let actionBar = FloatingPanelView()
-    private let closeButton = TextButton(title: "Close Tabs", font: Tokens.Font.body(.medium))
-    private let doneButton = TextButton(title: "Done", font: Tokens.Font.body(.medium))
+    private let closeButton = PillButton(title: "Close Tabs", style: .prominent)
+    private let doneButton = PillButton(title: "Done", style: .quiet)
     private var headers: [UUID: DeskHeaderView] = [:]
     private var cards: [UUID: TabThumbnailView] = [:]
     /// Spaces with no tabs, by space.
@@ -138,6 +142,7 @@ final class DeskController {
     private let noMatches = Label("No tabs match", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
     private static let searchHeight = Tokens.Space.x8
+    private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
     private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
     private var frameToken: NSObjectProtocol?
 
@@ -168,7 +173,8 @@ final class DeskController {
                 self.applyLayout(animated: false)
             }
         }
-        actionBar.radius = Tokens.Radius.row + Tokens.Space.x1
+        // A glass capsule at the bottom, its pills inset evenly so their ends run with its own.
+        actionBar.radius = Self.actionBarHeight / 2
         actionBar.addSubview(closeButton)
         actionBar.addSubview(doneButton)
         closeButton.onClick = { [weak self] _ in self?.closeSelected() }
@@ -178,7 +184,9 @@ final class DeskController {
         searchBox.layer?.cornerRadius = Self.searchHeight / 2
         searchBox.layer?.cornerCurve = .continuous
         searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body)
-        searchIcon.contentTintColor = Tokens.Color.textSecondary
+        searchIcon.contentTintColor = Tokens.Color.textTertiary
+        // Soft glass on the frame, like the favorites: the desk's field sits on the space's color.
+        searchBox.layer?.borderWidth = Tokens.Metric.hairline
         searchBox.addSubview(searchIcon)
         searchBox.addSubview(searchField)
         backdrop.addSubview(searchBox)
@@ -585,8 +593,9 @@ final class DeskController {
         let top = backdrop.isFlipped ? Tokens.Space.x6 : b.height - Tokens.Space.x6 - h
         searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
         searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
-        searchBox.color = Tokens.Color.fieldFill
-        let icon: CGFloat = 16
+        searchBox.color = Tokens.Color.glassFill
+        Tokens.Motion.withoutAnimation { searchBox.layer?.borderColor = searchBox.cgColor(Tokens.Color.glassEdge) }
+        let icon = Tokens.Metric.favicon
         searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
         let textHeight = ceil(searchField.intrinsicContentSize.height)
         let x = searchIcon.frame.maxX + Tokens.Space.x2
@@ -838,13 +847,14 @@ final class DeskController {
         closeButton.title = selection.count == 1 ? "Close Tab" : "Close \(selection.count) Tabs"
         doneButton.title = "Done"
         let cw = closeButton.fittingWidth, dw = doneButton.fittingWidth
-        let pad = Tokens.Space.x2
-        let height = Tokens.Space.x10 + Tokens.Space.x1
-        let width = pad * 3 + cw + dw
+        let height = Self.actionBarHeight
+        let control = Tokens.Page.controlHeight
+        let pad = (height - control) / 2
+        let width = pad * 2 + Tokens.Space.x1 + cw + dw
         let root = controller.root.bounds
         actionBar.frame = NSRect(x: round(root.midX - width / 2), y: root.maxY - height - Tokens.Space.x6, width: width, height: height)
-        closeButton.frame = NSRect(x: pad, y: (height - Tokens.Space.x8) / 2, width: cw, height: Tokens.Space.x8)
-        doneButton.frame = NSRect(x: closeButton.frame.maxX + pad, y: closeButton.frame.minY, width: dw, height: Tokens.Space.x8)
+        doneButton.frame = NSRect(x: pad, y: pad, width: dw, height: control)
+        closeButton.frame = NSRect(x: doneButton.frame.maxX + Tokens.Space.x1, y: pad, width: cw, height: control)
         if actionBar.superview == nil {
             controller.root.overlay.addSubview(actionBar)
             actionBar.present()
