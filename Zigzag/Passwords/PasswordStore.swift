@@ -98,7 +98,18 @@ actor PasswordStore {
     init(label: String = "Zigzag", synchronizable: Bool = UserDefaults.standard.object(forKey: "PasswordsSyncWithICloud") as? Bool ?? true) {
         self.label = label
         self.synchronizable = synchronizable
+        #if DEBUG
+        if label == Self.memoryLabel { memory = [:] }
+        #endif
     }
+
+    #if DEBUG
+    /// Debug builds only, `ZIGZAG_TEST_VAULT=memory`: a vault held in memory for this run, for a copy that can't
+    /// reach the keychain (an ad-hoc signed one) to show its Passwords window with test logins. It never reads or
+    /// writes the keychain, and it's gone when the app quits.
+    private static let memoryLabel = "Zigzag Test memory"
+    private var memory: [UUID: (credential: Credential, password: SecretString)]?
+    #endif
 
     enum Failure: Error { case keychain(OSStatus), notFound }
 
@@ -109,6 +120,9 @@ actor PasswordStore {
 
     /// Every saved login's details, newest first. No passwords.
     func all() throws -> [Credential] {
+        #if DEBUG
+        if let memory { return memory.values.map(\.credential).sorted { $0.modified > $1.modified } }
+        #endif
         var query = baseQuery()
         query[kSecMatchLimit] = kSecMatchLimitAll
         query[kSecReturnAttributes] = true
@@ -126,6 +140,9 @@ actor PasswordStore {
 
     /// The password of one login.
     func password(for id: UUID) throws -> SecretString {
+        #if DEBUG
+        if let memory { guard let entry = memory[id] else { throw Failure.notFound }; return entry.password }
+        #endif
         var query = try itemQuery(for: id)
         query[kSecReturnData] = true
         var result: CFTypeRef?
@@ -150,6 +167,9 @@ actor PasswordStore {
         }
         let credential = Credential(id: UUID(), origin: origin, username: username, title: title ?? origin.displayName,
                                     notes: notes, otpAuth: otpAuth, created: created, modified: Date(), lastUsed: nil)
+        #if DEBUG
+        if memory != nil { memory?[credential.id] = (credential, password); notify(); return credential }
+        #endif
         var item = attributes(for: credential)
         item[kSecValueData] = password.data
         let status = SecItemAdd(item as CFDictionary, nil)
@@ -160,6 +180,14 @@ actor PasswordStore {
 
     /// Changes a login's details, and its password when one is given.
     func update(_ credential: Credential, password: SecretString? = nil) throws {
+        #if DEBUG
+        if let memory {
+            guard let entry = memory[credential.id] else { throw Failure.notFound }
+            self.memory?[credential.id] = (credential, password ?? entry.password)
+            notify()
+            return
+        }
+        #endif
         var changes = attributes(for: credential)
         for key in [kSecClass, kSecUseDataProtectionKeychain, kSecAttrAccessGroup, kSecAttrSynchronizable] { changes[key] = nil }
         if let password { changes[kSecValueData] = password.data }
@@ -175,6 +203,9 @@ actor PasswordStore {
                      created: Date, modified: Date) throws -> Credential {
         let credential = Credential(id: UUID(), origin: origin, username: username, title: origin.displayName,
                                     notes: notes, otpAuth: otpAuth, created: created, modified: modified, lastUsed: nil)
+        #if DEBUG
+        if memory != nil { memory?[credential.id] = (credential, password); return credential }
+        #endif
         var item = attributes(for: credential)
         item[kSecValueData] = password.data
         let status = SecItemAdd(item as CFDictionary, nil)
@@ -184,6 +215,9 @@ actor PasswordStore {
 
     /// Replaces an imported login's password, quietly, for the same reason.
     func replaceImported(_ credential: Credential, password: SecretString) throws {
+        #if DEBUG
+        if memory != nil { memory?[credential.id] = (credential, password); return }
+        #endif
         var changes = attributes(for: credential)
         for key in [kSecClass, kSecUseDataProtectionKeychain, kSecAttrAccessGroup, kSecAttrSynchronizable] { changes[key] = nil }
         changes[kSecValueData] = password.data
@@ -201,6 +235,9 @@ actor PasswordStore {
     }
 
     func delete(_ id: UUID) throws {
+        #if DEBUG
+        if memory != nil { memory?[id] = nil; notify(); return }
+        #endif
         let status = SecItemDelete(try itemQuery(for: id) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw Failure.keychain(status) }
         notify()
@@ -209,12 +246,18 @@ actor PasswordStore {
     // MARK: Never for this site
 
     func neverSaves(on origin: Origin) -> Bool {
+        #if DEBUG
+        if memory != nil { return false }
+        #endif
         var query = neverQuery(origin)
         query[kSecMatchLimit] = kSecMatchLimitOne
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
     func setNeverSave(_ never: Bool, on origin: Origin) {
+        #if DEBUG
+        if memory != nil { return }
+        #endif
         let query = neverQuery(origin)
         SecItemDelete(query as CFDictionary)
         guard never else { return }
@@ -226,6 +269,9 @@ actor PasswordStore {
     }
 
     func neverSaveSites() -> [Origin] {
+        #if DEBUG
+        if memory != nil { return [] }
+        #endif
         var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: Self.neverService + "." + label,
                                       kSecUseDataProtectionKeychain: true, kSecAttrAccessGroup: Self.accessGroup,
                                       kSecAttrSynchronizable: kSecAttrSynchronizableAny]
@@ -238,6 +284,9 @@ actor PasswordStore {
 
     /// Removes everything this store's label owns. Tests use it to clean up after themselves.
     func deleteAll() {
+        #if DEBUG
+        if memory != nil { memory = [:]; return }
+        #endif
         var query = baseQuery()
         query[kSecMatchLimit] = nil
         SecItemDelete(query as CFDictionary)
