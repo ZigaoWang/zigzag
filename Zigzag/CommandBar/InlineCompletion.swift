@@ -82,6 +82,9 @@ enum InlineCompletion {
         guard !bare.isEmpty, looksLikeHost(lower) else { return nil }
         // A whole host that matches always beats one only matched once shortened.
         var best: (site: Site, address: String, whole: Bool)?
+        // A host you've been to, typed out in full, is where you mean to go: it isn't stretched to a page there or
+        // to a longer host (192.168.1.1 to 192.168.1.10).
+        var exact: Site?
         func consider(_ site: Site, _ address: String, whole: Bool) {
             if let current = best {
                 if current.whole && !whole { return }
@@ -96,6 +99,7 @@ enum InlineCompletion {
             let address = address(site.url)
             // The host (and port) alone has to start with what you typed; a path never does.
             let host = String(address.prefix { $0 != "/" })
+            if host == bare, exact.map({ site.score > $0.score }) ?? true { exact = site }
             if host.hasPrefix(bare) {
                 consider(site, address, whole: true)
             } else if let short = shortenedHosts(host).last(where: { $0.hasPrefix(bare) }) {
@@ -104,6 +108,9 @@ enum InlineCompletion {
                 consider(Site(url: url, score: site.score), short, whole: false)
             }
         }
+        if let exact, let front = target(exact.url, wholePage: false) {
+            return Match(text: (www ? "www." : "") + bare, url: front)
+        }
         guard let best else { return nil }
         return Match(text: (www ? "www." : "") + best.address, url: best.site.url)
     }
@@ -111,6 +118,13 @@ enum InlineCompletion {
     /// A completion still showing after one more letter: kept while what you've typed is still its beginning.
     static func kept(_ match: Match, typed: String) -> Match? {
         match.text.lowercased().hasPrefix(typed.lowercased()) ? match : nil
+    }
+
+    /// What completes after one more letter: what you've typed when it's a whole host you've been to, otherwise the
+    /// completion already showing while it still agrees, otherwise what was looked up.
+    static func next(previous: Match?, found: Match?, typed: String) -> Match? {
+        if let found, found.text.count == typed.count { return found }
+        return previous.flatMap { kept($0, typed: typed) } ?? found
     }
 
     /// Sites gathered from several places, one per host and port: scores add up, and a page from history wins

@@ -583,9 +583,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         completion = nil
         // Not in a site search or history, and never while an input method is still composing.
         if allowed, scope == nil, let controller, mode != .history {
-            // A letter that agrees with the completion keeps it; anything else looks again. One lookup per keystroke.
-            completion = previous.flatMap { InlineCompletion.kept($0, typed: text) }
-                ?? CommandRanker.inlineCompletion(for: text, manager: controller.tabManager)
+            // A letter that agrees with the completion keeps it, unless it finished a host you've been to. One lookup per keystroke.
+            completion = InlineCompletion.next(previous: previous, found: CommandRanker.inlineCompletion(for: text, manager: controller.tabManager),
+                                               typed: text)
             if let completion, completion.text.count > text.count {
                 // What you typed stays as you typed it; the rest follows, selected, so the next letter replaces it.
                 let rest = String(completion.text.dropFirst(text.count))

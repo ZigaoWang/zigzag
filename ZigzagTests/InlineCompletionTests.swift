@@ -67,6 +67,23 @@ struct InlineCompletionTests {
         #expect(InlineCompletion.best(for: "gi", among: [site("https://gist.github.com"), site("https://github.com")])?.text == "github.com")
     }
 
+    @Test func aWholeHostYouVisitedStaysAsTyped() {
+        let pages = [site("https://github.com/notifications", 9)]
+        #expect(InlineCompletion.best(for: "github.co", among: pages)?.text == "github.com/notifications")
+        #expect(InlineCompletion.best(for: "github.com", among: pages)?.text == "github.com")
+        #expect(InlineCompletion.best(for: "github.com", among: pages)?.url.absoluteString == "https://github.com")
+        let routers = [site("http://192.168.1.10", 9), site("http://192.168.1.1", 1)]
+        #expect(InlineCompletion.best(for: "192.168.1.1", among: routers)?.text == "192.168.1.1")
+        #expect(InlineCompletion.best(for: "192.168.1.1", among: routers)?.url.absoluteString == "http://192.168.1.1")
+        // Only one you've been to: an address you haven't still completes.
+        #expect(InlineCompletion.best(for: "192.168.1.1", among: [site("http://192.168.1.10")])?.text == "192.168.1.10")
+        // The letter that finishes the host drops the longer completion still showing.
+        let showing = InlineCompletion.Match(text: "github.com/notifications", url: URL(string: "https://github.com/notifications")!)
+        let whole = InlineCompletion.Match(text: "github.com", url: URL(string: "https://github.com")!)
+        #expect(InlineCompletion.next(previous: showing, found: whole, typed: "github.com") == whole)
+        #expect(InlineCompletion.next(previous: showing, found: whole, typed: "github.c") == showing)
+    }
+
     @Test func aPortAndAPathComeAlong() {
         #expect(InlineCompletion.best(for: "local", among: [site("http://localhost:3000")])?.text == "localhost:3000")
         #expect(InlineCompletion.best(for: "localhost:3", among: [site("http://localhost:3000")])?.text == "localhost:3000")
