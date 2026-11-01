@@ -90,7 +90,8 @@ enum Brand {
         static let navy = Theme(hue: nil)
 
         static func of(_ space: SpaceInfo?) -> Theme {
-            guard let space, !space.isNeutral else { return .navy }
+            // Drawn mostly toward the wheel's middle, a space reads as gray: its hue would be a color it doesn't show.
+            guard let space, !space.isNeutral, space.tintAmount >= 0.3 else { return .navy }
             if let hue = space.hue { return Theme(hue: hue) }
             return space.color.isNeutral || space.color == .sky ? .navy : Theme(hue: space.color.hue)
         }
