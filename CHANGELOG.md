@@ -5,6 +5,58 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-01
+
+### New
+- A new look across Zigzag: calmer, roomier rows with quiet section labels, a soft card for the tab you're on, glass favorites and glass panels.
+- One color wheel for every space: drag toward the middle for white, gray or black, add a second color for a gradient, and make any look see-through so your desktop shows behind it. ([#3](https://github.com/ZigaoWang/zigzag/issues/3))
+- The page meets the window's edges beside the sidebar. Turn off Borderless page in Settings to float it again.
+- Beta updates: try new versions first, on your own tabs and data. Your profile is saved before every update, so one can be undone.
+- The address bar fills in sites you've been to as you type, so "wiki" becomes wikipedia.org and Return goes there.
+- Drag and drop works the same everywhere: in the tab list, favorites and Settings. What you pick up stays put, faint, and a see-through copy follows you. A line shows where it will land, and nothing else moves out of the way.
+- Drop a tab on the middle of another tab, a pinned tab or a favorite to open them side by side. A split view can be a favorite, and you can separate it again from its menu.
+- A split view moves as one: into favorites, pinned tabs, another space or another window.
+- Drag a favorite among your pinned tabs to pin it, onto a space's dot to move it there, or into another window's sidebar. Hold on a dot, or at the sidebar's edge, to switch spaces while you drag.
+- Folders and spaces can have an icon, any symbol or emoji. ([#1](https://github.com/ZigaoWang/zigzag/issues/1), [#7](https://github.com/ZigaoWang/zigzag/issues/7))
+- Settings opens as a tab beside your pages, with search across every section.
+- History groups visits into sessions and sites.
+- A closed tab comes back into its split view. Separate Tabs is ⌥⌘\.
+
+### Changed
+- Favorites have bigger icons, and an open one has a fine edge. Point at it to close it.
+- Swiping back or forward holds while your fingers rest, so you can keep reading before you let go.
+- Permission requests hang from the site's address and go away when the site does.
+- Find stays with its tab. Esc closes it from the page, and ⌘F again closes it.
+- Click a space's name to edit it, and its chevron to fold its pinned tabs.
+- Closing a tab goes back to the one you were on before it.
+- Motion is quicker and calmer across the app, and Reduce Motion stops slides.
+
+### Fixed
+- Reordering spaces in Settings is smooth. ([#2](https://github.com/ZigaoWang/zigzag/issues/2))
+- Reordering favorites and pinned tabs lands exactly where you drop. ([#5](https://github.com/ZigaoWang/zigzag/issues/5))
+- Favicons are sharp, never blank, and a site's own icon wins over its home-screen tile. One-color icons take the sidebar's ink. ([#8](https://github.com/ZigaoWang/zigzag/issues/8))
+- Undo puts tabs, pinned tabs and favorites back exactly as they were.
+- A password is offered to save only after the site accepts it, and the prompt stays with its tab.
+- A page's alerts stay with its tab and dim only that page.
+- Contact autofill fills only visible fields on the site it was offered for.
+- Links in Reader and PDFs open web pages only, and ask before opening an app.
+- Extensions can't widen the site access you gave them.
+- Pages that fail to load stay out of history. Clear History also clears archived tabs.
+- Replacing a file with a download keeps the old one until the new one is done.
+- Windows come back once and at their own size after a restart.
+- Return never confirms a destructive action, and never approves an extension while you type in a page.
+- Private windows stay private: links opened in a new window open privately, and their pages can't be pinned or favorited.
+- Closing one half of a split no longer leaves a blank pane, and closing a page opened from a split puts the one it came from back.
+- Clicking the Dock icon brings back a minimized window instead of opening another. ⇧⌘T works with no window open.
+- ⌘← and ⌘→ in a text field move the cursor instead of going back or forward.
+- Esc in the address bar works over Peek and permission questions, and Undo there takes back only what you typed.
+- Typing in Chinese, Japanese or another input method no longer closes the space editor on Esc.
+- Emoji like ❤️ and ☀️ work as folder and space icons.
+- Back, forward and reload line up.
+- Favorites and pinned tabs can be renamed, middle-click closes any row, and ⌘1 to ⌘9 count the rows you see.
+
+Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2, #3, #5, #7 and #8.
+
 ## [0.3.1] - 2026-10-31
 
 ### New
