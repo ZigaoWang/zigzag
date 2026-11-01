@@ -139,6 +139,7 @@ final class DeskController {
     private var query = ""
     private static let searchHeight = Tokens.Space.x8
     private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
+    private var frameToken: NSObjectProtocol?
 
     /// Cards shrink with more tabs down to this, where a title still reads, and grow with fewer up to the largest.
     private let minCardWidth = Tokens.Metric.deskCardWidth
@@ -161,7 +162,7 @@ final class DeskController {
         backdrop.addSubview(scrollView)
         // The window resized, went full screen or the sidebar moved: the cards take the page area's new shape.
         scrollView.contentView.postsFrameChangedNotifications = true
-        NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
+        frameToken = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isVisible else { return }
                 self.applyLayout(animated: false)
@@ -207,6 +208,10 @@ final class DeskController {
                 return false
             }
         }
+    }
+
+    isolated deinit {
+        if let frameToken { NotificationCenter.default.removeObserver(frameToken) }
     }
 
     private var manager: TabManager? { controller?.tabManager }

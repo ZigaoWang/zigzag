@@ -263,6 +263,7 @@ final class BrowserRootView: ColorView {
     var onSidebarWidthChange: ((CGFloat) -> Void)?
 
     private var trackingArea: NSTrackingArea?
+    private var borderlessToken: NSObjectProtocol?
     /// Keeps the floating sidebar open, e.g. while a menu from it is showing.
     var holdReveal = false
     /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
@@ -304,7 +305,7 @@ final class BrowserRootView: ColorView {
         addSubview(sidebarContainer)
         addSubview(splitDropHint)
         addSubview(overlay)
-        NotificationCenter.default.addObserver(forName: Self.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
+        borderlessToken = NotificationCenter.default.addObserver(forName: Self.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 Tokens.Motion.animate(Tokens.Motion.gentle) {
@@ -616,6 +617,7 @@ final class BrowserRootView: ColorView {
     isolated deinit {
         pointerTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
+        if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
     }
 
     private func followPointer() {
