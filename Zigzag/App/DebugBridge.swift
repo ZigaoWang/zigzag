@@ -41,8 +41,8 @@ enum DebugBridge {
         case "bg": if let url = URL(string: arg) { controller.open(url, disposition: .backgroundTab, allowSwitch: false) }
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
-        case "reveal": controller.root.reveal(true)
-        case "unreveal": controller.root.reveal(false)
+        case "reveal": controller.root.holdReveal = arg == "hold"; controller.root.reveal(true)
+        case "unreveal": controller.root.holdReveal = false; controller.root.reveal(false)
         case "lights":
             let w = controller.window as? BrowserWindow
             let b = w?.standardWindowButton(.closeButton)
@@ -661,6 +661,16 @@ enum DebugBridge {
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
         case "pagecorner":
             if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.card.needsLayout = true; controller.root.secondCard.needsLayout = true }
+        case "spacelook":
+            // spacelook <hue 0-360> <second hue or -> <see-through 0-1>: the current space's color, gradient and glass.
+            let f = arg.split(separator: " ").map(String.init)
+            guard f.count == 3, var look = Library.shared.space(controller.tabManager.currentSpaceID) else { break }
+            look.hue = Double(f[0]).map { $0 / 360 }
+            look.intensity = look.hue == nil ? nil : 0.6
+            look.hue2 = Double(f[1]).map { $0 / 360 }
+            look.intensity2 = look.hue2 == nil ? nil : 0.6
+            look.translucency = Double(f[2]).flatMap { $0 > 0 ? $0 : nil }
+            Library.shared.setLook(look)
         case "addfav", "addpin":
             // addfav <url> <title>, addpin <url> <title>: a favorite or a pinned page, without loading its page.
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
