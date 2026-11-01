@@ -142,6 +142,24 @@ final class PillButton: InteractiveView {
     }
     /// The accent for `.prominent`; nil takes its window's.
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
+    /// For an action that can't be undone (Delete): `.prominent` turns red, the others take red ink.
+    var isDestructive = false { didSet { stateDidChange(animated: false) } }
+    /// Set both to draw the button in other colors: a light pill on the brand's blue frame (the welcome).
+    var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
+    var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
+
+    /// The words on it, changed as what it does changes ("Import", then "Importing…").
+    var title: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            label.isHidden = newValue.isEmpty
+            setAccessibilityLabel(newValue)
+            invalidateIntrinsicContentSize()
+            needsLayout = true
+            superview?.needsLayout = true
+        }
+    }
 
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
@@ -202,11 +220,15 @@ final class PillButton: InteractiveView {
         let fill: NSColor?
         let ink: NSColor
         switch style {
+        case _ where customFill != nil:
+            let base = customFill ?? .clear
+            fill = isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.12) ?? base) : base
+            ink = customInk ?? Tokens.Color.textPrimary
         case .prominent:
             let theme = Brand.Theme.for(self)
-            let base = tint ?? theme.accent
+            let base = isDestructive ? Tokens.Color.destructive : tint ?? theme.accent
             fill = isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
-            ink = theme.onAccent
+            ink = isDestructive ? .white : theme.onAccent
         case .plain:
             fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
             ink = Tokens.Color.textPrimary
@@ -215,8 +237,9 @@ final class PillButton: InteractiveView {
             ink = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-        label.textColor = ink
-        iconView.contentTintColor = style == .prominent ? ink : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.icon
+        let tinted = style == .prominent || customFill != nil
+        label.textColor = isDestructive && !tinted ? Tokens.Color.destructive : ink
+        iconView.contentTintColor = tinted ? ink : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.icon
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 }
@@ -301,4 +324,140 @@ enum PanelMaterial {
         if #available(macOS 26.0, *), let glass = view as? NSGlassEffectView { glass.cornerRadius = radius; return }
         view.layer?.cornerRadius = radius
     }
+}
+
+// MARK: - Dialogs
+
+/// The top of every dialog (`Tokens.Dialog`): a picture (a site's or an app's icon, or a symbol on a soft circle of
+/// the accent), the question in the heading's weight, and a quiet line under it (the site, the version).
+final class DialogHeader: NSView {
+    private let picture = NSImageView()
+    private let circle = ColorView(color: .clear)
+    let title: NSTextField
+    let subtitle = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    /// Room kept at the trailing end for a close button in the panel's corner.
+    var trailingRoom: CGFloat = 0 { didSet { needsLayout = true } }
+
+    init(title text: String, subtitle detail: String = "") {
+        title = NSTextField(wrappingLabelWithString: text)
+        title.font = Tokens.Font.heading()
+        title.textColor = Tokens.Color.textPrimary
+        title.isSelectable = false
+        title.maximumNumberOfLines = 3
+        super.init(frame: .zero)
+        subtitle.stringValue = detail
+        subtitle.lineBreakMode = .byTruncatingMiddle
+        circle.wantsLayer = true
+        circle.layer?.cornerRadius = Tokens.Dialog.iconSide / 2
+        circle.isHidden = true
+        picture.isHidden = true
+        [circle, picture, title, subtitle].forEach { addSubview($0) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    /// A picture of its own: a favicon, an app's or an extension's icon.
+    func setImage(_ image: NSImage?) {
+        picture.image = image
+        picture.imageScaling = .scaleProportionallyUpOrDown
+        picture.contentTintColor = nil
+        picture.isHidden = image == nil
+        circle.isHidden = true
+        needsLayout = true
+    }
+
+    /// A symbol in the accent on a soft circle of it.
+    func setSymbol(_ name: String, tint: NSColor) {
+        picture.image = Tokens.Symbol.image(name, size: Tokens.TypeSize.heading)
+        picture.imageScaling = .scaleNone
+        picture.contentTintColor = tint
+        picture.isHidden = false
+        circle.color = tint.withAlphaComponent(Tokens.Color.selectionAlpha)
+        circle.isHidden = false
+        needsLayout = true
+    }
+
+    private var hasPicture: Bool { !picture.isHidden }
+    private var textX: CGFloat { hasPicture ? Tokens.Dialog.iconSide + Tokens.Space.x3 : 0 }
+
+    private func titleHeight(_ width: CGFloat) -> CGFloat {
+        ceil(title.sizeThatFits(NSSize(width: max(0, width - textX - trailingRoom), height: 400)).height)
+    }
+
+    private func textHeight(_ width: CGFloat) -> CGFloat {
+        titleHeight(width) + (subtitle.stringValue.isEmpty ? 0 : 2 + subtitle.lineHeight)
+    }
+
+    func height(for width: CGFloat) -> CGFloat { max(hasPicture ? Tokens.Dialog.iconSide : 0, textHeight(width)) }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Dialog.iconSide
+        let text = textHeight(bounds.width)
+        let total = height(for: bounds.width)
+        circle.frame = NSRect(x: 0, y: round((total - side) / 2), width: side, height: side)
+        picture.frame = circle.frame
+        let width = max(0, bounds.width - textX - trailingRoom)
+        title.frame = NSRect(x: textX, y: round((total - text) / 2), width: width, height: titleHeight(bounds.width))
+        subtitle.isHidden = subtitle.stringValue.isEmpty
+        subtitle.frame = NSRect(x: textX - Label.inset, y: title.frame.maxY + 2, width: width + Label.inset * 2, height: subtitle.lineHeight)
+    }
+}
+
+/// A dialog's answers: pill buttons at the trailing end, the main one last and filled; a quiet choice can sit
+/// alone at the leading end. When they don't fit side by side, the trailing ones share the row evenly.
+final class DialogButtons: NSView {
+    var leading: [PillButton] = [] { didSet { replace(oldValue, with: leading) } }
+    var trailing: [PillButton] = [] { didSet { replace(oldValue, with: trailing) } }
+
+    private func replace(_ old: [PillButton], with new: [PillButton]) {
+        old.forEach { if !new.contains($0) { $0.removeFromSuperview() } }
+        new.forEach { if $0.superview !== self { addSubview($0) } }
+        needsLayout = true
+    }
+
+    override var isFlipped: Bool { true }
+    static var height: CGFloat { Tokens.Page.controlHeight }
+
+    private static func width(_ button: PillButton) -> CGFloat { max(button.fittingWidth, Tokens.Dialog.minButtonWidth) }
+
+    override func layout() {
+        super.layout()
+        let gap = Tokens.Dialog.buttonGap, h = Self.height
+        let shown = trailing.filter { !$0.isHidden }
+        let lead = leading.filter { !$0.isHidden }
+        let leadWidth = lead.reduce(0) { $0 + $1.fittingWidth + gap }
+        let wanted = shown.reduce(0) { $0 + Self.width($1) } + gap * CGFloat(max(0, shown.count - 1))
+        let even = wanted > bounds.width - leadWidth
+        let each = (bounds.width - gap * CGFloat(max(0, shown.count - 1))) / CGFloat(max(1, shown.count))
+        var x = bounds.width
+        for button in shown.reversed() {
+            let w = even ? each : Self.width(button)
+            x -= w
+            button.frame = NSRect(x: x, y: 0, width: w, height: h)
+            x -= gap
+        }
+        var lx: CGFloat = 0
+        for button in lead {
+            // No room beside the answers: the quiet choice steps aside rather than squeeze them.
+            button.alphaValue = even ? 0 : 1
+            button.frame = NSRect(x: lx, y: 0, width: button.fittingWidth, height: h)
+            lx += button.fittingWidth + gap
+        }
+    }
+}
+
+extension NSTextField {
+    /// A dialog's or a page's explaining sentence: body size, secondary, wrapping.
+    static func dialogText(_ text: String, font: NSFont = Tokens.Font.body()) -> NSTextField {
+        let field = NSTextField(wrappingLabelWithString: text)
+        field.font = font
+        field.textColor = Tokens.Color.textSecondary
+        field.isSelectable = false
+        return field
+    }
+
+    /// Its height when wrapped to `width`.
+    func wrappedHeight(_ width: CGFloat) -> CGFloat { ceil(sizeThatFits(NSSize(width: max(0, width), height: 2000)).height) }
 }

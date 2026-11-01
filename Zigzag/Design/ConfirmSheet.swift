@@ -10,11 +10,12 @@ final class ConfirmSheet: NSView {
     enum Choice { case confirm, alternate, cancel }
 
     private let panel = FloatingPanelView()
-    private let titleLabel: Label
+    private let header: DialogHeader
     private let body: NSTextField
-    private let confirm: PrimaryButton
-    private let cancel = TextButton(title: "Cancel", font: Tokens.Font.body(.medium))
-    private let alternate: TextButton?
+    private let buttons = DialogButtons()
+    private let confirm: PillButton
+    private let cancel = PillButton(title: "Cancel", style: .plain)
+    private let alternate: PillButton?
     private var monitor: Any?
     private let isDestructive: Bool
     /// Where the keyboard was, given back when the sheet goes.
@@ -22,21 +23,18 @@ final class ConfirmSheet: NSView {
     private var completion: (Choice) -> Void
 
     private init(title: String, message: String, confirmTitle: String, alternateTitle: String? = nil, destructive: Bool, completion: @escaping (Choice) -> Void) {
-        titleLabel = Label(title, font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-        body = NSTextField(wrappingLabelWithString: message)
-        confirm = PrimaryButton(title: confirmTitle)
+        header = DialogHeader(title: title)
+        body = .dialogText(message)
+        confirm = PillButton(title: confirmTitle, style: .prominent)
         confirm.isDestructive = destructive
         isDestructive = destructive
-        alternate = alternateTitle.map(TextButton.form)
+        alternate = alternateTitle.map { PillButton(title: $0, style: .plain) }
         self.completion = completion
         super.init(frame: .zero)
         wantsLayer = true
-        body.font = Tokens.Font.body()
-        body.textColor = Tokens.Color.textSecondary
-        body.isSelectable = false
         addSubview(panel)
-        [titleLabel, body, cancel, confirm].forEach { panel.addSubview($0) }
-        if let alternate { panel.addSubview(alternate) }
+        [header, body, buttons].forEach { panel.addSubview($0) }
+        buttons.trailing = [cancel, alternate, confirm].compactMap { $0 }
         confirm.onClick = { [weak self] _ in self?.finish(.confirm) }
         alternate?.onClick = { [weak self] _ in self?.finish(.alternate) }
         cancel.onClick = { [weak self] _ in self?.finish(.cancel) }
@@ -201,32 +199,26 @@ final class ConfirmSheet: NSView {
         updateBackdrop()
     }
 
-    private let width: CGFloat = 360
+    /// The dialog's width: the shared one, narrower only in a small window.
+    private var width: CGFloat { min(Tokens.Dialog.width, bounds.width - Tokens.Space.x6 * 2) }
+
+    private func height(for width: CGFloat) -> CGFloat {
+        let pad = Tokens.Dialog.padding, inner = width - pad * 2
+        return pad + header.height(for: inner) + Tokens.Space.x2 + body.wrappedHeight(inner) + Tokens.Dialog.gap + Tokens.Space.x1
+            + DialogButtons.height + pad
+    }
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x5
-        let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width - pad * 2, height: 400)).height)
-        let height = pad + titleLabel.lineHeight + Tokens.Space.x2 + bodyHeight + Tokens.Space.x5 + Tokens.Space.x8 + pad
+        let height = height(for: width)
         panel.frame = NSRect(x: round((bounds.width - width) / 2), y: round((bounds.height - height) / 2.4), width: width, height: height)
     }
 
     private func layoutPanel() {
-        let pad = Tokens.Space.x5
+        let pad = Tokens.Dialog.padding
         let inner = panel.bounds.width - pad * 2
-        titleLabel.frame = NSRect(x: pad, y: pad, width: inner, height: titleLabel.lineHeight)
-        let bodyHeight = ceil(body.sizeThatFits(NSSize(width: inner, height: 400)).height)
-        body.frame = NSRect(x: pad, y: titleLabel.frame.maxY + Tokens.Space.x2, width: inner, height: bodyHeight)
-        let y = body.frame.maxY + Tokens.Space.x5
-        let cw = max(confirm.fittingWidth, 88)
-        confirm.frame = NSRect(x: panel.bounds.width - pad - cw, y: y, width: cw, height: Tokens.Space.x8)
-        var trailing = confirm.frame.minX
-        if let alternate {
-            let aw = alternate.fittingWidth + Tokens.Space.x2
-            alternate.frame = NSRect(x: trailing - Tokens.Space.x2 - aw, y: y, width: aw, height: Tokens.Space.x8)
-            trailing = alternate.frame.minX
-        }
-        let xw = cancel.fittingWidth
-        cancel.frame = NSRect(x: trailing - Tokens.Space.x2 - xw, y: y, width: xw, height: Tokens.Space.x8)
+        header.frame = NSRect(x: pad, y: pad, width: inner, height: header.height(for: inner))
+        body.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Space.x2, width: inner, height: body.wrappedHeight(inner))
+        buttons.frame = NSRect(x: pad, y: panel.bounds.height - pad - DialogButtons.height, width: inner, height: DialogButtons.height)
     }
 }

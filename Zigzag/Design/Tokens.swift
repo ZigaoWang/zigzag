@@ -147,6 +147,57 @@ enum Tokens {
         static let groupPad: CGFloat = Space.x4
         /// Between one group on a page and the next section.
         static let groupGap: CGFloat = Space.x6
+        /// A page in a window of its own (Passwords): the strip its traffic lights sit in, above the header.
+        static let windowTop: CGFloat = Space.x6 + Space.x1
+        /// The middle column of a three-part page: the list of things in the chosen section (Passwords' logins).
+        static let listWidth: CGFloat = 300
+        /// A row of the middle list: a title over a quiet second line.
+        static let tallRowHeight: CGFloat = Space.x12
+        /// The text column of a detail pane, so a wide window doesn't stretch its lines.
+        static let detailWidth: CGFloat = 520
+    }
+
+    // MARK: - Dialogs
+
+    /// Every question Zigzag asks over a window or a page (a confirmation, saving a password, a permission, adding
+    /// an extension): one floating panel, the same padding, the same header and the same row of pill buttons.
+    enum Dialog {
+        static let width: CGFloat = 360
+        /// From the panel's edge to everything in it.
+        static let padding: CGFloat = Space.x5
+        /// The picture at the start of the header: a site's icon, an extension's, or a symbol on a soft circle.
+        static let iconSide: CGFloat = Space.x8
+        /// Between the header and what's under it, and before the buttons.
+        static let gap: CGFloat = Space.x4
+        /// The space between two buttons in the row.
+        static let buttonGap: CGFloat = Space.x2
+        /// The narrowest a button in the row gets, so a short "OK" still reads as a button.
+        static let minButtonWidth: CGFloat = Space.x16 + Space.x4
+    }
+
+    // MARK: - Brand moments
+
+    /// First run, the welcome and the import window: the brand's blue frame and what floats on it.
+    enum Welcome {
+        /// The wordmark on the hello screen.
+        static let wordmarkHeight: CGFloat = 72
+        /// The wordmark heading a window of the app's own (About, Import).
+        static let smallWordmarkHeight: CGFloat = 22
+        /// The glass card a step's choice sits on.
+        static let cardWidth: CGFloat = 560
+        /// Its padding.
+        static let cardPadding: CGFloat = Space.x5
+        /// A step's big title, in display weight: the one place type is this large.
+        static let titleSize: CGFloat = 30
+        /// The progress dots: the dot, and the long one for the step you're on.
+        static let dot: CGFloat = 6
+        static let currentDot: CGFloat = Space.x5 + 2
+        /// The main pill on a step and the welcome's one button.
+        static let buttonHeight: CGFloat = Space.x10
+        static let buttonWidth: CGFloat = 168
+        /// A question's two answers.
+        static let answerWidth: CGFloat = 200
+        static let answerHeight: CGFloat = Space.x10 + Space.x1
     }
 
     // MARK: - Type (SF Pro, three sizes for text, plus the display heading and the badge)
@@ -567,6 +618,13 @@ enum Tokens {
             guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
             return 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
         }
+        /// A status color's soft fill behind a note (a weak password's warning): the color at this opacity.
+        static let statusFillAlpha: CGFloat = 0.12
+        /// Light ink and fills on the brand's blue frame (the welcome, onboarding): the ribbon's own color, and how
+        /// much of it a quiet line, a quiet fill and a lit fill take.
+        static let onFrameSecondaryAlpha: CGFloat = 0.72
+        static let onFrameFillAlpha: CGFloat = 0.1
+        static let onFrameChosenAlpha: CGFloat = 0.2
     }
 
     // MARK: - Shadows (purposeful only)
