@@ -49,6 +49,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
+        // From a full-screen window, a sign-in popup opens over it in the same Space, not off in another one.
+        if parent?.styleMask.contains(.fullScreen) == true { window.collectionBehavior.insert(.fullScreenAuxiliary) }
         window.setFrameOrigin(origin)
         super.init(window: window)
         window.delegate = self
