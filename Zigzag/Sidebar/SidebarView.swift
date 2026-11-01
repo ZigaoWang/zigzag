@@ -678,7 +678,7 @@ final class SidebarView: NSView {
                 let fade = CABasicAnimation(keyPath: "opacity")
                 fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
                 fade.toValue = opacity
-                fade.duration = 0.15
+                fade.duration = Tokens.Motion.selection
                 fade.timingFunction = Tokens.Motion.easeOut
                 Tokens.Motion.withoutAnimation { layer.opacity = opacity }
                 layer.add(fade, forKey: "fade")
@@ -707,23 +707,6 @@ final class SidebarView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         tintDownloadsRing()
-    }
-
-    /// The button answers when a download lands in it: a small press inward and back.
-    func pulseDownloads() {
-        guard !Tokens.Motion.reduceMotion, let layer = downloadsButton.layer else { return }
-        // Struck by the download landing: a short press inward and back, like a click.
-        let size = downloadsButton.bounds.size
-        func scaled(_ k: CGFloat) -> NSValue {
-            NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
-                                                       CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
-        }
-        let pulse = CAKeyframeAnimation(keyPath: "transform")
-        pulse.values = [scaled(1), scaled(0.95), scaled(1)]
-        pulse.keyTimes = [0, 0.35, 1]
-        pulse.timingFunctions = [Tokens.Motion.easeOut, Tokens.Motion.easeOut]
-        pulse.duration = 0.26
-        layer.add(pulse, forKey: "pulse")
     }
 
     var downloadsAnchor: NSView { downloadsButton }

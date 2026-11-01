@@ -1063,11 +1063,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Sidebar hidden: its Downloads button stands in at the same corner, and the download flies there.
         if !sidebarShown { showFloatingDownloads() }
         let target = sidebarShown ? anchor : floatingDownloadsButton
-        // The landing is one moment: the file goes into the button, the button takes the hit, and the panel
-        // springs open out of it, showing the file come in, and tidies itself away a while after it's done.
+        // The landing is one moment: the file goes into the button and the panel opens out of it, showing the file
+        // come in, and tidies itself away a while after it's done. The ring on the button says the rest.
         let land = { [weak self] in
             guard let self else { return }
-            if sidebarShown { self.sidebar.pulseDownloads() }
             if refresh, !self.hasFloatingPanel, self.window?.isKeyWindow == true {
                 DownloadsPanel.reveal(from: target, in: self, closingAfter: item)
             } else if !sidebarShown, !DownloadsPanel.isOpen(in: self.window) {
