@@ -579,7 +579,9 @@ final class PrimaryButton: InteractiveView {
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(title: String) {
-        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
+        // Lowercase, like every button's words (`PillButton`); VoiceOver reads the title as written.
+        written = title
+        label = Label(title.lowercased(), font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
         super.init(frame: .zero)
         pressScales = true
         layer?.cornerCurve = .continuous
@@ -591,9 +593,10 @@ final class PrimaryButton: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    private var written = ""
     var title: String {
-        get { label.stringValue }
-        set { label.stringValue = newValue; setAccessibilityLabel(newValue); needsLayout = true }
+        get { written }
+        set { written = newValue; label.stringValue = newValue.lowercased(); setAccessibilityLabel(newValue); needsLayout = true }
     }
 
     var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
@@ -626,7 +629,8 @@ final class TextButton: InteractiveView {
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
-        label = Label(title, font: font, color: Tokens.Color.textSecondary)
+        written = title
+        label = Label(title.lowercased(), font: font, color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
@@ -638,10 +642,12 @@ final class TextButton: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    private var written = ""
     var title: String {
-        get { label.stringValue }
+        get { written }
         set {
-            label.stringValue = newValue
+            written = newValue
+            label.stringValue = newValue.lowercased()
             setAccessibilityLabel(newValue)
             invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
         }
