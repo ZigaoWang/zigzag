@@ -659,6 +659,15 @@ enum DebugBridge {
             }
         case "favorite":
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
+        case "pagecorner":
+            if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.card.needsLayout = true; controller.root.secondCard.needsLayout = true }
+        case "addfav", "addpin":
+            // addfav <url> <title>, addpin <url> <title>: a favorite or a pinned page, without loading its page.
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard let url = f.first.flatMap(URL.init(string:)) else { break }
+            let title = f.count > 1 ? f[1] : url.host() ?? ""
+            if name == "addfav" { _ = Library.shared.addFavorite(url: url, title: title) }
+            else { _ = Library.shared.addBookmark(url: url, title: title, to: controller.tabManager.currentSpaceID) }
         case "unfavorite":
             // unfavorite <title>: back to a tab, in whichever window holds its page.
             if let favorite = Library.shared.favorites.first(where: { $0.title == arg }) {
