@@ -359,13 +359,23 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let tab = selectedTab else { return }
         tab.setMuted(!tab.isMuted)
     }
-    @objc func closeOtherTabs(_ sender: Any?) {
-        guard let tab = selectedTab else { return }
-        closeManyWithUndoToast(tabManager.currentTabs.filter { $0 !== tab })
+    @objc func closeOtherTabs(_ sender: Any?) { closeManyWithUndoToast(otherTabs) }
+    @objc func closeTabsBelow(_ sender: Any?) { closeManyWithUndoToast(tabsBelow) }
+
+    /// The space's tabs but the one you're on and its split partner. Pinned pages never count: on one, it's every tab.
+    var otherTabs: [Tab] {
+        guard let tab = selectedTab else { return [] }
+        let partner = tabManager.partner(of: tab)
+        return tabManager.currentTabs.filter { $0 !== tab && $0 !== partner }
     }
-    @objc func closeTabsBelow(_ sender: Any?) {
-        guard let tab = selectedTab, let index = tabManager.currentTabs.firstIndex(where: { $0 === tab }) else { return }
-        closeManyWithUndoToast(Array(tabManager.currentTabs.dropFirst(index + 1)))
+
+    /// The tabs under the one you're on. Every tab is under a pinned page or favorite.
+    var tabsBelow: [Tab] {
+        guard let tab = selectedTab else { return [] }
+        let tabs = tabManager.currentTabs
+        let partner = tabManager.partner(of: tab)
+        let last = tabs.lastIndex { $0 === tab || $0 === partner }
+        return Array(tabs.dropFirst(last.map { $0 + 1 } ?? 0))
     }
 
     /// Several tabs closing at once say how many, with the Undo that brings them back, as Clear does.
@@ -463,7 +473,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(toggleMute(_:)):
             item.title = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
             return tab != nil
-        case #selector(closeOtherTabs(_:)), #selector(closeTabsBelow(_:)): return tab != nil && tab?.bookmarkID == nil
+        case #selector(closeOtherTabs(_:)): return !otherTabs.isEmpty
+        case #selector(closeTabsBelow(_:)): return !tabsBelow.isEmpty
         case #selector(selectSpaceByNumber(_:)):
             let spaces = Library.shared.spaces
             let index = item.tag - 1
