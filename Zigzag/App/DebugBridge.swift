@@ -377,6 +377,41 @@ enum DebugBridge {
                                         isARepeat: false, keyCode: codes[ch] ?? 0) {
                 NSApp.postEvent(e, atStart: false)
             }
+        case "menukey":
+            // menukey <char> [cmd|shift|ctrl|opt...]: the key equivalent as the menu bar sees it, then as the window does
+            // (which is where a real key press goes), logging which one took it.
+            let f = arg.split(separator: " ").map(String.init)
+            guard let ch = f.first, let window = controller.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            for m in f.dropFirst() {
+                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
+            }
+            let codes: [String: UInt16] = ["w": 13, "t": 17, "c": 8, "d": 2, "z": 6, "l": 37]
+            guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window.windowNumber, context: nil, characters: ch, charactersIgnoringModifiers: ch,
+                                           isARepeat: false, keyCode: codes[ch] ?? 0) else { break }
+            if NSApp.isActive, NSApp.keyWindow === window {
+                // Frontmost: the real path, window first, then the menu bar.
+                let handled = window.performKeyEquivalent(with: e)
+                debugLog("menukey \(arg): handled=\(handled) tabs=\(controller.tabManager.currentTabs.count) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "nil")")
+                break
+            }
+            // Behind another app there's no key window for the menu to send to, so do what it would: find the item with
+            // this key, then the first responder in this window's chain that takes its action, validated as a menu would.
+            func find(in menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(in: sub) { return found }
+                    if item.keyEquivalent == ch, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == flags, item.action != nil { return item }
+                }
+                return nil
+            }
+            guard let menuItem = NSApp.mainMenu.flatMap(find(in:)), let action = menuItem.action else { debugLog("menukey \(arg): no item"); break }
+            var responder: NSResponder? = window.firstResponder ?? window
+            while let r = responder, !r.responds(to: action) { responder = r.nextResponder }
+            let target: AnyObject? = responder ?? (NSApp.responds(to: action) ? NSApp : NSApp.delegate as AnyObject?)
+            let enabled = (target as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
+            if enabled { NSApp.sendAction(action, to: target, from: menuItem) }
+            debugLog("menukey \(arg): item=\(menuItem.title) target=\(target.map { "\(type(of: $0))" } ?? "nil") enabled=\(enabled) tabs=\(controller.tabManager.currentTabs.count) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "nil") peek=\(controller.peek.isVisible) bar=\(controller.commandBar.isVisible)")
         case "tlshot":
             if let image = (controller.window as? BrowserWindow)?.trafficLightsImage(), let tiff = image.tiffRepresentation,
                let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
