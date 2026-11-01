@@ -52,10 +52,23 @@ enum PageDialogs {
 
     static func openPanel(parameters: WKOpenPanelParameters, window: NSWindow?) async -> [URL]? {
         let panel = NSOpenPanel()
-        panel.canChooseFiles = true
+        // A page that asks for a folder gets a folder; one that asks for files gets files.
+        panel.canChooseFiles = !parameters.allowsDirectories
         panel.canChooseDirectories = parameters.allowsDirectories
         panel.allowsMultipleSelection = parameters.allowsMultipleSelection
         panel.resolvesAliases = true
+        // What the page accepts ("image/*", ".pdf"), as Safari offers it: other files are greyed out. WebKit keeps the
+        // list on its parameters without a public name; when it isn't there, or names nothing we know, any file goes.
+        if !parameters.allowsDirectories {
+            func strings(_ key: String) -> [String] {
+                parameters.responds(to: NSSelectorFromString(key)) ? (parameters.value(forKey: key) as? [String]) ?? [] : []
+            }
+            let types = strings("_acceptedMIMETypes").compactMap { mime -> UTType? in
+                mime.hasSuffix("/*") ? UTType(mime == "image/*" ? "public.image" : mime == "video/*" ? "public.movie" : mime == "audio/*" ? "public.audio" : "")
+                    : UTType(mimeType: mime)
+            } + strings("_acceptedFileExtensions").compactMap { UTType(filenameExtension: $0.hasPrefix(".") ? String($0.dropFirst()) : $0) }
+            if !types.isEmpty { panel.allowedContentTypes = types }
+        }
         let response: NSApplication.ModalResponse
         if let window {
             response = await withCheckedContinuation { continuation in
