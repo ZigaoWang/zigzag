@@ -19,7 +19,7 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
   ours is how it's set: light weights, one large display size against small text, display type tracked tight
   (`Sidebar.spaceNameKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
 - **Case, decided once.** Words Zigzag says itself, in the window's chrome, are lowercase: the space's name in the
-  sidebar, "tabs", "new tab", "clear", every pill button's title (`PillButton` shows it lowercase; VoiceOver reads it
+  sidebar, "tabs", "new tab", "clear", every pill button's title and a panel's action words (the site panel's tiles, "open downloads folder"; `PillButton` shows its title lowercase, VoiceOver reads it
   as written), the space editor's labels, and the names of Zigzag's own pages wherever the chrome names them
   ("settings", "history" in a tab's row and the address, `Tab.displayTitle`). Everything else keeps its case:
   content (a web page's title, a site's name, what you typed: the space's name in its own field reads as you wrote
