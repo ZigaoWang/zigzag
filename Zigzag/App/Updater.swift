@@ -69,6 +69,8 @@ nonisolated enum ProfileBackup {
     private static let restoreMarker = "Restore"
     private static let lastBuildKey = "LastRunBuild"
     private static let lastVersionKey = "LastRunVersion"
+    /// Ends the name of a backup made just before a restore, so a restore that wasn't wanted can be undone.
+    private static let beforeRestore = "before restore"
 
     private static func folder(in root: URL) -> URL { root.appendingPathComponent("Backups", isDirectory: true) }
 
@@ -78,7 +80,12 @@ nonisolated enum ProfileBackup {
         return found.filter(\.hasDirectoryPath).sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
-    static var latest: URL? { all().first }
+    /// The backups made at updates, newest first: the ones a restore puts back.
+    static func updates(in root: URL = Paths.support) -> [URL] {
+        all(in: root).filter { !$0.lastPathComponent.hasSuffix(beforeRestore) }
+    }
+
+    static var latest: URL? { updates().first }
 
     /// When the newest backup was made, from its name.
     static var latestDate: Date? {
@@ -106,18 +113,24 @@ nonisolated enum ProfileBackup {
         defaults.set(version, forKey: lastVersionKey)
     }
 
-    /// Named for when it was made and the version it was made from, when that's known.
+    /// Named for when it was made and the version it was made from, when that's known. Whole or not at all: a
+    /// file that can't be copied leaves no backup. The last three of each kind are kept.
     @discardableResult
-    static func make(from version: String?, in root: URL = Paths.support) -> URL? {
-        let name = [stamp.string(from: Date()), version].compactMap { $0 }.joined(separator: " ")
+    static func make(from version: String?, beforeRestoring: Bool = false, in root: URL = Paths.support) -> URL? {
+        let name = [stamp.string(from: Date()), version, beforeRestoring ? beforeRestore : nil].compactMap { $0 }.joined(separator: " ")
         let target = folder(in: root).appendingPathComponent(name, isDirectory: true)
         let manager = FileManager.default
         guard (try? manager.createDirectory(at: target, withIntermediateDirectories: true)) != nil else { return nil }
         for name in files {
             let source = root.appendingPathComponent(name)
-            if manager.fileExists(atPath: source.path) { try? manager.copyItem(at: source, to: target.appendingPathComponent(name)) }
+            guard manager.fileExists(atPath: source.path) else { continue }
+            guard (try? manager.copyItem(at: source, to: target.appendingPathComponent(name))) != nil else {
+                try? manager.removeItem(at: target)
+                return nil
+            }
         }
-        for old in all(in: root).dropFirst(kept) { try? manager.removeItem(at: old) }
+        let sameKind = all(in: root).filter { $0.lastPathComponent.hasSuffix(beforeRestore) == beforeRestoring }
+        for old in sameKind.dropFirst(kept) { try? manager.removeItem(at: old) }
         return target
     }
 
@@ -136,7 +149,8 @@ nonisolated enum ProfileBackup {
         NSApp.terminate(nil)
     }
 
-    /// At launch: if a restore was asked for, the backup's files replace the profile's.
+    /// At launch: if a restore was asked for, the backup's files replace the profile's. What's there now is
+    /// backed up first, and nothing live goes until its replacement is in place.
     static func restoreIfAsked(root: URL = Paths.support) {
         let manager = FileManager.default
         let marker = folder(in: root).appendingPathComponent(restoreMarker)
@@ -144,10 +158,31 @@ nonisolated enum ProfileBackup {
         try? manager.removeItem(at: marker)
         let source = folder(in: root).appendingPathComponent(name, isDirectory: true)
         guard manager.fileExists(atPath: source.path) else { return }
-        for file in files {
-            let from = source.appendingPathComponent(file), to = root.appendingPathComponent(file)
-            try? manager.removeItem(at: to)
-            if manager.fileExists(atPath: from.path) { try? manager.copyItem(at: from, to: to) }
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        guard make(from: version, beforeRestoring: true, in: root) != nil else { return }
+        // Each file is copied in beside the one it replaces, then swapped in whole.
+        var staged: [(temp: URL, target: URL)] = []
+        for file in files where manager.fileExists(atPath: source.appendingPathComponent(file).path) {
+            let temp = root.appendingPathComponent(".\(file).restoring")
+            try? manager.removeItem(at: temp)
+            guard (try? manager.copyItem(at: source.appendingPathComponent(file), to: temp)) != nil else {
+                for item in staged { try? manager.removeItem(at: item.temp) }
+                return
+            }
+            staged.append((temp, root.appendingPathComponent(file)))
+        }
+        var replacedAll = true
+        for item in staged {
+            let replaced = manager.fileExists(atPath: item.target.path)
+                ? (try? manager.replaceItemAt(item.target, withItemAt: item.temp)) != nil
+                : (try? manager.moveItem(at: item.temp, to: item.target)) != nil
+            if !replaced { replacedAll = false; try? manager.removeItem(at: item.temp) }
+        }
+        // A file the backup doesn't have (the history's journal, say) wouldn't match what came back, so it goes,
+        // once everything else is in place.
+        guard replacedAll else { return }
+        for file in files where !manager.fileExists(atPath: source.appendingPathComponent(file).path) {
+            try? manager.removeItem(at: root.appendingPathComponent(file))
         }
     }
 }
