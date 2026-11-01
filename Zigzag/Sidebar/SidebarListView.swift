@@ -976,6 +976,28 @@ final class SidebarListView: NSView {
         return (.tabs, count)
     }
 
+    /// A gap among the tab rows (`row` rows above it) as a position in the space's tab list. A split is one row but
+    /// two tabs, so the two counts differ once a split sits above the gap. `rows` are the tabs each row shows, top to
+    /// bottom; `list` is the tab list the position is for. The gap lands just before the next row's first tab.
+    static func listIndex(forRow row: Int, rows: [[UUID]], in list: [UUID]) -> Int {
+        for group in rows.dropFirst(max(row, 0)) {
+            if let position = group.compactMap({ list.firstIndex(of: $0) }).min() { return position }
+        }
+        return list.count
+    }
+
+    /// `listIndex(forRow:rows:in:)` for this list: its tab rows but the carried ones, and the space's tabs but the
+    /// ones being moved (taken out before they're put back in).
+    private func tabListIndex(forRow row: Int, carried: Set<SidebarItem>, moving: Set<UUID>) -> Int {
+        guard let manager else { return row }
+        let rows: [[UUID]] = items.filter { !carried.contains($0) }.compactMap { item in
+            guard case .tab(let id) = item else { return nil }
+            return [id] + (manager.tab(with: id).flatMap { manager.partner(of: $0) }.map { [$0.id] } ?? [])
+        }
+        let list = manager.tabs(in: shownSpaceID ?? manager.currentSpaceID).map(\.id).filter { !moving.contains($0) }
+        return Self.listIndex(forRow: row, rows: rows, in: list)
+    }
+
     /// The sidebar list under a screen point, in whichever window is in front there.
     static func list(at screenPoint: NSPoint) -> (BrowserWindowController, SidebarListView)? {
         for window in NSApp.orderedWindows where window.isVisible && window.frame.contains(screenPoint) {
@@ -1012,7 +1034,8 @@ final class SidebarListView: NSView {
         let point = convert(window.convertPoint(fromScreen: screenPoint), from: nil)
         let (section, index) = target(at: point.y, allowsPinned: allowsPinned, carried: [])
         let folder = section == .bookmarks ? folderForGap(in: withPlaceholder(items, section: section, index: index, carried: []), pointX: point.x) : nil
-        return (section, index, folder)
+        // Among the tabs, a position in the tab list rather than a count of rows.
+        return (section, section == .tabs ? tabListIndex(forRow: index, carried: [], moving: []) : index, folder)
     }
 
     /// Where a tab from another window would land, for a screen point over this list.
@@ -1433,9 +1456,11 @@ final class SidebarListView: NSView {
         // Nowhere new: back to its row, if that's on show. (Asked of this drag: the list's own has ended by now.)
         guard let section = drag.targetSection else { return shownSpaceID == drag.originSpace ? drag.view : nil }
         var landing: NSView?
+        // Among the tabs, the gap's row count as a position in the tab list (the dragged tab taken out first).
+        let listIndex = tabListIndex(forRow: drag.targetIndex, carried: drag.carried, moving: tab.map { [$0.id] } ?? [])
         switch (drag.item, section) {
         case (.tab, .tabs):
-            if let tab { delegate?.listMove(tab, to: drag.targetIndex, in: space) }
+            if let tab { delegate?.listMove(tab, to: listIndex, in: space) }
         case (.tab, .bookmarks):
             if let tab {
                 if tab.spaceID != space { delegate?.listMove(tab, to: 0, in: space) }
@@ -1452,14 +1477,14 @@ final class SidebarListView: NSView {
             delegate?.listMoveFolder(id, to: drag.targetIndex, in: space)
             landing = rows[.folder(id)]
         case (.bookmark(let id), .tabs):
-            delegate?.listUnbookmark(id, to: drag.targetIndex)
+            delegate?.listUnbookmark(id, to: listIndex)
             let tabs = manager.tabs(in: space)
-            landing = tabs.indices.contains(drag.targetIndex) ? row(for: tabs[drag.targetIndex]) : nil
+            landing = tabs.indices.contains(listIndex) ? row(for: tabs[listIndex]) : nil
         default:
             break
         }
         if drag.together.count > 1 {
-            carry(drag.together, around: drag.item, to: section, at: drag.targetIndex, folder: gapFolder)
+            carry(drag.together, around: drag.item, to: section, at: section == .tabs ? listIndex : drag.targetIndex, folder: gapFolder)
         }
         return tab.map(landingView(for:)) ?? landing
     }
