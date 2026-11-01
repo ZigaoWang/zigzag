@@ -131,6 +131,8 @@ class InteractiveView: NSView {
         guard isEnabled, let start = mouseDownEvent, !dragging else { return }
         let distance = hypot(event.locationInWindow.x - start.locationInWindow.x, event.locationInWindow.y - start.locationInWindow.y)
         if distance > 4, let onDragStart {
+            // Picked up, it's no longer being pressed: it doesn't keep the pressed look through the whole drag.
+            isPressed = false
             if onDragStart(start) {
                 dragging = true
                 isPressed = false
