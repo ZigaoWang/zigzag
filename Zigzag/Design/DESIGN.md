@@ -26,45 +26,55 @@ soft glass (favorite tiles, `Color.glassFill` with a light `glassEdge`).
 Glass is only for floating things. Never on the window background (see-through spaces handle that) and never under
 long reading text without the wash.
 
-## Type
+## Size scale
+
+One scale for the whole app, in `Tokens`: the same role is the same size everywhere, on pages, in panels and in
+the sidebar. Nothing else picks a size. Pages read calm, Mac-like; what you press is big and easy to hit.
 
 SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight.
 
-| Role | Token | Size, weight | Color |
+| Text | Token | Size, weight | For |
 |---|---|---|---|
-| Section label ("Tabs", the space name, a panel's group) | `Font.label()` | 12 medium | `textTertiary` |
-| Small print, captions, counts | `Font.small()` | 11 regular | `textSecondary` / `textTertiary` |
-| Body: panels, forms, page rows | `Font.body()` | 13 regular | `textPrimary` |
-| Sidebar rows and address | `Font.row()` | 14 regular | `textPrimary` |
-| A panel's title | `Font.heading()` | 15 semibold | `textPrimary` |
-| What a button or dropdown says | `Font.control()` | 14 medium | `textPrimary` |
-| Large | `Font.large()` | 18 | |
-| Display (one line per window) | `Brand.display`, `TypeSize.title` | 22 heavy | |
+| label | `Font.label()` | 12 medium, `textTertiary` | A section's label ("Tabs", the space name), a group's heading on a page |
+| | `Font.detail()` | 12 regular, `textSecondary` | A row's explanation under its title |
+| small | `Font.small()` | 11 | Small print, captions, counts, keycaps |
+| body | `Font.body()`, `Font.control()` | 13 regular; 13 medium | Panels, forms, menus; what a button or dropdown says |
+| row | `Font.row()` | 14 regular | A row's title in any list: sidebar rows and address, Settings' sections and rows, History, Passwords |
+| heading | `Font.heading()` | 15 semibold | A panel's title, a section's title on a page |
+| title | `Font.title()` | 17 semibold | A page's title in its header, a big panel's title, the command bar's field |
+| display | `Brand.display`, `TypeSize.display` | 22 heavy | Brand moments only, one line per window |
 
-Pages (Settings, History, Passwords) read a size up from panels, for a friendlier feel:
-
-| Role on a page | Token | Size, weight | Color |
+| Icon | Token | pt | For |
 |---|---|---|---|
-| The page's title in its header | `Font.pageTitle()` | 17 semibold | `textPrimary` |
-| A row's title in a group | `Font.pageRow()` | 15 medium | `textPrimary` |
-| The column of sections, a menu's items, History's titles | `Font.pageRow(.regular)` | 15 regular | `textPrimary` |
-| A row's explanation | `Font.pageDetail()` | 13 regular | `textSecondary` |
-| A group's heading (`Label.groupHeading`) | `Font.pageLabel()` | 13 medium | `textTertiary` |
+| glyph | `Symbol.glyph` | 17 | In an icon button: toolbar, bottom bar, pane header, find bar, a panel's close |
+| compact glyph | `Symbol.compactGlyph` | 14 | In a compact icon button, inside a row or a field |
+| row icon | `Metric.favicon`, `Symbol.row` | 18 slot, 16pt symbol | A favicon, or the symbol in its place, wherever a row has a picture |
+| inline | `Symbol.inline` | 11 | A lock, a disclosure chevron, a dropdown's arrows |
 
-Symbols are regular weight (`Symbol.weight`), monochrome outlines, sized to the text beside them, tinted `Color.icon`.
+| Hit target | Token | pt | For |
+|---|---|---|---|
+| icon button | `Metric.iconButton`, `IconButton(.regular)` | 32 | Everything above that takes a `glyph` |
+| compact icon button | `Metric.compactIconButton`, `IconButton(.compact)` | 24 | A tab's close and mute, the address's Reader and extensions, a row's trash |
+| control | `Metric.controlHeight` (`Page.controlHeight`) | 28 | Pill buttons, dropdowns, search fields, a menu's items |
+| row | `Metric.rowHeight` (`Page.rowHeight`) | 34 | A row in the sidebar, a list of places, History |
+
+Every symbol is regular weight (`Symbol.weight`), a monochrome outline tinted `Color.icon`, centered by its ink
+(`IconButton` measures it with `Symbol.inkOffset`), and the hover fill shows the whole target. A tick small enough to
+need it (a checkbox, a folder's cut-out icon) is the only bolder mark. The sidebar is never narrower than
+`Metric.sidebarMinWidth` (216), the room the traffic lights and the four toolbar buttons need.
 
 ## Spacing
 
 A 4pt grid (`Space.x1`...`x16`). Rhythm:
 
 - Sidebar: 8pt from its edges; rows `Metric.rowHeight` (34) with `Metric.rowGap` (2), so rows sit 36pt apart; 10pt
-  (`CardRow.inset`) from a row's edge to its icon and from the icon to its title; 16pt (`Metric.sectionGap`)
-  between groups.
+  (`CardRow.inset`) from a row's edge to its 18pt icon and from the icon to its title; 16pt (`Metric.sectionGap`)
+  between groups. The toolbar's and bottom bar's buttons are 32pt icon buttons.
 - Sections are separated by space and a quiet label (`Label.section`, in a `Metric.sectionLabelHeight` slot with the
   label low in it), never by divider lines.
 - Panels: 12pt padding (`Space.x3`), 4pt inset for rows inside them so a row's corners run with the panel's.
-- Pages: `Tokens.Page` (gutter 28, header 16 + 32 + 12, max width 880). Grouped rows are at least 56 tall with 20pt
-  (`groupPad`) from the group's edge and 16pt (`groupRowPad`) above and below their two lines; list rows are 38.
+- Pages: `Tokens.Page` (gutter 28, header 16 + 28 + 12, max width 880). Grouped rows are at least 44 tall with 16pt
+  (`groupPad`) from the group's edge and 12pt (`groupRowPad`) above and below their two lines; list rows are 34.
   Narrower than a row's text needs, its control moves under the text instead of squeezing it, and a header's search
   gives way to the title before either is cut.
 
@@ -137,7 +147,7 @@ something came from, answers at once, and can be interrupted.
 - **Window frame**: the space's color or gradient, its grain, optionally see-through. The sidebar and the gaps
   around the page are the frame.
 - **Sidebar**: on the frame. Top row: traffic lights, sidebar toggle, back, forward, reload (light, regular-weight
-  symbols). The address: a quiet pill (`Color.addressFill`, 14pt text). Favorites: glass tiles. Then the space name
+  symbols). The address: a quiet pill (`Color.addressFill`, `row` text, compact buttons). Favorites: glass tiles. Then the space name
   as a quiet section label, pinned rows, the "Tabs" label with Clear, New Tab, tabs. The bottom bar: downloads,
   space dots, +.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window.
@@ -148,8 +158,8 @@ something came from, answers at once, and can be interrupted.
   `CardRow`-style rows inset 4pt. Command bar, space editor, icon picker, site panel, downloads, previews, peek.
 - **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's. A solid panel
   (`panelBackground`, white in light mode), `Radius.panel`, a hairline `panelEdge`, a lit top rim (`topHighlight`),
-  and depth in two layers: a tight contact shadow (`contactShadow`, 1.5pt) under the wide panel shadow. 15pt items
-  `Page.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
+  and depth in two layers: a tight contact shadow (`contactShadow`, 1.5pt) under the wide panel shadow. `body` items
+  `Metric.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
   site's icon is missing; the chosen item has a check at its trailing end in the window's accent. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
   of menu items and speaks the item the keys reach. A click outside closes it and goes no further. Panels under it
@@ -168,7 +178,7 @@ something came from, answers at once, and can be interrupted.
 - **Dialog** (`Tokens.Dialog`): `DialogHeader` (a picture, the question in the heading's weight, a quiet line under
   it), the explaining text, then `DialogButtons` (the answers at the trailing end, the main one last and filled; a
   quiet choice alone at the leading end). Confirmations, page dialogs, extension and save-password prompts use it.
-- **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Page.controlHeight` (32) tall, `Font.control()`:
+- **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Metric.controlHeight` (28) tall, `Font.control()`:
   - Secondary (`PillButton` `.plain`, `TextButton.form`): `controlFill` (white; a lighter step of the surface in
     dark mode), a hairline `controlEdge` and a faint `controlShadow` (1.5pt, 0.5 down). A symbol may lead the title.
   - Primary (`PillButton` `.prominent`, `PrimaryButton`): the one thing to do on a surface, a dark filled pill
