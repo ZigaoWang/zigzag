@@ -183,6 +183,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             SitePanel.closeCurrent()
             DownloadsPanel.closeCurrent()
             SpaceEditorPanel.current?.close()
+            // Over a peek, Esc and ⌘L would go to the peek's page or the tab behind it: put the peek away first.
+            controller.peek.close()
             controller.previews.hide()
             controller.linkStatus.show(nil, in: controller.root.cardFrame)
             isVisible = true
