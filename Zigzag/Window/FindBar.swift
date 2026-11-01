@@ -365,6 +365,10 @@ class FloatingPanelView: NSView {
         if showsGlass, material == nil {
             let glass = PanelMaterial.make(radius: radius)
             super.addSubview(glass, positioned: .below, relativeTo: surface)
+            // Behind the surface and everything in it, whatever order the effect view's own layer asks for.
+            glass.wantsLayer = true
+            glass.layer?.zPosition = -1
+            surface.layer?.zPosition = 1
             material = glass
         }
         if let material {
