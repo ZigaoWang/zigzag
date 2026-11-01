@@ -333,7 +333,7 @@ enum BookmarkEditor {
 /// One field in a small Zigzag panel, for renaming something that has no row of its own (a favorite).
 final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
     private let field = FilledField(placeholder: "Name")
-    private let save = PrimaryButton(title: "Rename")
+    private let save = PillButton(title: "Rename", style: .prominent)
     private var done: ((String) -> Void)?
     private var monitor: Any?
 

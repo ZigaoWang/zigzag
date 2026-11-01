@@ -448,11 +448,11 @@ extension NSScrollView {
     }
 }
 
-/// The one filled button style: the main action on a screen, in its window's accent. Use one per screen.
+/// The primary action on a screen: the dark filled pill (`ButtonLook.primary`), one per screen. Kept for the forms
+/// that still build on it; new code uses `PillButton(style: .prominent)`, which looks the same.
 final class PrimaryButton: InteractiveView {
     private let label: Label
-    private var themeToken: SignalToken?
-    /// Its window's accent unless set.
+    /// Kept for callers from when the primary took its window's accent; the primary is dark whatever the theme.
     var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
     /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
     var isDestructive = false { didSet { stateDidChange(animated: false) } }
@@ -463,14 +463,13 @@ final class PrimaryButton: InteractiveView {
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
     init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.semibold), color: Brand.Theme.brand.onAccent)
+        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
         super.init(frame: .zero)
-        themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }
-        layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         addSubview(label)
         setAccessibilityRole(.button)
         setAccessibilityLabel(title)
+        stateDidChange(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -482,24 +481,104 @@ final class PrimaryButton: InteractiveView {
 
     var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
 
-    override var intrinsicContentSize: NSSize { NSSize(width: ceil(max(fittingWidth, 72)), height: Tokens.Space.x8) }
+    override var intrinsicContentSize: NSSize { NSSize(width: ceil(max(fittingWidth, 72)), height: Tokens.Page.controlHeight) }
 
     override func layout() {
         super.layout()
+        layer?.cornerRadius = bounds.height / 2
         let h = label.lineHeight
         label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: (bounds.height - h) / 2, width: bounds.width - Tokens.Space.x8, height: h)
         label.alignment = .center
     }
 
     override func stateDidChange(animated: Bool) {
-        // Its window's accent: the one primary action on a screen.
-        let theme = fixedTheme ?? Brand.Theme.for(self)
-        let base = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
-        label.textColor = customInk ?? (isDestructive ? .white : theme.onAccent)
-        let color = !isEnabled ? base.withAlphaComponent(Tokens.Opacity.disabled) : isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
-        layer?.set(backgroundColor: cgColor(color), animated: false)
+        let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : nil)
+        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : nil))
+    }
+}
+
+/// A text button: quiet text that fills under the pointer ("Clear", "Skip"), or with `form` the secondary look
+/// (`ButtonLook.secondary`). Kept for the forms that still build on it; new code uses `PillButton`.
+final class TextButton: InteractiveView {
+    private let label: Label
+    /// The secondary look (white, a hairline, a faint shadow) rather than text alone.
+    var showsFillAtRest = false { didSet { needsLayout = true; stateDidChange(animated: false) } }
+    /// Overrides the label color (destructive actions).
+    var textColor: NSColor? { didSet { stateDidChange(animated: false) } }
+    /// Moves the title off center, to leave room for something beside it (a keycap).
+    var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
+
+    init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
+        label = Label(title, font: font, color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.control
+        layer?.cornerCurve = .continuous
+        addSubview(label)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(title)
     }
 
+    required init?(coder: NSCoder) { fatalError() }
+
+    var title: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            setAccessibilityLabel(newValue)
+            invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
+        }
+    }
+
+    /// Says what just happened in place of the title for a moment ("Cleared"), then goes back.
+    func flash(_ text: String, for seconds: TimeInterval = 1.6) {
+        let original = title
+        title = text
+        isEnabled = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            self?.title = original
+            self?.isEnabled = true
+        }
+    }
+
+    /// The button used in forms and windows: the secondary look.
+    static func form(_ title: String) -> TextButton {
+        let button = TextButton(title: title, font: Tokens.Font.control())
+        button.showsFillAtRest = true
+        return button
+    }
+
+    /// `textWidth` already carries the label's own inset; the label is centered, so the padding is even.
+    var fittingWidth: CGFloat { label.textWidth + (showsFillAtRest ? Tokens.Space.x6 : Tokens.Space.x3) }
+
+    /// So stacks and form rows can size it like any control.
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: ceil(fittingWidth), height: showsFillAtRest ? Tokens.Page.controlHeight : Tokens.Space.x7Height)
+    }
+
+    override func layout() {
+        super.layout()
+        if showsFillAtRest {
+            layer?.cornerRadius = bounds.height / 2
+            updateButtonShadowPath()
+        }
+        let h = label.lineHeight
+        label.alignment = .center
+        label.frame = NSRect(x: labelOffset, y: (bounds.height - h) / 2, width: bounds.width, height: h)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let ink = applyButtonLook(showsFillAtRest ? .secondary : .quiet)
+        // Text alone dims only its words when it can't be used, not the whole button.
+        if !showsFillAtRest { alphaValue = 1 }
+        label.textColor = textColor ?? ink
+        label.alphaValue = isEnabled || showsFillAtRest ? 1 : Tokens.Opacity.disabled
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled, let event = NSApp.currentEvent else { return false }
+        onClick?(event)
+        return true
+    }
 }
 
 /// A text field on a soft fill, ringed in the accent while typing: the one look for fields in panels and windows.
@@ -562,10 +641,20 @@ final class FilledField: NSView {
 
     @objc private func editingChanged() { updateColors() }
 
+    /// The page look: white with a hairline edge and a faint shadow, like the secondary button beside it, where a
+    /// panel's field is a soft fill. A page's header sets it for its search.
+    var isOutlined = false { didSet { updateColors(); needsLayout = true } }
+
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = Tokens.Color.fieldFill.cgColor
-            layer?.borderColor = (isEditing ? (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(0.6) : .clear).cgColor
+            layer?.backgroundColor = (isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
+            let ring = (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(Tokens.Color.focusAlpha)
+            layer?.borderColor = (isEditing ? ring : isOutlined ? Tokens.Color.controlEdge : .clear).cgColor
+            layer?.borderWidth = isEditing ? 1.5 : isOutlined ? Tokens.Metric.hairline : 1.5
+            layer?.shadowOpacity = isOutlined ? 1 : 0
+            layer?.shadowColor = Tokens.Color.controlShadow.cgColor
+            layer?.shadowRadius = Tokens.Shadow.controlRadius
+            layer?.shadowOffset = CGSize(width: 0, height: -Tokens.Shadow.controlDrop)
         }
     }
 
@@ -582,6 +671,10 @@ final class FilledField: NSView {
     override func layout() {
         super.layout()
         layer?.cornerRadius = isPill ? bounds.height / 2 : Tokens.Radius.field
+        if isOutlined {
+            let r = layer?.cornerRadius ?? 0
+            layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: r, cornerHeight: r, transform: nil)
+        }
         let h = ceil(field.intrinsicContentSize.height)
         var x = (isPill ? Tokens.Space.x3 : Tokens.Space.x2) + 2
         if let symbolView {

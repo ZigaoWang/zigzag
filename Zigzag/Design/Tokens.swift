@@ -73,6 +73,12 @@ enum Tokens {
         static let edgeRevealWidth: CGFloat = Space.x2
         static let resizeHandleWidth: CGFloat = Space.x2
         static let hairline: CGFloat = 1
+        /// Keyboard focus: the ring's width, and its gap outside the control.
+        static let focusRing: CGFloat = 2
+        static let focusGap: CGFloat = 2
+        /// Zigzag's switch (`Toggle`): track and knob.
+        static let toggleSize = NSSize(width: 36, height: 22)
+        static let toggleKnob: CGFloat = 18
         static let commandBarWidth: CGFloat = 640
         static let commandBarFieldHeight: CGFloat = Space.x12 + Space.x2
         static let commandBarRowHeight: CGFloat = Space.x10
@@ -127,24 +133,26 @@ enum Tokens {
         /// The header: its top and bottom padding, and the height of what's in it (title, search, buttons).
         static let headerTop: CGFloat = Space.x4
         static let headerBottom: CGFloat = Space.x3
-        static let controlHeight: CGFloat = Space.x7Height
+        /// One control height on pages and in panels: pill buttons, dropdowns, the search field, a menu's rows.
+        static let controlHeight: CGFloat = Space.x8
         static var headerHeight: CGFloat { headerTop + controlHeight + headerBottom }
         /// The widest the content gets; past it the page centers it.
         static let maxWidth: CGFloat = 880
-        /// A row in a list: History's pages, Settings' sections.
-        static let rowHeight: CGFloat = Metric.rowHeight
+        /// A row in a list: History's pages, Settings' sections. Roomier than the sidebar's, for 15pt text.
+        static let rowHeight: CGFloat = Space.x10 - 2
         /// How far a row's hover fill reaches past its text, on each side.
-        static let rowInset: CGFloat = Space.x2
+        static let rowInset: CGFloat = Space.x2 + 2
         /// The wordmark in the header: about the title's cap height, so the two read as one line.
-        static let wordmarkHeight: CGFloat = 15
+        static let wordmarkHeight: CGFloat = 16
         /// The search field in the header.
-        static let searchWidth: CGFloat = 260
+        static let searchWidth: CGFloat = 280
         /// A column of sections at the left (Settings).
-        static let columnWidth: CGFloat = 232
+        static let columnWidth: CGFloat = 240
         /// A row in a group on a page (Settings): one line of text, or more with its explanation under it.
-        static let groupRowHeight: CGFloat = Space.x12
-        /// From a group's edge to the text and controls in its rows.
-        static let groupPad: CGFloat = Space.x4
+        static let groupRowHeight: CGFloat = Space.x12 + Space.x2
+        /// From a group's edge to the text and controls in its rows, and above and below a row's two lines.
+        static let groupPad: CGFloat = Space.x5
+        static let groupRowPad: CGFloat = Space.x4
         /// Between one group on a page and the next section.
         static let groupGap: CGFloat = Space.x6
         /// A page in a window of its own (Passwords): the strip its traffic lights sit in, above the header.
@@ -198,6 +206,7 @@ enum Tokens {
         /// A question's two answers.
         static let answerWidth: CGFloat = 200
         static let answerHeight: CGFloat = Space.x10 + Space.x1
+        static let groupGap: CGFloat = Space.x6 + Space.x1
     }
 
     // MARK: - Type (SF Pro, three sizes for text, plus the display heading and the badge)
@@ -216,6 +225,13 @@ enum Tokens {
         static let title: CGFloat = 22
         /// The count on an extension's button: the one place text has to fit a 10pt capsule.
         static let badge: CGFloat = 8
+        /// Pages (Settings, History, Passwords) read a size up from panels: a row's title, the column of sections,
+        /// a menu's items.
+        static let pageRow: CGFloat = 15
+        /// A page's title in its header.
+        static let pageTitle: CGFloat = 17
+        /// A group's heading on a page, and a row's explanation under its title.
+        static let pageLabel: CGFloat = 13
     }
 
     enum Font {
@@ -226,6 +242,15 @@ enum Tokens {
         static func row(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.row, weight: weight) }
         /// A quiet section label: "Tabs", the space's name over its pinned tabs.
         static func label() -> NSFont { .systemFont(ofSize: TypeSize.label, weight: .medium) }
+        /// A row's title on a page (medium), the column of sections and a menu's items (regular).
+        static func pageRow(_ weight: NSFont.Weight = .medium) -> NSFont { .systemFont(ofSize: TypeSize.pageRow, weight: weight) }
+        /// A row's explanation on a page, in `textSecondary`.
+        static func pageDetail() -> NSFont { .systemFont(ofSize: TypeSize.pageLabel) }
+        /// A group's heading on a page, in `textTertiary`.
+        static func pageLabel() -> NSFont { .systemFont(ofSize: TypeSize.pageLabel, weight: .medium) }
+        static func pageTitle() -> NSFont { .systemFont(ofSize: TypeSize.pageTitle, weight: .semibold) }
+        /// What a button or a dropdown says.
+        static func control() -> NSFont { .systemFont(ofSize: TypeSize.row, weight: .medium) }
     }
 
     // MARK: - Symbols (one weight everywhere)
@@ -546,6 +571,24 @@ enum Tokens {
         static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09))
         static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06))
 
+        /// The secondary button, a dropdown, a page's search field: white with a hairline and a faint shadow, a lighter
+        /// step of the surface in dark mode. Hover is a hair grayer, pressed a step darker; never a scale.
+        static let controlFill = dynamic(light: hex(0xFFFFFF), dark: hex(0xFFFFFF, alpha: 0.09))
+        static let controlHover = dynamic(light: hex(0xF6F6F7), dark: hex(0xFFFFFF, alpha: 0.13))
+        static let controlPressed = dynamic(light: hex(0xECECEE), dark: hex(0xFFFFFF, alpha: 0.06))
+        static let controlEdge = dynamic(light: hex(0x000000, alpha: 0.12), dark: hex(0xFFFFFF, alpha: 0.1))
+        static let controlShadow = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0x000000, alpha: 0.3))
+        /// The one primary action on a surface: a dark filled pill (light in dark mode), whatever the space.
+        static let primaryFill = dynamic(light: hex(0x1D1D1F), dark: hex(0xF2F2F4))
+        static let primaryHover = dynamic(light: hex(0x343437), dark: hex(0xFFFFFF))
+        static let primaryPressed = dynamic(light: hex(0x000000), dark: hex(0xD9D9DD))
+        static let onPrimary = dynamic(light: hex(0xFFFFFF), dark: hex(0x1D1D1F))
+        /// A switch that's off: a clear gray track, so on and off never look alike.
+        static let toggleOff = dynamic(light: hex(0x000000, alpha: 0.14), dark: hex(0xFFFFFF, alpha: 0.2))
+        /// Keyboard focus on a drawn control: a ring in the window's accent at this opacity, `Metric.focusRing` wide,
+        /// `Metric.focusGap` outside the control.
+        static let focusAlpha: CGFloat = 0.6
+
         static let separator = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08))
 
         /// The page card when there is no page, and its edge.
@@ -639,6 +682,9 @@ enum Tokens {
         /// The selected row's card and a selected tile: a faint shadow just under them.
         static let liftRadius: CGFloat = 3
         static let liftDrop: CGFloat = 1
+        /// A secondary button's faint shadow: just enough to sit on the white it's on.
+        static let controlRadius: CGFloat = 1.5
+        static let controlDrop: CGFloat = 0.5
 
         /// The drop as a layer offset: flipped views measure y downward, so the sign follows the view.
         static func panelOffset(flipped: Bool) -> CGSize { CGSize(width: 0, height: flipped ? panelDrop : -panelDrop) }

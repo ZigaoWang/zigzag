@@ -121,10 +121,63 @@ class GlassTile: InteractiveView {
     }
 }
 
+// MARK: - Button looks
+
+/// The looks a button takes, the same everywhere (`PillButton`, `PrimaryButton`, `TextButton.form`, `DropdownButton`):
+/// - `.secondary`: white with a hairline edge and a faint shadow (a lighter step of the surface in dark mode);
+/// - `.primary`: the one thing to do on a surface, a dark filled pill (light in dark mode), whatever the space;
+/// - `.quiet`: no fill until the pointer is over it.
+/// Hover is instant and a hair grayer; pressed is a step darker, at once, never a scale or a bounce.
+enum ButtonLook { case secondary, primary, quiet }
+
+extension InteractiveView {
+    /// Paints the look for the control's state and returns the color its text and symbol take. `tint` replaces the
+    /// primary's dark fill (a light button on the brand's blue, a destructive red), with `ink` on it.
+    @discardableResult
+    func applyButtonLook(_ look: ButtonLook, tint: NSColor? = nil, ink: NSColor? = nil) -> NSColor {
+        let fill: NSColor?
+        var text = Tokens.Color.textPrimary
+        switch look {
+        case .secondary:
+            fill = isPressed ? Tokens.Color.controlPressed : isHovered || isSelected ? Tokens.Color.controlHover : Tokens.Color.controlFill
+        case .primary:
+            if let tint {
+                fill = isPressed ? (tint.shadow(withLevel: 0.15) ?? tint) : isHovered ? (tint.highlight(withLevel: 0.08) ?? tint) : tint
+                text = ink ?? .white
+            } else {
+                fill = isPressed ? Tokens.Color.primaryPressed : isHovered ? Tokens.Color.primaryHover : Tokens.Color.primaryFill
+                text = ink ?? Tokens.Color.onPrimary
+            }
+        case .quiet:
+            fill = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
+            text = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        }
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
+        let edged = look == .secondary
+        Tokens.Motion.withoutAnimation {
+            layer?.borderWidth = edged ? Tokens.Metric.hairline : 0
+            layer?.borderColor = cgColor(Tokens.Color.controlEdge)
+            layer?.shadowOpacity = edged && isEnabled ? 1 : 0
+            layer?.shadowColor = cgColor(Tokens.Color.controlShadow)
+            layer?.shadowRadius = Tokens.Shadow.controlRadius
+            layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.controlDrop : -Tokens.Shadow.controlDrop)
+        }
+        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+        return text
+    }
+
+    /// The faint shadow's shape, set once the control has its size so it isn't worked out from its contents.
+    func updateButtonShadowPath() {
+        let radius = layer?.cornerRadius ?? 0
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+    }
+}
+
 // MARK: - Pill buttons
 
-/// A capsule button: a symbol, a title, or both. `.plain` sits on a soft fill, `.quiet` shows a fill only under the
-/// pointer, `.prominent` is the accent (one per surface, for the thing to do).
+/// A capsule button: a symbol, a title, or both. `.plain` is the secondary look (white, a hairline, a faint shadow),
+/// `.quiet` shows a fill only under the pointer, `.prominent` is the primary, a dark filled pill (one per surface,
+/// for the thing to do).
 final class PillButton: InteractiveView {
     enum Style { case plain, quiet, prominent }
     let style: Style
@@ -140,7 +193,7 @@ final class PillButton: InteractiveView {
             invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
         }
     }
-    /// The accent for `.prominent`; nil takes its window's.
+    /// A fill for `.prominent` in place of the dark one (a red for what can't be undone); nil is the primary's.
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
     /// For an action that can't be undone (Delete): `.prominent` turns red, the others take red ink.
     var isDestructive = false { didSet { stateDidChange(animated: false) } }
@@ -150,7 +203,7 @@ final class PillButton: InteractiveView {
 
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
-        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Page.controlHeight))
         layer?.cornerCurve = .continuous
         iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.body) }
@@ -179,9 +232,12 @@ final class PillButton: InteractiveView {
         }
     }
 
+    /// Room on each side of the title: a touch more for the outlined and filled looks, which read as objects.
+    private var sidePad: CGFloat { style == .quiet ? Tokens.Space.x3 : Tokens.Space.x4 - 2 }
+
     var fittingWidth: CGFloat {
         guard hasTitle else { return Tokens.Page.controlHeight }
-        return ceil(Tokens.Space.x3 * 2 + label.inkWidth + (hasIcon ? Tokens.Space.x4 + Tokens.Space.x1 + 2 : 0))
+        return ceil(sidePad * 2 + label.inkWidth + (hasIcon ? Tokens.Space.x4 + Tokens.Space.x1 + 2 : 0))
     }
 
     override var intrinsicContentSize: NSSize { NSSize(width: fittingWidth, height: Tokens.Page.controlHeight) }
@@ -189,6 +245,7 @@ final class PillButton: InteractiveView {
     override func layout() {
         super.layout()
         layer?.cornerRadius = bounds.height / 2
+        updateButtonShadowPath()
         let side = Tokens.Space.x4
         guard hasTitle else {
             iconView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
@@ -204,30 +261,19 @@ final class PillButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor?
         let ink: NSColor
         switch style {
         case _ where customFill != nil:
-            let base = customFill ?? .clear
-            fill = isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.12) ?? base) : base
-            ink = customInk ?? Tokens.Color.textPrimary
+            ink = applyButtonLook(.primary, tint: customFill, ink: customInk ?? Tokens.Color.textPrimary)
         case .prominent:
-            let theme = Brand.Theme.for(self)
-            let base = isDestructive ? Tokens.Color.destructive : tint ?? theme.accent
-            fill = isPressed ? (base.shadow(withLevel: 0.15) ?? base) : isHovered ? (base.highlight(withLevel: 0.08) ?? base) : base
-            ink = isDestructive ? .white : theme.onAccent
-        case .plain:
-            fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
-            ink = Tokens.Color.textPrimary
-        case .quiet:
-            fill = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
-            ink = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            ink = isDestructive ? applyButtonLook(.primary, tint: Tokens.Color.destructive, ink: .white)
+                : applyButtonLook(.primary, tint: tint, ink: tint.map { _ in .white })
+        case .plain: ink = applyButtonLook(.secondary)
+        case .quiet: ink = applyButtonLook(.quiet)
         }
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         let tinted = style == .prominent || customFill != nil
         label.textColor = isDestructive && !tinted ? Tokens.Color.destructive : ink
-        iconView.contentTintColor = tinted ? ink : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.icon
-        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+        iconView.contentTintColor = tinted ? ink : isHovered || isSelected || style == .plain ? Tokens.Color.textPrimary : Tokens.Color.icon
     }
 }
 
