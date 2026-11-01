@@ -268,7 +268,8 @@ final class FavoritesView: NSView {
     }
 }
 
-final class FavoriteTile: InteractiveView {
+/// A favorite: a glass tile with the site's icon, or a split's two icons side by side.
+final class FavoriteTile: GlassTile {
     let bookmark: Bookmark?
     /// A split favorite's right page, shown beside the left one in the same tile.
     let partner: Bookmark?
@@ -284,7 +285,8 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
+    /// Its page is open in the background: a fine edge, so you can tell at a glance which are loaded.
+    var isOpen = false { didSet { showsOpenEdge = isOpen } }
     var iconImage: NSImage? { icon.image }
     var partnerIconImage: NSImage? { partnerIcon.image }
     var onClose: (() -> Void)?
@@ -311,8 +313,6 @@ final class FavoriteTile: InteractiveView {
         self.bookmark = bookmark
         self.partner = partner
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.tile
-        layer?.cornerCurve = .continuous
         addSubview(icon)
         partnerIcon.isHidden = partner == nil
         addSubview(partnerIcon)
@@ -389,32 +389,16 @@ final class FavoriteTile: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         if isPlaceholder {
+            // Where the first favorite will land: the drop target's look.
+            setLifted(false)
             layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.12))
             layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
             layer?.borderWidth = 1.5
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // The one you're on is lit; one that's open in the background has a fine edge, so you can tell at a glance
-        // which are loaded without anything fading or moving.
-        icon.alphaValue = 1
         // Resting tiles are soft glass; the one you're on is the same card as the tab you're on.
-        let fill: NSColor
-        if isSelected {
-            fill = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
-        } else if isPressed {
-            fill = Tokens.Color.pressedFill
-        } else if isHovered {
-            fill = Tokens.Color.glassHover
-        } else {
-            fill = Tokens.Color.glassFill
-        }
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
-        setLifted(isSelected)
-        if !isSelected {
-            layer?.borderWidth = Tokens.Metric.hairline
-            layer?.borderColor = cgColor(isOpen ? Tokens.Color.openEdge : Tokens.Color.glassEdge)
-        }
+        super.stateDidChange(animated: animated)
     }
 
     private static let iconSide: CGFloat = 22

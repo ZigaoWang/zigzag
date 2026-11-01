@@ -28,8 +28,8 @@ class SidebarRowView: InteractiveView {
     /// Space reserved at the trailing edge for accessory buttons.
     var trailingAccessoryWidth: CGFloat { 0 }
 
-    /// From the row's edge to its icon, and from the icon to the title.
-    static let inset: CGFloat = Tokens.Space.x2 + 2
+    /// From the row's edge to its icon, and from the icon to the title, as every row has it.
+    static let inset = CardRow.inset
 
     override func layout() {
         super.layout()
