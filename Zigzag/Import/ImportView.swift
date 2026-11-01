@@ -487,8 +487,15 @@ private final class SourceRow: InteractiveView {
                 button.onClick = { [weak self, weak button] _ in
                     NSWorkspace.shared.recycle([exportFile]) { _, error in
                         DispatchQueue.main.async {
-                            button?.title = error == nil ? "Moved to Trash" : "Couldn’t Move It"
-                            button?.isEnabled = false
+                            if error == nil {
+                                button?.title = "Moved to Trash"
+                                button?.isEnabled = false
+                            } else {
+                                // Not a dead end: say so, and take you to the file to delete it yourself.
+                                self?.detail.stringValue += "\nZigzag couldn’t move it to the Trash. Show it in Finder and delete it there."
+                                button?.title = "Show in Finder"
+                                button?.onClick = { _ in NSWorkspace.shared.activateFileViewerSelecting([exportFile]) }
+                            }
                             self?.needsLayout = true
                         }
                     }
