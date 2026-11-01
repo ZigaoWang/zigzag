@@ -211,6 +211,8 @@ final class TabManager {
 
     func select(_ tab: Tab) {
         Autofill.shared.hide()
+        // Favorites belong to every space: they open in the one you're in.
+        if tab.isFavorite { tab.spaceID = currentSpaceID }
         if tab.spaceID != currentSpaceID {
             currentSpaceID = tab.spaceID
             changed.send(.space)
@@ -466,8 +468,6 @@ final class TabManager {
     /// side by side again.
     func openBookmark(_ bookmark: Bookmark) {
         let tab = liveTab(for: bookmark)
-        // Favorites belong to every space: they open in the one you're in.
-        if Library.shared.isFavorite(bookmark.id) { tab.spaceID = currentSpaceID }
         if let pinned = Library.shared.pinnedSplit(containing: bookmark.id), split(for: tab) == nil,
            let otherBookmark = Library.shared.bookmark(pinned.left == bookmark.id ? pinned.right : pinned.left) {
             let other = liveTab(for: otherBookmark)
