@@ -430,9 +430,6 @@ final class BrowserRootView: ColorView {
         secondCard.squaresRightCorners = panes.right.map { windowCorners(of: $0, attached: attached) } ?? (false, false)
         card.isAttached = attached
         secondCard.isAttached = attached
-        let edge = sidebarVisible ? sidebarWidth : -1
-        card.castsOnSidebar = !isEdgeToEdge && panes.left.minX <= edge + 1
-        secondCard.castsOnSidebar = !isEdgeToEdge && (panes.right?.minX ?? .infinity) <= edge + 1
         if let right = panes.right {
             secondCard.isHidden = false
             secondCard.frame = right

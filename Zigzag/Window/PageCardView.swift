@@ -32,12 +32,7 @@ final class PageCardView: NSView {
     var squaresRightCorners = (top: false, bottom: false) { didSet { if squaresRightCorners != oldValue { needsLayout = true } } }
     /// Meeting the window's edges beside the sidebar: its corners curve like the window's, so a split's two panes
     /// match across the gap and the corner by the sidebar matches the window's.
-    var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true } } }
-    /// Its left edge is beside the sidebar: it casts a soft shade onto the frame there and catches the light along
-    /// that edge, so the page reads as a sheet laid on the frame.
-    var castsOnSidebar = false { didSet { if castsOnSidebar != oldValue { needsLayout = true; refreshColors() } } }
-    private let cast = CastShadow()
-    private let rim = GradientStroke(width: 1)
+    var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true; refreshColors() } } }
 
     /// The corner it rounds to: none edge to edge, the generous sheet's beside the sidebar, a card's floating.
     private var cornerRadius: CGFloat { edgeToEdge ? 0 : isAttached ? Self.attachedRadius : Tokens.Radius.card }
@@ -47,6 +42,9 @@ final class PageCardView: NSView {
     #else
     static let attachedRadius = Tokens.Radius.attached
     #endif
+    /// Beside the sidebar it meets the frame cleanly, its corners and a faint hairline only; floating, the card
+    /// keeps its whisper of shadow.
+    private var castsShadow: Bool { !edgeToEdge && !isAttached }
 
     /// Squares the corners off (or rounds them back) over `duration`, in step with the sidebar sliding away or back.
     func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
@@ -60,9 +58,7 @@ final class PageCardView: NSView {
         clip.layer?.cornerRadius = radius
         edge.cornerRadius = radius
         edge.opacity = on ? 0 : 1
-        rim.layer.opacity = on || !castsOnSidebar ? 0 : 1
-        [cast.ambient, cast.contact].forEach { $0.opacity = on || !castsOnSidebar ? 0 : 1 }
-        layer?.shadowOpacity = on ? 0 : 1
+        layer?.shadowOpacity = castsShadow ? 1 : 0
         CATransaction.commit()
         needsLayout = true
     }
@@ -149,12 +145,6 @@ final class PageCardView: NSView {
         edge.borderWidth = Tokens.Metric.hairline
         edge.zPosition = 10
         clip.layer?.addSublayer(edge)
-        rim.layer.zPosition = 11
-        rim.layer.startPoint = CGPoint(x: 0, y: 0.5)
-        rim.layer.endPoint = CGPoint(x: 1, y: 0.5)
-        clip.layer?.addSublayer(rim.layer)
-        layer?.insertSublayer(cast.ambient, at: 0)
-        layer?.insertSublayer(cast.contact, at: 1)
         header.isHidden = true
         clip.addSubview(header)
         refreshColors()
@@ -188,15 +178,6 @@ final class PageCardView: NSView {
             clip.layer?.maskedCorners = corners
             edge.maskedCorners = corners
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
-            // The shade comes only from the edge by the sidebar: it falls on the frame there, never on a split's
-            // other page or past the window's edges.
-            let strip = CGRect(x: 0, y: 0, width: min(bounds.width, radius * 2 + Tokens.Space.x6), height: bounds.height)
-            cast.set(frame: bounds, path: MaterialShape.rounded(strip, radius: radius))
-            rim.set(frame: clip.bounds, path: MaterialShape.rounded(clip.bounds.insetBy(dx: 0.5, dy: 0.5), radius: max(0, radius - 0.5)))
-            let reach = clip.bounds.width > 0 ? Tokens.Material.pageRimReach / clip.bounds.width : 0
-            rim.layer.locations = [0, NSNumber(value: Double(reach))]
-            rim.layer.opacity = isEdgeToEdge || !castsOnSidebar ? 0 : 1
-            [cast.ambient, cast.contact].forEach { $0.opacity = isEdgeToEdge || !castsOnSidebar ? 0 : 1 }
         }
     }
 
@@ -213,10 +194,7 @@ final class PageCardView: NSView {
             edge.borderWidth = Tokens.Metric.hairline
             header.alphaValue = isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1
             layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
-            let dark = effectiveAppearance.isDark
-            cast.apply(Tokens.Material.pageAmbient, isDark: dark)
-            let light = Tokens.Material.pageRim.cg(dark)
-            rim.layer.colors = [light, light.copy(alpha: 0)!]
+            layer?.shadowOpacity = castsShadow ? 1 : 0
         }
     }
 
@@ -239,8 +217,6 @@ final class PageCardView: NSView {
         placeholder.isHidden = placeholderImage == nil
         edge.removeFromSuperlayer()
         clip.layer?.addSublayer(edge)
-        rim.layer.removeFromSuperlayer()
-        clip.layer?.addSublayer(rim.layer)
     }
 
     /// Puts the shown tab's PDF viewer (or Settings) over its page, or takes it away. Typing goes to it, as it did to
