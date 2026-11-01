@@ -478,7 +478,7 @@ enum Tokens {
         static let panelBackground = dynamic(light: hex(0xFCFCFC), dark: hex(0x2A2A2D))
         /// The panel color washed over a floating panel's glass: enough to keep text calm and readable on any page,
         /// little enough that the glass still reads as glass.
-        static let panelWash = dynamic(light: hex(0xFFFFFF, alpha: 0.72), dark: hex(0x1F1F22, alpha: 0.72))
+        static let panelWash = dynamic(light: hex(0xFFFFFF, alpha: 0.8), dark: hex(0x1F1F22, alpha: 0.76))
         static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0xFFFFFF, alpha: 0.10))
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.13), dark: hex(0x000000, alpha: 0.42))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
