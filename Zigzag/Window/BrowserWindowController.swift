@@ -1230,6 +1230,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens a URL the way the user asked, switching to an existing tab when the page is already open.
     func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true) {
+        // A page that comes to the front, say a link from Mail, isn't left under the command bar the empty window opened with.
+        if disposition == .foregroundTab || disposition == .currentTab, commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
         if allowSwitch, disposition == .foregroundTab, let existing = tabManager.existingTab(for: url) {
             tabManager.select(existing)
             return
