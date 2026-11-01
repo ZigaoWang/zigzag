@@ -1086,7 +1086,7 @@ final class SidebarListView: NSView {
         if carriedRowShown, let block = drag.carried.compactMap({ rows[$0]?.frame }).reduce(nil, { $0?.union($1) ?? $1 }) {
             if y > block.maxY { y -= block.height + rowGap } else if y >= block.minY { y = block.minY }
         }
-        return target(at: y, allowsPinned: true, carried: drag.carried)
+        return target(at: y, allowsPinned: manager?.isPrivate == false, carried: drag.carried)
     }
 
     /// The row as one side of a split drop (see TabManager.canSplit); nil for rows that aren't a page.
@@ -1244,7 +1244,9 @@ final class SidebarListView: NSView {
         let inWindow = Self.window(at: mouse) === window.windowController
 
         // Another window's list shows where a tab would land there; a pinned page can land among its pinned tabs too.
-        if let (_, list) = hit, list !== self, drag.item.canBeFavorite {
+        // Only where it would be taken: neither window private, as the drop itself asks (`listMoveToWindow`).
+        if let (controller, list) = hit, list !== self, drag.item.canBeFavorite,
+           manager?.isPrivate == false, !controller.tabManager.isPrivate {
             if externalTarget !== list { externalTarget?.externalHover(at: nil) }
             externalTarget = list
             list.externalHover(at: mouse, allowsPinned: { if case .bookmark = drag.item { true } else { false } }())
