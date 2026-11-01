@@ -1676,12 +1676,16 @@ extension BrowserWindowController: SidebarDelegate {
         let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
         if let split {
-            let tab: Tab? = switch dragged {
-            case .tab(let id): tabManager.tab(with: id)
-            case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
-            default: nil
+            // A pinned page not loaded yet opens as part of the change, so ⌘Z puts it back unloaded.
+            pageChange("Split View") { [weak self] in
+                guard let self else { return }
+                let tab: Tab? = switch dragged {
+                case .tab(let id): tabManager.tab(with: id)
+                case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
+                default: nil
+                }
+                if let tab { joinFavoriteWithUndo(tab, onto: split.id, onRight: split.onRight) }
             }
-            if let tab { joinFavoriteWithUndo(tab, onto: split.id, onRight: split.onRight) }
             return true
         }
         // Each a tile after the one before (a split's two pages make one), in list order.
@@ -1721,13 +1725,16 @@ extension BrowserWindowController: SidebarDelegate {
         let side = root.splitDropHint.side
         root.splitDropHint.show(nil)
         guard let side, canDropBeside(item), let current = tabManager.selectedTab else { return false }
-        let tab: Tab? = switch item {
-        case .tab(let id): tabManager.tab(with: id)
-        case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
-        default: nil
+        // A pinned page not loaded yet opens as part of the change, so ⌘Z puts it back unloaded.
+        pageChange("Split View") { [weak self] in
+            guard let self else { return }
+            let tab: Tab? = switch item {
+            case .tab(let id): tabManager.tab(with: id)
+            case .bookmark(let id): Library.shared.bookmark(id).map(tabManager.pageTab(for:))
+            default: nil
+            }
+            if let tab { splitWithUndo(current, with: tab, otherOnRight: side == .right) }
         }
-        guard let tab else { return false }
-        splitWithUndo(current, with: tab, otherOnRight: side == .right)
         return true
     }
 
