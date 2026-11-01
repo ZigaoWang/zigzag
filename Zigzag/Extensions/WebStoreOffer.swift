@@ -8,7 +8,7 @@ final class WebStoreOffer: FloatingPanelView {
     private let icon = NSImageView()
     private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let line = Label("Works in Zigzag", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let add = PrimaryButton(title: "Add to Zigzag")
+    private let add = PillButton(title: "Add to Zigzag", style: .prominent)
     private let close = IconButton(symbol: "xmark", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Not Now")
     private let id: String
     private let spinner = Spinner()
@@ -146,16 +146,18 @@ final class WebStoreOffer: FloatingPanelView {
     }
 
     private func layoutContent() {
-        let h = bounds.height, pad: CGFloat = 14
-        icon.frame = NSRect(x: pad, y: (h - 36) / 2, width: 36, height: 36)
+        let h = bounds.height, pad = Tokens.Space.x4, gap = Tokens.Space.x2
+        let iconSide = Tokens.Space.x8 + Tokens.Space.x1
+        icon.frame = NSRect(x: pad, y: (h - iconSide) / 2, width: iconSide, height: iconSide)
         let cb = close.frame.width
-        close.frame.origin = NSPoint(x: bounds.width - pad + 4 - cb, y: (h - cb) / 2)
-        let aw = max(add.fittingWidth, 120)
-        add.frame = NSRect(x: close.frame.minX - 8 - aw, y: (h - Tokens.Space.x8) / 2, width: aw, height: Tokens.Space.x8)
-        spinner.frame = NSRect(x: close.frame.minX - 8 - 18, y: (h - 18) / 2, width: 18, height: 18)
-        done.frame = NSRect(x: close.frame.minX - 8 - 24, y: (h - 24) / 2, width: 24, height: 24)
+        close.frame.origin = NSPoint(x: bounds.width - pad + Tokens.Space.x1 - cb, y: (h - cb) / 2)
+        let aw = add.fittingWidth, bh = Tokens.Page.controlHeight
+        add.frame = NSRect(x: close.frame.minX - gap - aw, y: (h - bh) / 2, width: aw, height: bh)
+        let spin = Tokens.Space.x4 + 2, check = Tokens.Space.x6
+        spinner.frame = NSRect(x: close.frame.minX - gap - spin, y: (h - spin) / 2, width: spin, height: spin)
+        done.frame = NSRect(x: close.frame.minX - gap - check, y: (h - check) / 2, width: check, height: check)
         let right = add.isHidden ? (done.isHidden ? spinner.frame.minX : done.frame.minX) : add.frame.minX
-        let x = icon.frame.maxX + 12, w = right - x - 12
+        let x = icon.frame.maxX + Tokens.Space.x3, w = right - x - Tokens.Space.x3
         let block = name.lineHeight + 1 + line.lineHeight
         name.frame = NSRect(x: x, y: (h - block) / 2, width: w, height: name.lineHeight)
         line.frame = NSRect(x: x, y: name.frame.maxY + 1, width: w, height: line.lineHeight)
