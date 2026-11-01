@@ -293,7 +293,7 @@ enum PageStyle {
         let page = Tokens.Page.self, radius = Tokens.Radius.self, size = Tokens.TypeSize.self
         let metrics = [
             "--gutter: \(px(page.gutter))", "--header-top: \(px(page.headerTop))", "--header-bottom: \(px(page.headerBottom))",
-            "--control: \(px(page.controlHeight))", "--max: \(px(page.maxWidth))", "--row: \(px(page.rowHeight))",
+            "--control-height: \(px(page.controlHeight))", "--max: \(px(page.maxWidth))", "--row: \(px(page.rowHeight))",
             "--row-inset: \(px(page.rowInset))", "--wordmark: \(px(page.wordmarkHeight))", "--search: \(px(page.searchWidth))",
             "--radius-small: \(px(radius.small))", "--radius-control: \(px(radius.control))", "--radius-field: \(px(radius.field))", "--radius-row: \(px(radius.row))",
             "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--label: \(px(size.label))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
@@ -326,14 +326,14 @@ enum PageStyle {
     .page-header.scrolled { box-shadow: 0 1px 0 var(--line); }
     .page-header > .inner { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }
-    .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control); margin-right: auto; min-width: 0; }
+    .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); margin-right: auto; min-width: 0; }
     .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
     .page-title .divider { width: 1px; height: 20px; background: var(--line); flex: none; }
     .page-title h1 { font-size: var(--title); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
-    .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control) / 2); padding: 0 14px 0 10px;
-              height: var(--control); width: var(--search); max-width: 100%; box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); }
+    .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control-height) / 2); padding: 0 14px 0 10px;
+              height: var(--control-height); width: var(--search); max-width: 100%; box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); }
     .search:focus-within { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) var(--focus), transparent); }
     .search svg { flex: none; width: 16px; padding: 1px; color: var(--faint); }
     .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent);
@@ -345,7 +345,7 @@ enum PageStyle {
     /* A pill button (PillButton): the secondary look, white with a hairline edge and a faint shadow. `.quiet` shows a
        fill only under the pointer; `.prominent` is the primary, a dark filled pill, one per page. Hover and press are
        instant; press darkens, never scales. */
-    .button { height: var(--control); padding: 0 14px; border-radius: calc(var(--control) / 2); background: var(--control); color: var(--text);
+    .button { height: var(--control-height); padding: 0 14px; border-radius: calc(var(--control-height) / 2); background: var(--control); color: var(--text);
               box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); font-size: var(--control-text);
               font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
     .button:hover, .button[aria-expanded="true"] { background: var(--control-hover); }
@@ -366,7 +366,7 @@ enum PageStyle {
     @keyframes menu-in { from { opacity: 0; transform: scale(.97); } }
     @media (prefers-reduced-motion: reduce) { .menu.open { animation-name: menu-fade; } }
     @keyframes menu-fade { from { opacity: 0; } }
-    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-row);
+    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control-height); padding: 0 var(--space-3); border-radius: var(--radius-row);
                               font-size: var(--body); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
