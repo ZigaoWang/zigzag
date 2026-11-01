@@ -1,20 +1,23 @@
 import AppKit
 import WebKit
 
-/// The floating card that shows a tab's page when you hover it in the sidebar.
+/// The glass card that shows a tab's page when you hover it in the sidebar: the picture inset a little, its corners
+/// running with the panel's, and the title and address under it.
 final class TabPreviewView: FloatingPanelView {
     private let imageView = NSImageView()
     private let placeholder = FaviconView()
-    private let title = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-    private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
     private let imageClip = NSView()
-    static let footerHeight = Tokens.Space.x12
+    static let footerHeight = Tokens.Metric.previewCaptionHeight
+    /// From the panel's edge to the picture; the picture's corners are the panel's less this, so the two run together.
+    private static let inset = Tokens.Space.x1
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         imageClip.wantsLayer = true
         imageClip.layer?.masksToBounds = true
-        imageClip.layer?.cornerRadius = Tokens.Radius.thumbnail
+        imageClip.layer?.cornerRadius = Tokens.Radius.panel - Self.inset
         imageClip.layer?.cornerCurve = .continuous
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.imageAlignment = .alignTop
@@ -48,13 +51,13 @@ final class TabPreviewView: FloatingPanelView {
     }
 
     private func layoutContent() {
-        let pad = Tokens.Space.x2
+        let pad = Self.inset
         let footer = Self.footerHeight
         imageClip.frame = NSRect(x: pad, y: pad, width: bounds.width - pad * 2, height: bounds.height - footer - pad)
         imageView.frame = imageClip.bounds
         let icon = Tokens.Space.x8
         placeholder.frame = NSRect(x: imageClip.frame.midX - icon / 2, y: imageClip.frame.midY - icon / 2, width: icon, height: icon)
-        let textX = pad + Tokens.Space.x1
+        let textX = Tokens.Space.x3 - Label.inset
         let titleH = title.lineHeight, detailH = detail.lineHeight
         let top = imageClip.frame.maxY + (footer - titleH - detailH) / 2
         title.frame = NSRect(x: textX, y: top, width: bounds.width - textX * 2, height: titleH)
