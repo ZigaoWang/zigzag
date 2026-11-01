@@ -16,6 +16,7 @@
 		087468A86D6129B66892F5D9 /* Autofill.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB39442D06F521CAE1203D0 /* Autofill.swift */; };
 		089B04904C4690F9A9C519AC /* WelcomeWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12B055E9A9D600A2CAA8EAA /* WelcomeWindow.swift */; };
 		08FACDB4874ECAC187142B05 /* FolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */; };
+		AB48223278A8FC393B94EB44 /* FaviconRankTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF3822E5A703ACAC8234206 /* FaviconRankTests.swift */; };
 		7D5BF55A96BCB108346C530B /* SplitDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 811CB9C61A2981F8FE756A3B /* SplitDropTests.swift */; };
 		9FD1440AB3984D4BE07577E6 /* FavoriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 182E5791F4F0934865BB6828 /* FavoriteTests.swift */; };
 		09844A022115C19F24950AE6 /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = C88A57E41A091A03DA97E06C /* CHANGELOG.md */; };
@@ -286,6 +287,7 @@
 		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
 		CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryClustersTests.swift; sourceTree = "<group>"; };
 		CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTests.swift; sourceTree = "<group>"; };
+		DFF3822E5A703ACAC8234206 /* FaviconRankTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconRankTests.swift; sourceTree = "<group>"; };
 		811CB9C61A2981F8FE756A3B /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		182E5791F4F0934865BB6828 /* FavoriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTests.swift; sourceTree = "<group>"; };
 		D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordsWindow.swift; sourceTree = "<group>"; };
@@ -629,6 +631,7 @@
 				8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */,
 				53584D3A138EABED88285971 /* DialogPasswordFixesTests.swift */,
 				CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */,
+				DFF3822E5A703ACAC8234206 /* FaviconRankTests.swift */,
 				811CB9C61A2981F8FE756A3B /* SplitDropTests.swift */,
 				182E5791F4F0934865BB6828 /* FavoriteTests.swift */,
 				CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */,
@@ -943,6 +946,7 @@
 				247132AF897197093E229872 /* CRXPackageTests.swift in Sources */,
 				CE5616DC4C93BC6AEDB917D3 /* DialogPasswordFixesTests.swift in Sources */,
 				08FACDB4874ECAC187142B05 /* FolderTests.swift in Sources */,
+				AB48223278A8FC393B94EB44 /* FaviconRankTests.swift in Sources */,
 				7D5BF55A96BCB108346C530B /* SplitDropTests.swift in Sources */,
 				9FD1440AB3984D4BE07577E6 /* FavoriteTests.swift in Sources */,
 				038B1D66977B38EB772C0ECD /* HistoryClustersTests.swift in Sources */,

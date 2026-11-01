@@ -68,9 +68,9 @@ final class FaviconStore {
     /// Picks the best declared icon (falling back to /favicon.ico), downloads, caches, and returns it.
     func resolve(pageURL: URL, links: [[String: String]], completion: @escaping (NSImage?) -> Void) {
         guard let key = key(for: pageURL) else { completion(nil); return }
-        let candidates = rank(links: links, pageURL: pageURL)
+        let (icons, touch) = Self.rank(links: links, pageURL: pageURL)
         let hasIcon = memory[key] != nil || FileManager.default.fileExists(atPath: file(for: key).path)
-        fetchFirst(candidates, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasIcon), completion: completion)
+        fetchFirst(icons, touch: touch, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasIcon), completion: completion)
     }
 
     /// Whether a page's icon becomes its whole site's. A page deep in a site can wear its own (each claude.ai artifact
@@ -86,69 +86,79 @@ final class FaviconStore {
               // A Google app's icon isn't at the host's root; it arrives with its page instead.
               !key.contains("/") else { return }
         inFlight.insert(key)
-        var components = URLComponents()
-        components.scheme = url.scheme ?? "https"
-        components.host = url.host()
-        components.path = "/favicon.ico"
-        var candidates: [URL] = []
-        if let ico = components.url { candidates.append(ico) }
-        components.path = "/apple-touch-icon.png"
-        if let touch = components.url { candidates.append(touch) }
-        fetchFirst(candidates, key: key) { [weak self] _ in self?.inFlight.remove(key) }
+        let (icons, touch) = Self.rank(links: [], pageURL: url)
+        fetchFirst(icons, touch: touch, key: key) { [weak self] _ in self?.inFlight.remove(key) }
     }
 
-    private func rank(links: [[String: String]], pageURL: URL) -> [URL] {
-        func size(_ link: [String: String]) -> Int {
+    /// Where to look for a page's icon, best first: the site's own icons, and apart from them its home-screen ones,
+    /// made for a phone's screen on a solid square of their own, only for a site with no icon of its own.
+    /// /favicon.ico stands in when the page declares no icon, /apple-touch-icon.png when it declares no home-screen
+    /// one.
+    nonisolated static func rank(links: [[String: String]], pageURL: URL) -> (icons: [URL], touch: [URL]) {
+        func size(_ link: [String: String]) -> Int? {
             let sizes = link["sizes"] ?? ""
             if sizes == "any" { return 512 }
-            return sizes.split(separator: " ").compactMap { Int($0.split(separator: "x").first ?? "") }.max() ?? 16
+            return sizes.split(separator: " ").compactMap { Int($0.split(separator: "x").first ?? "") }.max()
         }
-        // The site's own icon, drawn for small sizes, comes first: an SVG, then the smallest of 64px or more, then of
-        // 32px or more. A touch icon only after those: it's made for a home screen, on a solid square of its own.
-        let scored = links.compactMap { link -> (URL, Int)? in
-            guard let href = link["href"], let url = URL(string: href) else { return nil }
-            let s = size(link)
+        // An SVG first, then the smallest of 64px or more, then of 32px or more, then the rest, largest first.
+        var icons: [(URL, Int)] = [], touch: [(URL, Int)] = []
+        for link in links {
+            guard let href = link["href"], let url = URL(string: href) else { continue }
             let isSVG = (link["type"] ?? "").contains("svg") || url.pathExtension.lowercased() == "svg"
-            let isTouch = (link["rel"] ?? "").contains("apple-touch")
-            var score = s >= 64 ? 2000 - s : s >= 32 ? 1000 - s : s
-            if isSVG { score = 2100 }
-            if isTouch { score = s >= 32 ? 500 : s }
-            return (url, score)
+            if (link["rel"] ?? "").contains("apple-touch") {
+                // A home-screen icon that doesn't say is the usual 180px.
+                touch.append((url, size(link) ?? 180))
+            } else {
+                let s = size(link) ?? 16
+                icons.append((url, isSVG ? 2100 : s >= 64 ? 2000 - s : s >= 32 ? 1000 - s : s))
+            }
         }
-        var result = scored.sorted { $0.1 > $1.1 }.map(\.0)
         var components = URLComponents()
-        components.scheme = pageURL.scheme
+        components.scheme = pageURL.scheme ?? "https"
         components.host = pageURL.host()
         components.port = pageURL.port
-        components.path = "/favicon.ico"
-        if let fallback = components.url, !result.contains(fallback) { result.append(fallback) }
-        components.path = "/apple-touch-icon.png"
-        if let touch = components.url, !result.contains(touch) { result.append(touch) }
-        return result
+        if icons.isEmpty {
+            components.path = "/favicon.ico"
+            if let fallback = components.url { icons.append((fallback, 0)) }
+        }
+        if touch.isEmpty {
+            components.path = "/apple-touch-icon.png"
+            if let fallback = components.url { touch.append((fallback, 0)) }
+        }
+        return (icons.sorted { $0.1 > $1.1 }.map(\.0), touch.sorted { $0.1 > $1.1 }.map(\.0))
     }
 
     /// Without `save`, the icon is only handed back, for the one page that declared it.
-    /// A 16px icon (too small to stay sharp anywhere bigger than a tab) is kept only until a larger one turns up
-    /// further down the list; 32px and up is the site's own icon, and wins over a home-screen one on a square.
-    private func fetchFirst(_ candidates: [URL], key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
+    /// A 16px icon (too small to stay sharp anywhere bigger than a tab) is kept only until a larger one of the site's
+    /// own turns up further down the list. The home-screen icons in `touch` are tried only when the site has none
+    /// of its own at all: a small icon of its own still wins over a home-screen tile.
+    private func fetchFirst(_ candidates: [URL], touch: [URL] = [], key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
         func finish(_ image: NSImage) {
             if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
         }
         func found(_ image: NSImage, rest: [URL]) {
             // An icon that draws nothing (an SVG styled by the page, which AppKit can't follow) is passed over.
             if Self.isBlank(image) {
-                fetchFirst(rest, key: key, save: save, small: small, completion: completion)
+                fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
                 return
             }
             let pixels = image.representations.map(\.pixelsWide).max() ?? 0
             if pixels > 0, pixels < 32, !rest.isEmpty {
-                fetchFirst(rest, key: key, save: save, small: small ?? image, completion: completion)
+                fetchFirst(rest, touch: touch, key: key, save: save, small: small ?? image, completion: completion)
+            } else if pixels > 0, pixels < 32, let small, (small.representations.map(\.pixelsWide).max() ?? 0) >= pixels {
+                finish(small)
             } else {
                 finish(image)
             }
         }
         guard let next = candidates.first else {
-            if let small { finish(small) } else { completion(nil) }
+            if let small {
+                finish(small)
+            } else if !touch.isEmpty {
+                fetchFirst(touch, key: key, save: save, completion: completion)
+            } else {
+                completion(nil)
+            }
             return
         }
         let rest = Array(candidates.dropFirst())
@@ -162,7 +172,7 @@ final class FaviconStore {
             if ok, let data = result?.0, let image = NSImage(data: data), image.isValid, image.size.width > 0 {
                 found(image, rest: rest)
             } else {
-                fetchFirst(rest, key: key, save: save, small: small, completion: completion)
+                fetchFirst(rest, touch: touch, key: key, save: save, small: small, completion: completion)
             }
         }
     }
@@ -211,7 +221,7 @@ final class FaviconStore {
         return true
     }
 
-    /// The largest size, in points, an icon shows at without being stretched on a Retina display.
+    /// The size, in points, an icon fills pixel for pixel on a Retina display; drawn any larger, it's scaled up.
     static func sharpSide(of image: NSImage) -> CGFloat {
         CGFloat(image.representations.map(\.pixelsWide).max() ?? 0) / 2
     }
