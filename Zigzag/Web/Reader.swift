@@ -449,6 +449,12 @@ final class ReaderControls: FloatingPanelView {
         if options.superview != nil { hideOptions() }
         super.removeFromSuperview()
     }
+
+    /// Reader closed with the panel open: the panel, and its listener for Esc and clicks, go with it.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil, monitor != nil { hideOptions() }
+    }
 }
 
 /// How it reads: size, typeface, colours. Three even rows, each one control across the panel.
