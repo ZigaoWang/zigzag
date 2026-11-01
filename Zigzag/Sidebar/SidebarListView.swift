@@ -755,8 +755,18 @@ final class SidebarListView: NSView {
         let now = lit.count == 1 ? lit[0] : nil
         let from = cardRow
         cardRow = now
-        guard let now, let from, from !== now, from.superview === self, drag == nil, window != nil,
-              !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion, abs(from.frame.minY - now.frame.minY) < 600 else { return }
+        guard from !== now else { return }
+        guard let now, let from, from.superview === self, drag == nil, window != nil,
+              !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion, abs(from.frame.minY - now.frame.minY) < 600 else {
+            // No slide this time: a card still traveling stops where it is, and the row it was going to shows its
+            // own at once, so two cards never show together.
+            cardTrip += 1
+            travelingCard.layer?.removeAllAnimations()
+            travelingCard.isHidden = true
+            waitingRow?.holdsCardBack = false
+            waitingRow = nil
+            return
+        }
         waitingRow?.holdsCardBack = false
         let card = travelingCard
         // From wherever the card is now: a slide interrupted by another click carries on from there.
