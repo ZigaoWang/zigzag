@@ -295,18 +295,14 @@ final class DownloadsPanelView: FloatingPanelView {
     /// One short menu, like the sidebar's: a "Save Downloads To" heading over the folder, Ask Each Time and
     /// Choose Folder…, the one in use checked.
     private func showMoreMenu() {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(.sectionHeader(title: "Save Downloads To"))
         let folder = DownloadManager.folder
-        let folderItem = SidebarMenus.Item(FileManager.default.displayName(atPath: folder.path)) { DownloadPlace.pick(0) }
-        folderItem.state = DownloadManager.asksWhereToSave ? .off : .on
-        let ask = SidebarMenus.Item("Ask Each Time") { DownloadPlace.pick(1) }
-        ask.state = DownloadManager.asksWhereToSave ? .on : .off
-        menu.addItem(folderItem)
-        menu.addItem(ask)
-        menu.addItem(SidebarMenus.Item("Choose Folder…") { DownloadPlace.pick(2) })
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: more.isFlipped ? more.bounds.maxY + 4 : -4), in: more)
+        let asks = DownloadManager.asksWhereToSave
+        MenuPanel.show([
+            .header("Save Downloads To"),
+            .item(.init(title: FileManager.default.displayName(atPath: folder.path), isChecked: !asks) { DownloadPlace.pick(0) }),
+            .item(.init(title: "Ask Each Time", isChecked: asks) { DownloadPlace.pick(1) }),
+            .item(.init(title: "Choose Folder…") { DownloadPlace.pick(2) }),
+        ], from: more)
     }
 
     func show(from anchor: NSView, arrival: Arrival = .pop) {
@@ -321,8 +317,9 @@ final class DownloadsPanelView: FloatingPanelView {
         growsFrom = CGPoint(x: 0.1, y: 1)
         present(arrival: arrival)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
-            // Only its own window: keys and clicks in Settings or another window are theirs.
-            guard let self, event.window === self.window else { return event }
+            // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
+            // takes Esc and the click that closes it.
+            guard let self, event.window === self.window, MenuPanel.current == nil else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { self.close(); return nil }
                 return event

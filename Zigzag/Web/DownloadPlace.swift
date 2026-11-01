@@ -3,13 +3,13 @@ import AppKit
 /// Where downloads go, as one menu shared by Settings and the downloads panel, so the two always agree: the folder
 /// (with its own icon), Ask Each Time, and Other… to pick a folder.
 enum DownloadPlace {
-    static func configure(_ button: MenuButton) {
+    static func configure(_ button: DropdownButton) {
         let folder = DownloadManager.folder
         let icon = NSWorkspace.shared.icon(forFile: folder.path)
         icon.size = NSSize(width: 16, height: 16)
-        button.options = [MenuButton.Option(title: FileManager.default.displayName(atPath: folder.path), image: icon),
-                          MenuButton.Option(title: "Ask Each Time", image: nil),
-                          MenuButton.Option(title: "Other…", image: nil)]
+        button.options = [DropdownButton.Option(title: FileManager.default.displayName(atPath: folder.path), image: icon),
+                          DropdownButton.Option(title: "Ask Each Time", image: nil),
+                          DropdownButton.Option(title: "Other…", image: nil)]
         button.selectedIndex = DownloadManager.asksWhereToSave ? 1 : 0
     }
 

@@ -88,11 +88,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
-            let menu = NSMenu()
-            menu.addItem(SidebarMenus.Item("Stop Camera and Microphone", symbol: "stop.circle") { tab.stopCapture() })
-            menu.addItem(SidebarMenus.Item("Ask Again Next Time", symbol: "arrow.counterclockwise") { SitePermissions.forget(host: host) })
-            let button = self.sidebar.address.captureButton
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+            MenuPanel.show([
+                .item(.init(title: "Stop Camera and Microphone", symbol: "stop.circle") { tab.stopCapture() }),
+                .item(.init(title: "Ask Again Next Time", symbol: "arrow.counterclockwise") { SitePermissions.forget(host: host) }),
+            ], from: self.sidebar.address.captureButton)
         }
         sidebar.nowPlaying.onClick = { [weak self] _ in
             if let tab = self?.nowPlayingTab { self?.tabManager.select(tab) }

@@ -125,8 +125,9 @@ final class SitePanel: FloatingPanelView {
         panel.present(arrival: .pop)
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
-            // Only its own window: keys and clicks in Settings or another window are theirs.
-            guard let panel, event.window === panel.window else { return event }
+            // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
+            // takes Esc and the click that closes it.
+            guard let panel, event.window === panel.window, MenuPanel.current == nil else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { panel.close(); return nil }
                 return event
@@ -194,13 +195,11 @@ final class SitePanel: FloatingPanelView {
 
     /// Clearing this site's cache or cookies: there when you need it, out of the way when you don't.
     private func showMoreMenu() {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        if canClear {
-            menu.addItem(SidebarMenus.Item("Clear Cache for This Site…") { [weak self] in self?.clear(.cache) })
-            menu.addItem(SidebarMenus.Item("Clear Cookies for This Site…") { [weak self] in self?.clear(.cookies) })
-        }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: moreButton.isFlipped ? moreButton.bounds.maxY + 4 : -4), in: moreButton)
+        guard canClear else { return }
+        MenuPanel.show([
+            .item(.init(title: "Clear Cache for This Site…") { [weak self] in self?.clear(.cache) }),
+            .item(.init(title: "Clear Cookies for This Site…") { [weak self] in self?.clear(.cookies) }),
+        ], from: moreButton)
     }
 
     private func buildExtensions() {

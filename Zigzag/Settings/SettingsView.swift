@@ -132,9 +132,15 @@ final class FormRow: NSView, SettingsSearchable {
     /// Where the row's text starts.
     var textInset: CGFloat { icon.isHidden ? pad : pad + Self.iconSide + Tokens.Space.x3 }
 
+    /// Narrow (half of a split, a small window), the control goes under the text instead of squeezing it.
+    private func isStacked(_ width: CGFloat) -> Bool {
+        controlSize.width > 0 && width - pad - controlSize.width - Tokens.Space.x4 - textInset < Self.minimumTextWidth
+    }
+    private static let minimumTextWidth: CGFloat = 180
+
     private func textWidth(for width: CGFloat) -> CGFloat {
-        let control = controlSize.width > 0 ? controlSize.width + Tokens.Space.x4 : 0
-        return max(Tokens.Space.x16 * 2, width - pad - control - textInset)
+        let control = controlSize.width > 0 && !isStacked(width) ? controlSize.width + Tokens.Space.x4 : 0
+        return max(0, width - pad - control - textInset)
     }
 
     private func detailHeight(for width: CGFloat) -> CGFloat {
@@ -143,14 +149,18 @@ final class FormRow: NSView, SettingsSearchable {
 
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
-        guard !detail.isHidden else { return Tokens.Page.groupRowHeight }
-        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width))
+        let stack = isStacked(width) ? Tokens.Space.x3 + controlSize.height : 0
+        guard !detail.isHidden else { return stack > 0 ? Tokens.Page.groupRowPad * 2 + title.lineHeight + stack : Tokens.Page.groupRowHeight }
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width) + stack)
     }
 
     override func layout() {
         super.layout()
         let size = controlSize
-        control.frame = NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
+        let stacked = isStacked(bounds.width)
+        control.frame = stacked
+            ? NSRect(x: textInset, y: bounds.height - Tokens.Page.groupRowPad - size.height, width: min(size.width, bounds.width - textInset - pad), height: size.height)
+            : NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
         if !icon.isHidden {
             let side = Self.iconSide
             icon.frame = NSRect(x: pad, y: round((bounds.height - side) / 2), width: side, height: side)
@@ -159,7 +169,7 @@ final class FormRow: NSView, SettingsSearchable {
         let width = textWidth(for: bounds.width) + Label.inset * 2
         let detailHeight = detailHeight(for: bounds.width)
         let block = title.lineHeight + (detail.isHidden ? 0 : Self.lineGap + detailHeight)
-        let top = round((bounds.height - block) / 2)
+        let top = stacked ? Tokens.Page.groupRowPad : round((bounds.height - block) / 2)
         title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
         detail.frame = NSRect(x: x, y: title.frame.maxY + Self.lineGap, width: width, height: detailHeight)
     }
@@ -456,6 +466,8 @@ private final class SectionItem: ListItem {
 final class SettingsView: NSView, NSTextFieldDelegate {
     private var items: [SectionItem] = []
     private let column = FlippedView()
+    /// The chosen section's fill, gliding to the one you pick.
+    private let sectionSelection = SelectionGlide()
     /// The wordmark and "Settings" at the top of the column, where History has its own.
     private let columnTitle = PageTitleView("Settings")
     /// Over the chosen section: its name, and the search at the right, as History's header has them.
@@ -491,8 +503,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let developerGroup = FormGroup()
     private var shortcutGroups: [(String, FormGroup)] = []
 
-    private let engine = MenuButton()
-    private let archiveAfter = MenuButton()
+    private let engine = DropdownButton()
+    private let archiveAfter = DropdownButton()
     private let defaultButton = PillButton(title: "Make Default")
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
@@ -501,13 +513,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let borderlessToggle = Toggle()
     private let quitToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
-    private let downloadPlace = MenuButton()
+    private let downloadPlace = DropdownButton()
     private var downloadPlaceToken: SignalToken?
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
     private let cardToggle = Toggle()
     private let translateOffer = Toggle()
-    private let translateInto = MenuButton()
+    private let translateInto = DropdownButton()
     private var languages: [(id: String, name: String)] = []
     private let addSpaceButton = PillButton(title: "New Space")
     private let getExtensionsButton = PillButton(title: "Get Extensions")
@@ -549,8 +561,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func build() {
         // The column of sections, under the page's title.
         column.addSubview(columnTitle)
+        column.addSubview(sectionSelection)
         items = SettingsPane.allCases.map { pane in
             let item = SectionItem(pane)
+            item.drawsSelection = false
             item.onClick = { [weak self] _ in self?.pick(pane) }
             column.addSubview(item)
             return item
@@ -559,7 +573,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         addSubview(columnEdge)
 
         // General
-        engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
         SearchEngine.allCases.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
         engine.onSelect = { index in Library.shared.searchEngine = SearchEngine.allCases[index] }
         defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
@@ -577,7 +591,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
         downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
-        archiveAfter.options = TabArchive.After.allCases.map { MenuButton.Option(title: $0.title) }
+        archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
         tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
         tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
@@ -748,12 +762,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 x += side + gap
             }
         }
+        moveSectionSelection(animated: false)
+    }
+
+    private func moveSectionSelection(animated: Bool) {
+        sectionSelection.tint = Brand.Theme.for(self).accent
+        sectionSelection.move(to: items.first { $0.isSelected }?.frame ?? .zero, animated: animated)
     }
     /// Opens a pane.
     func show(_ pane: SettingsPane) {
         self.pane = pane
         settingSearch.stringValue = ""
         items.forEach { $0.isSelected = $0.pane == pane }
+        moveSectionSelection(animated: true)
         refreshTitle()
         if pane == .privacy { reloadPrivacy() }
         if pane == .shortcuts { reloadShortcuts() }
@@ -926,7 +947,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         translationGroup.removeAllRows()
         alwaysGroup.removeAllRows()
         let system = Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
-        translateInto.options = [MenuButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { MenuButton.Option(title: $0.name, image: nil) }
+        translateInto.options = [DropdownButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { DropdownButton.Option(title: $0.name, image: nil) }
         translateInto.selectedIndex = PageTranslator.chosenLanguage.flatMap { chosen in languages.firstIndex { $0.id == chosen }.map { $0 + 1 } } ?? 0
         translateOffer.isOn = PageTranslator.offers
         translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
@@ -992,6 +1013,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func searchChanged() {
         items.forEach { $0.isSelected = !isSearching && $0.pane == pane }
+        moveSectionSelection(animated: false)
         refreshTitle()
         reloadShortcuts()
         layoutDocument()
@@ -1168,7 +1190,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func refreshDownloadPlace() { DownloadPlace.configure(downloadPlace) }
 
     private func refresh() {
-        engine.options = SearchEngine.allCases.map { MenuButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
         engine.selectedIndex = SearchEngine.allCases.firstIndex(of: Library.shared.searchEngine) ?? 0
         let isDefault = DefaultBrowser.isDefault
         defaultStatus.isHidden = !isDefault

@@ -42,6 +42,7 @@ class CardRow: InteractiveView {
     init(title: String, symbol: String? = nil, detail: String = "", font: NSFont = Tokens.Font.row()) {
         self.title = Label(title, font: font, color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
+        pressScales = true
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         iconView.imageScaling = .scaleProportionallyDown
@@ -118,6 +119,34 @@ class GlassTile: InteractiveView {
         guard !isSelected else { return }
         layer?.borderWidth = Tokens.Metric.hairline
         layer?.borderColor = cgColor(showsOpenEdge ? Tokens.Color.openEdge : Tokens.Color.glassEdge)
+    }
+}
+
+// MARK: - Press
+
+extension NSView {
+    /// The tactile press, shared by every button and row (`InteractiveView.pressScales`): down to
+    /// `Motion.pressScale` around its middle as it's pressed, eased out at once, and a critically damped spring back
+    /// when let go, from wherever it is, so quick taps never queue or jump. Nothing waits on it. Not with Reduce Motion,
+    /// and not for a press from the keyboard, where the darker fill says it.
+    func showPress(_ pressed: Bool) {
+        guard let layer else { return }
+        let still = Tokens.Motion.reduceMotion || (pressed && Tokens.Motion.isFromKey)
+        let target = pressed && !still ? Tokens.Motion.scale(Tokens.Motion.pressScale, of: layer) : CATransform3DIdentity
+        let shown = layer.presentation()?.transform ?? layer.transform
+        Tokens.Motion.withoutAnimation { layer.transform = target }
+        guard !still, !CATransform3DEqualToTransform(shown, target) else { layer.removeAnimation(forKey: "press"); return }
+        let animation: CABasicAnimation
+        if pressed {
+            animation = CABasicAnimation(keyPath: "transform")
+            animation.duration = Tokens.Motion.pressIn
+            animation.timingFunction = Tokens.Motion.easeOut
+        } else {
+            animation = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.pressOut)
+        }
+        animation.fromValue = NSValue(caTransform3D: shown)
+        animation.toValue = NSValue(caTransform3D: target)
+        layer.add(animation, forKey: "press")
     }
 }
 
@@ -205,6 +234,7 @@ final class PillButton: InteractiveView {
         self.style = style
         label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Page.controlHeight))
+        pressScales = true
         layer?.cornerCurve = .continuous
         iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.body) }
         iconView.imageScaling = .scaleNone

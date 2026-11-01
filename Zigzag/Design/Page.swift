@@ -52,7 +52,11 @@ final class PageTitleView: NSView {
     override func layout() {
         super.layout()
         var x: CGFloat = 0
-        if showsWordmark {
+        // Too narrow for the wordmark and some of the title: the title alone, rather than the two overlapping.
+        let roomy = bounds.width >= Self.wordmarkWidth + Tokens.Space.x6 + min(label.textWidth, Tokens.Space.x16)
+        wordmark.isHidden = !showsWordmark || !roomy
+        divider.isHidden = wordmark.isHidden
+        if !wordmark.isHidden {
             let h = Tokens.Page.wordmarkHeight
             wordmark.frame = NSRect(x: 0, y: round((bounds.height - h) / 2), width: Self.wordmarkWidth, height: h)
             x = wordmark.frame.maxX + Tokens.Space.x3
@@ -104,14 +108,24 @@ final class PageHeader: NSView {
         super.layout()
         let h = Tokens.Page.controlHeight, y = Tokens.Page.headerTop
         var right = contentFrame.maxX
+        // The title keeps the room it needs; a search field gives way first, down to a usable width.
+        let titleNeeds = (leading as? PageTitleView)?.fittingWidth ?? 0
+        let others = trailing.filter { !$0.isHidden && !($0 is FilledField) }.map { Self.width(of: $0) + Tokens.Space.x2 }.reduce(0, +)
         for view in trailing.reversed() where !view.isHidden {
-            let width = min(Self.width(of: view), max(0, right - contentFrame.minX))
+            var wanted = Self.width(of: view)
+            if view is FilledField {
+                let spare = contentFrame.maxX - contentFrame.minX - others - titleNeeds - Tokens.Space.x2
+                wanted = max(min(wanted, spare), Self.minimumSearchWidth)
+            }
+            let width = min(wanted, max(0, right - contentFrame.minX))
             view.frame = NSRect(x: right - width, y: y, width: width, height: h)
             right = view.frame.minX - Tokens.Space.x2
         }
         leading?.frame = NSRect(x: contentFrame.minX, y: y, width: max(0, right - Tokens.Space.x2 - contentFrame.minX), height: h)
         edge.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
     }
+
+    private static let minimumSearchWidth: CGFloat = 160
 
     private static func width(of view: NSView) -> CGFloat {
         if view is FilledField { return Tokens.Page.searchWidth }
@@ -144,6 +158,9 @@ class ListItem: InteractiveView {
         get { count.stringValue }
         set { count.stringValue = newValue; count.isHidden = newValue.isEmpty || isCompact; needsLayout = true }
     }
+    /// Off where the list draws one selection that glides between its places (`SelectionGlide`): the chosen item
+    /// then shows only its accent symbol.
+    var drawsSelection = true { didSet { stateDidChange(animated: false) } }
     var isCompact = false {
         didSet {
             label.isHidden = isCompact
@@ -157,6 +174,7 @@ class ListItem: InteractiveView {
         self.title = title
         label = Label(title, font: Tokens.Font.pageRow(.regular), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
+        pressScales = true
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         // Monochrome outline symbols, the size of the text beside them.
@@ -190,10 +208,38 @@ class ListItem: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let accent = Brand.Theme.for(self).accent
-        let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.22 : Tokens.Color.selectionAlpha)
+        let fill: NSColor? = isSelected ? (drawsSelection ? accent.withAlphaComponent(isPressed ? Tokens.Color.selectionPressedAlpha : Tokens.Color.selectionAlpha) : nil)
             : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         icon.contentTintColor = isSelected ? accent : Tokens.Color.icon
+    }
+}
+
+/// One selection that glides between a list's places or a filter's segments, instead of each lighting on its own:
+/// a soft fill of the accent, `Radius.row`, moved with `Motion.glide` in `Motion.highlightGlide`. Put it behind the
+/// items; a change from the keyboard, or with Reduce Motion, lands at once.
+final class SelectionGlide: ColorView {
+    var tint: NSColor? { didSet { color = tint?.withAlphaComponent(Tokens.Color.selectionAlpha) } }
+
+    init(radius: CGFloat = Tokens.Radius.row) {
+        super.init(color: nil)
+        layer?.cornerRadius = radius
+        layer?.cornerCurve = .continuous
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    /// Moves to `frame`; `animated` when the choice was made with the pointer.
+    func move(to frame: NSRect, animated: Bool) {
+        isHidden = frame.isEmpty
+        if animated && !Tokens.Motion.isFromKey && frame.width > 0 && self.frame.width > 0 {
+            Tokens.Motion.glide(self, to: frame, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
+        } else {
+            layer?.removeAnimation(forKey: "glide")
+            Tokens.Motion.withoutAnimation { self.frame = frame }
+        }
     }
 }
 

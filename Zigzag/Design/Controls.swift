@@ -56,8 +56,11 @@ class InteractiveView: NSView {
         didSet {
             guard oldValue != isPressed else { return }
             stateDidChange(animated: false)
+            if pressScales { showPress(isPressed) }
         }
     }
+    /// Buttons and rows give under the finger: `Tokens.Motion.pressScale` while held, springing back on release.
+    var pressScales = false
     var isSelected = false {
         didSet {
             guard oldValue != isSelected else { return }
@@ -89,6 +92,8 @@ class InteractiveView: NSView {
         super.init(frame: frame)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
+        // A control's faint shadow and keyboard focus ring fall just outside it.
+        clipsToBounds = false
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -188,7 +193,7 @@ class InteractiveView: NSView {
     /// With Full Keyboard Access on, Tab reaches these controls as it does AppKit's own: a focus ring shows where
     /// you are, and Space or Return presses. A click never moves focus here, so the mouse works as it always has.
     override var acceptsFirstResponder: Bool {
-        guard NSApp.isFullKeyboardAccessEnabled, isEnabled, onClick != nil else { return false }
+        guard Self.keyboardAccess, isEnabled, onClick != nil else { return false }
         if let type = NSApp.currentEvent?.type, [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(type) { return false }
         return true
     }
@@ -208,11 +213,22 @@ class InteractiveView: NSView {
         return true
     }
 
+    private static var keyboardAccess: Bool {
+        #if DEBUG
+        if debugKeyboardAccess { return true }
+        #endif
+        return NSApp.isFullKeyboardAccessEnabled
+    }
+    #if DEBUG
+    /// Debug builds: Tab reaches drawn controls without turning on Full Keyboard Access, for testing.
+    static var debugKeyboardAccess = false
+    #endif
+
     private func setKeyboardFocus(_ focused: Bool) {
         guard hasKeyboardFocus != focused else { return }
         hasKeyboardFocus = focused
         keyboardFocusChanged?(focused)
-        noteFocusRingMaskChanged()
+        updateFocusRing()
     }
 
     override func keyDown(with event: NSEvent) {
@@ -222,12 +238,42 @@ class InteractiveView: NSView {
         super.keyDown(with: event)
     }
 
-    /// The system focus ring, in the control's own rounded shape.
-    override var focusRingMaskBounds: NSRect { bounds }
+    /// Keyboard focus, drawn as the design has it rather than the system's blue: a ring in the window's accent just
+    /// outside the control, following its rounded shape. Only the keyboard brings it; a click never does.
+    private var focusRing: CAShapeLayer?
 
-    override func drawFocusRingMask() {
-        let radius = layer?.cornerRadius ?? 0
-        NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
+    override var focusRingType: NSFocusRingType {
+        get { .none }
+        set {}
+    }
+
+    private func updateFocusRing() {
+        guard hasKeyboardFocus, let layer else {
+            focusRing?.removeFromSuperlayer()
+            focusRing = nil
+            return
+        }
+        layer.masksToBounds = false
+        let ring = focusRing ?? CAShapeLayer()
+        let width = Tokens.Metric.focusRing, out = Tokens.Metric.focusGap + width / 2
+        let rect = bounds.insetBy(dx: -out, dy: -out)
+        let radius = min(layer.cornerRadius + out, rect.height / 2, rect.width / 2)
+        Tokens.Motion.withoutAnimation {
+            ring.path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+            ring.fillColor = nil
+            ring.lineWidth = width
+            ring.strokeColor = cgColor(Brand.Theme.for(self).accent.withAlphaComponent(Tokens.Color.focusAlpha))
+            ring.zPosition = 10
+            if ring.superlayer == nil { layer.addSublayer(ring) }
+        }
+        focusRing = ring
+    }
+
+    override func layout() {
+        super.layout()
+        // AppKit can turn clipping back on for a backing layer; the shadow and the ring need it off.
+        if layer?.masksToBounds == true { layer?.masksToBounds = false }
+        if hasKeyboardFocus { updateFocusRing() }
     }
 
     override func otherMouseUp(with event: NSEvent) {
@@ -242,6 +288,7 @@ class InteractiveView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         stateDidChange(animated: false)
+        updateFocusRing()
     }
 
     override func viewDidMoveToWindow() {
@@ -281,6 +328,7 @@ final class IconButton: InteractiveView {
         self.symbol = symbol
         self.symbolSize = symbolSize
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
+        pressScales = true
         layer?.cornerRadius = radius
         layer?.cornerCurve = .continuous
         imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
@@ -465,6 +513,7 @@ final class PrimaryButton: InteractiveView {
     init(title: String) {
         label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
         super.init(frame: .zero)
+        pressScales = true
         layer?.cornerCurve = .continuous
         addSubview(label)
         setAccessibilityRole(.button)
@@ -511,6 +560,7 @@ final class TextButton: InteractiveView {
     init(title: String, font: NSFont = Tokens.Font.small(.medium)) {
         label = Label(title, font: font, color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
+        pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         addSubview(label)
@@ -748,6 +798,7 @@ final class SegmentedPills: NSView {
         init(_ text: String) {
             title = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
             super.init(frame: .zero)
+            pressScales = true
             layer?.cornerRadius = Tokens.Radius.field
             layer?.cornerCurve = .continuous
             [title, count].forEach { addSubview($0) }
@@ -775,8 +826,8 @@ final class SegmentedPills: NSView {
         }
 
         override func stateDidChange(animated: Bool) {
-            let tint = tint ?? Brand.Theme.for(self).accent
-            let fill: NSColor? = isSelected ? tint.withAlphaComponent(isPressed ? 0.24 : 0.16) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+            // The chosen one's fill is the row's one gliding selection (`SelectionGlide`).
+            let fill: NSColor? = isSelected ? nil : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
             layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
             title.textColor = isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
             count.textColor = isSelected ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
@@ -784,13 +835,20 @@ final class SegmentedPills: NSView {
     }
 
     private var segments: [Segment] = []
+    private let selection = SelectionGlide(radius: Tokens.Radius.field)
     var onChange: ((Int) -> Void)?
-    var selectedIndex = 0 { didSet { segments.enumerated().forEach { $0.element.isSelected = $0.offset == selectedIndex } } }
+    var selectedIndex = 0 {
+        didSet {
+            segments.enumerated().forEach { $0.element.isSelected = $0.offset == selectedIndex }
+            if segments.indices.contains(selectedIndex), window != nil { selection.move(to: segments[selectedIndex].frame, animated: oldValue != selectedIndex) }
+        }
+    }
     /// Nil takes its window's accent.
-    var tint: NSColor? { didSet { segments.forEach { $0.tint = tint } } }
+    var tint: NSColor? { didSet { segments.forEach { $0.tint = tint }; needsLayout = true } }
 
     init(_ titles: [String]) {
         super.init(frame: .zero)
+        addSubview(selection)
         segments = titles.enumerated().map { index, text in
             let segment = Segment(text)
             segment.onClick = { [weak self] _ in
@@ -823,10 +881,14 @@ final class SegmentedPills: NSView {
             segment.frame = NSRect(x: x, y: 0, width: w, height: bounds.height)
             x += w + 2
         }
+        selection.tint = tint ?? Brand.Theme.for(self).accent
+        if segments.indices.contains(selectedIndex) { selection.move(to: segments[selectedIndex].frame, animated: false) }
     }
 }
 
-/// Zigzag's switch: a capsule in its window's accent when on, a knob that slides on a soft spring.
+/// Zigzag's switch: a capsule track, clearly on in its window's accent and clearly off in a plain gray, with a white
+/// knob that slides across. The knob settles in `Motion.standard` with no bounce, and stretches a little while held,
+/// so a press reads at once; with Reduce Motion it moves at once and only the color fades.
 final class Toggle: InteractiveView {
     private let knob = CALayer()
     var onChange: ((Bool) -> Void)?
@@ -834,14 +896,14 @@ final class Toggle: InteractiveView {
 
     init(isOn: Bool = false) {
         self.isOn = isOn
-        super.init(frame: NSRect(x: 0, y: 0, width: 34, height: 20))
-        layer?.cornerRadius = 10
-        knob.backgroundColor = NSColor.white.cgColor
-        knob.cornerRadius = 8
-        knob.shadowColor = NSColor.black.cgColor
-        knob.shadowOpacity = 0.22
-        knob.shadowRadius = 1.5
-        knob.shadowOffset = CGSize(width: 0, height: -0.5)
+        super.init(frame: NSRect(origin: .zero, size: Tokens.Metric.toggleSize))
+        layer?.cornerRadius = Tokens.Metric.toggleSize.height / 2
+        layer?.cornerCurve = .continuous
+        knob.cornerRadius = Tokens.Metric.toggleKnob / 2
+        knob.cornerCurve = .continuous
+        knob.borderWidth = 0.5
+        knob.shadowOpacity = 1
+        knob.shadowRadius = 2
         layer?.addSublayer(knob)
         onClick = { [weak self] _ in
             guard let self, self.isEnabled else { return }
@@ -849,41 +911,63 @@ final class Toggle: InteractiveView {
             self.onChange?(self.isOn)
         }
         setAccessibilityRole(.checkBox)
+        setAccessibilitySubrole(.switch)
         update(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var intrinsicContentSize: NSSize { NSSize(width: 34, height: 20) }
+    override var intrinsicContentSize: NSSize { Tokens.Metric.toggleSize }
     override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
 
+    private var inset: CGFloat { (bounds.height - Tokens.Metric.toggleKnob) / 2 }
+
     private var knobFrame: CGRect {
-        let side: CGFloat = 16
-        return CGRect(x: isOn ? bounds.width - side - 2 : 2, y: (bounds.height - side) / 2, width: side, height: side)
+        let side = Tokens.Metric.toggleKnob
+        // Held, the knob stretches toward the middle, as if about to go.
+        let width = side + (isPressed ? 4 : 0)
+        return CGRect(x: isOn ? bounds.width - width - inset : inset, y: inset, width: width, height: side)
     }
 
     override func layout() {
         super.layout()
+        layer?.cornerRadius = bounds.height / 2
         Tokens.Motion.withoutAnimation { knob.frame = knobFrame }
     }
 
     private func update(animated: Bool) {
-        stateDidChange(animated: animated)
-        guard animated else { Tokens.Motion.withoutAnimation { knob.frame = knobFrame }; return }
-        let move = CASpringAnimation(keyPath: "position.x")
-        move.stiffness = 300
-        move.damping = 2 * sqrt(300)   // the knob lands, it doesn't wobble
-        move.fromValue = knob.presentation()?.position.x ?? knob.position.x
-        move.toValue = knobFrame.midX
-        move.duration = move.settlingDuration
-        knob.add(move, forKey: "move")
+        if animated && !Tokens.Motion.reduceMotion {
+            let move = Tokens.Motion.springAnimation(keyPath: "position.x")
+            move.fromValue = knob.presentation()?.position.x ?? knob.position.x
+            move.toValue = knobFrame.midX
+            knob.add(move, forKey: "move")
+        }
         Tokens.Motion.withoutAnimation { knob.frame = knobFrame }
+        paint(fading: animated)
     }
 
     override func stateDidChange(animated: Bool) {
-        let off = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.13), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.18))
-        let track = isOn ? Brand.Theme.for(self).accent : off
-        layer?.set(backgroundColor: cgColor(isPressed ? (track.blended(withFraction: 0.08, of: .black) ?? track) : track), animated: animated)
+        // Pressing stretches the knob at once; letting go puts it back.
+        Tokens.Motion.withoutAnimation { knob.frame = knobFrame }
+        paint(fading: animated)
+    }
+
+    private func paint(fading: Bool) {
+        var track = isOn ? Brand.Theme.for(self).accent : Tokens.Color.toggleOff
+        if isHovered || isPressed {
+            // A touch deeper under the pointer, either way.
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                let base = track.usingColorSpace(.sRGB) ?? track
+                track = base.blended(withFraction: isPressed ? 0.12 : 0.06, of: effectiveAppearance.isDark && !isOn ? .white : .black) ?? base
+            }
+        }
+        layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.standard)
+        Tokens.Motion.withoutAnimation {
+            knob.backgroundColor = cgColor(Tokens.Color.dynamic(light: .white, dark: Tokens.Color.hex(0xF4F4F6)))
+            knob.borderColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.06), dark: .clear))
+            knob.shadowColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.2), dark: Tokens.Color.hex(0x000000, alpha: 0.4)))
+            knob.shadowOffset = CGSize(width: 0, height: isFlipped ? 1 : -1)
+        }
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 }
@@ -952,25 +1036,38 @@ final class CheckBox: InteractiveView {
     }
 }
 
-/// A choice from a list, in Zigzag's style: the current choice (with its icon) on a quiet fill and a chevron;
-/// clicking opens the native menu right over it.
-final class MenuButton: InteractiveView {
-    struct Option { var title: String; var image: NSImage? }
-    private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+/// A choice from a list, drawn as Zigzag's: the current choice (with its icon) on the secondary look, a chevron at
+/// the end, and Zigzag's own menu (`MenuPanel`) when clicked, its chosen item right over the button as macOS places it.
+/// Press and drag to an item to choose in one go; with the keyboard, Space, Return or an arrow opens it.
+final class DropdownButton: InteractiveView {
+    struct Option {
+        var title: String
+        var image: NSImage?
+        init(title: String, image: NSImage? = nil) { self.title = title; self.image = image }
+    }
+    private let label = Label("", font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
     private let icon = NSImageView()
     private let chevron = NSImageView()
     var options: [Option] = [] { didSet { refresh() } }
     var selectedIndex = 0 { didSet { refresh() } }
     var onSelect: ((Int) -> Void)?
+    private var openedAt: TimeInterval = 0
+    private var menuOpen = false { didSet { stateDidChange(animated: false) } }
+
+    static let iconSide: CGFloat = Tokens.Space.x4
+    /// From the button's edge to its icon or title: the menu's items line up with it.
+    static let textInset: CGFloat = Tokens.Space.x3
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.field
+        pressScales = true
+        layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         chevron.image = Tokens.Symbol.image("chevron.up.chevron.down", size: Tokens.TypeSize.small)
-        chevron.contentTintColor = Tokens.Color.textSecondary
+        chevron.imageScaling = .scaleNone
         icon.imageScaling = .scaleProportionallyUpOrDown
         [icon, label, chevron].forEach { addSubview($0) }
+        clicksOnMouseDown = true
         onClick = { [weak self] _ in self?.openMenu() }
         setAccessibilityRole(.popUpButton)
         stateDidChange(animated: false)
@@ -982,8 +1079,11 @@ final class MenuButton: InteractiveView {
 
     private func refresh() {
         label.stringValue = current?.title ?? ""
-        icon.image = current?.image
-        icon.isHidden = current?.image == nil
+        // A neutral globe where a site's icon is missing, so the column of pictures never has a gap.
+        let pictured = options.contains { $0.image != nil }
+        icon.image = current?.image ?? (pictured ? MenuPanel.placeholder : nil)
+        icon.contentTintColor = Tokens.Color.icon
+        icon.isHidden = icon.image == nil
         setAccessibilityValue(label.stringValue)
         invalidateIntrinsicContentSize()
         needsLayout = true
@@ -991,42 +1091,595 @@ final class MenuButton: InteractiveView {
     }
 
     override var intrinsicContentSize: NSSize {
-        let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.body(.medium)]).width }.max() ?? 0
-        let iconWidth: CGFloat = options.contains { $0.image != nil } ? 16 + Tokens.Space.x2 : 0
-        return NSSize(width: ceil(Tokens.Space.x3 + iconWidth + widest + Tokens.Space.x2 + 12 + Tokens.Space.x3), height: Tokens.Space.x7Height)
+        let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width }.max() ?? 0
+        let iconWidth: CGFloat = options.contains { $0.image != nil } ? Self.iconSide + Tokens.Space.x2 : 0
+        return NSSize(width: ceil(Self.textInset + iconWidth + widest + Tokens.Space.x3 + 10 + Self.textInset), height: Tokens.Page.controlHeight)
     }
 
     override func layout() {
         super.layout()
-        var x = Tokens.Space.x3
+        updateButtonShadowPath()
+        var x = Self.textInset
         if !icon.isHidden {
-            icon.frame = NSRect(x: x, y: (bounds.height - 16) / 2, width: 16, height: 16)
+            icon.frame = NSRect(x: x, y: (bounds.height - Self.iconSide) / 2, width: Self.iconSide, height: Self.iconSide)
             x = icon.frame.maxX + Tokens.Space.x2
         }
-        chevron.frame = NSRect(x: bounds.width - Tokens.Space.x3 - 10, y: (bounds.height - 12) / 2, width: 10, height: 12)
-        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: chevron.frame.minX - x - Tokens.Space.x1, height: label.lineHeight)
+        chevron.frame = NSRect(x: bounds.width - Self.textInset - 10, y: (bounds.height - 14) / 2, width: 10, height: 14)
+        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2, width: max(0, chevron.frame.minX - x - Tokens.Space.x1), height: label.lineHeight)
     }
 
-    private func openMenu() {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        for (index, option) in options.enumerated() {
-            let item = SidebarMenus.Item(option.title) { [weak self] in
-                self?.selectedIndex = index
-                self?.onSelect?(index)
-            }
-            item.image = option.image
-            item.state = index == selectedIndex ? .on : .off
-            menu.addItem(item)
+    func openMenu() {
+        guard !options.isEmpty, MenuPanel.current?.anchor !== self else { return }
+        let items: [MenuPanel.Entry] = options.enumerated().map { index, option in
+            .item(MenuPanel.Item(title: option.title, image: option.image, isChecked: index == selectedIndex) { [weak self] in
+                guard let self else { return }
+                self.selectedIndex = index
+                self.onSelect?(index)
+            })
         }
-        menu.minimumWidth = bounds.width
-        menu.popUp(positioning: menu.items.indices.contains(selectedIndex) ? menu.items[selectedIndex] : nil,
-                   at: NSPoint(x: Tokens.Space.x1, y: bounds.height - 3), in: self)
+        openedAt = ProcessInfo.processInfo.systemUptime
+        menuOpen = true
+        MenuPanel.show(items, from: self, placement: .over(selectedIndex, textInset: Self.textInset), minWidth: bounds.width) { [weak self] in
+            self?.menuOpen = false
+        }
     }
+
+    // Press, drag to an item and let go: chosen in one movement, as macOS menus allow.
+    override func mouseDragged(with event: NSEvent) {
+        guard let menu = MenuPanel.current, menu.anchor === self else { return super.mouseDragged(with: event) }
+        menu.track(windowPoint: event.locationInWindow)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        guard let menu = MenuPanel.current, menu.anchor === self else { return }
+        // A quick click leaves the menu open; a press held or dragged onto an item chooses it.
+        let held = ProcessInfo.processInfo.systemUptime - openedAt > 0.35
+        let onButton = bounds.contains(convert(event.locationInWindow, from: nil))
+        if held && !onButton { menu.chooseTracked(windowPoint: event.locationInWindow) }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        // Up or Down opens it, as a pop-up button does.
+        if hasKeyboardFocus, [125, 126].contains(event.keyCode) { openMenu(); return }
+        super.keyDown(with: event)
+    }
+
+    override func accessibilityPerformShowMenu() -> Bool { openMenu(); return true }
 
     override func stateDidChange(animated: Bool) {
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        let ink = applyButtonLook(.secondary)
+        if menuOpen { layer?.set(backgroundColor: cgColor(Tokens.Color.controlHover), animated: false) }
+        label.textColor = ink
+        chevron.contentTintColor = Tokens.Color.textSecondary
+    }
+}
+
+/// Zigzag's own menu, drawn rather than the system's, for choosing from a list (a dropdown's options) or acting on
+/// something (a button's few actions): a solid panel with a hairline edge and the panel shadow, 15pt items, a soft gray
+/// row under the pointer or the arrow keys, a check at the trailing end of the chosen one. It arrives in a quick fade
+/// from a touch smaller and leaves the same way; opened or closed from the keyboard it's simply there.
+/// Keys: Up and Down move, Return or Space chooses, Esc closes, and typing a name jumps to it. Right-click menus stay
+/// the system's.
+final class MenuPanel: FloatingPanelView {
+    enum Entry {
+        case item(Item)
+        /// A quiet heading over the items after it ("Save Downloads To").
+        case header(String)
+        case separator
+    }
+
+    struct Item {
+        var title: String
+        var image: NSImage?
+        var symbol: String?
+        var isChecked = false
+        var isDestructive = false
+        var isEnabled = true
+        var action: () -> Void
+
+        init(title: String, image: NSImage? = nil, symbol: String? = nil, isChecked: Bool = false, isDestructive: Bool = false,
+             isEnabled: Bool = true, action: @escaping () -> Void) {
+            self.title = title; self.image = image; self.symbol = symbol; self.isChecked = isChecked
+            self.isDestructive = isDestructive; self.isEnabled = isEnabled; self.action = action
+        }
+    }
+
+    /// Where it opens: with item `index` right over the control, its text `textInset` from the control's edge, as a
+    /// pop-up button's menu does (below it when there's no room); or under the control, as a button's menu does.
+    enum Placement { case over(Int, textInset: CGFloat), below }
+
+    /// The menu that's open, if any. Panels that close on Esc or a click elsewhere leave those to it while it's open.
+    static weak var current: MenuPanel?
+    private(set) weak var anchor: NSView?
+
+    private let entries: [Entry]
+    private var rows: [Row] = []
+    private let scroll = NSScrollView()
+    private let list = FlippedView()
+    /// One soft gray pill that glides from row to row under the pointer, rather than each row lighting on its own.
+    private let pill = ColorView(color: Tokens.Color.highlight)
+    private var highlighted: Int? {
+        didSet {
+            rows.enumerated().forEach { $0.element.isHighlighted = $0.offset == highlighted }
+            movePill(from: oldValue)
+        }
+    }
+    /// The glass, the contact shadow and the lit top edge that give the panel its depth.
+    private let contact = CALayer()
+    private let rim = CAShapeLayer()
+    /// The neutral picture for an item whose own is missing (a site with no favicon yet).
+    static var placeholder: NSImage { Tokens.Symbol.image("globe", size: Tokens.TypeSize.body) }
+    private var monitor: Any?
+    private var observers: [NSObjectProtocol] = []
+    private var onClose: (() -> Void)?
+    private var typed = ""
+    private var typedAt: TimeInterval = 0
+
+    private static let pad = Tokens.Space.x1
+    private static let rowHeight = Tokens.Page.controlHeight
+    private static let headerHeight = Tokens.Space.x7Height
+    private static let separatorHeight = Tokens.Space.x2 + 1
+    /// From a row's edge to its icon or text, and from its check to the trailing edge.
+    private static let rowInset = Tokens.Space.x2 + 2
+    private static let margin = Tokens.Space.x2
+
+    private init(entries: [Entry]) {
+        self.entries = entries
+        super.init(frame: .zero)
+        isGlass = false
+        radius = Tokens.Radius.panel
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.verticalScrollElasticity = .none
+        scroll.useSlimScroller()
+        scroll.documentView = list
+        addSubview(scroll)
+        pill.wantsLayer = true
+        pill.layer?.cornerRadius = Tokens.Radius.row
+        pill.layer?.cornerCurve = .continuous
+        pill.alphaValue = 0
+        list.addSubview(pill)
+        layer?.insertSublayer(contact, at: 0)
+        rim.fillColor = nil
+        rim.lineWidth = Tokens.Metric.hairline
+        layer?.addSublayer(rim)
+        let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
+        for entry in entries {
+            switch entry {
+            case .item(let item):
+                let row = Row(item, reservesIcon: hasImages)
+                let index = rows.count
+                row.onClick = { [weak self] _ in self?.choose(index) }
+                row.hoverChanged = { [weak self] hovered in
+                    guard let self else { return }
+                    if hovered { self.highlighted = self.rows[index].item.isEnabled ? index : nil } else if self.highlighted == index { self.highlighted = nil }
+                }
+                rows.append(row)
+                list.addSubview(row)
+            case .header(let text):
+                list.addSubview(Label.section(text))
+            case .separator:
+                list.addSubview(ColorView(color: Tokens.Color.separator))
+            }
+        }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.menu)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var contentHeight: CGFloat {
+        Self.pad * 2 + entries.map { entry -> CGFloat in
+            switch entry {
+            case .item: Self.rowHeight
+            case .header: Self.headerHeight
+            case .separator: Self.separatorHeight
+            }
+        }.reduce(0, +)
+    }
+
+    /// The top of item `index` in the list.
+    private func top(ofItem index: Int) -> CGFloat {
+        var y = Self.pad, seen = 0
+        for entry in entries {
+            switch entry {
+            case .item:
+                if seen == index { return y }
+                seen += 1
+                y += Self.rowHeight
+            case .header: y += Self.headerHeight
+            case .separator: y += Self.separatorHeight
+            }
+        }
+        return y
+    }
+
+    private var fittingWidth: CGFloat {
+        let font = Tokens.Font.pageRow(.regular)
+        let widest = rows.map { ceil(($0.item.title as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
+        let icon: CGFloat = rows.first?.reservesIcon == true ? DropdownButton.iconSide + Tokens.Space.x2 : 0
+        return Self.pad * 2 + Self.rowInset + icon + widest + Tokens.Space.x6 + Row.checkSide + Self.rowInset
+    }
+
+    // MARK: Showing
+
+    /// Opens a menu from `anchor`. `closed` runs once it's gone, chosen or not.
+    @discardableResult
+    static func show(_ entries: [Entry], from anchor: NSView, placement: Placement = .below, minWidth: CGFloat = 0,
+                     closed: (() -> Void)? = nil) -> MenuPanel? {
+        current?.close(animated: false)
+        guard let window = anchor.window, let host = window.contentView else { closed?(); return nil }
+        let menu = MenuPanel(entries: entries)
+        menu.anchor = anchor
+        menu.onClose = closed
+
+        let width = ceil(max(menu.fittingWidth, minWidth + Self.pad * 2))
+        let a = anchor.convert(anchor.bounds, to: nil)
+        let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
+        let full = menu.contentHeight
+        let height = min(full, area.height)
+        var x = a.minX, maxY: CGFloat
+        var growsY: CGFloat = 0
+        var scrollTo: CGFloat = 0
+        func fits(_ top: CGFloat) -> Bool { top <= area.maxY && top - height >= area.minY }
+        switch placement {
+        case .over(let index, let inset):
+            // The chosen item's text right over the button's.
+            x = a.minX + inset - Self.pad - Self.rowInset
+            let rowMid = menu.top(ofItem: index) + Self.rowHeight / 2
+            let aligned = a.midY + rowMid
+            if height == full, fits(aligned) {
+                maxY = aligned
+                growsY = rowMid / height
+            } else if fits(a.minY - Tokens.Space.x1) {
+                maxY = a.minY - Tokens.Space.x1
+            } else if fits(a.maxY + Tokens.Space.x1 + height) {
+                maxY = a.maxY + Tokens.Space.x1 + height
+                growsY = 1
+            } else {
+                // Taller than the room: as close to aligned as the window allows, scrolled to the chosen item.
+                maxY = min(max(aligned, area.minY + height), area.maxY)
+                scrollTo = min(max(0, rowMid - (maxY - a.midY)), full - height)
+                growsY = min(max((maxY - a.midY) / height, 0), 1)
+            }
+        case .below:
+            if fits(a.minY - Tokens.Space.x1) {
+                maxY = a.minY - Tokens.Space.x1
+            } else if fits(a.maxY + Tokens.Space.x1 + height) {
+                maxY = a.maxY + Tokens.Space.x1 + height
+                growsY = 1
+            } else {
+                maxY = area.maxY
+            }
+        }
+        x = min(max(x, area.minX), max(area.minX, area.maxX - width))
+        let rect = NSRect(x: x, y: maxY - height, width: width, height: height)
+        menu.frame = host.convert(rect, from: nil)
+        menu.growsFrom = CGPoint(x: min(max((a.midX - x) / width, 0), 1), y: growsY)
+        host.addSubview(menu)
+        menu.layoutSubtreeIfNeeded()
+        menu.scroll.contentView.scroll(to: NSPoint(x: 0, y: scrollTo))
+        menu.scroll.reflectScrolledClipView(menu.scroll.contentView)
+        if case .over(let index, _) = placement, menu.rows.indices.contains(index), menu.rows[index].item.isEnabled {
+            menu.highlighted = index
+        }
+        menu.arrive()
+        current = menu
+        menu.watch(window)
+        NSAccessibility.post(element: menu, notification: .created)
+        if let index = menu.highlighted { Announcement.post(menu.rows[index].item.title) }
+        return menu
+    }
+
+    override func layout() {
+        super.layout()
+        scroll.frame = bounds
+        let width = bounds.width
+        list.frame = NSRect(x: 0, y: 0, width: width, height: contentHeight)
+        var y = Self.pad, index = 0
+        for view in list.subviews where view !== pill {
+            if let row = view as? Row {
+                row.frame = NSRect(x: Self.pad, y: y, width: width - Self.pad * 2, height: Self.rowHeight)
+                y += Self.rowHeight
+                index += 1
+            } else if let label = view as? Label {
+                label.frame = NSRect(x: Self.pad + Self.rowInset - Label.inset, y: y + Self.headerHeight - Tokens.Space.x1 - label.lineHeight - 2,
+                                     width: width - (Self.pad + Self.rowInset) * 2, height: label.lineHeight)
+                y += Self.headerHeight
+            } else {
+                view.frame = NSRect(x: Self.pad + Self.rowInset, y: y + floor(Self.separatorHeight / 2), width: width - (Self.pad + Self.rowInset) * 2,
+                                    height: Tokens.Metric.hairline)
+                y += Self.separatorHeight
+            }
+        }
+        if let highlighted, rows.indices.contains(highlighted) { Tokens.Motion.withoutAnimation { pill.frame = rows[highlighted].frame } }
+        // Depth: a tight contact shadow right under the edge beneath the wide panel shadow, and a lit top rim.
+        let r = radius
+        Tokens.Motion.withoutAnimation {
+            contact.frame = bounds
+            contact.shadowPath = CGPath(roundedRect: bounds, cornerWidth: r, cornerHeight: r, transform: nil)
+            contact.shadowColor = cgColor(Tokens.Color.contactShadow)
+            contact.shadowOpacity = 1
+            contact.shadowRadius = Tokens.Shadow.contactRadius
+            contact.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.contactDrop : -Tokens.Shadow.contactDrop)
+            let rimPath = CGMutablePath()
+            let y = isFlipped ? 1.0 : bounds.height - 1
+            rimPath.move(to: CGPoint(x: r, y: y))
+            rimPath.addLine(to: CGPoint(x: bounds.width - r, y: y))
+            rim.path = rimPath
+            rim.strokeColor = cgColor(Tokens.Color.topHighlight)
+            rim.frame = bounds
+        }
+    }
+
+    /// The highlight glides from where it was to the row now under the pointer. From the keyboard, or arriving from
+    /// nothing, it's simply there; leaving every row, it fades.
+    private func movePill(from old: Int?) {
+        guard let highlighted, rows.indices.contains(highlighted) else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Tokens.Motion.quick
+                pill.animator().alphaValue = 0
+            }
+            return
+        }
+        let target = rows[highlighted].frame
+        if old == nil || pill.alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
+            pill.layer?.removeAllAnimations()
+            Tokens.Motion.withoutAnimation { pill.frame = target }
+            pill.alphaValue = 1
+        } else {
+            pill.alphaValue = 1
+            Tokens.Motion.glide(pill, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
+        }
+    }
+
+    /// Pressed, the highlight darkens a step.
+    fileprivate func showPressed(_ pressed: Bool) { pill.color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+
+    // MARK: Closing
+
+    private func watch(_ window: NSWindow) {
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
+            guard let self else { return event }
+            return self.handle(event)
+        }
+        let center = NotificationCenter.default
+        for name in [NSWindow.didResignKeyNotification, NSWindow.didResizeNotification, NSWindow.willCloseNotification] {
+            observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.close(animated: false) }
+            })
+        }
+        observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close(animated: false) }
+        })
+    }
+
+    func close(animated: Bool = true) {
+        guard Self.current === self || monitor != nil else { return }
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        if Self.current === self { Self.current = nil }
+        let closed = onClose
+        onClose = nil
+        if animated { leave() } else { removeFromSuperview() }
+        closed?()
+    }
+
+    /// Grows out of the control that opened it: from `Motion.menuFrom` with a fade, anchored at that control, eased
+    /// out. From the keyboard it's simply there; with Reduce Motion it only fades.
+    private func arrive() {
+        guard let layer, !Tokens.Motion.isFromKey else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = Tokens.Motion.menuIn * 0.7
+        fade.timingFunction = Tokens.Motion.easeOut
+        layer.add(fade, forKey: "arrive.fade")
+        guard !Tokens.Motion.reduceMotion else { return }
+        let grow = CABasicAnimation(keyPath: "transform")
+        grow.fromValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.menuFrom, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
+        grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        grow.duration = Tokens.Motion.menuIn
+        grow.timingFunction = Tokens.Motion.easeOut
+        layer.add(grow, forKey: "arrive.grow")
+    }
+
+    /// Leaves quicker and subtler than it came: a fade as it eases a touch smaller toward its control, from wherever
+    /// it is, so a quick open and close never jumps.
+    private func leave() {
+        guard let layer, !Tokens.Motion.isFromKey else { removeFromSuperview(); return }
+        let shownOpacity = layer.presentation()?.opacity ?? 1
+        let shownTransform = layer.presentation()?.transform ?? CATransform3DIdentity
+        layer.removeAllAnimations()
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in self?.removeFromSuperview() }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = shownOpacity
+        fade.toValue = 0
+        fade.duration = Tokens.Motion.menuOut
+        fade.timingFunction = Tokens.Motion.easeOut
+        layer.add(fade, forKey: "leave.fade")
+        layer.opacity = 0
+        if !Tokens.Motion.reduceMotion {
+            let shrink = CABasicAnimation(keyPath: "transform")
+            shrink.fromValue = NSValue(caTransform3D: shownTransform)
+            shrink.toValue = NSValue(caTransform3D: Tokens.Motion.scale(Tokens.Motion.menuOutScale, of: layer, around: growsFrom, flipped: layer.isGeometryFlipped || isFlipped))
+            shrink.duration = Tokens.Motion.menuOut
+            shrink.timingFunction = Tokens.Motion.easeOut
+            shrink.fillMode = .forwards
+            shrink.isRemovedOnCompletion = false
+            layer.add(shrink, forKey: "leave.grow")
+        }
+        CATransaction.commit()
+    }
+
+    private func choose(_ index: Int) {
+        guard rows.indices.contains(index), rows[index].item.isEnabled else { return }
+        let action = rows[index].item.action
+        close()
+        action()
+    }
+
+    // MARK: Pointer and keys
+
+    private func row(at windowPoint: NSPoint) -> Int? {
+        rows.firstIndex { $0.bounds.contains($0.convert(windowPoint, from: nil)) && $0.item.isEnabled }
+    }
+
+    /// The pointer moving with the button still held from the dropdown that opened it.
+    func track(windowPoint: NSPoint) {
+        highlighted = row(at: windowPoint)
+    }
+
+    func chooseTracked(windowPoint: NSPoint) {
+        if let index = row(at: windowPoint) { choose(index) }
+    }
+
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        let inSameWindow = event.window === window
+        let inside = inSameWindow && bounds.contains(convert(event.locationInWindow, from: nil))
+        switch event.type {
+        case .keyDown:
+            return handleKey(event) ? nil : event
+        case .scrollWheel:
+            if inside { return event }
+            close(animated: false)
+            return event
+        default:
+            if inside { return event }
+            // A click elsewhere closes the menu and goes no further in this window, as with any menu.
+            close()
+            return inSameWindow ? nil : event
+        }
+    }
+
+    /// True when the key was the menu's.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        let mods = event.modifierFlags.intersection([.command, .control, .option])
+        if !mods.isEmpty {
+            // A shortcut: the menu steps aside and lets it through.
+            close(animated: false)
+            return false
+        }
+        switch event.keyCode {
+        case 53: close(); return true                                     // Esc
+        case 125: move(1); return true                                    // Down
+        case 126: move(-1); return true                                   // Up
+        case 115: move(-rows.count); return true                          // Home
+        case 119: move(rows.count); return true                           // End
+        case 36, 76: if let highlighted { choose(highlighted) } else { close() }; return true   // Return, Enter
+        case 48: close(); return true                                     // Tab
+        case 49 where typed.isEmpty || ProcessInfo.processInfo.systemUptime - typedAt > 1:      // Space
+            if let highlighted { choose(highlighted) }
+            return true
+        default:
+            guard let text = event.characters, !text.isEmpty, text.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else { return true }
+            typeSelect(text)
+            return true
+        }
+    }
+
+    private func move(_ step: Int) {
+        let enabled = rows.indices.filter { rows[$0].item.isEnabled }
+        guard !enabled.isEmpty else { return }
+        let next: Int
+        if let highlighted, let at = enabled.firstIndex(of: highlighted) {
+            next = enabled[min(max(at + step, 0), enabled.count - 1)]
+        } else {
+            next = step > 0 ? enabled.first! : enabled.last!
+        }
+        highlight(next)
+    }
+
+    private func highlight(_ index: Int) {
+        highlighted = index
+        let row = rows[index]
+        list.scrollToVisible(row.frame)
+        Announcement.post(row.item.title)
+    }
+
+    /// Typing a name jumps to the first item that starts with it; a pause of a second starts over.
+    private func typeSelect(_ text: String) {
+        let now = ProcessInfo.processInfo.systemUptime
+        typed = now - typedAt > 1 ? text : typed + text
+        typedAt = now
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .anchored]
+        if let index = rows.indices.first(where: { rows[$0].item.isEnabled && rows[$0].item.title.range(of: typed, options: options) != nil }) {
+            highlight(index)
+        }
+    }
+
+    // MARK: Rows
+
+    fileprivate final class Row: InteractiveView {
+        let item: Item
+        let reservesIcon: Bool
+        private let icon = NSImageView()
+        private let label: Label
+        private let check = NSImageView()
+        static let checkSide: CGFloat = 12
+        var isHighlighted = false { didSet { if oldValue != isHighlighted { stateDidChange(animated: false) } } }
+
+        init(_ item: Item, reservesIcon: Bool) {
+            self.item = item
+            self.reservesIcon = reservesIcon
+            label = Label(item.title, font: Tokens.Font.pageRow(.regular), color: item.isDestructive ? Tokens.Color.destructive : Tokens.Color.textPrimary)
+            super.init(frame: .zero)
+            layer?.cornerRadius = Tokens.Radius.row
+            layer?.cornerCurve = .continuous
+            if let image = item.image {
+                icon.image = image
+                icon.imageScaling = .scaleProportionallyUpOrDown
+            } else if let symbol = item.symbol {
+                icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
+                icon.imageScaling = .scaleNone
+                icon.contentTintColor = item.isDestructive ? Tokens.Color.destructive : Tokens.Color.icon
+            } else if reservesIcon {
+                // Every item has its picture: a neutral globe where one is missing, so the column stays aligned.
+                icon.image = MenuPanel.placeholder
+                icon.imageScaling = .scaleNone
+                icon.contentTintColor = Tokens.Color.icon
+            }
+            check.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: Tokens.TypeSize.body, weight: .semibold))
+            check.imageScaling = .scaleNone
+            check.isHidden = !item.isChecked
+            [icon, label, check].forEach { addSubview($0) }
+            isEnabled = item.isEnabled
+            setAccessibilityRole(.menuItem)
+            setAccessibilityLabel(item.title)
+            setAccessibilityValue(item.isChecked ? "selected" : nil)
+            stateDidChange(animated: false)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func layout() {
+            super.layout()
+            var x = MenuPanel.rowInset
+            if reservesIcon {
+                let side = DropdownButton.iconSide
+                icon.frame = NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side)
+                x = icon.frame.maxX + Tokens.Space.x2
+            }
+            let side = Self.checkSide + 4
+            check.frame = NSRect(x: bounds.width - MenuPanel.rowInset - side, y: (bounds.height - side) / 2, width: side, height: side)
+            label.frame = NSRect(x: x - Label.inset, y: (bounds.height - label.lineHeight) / 2,
+                                 width: max(0, check.frame.minX - Tokens.Space.x2 - x + Label.inset * 2), height: label.lineHeight)
+        }
+
+        override func stateDidChange(animated: Bool) {
+            // The highlight is the menu's one gliding pill (`MenuPanel.pill`); the chosen item has its check, in the
+            // window's accent.
+            check.contentTintColor = Brand.Theme.for(self).accent
+            sequence(first: superview, next: { $0?.superview }).lazy.compactMap { $0 as? MenuPanel }.first?.showPressed(isPressed)
+            alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+            setAccessibilitySelected(isHighlighted)
+        }
     }
 }
 

@@ -327,6 +327,30 @@ enum Tokens {
         /// Sidebar slides in and out: fast enough to feel attached to the pointer.
         static let slideDuration: TimeInterval = 0.18
 
+        /// The tactile press: a button or row eases down to this scale as it's pressed (`pressIn`, eased out) and
+        /// springs back when let go (`pressOut`, critically damped, so it never overshoots). The action never waits on it.
+        static let pressScale: CGFloat = 0.97
+        static let pressIn: TimeInterval = 0.08
+        static let pressOut: TimeInterval = 0.2
+        /// A menu growing out of the control that opened it: from this scale with a fade, in `menuIn`, eased out;
+        /// leaving is quicker and subtler (`menuOut`, toward `menuOutScale`).
+        static let menuFrom: CGFloat = 0.96
+        static let menuIn: TimeInterval = 0.18
+        static let menuOut: TimeInterval = 0.12
+        static let menuOutScale: CGFloat = 0.98
+        /// One shared highlight gliding from row to row in a menu, and a selection gliding between a list's places
+        /// or a filter's segments.
+        static let highlightGlide: TimeInterval = 0.14
+
+        /// A layer's transform scaling it by `k` around `point` (0 to 1 across its bounds, from its top left), whatever
+        /// its anchor: what a press or a growing menu uses.
+        static func scale(_ k: CGFloat, of layer: CALayer, around point: CGPoint = CGPoint(x: 0.5, y: 0.5), flipped: Bool = true) -> CATransform3D {
+            let size = layer.bounds.size
+            let px = (point.x - layer.anchorPoint.x) * size.width
+            let py = ((flipped ? point.y : 1 - point.y) - layer.anchorPoint.y) * size.height
+            return CATransform3DConcat(CATransform3DMakeScale(k, k, 1), CATransform3DMakeTranslation(px * (1 - k), py * (1 - k), 0))
+        }
+
         /// A motion style: how long, and which curve. Every curve is a fast-out, no-overshoot spring shape,
         /// run by Core Animation on the render server so it stays smooth while pages are busy.
         struct Curve {
@@ -604,6 +628,9 @@ enum Tokens {
         static let panelWash = dynamic(light: hex(0xFFFFFF, alpha: 0.8), dark: hex(0x1F1F22, alpha: 0.76))
         static let panelEdge = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0xFFFFFF, alpha: 0.10))
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.13), dark: hex(0x000000, alpha: 0.42))
+        static let contactShadow = dynamic(light: hex(0x000000, alpha: 0.12), dark: hex(0x000000, alpha: 0.5))
+        /// A floating menu's lit top edge: a faint light line inside its upper rim, so it reads as an object above the page.
+        static let topHighlight = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.12))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
 
         /// Zigzag's one accent. The rule: UI in a browser window takes that window's space accent, so progress,
@@ -685,6 +712,9 @@ enum Tokens {
         /// A secondary button's faint shadow: just enough to sit on the white it's on.
         static let controlRadius: CGFloat = 1.5
         static let controlDrop: CGFloat = 0.5
+        /// A menu's depth, in two layers: a tight contact shadow right under its edge, and the wide panel shadow around it.
+        static let contactRadius: CGFloat = 1.5
+        static let contactDrop: CGFloat = 1
 
         /// The drop as a layer offset: flipped views measure y downward, so the sign follows the view.
         static func panelOffset(flipped: Bool) -> CGSize { CGSize(width: 0, height: flipped ? panelDrop : -panelDrop) }
