@@ -971,6 +971,11 @@ final class SidebarListView: NSView {
 
     private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
         guard carried != target, let a = splitSide(of: carried), let b = splitSide(of: target) else { return false }
+        // Pinned pages are shared by every window, so a private one makes no pinned splits and takes none apart.
+        if manager?.isPrivate == true {
+            if case .bookmark = carried { return false }
+            if case .bookmark = target { return false }
+        }
         return TabManager.canSplit(a, onto: b)
     }
 

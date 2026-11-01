@@ -1422,11 +1422,13 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// A tab dropped on a pinned page: the two become one pinned split where the pinned page is, open side by side.
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool) {
+        guard !tabManager.isPrivate else { return }
         pageChange("Split View") { [tabManager] in tabManager.pinSplit(tab, with: bookmarkID, tabOnRight: tabOnRight) }
     }
 
     /// A pinned page dropped on a tab: it comes down among the tabs, beside that one, and the two open side by side.
     func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {
+        guard !tabManager.isPrivate else { return }
         pageChange("Split View") { [tabManager] in
             let index = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab }.map { $0 + 1 }
             if let unpinned = tabManager.unbookmark(bookmarkID, toIndex: index) {
