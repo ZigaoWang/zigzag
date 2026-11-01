@@ -1,0 +1,137 @@
+import Foundation
+import Testing
+@testable import Zigzag
+
+/// The address bar filling in a site you've been to: what it completes to, and when it holds back.
+@MainActor
+struct InlineCompletionTests {
+    private func site(_ address: String, _ score: Double = 1) -> InlineCompletion.Site {
+        InlineCompletion.Site(url: URL(string: address)!, score: score)
+    }
+
+    @Test func completesTheStartOfAHost() {
+        let sites = [site("https://wikipedia.org"), site("https://github.com")]
+        #expect(InlineCompletion.best(for: "wiki", among: sites)?.text == "wikipedia.org")
+        #expect(InlineCompletion.best(for: "wiki", among: sites)?.url.absoluteString == "https://wikipedia.org")
+        #expect(InlineCompletion.best(for: "WiKi", among: sites)?.text == "wikipedia.org")
+        #expect(InlineCompletion.best(for: "wikipedia.org", among: sites)?.text == "wikipedia.org")
+    }
+
+    @Test func onlyTheHostsBeginningCounts() {
+        let sites = [site("https://en.wikipedia.org"), site("https://example.com/wiki")]
+        // Inside the host, or in its path, is not its start.
+        #expect(InlineCompletion.best(for: "pedia", among: [site("https://wikipedia.org")]) == nil)
+        #expect(InlineCompletion.best(for: "wiki", among: sites) == nil)
+        #expect(InlineCompletion.best(for: "en.wi", among: sites)?.text == "en.wikipedia.org")
+    }
+
+    @Test func matchesWithAndWithoutWWW() {
+        let sites = [site("https://www.wikipedia.org")]
+        #expect(InlineCompletion.best(for: "wiki", among: sites)?.text == "wikipedia.org")
+        #expect(InlineCompletion.best(for: "www.wiki", among: sites)?.text == "www.wikipedia.org")
+        // The address keeps the "www." it was visited with, so the site answers as it did.
+        #expect(InlineCompletion.best(for: "wiki", among: sites)?.url.host() == "www.wikipedia.org")
+        #expect(InlineCompletion.best(for: "www.", among: sites) == nil)
+    }
+
+    @Test func theMostUsedSiteWins() {
+        let sites = [site("https://github.com", 2), site("https://gitlab.com", 9), site("https://gist.github.com", 9)]
+        #expect(InlineCompletion.best(for: "gi", among: sites)?.text == "gitlab.com")
+        #expect(InlineCompletion.best(for: "github", among: sites)?.text == "github.com")
+        // Even: the shorter address.
+        #expect(InlineCompletion.best(for: "gi", among: [site("https://gist.github.com"), site("https://github.com")])?.text == "github.com")
+    }
+
+    @Test func aPortAndAPathComeAlong() {
+        #expect(InlineCompletion.best(for: "local", among: [site("http://localhost:3000")])?.text == "localhost:3000")
+        #expect(InlineCompletion.best(for: "localhost:3", among: [site("http://localhost:3000")])?.text == "localhost:3000")
+        #expect(InlineCompletion.best(for: "git", among: [site("https://github.com/zigzag/app/")])?.text == "github.com/zigzag/app")
+        #expect(InlineCompletion.best(for: "github.com/", among: [site("https://github.com/zigzag/app")]) == nil)
+    }
+
+    @Test func aPageOnlyWhenItsTheOneYouVisit() {
+        let page = URL(string: "https://github.com/zigzag/app")!
+        #expect(InlineCompletion.target(page, wholePage: true)?.absoluteString == "https://github.com/zigzag/app")
+        #expect(InlineCompletion.target(page, wholePage: false)?.absoluteString == "https://github.com")
+        // A search or a place in a page only gives its site.
+        #expect(InlineCompletion.target(URL(string: "https://www.google.com/search?q=cats")!, wholePage: true)?.absoluteString == "https://www.google.com")
+        #expect(InlineCompletion.target(URL(string: "https://example.com/doc#part")!, wholePage: true)?.absoluteString == "https://example.com")
+        #expect(InlineCompletion.target(URL(string: "file:///Users/me/page.html")!, wholePage: true) == nil)
+    }
+
+    @Test func searchesAreLeftAlone() {
+        #expect(InlineCompletion.looksLikeHost("wiki"))
+        #expect(InlineCompletion.looksLikeHost("localhost:30"))
+        #expect(!InlineCompletion.looksLikeHost("wiki pedia"))
+        #expect(!InlineCompletion.looksLikeHost("how to"))
+        #expect(!InlineCompletion.looksLikeHost("github.com/zig"))
+        #expect(!InlineCompletion.looksLikeHost("?wiki"))
+        #expect(!InlineCompletion.looksLikeHost("c++"))
+        #expect(!InlineCompletion.looksLikeHost(""))
+        #expect(InlineCompletion.best(for: "wiki pedia", among: [site("https://wikipedia.org")]) == nil)
+    }
+
+    @Test func typingForwardCompletes() {
+        #expect(InlineCompletion.allowed("w", shown: "", typed: "", caretAtEnd: true, hasMarkedText: false))
+        // A letter that replaces the selected completion.
+        #expect(InlineCompletion.allowed("wikip", shown: "wikipedia.org", typed: "wiki", caretAtEnd: true, hasMarkedText: false))
+        // A new address over the whole old one.
+        #expect(InlineCompletion.allowed("g", shown: "https://example.com/", typed: "https://example.com/", caretAtEnd: true, hasMarkedText: false))
+    }
+
+    @Test func deletingNeverCompletes() {
+        // Backspace, forward delete or cut on the selected completion leaves what you typed.
+        #expect(!InlineCompletion.allowed("wiki", shown: "wikipedia.org", typed: "wiki", caretAtEnd: true, hasMarkedText: false))
+        // And again, a letter of what you typed.
+        #expect(!InlineCompletion.allowed("wik", shown: "wiki", typed: "wiki", caretAtEnd: true, hasMarkedText: false))
+        #expect(InlineCompletion.isDeletion("", shown: "w", typed: "w"))
+        #expect(!InlineCompletion.isDeletion("wikix", shown: "wikipedia.org", typed: "wiki"))
+    }
+
+    @Test func holdsBackMidTextWithSpacesAndWhileComposing() {
+        #expect(!InlineCompletion.allowed("wiki", shown: "wik", typed: "wik", caretAtEnd: false, hasMarkedText: false))
+        #expect(!InlineCompletion.allowed("wiki p", shown: "wiki ", typed: "wiki ", caretAtEnd: true, hasMarkedText: false))
+        // An input method still composing (pinyin, kana): its text isn't settled, so nothing is filled in after it.
+        #expect(!InlineCompletion.allowed("wiki", shown: "wik", typed: "wik", caretAtEnd: true, hasMarkedText: true))
+    }
+
+    @Test func aMatchingLetterKeepsTheCompletion() {
+        let match = InlineCompletion.Match(text: "wikipedia.org", url: URL(string: "https://wikipedia.org")!)
+        #expect(InlineCompletion.kept(match, typed: "wikip") == match)
+        #expect(InlineCompletion.kept(match, typed: "WIKIP") == match)
+        #expect(InlineCompletion.kept(match, typed: "wikipedia.org") == match)
+        #expect(InlineCompletion.kept(match, typed: "wikix") == nil)
+    }
+
+    @Test func oneSitePerHost() {
+        let merged = InlineCompletion.merge([site("https://github.com/zigzag/app", 3), site("https://github.com", 1), site("https://www.github.com", 1),
+                                             site("https://gitlab.com", 2)])
+        #expect(merged.count == 2)
+        #expect(merged.first?.url.absoluteString == "https://github.com/zigzag/app")
+        #expect(merged.first?.score == 5)
+    }
+
+    /// History of its own, in memory: never the history you browse with.
+    @Test func historyGivesEachSitesMostVisitedPage() {
+        let store = HistoryStore(path: ":memory:")
+        let now = Date()
+        store.recordVisit(url: URL(string: "https://www.wikipedia.org/")!, title: "Wikipedia", at: now, count: 2)
+        store.recordVisit(url: URL(string: "https://wikipedia.org/wiki/Swift")!, title: "Swift", at: now, count: 1)
+        store.recordVisit(url: URL(string: "https://github.com/zigzag/app")!, title: "Zigzag", at: now, count: 9)
+        store.recordVisit(url: URL(string: "https://github.com/")!, title: "GitHub", at: now, count: 3)
+        store.recordVisit(url: URL(string: "https://gist.github.com/")!, title: "Gist", at: now.addingTimeInterval(-86400 * 70), count: 9)
+
+        let wiki = store.completionSites(for: "wiki")
+        #expect(wiki.count == 1)
+        #expect(wiki.first?.entry.url.absoluteString == "https://www.wikipedia.org/")
+        #expect(store.completionSites(for: "WIKI").count == 1)
+        #expect(store.completionSites(for: "pedia").isEmpty)
+
+        // github.com: more visits, and lately; its most visited page is a project, so that's where it goes.
+        let git = store.completionSites(for: "gi")
+        #expect(git.map { HistoryStore.normalizedHost($0.entry.url) } == ["github.com", "gist.github.com"])
+        #expect(git.first?.entry.url.absoluteString == "https://github.com/zigzag/app")
+        let sites = git.compactMap { entry, score in InlineCompletion.target(entry.url, wholePage: true).map { InlineCompletion.Site(url: $0, score: score) } }
+        #expect(InlineCompletion.best(for: "gi", among: sites)?.text == "github.com/zigzag/app")
+    }
+}
