@@ -898,10 +898,9 @@ final class SidebarListView: NSView {
         view.alphaValue = 0
         panel.alphaValue = 1
         panel.orderFront(nil)
-        // Picked up: it lifts a touch and turns see-through, so you can see where it's going.
+        // Picked up: it lifts a touch and stays solid, like a favorite does; the gap shows where it will land.
         Tokens.Motion.animate(Tokens.Motion.feedback) {
             panel.animator().setFrame(rowScreen.insetBy(dx: -3, dy: -1), display: true)
-            panel.animator().alphaValue = 0.6
         }
         apply(items: displayItems(), animated: true)
 
