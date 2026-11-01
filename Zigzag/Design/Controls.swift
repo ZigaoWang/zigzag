@@ -448,43 +448,6 @@ final class Label: NSTextField {
 
     /// Height of one line in this label's font.
     var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
-
-    /// Text too long for the label fades out over its last few points instead of ending in "…".
-    var fadesTruncation = false {
-        didSet {
-            lineBreakMode = fadesTruncation ? .byClipping : .byTruncatingTail
-            cell?.truncatesLastVisibleLine = !fadesTruncation
-            updateFade()
-        }
-    }
-
-    override var stringValue: String { didSet { if fadesTruncation { updateFade() } } }
-
-    override func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        if fadesTruncation { updateFade() }
-    }
-
-    private func updateFade() {
-        let room = bounds.width - Self.inset * 2
-        guard fadesTruncation, bounds.width > 0, inkWidth > room + 0.5 else {
-            if layer?.mask != nil { layer?.mask = nil }
-            return
-        }
-        wantsLayer = true
-        guard let layer else { return }
-        let mask = layer.mask as? CAGradientLayer ?? CAGradientLayer()
-        let fade = min(Tokens.Metric.textFade, room / 3)
-        let end = (bounds.width - Self.inset) / bounds.width
-        Tokens.Motion.withoutAnimation {
-            mask.frame = layer.bounds
-            mask.startPoint = CGPoint(x: 0, y: 0.5)
-            mask.endPoint = CGPoint(x: 1, y: 0.5)
-            mask.colors = [NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor]
-            mask.locations = [0, NSNumber(value: Double(end - fade / bounds.width)), NSNumber(value: Double(end))]
-            if layer.mask !== mask { layer.mask = mask }
-        }
-    }
 }
 
 /// A view that paints a single flat color from a dynamic NSColor, following appearance changes.

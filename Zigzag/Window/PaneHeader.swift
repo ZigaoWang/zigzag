@@ -98,7 +98,7 @@ final class PaneHeaderView: NSView {
     }
 }
 
-/// A pane's address: the page's address as small quiet text, a faint pill under the pointer. A click edits it.
+/// A pane's address: the page's address in a small field, a faint fill and a 1px edge. A click edits it.
 final class PaneAddressView: InteractiveView {
     private let label = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textSecondary)
     static let padding = Tokens.Space.x2 + 2
@@ -146,8 +146,12 @@ final class PaneAddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // Bare at rest, the address as quiet text; a faint fill under the pointer says it can be clicked.
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        // The sidebar address's look, smaller: a faint fill and a 1px edge, a step deeper under the pointer.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        Tokens.Motion.withoutAnimation {
+            layer?.borderWidth = Tokens.Metric.hairline
+            layer?.borderColor = cgColor(Tokens.Color.chromeEdge)
+        }
     }
 }

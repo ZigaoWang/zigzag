@@ -16,7 +16,6 @@ class SidebarRowView: InteractiveView {
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         title.font = Tokens.Font.sidebarRow()
-        title.fadesTruncation = true
         addSubview(icon)
         addSubview(title)
         setAccessibilityRole(.button)
@@ -61,9 +60,16 @@ class SidebarRowView: InteractiveView {
             base = nil
         }
         layer?.set(backgroundColor: base.map { cgColor($0) }, animated: animated && !isHovered)
-        // The tab you're on is the faint fill alone, no edge or shadow; only a row picked up to carry stands off the
-        // list.
-        setLifted(isLifted)
+        // The tab you're on: the clear fill with a 1px edge, no shadow. A row picked up to carry stands off the list.
+        if isLifted {
+            setLifted(true)
+        } else {
+            Tokens.Motion.withoutAnimation {
+                layer?.shadowOpacity = 0
+                layer?.borderWidth = isSelected ? Tokens.Metric.hairline : 0
+                layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
+            }
+        }
         applyFreshness()
     }
 
@@ -137,7 +143,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var pinName: String? { didSet { pinLabel.stringValue = pinName ?? ""; needsLayout = true } }
     private lazy var pinLabel: Label = {
         let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
-        label.fadesTruncation = true
         addSubview(label)
         return label
     }()
@@ -178,11 +183,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
-    private let partnerTitle: Label = {
-        let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
-        label.fadesTruncation = true
-        return label
-    }()
+    private let partnerTitle = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
     private let divider = ColorView(color: Tokens.Color.separator)
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()

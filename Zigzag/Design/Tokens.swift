@@ -82,8 +82,6 @@ enum Tokens {
         static let edgeRevealWidth: CGFloat = Space.x2
         static let resizeHandleWidth: CGFloat = Space.x2
         static let hairline: CGFloat = 1
-        /// How far a title too long for its row fades out at its end, in place of an ellipsis.
-        static let textFade: CGFloat = Space.x6
         /// Keyboard focus: the ring's width, and its gap outside the control.
         static let focusRing: CGFloat = 2
         static let focusGap: CGFloat = 2
@@ -134,9 +132,10 @@ enum Tokens {
     /// rows under it. History's CSS is generated from these values (`PageStyle`), so the two never drift.
     /// The sidebar's own proportions: compact and precise, in the spirit of Linear and shadcn on the window's glass.
     /// 13pt rows 30 tall, 16pt favicons, four small favorites to a row, 26pt toolbar buttons with 14pt glyphs. Nothing
-    /// bigger than its role needs, and almost no chrome: fills come only under the pointer and on what's chosen.
-    /// One left edge runs down it: the traffic lights, every icon and the address's at 12pt, every title, label and
-    /// the host at 36pt. Pages (Settings, History) keep the calmer app scale (`Metric`, `TypeSize.row`).
+    /// bigger than its role needs. Light structure, always visible: faint fills and 1px edges on the address and the
+    /// favorites, a clear fill on the row you're on. One left edge runs down it: the traffic lights and every icon at
+    /// 12pt, every title and label at 36pt. Pages (Settings, History) keep the calmer app scale (`Metric`,
+    /// `TypeSize.row`).
     enum Sidebar {
         /// From the sidebar's edges to its rows, favorites and address.
         static let edge: CGFloat = 6
@@ -165,7 +164,7 @@ enum Tokens {
         /// Between the favorites and the list.
         static let sectionGap: CGFloat = Space.x3
 
-        /// Favorites: four to a row, small tiles, bare at rest, a faint fill under the pointer or while open.
+        /// Favorites: four to a row, small tiles with a faint fill and a 1px edge.
         static let favoriteColumns = 4
         static let favoriteHeight: CGFloat = 36
         static let favoriteIcon: CGFloat = 18
@@ -186,8 +185,8 @@ enum Tokens {
         static let button: CGFloat = 26
         static let glyph: CGFloat = 14
 
-        /// The address: a 30pt line with 8pt corners, bare at rest like a row, its glyph in the icon column and the host
-        /// in the text column; its own buttons 22pt with 13pt glyphs, inset evenly.
+        /// The address: a 30pt field with 8pt corners, the favorites' faint fill and 1px edge, the host 10pt in; its
+        /// own buttons 22pt with 13pt glyphs, inset evenly.
         static let addressTop: CGFloat = 40
         static let addressHeight: CGFloat = 30
         static let addressRadius: CGFloat = Radius.field
@@ -679,24 +678,27 @@ enum Tokens {
         /// Row and button overlays drawn on top of the window background.
         static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06))
         static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
-        /// The selected row: a very faint neutral fill the space's color shows through. In the sidebar that's all; a
-        /// chosen card on a panel adds a 1px edge (`selectedEdge`) and a shadow-sm (`liftShadow`). Never a white slab.
-        static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.07))
-        static let selectedHoverFill = dynamic(light: hex(0x000000, alpha: 0.075), dark: hex(0xFFFFFF, alpha: 0.09))
-        /// The sidebar's rows, address and favorites under the pointer: fainter than the selected fill, so the two
-        /// never read alike.
-        static let quietHover = dynamic(light: hex(0x000000, alpha: 0.035), dark: hex(0xFFFFFF, alpha: 0.04))
-        static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.08))
+        /// The selected row: a clear neutral fill the space's color shows through, with a 1px edge (`selectedEdge`),
+        /// seen at a glance. A chosen card on a panel adds a shadow-sm (`liftShadow`). Never a white slab.
+        static let selectedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.11))
+        static let selectedHoverFill = dynamic(light: hex(0x000000, alpha: 0.11), dark: hex(0xFFFFFF, alpha: 0.13))
+        /// The sidebar's rows under the pointer: half the selected fill.
+        static let quietHover = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.055))
+        static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.06))
         static let liftShadow = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0x000000, alpha: 0.28))
-        /// A favorite whose page is open: a faint fill, the tile's only mark. Bare at rest, `quietHover` under the
-        /// pointer, a step deeper when it's both.
-        static let favoriteOpen = dynamic(light: hex(0x000000, alpha: 0.035), dark: hex(0xFFFFFF, alpha: 0.045))
-        static let favoriteOpenHover = dynamic(light: hex(0x000000, alpha: 0.055), dark: hex(0xFFFFFF, alpha: 0.065))
+        /// The sidebar's quiet surfaces, the address and the favorites: a faint fill and a 1px edge, always there, a
+        /// step deeper under the pointer. A favorite whose page is open takes the darker `openEdge`.
+        static let chromeFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.07))
+        static let chromeHover = dynamic(light: hex(0x000000, alpha: 0.075), dark: hex(0xFFFFFF, alpha: 0.10))
+        static let chromeEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.08))
         static let glassFill = dynamic(light: hex(0xFFFFFF, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.06))
         static let glassHover = dynamic(light: hex(0xFFFFFF, alpha: 0.5), dark: hex(0xFFFFFF, alpha: 0.1))
         static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08))
-        /// A tile whose page is open in the background: a fine darker edge in place of the light one.
-        static let openEdge = dynamic(light: hex(0x000000, alpha: 0.14), dark: hex(0xFFFFFF, alpha: 0.2))
+        /// A tile whose page is open in the background: a fine darker edge in place of the usual one.
+        static let openEdge = dynamic(light: hex(0x000000, alpha: 0.16), dark: hex(0xFFFFFF, alpha: 0.2))
+        /// How much of a space's saturation the window's frame keeps in light mode (`SpaceColor.frame`): toned toward
+        /// neutral so the chrome on it reads crisp.
+        static let frameChroma: CGFloat = 0.55
         /// The keyboard-selected row in floating lists (command bar, downloads).
         static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09))
         static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06))

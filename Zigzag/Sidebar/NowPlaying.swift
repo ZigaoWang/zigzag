@@ -52,8 +52,12 @@ final class NowPlayingView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // An open page's faint fill, as an open favorite's: it's a page that's running.
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.favoriteOpenHover : Tokens.Color.favoriteOpen
+        // The address's and favorites' look: a faint fill and a 1px edge.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        Tokens.Motion.withoutAnimation {
+            layer?.borderWidth = Tokens.Metric.hairline
+            layer?.borderColor = cgColor(Tokens.Color.chromeEdge)
+        }
     }
 }

@@ -66,7 +66,6 @@ final class AddressView: InteractiveView {
         layer?.cornerCurve = .continuous
         // Keyboard focus: the accent ring, as a field's.
         lock.imageScaling = .scaleNone
-        label.fadesTruncation = true
         lock.contentTintColor = Tokens.Color.textTertiary
         addSubview(lock)
         addSubview(label)
@@ -106,9 +105,10 @@ final class AddressView: InteractiveView {
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
         if label.stringValue.isEmpty { label.stringValue = "Search or enter address" }
-        // In the icon column: a quiet magnifying glass, or the not-secure mark on a plain http page.
+        // Only a plain http page marks itself, with the not-secure symbol before the host.
         let insecure = url?.scheme == "http"
-        lock.image = Tokens.Symbol.image(insecure ? SitePanel.notSecureSymbol : "magnifyingglass", size: Tokens.Sidebar.addressGlyph)
+        lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
+        lock.isHidden = !insecure
         lock.toolTip = insecure ? SitePanel.notSecure : nil
         setAccessibilityLabel(insecure ? "\(label.stringValue), \(SitePanel.notSecure)" : label.stringValue)
         needsLayout = true
@@ -116,11 +116,13 @@ final class AddressView: InteractiveView {
 
     override func layout() {
         super.layout()
-        // The glyph in the rows' icon column, the host's first letter in their text column.
-        let side16 = Tokens.Sidebar.favicon
-        lock.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - side16) / 2, width: side16, height: side16)
-        let x = SidebarRowView.textX
-        let pad = SidebarRowView.inset
+        // The host's first letter 10pt in, as an input's text, after the not-secure mark when there is one.
+        let pad = Tokens.Space.x2 + 2
+        var x = pad
+        if !lock.isHidden {
+            lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
+            x = lock.frame.maxX + Tokens.Space.x1
+        }
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         var right = bounds.width - inset
         let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
@@ -136,9 +138,13 @@ final class AddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // Bare at rest, a line of quiet text like a row; the rows' faint fill under the pointer.
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.quietHover : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        // A field: a faint fill and a 1px edge, a step deeper under the pointer and pressed.
+        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        Tokens.Motion.withoutAnimation {
+            layer?.borderWidth = Tokens.Metric.hairline
+            layer?.borderColor = cgColor(Tokens.Color.chromeEdge)
+        }
     }
 }
 

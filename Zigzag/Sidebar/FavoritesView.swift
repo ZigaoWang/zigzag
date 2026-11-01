@@ -407,14 +407,16 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Bare at rest: the icon alone. A faint fill while its page is open (so you can tell which are loaded) or
-        // under the pointer; the one you're on takes the selected row's fill. No edge, no shadow.
-        let fill: NSColor? = isSelected ? (isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
-            : isPressed ? Tokens.Color.pressedFill
-            : isOpen ? (isHovered ? Tokens.Color.favoriteOpenHover : Tokens.Color.favoriteOpen)
-            : isHovered ? Tokens.Color.quietHover : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered, duration: Tokens.Motion.selection)
-        Tokens.Motion.withoutAnimation { layer?.borderWidth = 0 }
+        // A small tile, a faint fill and a 1px edge, a step deeper under the pointer; the edge darker while its page
+        // is open, so you can tell which are loaded. The one you're on takes the selected row's look. No shadow.
+        let fill = isSelected ? (isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
+            : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
+        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
+        Tokens.Motion.withoutAnimation {
+            layer?.shadowOpacity = 0
+            layer?.borderWidth = Tokens.Metric.hairline
+            layer?.borderColor = cgColor(isSelected ? Tokens.Color.selectedEdge : isOpen ? Tokens.Color.openEdge : Tokens.Color.chromeEdge)
+        }
     }
 
     private static let iconSide = Tokens.Sidebar.favoriteIcon
