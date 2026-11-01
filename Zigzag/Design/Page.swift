@@ -11,7 +11,7 @@ import AppKit
 final class PageTitleView: NSView {
     private let wordmark = WordmarkView()
     private let divider = ColorView(color: Tokens.Color.separator)
-    private let label = Label("", font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+    private let label = Label("", font: Tokens.Font.pageTitle(), color: Tokens.Color.textPrimary)
     private var themeToken: SignalToken?
 
     var title: String {
@@ -56,7 +56,7 @@ final class PageTitleView: NSView {
             let h = Tokens.Page.wordmarkHeight
             wordmark.frame = NSRect(x: 0, y: round((bounds.height - h) / 2), width: Self.wordmarkWidth, height: h)
             x = wordmark.frame.maxX + Tokens.Space.x3
-            let lineHeight: CGFloat = 18
+            let lineHeight: CGFloat = Tokens.Space.x5
             divider.frame = NSRect(x: x, y: round((bounds.height - lineHeight) / 2), width: Tokens.Metric.hairline, height: lineHeight)
             x = divider.frame.maxX + Tokens.Space.x3
         }
@@ -73,7 +73,13 @@ final class PageHeader: NSView {
     }
     /// Right to left in reading order: the last one sits at the right edge.
     var trailing: [NSView] = [] {
-        didSet { oldValue.forEach { if !trailing.contains($0) { $0.removeFromSuperview() } }; trailing.forEach { if $0.superview !== self { addSubview($0) } }; needsLayout = true }
+        didSet {
+            oldValue.forEach { if !trailing.contains($0) { $0.removeFromSuperview() } }
+            trailing.forEach { if $0.superview !== self { addSubview($0) } }
+            // A page's search is the outlined pill, like the buttons beside it.
+            trailing.compactMap { $0 as? FilledField }.forEach { $0.isOutlined = true; $0.isPill = true }
+            needsLayout = true
+        }
     }
     /// Where the content starts and ends across the bar, so the header lines up with what's under it.
     var contentFrame: (minX: CGFloat, maxX: CGFloat) = (0, 0) { didSet { needsLayout = true } }
@@ -116,6 +122,16 @@ final class PageHeader: NSView {
     }
 }
 
+extension Label {
+    /// A group's heading on a page ("Tabs", "Browsing data"): quiet gray, a size up from a panel's section label,
+    /// over the group with room above it in place of a line.
+    static func groupHeading(_ text: String) -> Label {
+        let label = Label(text, font: Tokens.Font.pageLabel(), color: Tokens.Color.textTertiary)
+        label.setAccessibilityRole(.staticText)
+        return label
+    }
+}
+
 /// A row in a list of places (Settings' sections): a symbol and a name, a soft fill of the accent when chosen, the
 /// hover fill under the pointer. With little room it's just the symbol.
 class ListItem: InteractiveView {
@@ -139,11 +155,12 @@ class ListItem: InteractiveView {
 
     init(title: String, symbol: String) {
         self.title = title
-        label = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        label = Label(title, font: Tokens.Font.pageRow(.regular), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        icon.image = Tokens.Symbol.image(symbol, size: 15)
+        // Monochrome outline symbols, the size of the text beside them.
+        icon.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.pageRow)
         icon.imageScaling = .scaleNone
         count.alignment = .right
         count.isHidden = true
@@ -162,7 +179,7 @@ class ListItem: InteractiveView {
         } else {
             // The symbol's ink, not its box, starts at the row's inset, so it lines up with text above and below.
             icon.frame = NSRect(x: Tokens.Page.rowInset - 2, y: (bounds.height - side) / 2, width: side, height: side)
-            let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
+            let x = icon.frame.maxX + Tokens.Space.x2 + 2 - Label.inset
             let countWidth = count.isHidden ? 0 : count.inkWidth + Label.inset * 2
             count.frame = NSRect(x: bounds.width - Tokens.Page.rowInset + Label.inset - countWidth, y: (bounds.height - count.lineHeight) / 2,
                                  width: countWidth, height: count.lineHeight)
@@ -222,6 +239,9 @@ enum PageStyle {
             ("hover", C.hoverFill), ("pressed", C.pressedFill), ("highlight", C.highlight), ("field", C.fieldFill), ("line", C.separator),
             ("group", C.surfaceGroup), ("group-edge", C.surfaceGroupEdge),
             ("panel", C.panelBackground), ("panel-wash", C.panelWash), ("panel-edge", C.panelEdge), ("panel-shadow", C.panelShadow), ("destructive", C.destructive),
+            ("control", C.controlFill), ("control-hover", C.controlHover), ("control-pressed", C.controlPressed), ("control-edge", C.controlEdge),
+            ("control-shadow", C.controlShadow), ("primary", C.primaryFill), ("primary-hover", C.primaryHover), ("primary-pressed", C.primaryPressed),
+            ("on-primary", C.onPrimary),
         ]
         func block(_ name: NSAppearance.Name) -> String { colors.map { "--\($0.0): \(color($0.1, name));" }.joined(separator: " ") }
         let page = Tokens.Page.self, radius = Tokens.Radius.self, size = Tokens.TypeSize.self
@@ -232,6 +252,8 @@ enum PageStyle {
             "--radius-small: \(px(radius.small))", "--radius-control: \(px(radius.control))", "--radius-field: \(px(radius.field))", "--radius-row: \(px(radius.row))",
             "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--label: \(px(size.label))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
             "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%", "--group-gap: \(px(page.groupGap))",
+            "--page-row: \(px(size.pageRow))", "--page-label: \(px(size.pageLabel))", "--page-title: \(px(size.pageTitle))",
+            "--control-text: \(px(size.row))", "--focus: \(Int(Tokens.Color.focusAlpha * 100))%",
             "--disabled: \(Tokens.Opacity.disabled)", "--space-1: \(px(Tokens.Space.x1))", "--space-2: \(px(Tokens.Space.x2))", "--space-3: \(px(Tokens.Space.x3))", "--space-4: \(px(Tokens.Space.x4))", "--space-5: \(px(Tokens.Space.x5))",
             "--space-6: \(px(Tokens.Space.x6))", "--space-8: \(px(Tokens.Space.x8))",
             "--panel-blur: \(px(Tokens.Shadow.panelRadius))", "--panel-drop: \(px(Tokens.Shadow.panelDrop))",
@@ -250,7 +272,8 @@ enum PageStyle {
                  -webkit-font-smoothing: antialiased; -webkit-user-select: none; cursor: default; }
     ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
     button { appearance: none; border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: default; }
-    :focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
+    /* Keyboard focus: a ring in the accent just outside the control, never the system's blue. */
+    :focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) var(--focus), transparent); outline-offset: 2px; }
 
     /* The header: the title at the left, the search field and actions at the right, the page under it. */
     .page-header { position: sticky; top: 0; z-index: 4; background: var(--bg); box-shadow: 0 1px 0 transparent; transition: box-shadow .15s; }
@@ -259,12 +282,13 @@ enum PageStyle {
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control); margin-right: auto; min-width: 0; }
     .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
-    .page-title .divider { width: 1px; height: 18px; background: var(--line); flex: none; }
-    .page-title h1 { font-size: var(--heading); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page-title .divider { width: 1px; height: 20px; background: var(--line); flex: none; }
+    .page-title h1 { font-size: var(--page-title); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .search { display: flex; align-items: center; gap: 4px; background: var(--field); border-radius: var(--radius-field); padding: 0 12px 0 8px;
-              height: var(--control); width: var(--search); max-width: 100%; box-shadow: inset 0 0 0 1.5px transparent; }
-    .search:focus-within { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent); }
+    /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
+    .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control) / 2); padding: 0 14px 0 10px;
+              height: var(--control); width: var(--search); max-width: 100%; box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); }
+    .search:focus-within { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) var(--focus), transparent); }
     .search svg { flex: none; width: 16px; padding: 1px; color: var(--faint); }
     .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent);
                     -webkit-user-select: text; padding: 0 0 0 2px; }
@@ -272,31 +296,36 @@ enum PageStyle {
     .search input::-webkit-search-cancel-button { display: none; }
     @media (max-width: 520px) { .search { order: 3; width: 100%; } }
 
-    /* A pill button (PillButton): a capsule of medium body text on the soft fill. `.quiet` shows a fill only under
-       the pointer; `.prominent` is the accent, one per page. */
-    .button { height: var(--control); padding: 0 var(--space-3); border-radius: calc(var(--control) / 2); background: var(--field); color: var(--text);
+    /* A pill button (PillButton): the secondary look, white with a hairline edge and a faint shadow. `.quiet` shows a
+       fill only under the pointer; `.prominent` is the primary, a dark filled pill, one per page. Hover and press are
+       instant; press darkens, never scales. */
+    .button { height: var(--control); padding: 0 14px; border-radius: calc(var(--control) / 2); background: var(--control); color: var(--text);
+              box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); font-size: var(--control-text);
               font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-    .button:hover, .button[aria-expanded="true"] { background: var(--highlight); }
-    .button:active { background: var(--pressed); }
-    .button.quiet { background: none; }
+    .button:hover, .button[aria-expanded="true"] { background: var(--control-hover); }
+    .button:active { background: var(--control-pressed); }
+    .button.quiet { background: none; box-shadow: none; padding: 0 var(--space-3); }
     .button.quiet:hover, .button.quiet[aria-expanded="true"] { background: var(--hover); }
     .button.quiet:active { background: var(--pressed); }
-    .button.prominent { background: var(--accent); color: var(--on-accent); }
-    .button.prominent:hover { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
-    .button.prominent:active { background: color-mix(in srgb, var(--accent) 78%, var(--text)); }
-    .button:disabled { opacity: var(--disabled); background: var(--field); }
+    .button.prominent { background: var(--primary); color: var(--on-primary); box-shadow: none; }
+    .button.prominent:hover { background: var(--primary-hover); }
+    .button.prominent:active { background: var(--primary-pressed); }
+    .button:disabled { opacity: var(--disabled); }
 
-    /* A menu, as Zigzag's panels float: glass under the panel's wash, a hairline edge and the one panel shadow. */
+    /* A menu, drawn as Zigzag's menus are (MenuPanel): a solid panel with a hairline edge and the one panel shadow,
+       15px items, a soft gray row under the pointer. It arrives with a quick fade from a touch smaller. */
     .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 5; min-width: 200px; padding: var(--space-1); border-radius: var(--radius-float);
-            background: var(--panel-wash); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
-            box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
-    @media (prefers-reduced-transparency: reduce) { .menu { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; } }
-    .menu.open { display: block; }
-    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 var(--space-2); border-radius: var(--radius-row); }
+            background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
+    .menu.open { display: block; animation: menu-in .14s cubic-bezier(.23, 1, .32, 1); transform-origin: top right; }
+    @keyframes menu-in { from { opacity: 0; transform: scale(.97); } }
+    @media (prefers-reduced-motion: reduce) { .menu.open { animation-name: menu-fade; } }
+    @keyframes menu-fade { from { opacity: 0; } }
+    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-row);
+                              font-size: var(--page-row); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
     .menu [role="menuitem"].destructive { color: var(--destructive); }
-    .menu hr { border: 0; height: 1px; background: var(--line); margin: var(--space-1) var(--space-2); }
+    .menu hr { border: 0; height: 1px; background: var(--line); margin: var(--space-1) var(--space-3); }
 
     """
 }

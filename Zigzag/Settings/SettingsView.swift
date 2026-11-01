@@ -90,7 +90,7 @@ final class FormRow: NSView, SettingsSearchable {
     var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
-    private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
     private let detail = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
     let control: NSView
@@ -104,7 +104,7 @@ final class FormRow: NSView, SettingsSearchable {
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         self.title.stringValue = title
         self.detail.stringValue = detail ?? ""
-        self.detail.font = Tokens.Font.small()
+        self.detail.font = Tokens.Font.pageDetail()
         self.detail.textColor = Tokens.Color.textSecondary
         self.detail.isSelectable = false
         self.detail.isHidden = (detail ?? "").isEmpty
@@ -121,6 +121,8 @@ final class FormRow: NSView, SettingsSearchable {
     private let pad = Tokens.Page.groupPad
     /// A picture's side: an extension's icon, a site's favicon.
     private static let iconSide = Tokens.Space.x6
+    /// Between a row's title and its explanation.
+    private static let lineGap: CGFloat = 2
 
     private var controlSize: NSSize {
         let size = control.fittingSize
@@ -142,7 +144,7 @@ final class FormRow: NSView, SettingsSearchable {
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
         guard !detail.isHidden else { return Tokens.Page.groupRowHeight }
-        return max(Tokens.Page.groupRowHeight, Tokens.Space.x3 * 2 + title.lineHeight + 2 + detailHeight(for: width))
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width))
     }
 
     override func layout() {
@@ -156,10 +158,10 @@ final class FormRow: NSView, SettingsSearchable {
         let x = textInset - Label.inset
         let width = textWidth(for: bounds.width) + Label.inset * 2
         let detailHeight = detailHeight(for: bounds.width)
-        let block = title.lineHeight + (detail.isHidden ? 0 : 2 + detailHeight)
+        let block = title.lineHeight + (detail.isHidden ? 0 : Self.lineGap + detailHeight)
         let top = round((bounds.height - block) / 2)
         title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
-        detail.frame = NSRect(x: x, y: title.frame.maxY + 2, width: width, height: detailHeight)
+        detail.frame = NSRect(x: x, y: title.frame.maxY + Self.lineGap, width: width, height: detailHeight)
     }
 }
 
@@ -226,7 +228,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     /// Its color as a tile with its first letter, the same size and shape as the icons on every other row.
     private let tile = NSImageView()
     private let name: Label
-    private let detail = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let detail = Label("", font: Tokens.Font.pageDetail(), color: Tokens.Color.textSecondary)
     private let editButton = PillButton(title: "Edit")
     private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
     /// True while the row is being dragged; it draws as lifted.
@@ -236,7 +238,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
     init(space: SpaceInfo) {
         spaceID = space.id
-        name = Label(space.name, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        name = Label(space.name, font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight + Tokens.Space.x2))
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
@@ -1046,7 +1048,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if title != nil || accessory != nil {
                 let size = accessory.map { $0.fittingSize } ?? .zero
                 let slot = max(Tokens.Metric.sectionLabelHeight, size.height + Tokens.Space.x2)
-                let label = Label.section(title ?? "")
+                let label = Label.groupHeading(title ?? "")
                 let labelY = y + slot - Tokens.Space.x2 - label.lineHeight
                 label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: labelY,
                                      width: max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad), height: label.lineHeight)
@@ -1075,7 +1077,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let shown = groups(of: pane).filter { $0.group.rows.contains { !$0.isHidden } }
                 guard !shown.isEmpty else { continue }
                 found = true
-                let heading = Label(pane.title, font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+                let heading = Label(pane.title, font: Tokens.Font.pageTitle(), color: Tokens.Color.textPrimary)
                 heading.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: heading.lineHeight)
                 documentView.addSubview(heading)
                 y = heading.frame.maxY + Tokens.Space.x3
@@ -1083,7 +1085,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 y += Tokens.Space.x2
             }
             if !found {
-                let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+                let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.pageRow(.regular), color: Tokens.Color.textSecondary)
                 none.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: none.lineHeight)
                 documentView.addSubview(none)
                 y = none.frame.maxY + Tokens.Space.x6
@@ -1104,7 +1106,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section("Your spaces", spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
-                let hint = Label("Drag a space to change its order.", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+                let hint = Label("Drag a space to change its order.", font: Tokens.Font.pageDetail(), color: Tokens.Color.textTertiary)
                 hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
                                     width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
                 documentView.addSubview(hint)
@@ -1139,7 +1141,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
-            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.pageDetail(), color: Tokens.Color.textSecondary)
             hint.lineBreakMode = .byTruncatingTail
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
                                 width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad), height: hint.lineHeight)
@@ -1388,7 +1390,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private var keys: [String] = []
     private let item: NSMenuItem?
     private let title: Label
-    private let note = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let note = Label("", font: Tokens.Font.pageDetail(), color: Tokens.Color.textSecondary)
     private var caps: [KeyHint] = []
     private let field = ColorView(color: .clear)
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
@@ -1402,7 +1404,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// A row for a menu item, which you can change.
     init(title text: String, item: NSMenuItem) {
         self.item = item
-        title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        title = Label(text, font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: Shortcuts.caps(item))
         toolTip = "Click to change"
@@ -1417,7 +1419,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// A fixed row, like ⌘1–9, which can't be changed.
     init(title text: String, keys: [String]) {
         item = nil
-        title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        title = Label(text, font: Tokens.Font.pageRow(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: keys)
     }
