@@ -407,15 +407,15 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // A small tile, a faint fill and a 1px edge, a step deeper under the pointer; the edge darker while its page
-        // is open, so you can tell which are loaded. The one you're on takes the selected row's look. No shadow.
-        let fill = isSelected ? (isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
-            : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
+        // A soft tile of the space's own color, a step lighter under the pointer; a fine edge while its page is open,
+        // so you can tell which are loaded. The one you're on is the selected tab's card.
+        let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
+            : isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
         Tokens.Motion.withoutAnimation {
-            layer?.shadowOpacity = 0
-            layer?.borderWidth = Tokens.Metric.hairline
-            layer?.borderColor = cgColor(isSelected ? Tokens.Color.selectedEdge : isOpen ? Tokens.Color.openEdge : Tokens.Color.chromeEdge)
+            layer?.borderWidth = isSelected || isOpen ? Tokens.Metric.hairline : 0
+            layer?.borderColor = cgColor(isSelected ? Tokens.Chrome.cardEdge : Tokens.Chrome.openEdge)
+            setCardShadow(isSelected)
         }
     }
 

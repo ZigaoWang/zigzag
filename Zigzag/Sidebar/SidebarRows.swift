@@ -8,6 +8,8 @@ class SidebarRowView: InteractiveView {
     var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    /// Set while the list's sliding card travels to this row: the row draws no card of its own until it lands.
+    var holdsCardBack = false { didSet { if oldValue != holdsCardBack { stateDidChange(animated: false) } } }
     /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
     var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
 
@@ -48,26 +50,29 @@ class SidebarRowView: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let base: NSColor?
-        if isSelected || isLifted {
-            base = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
+        // While the list slides the card here from the row it was on, this row leaves its own card to it.
+        let showsCard = (isSelected && !holdsCardBack) || isLifted
+        if showsCard {
+            base = isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card
         } else if isMarked {
             base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
         } else if isPressed {
-            base = Tokens.Color.pressedFill
+            base = Tokens.Chrome.pressed
         } else if isHovered {
-            base = Tokens.Color.quietHover
+            base = Tokens.Chrome.hover
         } else {
             base = nil
         }
         layer?.set(backgroundColor: base.map { cgColor($0) }, animated: animated && !isHovered)
-        // The tab you're on: the clear fill with a 1px edge, no shadow. A row picked up to carry stands off the list.
+        // The tab you're on: a soft light card of the space's color, a crisp quiet edge and a shadow-sm. A row picked
+        // up to carry stands off the list.
         if isLifted {
             setLifted(true)
         } else {
             Tokens.Motion.withoutAnimation {
-                layer?.shadowOpacity = 0
-                layer?.borderWidth = isSelected ? Tokens.Metric.hairline : 0
-                layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
+                layer?.borderWidth = showsCard ? Tokens.Metric.hairline : 0
+                layer?.borderColor = cgColor(Tokens.Chrome.cardEdge)
+                setCardShadow(showsCard)
             }
         }
         applyFreshness()
@@ -85,6 +90,35 @@ class SidebarRowView: InteractiveView {
         let visible = isAboutToClear ? 0.18 : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
         (animated ? icon.animator() : icon).alphaValue = visible
         (animated ? title.animator() : title).alphaValue = visible
+    }
+}
+
+/// The selected tab's card on its own, for the moment it slides between rows: the same fill, edge and shadow-sm.
+final class SelectionCardView: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Sidebar.rowRadius
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = Tokens.Metric.hairline
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func refresh() {
+        Tokens.Motion.withoutAnimation {
+            layer?.backgroundColor = cgColor(Tokens.Chrome.card)
+            layer?.borderColor = cgColor(Tokens.Chrome.cardEdge)
+            setCardShadow(true)
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh()
     }
 }
 
@@ -577,7 +611,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// The space name above its bookmarks. Click the name to edit the space; click the chevron beside it to fold the
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
-    let label = Label("", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
     private let chevron = NSImageView()
     private let iconView = NSImageView()
     /// The space's icon, before its name. Nil: the name alone.
@@ -615,12 +649,16 @@ final class SpaceHeaderView: InteractiveView {
         let h = label.lineHeight
         // In the rows' text column, its icon (if any) in their icon column.
         let x = SidebarRowView.textX - Label.inset
+        // Low in its slot, near the pinned tabs it names, with the room above it.
+        let pad = Tokens.Space.x1
+        let y = isFlipped ? bounds.height - h - pad : pad
+        let mid = y + h / 2
         if icon != nil {
             let side = Tokens.Sidebar.favicon
-            iconView.frame = NSRect(x: SidebarRowView.inset, y: (bounds.height - side) / 2, width: side, height: side)
+            iconView.frame = NSRect(x: SidebarRowView.inset, y: mid - side / 2, width: side, height: side)
         }
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
-        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: 0, width: Tokens.Space.x3, height: bounds.height)
+        label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
+        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: mid - Tokens.Space.x2, width: Tokens.Space.x3, height: Tokens.Space.x4)
     }
 
     /// Whether a click lands on the chevron (or just past the name, where it shows), rather than on the name.
@@ -629,8 +667,9 @@ final class SpaceHeaderView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        label.textColor = isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
-        iconView.contentTintColor = label.textColor
+        // The name in light type, quietly darker under the pointer; its icon a step back from it.
+        label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textPrimary.withAlphaComponent(0.78)
+        iconView.contentTintColor = Tokens.Color.textSecondary
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.Symbol.inline)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
@@ -821,7 +860,7 @@ final class ClearTabsButton: InteractiveView {
         let active = isHovered || isPressed
         label.textColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
         arrow.contentTintColor = label.textColor
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        let fill: NSColor? = isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
     }
 }

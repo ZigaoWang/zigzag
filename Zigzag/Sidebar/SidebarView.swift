@@ -138,12 +138,11 @@ final class AddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // A field: a faint fill and a 1px edge, a step deeper under the pointer and pressed.
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
+        // A soft field of the space's own color, a step lighter under the pointer and pressed.
+        let fill = isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         Tokens.Motion.withoutAnimation {
-            layer?.borderWidth = Tokens.Metric.hairline
-            layer?.borderColor = cgColor(Tokens.Color.chromeEdge)
+            layer?.borderWidth = 0
         }
     }
 }
@@ -227,7 +226,7 @@ final class SpaceDotView: InteractiveView {
         } else {
             Tokens.Motion.withoutAnimation(apply)
         }
-        let fill: NSColor? = isDropTarget ? Tokens.Color.pressedFill : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }

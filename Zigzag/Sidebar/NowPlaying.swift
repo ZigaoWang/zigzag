@@ -52,12 +52,11 @@ final class NowPlayingView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The address's and favorites' look: a faint fill and a 1px edge.
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.chromeHover : Tokens.Color.chromeFill
+        // The address's and favorites' look: a soft field of the space's color.
+        let fill = isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         Tokens.Motion.withoutAnimation {
-            layer?.borderWidth = Tokens.Metric.hairline
-            layer?.borderColor = cgColor(Tokens.Color.chromeEdge)
+            layer?.borderWidth = 0
         }
     }
 }

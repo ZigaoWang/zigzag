@@ -24,6 +24,18 @@ extension NSView {
     }
 }
 
+extension NSView {
+    /// The sidebar's card shadow-sm (`Tokens.Chrome.cardShadow`), on or off: tiny, straight down.
+    func setCardShadow(_ on: Bool) {
+        guard let layer else { return }
+        layer.shadowOpacity = on ? 1 : 0
+        guard on else { return }
+        layer.shadowColor = cgColor(Tokens.Chrome.cardShadow)
+        layer.shadowRadius = Tokens.Shadow.liftRadius
+        layer.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.liftDrop : -Tokens.Shadow.liftDrop)
+    }
+}
+
 extension CALayer {
     /// Sets a property with a short fade, or instantly.
     func set(backgroundColor color: CGColor?, animated: Bool, duration: TimeInterval = Tokens.Motion.quick) {
@@ -405,7 +417,10 @@ final class IconButton: InteractiveView {
             imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
             return
         }
-        let fill: NSColor? = !isEnabled ? nil : isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.hoverFill : showsFillAtRest ? Tokens.Color.fieldFill : nil
+        // On the window's frame, hover and press are washes of the space's own color, like the rows beside them.
+        let pressed = isChrome ? Tokens.Chrome.pressed : Tokens.Color.pressedFill
+        let hover = isChrome ? Tokens.Chrome.hover : Tokens.Color.hoverFill
+        let fill: NSColor? = !isEnabled ? nil : isPressed ? pressed : (isHovered || isSelected) ? hover : showsFillAtRest ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         imageView.contentTintColor = image == nil ? tint : nil
         imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
@@ -1235,9 +1250,6 @@ final class MenuPanel: FloatingPanelView {
             movePill(from: oldValue)
         }
     }
-    /// The glass, the contact shadow and the lit top edge that give the panel its depth.
-    private let contact = CALayer()
-    private let rim = CAShapeLayer()
     /// The neutral picture for an item whose own is missing (a site with no favicon yet).
     static var placeholder: NSImage { Tokens.Symbol.image("globe", size: Tokens.TypeSize.body) }
     private var monitor: Any?
@@ -1257,7 +1269,6 @@ final class MenuPanel: FloatingPanelView {
     private init(entries: [Entry]) {
         self.entries = entries
         super.init(frame: .zero)
-        isGlass = false
         radius = Tokens.Radius.panel
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
@@ -1271,10 +1282,6 @@ final class MenuPanel: FloatingPanelView {
         pill.layer?.cornerCurve = .continuous
         pill.alphaValue = 0
         list.addSubview(pill)
-        layer?.insertSublayer(contact, at: 0)
-        rim.fillColor = nil
-        rim.lineWidth = Tokens.Metric.hairline
-        layer?.addSublayer(rim)
         let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
         for entry in entries {
             switch entry {
@@ -1425,23 +1432,6 @@ final class MenuPanel: FloatingPanelView {
             }
         }
         if let highlighted, rows.indices.contains(highlighted) { Tokens.Motion.withoutAnimation { pill.frame = rows[highlighted].frame } }
-        // Depth: a tight contact shadow right under the edge beneath the wide panel shadow, and a lit top rim.
-        let r = radius
-        Tokens.Motion.withoutAnimation {
-            contact.frame = bounds
-            contact.shadowPath = CGPath(roundedRect: bounds, cornerWidth: r, cornerHeight: r, transform: nil)
-            contact.shadowColor = cgColor(Tokens.Color.contactShadow)
-            contact.shadowOpacity = 1
-            contact.shadowRadius = Tokens.Shadow.contactRadius
-            contact.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.contactDrop : -Tokens.Shadow.contactDrop)
-            let rimPath = CGMutablePath()
-            let y = isFlipped ? 1.0 : bounds.height - 1
-            rimPath.move(to: CGPoint(x: r, y: y))
-            rimPath.addLine(to: CGPoint(x: bounds.width - r, y: y))
-            rim.path = rimPath
-            rim.strokeColor = cgColor(Tokens.Color.topHighlight)
-            rim.frame = bounds
-        }
     }
 
     /// The highlight glides from where it was to the row now under the pointer. From the keyboard, or arriving from
