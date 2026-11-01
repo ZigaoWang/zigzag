@@ -177,19 +177,23 @@ final class WindowManager {
         // Back/forward lists live in their own files: opaque and occasionally large. Only changed ones are
         // written, and never on the main thread.
         var keep = Set<UUID>()
+        var shown = Set<UUID>()
         var writes: [(URL, Data)] = []
         for controller in saved {
-            for tab in controller.tabManager.allTabs {
+            let manager = controller.tabManager
+            // The pages on screen: one may have been scrolled since, which only an encode would see.
+            let onScreen = [manager.selectedTab, manager.selectedTab.flatMap(manager.partner(of:))].compactMap { $0?.id }
+            shown.formUnion(onScreen)
+            for tab in manager.allTabs {
                 keep.insert(tab.id)
-                // Compared in full: a hash of Data looks only at its length and first bytes, so going Back (same
-                // length, different place) would go unsaved and the tab reopen on the wrong page.
-                guard let data = tab.interactionStateForSaving else { continue }
-                if savedStates[tab.id] == data { continue }
-                savedStates[tab.id] = data
+                // Only the tabs that could have changed are encoded again: with many tabs, the rest cost nothing.
+                guard tabStates.needsEncoding(tab.id, navigated: tab.navigatedSinceSave, shown: onScreen.contains(tab.id)) else { continue }
+                tab.navigatedSinceSave = false
+                guard let data = tab.interactionStateForSaving, tabStates.update(tab.id, with: data) else { continue }
                 writes.append((Paths.tabState.appendingPathComponent(tab.id.uuidString), data))
             }
         }
-        for id in savedStates.keys where !keep.contains(id) { savedStates[id] = nil }
+        tabStates.finish(keeping: keep, shown: shown)
         let directory = Paths.tabState
         // Frozen copies for the writer's queue, so nothing it reads can change under it.
         let toWrite = writes, kept = keep
@@ -200,7 +204,7 @@ final class WindowManager {
         }
     }
 
-    private var savedStates: [UUID: Data] = [:]
+    private var tabStates = TabStateCache()
     /// One writer at a time, in order, so an older write can't delete a file a newer one just wrote.
     private let stateWriter = DispatchQueue(label: "Zigzag.tab-states")
 

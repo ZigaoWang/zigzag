@@ -278,6 +278,9 @@ final class Tab: NSObject {
     }
 
     /// History snapshot for session restore. Cheap when the web view is suspended.
+    /// Went somewhere since the session was last saved, so its back/forward data has to be encoded again.
+    var navigatedSinceSave = true
+
     var interactionStateForSaving: Data? {
         if let webView { return webView.interactionState as? Data }
         return pendingInteractionState
@@ -491,6 +494,7 @@ final class Tab: NSObject {
                     }
                     let changedPage = url != self.url
                     self.url = url
+                    self.navigatedSinceSave = true
                     // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
                     if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
                     // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
@@ -759,6 +763,8 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Back, Forward and reload end here too, even where the address stays the same.
+        navigatedSinceSave = true
         if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
         checkForPDF(webView)
         refreshFavicon()
