@@ -660,6 +660,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             right.reloadIfItStopped()
             root.card.isFocusedPane = left === tab
             root.secondCard.isFocusedPane = right === tab
+            root.card.isUnfocusedPane = left !== tab
+            root.secondCard.isUnfocusedPane = right !== tab
             root.card.showsHeader = true
             root.secondCard.showsHeader = true
             root.card.header.show(left)
@@ -674,6 +676,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.secondCard.show(nil)
             root.card.isFocusedPane = false
             root.secondCard.isFocusedPane = false
+            root.card.isUnfocusedPane = false
+            root.secondCard.isUnfocusedPane = false
             root.card.showsHeader = false
             root.secondCard.showsHeader = false
         }

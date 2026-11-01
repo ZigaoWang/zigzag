@@ -7,8 +7,11 @@ final class PageCardView: NSView {
     private let clip = NSView()
     private let edge = CALayer()
     private(set) weak var webView: WKWebView?
-    /// In split view, the pane you're working in gets a quiet accent edge.
+    /// In split view, the pane you're working in: its toolbar is at full strength, the other's dims. An outline
+    /// would run along the window's own edges where a pane meets them.
     var isFocusedPane = false { didSet { refreshColors() } }
+    /// In split view, a pane you're not working in.
+    var isUnfocusedPane = false { didSet { refreshColors() } }
     /// In split view each pane gets its own small toolbar.
     let header = PaneHeaderView()
     var showsHeader = false { didSet { header.isHidden = !showsHeader; needsLayout = true } }
@@ -27,12 +30,15 @@ final class PageCardView: NSView {
 
     /// The card runs to the window's right edge, which rounds those corners itself.
     var squaresRightCorners = false { didSet { if squaresRightCorners != oldValue { needsLayout = true } } }
+    /// Meeting the window's edges beside the sidebar: its corners curve like the window's, so a split's two panes
+    /// match across the gap and the corner by the sidebar matches the window's.
+    var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true } } }
 
     /// Squares the corners off (or rounds them back) over `duration`, in step with the sidebar sliding away or back.
     func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
         guard on != edgeToEdge else { return }
         edgeToEdge = on
-        let radius = on ? 0 : squaresRightCorners ? Tokens.Radius.window : Tokens.Radius.card
+        let radius = on ? 0 : isAttached ? Tokens.Radius.window : Tokens.Radius.card
         CATransaction.begin()
         CATransaction.setDisableActions(duration == 0)
         CATransaction.setAnimationDuration(duration)
@@ -150,7 +156,7 @@ final class PageCardView: NSView {
             overlay?.frame = content
             edge.frame = clip.bounds
             if progressLine.superlayer != nil { layoutProgress() }
-            let radius = isEdgeToEdge ? 0 : squaresRightCorners ? Tokens.Radius.window : Tokens.Radius.card
+            let radius = isEdgeToEdge ? 0 : isAttached ? Tokens.Radius.window : Tokens.Radius.card
             clip.layer?.cornerRadius = radius
             edge.cornerRadius = radius
             let corners: CACornerMask = squaresRightCorners ? [.layerMinXMinYCorner, .layerMinXMaxYCorner]
@@ -170,8 +176,9 @@ final class PageCardView: NSView {
         Tokens.Motion.withoutAnimation {
             clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
             progressLine.backgroundColor = cgColor(Brand.Theme.current.accent)
-            edge.borderColor = cgColor(isFocusedPane ? Tokens.Color.accent.withAlphaComponent(0.55) : Tokens.Color.cardEdge)
-            edge.borderWidth = isFocusedPane ? 2 : Tokens.Metric.hairline
+            edge.borderColor = cgColor(Tokens.Color.cardEdge)
+            edge.borderWidth = Tokens.Metric.hairline
+            header.alphaValue = isUnfocusedPane ? 0.45 : 1
             layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
         }
     }

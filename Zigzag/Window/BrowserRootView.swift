@@ -411,6 +411,8 @@ final class BrowserRootView: ColorView {
         let attached = sidebarVisible && Self.isBorderless
         card.squaresRightCorners = attached && panes.left.maxX >= bounds.maxX - 1
         secondCard.squaresRightCorners = attached
+        card.isAttached = attached
+        secondCard.isAttached = attached
         if let right = panes.right {
             secondCard.isHidden = false
             secondCard.frame = right
@@ -557,6 +559,8 @@ final class BrowserRootView: ColorView {
         // Beside the sidebar, borderless, the page rounds like the window's corner; floating, like a card.
         card.squaresRightCorners = visible && Self.isBorderless && paneFrames.left.maxX >= bounds.maxX - 1
         secondCard.squaresRightCorners = visible && Self.isBorderless
+        card.isAttached = visible && Self.isBorderless
+        secondCard.isAttached = visible && Self.isBorderless
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
         secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, {
