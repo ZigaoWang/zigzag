@@ -313,9 +313,17 @@ enum SpaceEditor {
         controller.openSpaceEditor(spaceID, anchor: controller.sidebar.list.headerView)
     }
 
-    /// Deletes right away: ⌘Z brings the space back with its tabs, so there's nothing to confirm.
+    /// Deletes right away: ⌘Z brings the space back with its tabs, so there's nothing to confirm. The toast says what
+    /// went and offers the same Undo, for whoever doesn't know ⌘Z reaches this far.
     static func confirmDelete(spaceID: UUID, in controller: BrowserWindowController) {
+        guard let name = Library.shared.space(spaceID)?.name else { return }
         controller.removeSpaceWithUndo(spaceID)
+        guard Library.shared.space(spaceID) == nil else { return }
+        // Undo brings back this space, never whatever else was done since.
+        Toast.show("Deleted “\(name)”", symbol: "trash", action: ("Undo", { [weak controller] in
+            guard let undo = controller?.sidebarUndo, undo.canUndo, undo.undoActionName == "Delete Space" else { return }
+            undo.undo()
+        }), duration: 4, in: controller)
     }
 }
 
