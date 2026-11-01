@@ -814,9 +814,9 @@ final class DeskController {
         }
     }
 
+    /// A space's name picks its cards: the ones the search shows, a split's as one.
     private func selectSpace(_ id: UUID) {
-        guard let manager else { return }
-        let ids = Set(manager.tabs(in: id).map(\.id))
+        let ids = Set(cardTabs(in: id).map(\.id))
         selection = ids.isSubset(of: selection) ? selection.subtracting(ids) : selection.union(ids)
         updateSelection()
     }
