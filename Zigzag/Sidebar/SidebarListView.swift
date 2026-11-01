@@ -134,6 +134,8 @@ final class SidebarListView: NSView {
         /// Where it was picked up from; dropping there changes nothing, so no line shows.
         var originSection: Section? = nil
         var originIndex = 0
+        /// The space it was picked up in; carried to another, it's no longer in the list on show.
+        var originSpace: UUID? = nil
         /// Where the pointer is across the list: set in past a folder's last page, a drop stays in the folder.
         var pointX: CGFloat = 0
         /// The other picked rows going along with this one.
@@ -312,6 +314,8 @@ final class SidebarListView: NSView {
             }
         }
         if !changes.isEmpty { Tokens.Motion.animate { changes.forEach { $0() } } }
+        // The carried row's faint stand-in shows only in its own space.
+        drag?.view.isHidden = !carriedRowShown
         shownPages = [:]
         for item in displayed { if let id = pageID(item) { shownPages[item] = id } }
         updateDocumentHeight()
@@ -931,6 +935,7 @@ final class SidebarListView: NSView {
         if let landing = drag {
             drag?.originSection = landing.targetSection
             drag?.originIndex = landing.targetIndex
+            drag?.originSpace = shownSpaceID ?? manager?.currentSpaceID
         }
         // It stays in its place, faint, until it's dropped somewhere else.
         view.alphaValue = 0.35
@@ -966,7 +971,7 @@ final class SidebarListView: NSView {
     /// while you drag): below the carried row, every row sits one row lower than it will.
     private func reorderTarget(pointerY y: CGFloat, dragging drag: DragState) -> (Section, Int) {
         var y = y
-        if let view = rows[drag.item], view === drag.view {
+        if carriedRowShown, let view = rows[drag.item], view === drag.view {
             if y > view.frame.maxY { y -= view.frame.height + rowGap } else if y >= view.frame.minY { y = view.frame.minY }
         }
         return target(at: y, dragging: drag.item)
@@ -1021,12 +1026,19 @@ final class SidebarListView: NSView {
 
     private let insertionLine = InsertionLineView()
 
+    /// Whether the row being carried is in the list on show: in its own space it stays there, faint; carried to
+    /// another space, it isn't there at all.
+    private var carriedRowShown: Bool {
+        guard let drag, let manager else { return false }
+        return (shownSpaceID ?? manager.currentSpaceID) == drag.originSpace
+    }
+
     /// The line between the rows where the carried row (or a tab from elsewhere) would land, set in when it would
     /// go into a folder. Hidden when it would land where it already is, or while a split is on offer.
     private func placeLine() {
         let section: Section?, index: Int, pointX: CGFloat
         if let drag {
-            let home = drag.targetSection == drag.originSection && drag.targetIndex == drag.originIndex
+            let home = carriedRowShown && drag.targetSection == drag.originSection && drag.targetIndex == drag.originIndex
             section = home || drag.folderTarget != nil || splitCandidate != nil || drag.splitTarget != nil ? nil : drag.targetSection
             index = drag.targetIndex
             pointX = drag.pointX
@@ -1225,6 +1237,8 @@ final class SidebarListView: NSView {
         }
         if hovered != nil, hovered != drag.hoverSpace { Haptics.snap() }
         drag.hoverSpace = hovered
+        // On the space dots it's going to another space, not to the end of this list: no line meanwhile.
+        if hovered != nil { section = nil }
         // Crossing between pinned tabs and tabs is a different kind of place: a tap says so.
         if let section, let old = drag.targetSection, section != old { Haptics.snap() }
         let changed = section != drag.targetSection || index != drag.targetIndex
@@ -1273,6 +1287,7 @@ final class SidebarListView: NSView {
             : nil
         showFolderTarget(nil)
         self.drag = nil
+        drag.view.isHidden = false
         insertionLine.isHidden = true
         for other in drag.group { rows[other]?.alphaValue = 1 }
         // The picked rows, in the order they were in the list; they land together, in that order.
