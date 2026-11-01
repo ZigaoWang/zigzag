@@ -1267,10 +1267,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return container.bounds.contains(container.convert(event.locationInWindow, from: nil))
     }
 
-    /// Closes peek, find, previews: whatever floats above the page. Returns true if something closed.
+    /// Closes the peek, which floats above the page, so ⌘W puts it away before the tab. Find belongs to the tab and
+    /// goes with it, as in Safari; Esc closes find on its own. Returns true if something closed.
     func dismissFloatingContent() -> Bool {
         if peek.isVisible { peek.close(); return true }
-        if findBar.isVisible { findBar.hide(); return true }
         return false
     }
 
