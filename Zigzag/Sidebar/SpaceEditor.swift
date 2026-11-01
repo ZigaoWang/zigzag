@@ -21,6 +21,8 @@ final class ColorWheel: NSView {
     /// A faint disc behind the dots, so the wheel stays round where its deepest colors meet a dark panel.
     private let disc = CALayer()
     private let knobs = [WheelKnob(), WheelKnob()]
+    /// With a gradient, a line from one knob to the other: the two are one gradient, from here to there.
+    private let link = CAShapeLayer()
     private var paintedSize: CGSize = .zero
     private var pressed: Int?
 
@@ -29,6 +31,15 @@ final class ColorWheel: NSView {
         wantsLayer = true
         layer?.addSublayer(disc)
         layer?.addSublayer(dots)
+        link.fillColor = nil
+        link.strokeColor = NSColor.white.cgColor
+        link.lineWidth = 2
+        link.lineCap = .round
+        link.shadowColor = NSColor.black.cgColor
+        link.shadowOpacity = 0.25
+        link.shadowRadius = 1.5
+        link.shadowOffset = .zero
+        layer?.addSublayer(link)
         knobs.forEach { layer?.addSublayer($0.layer) }
         setAccessibilityRole(.group)
         setAccessibilityLabel("Color")
@@ -126,12 +137,27 @@ final class ColorWheel: NSView {
             guard i < spots.count else { continue }
             knob.layer.position = point(spots[i])
             knob.fill = i < knobColors.count ? knobColors[i] : SpaceColor.paint(hue: spots[i].hue, depth: spots[i].depth)
-            knob.isPressed = pressed == i
             // The one you're holding rides on top.
             knob.layer.zPosition = pressed == i ? 2 : CGFloat(1 - i)
         }
+        if spots.count > 1 {
+            let path = CGMutablePath()
+            path.move(to: point(spots[0]))
+            path.addLine(to: point(spots[1]))
+            link.frame = bounds
+            link.path = path
+            link.isHidden = false
+        } else {
+            link.isHidden = true
+        }
         CATransaction.commit()
         setAccessibilityValue(spots.map { "\(Int($0.depth * 100)) percent deep" }.joined(separator: ", "))
+    }
+
+    /// Anywhere on the disc can be clicked to pick that color.
+    override func resetCursorRects() {
+        let r = radius
+        addCursorRect(NSRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2), cursor: .pointingHand)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -162,12 +188,11 @@ final class ColorWheel: NSView {
     }
 }
 
-/// A knob on the wheel: the chosen color in a white ring, lifted by a soft shadow. It swells a little while held.
+/// A knob on the wheel: the chosen color in a white ring, lifted by a soft shadow.
 private final class WheelKnob {
     let layer = CALayer()
     private let inner = CALayer()
     var fill: NSColor = .white { didSet { inner.backgroundColor = fill.cgColor } }
-    var isPressed = false { didSet { layer.setAffineTransform(isPressed ? CGAffineTransform(scaleX: 1.2, y: 1.2) : .identity) } }
 
     init() {
         let size: CGFloat = 24
@@ -749,10 +774,11 @@ final class SpaceLookEditor: NSView {
             draft.glass = nil
             // A gradient needs two colors: a gray takes on Zigzag's blue, and the second starts as its neighbor.
             if draft.hue == nil { draft.hue = 0.6 }
-            let depth = min(max(draft.brightness ?? 0.3, 0.12), 0.88)
+            // Far enough from the middle, and from each other, that both knobs show and the gradient reads at once.
+            let depth = min(max(draft.brightness ?? 0.3, 0.3), 0.8)
             draft.brightness = depth
-            draft.hue2 = (draft.hue! + 0.1).truncatingRemainder(dividingBy: 1)
-            draft.brightness2 = depth < 0.6 ? depth + 0.16 : depth - 0.16
+            draft.hue2 = (draft.hue! + 0.14).truncatingRemainder(dividingBy: 1)
+            draft.brightness2 = depth < 0.55 ? depth + 0.2 : depth - 0.2
             draft.angle = draft.angle ?? 90
         case .glass:
             draft.glass = true
