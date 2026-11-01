@@ -264,6 +264,33 @@ enum Tokens {
         static let detailWidth: CGFloat = 520
     }
 
+    // MARK: - The guided tour
+
+    /// The tour's card at the page's bottom: the step's keys, what to do and why, a recording above when there is
+    /// one; and the last step, a note with the wordmark across its top.
+    enum Tour {
+        static let cardWidth: CGFloat = 400
+        /// A step's row: one line, or the line and its why.
+        static let rowHeight: CGFloat = Space.x16
+        static let rowWithNoteHeight: CGFloat = Space.x16 + Space.x3
+        /// A key to press: at least this wide and tall, `Space.x1` from the next.
+        static let keySide: CGFloat = Space.x8 + 2
+        static let keyGap: CGFloat = Space.x1
+        /// The done mark in place of the keys.
+        static let checkSide: CGFloat = Space.x5
+        /// The recording, inset from the card's edges.
+        static let videoInset: CGFloat = Space.x2
+        /// The last step: its width, padding, the band the wordmark sits in, and the wordmark's height.
+        static let finalWidth: CGFloat = 380
+        static let finalPad: CGFloat = Space.x8
+        static let finalHeader: CGFloat = 120
+        static let finalWordmark: CGFloat = Space.x8 + 2
+        static let finalTitleHeight: CGFloat = Space.x8 + 2
+        /// The ring around what to click: how far outside it, and round below this size.
+        static let ringOutset: CGFloat = 5
+        static let ringRoundBelow: CGFloat = 44
+    }
+
     // MARK: - Empty states
 
     /// A page with nothing to show yet (History, Passwords, the error page): the wordmark faded almost away, a quiet

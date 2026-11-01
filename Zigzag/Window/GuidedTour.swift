@@ -433,16 +433,18 @@ final class GuidedTour: NSView {
 
     private func pillSize(_ d: Display) -> NSSize {
         if d.isFinal {
-            let inner: CGFloat = 380 - 64
+            typealias F = Tokens.Tour
+            let inner = F.finalWidth - F.finalPad * 2
             let lh = ceil(letter.sizeThatFits(NSSize(width: inner, height: 400)).height)
-            return NSSize(width: 380, height: 120 + 26 + 34 + 10 + lh + 12 + signature.lineHeight + 24 + Tokens.Space.x10 + 28)
+            return NSSize(width: F.finalWidth, height: F.finalHeader + Tokens.Space.x6 + 2 + F.finalTitleHeight + Tokens.Space.x2 + 2 + lh
+                          + Tokens.Space.x3 + signature.lineHeight + Tokens.Space.x6 + Tokens.Space.x10 + Tokens.Space.x6 + Tokens.Space.x1)
         }
-        let keys = caps.map { max(34, $0.1.inkWidth + Tokens.Space.x4) }.reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * 4
+        let keys = caps.map { max(Tokens.Tour.keySide, $0.1.inkWidth + Tokens.Space.x4) }.reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * Tokens.Tour.keyGap
         let text = max(title.textWidth, d.note.isEmpty ? 0 : note.textWidth)
-        var width = Tokens.Space.x4 + (d.isDone ? 20 : keys) + Tokens.Space.x3 + text + Tokens.Space.x5
+        var width = Tokens.Space.x4 + (d.isDone ? Tokens.Tour.checkSide : keys) + Tokens.Space.x3 + text + Tokens.Space.x5
         if !skip.isHidden { width += skip.fittingWidth - Tokens.Space.x2 }
         if !step.isHidden { width += step.textWidth + Tokens.Space.x3 }
-        let row: CGFloat = d.note.isEmpty ? 64 : 76
+        let row = d.note.isEmpty ? Tokens.Tour.rowHeight : Tokens.Tour.rowWithNoteHeight
         // One width for every step, so the card never jumps; the recording on top when there is one.
         let w = max(ceil(width), Self.cardWidth)
         return NSSize(width: w, height: row + (showsVideo(d) ? Self.videoHeight(for: w) : 0))
@@ -453,7 +455,7 @@ final class GuidedTour: NSView {
         // Out first, so the ring goes where the sidebar is, not where it hides.
         pointsIntoSidebar = !d.isFinal && controller.map { target?.isDescendant(of: $0.sidebar) == true } ?? false
         if pointsIntoSidebar { controller?.root.reveal(true) }
-        let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -5, dy: -5) : nil } ?? .zero
+        let hole: NSRect = target.flatMap { $0.window != nil ? $0.convert($0.bounds, to: self).insetBy(dx: -Tokens.Tour.ringOutset, dy: -Tokens.Tour.ringOutset) : nil } ?? .zero
         // Dragging a tab onto the page uses the sidebar and the page at once: nothing dimmed, nothing ringed.
         // The tab to drag keeps its ring, so you know which one.
         // Nothing is dimmed: the window stays as it is, and a soft ring marks only small things to click.
@@ -461,7 +463,7 @@ final class GuidedTour: NSView {
         let page = controller?.root.cardFrame ?? bounds
         let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek"].contains(d.target)
         // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
-        let radius = max(hole.width, hole.height) < 44 ? min(hole.width, hole.height) / 2 : 12
+        let radius = max(hole.width, hole.height) < Tokens.Tour.ringRoundBelow ? min(hole.width, hole.height) / 2 : Tokens.Radius.tile
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
         pulse(ringed)
         let curve = Tokens.Motion.gentle
@@ -526,7 +528,7 @@ final class GuidedTour: NSView {
         layoutPill(d, in: frame.size)
     }
 
-    static let cardWidth: CGFloat = 400
+    static let cardWidth = Tokens.Tour.cardWidth
 
     /// The recording shows unless a peek covers the page (the card would sit on it).
     private func showsVideo(_ d: Display) -> Bool { d.clip != nil && d.target != "peek" }
@@ -538,7 +540,10 @@ final class GuidedTour: NSView {
     }
 
     /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.
-    private static func videoHeight(for width: CGFloat) -> CGFloat { round((width - 16) * 720 / 1120) + 8 }
+    private static func videoHeight(for width: CGFloat) -> CGFloat {
+        let inset = Tokens.Tour.videoInset
+        return round((width - inset * 2) * 720 / 1120) + inset
+    }
 
     private func layoutPill(_ d: Display, in size: NSSize) {
         let width = size.width
@@ -546,36 +551,40 @@ final class GuidedTour: NSView {
         video.isHidden = !showsVideo(d)
         updatePlayback()
         if showsVideo(d) {
-            let videoFrame = NSRect(x: 8, y: 8, width: width - 16, height: top - 8)
+            let inset = Tokens.Tour.videoInset
+            let videoFrame = NSRect(x: inset, y: inset, width: width - inset * 2, height: top - inset)
             if video.frame != videoFrame { video.frame = videoFrame }
             if videoLayer.frame != video.bounds { Tokens.Motion.withoutAnimation { videoLayer.frame = video.bounds } }
         }
         let height = size.height - top
         if d.isFinal {
-            let pad: CGFloat = 32, inner = width - pad * 2
+            typealias F = Tokens.Tour
+            let pad = F.finalPad, inner = width - pad * 2
             // The brand across the top, the note beneath it.
-            header.frame = NSRect(x: 0, y: 0, width: width, height: 120)
-            let wh: CGFloat = 34
-            wordmark.frame = NSRect(x: (width - wh * WordmarkView.aspect) / 2, y: (120 - wh) / 2, width: wh * WordmarkView.aspect, height: wh)
-            title.frame = NSRect(x: pad, y: header.frame.maxY + 26, width: inner, height: 34)
+            header.frame = NSRect(x: 0, y: 0, width: width, height: F.finalHeader)
+            let wh = F.finalWordmark
+            wordmark.frame = NSRect(x: (width - wh * WordmarkView.aspect) / 2, y: (F.finalHeader - wh) / 2, width: wh * WordmarkView.aspect, height: wh)
+            title.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Space.x6 + 2, width: inner, height: F.finalTitleHeight)
             let lh = ceil(letter.sizeThatFits(NSSize(width: inner, height: 400)).height)
-            letter.frame = NSRect(x: pad, y: title.frame.maxY + 10, width: inner, height: lh)
-            signature.frame = NSRect(x: pad, y: letter.frame.maxY + 12, width: inner, height: signature.lineHeight)
-            finish.frame = NSRect(x: pad, y: signature.frame.maxY + 24, width: inner, height: Tokens.Space.x10)
+            letter.frame = NSRect(x: pad, y: title.frame.maxY + Tokens.Space.x2 + 2, width: inner, height: lh)
+            signature.frame = NSRect(x: pad, y: letter.frame.maxY + Tokens.Space.x3, width: inner, height: signature.lineHeight)
+            finish.frame = NSRect(x: pad, y: signature.frame.maxY + Tokens.Space.x6, width: inner, height: Tokens.Space.x10)
             return
         }
         var x = Tokens.Space.x4
         if d.isDone {
-            check.frame = NSRect(x: x, y: top + (height - 20) / 2, width: 20, height: 20)
+            let c = Tokens.Tour.checkSide
+            check.frame = NSRect(x: x, y: top + (height - c) / 2, width: c, height: c)
             x = check.frame.maxX + Tokens.Space.x3
         }
         for (cap, label) in caps {
-            let w = max(34, label.inkWidth + Tokens.Space.x4)
-            cap.frame = NSRect(x: x, y: top + (height - 34) / 2, width: w, height: 34)
-            label.frame = NSRect(x: 0, y: (34 - label.lineHeight) / 2, width: w, height: label.lineHeight)
-            x += w + 4
+            let side = Tokens.Tour.keySide
+            let w = max(side, label.inkWidth + Tokens.Space.x4)
+            cap.frame = NSRect(x: x, y: top + (height - side) / 2, width: w, height: side)
+            label.frame = NSRect(x: 0, y: (side - label.lineHeight) / 2, width: w, height: label.lineHeight)
+            x += w + Tokens.Tour.keyGap
         }
-        if !caps.isEmpty { x += Tokens.Space.x3 - 4 }
+        if !caps.isEmpty { x += Tokens.Space.x3 - Tokens.Tour.keyGap }
         if note.isHidden {
             title.frame = NSRect(x: x, y: top + (height - title.lineHeight) / 2, width: title.textWidth + 4, height: title.lineHeight)
         } else {
