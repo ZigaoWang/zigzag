@@ -129,11 +129,19 @@ final class InnerShadow {
         layer.frame = frame
         clip.frame = layer.bounds
         clip.path = path
+        // The outside runs clockwise and the shape (as `MaterialShape` draws it) the other way, so the shadow's own
+        // path, which fills by winding, has the shape as its hole.
+        let r = layer.bounds.insetBy(dx: -40, dy: -40)
         let outer = CGMutablePath()
-        outer.addRect(layer.bounds.insetBy(dx: -40, dy: -40))
+        outer.move(to: CGPoint(x: r.minX, y: r.minY))
+        outer.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+        outer.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        outer.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        outer.closeSubpath()
         outer.addPath(path)
         caster.frame = layer.bounds
         caster.path = outer
+        caster.shadowPath = outer
     }
 
     /// `drop` moves the shadow down (y up), so the shade lands under the top edge; negative lights the bottom one.
@@ -556,7 +564,7 @@ final class GlassSurface: NSView {
 }
 
 /// A view for layers that never takes clicks.
-final class PassThroughView: NSView {
+class PassThroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
@@ -1142,6 +1150,270 @@ final class SkyBackdrop: NSView {
         Tokens.Motion.withoutAnimation {
             sun.colors = [light.cgColor, light.withAlphaComponent(light.alphaComponent * 0.35).cgColor, light.withAlphaComponent(0).cgColor]
             sun.locations = [0, 0.45, 1]
+        }
+    }
+}
+
+// MARK: - The browser window
+
+// The same light on the browser's own chrome, as glass rather than plastic, and kept quiet, since the page is what
+// you read: the frame as a soft surface lit from above (`FrameLight`), clear glass for the things you press and the
+// one you're on (`GlassPlate`), and a glass well for the address and a row under the pointer (`GlassWell`). Each
+// draws in a view of its own behind a control's content, y up as the rest of the kit, its layers set once and
+// changed only by state.
+
+/// The frame as a surface rather than paint: a soft light falling from above, a fine highlight along the top edge,
+/// and the faintest grain, over the space's color (and its gradient, or the desktop through it).
+final class FrameLight: PassThroughView {
+    private let falloff = CAGradientLayer()
+    private let edge = CAGradientLayer()
+    private let grain = CALayer()
+    /// How far along the top edge its highlight runs: the sidebar's width, or the whole frame.
+    var edgeWidth: CGFloat? { didSet { needsLayout = true } }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        falloff.startPoint = CGPoint(x: 0.5, y: 1)
+        falloff.endPoint = CGPoint(x: 0.5, y: 0)
+        // The highlight fades in from the window's rounded corner and out at its far end.
+        edge.startPoint = CGPoint(x: 0, y: 0.5)
+        edge.endPoint = CGPoint(x: 1, y: 0.5)
+        grain.backgroundColor = MaterialImages.grain.cgColor
+        grain.opacity = Tokens.Material.frameGrain
+        [falloff, grain, edge].forEach { layer?.addSublayer($0) }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        let line = 1 / (window?.backingScaleFactor ?? 2)
+        Tokens.Motion.withoutAnimation {
+            falloff.frame = bounds
+            grain.frame = bounds
+            edge.frame = CGRect(x: 0, y: bounds.maxY - line, width: min(edgeWidth ?? bounds.width, bounds.width), height: line)
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        layer?.applyContentsScale(window?.backingScaleFactor ?? 2)
+        needsLayout = true
+    }
+
+    private func refresh() {
+        let m = Tokens.Material.self
+        let dark = effectiveAppearance.isDark
+        Tokens.Motion.withoutAnimation {
+            let light = m.frameLight.cg(dark)
+            falloff.colors = [light, light.copy(alpha: light.alpha * 0.3)!, light.copy(alpha: 0)!]
+            falloff.locations = [0, NSNumber(value: Double(m.frameLightReach) * 0.4), NSNumber(value: Double(m.frameLightReach))]
+            let line = m.frameEdge.cg(dark)
+            edge.colors = [line.copy(alpha: 0)!, line, line, line.copy(alpha: 0)!]
+            edge.locations = [0, 0.08, 0.8, 1]
+        }
+    }
+}
+
+/// A pane of glass in the chrome: a thin wash the frame's color shows through, a specular rim brightest along its
+/// top edge and fading down the sides, a faint refraction line inside its bottom edge, the faintest hairline, and a
+/// large, soft, faint shadow. Under the pointer it rises a point; pressed it settles and dims. `.chosen` is the
+/// clearer card of the one you're on. Put it at the bottom of a control (`install(in:)`); it never takes clicks.
+final class GlassPlate: PassThroughView {
+    enum Pose { case hidden, rest, lifted, pressed }
+    enum Finish { case clear, chosen }
+
+    var radius: CGFloat = Tokens.Radius.control { didSet { needsLayout = true } }
+    /// The site's own color, a breath of it in the chosen card.
+    var tint: NSColor? { didSet { refresh(animated: false) } }
+    /// A darker hairline: a favorite whose page is open.
+    var showsOpenEdge = false { didSet { if oldValue != showsOpenEdge { refresh(animated: false) } } }
+    private(set) var pose = Pose.hidden
+    private(set) var finish = Finish.clear
+
+    private let cast = CastShadow()
+    private let pane = CALayer()
+    private let body = CAGradientLayer()
+    private let rim = GradientStroke(width: 1)
+    private let refraction = GradientStroke(width: 1)
+    private let hairline = CAShapeLayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = false
+        [cast.ambient, cast.contact, pane].forEach { layer?.addSublayer($0) }
+        [body, refraction.layer, rim.layer, hairline].forEach { pane.addSublayer($0) }
+        body.startPoint = CGPoint(x: 0.5, y: 1)
+        body.endPoint = CGPoint(x: 0.5, y: 0)
+        body.cornerCurve = .continuous
+        body.masksToBounds = true
+        hairline.fillColor = nil
+        hairline.lineWidth = 0.5
+        alphaValue = 0
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// Puts it under everything else in `view`, filling it.
+    func install(in view: NSView) {
+        frame = view.bounds
+        autoresizingMask = [.width, .height]
+        view.addSubview(self, positioned: .below, relativeTo: nil)
+    }
+
+    override func layout() {
+        super.layout()
+        let rect = bounds
+        Tokens.Motion.withoutAnimation {
+            pane.bounds = rect
+            pane.position = CGPoint(x: rect.midX, y: rect.midY)
+            body.frame = rect
+            body.cornerRadius = radius
+            rim.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: 0.5, dy: 0.5), radius: max(0, radius - 0.5)))
+            refraction.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: 1.5, dy: 1.5), radius: max(0, radius - 1.5)))
+            hairline.frame = rect
+            hairline.path = MaterialShape.rounded(rect.insetBy(dx: -0.25, dy: -0.25), radius: radius + 0.25)
+            // From well inside the footprint, so the shade reads as depth under the glass rather than a rim around it.
+            cast.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: min(4, rect.width * 0.08), dy: 2), radius: radius))
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh(animated: false)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        layer?.applyContentsScale(window?.backingScaleFactor ?? 2)
+        refresh(animated: false)
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        layer?.applyContentsScale(window?.backingScaleFactor ?? 2)
+    }
+
+    /// Shows a pose. Coming or going it's at once, as a hover fill is; rising, settling and coming back move,
+    /// quicker pressing in than coming back.
+    func set(_ pose: Pose, finish: Finish = .clear, animated: Bool) {
+        guard pose != self.pose || finish != self.finish else { return }
+        let appearing = self.pose == .hidden || pose == .hidden
+        self.pose = pose
+        self.finish = finish
+        Tokens.Motion.withoutAnimation { alphaValue = pose == .hidden ? 0 : 1 }
+        refresh(animated: animated && !appearing && window != nil, duration: pose == .pressed ? Tokens.Material.pressIn : Tokens.Material.settle)
+    }
+
+    private func refresh(animated: Bool, duration: TimeInterval = Tokens.Material.settle) {
+        let m = Tokens.Material.self
+        let dark = effectiveAppearance.isDark
+        let pressed = pose == .pressed
+        MaterialMotion.animate(animated ? duration : 0) {
+            var top = (pressed ? m.glassPressed : finish == .chosen ? m.chosenTop : m.glassTop).cg(dark)
+            var bottom = (pressed ? m.glassPressed : finish == .chosen ? m.chosenBottom : m.glassBottom).cg(dark)
+            if let tint, finish == .chosen, !pressed {
+                // A whisper of the site's color, more of it lower down, away from the light.
+                func lean(_ c: CGColor, _ k: CGFloat) -> CGColor {
+                    guard let base = NSColor(cgColor: c)?.usingColorSpace(.sRGB), let t = tint.usingColorSpace(.sRGB) else { return c }
+                    return (base.withAlphaComponent(1).blended(withFraction: k, of: t) ?? base).withAlphaComponent(base.alphaComponent).cgColor
+                }
+                top = lean(top, dark ? 0.12 : 0.06)
+                bottom = lean(bottom, dark ? 0.2 : 0.12)
+            }
+            body.colors = [top, bottom]
+            let spec = m.specular.cg(dark)
+            // Brightest along the top edge, running a little way down the sides and gone by the middle.
+            rim.set([spec, spec.copy(alpha: spec.alpha * 0.35)!, spec.copy(alpha: 0)!, spec.copy(alpha: 0)!], at: [0, 0.22, 0.5, 1])
+            rim.layer.opacity = pressed ? 0.4 : 1
+            let bend = m.refraction.cg(dark)
+            refraction.set([bend.copy(alpha: 0)!, bend.copy(alpha: 0)!, bend], at: [0, 0.6, 1])
+            hairline.strokeColor = (showsOpenEdge ? m.openHairline : m.glassHairline).cg(dark)
+            cast.apply(pressed ? m.glassSettled : pose == .lifted ? m.glassLifted : m.glassRest, isDark: dark)
+            let rise = Tokens.Motion.reduceMotion ? 0 : pose == .lifted ? m.glassLift : pressed ? -m.glassSink : 0
+            pane.transform = CATransform3DMakeTranslation(0, rise, 0)
+        }
+    }
+}
+
+/// Glass set into the frame: a faint darker wash, deeper under its top lip, a soft inner shadow beneath that lip,
+/// and (for the address) its lower edge catching the light. A row under the pointer is the same well, fainter,
+/// without the lip.
+final class GlassWell: PassThroughView {
+    var radius: CGFloat = Tokens.Radius.row { didSet { needsLayout = true } }
+    private let body = CAGradientLayer()
+    private let shade = InnerShadow()
+    private let lip = GradientStroke(width: 1)
+    private let depth: Float
+
+    /// `depth`: the inner shadow's strength (`Material.wellShade`, `rowWellShade`); `opacity`: the wash's.
+    init(depth: Float = Tokens.Material.wellShade, lip hasLip: Bool = true, opacity: Float = 1) {
+        self.depth = depth
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.masksToBounds = false
+        body.startPoint = CGPoint(x: 0.5, y: 1)
+        body.endPoint = CGPoint(x: 0.5, y: 0)
+        body.cornerCurve = .continuous
+        body.masksToBounds = true
+        body.opacity = opacity
+        lip.layer.isHidden = !hasLip
+        [lip.layer, body, shade.layer].forEach { layer?.addSublayer($0) }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func install(in view: NSView) {
+        frame = view.bounds
+        autoresizingMask = [.width, .height]
+        view.addSubview(self, positioned: .below, relativeTo: nil)
+    }
+
+    override func layout() {
+        super.layout()
+        let rect = bounds
+        Tokens.Motion.withoutAnimation {
+            body.frame = rect
+            body.cornerRadius = radius
+            shade.set(frame: rect, path: MaterialShape.rounded(rect, radius: radius))
+            let lipRect = rect.insetBy(dx: -0.5, dy: -0.5)
+            lip.set(frame: lipRect, path: MaterialShape.rounded(CGRect(origin: .zero, size: lipRect.size).insetBy(dx: 0.5, dy: 0.5), radius: radius))
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        layer?.applyContentsScale(window?.backingScaleFactor ?? 2)
+        refresh()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        layer?.applyContentsScale(window?.backingScaleFactor ?? 2)
+    }
+
+    private func refresh() {
+        let m = Tokens.Material.self
+        let dark = effectiveAppearance.isDark
+        Tokens.Motion.withoutAnimation {
+            body.colors = [m.wellTop.cg(dark), m.wellBottom.cg(dark)]
+            shade.set(color: m.recessShade.cg(dark), opacity: depth, radius: 2, drop: 1)
+            let light = m.specular.cg(dark)
+            lip.set([light.copy(alpha: 0)!, light.copy(alpha: 0)!, light.copy(alpha: light.alpha * (dark ? 0.35 : 0.8))!], at: [0, 0.62, 1])
         }
     }
 }

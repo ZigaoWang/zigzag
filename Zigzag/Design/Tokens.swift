@@ -34,6 +34,9 @@ enum Tokens {
         static let card: CGFloat = 8
         /// The window's own corner. A page that meets the window's edges takes it, so the two curves match.
         static let window: CGFloat = 16
+        /// The page's corners beside the sidebar when it meets the window's edges: rounder than the window's own, so
+        /// the page reads as a sheet laid on the frame rather than a notch cut out of it.
+        static let attached: CGFloat = 20
         /// A row in the sidebar or a floating list: soft enough that the selected one reads as a card.
         static let row: CGFloat = 10
         /// A favorite's tile.
@@ -588,6 +591,8 @@ enum Tokens {
         static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.45), dark: hex(0xFFFFFF, alpha: 0.42))
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66))
+        /// The window's own toolbar and bottom bar glyphs: a step crisper than a panel's icons, on any space's color.
+        static let chromeIcon = dynamic(light: hex(0x000000, alpha: 0.72), dark: hex(0xFFFFFF, alpha: 0.78))
 
         /// Row and button overlays drawn on top of the window background.
         static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06))
@@ -818,6 +823,59 @@ enum Tokens {
         static let largeText: CGFloat = 15
         /// A brand moment's headline: one line saying what Zigzag is.
         static let headline: CGFloat = 30
+
+        // MARK: The browser window (the same light, kept quiet: the page is what you read)
+
+        /// The frame's light falling from above: how bright at the top edge, and how far down (share of the height)
+        /// it has faded out.
+        static let frameLight = Tone(light: white(0.20), dark: white(0.045))
+        static let frameLightReach: CGFloat = 0.6
+        /// The fine highlight along the frame's top edge, under the traffic lights.
+        static let frameEdge = Tone(light: white(0.85), dark: white(0.10))
+        /// The frame's grain: the faintest, enough that it reads as a surface rather than paint.
+        static let frameGrain: Float = 0.022
+
+        /// Glass in the chrome (a favorite, the tab you're on, a toolbar button under the pointer): light, not paint.
+        /// A thin wash the space's color shows through, a touch brighter at the top; the chosen one a step clearer.
+        static let glassTop = Tone(light: white(0.46), dark: white(0.085))
+        static let glassBottom = Tone(light: white(0.30), dark: white(0.05))
+        static let chosenTop = Tone(light: white(0.80), dark: white(0.13))
+        static let chosenBottom = Tone(light: white(0.66), dark: white(0.09))
+        /// Pressed, the glass dims a little: the light behind it, not a shade painted on.
+        static let glassPressed = Tone(light: white(0.22), dark: white(0.035))
+        /// The edge that carries the glass: a specular rim brightest along the top, fading down the sides, and a
+        /// faint refraction line just inside the bottom edge.
+        static let specular = Tone(light: white(1), dark: white(0.32))
+        static let refraction = Tone(light: white(0.6), dark: white(0.08))
+        /// The faintest hairline, so white glass still parts from a pale frame.
+        static let glassHairline = Tone(light: ink(0.045), dark: Color.hex(0x000000, alpha: 0.28))
+        /// A favorite whose page is open in the background: its hairline a step darker, to tell at a glance.
+        static let openHairline = Tone(light: ink(0.2), dark: white(0.28))
+        /// Under glass the shadow is large, very soft and faint: depth, not a puff. At rest, under the pointer, and
+        /// pressed (the glass settles onto the frame).
+        static let glassRest = Elevation(ambientRadius: 8, ambientDrop: 3, ambientOpacity: 0.05, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.04)
+        static let glassLifted = Elevation(ambientRadius: 12, ambientDrop: 5, ambientOpacity: 0.08, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.04)
+        static let glassSettled = Elevation(ambientRadius: 4, ambientDrop: 1, ambientOpacity: 0.03, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.05)
+        /// How far glass rises under the pointer and sinks pressed: a point, no more, beside text.
+        static let glassLift: CGFloat = 1
+        static let glassSink: CGFloat = 0.5
+
+        /// The address, a pill of glass set into the frame: a faint darker wash, deeper under its top lip, a soft
+        /// inner shadow there, and its lower edge catching the light.
+        static let wellTop = Tone(light: ink(0.06), dark: Color.hex(0x000000, alpha: 0.22))
+        static let wellBottom = Tone(light: ink(0.025), dark: Color.hex(0x000000, alpha: 0.12))
+        static let wellShade: Float = 0.22
+        /// A row under the pointer: the same well, fainter, so a sweep down the list never gets busy.
+        static let rowWellShade: Float = 0.1
+
+        /// The page as a sheet on the frame: a large, faint shade it casts by the sidebar, and a light rim on that
+        /// edge, fading out across this many points.
+        static let pageAmbient = Elevation(ambientRadius: 18, ambientDrop: 2, ambientOpacity: 0.10, contactRadius: 1, contactDrop: 0, contactOpacity: 0.07)
+        static let pageRim = Tone(light: white(0.9), dark: white(0.16))
+        static let pageRimReach: CGFloat = Space.x6
+
+        /// The keyboard focus ring's soft glow around a field.
+        static let focusGlow: CGFloat = 4
     }
 
     // MARK: - Shadows (purposeful only)
