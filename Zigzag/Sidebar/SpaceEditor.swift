@@ -82,7 +82,8 @@ final class ColorWheel: NSView {
     }
 
     private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
-    private var radius: CGFloat { min(bounds.width, bounds.height) / 2 - 4 }
+    /// Room for a whole knob, and a little more, around the dots, so one at the rim never leaves the wheel's frame.
+    private var radius: CGFloat { min(bounds.width, bounds.height) / 2 - 14 }
 
     private func point(_ spot: Spot) -> CGPoint {
         let a = spot.hue * 2 * .pi - .pi / 2
@@ -621,15 +622,18 @@ final class LookSlider: NSView {
     }
 }
 
-/// Which way the gradient runs: a knob you turn, like one on a good amplifier. A raised disc with a notch, a ring of
-/// dots around it, and a soft click at each of the eight main directions. Drag around it, or click where it should point.
+/// Which way the gradient runs: a small knob you turn. A white thumb, the sliders' own, with a notch toward where the
+/// gradient goes, set in a ring of the gradient itself that turns with it, inside a fine ring of ticks with the one
+/// it points at lit. A soft click at each of the eight main directions. Drag around it, or click where it should point.
 final class DirectionKnob: NSView {
     var angle: Double = 45 { didSet { needsLayout = true } }
+    /// Where the gradient starts and ends, shown on the ring.
+    var colors: (NSColor, NSColor) = (.white, .black) { didSet { needsLayout = true } }
     var onChange: ((Double, Bool) -> Void)?
     private let ticks = CAShapeLayer()
     private let lit = CAShapeLayer()
-    private let disc = CAGradientLayer()
-    private let discShadow = CALayer()
+    private let ring = CAGradientLayer()
+    private let thumb = CALayer()
     private let notch = CALayer()
     private var lastDetent: Int?
 
@@ -638,15 +642,20 @@ final class DirectionKnob: NSView {
         wantsLayer = true
         layer?.addSublayer(ticks)
         layer?.addSublayer(lit)
-        discShadow.shadowOpacity = 1
-        discShadow.shadowRadius = 4
-        discShadow.shadowOffset = CGSize(width: 0, height: 2)
-        layer?.addSublayer(discShadow)
-        disc.masksToBounds = true
-        disc.borderWidth = Tokens.Metric.hairline
-        layer?.addSublayer(disc)
-        disc.addSublayer(notch)
-        toolTip = "Turn to change the direction"
+        ring.masksToBounds = true
+        ring.borderWidth = Tokens.Metric.hairline
+        layer?.addSublayer(ring)
+        // The same white disc as a slider's knob.
+        thumb.backgroundColor = .white
+        thumb.shadowOpacity = 1
+        thumb.shadowRadius = 3
+        thumb.shadowOffset = CGSize(width: 0, height: 1)
+        thumb.borderWidth = Tokens.Metric.hairline
+        thumb.borderColor = NSColor.black.withAlphaComponent(0.08).cgColor
+        layer?.addSublayer(thumb)
+        notch.backgroundColor = NSColor(white: 0.32, alpha: 1).cgColor
+        layer?.addSublayer(notch)
+        toolTip = "Gradient Direction"
         setAccessibilityRole(.slider)
         setAccessibilityLabel("Gradient direction")
     }
@@ -661,45 +670,46 @@ final class DirectionKnob: NSView {
         super.layout()
         let c = CGPoint(x: bounds.midX, y: bounds.midY)
         let outer = min(bounds.width, bounds.height) / 2
-        let r = outer - 11
-        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let ringRadius = outer - 5
+        let thumbRadius = ringRadius - 3.5
+        let a = angle * .pi / 180
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 ticks.fillColor = Tokens.Color.textTertiary.withAlphaComponent(0.6).cgColor
                 lit.fillColor = Tokens.Color.textPrimary.cgColor
-                discShadow.shadowColor = NSColor.black.withAlphaComponent(dark ? 0.5 : 0.18).cgColor
-                disc.borderColor = (dark ? NSColor.white.withAlphaComponent(0.08) : NSColor.black.withAlphaComponent(0.08)).cgColor
-                notch.backgroundColor = Tokens.Color.textPrimary.cgColor
+                ring.borderColor = Tokens.Color.panelEdge.cgColor
+                ring.colors = [colors.0.cgColor, colors.1.cgColor]
+                thumb.shadowColor = NSColor.black.withAlphaComponent(0.25).cgColor
             }
-            // A soft top light on the disc, so it reads raised.
-            disc.colors = dark ? [Tokens.Color.hex(0x48484C).cgColor, Tokens.Color.hex(0x323235).cgColor]
-                : [NSColor.white.cgColor, Tokens.Color.hex(0xF1F1F3).cgColor]
-            let rect = CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
-            disc.frame = rect
-            disc.cornerRadius = r
-            discShadow.frame = rect
-            discShadow.cornerRadius = r
-            discShadow.backgroundColor = disc.colors?.last.map { $0 as! CGColor }
+            ring.frame = CGRect(x: c.x - ringRadius, y: c.y - ringRadius, width: ringRadius * 2, height: ringRadius * 2)
+            ring.cornerRadius = ringRadius
+            // The ring runs the way the window does: from the first color to the second, along the angle.
+            let dx = cos(a) / 2, dy = sin(a) / 2
+            ring.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 - dy)
+            ring.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 + dy)
+            thumb.frame = CGRect(x: c.x - thumbRadius, y: c.y - thumbRadius, width: thumbRadius * 2, height: thumbRadius * 2)
+            thumb.cornerRadius = thumbRadius
             let ticksPath = CGMutablePath(), litPath = CGMutablePath()
             let nearest = Int((angle / 15).rounded()) % 24
             for i in 0..<24 {
                 let t = Double(i) / 24 * 2 * .pi
-                let size: CGFloat = i % 3 == 0 ? 1.7 : 1.1
-                let p = CGPoint(x: c.x + cos(t) * (outer - 3), y: c.y + sin(t) * (outer - 3))
+                let size: CGFloat = i % 3 == 0 ? 1.1 : 0.7
+                let p = CGPoint(x: c.x + cos(t) * (outer - 1.5), y: c.y + sin(t) * (outer - 1.5))
                 let dot = CGRect(x: p.x - size, y: p.y - size, width: size * 2, height: size * 2)
-                if i == nearest { litPath.addEllipse(in: dot.insetBy(dx: -0.6, dy: -0.6)) } else { ticksPath.addEllipse(in: dot) }
+                if i == nearest { litPath.addEllipse(in: dot.insetBy(dx: -0.5, dy: -0.5)) } else { ticksPath.addEllipse(in: dot) }
             }
             ticks.path = ticksPath
             ticks.frame = bounds
             lit.path = litPath
             lit.frame = bounds
+            // The notch turns with the knob, from near the middle out toward the second color.
+            let length = thumbRadius * 0.6
+            notch.bounds = CGRect(x: 0, y: 0, width: length, height: 2)
+            notch.cornerRadius = 1
+            let reach = thumbRadius - 2.5 - length / 2
+            notch.position = CGPoint(x: c.x + cos(a) * reach, y: c.y + sin(a) * reach)
+            notch.setAffineTransform(CGAffineTransform(rotationAngle: a))
         }
-        // The notch turns with the disc; clicks jump with a short ease, drags follow exactly.
-        let a = angle * .pi / 180
-        notch.bounds = CGRect(x: 0, y: 0, width: 9, height: 3)
-        notch.cornerRadius = 1.5
-        notch.position = CGPoint(x: r + cos(a) * (r - 8), y: r + sin(a) * (r - 8))
-        notch.setAffineTransform(CGAffineTransform(rotationAngle: a))
         setAccessibilityValue("\(Int(angle)) degrees")
     }
 
@@ -754,15 +764,159 @@ final class DirectionKnob: NSView {
     override func accessibilityPerformDecrement() -> Bool { angle = (angle + 315).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
 }
 
+/// One of the space's own colors in the Colors row: a round swatch like a preset's, ringed when its knob is the
+/// selected one on the wheel. The second shows a small × on hover that takes it away.
+final class ColorChip: InteractiveView {
+    var color: NSColor = .white { didSet { stateDidChange(animated: false) } }
+    /// Set for the second color: the × that removes it, and the same for VoiceOver.
+    var onRemove: (() -> Void)? {
+        didSet {
+            setAccessibilityCustomActions(onRemove == nil ? nil : [
+                NSAccessibilityCustomAction(name: "Remove second color") { [weak self] in self?.onRemove?(); return true },
+            ])
+        }
+    }
+    private let fill = CALayer()
+    private let ring = CALayer()
+    private let badge = CALayer()
+    private let cross = CAShapeLayer()
+    private static let badgeSize: CGFloat = 14
+
+    init(label: String) {
+        super.init(frame: .zero)
+        layer?.masksToBounds = false
+        layer?.addSublayer(ring)
+        layer?.addSublayer(fill)
+        // A dark dot with a white ×, edged in white so it lifts off any color, in either mode.
+        badge.backgroundColor = NSColor(white: 0.3, alpha: 1).cgColor
+        badge.borderColor = NSColor.white.cgColor
+        badge.borderWidth = 1.5
+        badge.isHidden = true
+        cross.strokeColor = NSColor.white.cgColor
+        cross.lineWidth = 1.4
+        cross.lineCap = .round
+        badge.addSublayer(cross)
+        layer?.addSublayer(badge)
+        setAccessibilityRole(.radioButton)
+        setAccessibilityLabel(label)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        stateDidChange(animated: false)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        stateDidChange(animated: false)
+    }
+
+    private var badgeFrame: CGRect {
+        CGRect(x: bounds.maxX - Self.badgeSize + 3, y: -3, width: Self.badgeSize, height: Self.badgeSize)
+    }
+
+    /// Whether a click landed on the ×.
+    func hitsBadge(_ event: NSEvent) -> Bool {
+        guard onRemove != nil else { return false }
+        return badgeFrame.insetBy(dx: -2, dy: -2).contains(convert(event.locationInWindow, from: nil))
+    }
+
+    override func stateDidChange(animated: Bool) {
+        Tokens.Motion.withoutAnimation {
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                ring.frame = bounds
+                ring.cornerRadius = bounds.width / 2
+                ring.borderWidth = 2
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : .clear).cgColor
+                let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
+                fill.frame = bounds.insetBy(dx: inset, dy: inset)
+                fill.cornerRadius = fill.frame.width / 2
+                fill.backgroundColor = color.cgColor
+                fill.borderWidth = Tokens.Metric.hairline
+                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+            }
+            badge.frame = badgeFrame
+            badge.cornerRadius = Self.badgeSize / 2
+            let path = CGMutablePath()
+            let m = Self.badgeSize / 2, r: CGFloat = 2.6
+            path.move(to: CGPoint(x: m - r, y: m - r))
+            path.addLine(to: CGPoint(x: m + r, y: m + r))
+            path.move(to: CGPoint(x: m + r, y: m - r))
+            path.addLine(to: CGPoint(x: m - r, y: m + r))
+            cross.path = path
+            cross.frame = badge.bounds
+            badge.isHidden = onRemove == nil || !isHovered
+        }
+        setAccessibilityValue(isSelected ? "selected" : nil)
+    }
+}
+
+/// An empty round slot with a +, beside the space's color: click it for a second color and a gradient.
+final class AddColorSlot: InteractiveView {
+    private let outline = CAShapeLayer()
+    private let plus = CAShapeLayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        outline.fillColor = nil
+        outline.lineWidth = 1.2
+        outline.lineDashPattern = [3, 2.5]
+        layer?.addSublayer(outline)
+        plus.lineWidth = 1.5
+        plus.lineCap = .round
+        layer?.addSublayer(plus)
+        toolTip = "Add a Second Color"
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("Add a second color")
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        stateDidChange(animated: false)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        Tokens.Motion.withoutAnimation {
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                let rect = bounds.insetBy(dx: 1.5, dy: 1.5)
+                outline.frame = bounds
+                outline.path = CGPath(ellipseIn: rect, transform: nil)
+                outline.strokeColor = (isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary).cgColor
+                outline.fillColor = isHovered ? Tokens.Color.fieldFill.cgColor : nil
+                plus.strokeColor = (isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary).cgColor
+            }
+            let path = CGMutablePath()
+            let c = CGPoint(x: bounds.midX, y: bounds.midY), r: CGFloat = 4.5
+            path.move(to: CGPoint(x: c.x - r, y: c.y))
+            path.addLine(to: CGPoint(x: c.x + r, y: c.y))
+            path.move(to: CGPoint(x: c.x, y: c.y - r))
+            path.addLine(to: CGPoint(x: c.x, y: c.y + r))
+            plus.frame = bounds
+            plus.path = path
+        }
+    }
+}
 
 /// How a space looks, in one piece, the same wherever it's edited: the wheel (around for the hue, out from the
-/// middle for how much of it, with a + for a second color and the direction dial once there are two), a row of
-/// presets, then Shade, See-through and Grain. `onPreview` fires while you drag, `onCommit` when you let go or pick
-/// something.
+/// middle for how much of it), a row of presets, then Colors (the space's one or two colors, a slot to add a second,
+/// and the direction once there are two), Shade, See-through and Grain. `onPreview` fires while you drag, `onCommit`
+/// when you let go or pick something.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
-    /// Adds a second color for a gradient, or takes it away again.
-    private let secondButton = IconButton(symbol: "plus", size: 26, toolTip: "Add Second Color")
+    private let colorsLabel = SpaceLookEditor.rowLabel("Colors")
+    /// The space's colors, one per knob on the wheel; clicking one selects its knob.
+    private let chips = [ColorChip(label: "Color"), ColorChip(label: "Second color")]
+    /// Adds a second color for a gradient; the second chip's × takes it away again.
+    private let addSlot = AddColorSlot()
     private let dial = DirectionKnob()
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
@@ -792,8 +946,8 @@ final class SpaceLookEditor: NSView {
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [wheel, secondButton, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, grainLabel, grainSlider]
-        (views + swatches).forEach { addSubview($0) }
+        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, grainLabel, grainSlider]
+        (views + chips + swatches).forEach { addSubview($0) }
 
         wheel.onChange = { [weak self] index, spot, final in
             guard let self else { return }
@@ -814,8 +968,17 @@ final class SpaceLookEditor: NSView {
             self?.selected = index
             self?.sync(animated: false)
         }
-        secondButton.radius = 13
-        secondButton.onClick = { [weak self] _ in self?.toggleSecondColor() }
+        for (i, chip) in chips.enumerated() {
+            chip.onClick = { [weak self, weak chip] event in
+                guard let self else { return }
+                if chip?.hitsBadge(event) == true { self.toggleSecondColor(); return }
+                guard self.selected != i else { return }
+                self.selected = i
+                self.sync(animated: false)
+            }
+        }
+        chips[1].onRemove = { [weak self] in self?.toggleSecondColor() }
+        addSlot.onClick = { [weak self] _ in self?.toggleSecondColor() }
         for swatch in swatches {
             swatch.onClick = { [weak self, weak swatch] _ in
                 guard let self, let look = swatch?.look else { return }
@@ -894,8 +1057,8 @@ final class SpaceLookEditor: NSView {
         changed(final: final, animated: false)
     }
 
-    /// The +: a second color, the first's neighbor on the wheel and a step deeper, so the gradient reads at once.
-    /// The − takes it away.
+    /// The + slot: a second color, the first's neighbor on the wheel and a step deeper, so the gradient reads at once.
+    /// The second chip's × takes it away.
     private func toggleSecondColor() {
         if draft.hue2 == nil {
             // From white, a gray or black, the second is Zigzag's blue, so there's something to fade into.
@@ -947,14 +1110,17 @@ final class SpaceLookEditor: NSView {
         grainSlider.colors = colors
         dial.angle = space.gradientAngle
         let two = space.hue2 != nil
-        secondButton.symbol = two ? "minus" : "plus"
-        secondButton.toolTip = two ? "Remove Second Color" : "Add Second Color"
-        secondButton.setAccessibilityLabel(secondButton.toolTip)
+        chips[0].color = colors[0]
+        chips[1].color = colors.last ?? colors[0]
+        for (i, chip) in chips.enumerated() { chip.isSelected = two && i == selected }
+        chips[1].isHidden = !two
+        addSlot.isHidden = two
+        dial.colors = (colors[0], colors.last ?? colors[0])
         showDial(two, animated: animated)
         needsLayout = true
     }
 
-    /// The direction dial fades in beside the wheel once there are two colors.
+    /// The direction dial fades in beside the two colors.
     private func showDial(_ show: Bool, animated: Bool) {
         guard show == dial.isHidden || dial.alphaValue != (show ? 1 : 0) else { return }
         dial.isHidden = false
@@ -978,18 +1144,20 @@ final class SpaceLookEditor: NSView {
     // MARK: Layout
 
     private let swatchSize: CGFloat = 24
+    private let chipSize: CGFloat = 26
     private let sliderHeight: CGFloat = 30
-    private let dialSize: CGFloat = 50
+    /// The Colors row: as tall as the dial, a little more than a slider.
+    private let dialSize: CGFloat = 40
     /// How tall the wheel is.
-    var wheelHeight: CGFloat = 216 { didSet { needsLayout = true } }
+    var wheelHeight: CGFloat = 232 { didSet { needsLayout = true } }
 
     var preferredHeight: CGFloat {
-        wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5 + sliderHeight * 3 + Tokens.Space.x3 * 2
+        wheelHeight + Tokens.Space.x3 + swatchSize + Tokens.Space.x5 + dialSize + sliderHeight * 3 + Tokens.Space.x3 * 3
     }
 
     /// Wide enough for the longest name, so every control starts at the same line.
     private var labelWidth: CGFloat {
-        let widest = [shadeLabel, clearLabel, grainLabel].map { ceil($0.intrinsicContentSize.width) }.max() ?? 0
+        let widest = [colorsLabel, shadeLabel, clearLabel, grainLabel].map { ceil($0.intrinsicContentSize.width) }.max() ?? 0
         return max(72, widest + Tokens.Space.x3)
     }
 
@@ -998,9 +1166,6 @@ final class SpaceLookEditor: NSView {
         let width = bounds.width
         var y: CGFloat = 0
         wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
-        // In the corners the round wheel leaves free: the + above, the dial below.
-        secondButton.frame.origin = NSPoint(x: width - secondButton.frame.width, y: y)
-        dial.frame = NSRect(x: width - dialSize, y: y + wheelHeight - dialSize, width: dialSize, height: dialSize)
         y += wheelHeight + Tokens.Space.x3
         let count = CGFloat(swatches.count)
         let gap = (width - count * swatchSize) / max(count - 1, 1)
@@ -1008,6 +1173,18 @@ final class SpaceLookEditor: NSView {
             swatch.frame = NSRect(x: CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
         }
         y += swatchSize + Tokens.Space.x5
+        // Colors: the space's own, then the slot for a second or, with two, which way they run.
+        let lh = ceil(colorsLabel.intrinsicContentSize.height)
+        colorsLabel.frame = NSRect(x: 0, y: y + (dialSize - lh) / 2, width: labelWidth, height: lh)
+        var x = labelWidth
+        let chipY = y + (dialSize - chipSize) / 2
+        chips[0].frame = NSRect(x: x, y: chipY, width: chipSize, height: chipSize)
+        x += chipSize + Tokens.Space.x2
+        chips[1].frame = NSRect(x: x, y: chipY, width: chipSize, height: chipSize)
+        addSlot.frame = chips[1].frame
+        x += chipSize + Tokens.Space.x3
+        dial.frame = NSRect(x: x, y: y, width: dialSize, height: dialSize)
+        y += dialSize + Tokens.Space.x3
         for (label, slider) in [(shadeLabel, shadeSlider), (clearLabel, clearSlider), (grainLabel, grainSlider)] {
             row(label, slider, y: y, height: sliderHeight)
             y += sliderHeight + Tokens.Space.x3
