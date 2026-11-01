@@ -141,7 +141,7 @@ final class DeskController {
     private let searchDelegate = DeskSearchDelegate()
     private let noMatches = Label("No tabs match", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
-    private static let searchHeight = Tokens.Space.x8
+    private static let searchHeight = Tokens.Metric.controlHeight
     private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
     private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
     private var frameToken: NSObjectProtocol?
@@ -183,11 +183,11 @@ final class DeskController {
         searchBox.wantsLayer = true
         searchBox.layer?.cornerRadius = Self.searchHeight / 2
         searchBox.layer?.cornerCurve = .continuous
-        searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body)
+        searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline)
+        searchIcon.imageScaling = .scaleNone
         searchIcon.contentTintColor = Tokens.Color.textTertiary
-        // Soft glass on the frame, like the favorites: the desk's field sits on the space's color.
-        searchBox.layer?.borderWidth = Tokens.Metric.hairline
-        searchBox.edgeColor = Tokens.Color.glassEdge
+        // The sidebar's soft field on the frame, like the address: the desk's search sits on the space's color.
+        searchBox.layer?.borderWidth = 0
         searchBox.addSubview(searchIcon)
         searchBox.addSubview(searchField)
         backdrop.addSubview(searchBox)
@@ -596,8 +596,8 @@ final class DeskController {
         let top = backdrop.isFlipped ? Tokens.Space.x6 : b.height - Tokens.Space.x6 - h
         searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
         searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
-        searchBox.color = Tokens.Color.glassFill
-        let icon = Tokens.Metric.favicon
+        searchBox.color = Tokens.Chrome.field
+        let icon = Tokens.Symbol.inline
         searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
         let textHeight = ceil(searchField.intrinsicContentSize.height)
         let x = searchIcon.frame.maxX + Tokens.Space.x2
@@ -943,9 +943,10 @@ final class DeskController {
         if !additive { selection = []; updateSelection() }
         var moved = false
         let layer = CAShapeLayer()
-        layer.fillColor = canvas.cgColor(Tokens.Color.accent.withAlphaComponent(0.12))
-        layer.strokeColor = canvas.cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-        layer.lineWidth = 1
+        // The marquee is a selection being drawn: the accent at the selection's strength, edged like a drop target.
+        layer.fillColor = canvas.cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.selectionAlpha))
+        layer.strokeColor = canvas.cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
+        layer.lineWidth = Tokens.Metric.hairline
         canvas.wantsLayer = true
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
@@ -973,8 +974,10 @@ final class DeskController {
         let offset = NSPoint(x: start.x - card.frame.minX, y: start.y - card.frame.minY)
         card.removeFromSuperview()
         canvas.addSubview(card)
+        // Carried, as a row picked up in the sidebar: the small carry shadow.
         card.layer?.shadowOpacity = 1
-        card.layer?.shadowRadius = Tokens.Space.x3
+        card.layer?.shadowRadius = Tokens.Shadow.carryRadius
+        card.layer?.shadowOffset = CGSize(width: 0, height: canvas.isFlipped ? Tokens.Shadow.carryDrop : -Tokens.Shadow.carryDrop)
         card.layer?.shadowColor = canvas.cgColor(Tokens.Color.panelShadow)
         var target = (id: tab.id, space: tab.spaceID, index: cardTabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0)
         let origin = target
