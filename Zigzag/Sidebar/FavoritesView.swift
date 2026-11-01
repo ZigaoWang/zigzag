@@ -29,10 +29,7 @@ final class FavoritesView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        // A tile's close badge sits over its corner and may reach past the grid's edge.
-        clipsToBounds = false
         wantsLayer = true
-        layer?.masksToBounds = false
         dropTile.isHidden = true
         dropTile.isPlaceholder = true
         addSubview(dropTile)
@@ -204,36 +201,18 @@ final class FavoriteTile: InteractiveView {
     private let icon = FaviconView()
     var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     var onClose: (() -> Void)?
-    /// Shown on an open favorite under the pointer, in the corner, like a tab's close button. The disc behind it is
-    /// its own view, so the button's hover fill sits on it and never replaces it.
-    /// A small round badge in the tile's top-right corner, like an app's badge.
+    /// Shown on an open favorite under the pointer: a small ×, inside the tile's top-right corner, so nothing hangs
+    /// past the tile to be cut off by the sidebar's edge.
     private static let closeSide: CGFloat = 16
-    private var badgeHovered = false
-    private var badgeLinger: DispatchWorkItem?
-    private lazy var closeDisc: ColorView = {
-        let side = Self.closeSide
-        let disc = ColorView(color: Self.badgeFill)
-        disc.wantsLayer = true
-        disc.layer?.cornerRadius = side / 2
-        disc.layer?.borderWidth = Tokens.Metric.hairline
-        disc.layer?.shadowOpacity = 1
-        disc.layer?.shadowRadius = 1.5
-        disc.layer?.shadowOffset = CGSize(width: 0, height: 1)
-        disc.isHidden = true
-        // The same close button a tab row has, on a disc of its own.
-        let button = IconButton(symbol: "xmark", size: side, symbolSize: 9, toolTip: "Unload Page")
+    private lazy var closeButton: IconButton = {
+        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: 8, toolTip: "Unload Page")
+        button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
-        button.layer?.cornerRadius = side / 2
+        button.layer?.cornerRadius = Self.closeSide / 2
         button.onClick = { [weak self] _ in self?.onClose?() }
-        // Over the part that hangs past the tile, the tile no longer counts as hovered; the badge stays for its own.
-        button.hoverChanged = { [weak self] hovering in
-            self?.badgeHovered = hovering
-            self?.stateDidChange(animated: false)
-        }
-        button.frame = NSRect(x: 0, y: 0, width: side, height: side)
-        disc.addSubview(button)
-        addSubview(disc)
-        return disc
+        button.isHidden = true
+        addSubview(button)
+        return button
     }()
     private weak var tab: Tab?
     private var tabToken: SignalToken?
@@ -244,8 +223,6 @@ final class FavoriteTile: InteractiveView {
     init(bookmark: Bookmark?) {
         self.bookmark = bookmark
         super.init(frame: .zero)
-        clipsToBounds = false
-        layer?.masksToBounds = false
         layer?.cornerRadius = Tokens.Radius.card
         layer?.cornerCurve = .continuous
         addSubview(icon)
@@ -295,22 +272,8 @@ final class FavoriteTile: InteractiveView {
         icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
         let dot = Self.dotSide
         openDot.frame = NSRect(x: (bounds.width - dot) / 2, y: isFlipped ? bounds.height - dot - 5 : 5, width: dot, height: dot)
-        // The badge hangs over the edge; AppKit turns clipping back on for a rounded layer, so it's turned off here.
-        clipsToBounds = false
-        layer?.masksToBounds = false
         let side = Self.closeSide
-        // Centered on the tile's corner, half over its edge, clear of the icon.
-        closeDisc.frame = NSRect(x: bounds.width - side / 2 - 2, y: -side / 2 + 2, width: side, height: side)
-    }
-
-
-    /// The badge reaches past the tile's edge; that part still takes the click.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        if !closeDisc.isHidden, let superview {
-            let local = convert(point, from: superview)
-            if closeDisc.frame.contains(local) { return closeDisc.hitTest(local) ?? closeDisc }
-        }
-        return super.hitTest(point)
+        closeButton.frame = NSRect(x: bounds.width - side - 4, y: isFlipped ? 4 : bounds.height - side - 4, width: side, height: side)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -320,27 +283,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = 1.5
             return
         }
-        // Shown while the pointer is on the tile or the badge; leaving the tile for the badge's outer half
-        // passes through a moment where neither is hovered, so hiding waits a beat.
-        let wanted = isOpen && (isHovered || badgeHovered)
-        badgeLinger?.cancel()
-        if wanted {
-            // Its edge and shadow are resolved here, so they follow light and dark like the tile.
-            closeDisc.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
-            closeDisc.layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
-            closeDisc.isHidden = false
-        } else if !closeDisc.isHidden {
-            let work = DispatchWorkItem { [weak self] in
-                guard let self, !(self.isOpen && (self.isHovered || self.badgeHovered)) else { return }
-                self.closeDisc.isHidden = true
-            }
-            badgeLinger = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
-        }
-        // The badge reaches over the next tile: the hovered tile is drawn on top.
-        if !closeDisc.isHidden, let superview, superview.subviews.last !== self {
-            superview.addSubview(self, positioned: .above, relativeTo: nil)
-        }
+        closeButton.isHidden = !(isOpen && isHovered)
         // Every favorite shows its icon in full (faded means old elsewhere in Zigzag). One that's open has a small
         // dot under its icon, as an app open in the Dock does; the one you're on is lit instead.
         icon.alphaValue = 1
@@ -369,8 +312,6 @@ final class FavoriteTile: InteractiveView {
     private let openDot = ColorView(color: Tokens.Color.textSecondary)
     private static let dotSide: CGFloat = 4
 
-    /// Light on dark and dark on light, so the badge reads on any tile.
-    private static let badgeFill = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF), dark: Tokens.Color.hex(0x5C5C62))
     private static let selected = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.95), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.2))
     private static let selectedHover = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 1), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.24))
 }
