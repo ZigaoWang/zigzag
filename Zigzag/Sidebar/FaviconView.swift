@@ -5,9 +5,15 @@ final class FaviconView: NSView {
     private let imageLayer = CALayer()
     private let spinner = RibbonView()
     private let fallback = NSImageView()
-    /// Dark one-color icons (GitHub, X, Notion) vanish on a dark frame; they get a light tile behind them.
-    private let backing = CALayer()
-    private var needsBacking = false
+    /// One-color icons (GitHub, X, Vercel) come in black or white, often whichever the page was in, so either can
+    /// vanish against the sidebar. They take the sidebar's own ink instead, readable in light and dark.
+    private var isInk = false
+    private struct RenderKey: Equatable {
+        let base: ObjectIdentifier?
+        let side: CGFloat, scale: CGFloat
+        let dark: Bool, ink: Bool
+    }
+    private var lastRender: RenderKey?
 
     var image: NSImage? { didSet { refreshImage() } }
     var isLoading = false { didSet { if oldValue != isLoading { refreshLoading() } } }
@@ -19,10 +25,6 @@ final class FaviconView: NSView {
         imageLayer.minificationFilter = .trilinear
         imageLayer.cornerRadius = Tokens.Radius.small - 1
         imageLayer.masksToBounds = true
-        backing.cornerRadius = Tokens.Radius.small
-        backing.cornerCurve = .continuous
-        backing.isHidden = true
-        layer?.addSublayer(backing)
         layer?.addSublayer(imageLayer)
 
         spinner.weight = 0.3
@@ -44,8 +46,7 @@ final class FaviconView: NSView {
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation {
-            backing.frame = bounds
-            imageLayer.frame = needsBacking && effectiveAppearance.isDark ? bounds.insetBy(dx: 2, dy: 2) : bounds
+            imageLayer.frame = bounds
             spinner.frame = bounds
             spinner.ribbonWidth = bounds.width * 0.62
             fallback.frame = bounds
@@ -67,22 +68,53 @@ final class FaviconView: NSView {
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
             spinner.color = Tokens.Color.icon
-            backing.backgroundColor = cgColor(Tokens.Color.hex(0xFFFFFF, alpha: 0.92))
-            backing.isHidden = !(needsBacking && effectiveAppearance.isDark) || imageLayer.opacity == 0
-            imageLayer.frame = needsBacking && effectiveAppearance.isDark ? bounds.insetBy(dx: 2, dy: 2) : bounds
-            imageLayer.cornerRadius = needsBacking && effectiveAppearance.isDark ? 0 : Tokens.Radius.small - 1
+            imageLayer.cornerRadius = isInk ? 0 : Tokens.Radius.small - 1
+            let scale = window?.backingScaleFactor ?? 2
+            // Drawn once at exactly the pixels it fills, with the best filtering, rather than scaled on the fly; again
+            // only when the icon, its size or its ink changes.
+            let key = RenderKey(base: image.map(ObjectIdentifier.init), side: bounds.width,
+                                scale: scale, dark: effectiveAppearance.isDark, ink: isInk)
+            if key != lastRender {
+                lastRender = key
+                let shown = isInk ? image.map { Self.inked($0, Tokens.Color.textPrimary, appearance: effectiveAppearance) } : image
+                imageLayer.contents = shown.flatMap { Self.render($0, side: bounds.width, scale: scale) }
+            }
+            imageLayer.contentsScale = scale
         }
     }
 
     private func refreshImage() {
-        needsBacking = image.map(FaviconView.isDarkMonochrome) ?? false
+        isInk = image.map(FaviconView.isMonochrome) ?? false
         refreshColors()
-        Tokens.Motion.withoutAnimation {
-            let scale = window?.backingScaleFactor ?? 2
-            imageLayer.contents = image?.layerContents(forContentsScale: scale)
-            imageLayer.contentsScale = scale
-        }
         fallback.isHidden = image != nil || isLoading
+    }
+
+    private static func render(_ image: NSImage, side: CGFloat, scale: CGFloat) -> CGImage? {
+        let pixels = Int((max(side, 1) * scale).rounded())
+        guard let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.interpolationQuality = .high
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        image.draw(in: NSRect(x: 0, y: 0, width: pixels, height: pixels), from: .zero, operation: .copy, fraction: 1,
+                   respectFlipped: false, hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)])
+        NSGraphicsContext.restoreGraphicsState()
+        return context.makeImage()
+    }
+
+    /// The icon's shape filled with one color, resolved for the view's light or dark look.
+    private static func inked(_ image: NSImage, _ color: NSColor, appearance: NSAppearance) -> NSImage {
+        var ink = color.cgColor
+        appearance.performAsCurrentDrawingAppearance { ink = color.cgColor }
+        return NSImage(size: image.size, flipped: false) { rect in
+            image.draw(in: rect)
+            guard let context = NSGraphicsContext.current?.cgContext else { return true }
+            context.setBlendMode(.sourceIn)
+            context.setFillColor(ink)
+            context.fill(rect)
+            return true
+        }
     }
 
     /// When loading began, so a page that's done almost at once doesn't flash the loader.
@@ -128,13 +160,13 @@ final class FaviconView: NSView {
                 MainActor.assumeIsolated { if let self, !self.isLoading { self.spinner.stopLooping() } }
             }
         }
-        Tokens.Motion.withoutAnimation { backing.isHidden = !(needsBacking && effectiveAppearance.isDark) || showSpinner }
     }
 
     private static var monochromeCache: [ObjectIdentifier: Bool] = [:]
 
-    /// True for icons that are mostly dark, colorless ink on transparency.
-    static func isDarkMonochrome(_ image: NSImage) -> Bool {
+    /// True for icons drawn in one colorless ink, black or white, on transparency. A black mark on a white disc
+    /// (Apple) is two tones and keeps its own colors.
+    static func isMonochrome(_ image: NSImage) -> Bool {
         let key = ObjectIdentifier(image)
         if let cached = monochromeCache[key] { return cached }
         var result = false
@@ -145,16 +177,18 @@ final class FaviconView: NSView {
                let data = ctx.data {
                 ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
                 let px = data.bindMemory(to: UInt8.self, capacity: side * side * 4)
-                var opaque = 0, transparent = 0, dark = 0, colorful = 0
+                var opaque = 0, transparent = 0, dark = 0, light = 0, colorful = 0
                 for i in 0..<(side * side) {
                     let a = Int(px[i * 4 + 3])
                     if a < 40 { transparent += 1; continue }
                     opaque += 1
                     let r = Int(px[i * 4]) * 255 / a, g = Int(px[i * 4 + 1]) * 255 / a, b = Int(px[i * 4 + 2]) * 255 / a
                     if max(r, g, b) < 90 { dark += 1 }
+                    if min(r, g, b) > 200 { light += 1 }
                     if max(r, g, b) - min(r, g, b) > 40 { colorful += 1 }
                 }
-                result = opaque > 0 && transparent > side * side / 6 && dark * 10 >= opaque * 7 && colorful * 10 < opaque
+                result = opaque > 0 && transparent > side * side / 6 && max(dark, light) * 10 >= opaque * 7
+                    && min(dark, light) * 10 < opaque && colorful * 10 < opaque
             }
         }
         monochromeCache[key] = result
