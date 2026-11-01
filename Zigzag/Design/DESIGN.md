@@ -1,10 +1,31 @@
 # Zigzag's design language
 
-Compact, precise and calm: the glass of a Mac app on macOS 26 with the structure of Linear and shadcn/ui (neutral
-zinc grays, 1px edges at low contrast, radii of 6 to 8, at most a shadow-sm, tight 13pt type, muted secondary text,
-clear focus rings), still unmistakably Zigzag (space colors and gradients, the see-through frame, the drawn ZIGZAG
-wordmark, the sidebar that carries back, forward, reload and the address). Nothing is bigger than its role needs, and
-nothing looks heavier than it needs to. Color comes from favicons and the space; everything else is neutral.
+Thin, calm and warm: each space is a soft color of its own, and the whole window wears it. The chrome on top is
+light: thin icons, light type with a clear hierarchy, no boxes, lines only where they structure something, and every
+fill a wash of the space's own color, so a space feels like yours rather than a gray template. Motion is short,
+eased out, never bouncy, and gets out of the way. The references are Arc's color per space without its complexity,
+Aside's polish, and the interaction craft of animations.dev. Still unmistakably Zigzag: the ribbon Z and the drawn
+ZIGZAG wordmark exactly as they are, the see-through frame, the sidebar that carries back, forward, reload and the
+address.
+
+## Space color
+
+The soul of the window. A space's color fills the sidebar and the frame around the page completely, by day and at
+night (`SpaceColor`, `Tokens.Frame`).
+
+- **Curated colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite. The hues sit at one OKLCH
+  lightness (0.915) and one gentle chroma (0.045) by day, and at a deep, quiet tint (0.27, 0.04) at night, so any two
+  look right side by side and each is colored enough to tell at a glance. A curated space follows the Mac between
+  its two shades. A new space takes the next curated color no other space has.
+- **Custom**: any hue and depth from the wheel, mixed in OKLCH (`SpaceColor.paint`); a deep one turns the window dark.
+- **Effects**, all optional: a second color for a gradient and its direction, see-through (the frosted desktop under
+  a thinner coat of the color), and grain.
+- **Ink**: text and icons are near-black or near-white with a little alpha, so the color shows through them a touch;
+  the window's mode follows the color's lightness, so they always pass AA on it.
+- **Switching spaces** cross-fades the frame's color (`Motion.standard`, eased out); from the keyboard too, since the
+  layout of the window should move so you see where you went.
+- Everything on the frame derives from the color (`Tokens.Chrome`): washes of white over it, so in any space, on a
+  gradient or see-through, each fill is a lighter step of that same color.
 
 Every value lives in `Tokens.swift`. Every shared part lives in `Components.swift`, `Controls.swift` and
 `Page.swift`. A view never invents a color, radius, shadow, size or duration; if the system lacks one, add it to
@@ -18,17 +39,17 @@ Four layers, front to back. Each has one material and one depth cue; nothing els
 | Layer | What | Material | Depth |
 |---|---|---|---|
 | 0. Frame | The window behind everything: the space's color, gradient, grain, or the desktop through it | Space color (`SpaceColor`), clear glass when see-through | None |
-| 1. Surfaces | The page card; Settings, History, Passwords pages | Opaque `Color.surface` | `Color.cardShadow`, barely there |
-| 2. Cards | The selected row, a selected tile, grouped rows on a page | `Color.selectedFill` / `surfaceGroup` | Hairline `selectedEdge` and `liftShadow` (`setLifted`) |
-| 3. Floating | Panels, popovers, menus, the command bar, previews, toasts | Liquid Glass (`.regular`) on macOS 26, `.popover` frost before, under `Color.panelWash` | Hairline `panelEdge` and the one panel shadow (`Shadow.panelRadius`, `panelDrop`) |
+| 1. Surfaces | The page card; Settings, History, Passwords pages | Opaque `Color.surface`; Settings' column a light tint of the space (`Theme.wash`) | `Color.cardShadow`, barely there |
+| 2. Cards | The selected tab, a selected favorite; grouped rows and chosen rows on pages and panels | On the frame `Chrome.card`; elsewhere `Color.selectedFill` / `surfaceGroup` | A quiet edge and a shadow-sm (`Chrome.cardEdge`, `cardShadow`; `setLifted`) |
+| 3. Floating | Panels, popovers, menus, the command bar, find, downloads, Peek, the switcher | Opaque, leaning toward the space (`Brand.Theme.panel`) | Hairline `panelEdge` and one soft small shadow (`Shadow.panelRadius` 16, `panelDrop` 3) |
 
-The sidebar has no surface of its own: it is the frame, its color toned toward neutral in light mode
-(`SpaceColor.frame`, `Color.frameChroma`) so the chrome on it reads crisp. What sits on it is quiet (rows at rest,
-labels) or light structure: a faint fill with a 1px edge (`chromeFill`, `chromeEdge`) on the address and the
-favorites, the clear selected fill with a 1px edge on the row you're on. No bevels, no puffy shadows.
+The sidebar has no surface of its own: it is the frame, in the space's full color. What sits on it is quiet (rows at
+rest, labels) or a soft wash of that color: the address and the favorites are soft fields (`Chrome.field`) with no
+line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 80% by day, 13% at night)
+with a crisp quiet edge and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
+No bevels, no puffy shadows, no boxes.
 
-Glass is only for floating things. Never on the window background (see-through spaces handle that) and never under
-long reading text without the wash.
+No glass gimmicks: see-through spaces frost the desktop under the frame, and that is the only blur.
 
 ## Size scale
 
@@ -36,7 +57,8 @@ One scale for pages and panels, in `Tokens`: the same role is the same size ever
 Mac-like. The browser window's chrome (the sidebar and a split pane's header) is a compact scale of its own,
 `Tokens.Sidebar` and `Tokens.Pane`, in the table after these. Nothing else picks a size.
 
-SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight.
+SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight. The
+space's name in the sidebar is the one heading there: 16 light (`Font.spaceName`), in a 40pt slot, low in it.
 
 | Text | Token | Size, weight | For |
 |---|---|---|---|
@@ -63,7 +85,7 @@ SF Pro, one weight per role. Secondary text is light gray and never bold; select
 | control | `Metric.controlHeight` (`Page.controlHeight`) | 28 | Pill buttons, dropdowns, search fields, a menu's items |
 | row | `Metric.rowHeight` (`Page.rowHeight`) | 34 | A list of places, History |
 
-Every symbol is regular weight (`Symbol.weight`), a monochrome outline tinted `Color.icon`, centered by its ink
+Every symbol is light weight (`Symbol.weight`), a thin monochrome outline tinted `Color.icon`, centered by its ink
 (`IconButton` measures it with `Symbol.inkOffset`), and the hover fill shows the whole target. A tick small enough to
 need it (a checkbox, a folder's cut-out icon) is the only bolder mark. The sidebar is never narrower than
 `Metric.sidebarMinWidth` (216), the room the traffic lights and the four toolbar buttons need; it opens at 240.
@@ -73,10 +95,11 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Element | Size |
 |---|---|
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
-| Address | 30pt field, radius 8, `chromeFill` and a 1px `chromeEdge`, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
-| Favorites | 4 to a row, 36pt tiles 6pt apart, 18pt icons, radius 8, `chromeFill` and a 1px edge (`openEdge` while the page is open); the × chip 14pt, 3pt inside the corner |
+| Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
+| Favorites | 4 to a row, 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
+| Space name | 16 light (`Font.spaceName`), 40pt slot, in the titles' column |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36 |
-| Selected row | `selectedFill` with a 1px `selectedEdge`, radius 6, no shadow; hover is half of it (`quietHover`) |
+| Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
 | Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
 | Section labels | 11pt medium, `textTertiary`, in the titles' column, low in a 28pt slot |
 | Bottom bar | 14pt icons in 26pt buttons, 6pt space dots, the current one a 14pt pill |
@@ -120,15 +143,17 @@ Pills (pill buttons, pill fields, the Clear chip) are capsules: radius = height 
 
 One look for each state, everywhere:
 
-- Rest: nothing (rows), `fieldFill` (fields, plain pills), `chromeFill` with a 1px `chromeEdge` (the sidebar's address and favorites), `glassFill` (glass tiles).
-- Hover: `Color.hoverFill` (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles),
-  a step lighter on the dark primary. Instant, both ways: a fade on something you sweep past all day reads as lag.
+- Rest: nothing (rows), `fieldFill` (fields, plain pills), `Chrome.field` (the sidebar's address and favorites), `glassFill` (glass tiles).
+- Hover: on the frame `Chrome.hover` (rows, the toolbar's buttons, the space dots); elsewhere `Color.hoverFill`
+  (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
+  dark primary. Instant, both ways: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`) at once, and buttons and rows give
   under the finger (`InteractiveView.pressScales`, `showPress`): down to `Motion.pressScale` (0.97) around their
   middle, eased out in `pressIn` (80ms), and a critically damped spring back in `pressOut` (200ms) when let go, from
   wherever they are. No bounce, and the action never waits on it. Not from the keyboard, not with Reduce Motion.
-- Selected / current: a clear neutral fill, `selectedFill`, with a 1px `selectedEdge`; in the sidebar that's all,
-  on a panel `setLifted(true)` adds a shadow-sm (`applyRowStyle`). In a list of places
+- Selected / current: in the sidebar the light card of the space's color (`Chrome.card`, `cardEdge`, a shadow-sm);
+  on a panel a clear neutral fill, `selectedFill`, with a 1px `selectedEdge` and `setLifted(true)`'s shadow-sm
+  (`applyRowStyle`). In a list of places
   (Settings' sections) and for a keyboard-chosen result: the accent at `Color.selectionAlpha`.
 - Keyboard highlight in a floating list: `Color.highlight`.
 - Focus: never the system's blue. A field shows the accent at `focusAlpha` (60%), 1.5pt, while typing. A drawn
@@ -148,6 +173,11 @@ something came from, answers at once, and can be interrupted.
 - Origin: a menu or popover grows out of what opened it, from `menuFrom` (0.96) with a fade, anchored at that
   control, in `menuIn` (180ms) on the house ease-out (0.23, 1, 0.32, 1). It leaves quicker and subtler: `menuOut`
   (120ms) toward 0.98. Exits are always quieter than entrances.
+- The selected tab's card slides: picking another row with the pointer, the card travels there from the row it was
+  on (`SelectionCardView`, `Motion.selection`, eased out), and the new row takes it over when it lands. A click
+  mid-slide carries on from where the card is. From the keyboard, with Reduce Motion or while dragging, it lands.
+- Space color: switching spaces cross-fades the frame; pointing at a preset in the space editor tries it on the
+  window at once, and moving off puts back what you have.
 - One highlight that moves: in a menu, the soft gray pill glides from row to row (`highlightGlide`, 140ms) instead of
   each row lighting on its own. A list of places (Settings' sections) and a row of filters (`SegmentedPills`) glide
   their selection the same way (`SelectionGlide`). From the keyboard it simply lands.
@@ -170,9 +200,9 @@ something came from, answers at once, and can be interrupted.
 - **Sidebar**: on the frame, compact (`Tokens.Sidebar`, the table above). Top row: the traffic lights,
   `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload at the trailing end, every glyph's
   ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
-  The address: a quiet field (`chromeFill`, a 1px `chromeEdge`, the host in `textPrimary`, its own small buttons, the
-  accent ring from the keyboard). Favorites: small tiles four to a row in the same look. The tab you're on: the
-  selected fill with its edge. A split row shows both pages, each half with its icon, its title and, while that page
+  The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons,
+  the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name,
+  16 light, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
@@ -181,14 +211,21 @@ something came from, answers at once, and can be interrupted.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
-- **Built-in pages** (History, Settings, Passwords): one plain `Color.surface`, `PageTitleView` (wordmark, hairline,
+- **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (Settings' column of sections in a
+  light tint of the space, `Brand.Theme.wash`), `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
   quiet rows.
-- **Floating panel** (`FloatingPanelView`): glass, panel radius, panel shadow, hairline edge, 12pt padding,
-  `CardRow`-style rows inset 4pt. Command bar, space editor, icon picker, site panel, downloads, previews, peek.
-- **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's. A solid panel
-  (`panelBackground`, white in light mode), `Radius.panel`, a hairline `panelEdge`, a lit top rim (`topHighlight`),
-  and depth in two layers: a tight contact shadow (`contactShadow`, 1.5pt) under the wide panel shadow. `body` items
+- **Floating panel** (`FloatingPanelView`): opaque, near white by day and a deep gray at night, each leaning just
+  perceptibly toward the window's space (`Brand.Theme.panel`), so the panel belongs to it and text always reads.
+  Panel radius, a crisp hairline edge, one soft small shadow, 12pt padding, `CardRow`-style rows inset 4pt. It grows
+  out of what opened it. Command bar, space editor, icon picker, site panel, find, downloads, previews, Peek, and the
+  Control-Tab switcher, which centers on the page beside the sidebar.
+- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of curated colors (one tap
+  each, a live preview on hover), the wheel and Shade for a color of your own, and Effects folded under a disclosure
+  (`DisclosureRow`): a second color and its direction, See-through, Grain. Effects opens by itself when the space
+  uses any of them.
+- **Menu** (`MenuPanel`): Zigzag draws its own; only right-click menus are the system's. The floating panel's
+  surface and its one shadow, `Radius.panel`, a hairline `panelEdge`. `body` items
   `Metric.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
   site's icon is missing; the chosen item has a check at its trailing end in the window's accent. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
