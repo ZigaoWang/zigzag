@@ -394,34 +394,11 @@ final class IconButton: InteractiveView {
     /// in a grid.
     var selectsAsCard = false { didSet { stateDidChange(animated: false) } }
 
-    /// The window's own toolbar and bottom bar: a crisp glyph at rest, a quiet fill under the pointer, and a pane of
-    /// glass that settles in when pressed.
-    var isTactile = false {
-        didSet {
-            guard isTactile != oldValue else { return }
-            if isTactile, plate == nil {
-                let plate = GlassPlate()
-                plate.radius = radius
-                plate.install(in: self)
-                self.plate = plate
-                tint = Tokens.Color.chromeIcon
-            }
-            stateDidChange(animated: false)
-        }
-    }
-    private var plate: GlassPlate?
+    /// The window's own toolbar and bottom bar: a step crisper glyph (`Color.chromeIcon`); the usual quiet hover
+    /// and press fills.
+    var isChrome = false { didSet { if isChrome { tint = Tokens.Color.chromeIcon } } }
 
     override func stateDidChange(animated: Bool) {
-        if isTactile, let plate {
-            plate.radius = radius
-            // No pane rising under the pointer: a quiet fill, as on any other button, and the glass only when pressed.
-            plate.set(isEnabled && isPressed ? .pressed : .hidden, animated: false)
-            let fill: NSColor? = isEnabled && !isPressed && (isHovered || isSelected) ? Tokens.Color.hoverFill : nil
-            layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
-            imageView.contentTintColor = image == nil ? tint : nil
-            imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
-            return
-        }
         if selectsAsCard {
             applyRowStyle(animated: animated)
             imageView.contentTintColor = image == nil ? (isSelected ? Tokens.Color.textPrimary : tint) : nil

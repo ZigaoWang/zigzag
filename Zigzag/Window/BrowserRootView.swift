@@ -31,11 +31,6 @@ final class SidebarContainer: NSView {
         sidebar.wantsLayer = true
         sidebar.layer?.cornerCurve = .continuous
         addSubview(sidebar)
-        // Floating, it carries the frame's light with it, over its color and under its rows.
-        light.isHidden = true
-        light.frame = sidebar.bounds
-        light.autoresizingMask = [.width, .height]
-        sidebar.addSubview(light, positioned: .below, relativeTo: nil)
         // Behind the sidebar's own views, inside its rounded shape.
         let backdrop = CALayer()
         backdrop.masksToBounds = true
@@ -64,7 +59,6 @@ final class SidebarContainer: NSView {
 
     private var backdrop: CALayer?
     private let dropRing = CALayer()
-    private let light = FrameLight()
 
     // MARK: Dropping links and files
 
@@ -160,7 +154,6 @@ final class SidebarContainer: NSView {
             // The grain blends inside this clipped layer, so the color sits here too, under it, as in the window.
             backdrop?.backgroundColor = isFloating ? cgColor(tint) : nil
             backdrop?.isHidden = !isFloating
-            light.isHidden = !isFloating
             if let gradient, isFloating {
                 let r = gradient.angle * .pi / 180
                 let dx = cos(r) / 2, dy = sin(r) / 2
@@ -239,7 +232,6 @@ final class BrowserRootView: ColorView {
     }
     /// The second page in split view.
     let secondCard = PageCardView()
-    private let frameLight = FrameLight()
     private let splitHandle = ResizeHandle()
     /// Share of the page area the left pane takes; nil when not split.
     var splitRatio: CGFloat? { didSet { needsLayout = true } }
@@ -295,8 +287,6 @@ final class BrowserRootView: ColorView {
     init(sidebar: SidebarView) {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
         super.init(color: SpaceColor.sky.background)
-        // The frame's light, over its color, gradient and grain and under everything on it.
-        addSubview(frameLight)
         addSubview(card)
         emptyHint.alphaValue = 0
         addSubview(emptyHint)
@@ -543,9 +533,6 @@ final class BrowserRootView: ColorView {
         super.layout()
         Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
         if !glassView.isHidden { glassView.frame = bounds }
-        frameLight.frame = bounds
-        // Under the traffic lights: along the sidebar where the page meets the window's top, the whole frame otherwise.
-        frameLight.edgeWidth = sidebarVisible && Self.isBorderless ? sidebarWidth : nil
         layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible
