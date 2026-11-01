@@ -159,6 +159,7 @@ final class FavoritesView: NSView {
                 }
                 tile.onRightClick = { [weak self] _ in self?.onMenu?(favorite) }
                 tile.onClose = { [weak self] in self?.onClose?(favorite) }
+                tile.onMiddleClick = tile.onClose
                 tile.onDragStart = { [weak self, weak tile] event in
                     guard let self, let tile else { return false }
                     self.drag(tile, favorite: favorite, event: event)

@@ -1353,6 +1353,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listSelect(_ tab: Tab) { tabManager.select(tab) }
     func listOpenBookmark(_ bookmark: Bookmark) { tabManager.openBookmark(bookmark) }
     func listClose(_ tab: Tab) { closeWithUndo(tab) }
+    func listClose(_ tabs: [Tab]) { closeManyWithUndo(tabs) }
 
     func listRenameBookmark(_ id: UUID, to name: String) {
         libraryChange("Rename Pinned Tab") { Library.shared.updateBookmark(id, title: name) }

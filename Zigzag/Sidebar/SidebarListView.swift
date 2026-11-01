@@ -6,6 +6,8 @@ protocol SidebarListDelegate: AnyObject {
     func listOpenBookmark(_ bookmark: Bookmark)
     func listRenameBookmark(_ id: UUID, to name: String)
     func listClose(_ tab: Tab)
+    /// Closes several at once; ⌘Z brings them all back.
+    func listClose(_ tabs: [Tab])
     func listNewTab()
     /// Clear: every tab in the space but the one you're on; with only that one left, it too.
     func listClearTabs()
@@ -501,16 +503,16 @@ final class SidebarListView: NSView {
                 }
                 _ = id
             }
-            row.onMiddleClick = { [weak self, weak row] in
-                if let tab = row?.tab { self?.delegate?.listClose(tab) }
-            }
             row.onDoubleClick = { [weak row] in row?.beginRename() }
             row.onRename = { [weak row] name in row?.tab?.customTitle = name.isEmpty ? nil : name }
             row.onClose = { [weak self, weak row] in
                 // Away from its page, the button says "Back to Pinned Page", and does that.
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
-                if let tab = row?.tab { self?.delegate?.listClose(tab) }
+                guard let tab = row?.tab else { return }
+                // A split row closes both its pages, as the desk's card does.
+                if let partner = row?.partner { self?.delegate?.listClose([tab, partner]) } else { self?.delegate?.listClose(tab) }
             }
+            row.onMiddleClick = row.onClose
             row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -545,6 +547,7 @@ final class SidebarListView: NSView {
                     self.delegate?.listClose(tab)
                 }
             }
+            row.onMiddleClick = row.onClose
             row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
