@@ -1118,6 +1118,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fadeTimer?.invalidate()
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()
+        // So is a folder's icon picker, and the event monitor it holds.
+        iconPicker?.close()
         onClose?(self)
     }
 
@@ -1255,13 +1257,21 @@ extension BrowserWindowController: TabHost {
 
     /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
     /// others when they open, and previews and the link bubble stay away while any of them is up.
-    var hasFloatingPanel: Bool { commandBar.isVisible || SitePanel.isOpen || DownloadsPanel.isOpen || SpaceEditorPanel.current != nil || desk.isVisible }
+    var hasFloatingPanel: Bool {
+        commandBar.isVisible || SitePanel.isOpen || DownloadsPanel.isOpen || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
+    }
+
+    /// A folder's icon picker, when it's open in this window.
+    private var iconPicker: IconPickerPanel? {
+        IconPickerPanel.current.flatMap { $0.window === window ? $0 : nil }
+    }
 
     func closeFloatingPanels() {
         if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
         SpaceEditorPanel.current?.close()
+        iconPicker?.close()
         previews.hide()
         linkStatus.show(nil, in: root.cardFrame)
     }
