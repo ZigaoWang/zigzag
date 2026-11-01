@@ -347,12 +347,12 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
 
     static func show(title: String, in controller: BrowserWindowController, done: @escaping (String) -> Void) {
         controller.closeFloatingPanels()
-        let panel = RenamePanel(frame: NSRect(x: 0, y: 0, width: 320, height: 64))
+        let panel = RenamePanel(frame: NSRect(x: 0, y: 0, width: Tokens.Dialog.width, height: Tokens.Metric.controlHeight + Tokens.Space.x3 * 2))
         panel.done = done
         panel.field.stringValue = title
         let card = controller.root.cardFrame
         // Where the command bar opens, the other place you type a name.
-        panel.frame.origin = NSPoint(x: round(card.midX - 160), y: card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)))
+        panel.frame.origin = NSPoint(x: round(card.midX - Tokens.Dialog.width / 2), y: card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)))
         controller.root.overlay.addSubview(panel)
         panel.present(arrival: .fade)
         controller.window?.makeFirstResponder(panel.field.field)
@@ -377,8 +377,8 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         save.onClick = { [weak self] _ in self?.close(commit: true) }
         onLayout = { [weak self] in
             guard let self else { return }
-            let pad = Tokens.Space.x3, h = Tokens.Space.x8
-            let bw = max(self.save.fittingWidth, 84)
+            let pad = Tokens.Space.x3, h = Tokens.Metric.controlHeight
+            let bw = max(self.save.fittingWidth, Tokens.Dialog.minButtonWidth)
             self.save.frame = NSRect(x: self.bounds.width - pad - bw, y: (self.bounds.height - h) / 2, width: bw, height: h)
             self.field.frame = NSRect(x: pad, y: (self.bounds.height - h) / 2, width: self.save.frame.minX - pad * 2, height: h)
         }
