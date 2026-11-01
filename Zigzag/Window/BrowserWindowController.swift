@@ -461,7 +461,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The site panel describes one page; another tab coming forward takes it away.
         if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
         if tab !== shownTab {
-            closeReader()
+            // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
+            let readerStillShown = readerTab != nil && tab.flatMap { tabManager.partner(of: $0) } === readerTab
+            if !readerStillShown { closeReader() }
             floatVideoOnSwitch(from: shownTab, to: tab)
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
