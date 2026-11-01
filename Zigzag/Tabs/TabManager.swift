@@ -726,7 +726,7 @@ final class TabManager {
         let list = tabs(in: closed.spaceID)
         if let opener = closed.opener, list.contains(where: { $0 === opener }) {
             select(opener)
-        } else if let previous = recentTabs.first(where: { $0 !== closed && $0.spaceID == closed.spaceID && !$0.isClosed }) {
+        } else if !leavesSpaceEmpty, let previous = recentTabs.first(where: { $0 !== closed && $0.spaceID == closed.spaceID && !$0.isClosed }) {
             select(previous)
         } else if !list.isEmpty {
             select(list[min(index, list.count - 1)])
