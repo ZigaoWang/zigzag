@@ -76,8 +76,9 @@ final class WhatsNewSheet: NSView {
     private let versionLabel = Label("Version \(WhatsNew.version)", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var headings: [Label] = []
     private var points: [(dot: ColorView, text: NSTextField)] = []
-    private let done = PrimaryButton(title: "Done")
-    private let all = TextButton(title: "All Release Notes", font: Tokens.Font.body(.medium))
+    private let buttons = DialogButtons()
+    private let done = PillButton(title: "Done", style: .prominent)
+    private let all = PillButton(title: "All Release Notes", style: .quiet)
     private var monitor: Any?
     private var width: CGFloat { min(560, bounds.width - Tokens.Space.x6 * 2) }
     private let pad = Tokens.Space.x6
@@ -89,7 +90,9 @@ final class WhatsNewSheet: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         addSubview(panel)
-        [icon, titleLabel, versionLabel, done, all, scroll].forEach { panel.addSubview($0) }
+        [icon, titleLabel, versionLabel, buttons, scroll].forEach { panel.addSubview($0) }
+        buttons.leading = [all]
+        buttons.trailing = [done]
         scroll.documentView = notes
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
@@ -195,7 +198,7 @@ final class WhatsNewSheet: NSView {
 
     private let iconSize: CGFloat = 52
     private var headerHeight: CGFloat { pad + iconSize + Tokens.Space.x5 }
-    private var footerHeight: CGFloat { Tokens.Space.x4 + Tokens.Space.x8 + pad }
+    private var footerHeight: CGFloat { Tokens.Dialog.gap + DialogButtons.height + pad }
 
     /// Lays the notes out in their scrolling column; returns how tall they are.
     @discardableResult
@@ -239,9 +242,6 @@ final class WhatsNewSheet: NSView {
         let scrollHeight = panel.bounds.height - headerHeight - footerHeight
         scroll.frame = NSRect(x: 0, y: headerHeight, width: width, height: max(0, scrollHeight))
         notes.frame = NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: max(contentHeight, scroll.contentSize.height))
-        let y = panel.bounds.height - pad - Tokens.Space.x8
-        let dw = max(done.fittingWidth, 88)
-        done.frame = NSRect(x: width - pad - dw, y: y, width: dw, height: Tokens.Space.x8)
-        all.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: all.fittingWidth, height: Tokens.Space.x8)
+        buttons.frame = NSRect(x: pad, y: panel.bounds.height - pad - DialogButtons.height, width: inner, height: DialogButtons.height)
     }
 }
