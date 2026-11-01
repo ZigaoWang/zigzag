@@ -1278,17 +1278,47 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     /// Turns a bookmark back into a tab, undoably.
-    func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
+    @discardableResult
+    func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) -> Tab? {
         let spaceID = Library.shared.spaceID(ofBookmark: bookmarkID) ?? tabManager.currentSpaceID
         // Half of a pinned split unpins the pair, from where the first of them was.
         let pinned = Library.shared.pinnedSplit(containing: bookmarkID)
         let oldIndex = Library.shared.bookmarks(in: spaceID).firstIndex { $0.id == bookmarkID || pinned?.contains($0.id) == true }
         let folder = Library.shared.folderID(containing: bookmarkID)
         // Unloaded, it comes back as a new tab: ⌘Z pins that one again.
-        if let tab = tabManager.unbookmark(bookmarkID, toIndex: index) {
-            sidebarUndo.registerUndo(withTarget: self) { $0.bookmarkWithUndo(tab, at: oldIndex, in: spaceID, folder: folder) }
-            sidebarUndo.setActionName("Unpin Tab")
+        guard let tab = tabManager.unbookmark(bookmarkID, toIndex: index) else { return nil }
+        sidebarUndo.registerUndo(withTarget: self) { $0.bookmarkWithUndo(tab, at: oldIndex, in: spaceID, folder: folder) }
+        sidebarUndo.setActionName("Unpin Tab")
+        return tab
+    }
+
+    /// A tab dropped on a pinned page: the two become one pinned split where the pinned page was, open side by
+    /// side. One ⌘Z puts both back.
+    func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool) {
+        let spaceID = Library.shared.spaceID(ofBookmark: bookmarkID) ?? tabManager.currentSpaceID
+        let index = Library.shared.bookmarks(in: spaceID).firstIndex { $0.id == bookmarkID }
+        let folder = Library.shared.folderID(containing: bookmarkID)
+        // The pinned page comes down where the tab is, so ⌘Z puts the tab back in its own place.
+        let tabIndex = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab }
+        sidebarUndo.beginUndoGrouping()
+        if let pinned = unbookmarkWithUndo(bookmarkID, to: tabIndex) {
+            splitWithUndo(pinned, with: tab, otherOnRight: tabOnRight)
+            // Half of a split pins the pair.
+            bookmarkWithUndo(tab, at: index, in: spaceID, folder: folder)
         }
+        sidebarUndo.endUndoGrouping()
+        sidebarUndo.setActionName("Split View")
+    }
+
+    /// A pinned page dropped on a tab: it comes down among the tabs, beside that one, and the two open side by side.
+    func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {
+        let index = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab }.map { $0 + 1 }
+        sidebarUndo.beginUndoGrouping()
+        if let unpinned = unbookmarkWithUndo(bookmarkID, to: index) {
+            splitWithUndo(tab, with: unpinned, otherOnRight: pinnedOnRight)
+        }
+        sidebarUndo.endUndoGrouping()
+        sidebarUndo.setActionName("Split View")
     }
     func listNewTab() { commandBar.show(mode: .newTab) }
 

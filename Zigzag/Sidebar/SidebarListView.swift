@@ -40,6 +40,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverFavorites(at windowPoint: NSPoint) -> Bool
     /// Dropped on the favorites grid. Returns true if it became a favorite.
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
+    func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool)
+    func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool)
     func listDropOnFavorites(_ tab: Tab) -> Bool
     /// A pinned page dropped on the favorites grid: it becomes a favorite, open or not.
     func listDropBookmarkOnFavorites(_ bookmarkID: UUID) -> Bool
@@ -1269,22 +1271,27 @@ final class SidebarListView: NSView {
         splitCandidate = nil
         for view in rows.values { (view as? TabRowView)?.splitDropSide = nil }
 
-        // Onto the middle of a tab's or pinned page's row: the two open side by side. A pinned page that isn't
-        // open yet opens for it.
+        // Onto the middle of a tab's or pinned page's row: the two open side by side. The pair takes the kind of the
+        // row it was dropped on, so it shows once: on a pinned page, a pinned split; on a tab, a split among tabs.
         if let split = drag.splitTarget {
-            func page(_ item: SidebarItem) -> Tab? {
-                switch item {
-                case .tab(let id): manager.tab(with: id)
-                case .bookmark(let id): Library.shared.bookmark(id).map(manager.liveTab(for:))
-                default: nil
+            drag.view.alphaValue = 1
+            let ontoTab = manager.tab(with: split.id)
+            switch drag.item {
+            case .tab(let id):
+                guard let carried = manager.tab(with: id) else { break }
+                if let ontoTab {
+                    delegate?.listSplit(ontoTab, with: carried, otherOnRight: split.onRight)
+                } else {
+                    delegate?.listPinSplit(carried, onto: split.id, tabOnRight: split.onRight)
                 }
-            }
-            let target: SidebarItem = manager.tab(with: split.id) != nil ? .tab(split.id) : .bookmark(split.id)
-            if let carried = page(drag.item), let other = page(target), manager.canSplit(other, with: carried) {
-                drag.view.alphaValue = 1
-                delegate?.listSplit(other, with: carried, otherOnRight: split.onRight)
                 reload(animated: true)
                 return
+            case .bookmark(let id):
+                guard let ontoTab else { break }
+                delegate?.listUnpinSplit(id, onto: ontoTab, pinnedOnRight: split.onRight)
+                reload(animated: true)
+                return
+            default: break
             }
         }
 
