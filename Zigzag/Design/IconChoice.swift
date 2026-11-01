@@ -188,7 +188,9 @@ final class IconPickerPanel: FloatingPanelView {
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
-                if event.keyCode == 53, event.window === self.window { self.close(); return nil }
+                // Mid-word in an input method (the emoji field takes any text), Esc belongs to it.
+                if event.keyCode == 53, event.window === self.window,
+                   (self.window?.firstResponder as? NSTextView)?.hasMarkedText() != true { self.close(); return nil }
                 return event
             }
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }

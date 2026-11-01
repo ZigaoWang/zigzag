@@ -1063,8 +1063,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
-                // Esc in another window (Settings, a second browser window) is that window's.
-                if event.keyCode == 53, event.window === self.window { self.cancel(); return nil }
+                // Esc in another window (Settings, a second browser window) is that window's; mid-word in a
+                // Chinese or Japanese input method, it belongs to the input method.
+                if event.keyCode == 53, event.window === self.window,
+                   (self.window?.firstResponder as? NSTextView)?.hasMarkedText() != true { self.cancel(); return nil }
                 return event
             }
             if event.window === self.window, !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }
