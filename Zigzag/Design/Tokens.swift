@@ -673,6 +673,8 @@ enum Tokens {
         /// this opacity, inside a `Metric.dropEdge` accent edge at `dropEdgeAlpha`. One look for every drop target.
         static let dropAlpha: CGFloat = 0.14
         static let dropEdgeAlpha: CGFloat = 0.7
+        /// The header of the split pane you're not working in, faded to this, so the one you are reads first.
+        static let unfocusedPaneAlpha: CGFloat = 0.45
         /// Selected text in our own fields (the command bar, its inline completion), in the accent at this opacity.
         static let textSelectionAlpha: CGFloat = 0.26
         /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.

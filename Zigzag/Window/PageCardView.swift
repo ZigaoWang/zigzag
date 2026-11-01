@@ -180,7 +180,7 @@ final class PageCardView: NSView {
             progressLine.backgroundColor = cgColor(Brand.Theme.current.accent)
             edge.borderColor = cgColor(Tokens.Color.cardEdge)
             edge.borderWidth = Tokens.Metric.hairline
-            header.alphaValue = isUnfocusedPane ? 0.45 : 1
+            header.alphaValue = isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1
             layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
         }
     }
