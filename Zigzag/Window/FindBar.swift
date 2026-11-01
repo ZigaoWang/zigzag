@@ -498,6 +498,9 @@ class FloatingPanelView: NSView {
         layer?.removeAnimation(forKey: "dismiss.shrink")
         Tokens.Motion.withoutAnimation { layer?.opacity = 1; layer?.transform = CATransform3DIdentity }
         alphaValue = 1
+        // A dismiss a moment ago left the layer at 0 (alphaValue alone doesn't reset it when it's already 1), and its
+        // completion would then take the panel away: shown again, it's fully back.
+        layer?.opacity = 1
         dismissing = false
         // Opened from the keyboard it's simply there: something you summon with a key, often many times a day, should
         // never make you wait for it (https://emilkowal.ski/ui/you-dont-need-animations). Opened with the mouse, or by
