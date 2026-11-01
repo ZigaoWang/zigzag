@@ -432,9 +432,12 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
     static func confirmDelete(_ id: UUID, in host: NSView) {
         guard let space = Library.shared.space(id), Library.shared.spaces.count > 1 else { return }
-        // Its tabs can come back with Undo in the browser, but it's still a big step, so it asks first.
+        // The sidebar deletes right away, ⌘Z being right there. Here Undo is in a browser window, or with none open
+        // nowhere at all, so it asks first and says which.
+        let undoable = BrowserWindowController.undoTarget != nil
         ConfirmSheet.show(in: host, title: "Delete “\(space.name)”?",
-                          message: "Its tabs and pinned tabs close. You can bring them back with Undo.",
+                          message: undoable ? "Its tabs and pinned tabs close. You can bring them back with Undo in a browser window."
+                                            : "Its tabs and pinned tabs close. This can’t be undone.",
                           confirmTitle: "Delete Space", destructive: true) { confirmed in
             guard confirmed else { return }
             if let controller = BrowserWindowController.undoTarget { controller.removeSpaceWithUndo(id) } else { Library.shared.removeSpace(id) }
