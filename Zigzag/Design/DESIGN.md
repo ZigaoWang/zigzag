@@ -31,7 +31,7 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 - **One warm accent on what's live** (`Color.live`, a matte persimmon): the knob of a switch that's on, the tick under
   the space you're in. Never on anything at rest, never a fill.
 - **Small details that work:** the space keys' numbers set in tabular figures like a dial's markings; the tick under
-  the current key; the selected card's top edge catching the light by one pixel (`Chrome.rim`, `setCardRim`); a
+  the current key; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
   hairline under the toolbar only while the list is scrolled under it.
 - **Edges.** The sidebar has three, and everything sits on one of them: the container edge (6pt: the address field,
   the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, and the
@@ -79,7 +79,7 @@ Four layers, front to back. Each has one material and one depth cue; nothing els
 
 The sidebar has no surface of its own: it is the frame, in the space's full color. What sits on it is quiet (rows at
 rest, labels) or a soft wash of that color: the address and the favorites are soft fields (`Chrome.field`) with no
-line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 72% by day, 16% at night)
+line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 80% by day, 16% at night)
 with a crisp quiet edge and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
 No bevels, no puffy shadows, no boxes.
 

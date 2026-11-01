@@ -905,11 +905,11 @@ enum Tokens {
 
         /// The tab you're on: a soft, light card of the space's own color, a crisp quiet edge and a shadow-sm
         /// (`cardShadow`, `Shadow.lift`). Seen at a glance on any color, never a slab.
-        static let card = Color.dynamic(light: white(0.72), dark: white(0.16))
-        static let cardHover = Color.dynamic(light: white(0.82), dark: white(0.19))
-        /// The card's top edge catching the light: one pixel of pure white inside its upper rim (`setCardRim`). By day
-        /// the card stays a step short of white (72%) so the lit edge has something to be brighter than.
-        static let rim = Color.dynamic(light: white(1), dark: white(0.14))
+        static let card = Color.dynamic(light: white(0.8), dark: white(0.16))
+        static let cardHover = Color.dynamic(light: white(0.9), dark: white(0.19))
+        /// At night the card's top edge catches the light: one pixel inside its upper rim (`setCardRim`). By day the
+        /// card is nearly white already and a lit edge can't read at 1x, so there is none.
+        static let rim = Color.dynamic(light: .clear, dark: white(0.14))
         static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.05), dark: white(0.08))
         static let cardShadow = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
