@@ -63,11 +63,11 @@ enum SidebarItem: Hashable {
     /// Shown while dragging a tab when there are no bookmarks yet: drop here to bookmark.
     case bookmarkDropZone
 
-    /// A tab, or a pinned page that isn't half of a pinned split: what the favorites grid takes.
+    /// A tab or a pinned page, a split's two pages included (they become one split favorite): what the favorites
+    /// grid takes.
     var canBeFavorite: Bool {
         switch self {
-        case .tab: true
-        case .bookmark(let id): Library.shared.pinnedSplit(containing: id) == nil
+        case .tab, .bookmark: true
         default: false
         }
     }
