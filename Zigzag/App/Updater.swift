@@ -33,6 +33,8 @@ final class Updater {
     }
 
     func start() {
+        // The first run of a beta keeps you on betas from then on, even after a stable version replaces it.
+        if Self.isBeta, UserDefaults.standard.object(forKey: Self.betaKey) == nil { UserDefaults.standard.set(true, forKey: Self.betaKey) }
         guard isConfigured else { return }
         controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: delegate, userDriverDelegate: nil)
     }
