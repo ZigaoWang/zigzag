@@ -442,9 +442,10 @@ final class LookSwatch: InteractiveView {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 ring.frame = bounds
                 ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : .clear).cgColor
-                let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
+                ring.borderWidth = 1.25
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.7) : .clear).cgColor
+                // Chosen, the swatch sits inside a fine ring; under the pointer it swells to meet the edge.
+                let inset: CGFloat = isSelected ? 3.5 : (isHovered ? 0 : 2)
                 fill.frame = bounds.insetBy(dx: inset, dy: inset)
                 fill.cornerRadius = fill.frame.width / 2
                 checker.frame = fill.frame
@@ -919,7 +920,7 @@ final class DisclosureRow: InteractiveView {
     var isOpen = false { didSet { if oldValue != isOpen { turn(animated: true) } } }
 
     init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+        label = Label(title, font: Tokens.Font.body(.light), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
         chevron.imageScaling = .scaleNone
@@ -972,7 +973,7 @@ final class DisclosureRow: InteractiveView {
 /// `onCommit` when you let go or pick something.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
-    private let colorsLabel = SpaceLookEditor.rowLabel("Colors")
+    private let colorsLabel = SpaceLookEditor.rowLabel("colors")
     /// The space's colors, one per knob on the wheel; clicking one selects its knob.
     private let chips = [ColorChip(label: "Color"), ColorChip(label: "Second color")]
     /// Adds a second color for a gradient; the second chip's × takes it away again.
@@ -980,13 +981,13 @@ final class SpaceLookEditor: NSView {
     private let dial = DirectionKnob()
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     /// Gradient, see-through and grain: there when you want them, folded away until then.
-    private let effects = DisclosureRow(title: "Effects")
+    private let effects = DisclosureRow(title: "effects")
     private var showsEffects = false
-    private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
+    private let shadeLabel = SpaceLookEditor.rowLabel("shade")
     private let shadeSlider = LookSlider(.shade)
-    private let clearLabel = SpaceLookEditor.rowLabel("See-through")
+    private let clearLabel = SpaceLookEditor.rowLabel("see-through")
     private let clearSlider = LookSlider(.seeThrough)
-    private let grainLabel = SpaceLookEditor.rowLabel("Grain")
+    private let grainLabel = SpaceLookEditor.rowLabel("grain")
     private let grainSlider = LookSlider(.grain)
 
     var onPreview: ((SpaceInfo) -> Void)?
@@ -1006,6 +1007,7 @@ final class SpaceLookEditor: NSView {
     /// `dark`: whether the window looks dark right now, for where a space that follows the Mac starts.
     init(space: SpaceInfo, dark: Bool) {
         let space = space.upgraded
+        isDark = dark
         original = space
         draft = space
         colorChosen = space.brightness != nil
@@ -1095,7 +1097,7 @@ final class SpaceLookEditor: NSView {
     override var isFlipped: Bool { true }
 
     private static func rowLabel(_ text: String) -> Label {
-        Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+        Label(text, font: Tokens.Font.body(.light), color: Tokens.Color.textSecondary)
     }
 
     /// Where the knob starts for a space that follows the Mac: about how it looks right now, so nothing jumps.
@@ -1122,8 +1124,11 @@ final class SpaceLookEditor: NSView {
     }
 
     private func depth(_ index: Int) -> Double {
-        index == 0 ? draft.brightness ?? 0 : draft.brightness2 ?? draft.brightness ?? 0
+        // A space that follows the Mac shows on the wheel at about the shade it has right now.
+        let follows = Self.startingDepth(draft, dark: isDark)
+        return index == 0 ? draft.brightness ?? follows : draft.brightness2 ?? draft.brightness ?? follows
     }
+    private let isDark: Bool
 
     /// Lighter or darker. With two colors both move together, keeping the step between them; holding Option moves
     /// only the selected one.
@@ -1145,7 +1150,7 @@ final class SpaceLookEditor: NSView {
     private func toggleSecondColor() {
         if draft.hue2 == nil {
             // From white, a gray or black, the second is Zigzag's blue, so there's something to fade into.
-            draft.hue2 = draft.isNeutral ? 0.6 : (draft.baseHue + 0.14).truncatingRemainder(dividingBy: 1)
+            draft.hue2 = draft.isNeutral ? 0.6 : (draft.baseHue + 0.22).truncatingRemainder(dividingBy: 1)
             draft.tint2 = draft.isNeutral ? nil : draft.tint
             let first = depth(0)
             draft.brightness2 = first < 0.6 ? first + 0.16 : first - 0.16
