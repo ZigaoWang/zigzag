@@ -86,6 +86,16 @@ extension BrowserWindowController {
         sidebarUndo.setActionName("Separate Tabs")
     }
 
+    /// A split favorite parted into two favorites, side by side in the grid; open, its pages part on screen too.
+    func separateFavoriteSplitWithUndo(_ favoriteID: UUID) {
+        guard let pair = Library.shared.pinnedSplit(containing: favoriteID) else { return }
+        if let live = [pair.left, pair.right].lazy.compactMap({ self.tabManager.bookmarkTab(for: $0) }).first(where: { self.tabManager.split(for: $0) != nil }) {
+            unsplitWithUndo(live)
+        } else {
+            libraryChange("Separate Tabs") { Library.shared.removePinnedSplit(containing: favoriteID) }
+        }
+    }
+
     // MARK: Favorites
 
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {

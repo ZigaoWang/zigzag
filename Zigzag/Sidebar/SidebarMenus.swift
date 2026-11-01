@@ -200,6 +200,16 @@ enum SidebarMenus {
                 controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(favorite.id, url: url) }
             })
         }
+        // A split favorite: its two pages go and come as one, and can be parted into two favorites.
+        if let pair = Library.shared.pinnedSplit(containing: favorite.id) {
+            menu.addItem(Item("Separate Split View") { controller.separateFavoriteSplitWithUndo(favorite.id) })
+            menu.addItem(Item("Move to Tabs") { controller.unfavoriteWithUndo(favorite.id, to: 0) })
+            menu.addItem(.separator())
+            let pages = [pair.left, pair.right].compactMap { manager.bookmarkTab(for: $0) }
+            if !pages.isEmpty { menu.addItem(Item("Unload Pages") { manager.close(pages) }) }
+            menu.addItem(Item("Remove from Favorites") { controller.removeFavoriteWithUndo(favorite.id) })
+            return menu
+        }
         menu.addItem(Item("Move to Tabs") { controller.unfavoriteWithUndo(favorite.id, to: 0) })
         menu.addItem(.separator())
         if let live {
