@@ -241,6 +241,8 @@ class InteractiveView: NSView {
     /// Keyboard focus, drawn as the design has it rather than the system's blue: a ring in the window's accent just
     /// outside the control, following its rounded shape. Only the keyboard brings it; a click never does.
     private var focusRing: CAShapeLayer?
+    /// A field's ring: brighter, with a soft glow of the accent around it (the address).
+    var focusRingGlows = false
 
     override var focusRingType: NSFocusRingType {
         get { .none }
@@ -262,7 +264,13 @@ class InteractiveView: NSView {
             ring.path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
             ring.fillColor = nil
             ring.lineWidth = width
-            ring.strokeColor = cgColor(Brand.Theme.for(self).accent.withAlphaComponent(Tokens.Color.focusAlpha))
+            let accent = Brand.Theme.for(self).accent
+            ring.strokeColor = cgColor(accent.withAlphaComponent(focusRingGlows ? 0.9 : Tokens.Color.focusAlpha))
+            ring.shadowPath = focusRingGlows ? ring.path?.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 0) : nil
+            ring.shadowColor = cgColor(accent)
+            ring.shadowRadius = Tokens.Material.focusGlow
+            ring.shadowOffset = .zero
+            ring.shadowOpacity = focusRingGlows ? 0.5 : 0
             ring.zPosition = 10
             if ring.superlayer == nil { layer.addSublayer(ring) }
         }
@@ -386,7 +394,33 @@ final class IconButton: InteractiveView {
     /// in a grid.
     var selectsAsCard = false { didSet { stateDidChange(animated: false) } }
 
+    /// The window's own toolbar and bottom bar: a crisp glyph at rest, a small pane of glass under the pointer that
+    /// settles in when pressed, in place of the hover fill.
+    var isTactile = false {
+        didSet {
+            guard isTactile != oldValue else { return }
+            if isTactile, plate == nil {
+                let plate = GlassPlate()
+                plate.radius = radius
+                plate.install(in: self)
+                self.plate = plate
+                tint = Tokens.Color.chromeIcon
+            }
+            stateDidChange(animated: false)
+        }
+    }
+    private var plate: GlassPlate?
+
     override func stateDidChange(animated: Bool) {
+        if isTactile, let plate {
+            layer?.set(backgroundColor: nil, animated: false)
+            plate.radius = radius
+            let pose: GlassPlate.Pose = !isEnabled ? .hidden : isPressed ? .pressed : isHovered || isSelected ? .lifted : .hidden
+            plate.set(pose, animated: window != nil)
+            imageView.contentTintColor = image == nil ? tint : nil
+            imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+            return
+        }
         if selectsAsCard {
             applyRowStyle(animated: animated)
             imageView.contentTintColor = image == nil ? (isSelected ? Tokens.Color.textPrimary : tint) : nil

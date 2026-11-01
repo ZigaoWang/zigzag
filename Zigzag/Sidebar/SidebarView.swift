@@ -12,6 +12,7 @@ protocol SidebarDelegate: SidebarListDelegate {
 final class AddressView: InteractiveView {
     private let label = Label("", font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
     private let lock = NSImageView()
+    private let well = GlassWell()
     /// Shows while the page uses the camera or microphone; click for options.
     /// Buttons inside the field: the same size, the same gap all round, corners that follow the field's.
     static let buttonSide: CGFloat = Tokens.Metric.compactIconButton
@@ -62,6 +63,10 @@ final class AddressView: InteractiveView {
         // Its buttons sit 4pt in, with 6pt corners: 10 here keeps the two curves running side by side.
         layer?.cornerRadius = Tokens.Radius.control + AddressView.buttonInset
         layer?.cornerCurve = .continuous
+        // A pill of glass set into the frame; keyboard focus rings it brightly.
+        well.radius = Tokens.Radius.control + AddressView.buttonInset
+        well.install(in: self)
+        focusRingGlows = true
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textTertiary
         addSubview(lock)
@@ -99,7 +104,8 @@ final class AddressView: InteractiveView {
         } else {
             label.stringValue = ""
         }
-        label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textSecondary
+        // The host crisp, in the text's own color; the prompt quiet.
+        label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
         if label.stringValue.isEmpty { label.stringValue = "Search or enter address" }
         let insecure = url?.scheme == "http"
         lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
@@ -131,9 +137,9 @@ final class AddressView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // Quieter than a field at rest; the usual hover when the pointer comes to it.
-        let fill = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.addressFill
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        // The well is the field at rest; the usual hover and press over it.
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }
 
@@ -141,6 +147,7 @@ final class AddressView: InteractiveView {
 final class SpaceDotView: InteractiveView {
     let spaceID: UUID
     private let dot = CALayer()
+    private let gloss = CAGradientLayer()
     /// A space with an icon shows it here instead of a dot, quiet until it's the space you're in.
     private let iconView = NSImageView()
     var icon: String? {
@@ -168,6 +175,12 @@ final class SpaceDotView: InteractiveView {
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Metric.iconButton, height: Tokens.Metric.iconButton))
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
+        // The space you're in is a lit bead of glass: a specular light along its top, standing on a soft shade.
+        gloss.startPoint = CGPoint(x: 0.5, y: 0)
+        gloss.endPoint = CGPoint(x: 0.5, y: 1)
+        gloss.masksToBounds = true
+        dot.addSublayer(gloss)
+        dot.shadowOffset = .zero
         iconView.imageScaling = .scaleNone
         iconView.isHidden = true
         addSubview(iconView)
@@ -191,6 +204,13 @@ final class SpaceDotView: InteractiveView {
         let width = height + (Tokens.Metric.currentSpaceDot - height) * share
         let ink = Tokens.Color.textPrimary
         let resting: CGFloat = isHovered ? 0.5 : 0.28
+        let dark = effectiveAppearance.isDark
+        // A top light, as flipped layers count y down: bright at the bead's top edge, gone by its middle.
+        let spec = Tokens.Material.specular.cg(dark)
+        gloss.colors = [spec.copy(alpha: dark ? 0.9 : 0.45)!, spec.copy(alpha: 0)!]
+        gloss.locations = [0, 0.6]
+        dot.shadowColor = Tokens.Material.shadowInk.cg(dark)
+        dot.shadowRadius = 2
         let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
         let changed = (wasSelected != nil && wasSelected != isSelected && swipeShare == nil) || settlesFromSwipe
         wasSelected = isSelected
@@ -200,6 +220,12 @@ final class SpaceDotView: InteractiveView {
             self.dot.position = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
             self.dot.cornerRadius = height / 2
             self.dot.backgroundColor = self.cgColor(tint)
+            let rect = CGRect(x: 0, y: 0, width: width, height: height)
+            self.gloss.frame = rect
+            self.gloss.cornerRadius = height / 2
+            self.gloss.opacity = Float(share)
+            self.dot.shadowPath = CGPath(roundedRect: rect.insetBy(dx: 1, dy: 0), cornerWidth: height / 2, cornerHeight: height / 2, transform: nil)
+            self.dot.shadowOpacity = Float(share) * (dark ? 0.5 : 0.18)
         }
         iconView.frame = bounds
         iconView.isHidden = icon == nil
@@ -274,7 +300,10 @@ final class SidebarView: NSView {
         wantsLayer = true
         layer?.masksToBounds = true
 
-        for button in [sidebarButton, backButton, forwardButton, reloadButton] { addSubview(button) }
+        for button in [sidebarButton, backButton, forwardButton, reloadButton] {
+            button.isTactile = true
+            addSubview(button)
+        }
         trafficLightsPicture.imageScaling = .scaleNone
         trafficLightsPicture.isHidden = true
         addSubview(trafficLightsPicture)
@@ -312,6 +341,8 @@ final class SidebarView: NSView {
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
 
+        downloadsButton.isTactile = true
+        newSpaceButton.isTactile = true
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
