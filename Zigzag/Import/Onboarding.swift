@@ -308,7 +308,9 @@ private final class StepPage: NSView {
         for (i, dot) in dots.enumerated() {
             let w: CGFloat = i == index ? 22 : 6
             dot.frame = NSRect(x: dx, y: dotY, width: w, height: 6)
-            dot.alphaValue = i == index ? 0.95 : i < index ? 0.55 : 0.28
+            // The step you're on is the live one, in the warm color, like the tick under the space you're in.
+            dot.color = i == index ? Tokens.Color.live : Brand.ribbon
+            dot.alphaValue = i == index ? 1 : i < index ? 0.55 : 0.28
             dx += w + 6
         }
         skip.frame = NSRect(x: bounds.width - 28 - skip.fittingWidth, y: 12, width: skip.fittingWidth, height: Tokens.Space.x8)
@@ -394,13 +396,16 @@ private enum Onboard {
     static let tint = Tokens.Color.dynamic(light: Tokens.Color.hex(0x1E3A5F), dark: Tokens.Color.hex(0xDAE5F2))
     static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Tokens.Color.textPrimary.withAlphaComponent(alpha * 0.85) }
 
-    /// A step's title, on the blue.
+    /// A step's title, on the blue: large, light and lowercase, set a little tight, as the space's name is.
     static func title(_ text: String) -> NSTextField {
-        let field = NSTextField(wrappingLabelWithString: text)
+        let field = NSTextField(wrappingLabelWithString: "")
         field.isSelectable = false
-        field.font = .systemFont(ofSize: Tokens.Welcome.titleSize, weight: .bold)
-        field.textColor = Brand.ribbon
-        field.alignment = .center
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        field.attributedStringValue = NSAttributedString(string: text.lowercased(), attributes: [
+            .font: NSFont.systemFont(ofSize: Tokens.Welcome.titleSize, weight: .light), .kern: Tokens.Sidebar.spaceNameKern,
+            .foregroundColor: Brand.ribbon, .paragraphStyle: paragraph,
+        ])
         return field
     }
 
@@ -438,8 +443,9 @@ private enum Onboard {
     static func mark(chosen: PrimaryButton, other: PrimaryButton) {
         chosen.customFill = Brand.ribbon.withAlphaComponent(0.2)
         chosen.customInk = Brand.ribbon
-        chosen.layer?.borderWidth = 2
-        chosen.layer?.borderColor = Brand.ribbon.cgColor
+        // The answer you're on is live: the one warm color rings it.
+        chosen.layer?.borderWidth = Tokens.Metric.fieldRing
+        chosen.layer?.borderColor = Tokens.Color.live.cgColor
         other.customFill = Brand.ribbon.withAlphaComponent(0.07)
         other.customInk = Brand.ribbon.withAlphaComponent(0.7)
         other.layer?.borderWidth = 0
@@ -489,7 +495,7 @@ private enum Onboard {
 /// "Welcome to", then the wordmark writing itself in, then one button. Nothing else on the screen moves.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let welcome = Label("Welcome to", font: Tokens.Font.title(.medium), color: Brand.ribbon.withAlphaComponent(0.78))
+    private let welcome = Label("welcome to", font: Tokens.Font.title(.light), color: Brand.ribbon.withAlphaComponent(0.78))
     private let wordmark = WordmarkView()
     private let start = Onboard.light("Get Started")
     private var drewIn = false
