@@ -427,7 +427,8 @@ final class TabSwitcher {
     private func finish() {
         isActive = false
         showWork?.cancel()
-        if shown { panel.dismiss() }
+        // Letting go of Control is a key event of its own (flags changed), so the switcher simply goes.
+        if shown { panel.dismiss(instantly: true) }
         shown = false
     }
 }

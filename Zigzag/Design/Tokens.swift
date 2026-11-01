@@ -507,11 +507,11 @@ enum Tokens {
         static var isFromKey: Bool { NSApp.currentEvent?.type == .keyDown }
 
         /// Runs AppKit animator() changes. Frames jump to their final values right away (so layout and
-        /// hit-testing always see the truth); only what's drawn animates.
+        /// hit-testing always see the truth); only what's drawn animates. From any key press it's instant.
         /// `evenFromKeyboard`: for changes to the window's layout (the sidebar, a split), where seeing where things
         /// went matters more than a few milliseconds.
         static func animate(_ curve: Curve = snappy, evenFromKeyboard: Bool = false, _ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
-            if isKeyboardDriven && !evenFromKeyboard {
+            if isFromKey && !evenFromKeyboard {
                 NSAnimationContext.runAnimationGroup({ ctx in
                     ctx.duration = 0
                     ctx.allowsImplicitAnimation = false
