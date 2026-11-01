@@ -127,6 +127,12 @@ enum DebugBridge {
                 controller.tabManager.currentTabs[Int(n[0])].lastActivated = Date().addingTimeInterval(-n[1] * 3600)
                 controller.sidebar.list.refreshRows()
             }
+        case "sidebarwidth":
+            // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
+            if let n = Double(arg) {
+                controller.root.sidebarWidth = min(max(n, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+                controller.root.needsLayout = true
+            }
         case "windowid":
             if let window = controller.window {
                 let screenHeight = NSScreen.screens.first?.frame.height ?? 0
