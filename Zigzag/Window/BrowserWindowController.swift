@@ -1279,6 +1279,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
         if event.type == .leftMouseDown, root.splitRatio != nil { focusPane(at: event.locationInWindow) }
+        // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,
+        // so without this the name stays open through drags and ⌘Z keeps going to it.
+        if event.type == .leftMouseDown, let editor = window?.firstResponder as? NSTextView, editor.isFieldEditor,
+           let field = editor.delegate as? NSTextField, field.isDescendant(of: sidebar.list),
+           !field.bounds.contains(field.convert(event.locationInWindow, from: nil)) {
+            window?.makeFirstResponder(nil)
+        }
         #if DEBUG
         if event.type == .scrollWheel, sidebarContains(event) { DebugBridge.recordScroll(event) }
         #endif
