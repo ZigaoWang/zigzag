@@ -96,6 +96,10 @@ final class TabPreviewController {
     /// Hover can end without a word: the row closes under the pointer, or you switch apps. This checks while a
     /// preview is up and takes it away once the pointer has really left.
     private var watchTimer: Timer?
+    #if DEBUG
+    /// The debug bridge's hover: this row counts as under the pointer, wherever the real one is.
+    weak var debugRow: NSView?
+    #endif
 
     init(controller: BrowserWindowController) { self.controller = controller }
 
@@ -201,6 +205,10 @@ final class TabPreviewController {
 
     /// The pointer is over this row, in the front window of the active app.
     private func isPointer(over row: NSView) -> Bool {
+        #if DEBUG
+        // Scripts drive a copy that may stay in the background, so neither the app's focus nor the pointer counts.
+        if row === debugRow { return row.window?.isVisible == true && !row.isHiddenOrHasHiddenAncestor }
+        #endif
         guard NSApp.isActive, let window = row.window, window.isVisible, !row.isHiddenOrHasHiddenAncestor else { return false }
         return row.bounds.contains(row.convert(window.mouseLocationOutsideOfEventStream, from: nil))
     }

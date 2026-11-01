@@ -1722,7 +1722,8 @@ extension BrowserWindowController: SidebarDelegate {
 extension BrowserWindowController {
     func debugHover(index: Int) {
         let tabs = tabManager.currentTabs
-        guard tabs.indices.contains(index), let row = sidebar.list.row(for: tabs[index]) else { return }
+        guard tabs.indices.contains(index), let row = sidebar.list.row(for: tabs[index]) else { previews.debugRow = nil; return }
+        previews.debugRow = row
         previews.hover(tabs[index], row: row, bookmark: nil)
     }
     func debugSwitcher() {
