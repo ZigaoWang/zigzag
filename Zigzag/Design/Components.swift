@@ -362,13 +362,18 @@ final class KeyCap: NSView {
 
 // MARK: - Panel material
 
+/// A panel's blur: only something to see through, never something to click.
+final class PanelFrost: NSVisualEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 /// What a floating panel is made of: Liquid Glass (regular) on macOS 26, a frosted popover material before it.
 /// `FloatingPanelView.isGlass` puts one behind a panel's content; this makes one for a surface of your own.
 enum PanelMaterial {
     /// A real blur on every macOS, with the panel's wash drawn over it. Liquid Glass draws above its sibling views,
     /// so the wash never landed on it and a busy page read straight through text panels like the address bar.
     static func make(radius: CGFloat) -> NSView {
-        let frost = NSVisualEffectView()
+        let frost = PanelFrost()
         frost.material = .popover
         frost.blendingMode = .withinWindow
         frost.state = .active

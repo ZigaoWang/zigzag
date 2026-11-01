@@ -355,7 +355,7 @@ class FloatingPanelView: NSView {
 
     /// Content goes in the surface so it is clipped to the rounded shape.
     override func addSubview(_ view: NSView) {
-        if view === surface { super.addSubview(view) } else { surface.addSubview(view) }
+        if view === surface || view === material { super.addSubview(view) } else { surface.addSubview(view) }
     }
 
     override func layout() {
@@ -364,6 +364,9 @@ class FloatingPanelView: NSView {
         surface.layer?.cornerRadius = radius
         if showsGlass, material == nil {
             let glass = PanelMaterial.make(radius: radius)
+            // Set first: AppKit adds a positioned view through `addSubview(_:)`, which would otherwise put the glass
+            // inside the surface, over the content, taking every click meant for it.
+            material = glass
             super.addSubview(glass, positioned: .below, relativeTo: surface)
             // Behind the surface and everything in it, whatever order the effect view's own layer asks for.
             glass.wantsLayer = true
