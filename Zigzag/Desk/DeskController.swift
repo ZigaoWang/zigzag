@@ -269,6 +269,8 @@ final class DeskController {
             zoomOut(settle: false)
             return
         }
+        // The desk fades in at once, before the page's picture is ready, so the first thing you see is the answer.
+        fade(backdrop, to: 1, duration: Tokens.Motion.standard)
         // The page's picture is taken fresh, so what shrinks is exactly what was on screen. That's quick; if it
         // isn't, the last picture will do.
         let id = transition
@@ -303,7 +305,7 @@ final class DeskController {
         guard let controller else { return }
         let id = transition
         let current = currentCard
-        fade(backdrop, to: 1, duration: Tokens.Motion.standard)
+        if backdrop.alphaValue < 1 { fade(backdrop, to: 1, duration: Tokens.Motion.standard) }
         if settle { settleIn(except: current) }
         guard let current, let tab = current.tab else { return }
         let target = current.imageClip.convert(current.imageClip.bounds, to: flightView)
@@ -365,7 +367,7 @@ final class DeskController {
         CATransaction.setDisableActions(true)
         CATransaction.setCompletionBlock(completion)
         for key in ["position", "transform", "cornerRadius"] {
-            let spring = Tokens.Motion.springAnimation(keyPath: key, duration: Tokens.Motion.zoom)
+            let spring = Tokens.Motion.easeAnimation(keyPath: key, duration: Tokens.Motion.zoom)
             spring.fromValue = from[key]
             spring.toValue = to[key]
             layer.setValue(to[key], forKeyPath: key)
@@ -384,10 +386,10 @@ final class DeskController {
     /// The picture a card's first page shows, or none for one that hasn't drawn.
     private static func picture(of tab: Tab) -> NSImage? { TabThumbnailView.isBlank(tab.snapshot) ? nil : tab.snapshot }
 
-    /// Fades a view to `value` on a spring, from wherever it is now.
+    /// Fades a view to `value`, eased out, from wherever it is now; `completion` runs when it's done, not later.
     private func fade(_ view: NSView, to value: CGFloat, duration: TimeInterval, completion: (() -> Void)? = nil) {
         guard let layer = view.layer else { completion?(); return }
-        let spring = Tokens.Motion.springAnimation(keyPath: "opacity", duration: duration)
+        let spring = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: duration)
         spring.fromValue = layer.presentation()?.opacity ?? layer.opacity
         spring.toValue = Float(value)
         CATransaction.begin()
@@ -406,7 +408,7 @@ final class DeskController {
         let now = CACurrentMediaTime()
         for (i, card) in ordered.enumerated() {
             guard let layer = card.layer else { continue }
-            let fade = Tokens.Motion.springAnimation(keyPath: "opacity", duration: Tokens.Motion.zoom)
+            let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.zoom)
             fade.fromValue = 0
             fade.toValue = 1
             let group = CAAnimationGroup()
@@ -417,7 +419,7 @@ final class DeskController {
                 let k: CGFloat = 0.96, size = card.bounds.size
                 let small = CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                 CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0))
-                let grow = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.zoom)
+                let grow = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.zoom)
                 grow.fromValue = NSValue(caTransform3D: small)
                 grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
                 group.animations = [grow, fade]
@@ -759,7 +761,7 @@ final class DeskController {
         // A view's layer is anchored at its corner: scale from there, then move.
         let from = CATransform3DConcat(CATransform3DMakeScale(shown.width / frame.width, shown.height / frame.height, 1),
                                        CATransform3DMakeTranslation(shown.minX - frame.minX, shown.minY - frame.minY, 0))
-        let spring = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+        let spring = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.large)
         spring.fromValue = NSValue(caTransform3D: from)
         spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
         layer.add(spring, forKey: "reflow")
@@ -769,11 +771,11 @@ final class DeskController {
     private func collapse(_ view: NSView) {
         guard let layer = view.layer, !Tokens.Motion.reduceMotion else { view.removeFromSuperview(); return }
         let size = view.bounds.size, k: CGFloat = 0.9
-        let shrink = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+        let shrink = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.large)
         shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
         shrink.toValue = NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                                     CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
-        let fade = Tokens.Motion.springAnimation(keyPath: "opacity", duration: Tokens.Motion.standard)
+        let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.standard)
         fade.fromValue = layer.presentation()?.opacity ?? 1
         fade.toValue = 0
         let group = CAAnimationGroup()
@@ -792,11 +794,11 @@ final class DeskController {
         for card in cards {
             guard let layer = card.layer else { continue }
             let k: CGFloat = 0.96, size = card.bounds.size
-            let grow = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+            let grow = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.large)
             grow.fromValue = NSValue(caTransform3D: CATransform3DConcat(CATransform3DMakeScale(k, k, 1),
                                                                         CATransform3DMakeTranslation(size.width * (1 - k) / 2, size.height * (1 - k) / 2, 0)))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            let fade = Tokens.Motion.springAnimation(keyPath: "opacity", duration: Tokens.Motion.large)
+            let fade = Tokens.Motion.easeAnimation(keyPath: "opacity", duration: Tokens.Motion.large)
             fade.fromValue = 0
             fade.toValue = 1
             let group = CAAnimationGroup()

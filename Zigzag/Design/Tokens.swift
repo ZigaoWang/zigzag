@@ -645,6 +645,15 @@ enum Tokens {
         }
 
         /// A critically damped spring: it never overshoots, and runs until it has settled.
+        /// The house ease-out over exactly `duration`: for movements whose completion has to land on time (a spring
+        /// settles well after it looks done).
+        static func easeAnimation(keyPath: String, duration: TimeInterval = standard) -> CABasicAnimation {
+            let animation = CABasicAnimation(keyPath: keyPath)
+            animation.duration = duration * debugSlowdown
+            animation.timingFunction = easeOut
+            return animation
+        }
+
         static func springAnimation(keyPath: String, duration: TimeInterval = standard) -> CASpringAnimation {
             let spring = CASpringAnimation(perceptualDuration: duration * debugSlowdown, bounce: 0)
             spring.keyPath = keyPath
