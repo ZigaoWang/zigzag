@@ -240,10 +240,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         suggestions = []
         refreshResults(animated: false)
         panel.frame = panelFrame()
-        // Attached to the address, it's simply there; over the page it arrives with the usual drop.
-        // Arrives once; asked again while open (⌘T twice), it simply stays.
-        // ⌘T is the thing you do most: the bar is simply there, no animation to wait through.
-        if opening { panel.present(arrival: .instant) }
+        // Arrives once; asked again while open (⌘T twice), it simply stays. From a key (⌘T, ⌘L, the thing you do
+        // most) it's simply there (`present` knows); clicked open, it grows out of the page's top, or fades in place
+        // over the address it stands in for.
+        if opening { panel.present(arrival: isAnchored ? .fade : .pop) }
         controller.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
@@ -870,8 +870,11 @@ final class ScrimView: ColorView {
     override func mouseDown(with event: NSEvent) { onClick?() }
     override var mouseDownCanMoveWindow: Bool { false }
 
+    /// Fades in from wherever it's drawn: shown again while still fading out, it turns around instead of flashing
+    /// back to nothing first.
     func show() {
-        alphaValue = 0
+        let shown = layer?.presentation()?.opacity
+        Tokens.Motion.withoutAnimation { alphaValue = shown.map { CGFloat($0) } ?? 0 }
         Tokens.Motion.animate(Tokens.Motion.feedback) { self.animator().alphaValue = 1 }
     }
 
