@@ -1502,7 +1502,11 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate else { return }
         bookmarkWithUndo(tab, at: index, in: spaceID)
     }
-    func listUnbookmark(_ bookmarkID: UUID, to index: Int) { unbookmarkWithUndo(bookmarkID, to: index) }
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int) {
+        // Pins are shared by every window: a private one doesn't take them away.
+        guard !tabManager.isPrivate else { return }
+        unbookmarkWithUndo(bookmarkID, to: index)
+    }
     /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
     func moveToNewWindow(_ tab: Tab) {
         guard !tabManager.isPrivate, let frame = window?.frame else { return }
