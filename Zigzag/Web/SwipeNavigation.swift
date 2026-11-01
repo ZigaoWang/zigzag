@@ -23,6 +23,9 @@ final class SwipeNavigator {
     private var samples: [(time: TimeInterval, dx: CGFloat)] = []
     /// Clears the arrow if the gesture's end never arrives (macOS sometimes drops it between quick swipes).
     private var watchdog: DispatchWorkItem?
+    /// While the fingers rest mid-swipe no events come at all, which looks the same as a lost end. A rest keeps the
+    /// swipe where it is; only doing something else (moving the pointer, a click, a key) shows the fingers are gone.
+    private var restMonitor: Any?
 
     /// How far to swipe before letting go navigates.
     private static let threshold: CGFloat = 85
@@ -45,6 +48,7 @@ final class SwipeNavigator {
             // A new gesture: anything left from the last one goes now.
             if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
             watchdog?.cancel()
+            stopWatchingRest()
             state = .deciding
             dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; samples = []
             if let room { pageScrolls = room } else { probe(at: webView.convert(event.locationInWindow, from: nil)) }
@@ -87,6 +91,7 @@ final class SwipeNavigator {
         case .ended, .cancelled:
             let wasTracking = state == .tracking
             watchdog?.cancel()
+            stopWatchingRest()
             if wasTracking {
                 if event.phase == .ended, progress >= 1 || isFlick { go() } else { cancel() }
                 state = .finishing
@@ -112,13 +117,34 @@ final class SwipeNavigator {
 
     private func armWatchdog() {
         watchdog?.cancel()
+        stopWatchingRest()
+        // Still for a moment: the fingers may be resting (to read a little more before going back), so the swipe
+        // holds. Anything else the hand does means the gesture ended without saying so, and it's dropped then.
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.state == .tracking else { return }
-            self.cancel()
-            self.state = .idle
+            self.restMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+                MainActor.assumeIsolated { self?.abandonRest() }
+                return event
+            }
+            // A rest that long is a lost gesture, not a pause.
+            let lost = DispatchWorkItem { [weak self] in self?.abandonRest() }
+            self.watchdog = lost
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: lost)
         }
         watchdog = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    private func abandonRest() {
+        stopWatchingRest()
+        guard state == .tracking else { return }
+        cancel()
+        state = .idle
+    }
+
+    private func stopWatchingRest() {
+        if let restMonitor { NSEvent.removeMonitor(restMonitor) }
+        restMonitor = nil
     }
 
     private func pageTakes(_ direction: Int) -> Bool {
@@ -204,6 +230,7 @@ final class SwipeNavigator {
 
     private func go() {
         watchdog?.cancel()
+        stopWatchingRest()
         guard let webView else { return }
         if direction < 0 { if let owner = webView.owner { owner.goBack() } else { webView.goBack() } } else { webView.goForward() }
         settlePage()
@@ -213,6 +240,7 @@ final class SwipeNavigator {
 
     private func cancel() {
         watchdog?.cancel()
+        stopWatchingRest()
         settlePage()
         arrow?.leave(toward: -direction, navigated: false)
         arrow = nil
