@@ -36,6 +36,27 @@ extension NSView {
     }
 }
 
+extension NSView {
+    /// The card's top edge catching the light: a one-pixel line just inside its upper rim, short of the corners.
+    func setCardRim(_ on: Bool) {
+        guard let layer else { return }
+        let rim = layer.sublayers?.first { $0.name == "rim" } ?? {
+            let line = CALayer()
+            line.name = "rim"
+            layer.addSublayer(line)
+            return line
+        }()
+        Tokens.Motion.withoutAnimation {
+            rim.isHidden = !on
+            guard on else { return }
+            let inset = max(layer.cornerRadius, 3)
+            let px = 1 / (window?.backingScaleFactor ?? 2)
+            rim.frame = CGRect(x: inset, y: isFlipped ? 1 : bounds.height - 1 - px, width: max(0, bounds.width - inset * 2), height: px)
+            rim.backgroundColor = cgColor(Tokens.Chrome.rim)
+        }
+    }
+}
+
 extension CALayer {
     /// Sets a property with a short fade, or instantly.
     func set(backgroundColor color: CGColor?, animated: Bool, duration: TimeInterval = Tokens.Motion.quick) {
@@ -934,8 +955,13 @@ final class SegmentedPills: NSView {
 /// Zigzag's switch: a capsule track, clearly on in its window's accent and clearly off in a plain gray, with a white
 /// knob that slides across. The knob settles in `Motion.standard` with no bounce, and stretches a little while held,
 /// so a press reads at once; with Reduce Motion it moves at once and only the color fades.
+/// A slide switch, as on a good piece of hardware: a small round knob in a recessed track. Off, the knob is matte
+/// porcelain on the left; on, it slides right and turns the one warm color (`Color.live`). The track never lights up:
+/// what's on is the knob.
 final class Toggle: InteractiveView {
     private let knob = CALayer()
+    /// The track's recess: shade under its upper lip.
+    private let recess = CAGradientLayer()
     var onChange: ((Bool) -> Void)?
     var isOn = false { didSet { if oldValue != isOn { update(animated: window != nil) } } }
 
@@ -944,11 +970,14 @@ final class Toggle: InteractiveView {
         super.init(frame: NSRect(origin: .zero, size: Tokens.Metric.toggleSize))
         layer?.cornerRadius = Tokens.Metric.toggleSize.height / 2
         layer?.cornerCurve = .continuous
+        layer?.borderWidth = Tokens.Metric.hairline
+        layer?.masksToBounds = false
+        recess.cornerCurve = .continuous
+        layer?.addSublayer(recess)
         knob.cornerRadius = Tokens.Metric.toggleKnob / 2
         knob.cornerCurve = .continuous
         knob.borderWidth = 0.5
         knob.shadowOpacity = 1
-        knob.shadowRadius = 2
         layer?.addSublayer(knob)
         onClick = { [weak self] _ in
             guard let self, self.isEnabled else { return }
@@ -977,7 +1006,11 @@ final class Toggle: InteractiveView {
     override func layout() {
         super.layout()
         layer?.cornerRadius = bounds.height / 2
-        Tokens.Motion.withoutAnimation { knob.frame = knobFrame }
+        Tokens.Motion.withoutAnimation {
+            recess.frame = bounds
+            recess.cornerRadius = bounds.height / 2
+            knob.frame = knobFrame
+        }
     }
 
     private func update(animated: Bool) {
@@ -998,20 +1031,23 @@ final class Toggle: InteractiveView {
     }
 
     private func paint(fading: Bool) {
-        var track = isOn ? Brand.Theme.for(self).accent : Tokens.Color.toggleOff
-        if isHovered || isPressed {
-            // A touch deeper under the pointer, either way.
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                let base = track.usingColorSpace(.sRGB) ?? track
-                track = base.blended(withFraction: isPressed ? 0.12 : 0.06, of: effectiveAppearance.isDark && !isOn ? .white : .black) ?? base
-            }
-        }
+        // The recess: a matte track a step darker than what it's set in, deeper under the pointer.
+        let deeper = isPressed ? 0.04 : isHovered ? 0.02 : 0
+        let track = Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.075 + deeper), dark: Tokens.Color.hex(0x000000, alpha: 0.32 + deeper * 2))
         layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.standard)
+        let porcelain = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFBFAF8), dark: Tokens.Color.hex(0xE9E7E4))
+        let face = isOn ? Tokens.Color.live : porcelain
+        knob.set(backgroundColor: cgColor(face), animated: fading, duration: Tokens.Motion.standard)
         Tokens.Motion.withoutAnimation {
-            knob.backgroundColor = cgColor(Tokens.Color.dynamic(light: .white, dark: Tokens.Color.hex(0xF4F4F6)))
-            knob.borderColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.06), dark: .clear))
-            knob.shadowColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.2), dark: Tokens.Color.hex(0x000000, alpha: 0.4)))
-            knob.shadowOffset = CGSize(width: 0, height: isFlipped ? 1 : -1)
+            layer?.borderColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.06), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.06)))
+            recess.colors = [cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.07), dark: Tokens.Color.hex(0x000000, alpha: 0.25))),
+                             cgColor(NSColor.clear)]
+            recess.startPoint = CGPoint(x: 0.5, y: isFlipped ? 0 : 1)
+            recess.endPoint = CGPoint(x: 0.5, y: isFlipped ? 0.55 : 0.45)
+            knob.borderColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: isOn ? 0.1 : 0.12), dark: Tokens.Color.hex(0x000000, alpha: 0.3)))
+            knob.shadowColor = cgColor(Tokens.Color.dynamic(light: Tokens.Color.hex(0x000000, alpha: 0.18), dark: Tokens.Color.hex(0x000000, alpha: 0.45)))
+            knob.shadowRadius = 1
+            knob.shadowOffset = CGSize(width: 0, height: isFlipped ? 0.5 : -0.5)
         }
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }

@@ -107,6 +107,14 @@ enum Brand {
                                         dark: SpaceColor.tone(hue: h, lightness: Tokens.Frame.washDarkLightness, chroma: Tokens.Frame.washDarkChroma))
         }
 
+        /// The space's own deep ink, for its name: a dark of its hue by day and a pale one at night, well past AA on
+        /// the frame. White, grays and black keep the plain text color.
+        var ink: NSColor {
+            guard let h = surfaceHue else { return Tokens.Color.textPrimary }
+            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: 0.3, chroma: 0.045),
+                                        dark: SpaceColor.tone(hue: h, lightness: 0.95, chroma: 0.018))
+        }
+
         static let navy = Theme(hue: nil)
 
         static func of(_ space: SpaceInfo?) -> Theme {

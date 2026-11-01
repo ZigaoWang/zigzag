@@ -90,8 +90,8 @@ enum Tokens {
         static let dropEdge: CGFloat = 1.5
         static let dropInset: CGFloat = 3
         /// Zigzag's switch (`Toggle`): track and knob.
-        static let toggleSize = NSSize(width: 36, height: 22)
-        static let toggleKnob: CGFloat = 18
+        static let toggleSize = NSSize(width: 34, height: 20)
+        static let toggleKnob: CGFloat = 14
         static let commandBarWidth: CGFloat = 640
         static let commandBarFieldHeight: CGFloat = Space.x12 + Space.x2
         static let commandBarRowHeight: CGFloat = Space.x10
@@ -162,8 +162,15 @@ enum Tokens {
         /// A section label's slot, the label low in it.
         static let labelHeight: CGFloat = 28
         /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.
-        static let spaceNameText: CGFloat = 16
-        static let spaceNameHeight: CGFloat = 40
+        static let spaceNameText: CGFloat = 26
+        static let spaceNameHeight: CGFloat = 52
+        /// Tracking for the space's name, in points: display type sits tighter.
+        static let spaceNameKern: CGFloat = -0.6
+        /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
+        static let spaceNameBearing: CGFloat = 1
+        /// A space key in the bottom bar: a small rounded key with its number, 4pt between keys.
+        static let spaceKey: CGFloat = 18
+        static let spaceKeyRadius: CGFloat = 5
         /// Between the favorites and the list.
         static let sectionGap: CGFloat = Space.x3
 
@@ -196,10 +203,8 @@ enum Tokens {
         static let addressButton: CGFloat = 22
         static let addressGlyph: CGFloat = 13
 
-        /// The bottom bar: 26pt buttons, 4pt from its edges; the space dots small, the current one a short pill.
+        /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
-        static let spaceDot: CGFloat = 6
-        static let currentSpaceDot: CGFloat = 14
         /// The now-playing strip above the bottom bar.
         static let nowPlayingHeight: CGFloat = 34
     }
@@ -333,12 +338,14 @@ enum Tokens {
         /// A row's explanation under its title, in `textSecondary`.
         static func detail() -> NSFont { .systemFont(ofSize: TypeSize.label) }
         /// What a button or a dropdown says.
-        static func control() -> NSFont { .systemFont(ofSize: TypeSize.body, weight: .medium) }
+        static func control() -> NSFont { .systemFont(ofSize: TypeSize.body) }
         /// The sidebar's rows and address (13 regular), and its section labels (11 medium): `Tokens.Sidebar`.
         static func sidebarRow() -> NSFont { .systemFont(ofSize: Sidebar.rowText) }
         static func sidebarLabel() -> NSFont { .systemFont(ofSize: Sidebar.labelText, weight: .medium) }
-        /// The space's name in the sidebar: 16 light.
+        /// The space's name in the sidebar: 26 light, SF's display cut, set tight (`Sidebar.spaceNameKern`).
         static func spaceName() -> NSFont { .systemFont(ofSize: Sidebar.spaceNameText, weight: .light) }
+        /// Numbers that count something on a control (a space key): tabular figures, so they sit like dial markings.
+        static func figures(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont { .monospacedDigitSystemFont(ofSize: size, weight: weight) }
     }
 
     // MARK: - Symbols (one weight everywhere)
@@ -714,8 +721,6 @@ enum Tokens {
         static let primaryHover = dynamic(light: hex(0x343437), dark: hex(0xFFFFFF))
         static let primaryPressed = dynamic(light: hex(0x000000), dark: hex(0xD9D9DD))
         static let onPrimary = dynamic(light: hex(0xFFFFFF), dark: hex(0x1D1D1F))
-        /// A switch that's off: a clear gray track, so on and off never look alike.
-        static let toggleOff = dynamic(light: hex(0x000000, alpha: 0.14), dark: hex(0xFFFFFF, alpha: 0.2))
         /// Keyboard focus on a drawn control: a ring in the window's accent at this opacity, `Metric.focusRing` wide,
         /// `Metric.focusGap` outside the control.
         static let focusAlpha: CGFloat = 0.6
@@ -742,6 +747,9 @@ enum Tokens {
         /// Passwords, Import, About, the welcome) take the brand's, `Brand.Theme.brand`. This is the front browser
         /// window's; a view that can show in either kind of window asks `Brand.Theme.for(self)` instead.
         @MainActor static var accent: NSColor { Brand.Theme.current.accent }
+        /// The one warm mark on what's live: an on switch's knob, the tick under the space you're in. A matte
+        /// persimmon that sits well on every space's color and never on anything at rest.
+        static let live = dynamic(light: hex(0xE2683C), dark: hex(0xF07A4E))
         /// Counts on extension buttons: quiet, never competing with the page.
         static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
 
@@ -835,8 +843,10 @@ enum Tokens {
 
         /// The tab you're on: a soft, light card of the space's own color, a crisp quiet edge and a shadow-sm
         /// (`cardShadow`, `Shadow.lift`). Seen at a glance on any color, never a slab.
-        static let card = Color.dynamic(light: white(0.8), dark: white(0.13))
-        static let cardHover = Color.dynamic(light: white(0.9), dark: white(0.16))
+        static let card = Color.dynamic(light: white(0.8), dark: white(0.16))
+        static let cardHover = Color.dynamic(light: white(0.9), dark: white(0.19))
+        /// The card's top edge catching the light: one pixel, inside its upper rim (`setCardRim`).
+        static let rim = Color.dynamic(light: white(1), dark: white(0.14))
         static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.05), dark: white(0.08))
         static let cardShadow = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
@@ -845,6 +855,9 @@ enum Tokens {
         /// The address and the favorites: a soft field of the space's color, no line around it.
         static let field = Color.dynamic(light: white(0.45), dark: white(0.065))
         static let fieldHover = Color.dynamic(light: white(0.62), dark: white(0.095))
+        /// A space key: its matte face, the hairline around it, and the shade along its lower lip.
+        static let key = Color.dynamic(light: white(0.5), dark: white(0.07))
+        static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09))
         /// A favorite whose page is open: a fine edge, the only line on a tile.
         static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16))
     }
