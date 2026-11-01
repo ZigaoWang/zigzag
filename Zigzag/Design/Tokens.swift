@@ -443,6 +443,10 @@ enum Tokens {
         static let pressScale: CGFloat = 0.97
         static let pressIn: TimeInterval = 0.08
         static let pressOut: TimeInterval = 0.2
+        /// The sink: keys, switches, pill buttons and favorites go down this far as they're pressed (`pressIn`), and
+        /// settle back over `pressSettle`, eased out, with weight and no bounce (`showSink`).
+        static let pressSink: CGFloat = 1
+        static let pressSettle: TimeInterval = 0.18
         /// A menu growing out of the control that opened it: from this scale with a fade, in `menuIn`, eased out;
         /// leaving is quicker and subtler (`menuOut`, toward `menuOutScale`).
         static let menuFrom: CGFloat = 0.96
@@ -843,15 +847,17 @@ enum Tokens {
 
         /// The tab you're on: a soft, light card of the space's own color, a crisp quiet edge and a shadow-sm
         /// (`cardShadow`, `Shadow.lift`). Seen at a glance on any color, never a slab.
-        static let card = Color.dynamic(light: white(0.8), dark: white(0.16))
-        static let cardHover = Color.dynamic(light: white(0.9), dark: white(0.19))
-        /// The card's top edge catching the light: one pixel, inside its upper rim (`setCardRim`).
+        static let card = Color.dynamic(light: white(0.72), dark: white(0.16))
+        static let cardHover = Color.dynamic(light: white(0.82), dark: white(0.19))
+        /// The card's top edge catching the light: one pixel of pure white inside its upper rim (`setCardRim`). By day
+        /// the card stays a step short of white (72%) so the lit edge has something to be brighter than.
         static let rim = Color.dynamic(light: white(1), dark: white(0.14))
         static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.05), dark: white(0.08))
         static let cardShadow = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
         static let hover = Color.dynamic(light: white(0.38), dark: white(0.05))
-        static let pressed = Color.dynamic(light: white(0.55), dark: white(0.08))
+        /// Pressed: a step darker than hover, as a thing pushed in is (`showSink`).
+        static let pressed = Color.dynamic(light: white(0.28), dark: white(0.035))
         /// The address and the favorites: a soft field of the space's color, no line around it.
         static let field = Color.dynamic(light: white(0.45), dark: white(0.065))
         static let fieldHover = Color.dynamic(light: white(0.62), dark: white(0.095))

@@ -92,9 +92,9 @@ final class AddressView: InteractiveView {
             // An extension's own page (its settings) is named after the extension, not its random address.
             label.stringValue = context.webExtension.displayName ?? "Extension"
         } else if HistoryPage.isHistory(url) {
-            label.stringValue = "History"
+            label.stringValue = "history"
         } else if SettingsPage.isSettings(url) {
-            label.stringValue = "Settings"
+            label.stringValue = "settings"
         } else if let url, let host = url.host() {
             label.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         } else if let url, url.isFileURL {
@@ -177,6 +177,7 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
+        pressSinks = true
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         iconView.imageScaling = .scaleNone
@@ -218,7 +219,10 @@ final class SpaceDotView: InteractiveView {
         wasSelected = isSelected
         settlesFromSwipe = false
         let key = CGRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side)
-        let face = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.18 + 0.67 * share), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.04 + 0.13 * share))
+        // Pressed, the face goes a step darker as the key sinks.
+        let held: CGFloat = isPressed ? 0.75 : 1
+        let face = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: (0.18 + 0.67 * share) * held),
+                                        dark: Tokens.Color.hex(0xFFFFFF, alpha: (0.04 + 0.13 * share) * held))
         let apply = {
             self.dot.frame = key
             self.dot.cornerRadius = Tokens.Sidebar.spaceKeyRadius

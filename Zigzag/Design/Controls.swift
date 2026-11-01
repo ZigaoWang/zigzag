@@ -89,11 +89,13 @@ class InteractiveView: NSView {
         didSet {
             guard oldValue != isPressed else { return }
             stateDidChange(animated: false)
-            if pressScales { showPress(isPressed) }
+            if pressScales { showPress(isPressed) } else if pressSinks { showSink(isPressed) }
         }
     }
     /// Buttons and rows give under the finger: `Tokens.Motion.pressScale` while held, springing back on release.
     var pressScales = false
+    /// Things that read as objects sink a point instead and settle back with weight (`showSink`).
+    var pressSinks = false
     var isSelected = false {
         didSet {
             guard oldValue != isSelected else { return }
@@ -1015,9 +1017,12 @@ final class Toggle: InteractiveView {
 
     private func update(animated: Bool) {
         if animated && !Tokens.Motion.reduceMotion {
-            let move = Tokens.Motion.springAnimation(keyPath: "position.x")
+            // The knob travels its short way eased out, from wherever it is, like a slider meeting its stop.
+            let move = CABasicAnimation(keyPath: "position.x")
             move.fromValue = knob.presentation()?.position.x ?? knob.position.x
             move.toValue = knobFrame.midX
+            move.duration = Tokens.Motion.pressSettle
+            move.timingFunction = Tokens.Motion.easeOut
             knob.add(move, forKey: "move")
         }
         Tokens.Motion.withoutAnimation { knob.frame = knobFrame }

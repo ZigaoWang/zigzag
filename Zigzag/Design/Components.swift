@@ -150,6 +150,29 @@ extension NSView {
     }
 }
 
+extension NSView {
+    /// The sink, for things that read as objects (a space key, a pill button, a favorite): down `Motion.pressSink`
+    /// as it's pressed, eased out at once, and back over `Motion.pressSettle` when let go, eased out, from wherever it
+    /// is. The darker pressed fill goes with it. From the keyboard it doesn't move; with Reduce Motion, never.
+    func showSink(_ pressed: Bool) {
+        guard let layer else { return }
+        let still = Tokens.Motion.reduceMotion || Tokens.Motion.isFromKey
+        // The move is in the superview's layer, so "down" follows which way that one runs.
+        let flipped = superview?.isFlipped ?? isFlipped
+        let down = CATransform3DMakeTranslation(0, flipped ? Tokens.Motion.pressSink : -Tokens.Motion.pressSink, 0)
+        let target = pressed && !still ? down : CATransform3DIdentity
+        let shown = layer.presentation()?.transform ?? layer.transform
+        Tokens.Motion.withoutAnimation { layer.transform = target }
+        guard !still, !CATransform3DEqualToTransform(shown, target) else { layer.removeAnimation(forKey: "press"); return }
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = NSValue(caTransform3D: shown)
+        animation.toValue = NSValue(caTransform3D: target)
+        animation.duration = pressed ? Tokens.Motion.pressIn : Tokens.Motion.pressSettle
+        animation.timingFunction = Tokens.Motion.easeOut
+        layer.add(animation, forKey: "press")
+    }
+}
+
 // MARK: - Button looks
 
 /// The looks a button takes, the same everywhere (`PillButton`, `PrimaryButton`, `TextButton.form`, `DropdownButton`):
@@ -238,7 +261,7 @@ final class PillButton: InteractiveView {
         written = title
         label = Label(title.lowercased(), font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Page.controlHeight))
-        pressScales = true
+        pressSinks = true
         layer?.cornerCurve = .continuous
         iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.body) }
         iconView.imageScaling = .scaleNone

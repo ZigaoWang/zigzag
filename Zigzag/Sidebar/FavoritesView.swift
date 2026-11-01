@@ -287,6 +287,7 @@ final class FavoriteTile: InteractiveView {
     }
     /// Its page is open in the background: a fine edge, so you can tell at a glance which are loaded.
     var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
+    override var pressSinks: Bool { get { true } set {} }
     var iconImage: NSImage? { icon.image }
     var partnerIconImage: NSImage? { partnerIcon.image }
     var onClose: (() -> Void)?
