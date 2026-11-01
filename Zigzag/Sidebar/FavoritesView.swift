@@ -372,8 +372,11 @@ final class FavoriteTile: GlassTile {
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(0.14)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.7))
         if partner != nil {
-            // A split: both pages' icons side by side, at a tab's size, so two fit any tile.
-            let size = Tokens.Metric.favicon, gap = Tokens.Space.x2
+            // A split: both pages' icons side by side, at a tab's size. In the narrowest tiles they move closer, then
+            // shrink, so the two always fit inside it.
+            let room = bounds.width - inset * 2
+            let gap = max(2, min(Tokens.Space.x2, room - Tokens.Metric.favicon * 2))
+            let size = min(Tokens.Metric.favicon, floor((room - gap) / 2))
             let x = (bounds.width - size * 2 - gap) / 2, y = (bounds.height - size) / 2
             icon.frame = NSRect(x: x, y: y, width: size, height: size).integral
             partnerIcon.frame = NSRect(x: x + size + gap, y: y, width: size, height: size).integral
