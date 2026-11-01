@@ -535,7 +535,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Covering the page, it takes the keyboard from the web view underneath, so typing goes nowhere unexpected.
     override var acceptsFirstResponder: Bool { true }
     override var wantsUpdateLayer: Bool { true }
-    override func updateLayer() { layer?.backgroundColor = Tokens.Color.surface.cgColor }
+    override func updateLayer() { layer?.backgroundColor = cgColor(Tokens.Color.surface) }
 
     private func sectionHeading(_ text: String) -> Label {
         Label(text, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)

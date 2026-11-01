@@ -92,7 +92,7 @@ final class PageHeader: NSView {
 
     override var isFlipped: Bool { true }
     override var wantsUpdateLayer: Bool { true }
-    override func updateLayer() { layer?.backgroundColor = Tokens.Color.surface.cgColor }
+    override func updateLayer() { layer?.backgroundColor = cgColor(Tokens.Color.surface) }
 
     override func layout() {
         super.layout()
