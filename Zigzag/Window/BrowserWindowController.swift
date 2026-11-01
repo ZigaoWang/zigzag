@@ -417,7 +417,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if !tabManager.isPrivate {
             let mode = space.readableAppearance
             let name: NSAppearance.Name? = mode == "light" ? .aqua : mode == "dark" ? .darkAqua : nil
-            if window?.appearance?.name != name { window?.appearance = name.flatMap(NSAppearance.init(named:)) }
+            if window?.appearance?.name != name {
+                // Light to dark and back cross-fades with the color, rather than snapping.
+                if animated, !Tokens.Motion.reduceMotion, let frameLayer = window?.contentView?.superview?.layer {
+                    let fade = CATransition()
+                    fade.type = .fade
+                    fade.duration = Tokens.Motion.standard
+                    fade.timingFunction = Tokens.Motion.easeOut
+                    frameLayer.add(fade, forKey: "appearance")
+                }
+                window?.appearance = name.flatMap(NSAppearance.init(named:))
+            }
         }
         let clear = !tabManager.isPrivate && space.isSeeThrough
         let color = tabManager.isPrivate ? SpaceColor.graphite.background : space.frameColor
