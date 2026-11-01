@@ -87,6 +87,22 @@ enum Tokens {
         static let windowMinSize = NSSize(width: 560, height: 400)
         static let deskCardWidth: CGFloat = 208
         static let deskCardMaxWidth: CGFloat = 440
+        /// The find bar, a glass capsule over the page's top right.
+        static let findBarHeight: CGFloat = Space.x10
+        /// A site's chip in front of the command bar's field while you search inside it; `chipHeightSmall` in the
+        /// sidebar's address.
+        static let chipHeight: CGFloat = Space.x6 + 2
+        static let chipHeightSmall: CGFloat = Space.x5
+        /// A keycap (`KeyCap`): Return on a chosen result, Tab beside "Search YouTube".
+        static let keyCapHeight: CGFloat = Space.x5 - 2
+        /// A small round button floating over a page edge on its own (swipe arrows, the stand-in Downloads button).
+        static let floatingButton: CGFloat = Space.x8 + Space.x1
+        /// The split pane's header strip, and the buttons in it.
+        static let paneHeaderHeight: CGFloat = Space.x8 + Space.x1
+        static let paneButton: CGFloat = Space.x6
+        /// A tab preview's caption under the picture, and Peek's top strip.
+        static let previewCaptionHeight: CGFloat = Space.x12
+        static let peekHeaderHeight: CGFloat = Space.x10
     }
 
     // MARK: - Pages
@@ -498,6 +514,15 @@ enum Tokens {
         static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06))
         /// Something chosen in a list (a section, a row reached with the keyboard), drawn in the accent at this opacity.
         static let selectionAlpha: CGFloat = 0.14
+        /// The same, held down.
+        static let selectionPressedAlpha: CGFloat = 0.22
+        /// Selected text in our own fields (the command bar, its inline completion), in the accent at this opacity.
+        static let textSelectionAlpha: CGFloat = 0.26
+        /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.
+        static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
+        /// A keycap's fill and edge (`KeyCap`): a touch of the field fill with a hairline, like a key seen from above.
+        static let keyCapFill = dynamic(light: hex(0x000000, alpha: 0.04), dark: hex(0xFFFFFF, alpha: 0.07))
+        static let keyCapEdge = dynamic(light: hex(0x000000, alpha: 0.1), dark: hex(0xFFFFFF, alpha: 0.1))
 
         /// Settings: the window behind grouped rows, and the groups themselves (System Settings proportions).
         static let formBackground = dynamic(light: hex(0xF2F2F4), dark: hex(0x1E1E20))
@@ -511,6 +536,20 @@ enum Tokens {
         static let caution = dynamic(light: hex(0x9A5B00), dark: hex(0xF2C14E))
         /// Status: done and fine.
         static let success = NSColor.systemGreen
+
+        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in Peek):
+        /// near-white on dark colors, near-black on light ones.
+        static func ink(on color: NSColor) -> NSColor {
+            guard let c = color.usingColorSpace(.sRGB) else { return textPrimary }
+            let luminance = 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
+            return luminance < 0.58 ? hex(0xFFFFFF, alpha: 0.94) : hex(0x000000, alpha: 0.84)
+        }
+
+        /// How dark a color is, 0 to 1 by its luminance: for deciding whether a color we don't choose needs an edge.
+        static func luminance(of color: NSColor) -> CGFloat {
+            guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
+            return 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
+        }
     }
 
     // MARK: - Shadows (purposeful only)

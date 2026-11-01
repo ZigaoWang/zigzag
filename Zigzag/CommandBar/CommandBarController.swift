@@ -1,14 +1,14 @@
 import AppKit
 
-/// One result row: icon, title, quiet detail, and an action hint when selected.
+/// One result row: an icon, the title, quiet detail after it, and on the chosen row what Return does, with its key.
+/// The chosen row is the space's accent, soft (`Tokens.Color.selectionAlpha`), so you always see where Return goes.
 final class CommandRowView: InteractiveView {
     private let icon = FaviconView()
     private let symbolView = NSImageView()
-    private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let detail = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
     private let action = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let returnKey = NSImageView()
-    /// On a tab that's already open: the other choice, a fresh copy in a new tab with ⌥↩.
+    private let returnKey = KeyCap(symbol: "return")
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -16,9 +16,6 @@ final class CommandRowView: InteractiveView {
         layer?.cornerCurve = .continuous
         symbolView.imageScaling = .scaleNone
         symbolView.contentTintColor = Tokens.Color.icon
-        returnKey.image = Tokens.Symbol.image("return", size: Tokens.TypeSize.small)
-        returnKey.contentTintColor = Tokens.Color.textTertiary
-        returnKey.imageScaling = .scaleNone
         [icon, symbolView, title, detail, action, returnKey].forEach { addSubview($0) }
         setAccessibilityRole(.button)
     }
@@ -36,44 +33,48 @@ final class CommandRowView: InteractiveView {
         } else {
             icon.isHidden = true
             symbolView.isHidden = false
-            symbolView.image = Tokens.Symbol.image(result.symbol ?? "globe")
+            symbolView.image = Tokens.Symbol.image(result.symbol ?? "globe", size: Tokens.TypeSize.row)
         }
         setAccessibilityRole(result.isActionable ? .button : .staticText)
         setAccessibilityLabel(result.detail.isEmpty ? result.title : "\(result.title), \(result.detail)")
         needsLayout = true
     }
 
+    /// Where a row's title starts, from the row's edge: the field's text lines up with it.
+    static let titleX = CardRow.inset * 2 + Tokens.Metric.favicon
+
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x3
-        let iconSize = Tokens.Metric.favicon
-        icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
+        let inset = CardRow.inset
+        let side = Tokens.Metric.favicon
+        icon.frame = NSRect(x: inset, y: (bounds.height - side) / 2, width: side, height: side)
         symbolView.frame = icon.frame
-        let showAction = isSelected
+        let showAction = isSelected && !action.stringValue.isEmpty
         action.isHidden = !showAction
         returnKey.isHidden = !showAction
-        var right = bounds.width - pad
+        var right = bounds.width - inset
         if showAction {
-            returnKey.frame = NSRect(x: right - Tokens.Space.x3, y: 0, width: Tokens.Space.x3, height: bounds.height)
+            let kw = returnKey.width, kh = Tokens.Metric.keyCapHeight
+            returnKey.frame = NSRect(x: right - kw, y: round((bounds.height - kh) / 2), width: kw, height: kh)
             let w = action.textWidth
-            let h = ceil(action.intrinsicContentSize.height)
-            action.frame = NSRect(x: returnKey.frame.minX - Tokens.Space.x1 - w, y: (bounds.height - h) / 2, width: w, height: h)
-            right = action.frame.minX - Tokens.Space.x3
+            action.frame = NSRect(x: returnKey.frame.minX - Tokens.Space.x2 - w, y: (bounds.height - action.lineHeight) / 2, width: w, height: action.lineHeight)
+            right = action.frame.minX - Tokens.Space.x4
         }
-        let x = icon.frame.maxX + Tokens.Space.x3
-        let h = ceil(title.intrinsicContentSize.height)
-        let y = (bounds.height - h) / 2
+        let x = Self.titleX - Label.inset
         let available = right - x
         let titleWidth = min(title.textWidth, detail.stringValue.isEmpty ? available : available * 0.62)
-        title.frame = NSRect(x: x, y: y, width: max(0, titleWidth), height: h)
+        title.frame = NSRect(x: x, y: round((bounds.height - title.lineHeight) / 2), width: max(0, titleWidth), height: title.lineHeight)
+        // On the title's baseline, though a size smaller.
+        let lift = (title.font?.ascender ?? 0) - (detail.font?.ascender ?? 0)
         let detailX = title.frame.maxX + Tokens.Space.x2
-        detail.frame = NSRect(x: detailX, y: y, width: max(0, right - detailX), height: h)
+        detail.frame = NSRect(x: detailX, y: title.frame.minY + round(lift), width: max(0, right - detailX), height: detail.lineHeight)
     }
 
     override func stateDidChange(animated: Bool) {
-        // The chosen row in the space's accent, like the rest of the window.
+        // The chosen row in the space's accent, like the rest of the window; hover moves the choice, so it has no
+        // fill of its own.
         let accent = Brand.Theme.for(self).accent
-        let fill: NSColor? = isPressed ? accent.withAlphaComponent(0.24) : isSelected ? accent.withAlphaComponent(0.16) : nil
+        let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? Tokens.Color.selectionPressedAlpha : Tokens.Color.selectionAlpha) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         needsLayout = true
     }
@@ -115,11 +116,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var shrinkWork: DispatchWorkItem?
     /// What you'd typed before Tab took you into a site, so Esc can give it back.
     private var typedBeforeScope = ""
+    /// The site's own color, a capsule in front of the field.
     private let chip = ColorView(color: .clear)
-    private let chipLabel = Label("", font: Tokens.Font.body(.semibold), color: .white)
+    private let chipLabel = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     /// "Search YouTube  Tab", at the right of the field, when what you've typed names a site.
     private let hint = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
-    private let hintKey = KeyHint("Tab")
+    private let hintKey = KeyCap("Tab")
     private var hinted: SiteSearch?
     /// For the guide: searching inside a site, or about to be (its name typed, Tab not yet pressed).
     var isSearchingSite: Bool { scope != nil }
@@ -141,7 +143,6 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(undoWillChange), name: .NSUndoManagerWillUndoChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(undoWillChange), name: .NSUndoManagerWillRedoChange, object: nil)
         chip.wantsLayer = true
-        chip.layer?.cornerRadius = Tokens.Radius.control
         chip.layer?.cornerCurve = .continuous
         chip.addSubview(chipLabel)
         chip.isHidden = true
@@ -155,18 +156,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     // MARK: Showing
 
-    /// The bar takes on the space it opens in: its surface carries the space's color, and the search icon,
-    /// cursor and chosen row use its accent.
+    /// The bar is glass, whatever the space: what's under it shows through. It belongs to the space by its accent,
+    /// in the cursor, the selected text and the chosen row.
     private func applySpaceTheme() {
         guard let controller else { return }
         let space = controller.tabManager.currentSpace
         let accent = Brand.Theme.of(controller.tabManager.isPrivate ? nil : space).accent
-        panel.surfaceTint = controller.tabManager.isPrivate ? SpaceColor.graphite.background : space.background
-        fieldIcon.contentTintColor = accent
-        divider.color = accent.withAlphaComponent(0.18)
         if let editor = field.currentEditor() as? NSTextView {
             editor.insertionPointColor = accent
-            editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(0.25)]
+            editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(Tokens.Color.textSelectionAlpha)]
         }
         rows.forEach { $0.stateDidChange(animated: false) }
     }
@@ -205,8 +203,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
         }
         applySpaceTheme()
-        // From the address: 15pt, easy to read across the wide field; the centered bar for a new tab keeps 18pt.
-        let font = isAnchored ? NSFont.systemFont(ofSize: 15) : Tokens.Font.large()
+        // From the address: a size up from the sidebar's, easy to read across the wide field; the centered bar for a
+        // new tab is large.
+        let font = isAnchored ? Tokens.Font.heading(.regular) : Tokens.Font.large()
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
@@ -254,7 +253,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private var listHeight: CGFloat {
         guard !results.isEmpty else { return 0 }
-        return CGFloat(results.count) * Tokens.Metric.commandBarRowHeight + Tokens.Space.x2 * 2
+        return CGFloat(results.count) * Tokens.Metric.commandBarRowHeight + Self.listInset * 2
     }
 
     /// Editing the address you're on opens right where it is: over the address field in the sidebar, reaching
@@ -300,7 +299,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             top = panelTop(in: card)
             bottom = card.maxY
         }
-        let room = bottom - Tokens.Space.x4 - top - fieldHeight - Tokens.Space.x2 * 2
+        let room = bottom - Tokens.Space.x4 - top - fieldHeight - Self.listInset * 2
         return max(1, min(Tokens.Metric.commandBarMaxRows, Int(room / Tokens.Metric.commandBarRowHeight)))
     }
 
@@ -308,43 +307,51 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// and a little more, so it never looks squeezed above them.
     private var fieldHeight: CGFloat { isAnchored ? Tokens.Metric.commandBarRowHeight + Tokens.Space.x2 : Tokens.Metric.commandBarFieldHeight }
 
+    /// Rows sit this far in from the panel's edges, so their corners run with the panel's.
+    private static let listInset = Tokens.Space.x1
+
     private func layoutPanel() {
         let b = panel.bounds
         let fieldHeight = self.fieldHeight
+        let inset = Self.listInset
+        // The glass lines up with the rows under it: its middle over their icons, the text where their titles start.
         let iconSize = Tokens.Space.x6
-        fieldIcon.frame = NSRect(x: Tokens.Space.x4, y: (fieldHeight - iconSize) / 2, width: iconSize, height: iconSize)
+        let iconMid = inset + CardRow.inset + Tokens.Metric.favicon / 2
+        fieldIcon.frame = NSRect(x: iconMid - iconSize / 2, y: (fieldHeight - iconSize) / 2, width: iconSize, height: iconSize)
         // Anchored there's no icon: the text starts exactly where the address's own text was.
         fieldIcon.isHidden = isAnchored
         let textHeight = ceil(field.intrinsicContentSize.height)
         // Anchored, the text starts exactly where the resting address's does, so nothing moves as you click in: the
         // label's 12pt, its own inset, less the gap the field's editor adds.
-        var fieldX = isAnchored ? Tokens.Space.x3 + Label.inset + 3 : fieldIcon.frame.maxX + Tokens.Space.x2
+        var fieldX = isAnchored ? Tokens.Space.x3 + Label.inset + 3 : inset + CommandRowView.titleX
         if scope != nil {
             // In the sidebar's address it's sized to the sidebar's text, not the big bar's.
-            chipLabel.font = isAnchored ? Tokens.Font.small(.semibold) : Tokens.Font.body(.semibold)
-            let cw = chipLabel.textWidth + (isAnchored ? Tokens.Space.x3 : Tokens.Space.x5)
-            let ch: CGFloat = isAnchored ? 20 : 26
-            chip.frame = NSRect(x: fieldX, y: (fieldHeight - ch) / 2, width: cw, height: ch)
+            chipLabel.font = isAnchored ? Tokens.Font.small(.medium) : Tokens.Font.body(.medium)
+            let ch = isAnchored ? Tokens.Metric.chipHeightSmall : Tokens.Metric.chipHeight
+            let cw = chipLabel.inkWidth + (isAnchored ? Tokens.Space.x2 : Tokens.Space.x3) * 2
+            chip.frame = NSRect(x: fieldX - (isAnchored ? 0 : Tokens.Space.x1), y: round((fieldHeight - ch) / 2), width: cw, height: ch)
+            chip.layer?.cornerRadius = ch / 2
             chipLabel.frame = NSRect(x: 0, y: (ch - chipLabel.lineHeight) / 2, width: cw, height: chipLabel.lineHeight)
             chipLabel.alignment = .center
             fieldX = chip.frame.maxX + Tokens.Space.x2
         }
         var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : Tokens.Space.x4)
         if !hint.isHidden {
-            let kw = hintKey.width
-            hintKey.frame = NSRect(x: fieldRight - kw, y: (fieldHeight - KeyHint.height) / 2, width: kw, height: KeyHint.height)
+            let kw = hintKey.width, kh = Tokens.Metric.keyCapHeight
+            hintKey.frame = NSRect(x: fieldRight - kw, y: round((fieldHeight - kh) / 2), width: kw, height: kh)
             let hw = hint.textWidth + 4
             hint.frame = NSRect(x: hintKey.frame.minX - Tokens.Space.x2 - hw, y: (fieldHeight - hint.lineHeight) / 2, width: hw, height: hint.lineHeight)
             fieldRight = hint.frame.minX - Tokens.Space.x3
         }
         // A little taller and wider than the text, which the field keeps inside, so selections draw whole.
-        let inset = field.textInset, boxHeight = textHeight + inset * 4
-        field.frame = NSRect(x: fieldX - inset, y: (fieldHeight - boxHeight) / 2, width: max(40, fieldRight - fieldX) + inset * 2, height: boxHeight)
-        divider.frame = NSRect(x: 0, y: fieldHeight - Tokens.Metric.hairline, width: b.width, height: Tokens.Metric.hairline)
+        let textInset = field.textInset, boxHeight = textHeight + textInset * 4
+        field.frame = NSRect(x: fieldX - textInset, y: (fieldHeight - boxHeight) / 2, width: max(40, fieldRight - fieldX) + textInset * 2, height: boxHeight)
+        // A hairline between what you type and what it finds, held in from the edges like the rows.
+        divider.frame = NSRect(x: Tokens.Space.x3, y: fieldHeight - Tokens.Metric.hairline, width: b.width - Tokens.Space.x3 * 2, height: Tokens.Metric.hairline)
         divider.isHidden = results.isEmpty
-        var y = fieldHeight + Tokens.Space.x2
+        var y = fieldHeight + inset
         for row in rows {
-            row.frame = NSRect(x: Tokens.Space.x2, y: y, width: b.width - Tokens.Space.x4, height: Tokens.Metric.commandBarRowHeight)
+            row.frame = NSRect(x: inset, y: y, width: b.width - inset * 2, height: Tokens.Metric.commandBarRowHeight)
             y += Tokens.Metric.commandBarRowHeight
         }
     }
@@ -479,13 +486,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         scope = site
         if leaving { fadeOutChip() } else { chip.isHidden = site == nil }
         chip.color = site?.color ?? .clear
-        // Ink that reads on the site's own colour: dark on light brands (IMDb, Amazon), white on the rest; a light
-        // edge so near-black brands (X, MDN) still show on a dark panel.
-        if let fill = site?.color.usingColorSpace(.sRGB) {
-            let luminance = 0.2126 * fill.redComponent + 0.7152 * fill.greenComponent + 0.0722 * fill.blueComponent
-            chipLabel.textColor = luminance > 0.6 ? NSColor(white: 0.1, alpha: 1) : .white
-            chip.layer?.borderWidth = luminance < 0.15 ? 1 : 0
-            chip.layer?.borderColor = NSColor(white: 1, alpha: 0.22).cgColor
+        // Ink that reads on the site's own color: dark on light brands (IMDb, Amazon), white on the rest; a hairline
+        // so near-black brands (X, MDN) still show on dark glass.
+        if let fill = site?.color {
+            chipLabel.textColor = Tokens.Color.ink(on: fill)
+            chip.layer?.borderWidth = Tokens.Color.luminance(of: fill) < 0.15 ? Tokens.Metric.hairline : 0
+            chip.layer?.borderColor = chip.cgColor(Tokens.Color.panelEdge)
         }
         chipLabel.stringValue = site?.name ?? ""
         completion = nil

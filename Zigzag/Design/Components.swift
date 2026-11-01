@@ -130,6 +130,16 @@ final class PillButton: InteractiveView {
     let style: Style
     private let label: Label
     private let iconView = NSImageView()
+    /// What it says. Settable for a button whose words change (a toast's action).
+    var title: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            label.isHidden = newValue.isEmpty
+            setAccessibilityLabel(newValue.isEmpty ? accessibilityLabel() : newValue)
+            invalidateIntrinsicContentSize(); needsLayout = true
+        }
+    }
     /// The accent for `.prominent`; nil takes its window's.
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
 
@@ -197,6 +207,59 @@ final class PillButton: InteractiveView {
         label.textColor = ink
         iconView.contentTintColor = style == .prominent ? ink : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.icon
         alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+    }
+}
+
+// MARK: - Keycaps
+
+/// A key, drawn small: Return on a chosen result, Tab beside "Search YouTube", a shortcut in a hint. A word or a
+/// symbol on a faint fill with a hairline edge, `Tokens.Metric.keyCapHeight` tall. Never takes clicks.
+final class KeyCap: NSView {
+    private let label = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+    private let iconView = NSImageView()
+
+    /// `key` is a word ("Tab", "esc"); `symbol` an SF Symbol ("return", "command") in its place.
+    init(_ key: String = "", symbol: String? = nil) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.small
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = Tokens.Metric.hairline
+        label.stringValue = key
+        label.alignment = .center
+        iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.small - 1) }
+        iconView.imageScaling = .scaleNone
+        iconView.contentTintColor = Tokens.Color.textSecondary
+        label.isHidden = symbol != nil
+        iconView.isHidden = symbol == nil
+        [label, iconView].forEach { addSubview($0) }
+        setAccessibilityElement(false)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    var width: CGFloat { iconView.isHidden ? max(Tokens.Metric.keyCapHeight + 4, label.inkWidth + Tokens.Space.x2 + 2) : Tokens.Metric.keyCapHeight + 4 }
+    override var intrinsicContentSize: NSSize { NSSize(width: width, height: Tokens.Metric.keyCapHeight) }
+
+    override func layout() {
+        super.layout()
+        label.frame = NSRect(x: 0, y: (bounds.height - label.lineHeight) / 2, width: bounds.width, height: label.lineHeight)
+        iconView.frame = bounds
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh()
+    }
+
+    private func refresh() {
+        Tokens.Motion.withoutAnimation {
+            layer?.backgroundColor = cgColor(Tokens.Color.keyCapFill)
+            layer?.borderColor = cgColor(Tokens.Color.keyCapEdge)
+        }
     }
 }
 
