@@ -145,37 +145,34 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.favorites.onDragMove = { [weak self] _, point in
             guard let self, let window = self.window else { return false }
             if self.favoriteDragOrigin == nil { self.favoriteDragOrigin = self.tabManager.currentSpaceID }
-            let over = !self.tabManager.isPrivate && self.isOverList(point)
+            // Over another window's list, the line shows there instead.
+            let other = self.otherWindowForFavorite(at: point)
+            if self.favoriteDropWindow !== other { self.favoriteDropWindow?.sidebar.list.externalHover(at: nil) }
+            self.favoriteDropWindow = other
+            other?.sidebar.list.externalHover(at: point, allowsPinned: true)
+            let over = other == nil && !self.tabManager.isPrivate && self.isOverList(point)
             self.sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
-            self.favoriteSpring(at: window.convertPoint(fromScreen: point))
-            self.sidebar.list.carryToEdge(at: point)
-            return over
+            self.favoriteSpring(at: other == nil ? window.convertPoint(fromScreen: point) : nil)
+            self.sidebar.list.carryToEdge(at: other == nil ? point : nil)
+            return over || other != nil
         }
         sidebar.favorites.onDrop = { [weak self] favorite, point in
             guard let self, !self.tabManager.isPrivate, let window = self.window else { return (false, nil) }
+            if let other = self.otherWindowForFavorite(at: point) {
+                return (true, other.takeFavorite(favorite, from: self, at: point))
+            }
             // Let go on a space's dot: it becomes a tab there, at the top, whichever space is showing.
             if let dot = self.sidebar.spaceDot(at: window.convertPoint(fromScreen: point)) {
                 self.unfavoriteWithUndo(favorite.id, to: 0, in: dot)
                 return (true, nil)
             }
             guard self.isOverList(point) else { return (false, nil) }
-            // Dragged down into the list: a pinned tab among the pinned ones (in a folder, if it's let go among a
-            // folder's pages), or a regular tab among the tabs, right where it was dropped.
-            let landing = self.sidebar.list.dropTarget(at: point, allowsPinned: true)
-            let space = self.tabManager.currentSpaceID
-            if landing.section == .bookmarks {
-                self.pageChange("Pin Tab") {
-                    Library.shared.pinFavorite(favorite.id, in: space, at: landing.index)
-                    if let folder = landing.folder { Library.shared.moveBookmark(favorite.id, to: landing.index, in: space, folder: .some(folder)) }
-                }
-                return (true, self.sidebar.list.row(forBookmark: favorite.id))
-            }
-            self.unfavoriteWithUndo(favorite.id, to: landing.index)
-            let tabs = self.tabManager.tabs(in: space)
-            return (true, tabs.indices.contains(landing.index) ? self.sidebar.list.row(for: tabs[landing.index]) : nil)
+            return (true, self.dropFavorite(favorite, at: point))
         }
         sidebar.favorites.onDragEnd = { [weak self] cancelled in
             guard let self else { return }
+            self.favoriteDropWindow?.sidebar.list.externalHover(at: nil)
+            self.favoriteDropWindow = nil
             self.sidebar.list.externalHover(at: nil)
             self.favoriteSpring(at: nil)
             self.sidebar.list.carryToEdge(at: nil)
@@ -269,6 +266,50 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return false }
         let list = sidebar.list.enclosingScrollView ?? sidebar.list
         return list.convert(list.bounds, to: nil).contains(window.convertPoint(fromScreen: screenPoint))
+    }
+
+    /// The window showing where a favorite carried from here would land, when that's another window's list.
+    private weak var favoriteDropWindow: BrowserWindowController?
+
+    /// Another window whose list is in front at a screen point, to take a favorite carried from here. Never to or
+    /// from a private window: its pages stay in it.
+    private func otherWindowForFavorite(at screenPoint: NSPoint) -> BrowserWindowController? {
+        guard !tabManager.isPrivate, let (controller, _) = SidebarListView.list(at: screenPoint), controller !== self,
+              !controller.tabManager.isPrivate else { return nil }
+        return controller
+    }
+
+    /// A favorite let go over this window's list: a pinned tab among the pinned ones (in a folder, if it's let go
+    /// among a folder's pages), or a regular tab among the tabs, right where it was dropped. Returns its new row.
+    func dropFavorite(_ favorite: Bookmark, at screenPoint: NSPoint) -> NSView? {
+        let landing = sidebar.list.dropTarget(at: screenPoint, allowsPinned: true)
+        let space = tabManager.currentSpaceID
+        if landing.section == .bookmarks {
+            pageChange("Pin Tab") {
+                Library.shared.pinFavorite(favorite.id, in: space, at: landing.index)
+                if let folder = landing.folder { Library.shared.moveBookmark(favorite.id, to: landing.index, in: space, folder: .some(folder)) }
+            }
+            return sidebar.list.row(forBookmark: favorite.id)
+        }
+        unfavoriteWithUndo(favorite.id, to: landing.index)
+        let tabs = tabManager.tabs(in: space)
+        return tabs.indices.contains(landing.index) ? sidebar.list.row(for: tabs[landing.index]) : nil
+    }
+
+    /// A favorite carried over from another window's Favorites: its open pages come along (one already open here
+    /// stays instead), it lands as it would from this window's own, and this window comes forward.
+    func takeFavorite(_ favorite: Bookmark, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
+        let ids = Library.shared.favoriteSplits.first { $0.contains(favorite.id) }.map { [$0.left, $0.right] } ?? [favorite.id]
+        for id in ids {
+            if tabManager.bookmarkTab(for: id) != nil {
+                if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
+            } else if let live = source.tabManager.detachBookmarkTab(id) {
+                tabManager.insertBookmarkTab(live, bookmarkID: id)
+            }
+        }
+        let row = dropFavorite(favorite, at: screenPoint)
+        window?.makeKeyAndOrderFront(nil)
+        return row
     }
 
     private func reloadFavorites() {

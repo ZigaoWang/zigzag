@@ -149,6 +149,27 @@ final class TabManager {
         if wasSelected { selectAfterClosing(tab, index: index) }
     }
 
+    /// A pinned page's or favorite's open page out of this window, still loaded, so another window can adopt it.
+    func detachBookmarkTab(_ bookmarkID: UUID) -> Tab? {
+        guard let tab = bookmarkTabs[bookmarkID] else { return nil }
+        splits.removeAll { $0.left == tab.id || $0.right == tab.id }
+        let wasSelected = selectedTab === tab
+        bookmarkTabs[bookmarkID] = nil
+        recentTabIDs.removeAll { $0 == tab.id }
+        tabTokens[tab.id] = nil
+        if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
+        changed.send(.structure)
+        if wasSelected { selectAfterClosing(tab, index: 0) }
+        return tab
+    }
+
+    /// A pinned page's or favorite's open page from another window, in the space you're in.
+    func insertBookmarkTab(_ tab: Tab, bookmarkID: UUID) {
+        tab.spaceID = currentSpaceID
+        adoptBookmarkTab(tab, bookmarkID: bookmarkID)
+        if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
+    }
+
     /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
     func insert(_ tab: Tab, at index: Int = 0) {
         tab.host = host

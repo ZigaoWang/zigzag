@@ -856,7 +856,7 @@ final class SidebarListView: NSView {
     }
 
     /// The sidebar list under a screen point, in whichever window is in front there.
-    private static func list(at screenPoint: NSPoint) -> (BrowserWindowController, SidebarListView)? {
+    static func list(at screenPoint: NSPoint) -> (BrowserWindowController, SidebarListView)? {
         for window in NSApp.orderedWindows where window.isVisible && window.frame.contains(screenPoint) {
             guard let controller = window.windowController as? BrowserWindowController else { return nil }
             let container = controller.root.sidebarContainer
