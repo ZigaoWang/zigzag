@@ -187,6 +187,7 @@ final class DeskController {
         searchIcon.contentTintColor = Tokens.Color.textTertiary
         // Soft glass on the frame, like the favorites: the desk's field sits on the space's color.
         searchBox.layer?.borderWidth = Tokens.Metric.hairline
+        searchBox.edgeColor = Tokens.Color.glassEdge
         searchBox.addSubview(searchIcon)
         searchBox.addSubview(searchField)
         backdrop.addSubview(searchBox)
@@ -594,7 +595,6 @@ final class DeskController {
         searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
         searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
         searchBox.color = Tokens.Color.glassFill
-        Tokens.Motion.withoutAnimation { searchBox.layer?.borderColor = searchBox.cgColor(Tokens.Color.glassEdge) }
         let icon = Tokens.Metric.favicon
         searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
         let textHeight = ceil(searchField.intrinsicContentSize.height)

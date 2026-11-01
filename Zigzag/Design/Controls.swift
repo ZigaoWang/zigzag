@@ -441,6 +441,8 @@ final class Label: NSTextField {
 /// A view that paints a single flat color from a dynamic NSColor, following appearance changes.
 class ColorView: NSView {
     var color: NSColor? { didSet { refresh(animated: false) } }
+    /// The edge's color, redrawn for light and dark like the fill (its width is the layer's own).
+    var edgeColor: NSColor? { didSet { refresh(animated: false) } }
 
     init(color: NSColor? = nil) {
         self.color = color
@@ -460,6 +462,7 @@ class ColorView: NSView {
 
     private func refresh(animated: Bool, duration: TimeInterval = Tokens.Motion.quick) {
         layer?.set(backgroundColor: color.map { cgColor($0) }, animated: animated, duration: duration)
+        if let edgeColor { Tokens.Motion.withoutAnimation { layer?.borderColor = cgColor(edgeColor) } }
     }
 
     override func viewDidChangeEffectiveAppearance() {

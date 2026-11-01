@@ -491,7 +491,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if let fill = site?.color {
             chipLabel.textColor = Tokens.Color.ink(on: fill)
             chip.layer?.borderWidth = Tokens.Color.luminance(of: fill) < 0.15 ? Tokens.Metric.hairline : 0
-            chip.layer?.borderColor = chip.cgColor(Tokens.Color.panelEdge)
+            chip.edgeColor = Tokens.Color.panelEdge
         }
         chipLabel.stringValue = site?.name ?? ""
         completion = nil
