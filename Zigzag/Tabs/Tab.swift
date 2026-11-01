@@ -553,6 +553,10 @@ final class Tab: NSObject {
         }
     }
 
+    /// The page and icon links the tab's icon came from, so the second look at the same page (on commit, then on
+    /// finish) doesn't fetch and save it again, which redraws every window's sidebar.
+    private var iconSource: (page: URL, links: [[String: String]])?
+
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
         // Private tabs only use icons already saved from normal browsing; they never fetch or save one.
@@ -564,8 +568,10 @@ final class Tab: NSObject {
         webView.evaluateJavaScript(PageScripts.iconLinks) { [weak self] result, _ in
             MainActor.assumeIsolated {
                 let links = (result as? [[String: String]]) ?? []
+                if let self, self.favicon != nil, let source = self.iconSource, source.page == pageURL, source.links == links { return }
                 FaviconStore.shared.resolve(pageURL: pageURL, links: links) { image in
                     guard let self, let image, self.url?.host() == pageURL.host() else { return }
+                    self.iconSource = (pageURL, links)
                     self.favicon = image
                     self.changed.send(.favicon)
                 }
