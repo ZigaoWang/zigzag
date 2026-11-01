@@ -319,7 +319,17 @@ final class IconButton: InteractiveView {
         }
     }
 
+    /// Chosen, it's the soft card (`applyRowStyle`) rather than the hover fill: a choice among many, like an icon
+    /// in a grid.
+    var selectsAsCard = false { didSet { stateDidChange(animated: false) } }
+
     override func stateDidChange(animated: Bool) {
+        if selectsAsCard {
+            applyRowStyle(animated: animated)
+            imageView.contentTintColor = image == nil ? (isSelected ? Tokens.Color.textPrimary : tint) : nil
+            imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+            return
+        }
         let fill: NSColor? = !isEnabled ? nil : isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.hoverFill : showsFillAtRest ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         imageView.contentTintColor = image == nil ? tint : nil

@@ -64,8 +64,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     var onPick: ((String?) -> Void)?
 
     private var cells: [IconButton] = []
-    private let emojiField = PlainTextField(font: Tokens.Font.body(), placeholder: "Or type an emoji")
-    private let emojiBackground = ColorView(color: Tokens.Color.fieldFill)
+    private let emojiField = FilledField(placeholder: "Or type an emoji")
 
     static let columns = 8
     static let cell: CGFloat = 30
@@ -89,12 +88,9 @@ final class IconGrid: NSView, NSTextFieldDelegate {
             button.onClick = { [weak self] _ in self?.pick(name) }
             return button
         }
-        cells.forEach { addSubview($0) }
-        emojiBackground.wantsLayer = true
-        emojiBackground.layer?.cornerRadius = Tokens.Radius.field
-        emojiBackground.layer?.cornerCurve = .continuous
-        addSubview(emojiBackground)
-        emojiField.delegate = self
+        // The chosen icon is the soft card, as the chosen row is anywhere.
+        cells.forEach { $0.selectsAsCard = true; addSubview($0) }
+        emojiField.field.delegate = self
         if let selected, !IconChoice.isSymbol(selected) { emojiField.stringValue = selected }
         addSubview(emojiField)
         refresh()
@@ -124,9 +120,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
                                 width: Self.cell, height: Self.cell)
         }
         let y = (cells.last?.frame.maxY ?? 0) + Tokens.Space.x3
-        emojiBackground.frame = NSRect(x: 0, y: y, width: bounds.width, height: Self.fieldHeight)
-        let fh = ceil(emojiField.intrinsicContentSize.height)
-        emojiField.frame = NSRect(x: Tokens.Space.x2 + 2, y: y + (Self.fieldHeight - fh) / 2, width: bounds.width - Tokens.Space.x4, height: fh)
+        emojiField.frame = NSRect(x: 0, y: y, width: bounds.width, height: Self.fieldHeight)
     }
 
     /// The last emoji typed is the icon; anything that isn't one is left out.
@@ -134,7 +128,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         guard let emoji = Self.lastEmoji(in: emojiField.stringValue) else {
             // Letters, or a digit or a symbol on its own, don't stay in the field as if they were the icon.
             // (Not while an input method is still composing: that text isn't settled.)
-            if (emojiField.currentEditor() as? NSTextView)?.hasMarkedText() != true { emojiField.stringValue = "" }
+            if (emojiField.field.currentEditor() as? NSTextView)?.hasMarkedText() != true { emojiField.stringValue = "" }
             return
         }
         emojiField.stringValue = emoji

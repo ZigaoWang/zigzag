@@ -1205,7 +1205,7 @@ final class SpaceLookEditor: NSView {
 final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
-    private let nameField = PlainTextField(font: Tokens.Font.large(.semibold), placeholder: "Name this space")
+    private let nameField = PlainTextField(font: Tokens.Font.heading(), placeholder: "Name this space")
     /// The name sits on a soft field, so it reads as something you can type into.
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let editor: SpaceLookEditor
@@ -1228,7 +1228,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameField.delegate = self
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
-        nameBackground.layer?.cornerRadius = Tokens.Radius.field
+        nameBackground.layer?.cornerRadius = Tokens.Radius.row
         [nameBackground, nameField, editor, iconButton].forEach { addSubview($0) }
         refreshIconButton(space.icon)
         iconButton.onClick = { [weak self] _ in self?.toggleIcons() }
@@ -1248,8 +1248,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     // MARK: Layout
 
-    private let pad = Tokens.Space.x4
-    private let nameHeight: CGFloat = 34
+    /// A panel's padding, and its name a row tall.
+    private let pad = Tokens.Space.x3
+    private let nameHeight = Tokens.Metric.rowHeight
 
     var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
 
