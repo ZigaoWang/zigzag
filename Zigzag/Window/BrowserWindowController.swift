@@ -143,8 +143,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return SidebarMenus.favoriteMenu(for: favorite, controller: self)
         }
         sidebar.favorites.onDragMove = { [weak self] _, point in
-            guard let self else { return }
-            self.sidebar.list.externalHover(at: self.isOverList(point) ? point : nil)
+            guard let self else { return false }
+            let over = self.isOverList(point)
+            self.sidebar.list.externalHover(at: over ? point : nil)
+            return over
         }
         sidebar.favorites.onDrop = { [weak self] favorite, point in
             guard let self else { return false }

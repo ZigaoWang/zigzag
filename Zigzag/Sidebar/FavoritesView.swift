@@ -19,8 +19,9 @@ final class FavoritesView: NSView {
         }
     }
     var onHeightChange: (() -> Void)?
-    /// A tile is being carried: where the pointer is, in screen points.
-    var onDragMove: ((Bookmark, NSPoint) -> Void)?
+    /// A tile is being carried: where the pointer is, in screen points. Returns true while it's over the tab list,
+    /// where it would become a tab again.
+    var onDragMove: ((Bookmark, NSPoint) -> Bool)?
     /// Dropped somewhere outside the grid. Returns true if it was handled.
     var onDrop: ((Bookmark, NSPoint) -> Bool)?
     var onReorder: ((Bookmark, Int) -> Void)?
@@ -105,18 +106,13 @@ final class FavoritesView: NSView {
     private func drag(_ tile: FavoriteTile, favorite: Bookmark, event: NSEvent) {
         guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
         let rect = window.convertToScreen(tile.convert(tile.bounds, to: nil))
-        let panel = NSPanel(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.level = .floating
-        panel.ignoresMouseEvents = true
-        let image = NSImageView(frame: NSRect(origin: .zero, size: rect.size))
-        image.image = Self.picture(of: tile)
-        panel.contentView = image
         let start = window.convertPoint(toScreen: event.locationInWindow)
         let grab = NSPoint(x: start.x - rect.minX, y: start.y - rect.minY)
-        panel.orderFront(nil)
+        let carried = CarriedFavorite(tile: Self.picture(of: tile), tileSize: rect.size, grab: grab, favorite: favorite,
+                                      icon: tile.iconImage, rowWidth: bounds.width, appearance: window.effectiveAppearance)
+        carried.move(to: start)
+        carried.panel.orderFront(nil)
+        let panel = carried.panel
         // Its place stays open (an empty slot) while it's carried.
         tile.alphaValue = 0
         liveOrder = tiles
@@ -135,13 +131,14 @@ final class FavoritesView: NSView {
             guard let event else { return }
             last = window.convertPoint(toScreen: event.locationInWindow)
             if event.type == .leftMouseUp { stop.pointee = true; return }
-            panel.setFrameOrigin(NSPoint(x: last.x - grab.x, y: last.y - grab.y))
+            carried.move(to: last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
             // Over the grid the others make room where the carried tile's middle is, wherever it was picked up by;
             // off it, everything goes back to where it was.
-            let center = self.convert(window.convertPoint(fromScreen: NSPoint(x: panel.frame.midX, y: panel.frame.midY)), from: nil)
+            let center = self.convert(window.convertPoint(fromScreen: carried.tileCenter), from: nil)
             arrange(self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local) ? self.slot(at: center, count: self.tiles.count) : from)
-            self.onDragMove?(favorite, last)
+            // Over the tab list it becomes the row it would be there; back over the grid, a tile again.
+            carried.isRow = self.onDragMove?(favorite, last) ?? false
         }
 
         let local = convert(window.convertPoint(fromScreen: last), from: nil)
@@ -158,11 +155,12 @@ final class FavoritesView: NSView {
             return
         }
         // Settles into its new place, then the grid takes on that order for good.
+        carried.isRow = false
         let landing = window.convertToScreen(tile.convert(tile.bounds, to: nil))
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = Tokens.Motion.reduceMotion ? 0 : 0.18
             context.timingFunction = Tokens.Motion.easeOut
-            panel.animator().setFrame(landing, display: true)
+            panel.animator().setFrame(carried.panelFrame(placingTileAt: landing), display: true)
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 finish()
@@ -227,6 +225,7 @@ final class FavoriteTile: InteractiveView {
     let bookmark: Bookmark?
     private let icon = FaviconView()
     var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
+    var iconImage: NSImage? { icon.image }
     var onClose: (() -> Void)?
     /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
     /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
