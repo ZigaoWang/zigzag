@@ -207,6 +207,10 @@ enum SidebarMenus {
         menu.autoenablesItems = false
         let manager = controller.tabManager
         let live = manager.bookmarkTab(for: favorite.id)
+        // Not a split favorite: a new name would only reach its left page.
+        if Library.shared.pinnedSplit(containing: favorite.id) == nil {
+            menu.addItem(Item("Rename…") { BookmarkEditor.edit(favorite.id, in: controller) })
+        }
         menu.addItem(Item("Copy Link") { controller.copyLink(favorite.url) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(favorite.id) })
