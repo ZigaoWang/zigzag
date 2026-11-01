@@ -332,6 +332,19 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: Tabs
 
+    /// ⌃⇧↑ and ⌃⇧↓: the tab you're on one row up or down, for reordering without a mouse. A split moves only by drag.
+    @objc func moveTabUp(_ sender: Any?) { if let target = tabMoveTarget(by: -1), let tab = selectedTab { moveWithUndo(tab, to: target, in: tab.spaceID) } }
+    @objc func moveTabDown(_ sender: Any?) { if let target = tabMoveTarget(by: 1), let tab = selectedTab { moveWithUndo(tab, to: target, in: tab.spaceID) } }
+
+    /// Where the tab you're on goes one row up or down, or nil at the end of the list, on a pinned page, or beside a split.
+    func tabMoveTarget(by offset: Int) -> Int? {
+        guard let tab = selectedTab, tab.bookmarkID == nil, tabManager.split(for: tab) == nil else { return nil }
+        let tabs = tabManager.currentTabs
+        guard let index = tabs.firstIndex(where: { $0 === tab }), tabs.indices.contains(index + offset),
+              tabManager.split(for: tabs[index + offset]) == nil else { return nil }
+        return index + offset
+    }
+
     @objc func selectNextTab(_ sender: Any?) { tabManager.selectNext(offset: 1) }
     @objc func selectPreviousTab(_ sender: Any?) { tabManager.selectNext(offset: -1) }
     /// ⌘1–⌘9: numbered as the sidebar shows them, each favorite tile, then each pinned and tab row, open or not.
@@ -482,6 +495,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(toggleMute(_:)):
             item.title = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
             return tab != nil
+        case #selector(moveTabUp(_:)): return tabMoveTarget(by: -1) != nil
+        case #selector(moveTabDown(_:)): return tabMoveTarget(by: 1) != nil
         case #selector(closeOtherTabs(_:)): return !otherTabs.isEmpty
         case #selector(closeTabsBelow(_:)): return !tabsBelow.isEmpty
         case #selector(selectSpaceByNumber(_:)):
