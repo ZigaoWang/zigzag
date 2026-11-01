@@ -1,24 +1,29 @@
 import AppKit
 
-/// The slim strip on top of each pane in split view: its own back, forward and reload,
-/// the page's address, and a button to take the pane out of the split.
+/// The slim strip on top of each pane in split view, on the page card's own surface: back, forward and reload at the
+/// leading end, the page's address centered in a quiet pill, and the split's own buttons at the trailing end. A
+/// hairline under it keeps it apart from the page. The pane you're not in dims it (`PageCardView`).
 final class PaneHeaderView: NSView {
-    let back = IconButton(symbol: "chevron.left", size: Tokens.Space.x6, toolTip: "Back")
-    let forward = IconButton(symbol: "chevron.right", size: Tokens.Space.x6, toolTip: "Forward")
-    let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Space.x6, toolTip: "Reload")
-    let orientation = IconButton(symbol: "rectangle.split.1x2", size: Tokens.Space.x6, toolTip: "Stack Vertically")
-    let swap = IconButton(symbol: "arrow.left.arrow.right", size: Tokens.Space.x6, symbolSize: Tokens.TypeSize.small, toolTip: "Swap Sides")
-    let close = IconButton(symbol: "rectangle.split.2x1.slash", size: Tokens.Space.x6, toolTip: "Separate Tabs")
+    let back = IconButton(symbol: "chevron.left", size: Tokens.Metric.paneButton, toolTip: "Back")
+    let forward = IconButton(symbol: "chevron.right", size: Tokens.Metric.paneButton, toolTip: "Forward")
+    let reload = IconButton(symbol: "arrow.clockwise", size: Tokens.Metric.paneButton, toolTip: "Reload")
+    let orientation = IconButton(symbol: "rectangle.split.1x2", size: Tokens.Metric.paneButton, toolTip: "Stack Vertically")
+    let swap = IconButton(symbol: "arrow.left.arrow.right", size: Tokens.Metric.paneButton, symbolSize: Tokens.TypeSize.small, toolTip: "Swap Sides")
+    let close = IconButton(symbol: "rectangle.split.2x1.slash", size: Tokens.Metric.paneButton, toolTip: "Separate Tabs")
+    private let addressPill = ColorView(color: Tokens.Color.addressFill)
     private let address = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let line = ColorView(color: Tokens.Color.separator)
     private weak var tab: Tab?
     private var token: SignalToken?
-    static let height = Tokens.Space.x8 + Tokens.Space.x1
+    static let height = Tokens.Metric.paneHeaderHeight
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         address.lineBreakMode = .byTruncatingMiddle
-        [back, forward, reload, address, swap, orientation, close, line].forEach { addSubview($0) }
+        address.alignment = .center
+        addressPill.wantsLayer = true
+        addressPill.layer?.cornerCurve = .continuous
+        [back, forward, reload, addressPill, address, swap, orientation, close, line].forEach { addSubview($0) }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
         reload.onClick = { [weak self] _ in
@@ -57,19 +62,29 @@ final class PaneHeaderView: NSView {
 
     override func layout() {
         super.layout()
-        let b = Tokens.Space.x6
-        let y = (bounds.height - b) / 2
-        var x = Tokens.Space.x2
+        let b = Tokens.Metric.paneButton
+        let edge = (bounds.height - Tokens.Metric.hairline - b) / 2
+        let y = edge
+        var x = edge
         for button in [back, forward, reload] {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
             x += b
         }
-        close.frame = NSRect(x: bounds.width - Tokens.Space.x2 - b, y: y, width: b, height: b)
+        close.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
         orientation.frame = NSRect(x: close.frame.minX - b, y: y, width: b, height: b)
         swap.frame = NSRect(x: orientation.frame.minX - b, y: y, width: b, height: b)
+        [back, forward, reload, swap, orientation, close].forEach { $0.radius = Tokens.Radius.control }
+        // The address pill is centered on the pane, and as wide as its text, within the room the buttons leave.
+        let room = max(0, min(bounds.midX - x, swap.frame.minX - bounds.midX) - Tokens.Space.x2) * 2
+        let padding = Tokens.Space.x3
+        let pillWidth = min(room, address.inkWidth + padding * 2)
+        let pill = NSRect(x: round(bounds.midX - pillWidth / 2), y: y, width: pillWidth, height: b)
+        addressPill.frame = pill
+        addressPill.layer?.cornerRadius = b / 2
+        addressPill.isHidden = address.stringValue.isEmpty || pillWidth < padding * 3
         let h = address.lineHeight
-        let textX = x + Tokens.Space.x2
-        address.frame = NSRect(x: textX, y: (bounds.height - h) / 2, width: max(0, swap.frame.minX - textX - Tokens.Space.x2), height: h)
+        address.frame = NSRect(x: pill.minX + padding - Label.inset, y: pill.midY - h / 2,
+                               width: max(0, pill.width - padding * 2 + Label.inset * 2), height: h)
         line.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
     }
 }
