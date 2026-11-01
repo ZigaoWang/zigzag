@@ -276,6 +276,13 @@ final class FavoritesView: NSView {
                                width: width, height: Self.tileHeight).integral
             if glides, tile !== dropTile, tile.frame.width > 0, tile.frame.size == frame.size {
                 Tokens.Motion.glide(tile, to: frame)
+            } else if glides, tile !== dropTile, tile.frame.width > 0, !Tokens.Motion.reduceMotion {
+                // A row gaining or losing a column: the tiles change width as they move, in the same stride.
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = Tokens.Motion.standard
+                    context.timingFunction = Tokens.Motion.easeInOut
+                    tile.animator().frame = frame
+                }
             } else {
                 tile.frame = frame
             }
