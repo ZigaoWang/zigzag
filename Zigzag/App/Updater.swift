@@ -12,15 +12,19 @@ final class Updater {
     static let betaFeed = "https://zigzagbrowser.com/updates/beta.xml"
     private static let betaKey = "BetaUpdates"
 
-    /// Get new versions before everyone else, to try them on your own tabs and data.
+    /// Get new versions before everyone else, to try them on your own tabs and data. Running a beta means you
+    /// chose to, so it's on until you turn it off.
     static var getsBetas: Bool {
-        get { UserDefaults.standard.bool(forKey: betaKey) }
+        get { UserDefaults.standard.object(forKey: betaKey) as? Bool ?? isBeta }
         set {
             UserDefaults.standard.set(newValue, forKey: betaKey)
             // Look again at once, on the feed just chosen.
             if newValue { shared.controller?.updater.checkForUpdatesInBackground() }
         }
     }
+
+    /// This copy of Zigzag is a beta (0.5.0-beta.1).
+    static var isBeta: Bool { (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "").contains("-beta") }
 
     /// Only signed release builds with a feed key can update; debug builds stay put.
     private var isConfigured: Bool {
