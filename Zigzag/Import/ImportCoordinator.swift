@@ -195,6 +195,8 @@ enum ImportCoordinator {
         let source: String
         var passwords = 0
         var updatedPasswords = 0
+        /// Logins already here whose imported password differed but wasn't known to be newer, so stayed as they were.
+        var keptPasswords = 0
         var bookmarks = 0
         var history = 0
         var spaces = 0
@@ -208,9 +210,10 @@ enum ImportCoordinator {
             if bookmarks > 0 { parts.append(count(bookmarks, "bookmark", "bookmarks")) }
             if spaces > 0 { parts.append(count(spaces, "space", "spaces")) }
             if history > 0 { parts.append(count(history, "page of history", "pages of history")) }
-            guard !parts.isEmpty else { return updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source)." }
+            let kept = keptPasswords > 0 ? " Kept \(count(keptPasswords, "password", "passwords")) already in Zigzag instead of the imported \(keptPasswords == 1 ? "one" : "ones")." : ""
+            guard !parts.isEmpty else { return (updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source).") + kept }
             let list = ListFormatter.localizedString(byJoining: parts)
-            return "Imported \(list) from \(source)."
+            return "Imported \(list) from \(source)." + kept
         }
     }
 
@@ -304,8 +307,13 @@ enum ImportCoordinator {
         for key in order {
             guard let login = newest[key] else { continue }
             if var current = here[key] {
-                guard let date = when(login), date > current.modified else { continue }
-                if let saved = try? await store.password(for: current.id), saved.matches(login.password) { continue }
+                let saved = try? await store.password(for: current.id)
+                if saved?.matches(login.password) == true { continue }
+                guard let date = when(login), date > current.modified else {
+                    // Not known to be newer (a CSV file has no dates): the one here stays, and the summary says so.
+                    if saved != nil { summary.keptPasswords += 1 }
+                    continue
+                }
                 current.modified = date
                 if (try? await store.replaceImported(current, password: login.password)) != nil {
                     here[key] = current

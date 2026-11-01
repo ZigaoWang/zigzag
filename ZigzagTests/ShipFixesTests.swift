@@ -245,4 +245,14 @@ struct BookmarkFolderTests {
             #expect(IconGrid.lastEmoji(in: text) == nil)
         }
     }
+
+    @Test func anImportSaysWhichPasswordsItKept() {
+        var summary = ImportCoordinator.Summary(source: "Passwords.csv")
+        summary.passwords = 2
+        summary.keptPasswords = 3
+        #expect(summary.sentence == "Imported 2 passwords from Passwords.csv. Kept 3 passwords already in Zigzag instead of the imported ones.")
+        summary.passwords = 0
+        summary.keptPasswords = 1
+        #expect(summary.sentence == "Nothing new to bring over from Passwords.csv. Kept 1 password already in Zigzag instead of the imported one.")
+    }
 }
