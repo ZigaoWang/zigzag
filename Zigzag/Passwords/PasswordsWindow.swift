@@ -139,8 +139,13 @@ final class PasswordsView: NSView {
         let unlockButton = PillButton(title: "Unlock", symbol: "lock.open", style: .prominent)
         unlockButton.onClick = { [weak self] _ in self?.unlock() }
         locked.action = unlockButton
-        let importPasswords = PillButton(title: "Import Passwords", style: .prominent)
         importPasswords.onClick = { _ in ImportWindowController.show() }
+        tryAgain.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.isLoadingVault = true
+            self.updateEmpty()
+            self.reload()
+        }
         empty.action = importPasswords
         detail.onDeleted = { [weak self] in self?.reload() }
         detail.onAllowSaving = { [weak self] origin in
@@ -214,6 +219,10 @@ final class PasswordsView: NSView {
 
     /// True from unlocking until the vault is read, so an empty state never flashes before the list arrives.
     private var isLoadingVault = false
+    /// The keychain wouldn't give up the list: say so, rather than look like there are no passwords at all.
+    private var readFailed = false
+    private let importPasswords = PillButton(title: "Import Passwords", style: .prominent)
+    private let tryAgain = PillButton(title: "Try Again", style: .prominent)
 
     private func setLocked(_ isLocked: Bool) {
         self.isLocked = isLocked
@@ -235,7 +244,9 @@ final class PasswordsView: NSView {
     private func reload() {
         Task { @MainActor in
             let store = PasswordStore.shared
-            credentials = ((try? await store.all()) ?? []).sorted {
+            let all: [Credential]
+            do { all = try await store.all(); readFailed = false } catch { all = []; readFailed = true }
+            credentials = all.sorted {
                 ($0.origin.displayName, $0.username.lowercased()) < ($1.origin.displayName, $1.username.lowercased())
             }
             neverSites = await store.neverSaveSites().sorted { $0.displayName < $1.displayName }
@@ -360,8 +371,12 @@ final class PasswordsView: NSView {
         detail.isHidden = nothing
         guard nothing else { return }
         empty.showsAction = false
+        empty.action = readFailed ? tryAgain : importPasswords
         if isLoadingVault {
             empty.text = "Opening your passwords…"
+        } else if readFailed {
+            empty.text = "Couldn’t read your passwords. Nothing was deleted."
+            empty.showsAction = true
         } else if !query.isEmpty {
             empty.text = "No sites or usernames match “\(search.stringValue)”."
         } else {
