@@ -237,7 +237,7 @@ final class SwipeNavigator {
         Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
         guard from != .identity, !Tokens.Motion.reduceMotion else { return }
         // The app's critically damped spring, as stiff as before (a perceptual 0.35 s).
-        let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: 0.35)
+        let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
         back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
         back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
         layer.add(back, forKey: "swipe.settle")

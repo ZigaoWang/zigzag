@@ -511,13 +511,13 @@ class FloatingPanelView: NSView {
             let drop = CABasicAnimation(keyPath: "transform")
             drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
             drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            drop.duration = 0.28
+            drop.duration = Tokens.Motion.zoom
             drop.timingFunction = Tokens.Motion.easeOut
             drop.fillMode = .backwards
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.12
+            fade.duration = Tokens.Motion.menuOut
             layer.add(drop, forKey: "present.grow")
             layer.add(fade, forKey: "present")
             return
@@ -528,12 +528,12 @@ class FloatingPanelView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.14
+            fade.duration = Tokens.Motion.highlightGlide
             fade.timingFunction = Tokens.Motion.easeOut
             let grow = CABasicAnimation(keyPath: "transform")
             grow.fromValue = NSValue(caTransform3D: scaled(arrival == .burst ? 0.94 : 0.97))
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-            grow.duration = 0.18
+            grow.duration = Tokens.Motion.menuIn
             grow.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "present")
             layer.add(grow, forKey: "present.grow")
@@ -544,16 +544,16 @@ class FloatingPanelView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.1
+            fade.duration = Tokens.Motion.quick
             fade.timingFunction = Tokens.Motion.easeOut
             layer.add(fade, forKey: "present")
             return
         }
-        let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+        let curve = Tokens.Motion.easeOut
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
-        fade.duration = 0.14
+        fade.duration = Tokens.Motion.highlightGlide
         if arrival == .zoom {
             // Grows a touch from its own middle, as Spotlight does: layers scale from their corner, so it's
             // shifted by half the shrink to stay centered.
@@ -565,7 +565,7 @@ class FloatingPanelView: NSView {
             grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
             let group = CAAnimationGroup()
             group.animations = [fade, grow]
-            group.duration = 0.2
+            group.duration = Tokens.Motion.standard
             group.timingFunction = curve
             layer.add(group, forKey: "present")
             return
@@ -573,10 +573,10 @@ class FloatingPanelView: NSView {
         let drop = CABasicAnimation(keyPath: "transform.translation.y")
         drop.fromValue = isFlippedInSuperview ? -4 : 4
         drop.toValue = 0
-        drop.duration = 0.2
+        drop.duration = Tokens.Motion.standard
         let group = CAAnimationGroup()
         group.animations = [fade, drop]
-        group.duration = 0.2
+        group.duration = Tokens.Motion.standard
         group.timingFunction = curve
         layer.add(group, forKey: "present")
     }

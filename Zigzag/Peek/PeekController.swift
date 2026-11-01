@@ -210,12 +210,12 @@ final class PeekController {
         let spring = CABasicAnimation(keyPath: "transform")
         spring.fromValue = NSValue(caTransform3D: origin == nil ? CATransform3DMakeScale(0.97, 0.97, 1) : start)
         spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        spring.duration = 0.22
+        spring.duration = Tokens.Motion.standard
         spring.timingFunction = Tokens.Motion.easeOut
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
-        fade.duration = 0.16
+        fade.duration = Tokens.Motion.menuIn
         fade.timingFunction = Tokens.Motion.easeOut
         layer.add(spring, forKey: "grow")
         layer.add(fade, forKey: "fade")
@@ -248,7 +248,7 @@ final class PeekController {
         fade.toValue = 0
         let both = CAAnimationGroup()
         both.animations = [move, fade]
-        both.duration = 0.16
+        both.duration = Tokens.Motion.menuIn
         both.timingFunction = Tokens.Motion.easeOut
         both.fillMode = .forwards
         both.isRemovedOnCompletion = false

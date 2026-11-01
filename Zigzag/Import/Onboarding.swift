@@ -127,7 +127,7 @@ final class OnboardingView: NSView {
     private func arrive(from hello: NSView, to steps: StepPage) {
         addSubview(hello, positioned: .above, relativeTo: steps)
         steps.rise()
-        Motion.fade(hello, from: 1, to: 0, duration: 0.25, remove: true)
+        Motion.fade(hello, from: 1, to: 0, duration: Tokens.Motion.standard, remove: true)
     }
 
     /// Moving on: the screen you're leaving drifts a little aside as it fades, the next arrives from the other
@@ -269,8 +269,8 @@ private final class StepPage: NSView {
         // Quiet: the card eases to its new size while the old step fades out and the new one fades in.
         Motion.easeFrame(card, from: oldCard, to: card.frame)
         for (i, view) in dots.enumerated() { Motion.easeFrame(view, from: oldDots[i], to: view.frame) }
-        for view in [old.title, old.body, old.content] { Motion.fade(view, from: 1, to: 0, duration: 0.15, remove: true) }
-        for view in [title, body, newContent] as [NSView] { Motion.fade(view, from: 0, to: 1, duration: 0.25, delay: 0.1) }
+        for view in [old.title, old.body, old.content] { Motion.fade(view, from: 1, to: 0, duration: Tokens.Motion.selection, remove: true) }
+        for view in [title, body, newContent] as [NSView] { Motion.fade(view, from: 0, to: 1, duration: Tokens.Motion.standard, delay: 0.1) }
     }
 
     /// Return and Esc: the main button, and Back, as a click on them would.
@@ -280,7 +280,7 @@ private final class StepPage: NSView {
     /// Arriving from the welcome: everything fades in together.
     func rise() {
         guard !Tokens.Motion.reduceMotion else { return }
-        Motion.fade(self, from: 0, to: 1, duration: 0.3, delay: 0.1)
+        Motion.fade(self, from: 0, to: 1, duration: Tokens.Motion.large, delay: 0.1)
     }
 
     /// The right side follows your space's color as soon as you pick one.
@@ -340,7 +340,7 @@ private final class StepPage: NSView {
 
 /// The few fades and resizes onboarding uses, on layers so nothing waits on layout.
 private enum Motion {
-    static let curve = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1)
+    static let curve = Tokens.Motion.easeOut
 
     static func fade(_ view: NSView, from: Float, to: Float, duration: CFTimeInterval, delay: CFTimeInterval = 0, remove: Bool = false) {
         view.wantsLayer = true
@@ -369,7 +369,7 @@ private enum Motion {
             let a = CABasicAnimation(keyPath: key)
             a.fromValue = from
             a.toValue = to
-            a.duration = 0.3
+            a.duration = Tokens.Motion.large
             a.timingFunction = curve
             layer.add(a, forKey: "m.\(key)")
         }
@@ -515,11 +515,11 @@ private final class HelloPage: NSView {
         layoutSubtreeIfNeeded()
         welcome.alphaValue = 0
         start.alphaValue = 0
-        let ease = CAMediaTimingFunction(controlPoints: 0.25, 0.8, 0.25, 1)
+        let ease = Tokens.Motion.easeOut
         func fadeIn(_ view: NSView, after delay: TimeInterval) {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.45
+                    ctx.duration = Tokens.Motion.large
                     ctx.timingFunction = ease
                     view.animator().alphaValue = 1
                 }
@@ -1269,8 +1269,8 @@ final class IntoZigzag: NSView {
             for (k, view) in sources.enumerated() {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.07) {
                     NSAnimationContext.runAnimationGroup({ ctx in
-                        ctx.duration = 0.45
-                        ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.5, 0, 0.3, 1)
+                        ctx.duration = Tokens.Motion.large
+                        ctx.timingFunction = Tokens.Motion.easeOut
                         if !Tokens.Motion.reduceMotion { view.animator().frame = target.insetBy(dx: 26, dy: 26) }
                         view.animator().alphaValue = 0
                     }, completionHandler: { MainActor.assumeIsolated { view.removeFromSuperview() } })
@@ -1281,7 +1281,7 @@ final class IntoZigzag: NSView {
                 let out = CABasicAnimation(keyPath: "opacity")
                 out.fromValue = from
                 out.toValue = 0
-                out.duration = 0.3
+                out.duration = Tokens.Motion.large
                 out.timingFunction = Tokens.Motion.easeOut
                 dot.add(out, forKey: "out")
                 dot.opacity = 0

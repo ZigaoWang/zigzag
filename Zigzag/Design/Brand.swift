@@ -236,7 +236,7 @@ enum Brand {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.22
+            fade.duration = Tokens.Motion.standard
             fade.beginTime = begin
             fade.fillMode = .backwards
             fade.timingFunction = Tokens.Motion.easeOut
@@ -355,7 +355,7 @@ class RibbonView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.2
+            fade.duration = Tokens.Motion.standard
             fade.beginTime = CACurrentMediaTime() + delay
             fade.fillMode = .backwards
             stroke.add(fade, forKey: "fade")
@@ -741,7 +741,7 @@ final class WordmarkView: NSView {
             let fade = CABasicAnimation(keyPath: "opacity")
             fade.fromValue = 0
             fade.toValue = 1
-            fade.duration = 0.25
+            fade.duration = Tokens.Motion.standard
             fade.beginTime = CACurrentMediaTime() + delay
             fade.fillMode = .backwards
             layer?.add(fade, forKey: "fade")

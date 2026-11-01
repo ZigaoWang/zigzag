@@ -207,7 +207,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         let move = CABasicAnimation(keyPath: "transform")
         move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
         move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        move.duration = 0.24
+        move.duration = Tokens.Motion.standard
         move.timingFunction = Tokens.Motion.easeInOut
         move.fillMode = .backwards
         layer.add(move, forKey: "follow")

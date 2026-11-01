@@ -367,13 +367,13 @@ final class PermissionPrompt: FloatingPanelView {
         let drop = CABasicAnimation(keyPath: "transform")
         drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
         drop.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        drop.duration = 0.32
+        drop.duration = Tokens.Motion.large
         drop.timingFunction = Tokens.Motion.easeOut
         drop.fillMode = .backwards
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0
         fade.toValue = 1
-        fade.duration = 0.12
+        fade.duration = Tokens.Motion.menuOut
         layer.add(drop, forKey: "slideIn")
         layer.add(fade, forKey: "fadeIn")
     }
@@ -386,14 +386,14 @@ final class PermissionPrompt: FloatingPanelView {
         let rise = CABasicAnimation(keyPath: "transform")
         rise.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
         rise.toValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
-        rise.duration = 0.2
+        rise.duration = Tokens.Motion.standard
         rise.timingFunction = Tokens.Motion.easeOut
         rise.fillMode = .forwards
         rise.isRemovedOnCompletion = false
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.toValue = 0
         fade.beginTime = CACurrentMediaTime() + 0.08
-        fade.duration = 0.12
+        fade.duration = Tokens.Motion.menuOut
         fade.fillMode = .forwards
         fade.isRemovedOnCompletion = false
         layer.add(rise, forKey: "slideOut")
