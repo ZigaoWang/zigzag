@@ -213,6 +213,7 @@ enum DebugBridge {
             case "drag": post(.leftMouseDragged)
             case "up": post(.leftMouseUp)
             case "click": post(.leftMouseDown); post(.leftMouseUp)
+            case "dclick": post(.leftMouseDown, clicks: 2); post(.leftMouseUp, clicks: 2)
             case "rclick": post(.rightMouseDown); post(.rightMouseUp)
             case "move", "hover":
                 // Tracking areas follow the real cursor, so hover is simulated by telling the view directly.
