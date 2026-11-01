@@ -278,6 +278,8 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     private let deleteButton = IconButton(symbol: "trash", size: Tokens.Space.x7Height, symbolSize: Tokens.TypeSize.small, toolTip: "Delete Space")
     /// True while the row is being dragged; it draws as lifted.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    /// True while any space is carried: rows sliding under the pointer don't count as hovered.
+    static var isReordering = false
 
     init(space: SpaceInfo) {
         spaceID = space.id
@@ -373,7 +375,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     override func stateDidChange(animated: Bool) {
         // Delete shows on hover, or once Tab brings keyboard focus to it. With Full Keyboard Access on it stays in
         // the Tab order, see-through until then.
-        let showsDelete = (isHovered || deleteButton.hasKeyboardFocus) && !isLifted
+        let showsDelete = (isHovered || deleteButton.hasKeyboardFocus) && !isLifted && !Self.isReordering
         deleteButton.isHidden = !showsDelete && !(NSApp.isFullKeyboardAccessEnabled && !isLifted)
         deleteButton.alphaValue = showsDelete ? 1 : 0
         needsLayout = true
@@ -908,6 +910,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             spacesGroup.add(row)
             return row
         }
+        layoutSubtreeIfNeeded()
+        syncSpaceHover()
         if pane == .spaces || isSearching { layoutDocument() }
     }
 
@@ -1214,6 +1218,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let start = spacesGroup.convert(event.locationInWindow, from: nil)
         let rowHeight = row.frame.height
         SpaceEditorPanel.current?.close()
+        SpaceSettingsRow.isReordering = true
         spaceRows.forEach { $0.isHovered = false }
         spacesGroup.addSubview(row, positioned: .above, relativeTo: nil)
         spacesGroup.showsDividers = false
@@ -1240,6 +1245,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let spaceID = row.spaceID, moved = target != startIndex
         glide(row, toY: CGFloat(target) * rowHeight, duration: 0.18, timing: Tokens.Motion.easeOut)
         DispatchQueue.main.asyncAfter(deadline: .now() + (Tokens.Motion.reduceMotion ? 0 : 0.18)) { [weak self] in
+            SpaceSettingsRow.isReordering = false
             row.isLifted = false
             self?.spacesGroup.showsDividers = true
             if moved {
@@ -1247,8 +1253,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else {
                 self?.reloadSpaces()
             }
+            self?.layoutSubtreeIfNeeded()
+            self?.syncSpaceHover()
         }
         return true
+    }
+
+    /// Hover follows where the pointer really is, once rows have moved or been rebuilt under it.
+    private func syncSpaceHover() {
+        guard let window else { return }
+        let mouse = window.mouseLocationOutsideOfEventStream
+        for row in spaceRows {
+            row.isHovered = row.window != nil && row.bounds.contains(row.convert(mouse, from: nil))
+        }
     }
 
     /// Moves a row to `y` at once and lets the render server show the slide there, from wherever it's drawn now,
