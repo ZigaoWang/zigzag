@@ -110,6 +110,7 @@ final class PageHeader: NSView {
     private static func width(of view: NSView) -> CGFloat {
         if view is FilledField { return Tokens.Page.searchWidth }
         if let button = view as? TextButton { return ceil(button.fittingWidth) }
+        if let pill = view as? PillButton { return pill.fittingWidth }
         let size = view.fittingSize
         return size.width > 0 ? size.width : view.intrinsicContentSize.width
     }
@@ -120,10 +121,17 @@ final class PageHeader: NSView {
 class ListItem: InteractiveView {
     private let icon = NSImageView()
     private let label: Label
+    /// Quiet text at the trailing end: how many are in it.
+    private let count = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
     let title: String
+    var detail: String {
+        get { count.stringValue }
+        set { count.stringValue = newValue; count.isHidden = newValue.isEmpty || isCompact; needsLayout = true }
+    }
     var isCompact = false {
         didSet {
             label.isHidden = isCompact
+            count.isHidden = isCompact || count.stringValue.isEmpty
             toolTip = isCompact ? title : nil
             needsLayout = true
         }
@@ -137,7 +145,9 @@ class ListItem: InteractiveView {
         layer?.cornerCurve = .continuous
         icon.image = Tokens.Symbol.image(symbol, size: 15)
         icon.imageScaling = .scaleNone
-        [icon, label].forEach { addSubview($0) }
+        count.alignment = .right
+        count.isHidden = true
+        [icon, label, count].forEach { addSubview($0) }
         setAccessibilityRole(.button)
         setAccessibilityLabel(title)
     }
@@ -153,7 +163,11 @@ class ListItem: InteractiveView {
             // The symbol's ink, not its box, starts at the row's inset, so it lines up with text above and below.
             icon.frame = NSRect(x: Tokens.Page.rowInset - 2, y: (bounds.height - side) / 2, width: side, height: side)
             let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
-            label.frame = NSRect(x: x, y: (bounds.height - label.lineHeight) / 2, width: max(0, bounds.width - x - Tokens.Space.x2), height: label.lineHeight)
+            let countWidth = count.isHidden ? 0 : count.inkWidth + Label.inset * 2
+            count.frame = NSRect(x: bounds.width - Tokens.Page.rowInset + Label.inset - countWidth, y: (bounds.height - count.lineHeight) / 2,
+                                 width: countWidth, height: count.lineHeight)
+            let end = count.isHidden ? bounds.width - Tokens.Space.x2 : count.frame.minX - Tokens.Space.x2
+            label.frame = NSRect(x: x, y: (bounds.height - label.lineHeight) / 2, width: max(0, end - x), height: label.lineHeight)
         }
     }
 

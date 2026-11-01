@@ -1,8 +1,10 @@
 import AppKit
 
-/// Every saved password in one place: filters (All, Weak, Reused, Never Saved), search, and two cards, the list and
-/// the chosen login's details. Locked until Touch ID (or the Mac's password); locks again when closed or when the
-/// Mac sleeps. Passwords stay dots until revealed, and copies clear themselves from the clipboard.
+/// Every saved password in one place, laid out as Zigzag's pages are (`Tokens.Page`), a sibling of Settings and
+/// History: the wordmark and "Passwords" over a column of kinds (All, Weak, Reused, Never Saved) at the left; the
+/// chosen kind's name, the search and Import and Export across the top; the sites under it; the chosen login's
+/// details at the right. Locked until Touch ID (or the Mac's password); locks again when the Mac sleeps. Passwords
+/// stay dots until revealed, and copies clear themselves from the clipboard.
 final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
     static var shared: PasswordsWindowController?
 
@@ -13,17 +15,18 @@ final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
             if let query { (shared.window?.contentView as? PasswordsView)?.search(for: query) }
             return
         }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 940, height: 580),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "Passwords"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
-        window.minSize = NSSize(width: 720, height: 440)
-        window.backgroundColor = Tokens.Color.formBackground
-        // Passwords on screen stay out of screenshots and screen sharing.
-        window.sharingType = .none
+        window.minSize = NSSize(width: 760, height: 480)
+        window.backgroundColor = Tokens.Color.surface
+        // Passwords on screen stay out of screenshots and screen sharing (a debug copy on its own test vault aside,
+        // so its layout can be checked).
+        window.sharingType = PasswordStore.isTestVault ? .readOnly : .none
         let view = PasswordsView(frame: window.contentLayoutRect)
         view.autoresizingMask = [.width, .height]
         window.contentView = view
@@ -57,27 +60,43 @@ private enum Category: CaseIterable {
 
     var symbol: String {
         switch self {
-        case .all: "key.fill"
-        case .weak: "exclamationmark.triangle.fill"
+        case .all: "key"
+        case .weak: "exclamationmark.triangle"
         case .reused: "arrow.triangle.2.circlepath"
         case .never: "nosign"
         }
     }
 }
 
+/// A kind of password in the column, with how many there are.
+private final class CategoryItem: ListItem {
+    let category: Category
+
+    init(_ category: Category) {
+        self.category = category
+        super.init(title: category.title, symbol: category.symbol)
+        setAccessibilityRole(.radioButton)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
 final class PasswordsView: NSView {
-    private let header = BrandBanner()
-    private let headerHeight: CGFloat = 116
-    private let locked = LockedView()
-    private let filters = SegmentedPills(Category.allCases.map(\.title))
-    private let search = FilledField(placeholder: "Search sites and usernames")
-    private let moreButton = IconButton(symbol: "ellipsis", size: Tokens.Space.x8, toolTip: "Import and Export")
-    private let listCard = PasswordsCard()
-    private let detailCard = PasswordsCard()
+    private let column = FlippedView()
+    private let columnTitle = PageTitleView("Passwords")
+    private let columnEdge = ColorView(color: Tokens.Color.separator)
+    private var items: [CategoryItem] = []
+    private let header = PageHeader()
+    private let paneTitle = PageTitleView("All Passwords")
+    private let search = FilledField.search("Search sites and usernames")
+    private let importButton = PillButton(title: "Import", symbol: "square.and.arrow.down", style: .plain)
+    private let exportButton = PillButton(title: "Export", symbol: "square.and.arrow.up", style: .plain)
     private let listScroll = NSScrollView()
     private let list = FlippedView()
+    private let listEdge = ColorView(color: Tokens.Color.separator)
     private let detail = DetailView()
-    private let empty = EmptyStateView()
+    private let empty = PageEmptyView()
+    private let locked = PageEmptyView()
 
     private var credentials: [Credential] = []
     private var neverSites: [Origin] = []
@@ -86,25 +105,28 @@ final class PasswordsView: NSView {
     private var category = Category.all
     private var selection: UUID?
     private var selectedNever: Origin?
-    private var rows: [ListRow] = []
+    private var rows: [SiteRow] = []
     private var changeObserver: Any?
     private var sleepObservers: [Any] = []
-
-    private let listWidth: CGFloat = 320
-    private let margin = Tokens.Space.x5
+    private var isLocked = true
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [filters, search, moreButton, listCard, detailCard, empty].forEach { addSubview($0) }
-        listCard.addSubview(listScroll)
-        detailCard.addSubview(detail)
-        addSubview(locked)
-        header.title = "Passwords"
-        header.subtitle = "In your Keychain, synced with iCloud Keychain"
-        header.contentInset = Tokens.Space.x5
-        addSubview(header, positioned: .below, relativeTo: nil)
-        filters.onChange = { [weak self] index in self?.choose(Category.allCases[index]) }
-        moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
+        wantsLayer = true
+        items = Category.allCases.map { category in
+            let item = CategoryItem(category)
+            item.onClick = { [weak self] _ in self?.choose(category) }
+            return item
+        }
+        ([columnTitle] + items as [NSView]).forEach { column.addSubview($0) }
+        [column, columnEdge, header, listScroll, listEdge, detail, empty, locked].forEach { addSubview($0) }
+        paneTitle.showsWordmark = false
+        header.leading = paneTitle
+        header.trailing = [search, importButton, exportButton]
+        importButton.toolTip = "Import passwords from another browser or a file"
+        exportButton.toolTip = "Export passwords to a file"
+        importButton.onClick = { _ in ImportWindowController.show() }
+        exportButton.onClick = { [weak self] _ in self?.export() }
         search.field.delegate = self
         listScroll.drawsBackground = false
         listScroll.hasVerticalScroller = true
@@ -112,7 +134,14 @@ final class PasswordsView: NSView {
         listScroll.automaticallyAdjustsContentInsets = false
         listScroll.documentView = list
         listScroll.useSlimScroller()
-        locked.onUnlock = { [weak self] in self?.unlock() }
+        listScroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: listScroll.contentView)
+        let unlockButton = PillButton(title: "Unlock", symbol: "lock.open", style: .prominent)
+        unlockButton.onClick = { [weak self] _ in self?.unlock() }
+        locked.action = unlockButton
+        let importPasswords = PillButton(title: "Import Passwords", style: .prominent)
+        importPasswords.onClick = { _ in ImportWindowController.show() }
+        empty.action = importPasswords
         detail.onDeleted = { [weak self] in self?.reload() }
         detail.onAllowSaving = { [weak self] origin in
             Task { @MainActor in
@@ -121,7 +150,6 @@ final class PasswordsView: NSView {
                 self?.reload()
             }
         }
-        empty.onImport = { ImportWindowController.show() }
         changeObserver = NotificationCenter.default.addObserver(forName: PasswordStore.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { if PasswordAuthentication.isUnlocked { self?.reload() } }
         }
@@ -133,29 +161,37 @@ final class PasswordsView: NSView {
         }
         // Still unlocked from a moment ago: straight to the passwords, no locked screen in between.
         setLocked(!PasswordAuthentication.isUnlocked)
+        refreshCounts()
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() { layer?.backgroundColor = cgColor(Tokens.Color.surface) }
 
     isolated deinit {
         if let changeObserver { NotificationCenter.default.removeObserver(changeObserver) }
         sleepObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        NotificationCenter.default.removeObserver(self)
     }
+
+    @objc private func listScrolled() { header.showsEdge = listScroll.contentView.bounds.minY > 0 }
 
     // MARK: Locking
 
     func unlock() {
         Task { @MainActor in
-            locked.isBusy = true
-            locked.clearFailure()
+            locked.action?.isEnabled = false
+            locked.text = Self.lockedPrompt
             let ok = await PasswordAuthentication.authenticate("see your saved passwords", keepUnlockedFor: PasswordAuthentication.unlockDuration)
-            locked.isBusy = false
-            guard ok else { locked.showFailure(); return }
+            locked.action?.isEnabled = true
+            guard ok else { locked.text = "Not unlocked. Try again when you’re ready."; return }
             setLocked(false)
             reload()
         }
     }
+
+    private static let lockedPrompt = "Your passwords are locked. Unlock with Touch ID or your Mac’s password."
 
     private func lock() {
         PasswordAuthentication.lock()
@@ -167,9 +203,18 @@ final class PasswordsView: NSView {
     private var isLoadingVault = false
 
     private func setLocked(_ isLocked: Bool) {
+        self.isLocked = isLocked
+        locked.text = Self.lockedPrompt
         locked.isHidden = !isLocked
-        [filters, search, moreButton, listCard, detailCard, empty].forEach { $0.isHidden = isLocked }
-        if !isLocked { isLoadingVault = true; updateEmpty() }
+        // Locked, the page is just its title and the way in: no kinds, no counts, no search.
+        ([columnEdge, header, listScroll, listEdge, detail, empty] + items as [NSView]).forEach { $0.isHidden = isLocked }
+        if isLocked {
+            locked.appear()
+        } else {
+            isLoadingVault = true
+            updateEmpty()
+        }
+        needsLayout = true
     }
 
     // MARK: Data
@@ -200,27 +245,30 @@ final class PasswordsView: NSView {
     }
 
     private func refreshCounts() {
-        filters.tint = Brand.Theme.brand.accent
-        for (index, category) in Category.allCases.enumerated() {
-            switch category {
-            case .all: filters.setCount(credentials.count, at: index)
-            case .weak: filters.setCount(weak.count, at: index)
-            case .reused: filters.setCount(reused.count, at: index)
-            case .never: filters.setCount(neverSites.count, at: index)
+        for item in items {
+            let n: Int
+            switch item.category {
+            case .all: n = credentials.count
+            case .weak: n = weak.count
+            case .reused: n = reused.count
+            case .never: n = neverSites.count
             }
+            item.detail = n == 0 ? "" : n.formatted()
+            item.isSelected = item.category == category
         }
-        filters.selectedIndex = Category.allCases.firstIndex(of: category) ?? 0
-        search.tint = Brand.Theme.brand.accent
-        let n = credentials.count
-        header.subtitle = n == 0 ? "In your Keychain, synced with iCloud Keychain" : "\(n.formatted()) saved in your Keychain, synced with iCloud Keychain"
+        paneTitle.title = category.title
+        exportButton.isEnabled = !credentials.isEmpty
+        header.needsLayout = true
     }
 
     private func choose(_ category: Category) {
+        guard category != self.category else { return }
         self.category = category
         selection = nil
         selectedNever = nil
         refreshCounts()
         rebuildList()
+        listScroll.contentView.scroll(to: .zero)
     }
 
     private var query: String { search.stringValue.trimmingCharacters(in: .whitespaces).lowercased() }
@@ -244,7 +292,7 @@ final class PasswordsView: NSView {
         rows.forEach { $0.removeFromSuperview() }
         if category == .never {
             rows = visibleNever.map { origin in
-                let row = ListRow(title: origin.displayName, subtitle: origin.scheme == "https" ? "Never offer to save" : origin.description, origin: origin)
+                let row = SiteRow(title: origin.displayName, subtitle: origin.scheme == "https" ? "Never offer to save" : origin.description, origin: origin)
                 row.onClick = { [weak self] _ in self?.selectNever(origin) }
                 return row
             }
@@ -252,7 +300,7 @@ final class PasswordsView: NSView {
         } else {
             let shown = visibleCredentials
             rows = shown.map { credential in
-                let row = ListRow(title: credential.title.isEmpty ? credential.origin.displayName : credential.title,
+                let row = SiteRow(title: credential.title.isEmpty ? credential.origin.displayName : credential.title,
                                   subtitle: credential.username.isEmpty ? "No username" : credential.username, origin: credential.origin)
                 row.credentialID = credential.id
                 row.onClick = { [weak self] _ in self?.select(credential.id) }
@@ -262,51 +310,58 @@ final class PasswordsView: NSView {
         }
         rows.forEach { list.addSubview($0) }
         needsLayout = true
-        updateSelection()
+        updateSelection(animated: false)
         updateEmpty()
     }
 
     private func select(_ id: UUID) {
+        guard id != selection else { return }
         selection = id
-        updateSelection()
+        updateSelection(animated: true)
     }
 
     private func selectNever(_ origin: Origin) {
+        guard origin != selectedNever else { return }
         selectedNever = origin
-        updateSelection()
+        updateSelection(animated: true)
     }
 
-    private func updateSelection() {
+    private func updateSelection(animated: Bool) {
         if category == .never {
-            rows.forEach { $0.isSelected = $0.origin == selectedNever }
+            rows.forEach { $0.setSelected($0.origin == selectedNever, animated: animated) }
             detail.showNever(selectedNever)
         } else {
-            rows.forEach { $0.isSelected = $0.credentialID == selection }
+            rows.forEach { $0.setSelected($0.credentialID == selection, animated: animated) }
             let credential = credentials.first { $0.id == selection }
             detail.show(credential, isWeak: credential.map { weak.contains($0.id) } ?? false, isReused: credential.map { reused.contains($0.id) } ?? false)
         }
+        if animated { detail.settle() }
     }
 
     private func updateEmpty() {
+        guard !isLocked else { return }
         let nothing = rows.isEmpty
-        empty.isHidden = !nothing || !locked.isHidden
-        listCard.isHidden = nothing || !locked.isHidden
-        detailCard.isHidden = nothing || !locked.isHidden
+        empty.isHidden = !nothing
+        listScroll.isHidden = nothing
+        listEdge.isHidden = nothing
+        detail.isHidden = nothing
         guard nothing else { return }
+        empty.showsAction = false
         if isLoadingVault {
-            empty.setLoading()
-            return
+            empty.text = "Opening your passwords…"
+        } else if !query.isEmpty {
+            empty.text = "No sites or usernames match “\(search.stringValue)”."
+        } else {
+            switch category {
+            case .all:
+                empty.text = "Passwords you save while signing in, or bring over from another browser, show up here."
+                empty.showsAction = true
+            case .weak: empty.text = "No weak passwords. Every one is long and varied enough to stand up to guessing."
+            case .reused: empty.text = "No reused passwords. Each site has a password of its own."
+            case .never: empty.text = "Sites where you choose Never when Zigzag offers to save show up here, so you can change your mind."
+            }
         }
-        if !query.isEmpty {
-            empty.set(symbol: "magnifyingglass", title: "No results for “\(search.stringValue)”", body: "Try a site or a username.", showsImport: false)
-            return
-        }
-        switch category {
-        case .all: empty.set(symbol: "key.fill", title: "No passwords yet", body: "Passwords you save while signing in, or bring over from another browser, appear here.", showsImport: true)
-        case .weak: empty.set(symbol: "checkmark.shield.fill", title: "No weak passwords", body: "Every saved password is long and varied enough to stand up to guessing.", showsImport: false)
-        case .reused: empty.set(symbol: "checkmark.shield.fill", title: "No reused passwords", body: "Each site has a password of its own.", showsImport: false)
-        case .never: empty.set(symbol: "nosign", title: "No sites here", body: "Sites where you choose Never when Zigzag offers to save appear here, so you can change your mind.", showsImport: false)
-        }
+        empty.appear()
     }
 
     // MARK: Export
@@ -340,77 +395,74 @@ final class PasswordsView: NSView {
     func debugShow(_ name: String) {
         switch name {
         case "lock": lock()
+        case "open": setLocked(false); reload()
         case "reveal", "delete", "edit": detail.debugAction(name)
-        default: if let category = Category.allCases.first(where: { "\($0)" == name }) { choose(category) }
+        default:
+            if name.hasPrefix("row ") , let n = Int(name.dropFirst(4)), rows.indices.contains(n) {
+                if let id = rows[n].credentialID { select(id) } else { selectNever(rows[n].origin) }
+            } else if name.hasPrefix("size ") {
+                let n = name.split(separator: " ").dropFirst().compactMap { Double($0) }
+                if n.count == 2 { window?.setContentSize(NSSize(width: n[0], height: n[1])) }
+            } else if name.hasPrefix("find ") {
+                search(for: String(name.dropFirst(5)))
+            } else if let category = Category.allCases.first(where: { "\($0)" == name }) {
+                choose(category)
+            }
         }
     }
     #endif
 
     // MARK: Layout
 
+    /// Wide enough, the kinds have their names; narrower, just their symbols.
+    private var isCompact: Bool { bounds.width < 900 }
+
     override func layout() {
         super.layout()
-        header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
-        header.contentInset = margin
-        let below = NSRect(x: 0, y: headerHeight, width: bounds.width, height: bounds.height - headerHeight)
-        locked.frame = below
-        // The toolbar: filters on the left, search and the menu on the right, all on one line.
-        let barY = headerHeight + Tokens.Space.x1
-        let barHeight = Tokens.Space.x8
-        filters.frame = NSRect(x: margin - Tokens.Space.x2, y: barY, width: filters.fittingWidth, height: barHeight)
-        moreButton.frame = NSRect(x: bounds.width - margin - barHeight, y: barY, width: barHeight, height: barHeight)
-        let searchWidth = min(260, max(160, moreButton.frame.minX - filters.frame.maxX - Tokens.Space.x6))
-        search.frame = NSRect(x: moreButton.frame.minX - Tokens.Space.x2 - searchWidth, y: barY, width: searchWidth, height: barHeight)
-        // Two cards on the window: the list, and the chosen login.
-        let cardsY = barY + barHeight + Tokens.Space.x4
-        let cardsHeight = bounds.height - cardsY - margin
-        listCard.frame = NSRect(x: margin, y: cardsY, width: listWidth, height: cardsHeight)
-        detailCard.frame = NSRect(x: listCard.frame.maxX + Tokens.Space.x4, y: cardsY, width: bounds.width - listCard.frame.maxX - Tokens.Space.x4 - margin, height: cardsHeight)
-        listScroll.frame = listCard.bounds
-        detail.frame = detailCard.bounds
-        let rowHeight = Tokens.Space.x12 + 2
-        let rowWidth = listWidth - Tokens.Space.x4
-        for (index, row) in rows.enumerated() {
-            row.frame = NSRect(x: Tokens.Space.x2, y: Tokens.Space.x2 + CGFloat(index) * (rowHeight + 2), width: rowWidth, height: rowHeight)
+        let top = Tokens.Page.windowTop
+        let line = Tokens.Metric.hairline
+        let gutter = Tokens.Page.gutter, inset = Tokens.Page.rowInset
+        let compact = isCompact
+        let columnWidth = compact ? Tokens.Space.x16 : Tokens.Page.columnWidth
+        column.frame = NSRect(x: 0, y: 0, width: columnWidth, height: bounds.height)
+        columnEdge.frame = NSRect(x: columnWidth, y: 0, width: line, height: bounds.height)
+        // The title where Settings has its own, under the traffic lights. Locked, it's all the page shows, with room.
+        columnTitle.frame = NSRect(x: gutter, y: top + Tokens.Page.headerTop, width: max(columnWidth - gutter * 2, columnTitle.fittingWidth + Tokens.Space.x2),
+                                   height: Tokens.Page.controlHeight)
+        columnTitle.isHidden = compact && !isLocked
+        var y = top + Tokens.Page.headerHeight + Tokens.Space.x1
+        for item in items {
+            item.isCompact = compact
+            if compact {
+                let side = Tokens.Space.x10
+                item.frame = NSRect(x: (columnWidth - side) / 2, y: y, width: side, height: side)
+                y += side + 2
+            } else {
+                item.frame = NSRect(x: gutter - inset, y: y, width: columnWidth - (gutter - inset) * 2, height: Tokens.Page.rowHeight)
+                y += Tokens.Page.rowHeight + 2
+            }
         }
-        list.frame = NSRect(x: 0, y: 0, width: listWidth, height: max(listScroll.contentSize.height, Tokens.Space.x4 + CGFloat(rows.count) * (rowHeight + 2)))
-        empty.frame = NSRect(x: 0, y: cardsY, width: bounds.width, height: cardsHeight)
-    }
 
-    private func showMoreMenu() {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item("Import Passwords…", symbol: "square.and.arrow.down") { ImportWindowController.show() })
-        let export = SidebarMenus.Item("Export Passwords…", symbol: "square.and.arrow.up") { [weak self] in self?.export() }
-        export.isEnabled = !credentials.isEmpty
-        menu.addItem(export)
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: moreButton.bounds.maxY + Tokens.Space.x1), in: moreButton)
-    }
-}
-
-/// A card on the Passwords window: the form's group surface, rounded, with a hairline edge.
-private final class PasswordsCard: NSView {
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.group
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-        layer?.borderWidth = Tokens.Metric.hairline
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        refresh()
-    }
-
-    private func refresh() {
-        layer?.backgroundColor = cgColor(Tokens.Color.formGroup)
-        layer?.borderColor = cgColor(Tokens.Color.formGroupEdge)
+        let area = NSRect(x: columnWidth + line, y: 0, width: max(0, bounds.width - columnWidth - line), height: bounds.height)
+        header.frame = NSRect(x: area.minX, y: top, width: area.width, height: Tokens.Page.headerHeight)
+        // The pane's title lines up with the sites' names under it.
+        let rowX = Tokens.Space.x3
+        header.contentFrame = (rowX + CardRow.inset, area.width - gutter)
+        // Under the header: the sites, a hairline, and the chosen one.
+        let bodyY = header.frame.maxY
+        let bodyHeight = max(0, bounds.height - bodyY)
+        let listWidth = Tokens.Page.listWidth
+        listScroll.frame = NSRect(x: area.minX, y: bodyY, width: listWidth, height: bodyHeight)
+        listEdge.frame = NSRect(x: listScroll.frame.maxX, y: bodyY, width: line, height: bodyHeight)
+        detail.frame = NSRect(x: listEdge.frame.maxX, y: bodyY, width: max(0, area.maxX - listEdge.frame.maxX), height: bodyHeight)
+        let rowHeight = Tokens.Page.tallRowHeight
+        for (index, row) in rows.enumerated() {
+            row.frame = NSRect(x: rowX, y: Tokens.Space.x2 + CGFloat(index) * (rowHeight + Tokens.Metric.rowGap), width: listWidth - rowX * 2, height: rowHeight)
+        }
+        let listHeight = Tokens.Space.x4 + CGFloat(rows.count) * (rowHeight + Tokens.Metric.rowGap)
+        list.frame = NSRect(x: 0, y: 0, width: listWidth, height: max(listScroll.contentSize.height, listHeight))
+        empty.frame = NSRect(x: area.minX, y: bodyY, width: area.width, height: bodyHeight)
+        locked.frame = bounds
     }
 }
 
@@ -431,6 +483,7 @@ extension PasswordsView: NSTextFieldDelegate {
             let index = ids.firstIndex { $0 == selection } ?? -1
             let next = selector == #selector(NSResponder.moveDown(_:)) ? min(index + 1, ids.count - 1) : max(index - 1, 0)
             select(ids[next])
+            if let row = rows.first(where: { $0.credentialID == ids[next] }) { list.scrollToVisible(row.frame.insetBy(dx: 0, dy: -Tokens.Space.x2)) }
             return true
         case #selector(NSResponder.cancelOperation(_:)):
             guard !search.stringValue.isEmpty else { return false }
@@ -443,120 +496,134 @@ extension PasswordsView: NSTextFieldDelegate {
     }
 }
 
-// MARK: - Locked
+// MARK: - Empty and locked
 
-private final class LockedView: NSView {
-    private let badge = RibbonView()
-    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-    private let body = Label(LockedView.prompt, font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
-    private let button = PillButton(title: "Unlock", style: .prominent)
-    var onUnlock: (() -> Void)?
-    var isBusy = false { didSet { button.isEnabled = !isBusy } }
+/// Nothing to show, the way History says it: the wordmark, faint and large, a quiet sentence under it, and at most
+/// one thing to do.
+private final class PageEmptyView: NSView {
+    private let mark = WordmarkView()
+    private let label = NSTextField(wrappingLabelWithString: "")
+    var action: PillButton? {
+        didSet { oldValue?.removeFromSuperview(); action.map { addSubview($0) }; needsLayout = true }
+    }
+    var showsAction = true { didSet { action?.isHidden = !showsAction; needsLayout = true } }
+    var text: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue; needsLayout = true }
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        badge.color = Brand.Theme.brand.accent
-        title.attributedStringValue = Brand.display("Your passwords are locked", size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
-        title.alignment = .center
-        body.alignment = .center
-        [badge, title, body, button].forEach { addSubview($0) }
-        button.onClick = { [weak self] _ in self?.onUnlock?() }
+        label.font = Tokens.Font.body()
+        label.textColor = Tokens.Color.textSecondary
+        label.alignment = .center
+        label.isSelectable = false
+        // Faded as one piece, as History's is, so its strokes don't darken where they cross.
+        markHolder.wantsLayer = true
+        markHolder.alphaValue = 0.08
+        markHolder.addSubview(mark)
+        [markHolder, label].forEach { addSubview($0) }
+        refreshColors()
     }
+
+    private let markHolder = NSView()
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private static let prompt = "Unlock with Touch ID or your Mac’s password."
-
-    func showFailure() {
-        body.stringValue = "Not unlocked. Try again when you’re ready."
-        needsLayout = true
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColors()
     }
 
-    /// Back to the plain prompt as soon as unlocking is tried again.
-    func clearFailure() {
-        body.stringValue = Self.prompt
-        needsLayout = true
+    private func refreshColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance { mark.color = Tokens.Color.textPrimary }
     }
 
-    override var isHidden: Bool {
-        didSet {
-            guard oldValue, !isHidden, window != nil else { return }
-            badge.color = Brand.Theme.brand.accent
-            Brand.enter([title, body, button], delay: 0.05)
-            badge.drawIn()
-        }
+    /// Eases in, rather than snapping, when it takes the page's place.
+    func appear() {
+        guard window != nil, !isHidden else { return }
+        layoutSubtreeIfNeeded()
+        Brand.enter([mark, label, action].compactMap { $0 }.filter { !$0.isHidden })
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard window != nil, !isHidden else { return }
-        badge.color = Brand.Theme.brand.accent
-        Brand.enter([title, body, button], delay: 0.05)
-        badge.drawIn()
+        appear()
     }
+
+    static let markWidth: CGFloat = 120
 
     override func layout() {
         super.layout()
-        let side: CGFloat = 52
-        let total = side + Tokens.Space.x4 + title.lineHeight + Tokens.Space.x2 + body.lineHeight + Tokens.Space.x6 + Tokens.Page.controlHeight
-        var y = round((bounds.height - total) / 2)
-        badge.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
-        y = badge.frame.maxY + Tokens.Space.x4
-        let titleHeight = ceil(title.intrinsicContentSize.height)
-        title.frame = NSRect(x: 0, y: y, width: bounds.width, height: titleHeight)
-        y = title.frame.maxY + Tokens.Space.x2
-        body.frame = NSRect(x: 0, y: y, width: bounds.width, height: body.lineHeight)
-        y = body.frame.maxY + Tokens.Space.x6
-        let w = max(button.fittingWidth, 120)
-        button.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Page.controlHeight)
+        let width = min(bounds.width - Tokens.Space.x8 * 2, 360)
+        let markHeight = ceil(Self.markWidth / WordmarkView.aspect)
+        let textHeight = ceil(label.sizeThatFits(NSSize(width: width, height: 400)).height)
+        let showsButton = action != nil && showsAction
+        let total = markHeight + Tokens.Space.x4 + textHeight + (showsButton ? Tokens.Space.x6 + Tokens.Page.controlHeight : 0)
+        // A little above the middle, where the eye rests.
+        var y = round((bounds.height - total) / 2.3)
+        markHolder.frame = NSRect(x: round((bounds.width - Self.markWidth) / 2), y: y, width: Self.markWidth, height: markHeight)
+        mark.frame = markHolder.bounds
+        y = markHolder.frame.maxY + Tokens.Space.x4
+        label.frame = NSRect(x: round((bounds.width - width) / 2), y: y, width: width, height: textHeight)
+        y = label.frame.maxY + Tokens.Space.x6
+        if let action {
+            let w = max(action.fittingWidth, Tokens.Dialog.minButtonWidth)
+            action.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Page.controlHeight)
+        }
     }
 }
 
-// MARK: - Sidebar and list rows
+// MARK: - Site rows
 
-private final class ListRow: InteractiveView {
+/// A site in the list: its icon, its name over the username, the soft card when chosen.
+private final class SiteRow: InteractiveView {
     let origin: Origin
     var credentialID: UUID?
     private let icon = FaviconView()
     private let title: Label
     private let subtitle: Label
+    private var animatesNext = false
 
     init(title: String, subtitle: String, origin: Origin) {
         self.origin = origin
-        self.title = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+        self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         self.subtitle = Label(subtitle, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.field
+        layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         icon.image = SiteIcon.image(for: origin)
+        self.title.lineBreakMode = .byTruncatingTail
+        self.subtitle.lineBreakMode = .byTruncatingMiddle
         [icon, self.title, self.subtitle].forEach { addSubview($0) }
         if let url = origin.url, FaviconStore.shared.cachedIcon(for: url) == nil { FaviconStore.shared.prefetch(for: url) }
         setAccessibilityRole(.row)
         setAccessibilityLabel("\(title), \(subtitle)")
+        stateDidChange(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    /// Chosen by a click, the card moves to it; on a rebuilt list it's simply there.
+    func setSelected(_ selected: Bool, animated: Bool) {
+        animatesNext = animated
+        isSelected = selected
+        animatesNext = false
+    }
+
     override func layout() {
         super.layout()
-        let side = Tokens.Space.x6
-        icon.frame = NSRect(x: Tokens.Space.x2, y: (bounds.height - side) / 2, width: side, height: side)
-        let x = icon.frame.maxX + Tokens.Space.x3
-        let top = (bounds.height - title.lineHeight - subtitle.lineHeight) / 2
-        title.frame = NSRect(x: x, y: top, width: bounds.width - x - Tokens.Space.x2, height: title.lineHeight)
-        subtitle.frame = NSRect(x: x, y: title.frame.maxY, width: bounds.width - x - Tokens.Space.x2, height: subtitle.lineHeight)
+        let side = Tokens.Space.x5
+        icon.frame = NSRect(x: CardRow.inset, y: round((bounds.height - side) / 2), width: side, height: side)
+        let x = icon.frame.maxX + CardRow.inset - Label.inset
+        let top = round((bounds.height - title.lineHeight - subtitle.lineHeight) / 2)
+        title.frame = NSRect(x: x, y: top, width: bounds.width - x - CardRow.inset, height: title.lineHeight)
+        subtitle.frame = NSRect(x: x, y: title.frame.maxY, width: bounds.width - x - CardRow.inset, height: subtitle.lineHeight)
     }
 
-    /// Selected with a soft fill of the space's accent.
-
-    override func stateDidChange(animated: Bool) {
-        let accent = Brand.Theme.brand.accent
-        let fill: NSColor? = isSelected ? accent.withAlphaComponent(isPressed ? 0.2 : 0.13) : isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-    }
-
+    override func stateDidChange(animated: Bool) { applyRowStyle(animated: animated || animatesNext) }
 }
 
 /// A site's favicon, or its first letter on a soft tile when there's none yet.
@@ -575,87 +642,6 @@ private enum SiteIcon {
     }
 }
 
-// MARK: - Empty
-
-private final class EmptyStateView: NSView {
-    private let icon = NSImageView()
-    /// Nothing saved yet gets the ribbon, written in; the calmer states keep a plain symbol.
-    private let ribbon = RibbonView()
-    private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
-    private let body = NSTextField(wrappingLabelWithString: "")
-    private let importButton = PillButton(title: "Import Passwords", style: .prominent)
-    var onImport: (() -> Void)?
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        icon.contentTintColor = Tokens.Color.textTertiary
-        title.usesSingleLineMode = false
-        title.maximumNumberOfLines = 2
-        title.cell?.wraps = true
-        title.alignment = .center
-        body.font = Tokens.Font.body()
-        body.textColor = Tokens.Color.textSecondary
-        body.alignment = .center
-        body.isSelectable = false
-        [icon, ribbon, title, body, importButton].forEach { addSubview($0) }
-        importButton.onClick = { [weak self] _ in self?.onImport?() }
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    /// While the vault is read: the ribbon writes, over and over, and nothing else asks for anything.
-    func setLoading() {
-        icon.isHidden = true
-        ribbon.isHidden = false
-        ribbon.color = Brand.Theme.brand.accent
-        ribbon.startLooping()
-        title.attributedStringValue = Brand.display("Opening your passwords…", size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, alignment: .center)
-        body.stringValue = ""
-        importButton.isHidden = true
-        needsLayout = true
-    }
-
-    func set(symbol: String, title: String, body: String, showsImport: Bool) {
-        ribbon.stopLooping()
-        let changed = self.title.stringValue != title
-        let usesRibbon = symbol == "key.fill"
-        icon.image = Tokens.Symbol.image(symbol, size: 28)
-        icon.isHidden = usesRibbon
-        ribbon.isHidden = !usesRibbon
-        ribbon.color = Brand.Theme.brand.accent.withAlphaComponent(0.85)
-        self.title.attributedStringValue = Brand.display(title, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary, alignment: .center, wraps: true)
-        self.title.alignment = .center
-        self.body.stringValue = body
-        importButton.isHidden = !showsImport
-        needsLayout = true
-        guard changed, window != nil, !isHidden else { return }
-        layoutSubtreeIfNeeded()
-        Brand.enter([icon, self.title, self.body, importButton].filter { !$0.isHidden })
-        if usesRibbon { ribbon.drawIn(delay: 0.05) }
-    }
-
-    override func layout() {
-        super.layout()
-        let width = min(bounds.width - Tokens.Space.x8 * 2, 340)
-        let bodyHeight = ceil(body.sizeThatFits(NSSize(width: width, height: 200)).height)
-        let side: CGFloat = 36
-        let titleHeight = ceil(title.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 200)).height ?? title.lineHeight)
-        let total = side + Tokens.Space.x4 + titleHeight + Tokens.Space.x2 + bodyHeight + (importButton.isHidden ? 0 : Tokens.Space.x6 + Tokens.Page.controlHeight)
-        var y = round((bounds.height - total) / 2)
-        let x = round((bounds.width - width) / 2)
-        icon.frame = NSRect(x: round((bounds.width - side) / 2), y: y, width: side, height: side)
-        ribbon.frame = icon.frame.insetBy(dx: -4, dy: -4)
-        y = icon.frame.maxY + Tokens.Space.x4
-        title.frame = NSRect(x: x, y: y, width: width, height: titleHeight)
-        y = title.frame.maxY + Tokens.Space.x2
-        body.frame = NSRect(x: x, y: y, width: width, height: bodyHeight)
-        y = body.frame.maxY + Tokens.Space.x6
-        let w = importButton.fittingWidth
-        importButton.frame = NSRect(x: round((bounds.width - w) / 2), y: y, width: w, height: Tokens.Page.controlHeight)
-    }
-}
-
 // MARK: - Detail
 
 private final class DetailView: NSView, NSTextFieldDelegate {
@@ -663,7 +649,8 @@ private final class DetailView: NSView, NSTextFieldDelegate {
     private let title = Label("", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let subtitle = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let warning = WarningBanner()
-    private let card = ColorView(color: Tokens.Color.fieldFill)
+    /// The login's details as quiet grouped rows, as Settings groups its own.
+    private let card = FormGroup()
     private let usernameRow = FieldRow(name: "Username")
     private let passwordRow = FieldRow(name: "Password")
     private let websiteRow = FieldRow(name: "Website")
@@ -687,14 +674,12 @@ private final class DetailView: NSView, NSTextFieldDelegate {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        card.wantsLayer = true
-        card.layer?.cornerRadius = Tokens.Radius.group
-        card.layer?.cornerCurve = .continuous
+        title.lineBreakMode = .byTruncatingTail
         neverBody.font = Tokens.Font.body()
         neverBody.textColor = Tokens.Color.textSecondary
         neverBody.isSelectable = false
         [icon, title, subtitle, warning, card, editButton, deleteButton, saveButton, cancelButton, neverBody, allowButton].forEach { addSubview($0) }
-        [usernameRow, passwordRow, websiteRow, notesRow].forEach { card.addSubview($0) }
+        [websiteRow, usernameRow, passwordRow, notesRow].forEach { card.add($0) }
         deleteButton.isDestructive = true
         passwordField.field.font = .monospacedSystemFont(ofSize: Tokens.TypeSize.body, weight: .regular)
 
@@ -721,13 +706,13 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         subviews.forEach { $0.isHidden = false }
         [neverBody, allowButton].forEach { $0.isHidden = true }
         icon.image = SiteIcon.image(for: credential.origin)
-        title.attributedStringValue = Brand.display(credential.title.isEmpty ? credential.origin.displayName : credential.title, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary)
+        title.stringValue = credential.title.isEmpty ? credential.origin.displayName : credential.title
         subtitle.stringValue = "Last changed " + credential.modified.formatted(date: .abbreviated, time: .omitted)
         usernameRow.value = credential.username.isEmpty ? "No username" : credential.username
         usernameRow.isPlaceholder = credential.username.isEmpty
         usernameRow.showsActions = !credential.username.isEmpty
         updatePasswordRow()
-        websiteRow.value = credential.origin.description
+        websiteRow.value = credential.origin.displayName + (credential.origin.port.map { ":\($0)" } ?? "")
         notesRow.value = credential.notes
         notesRow.isHidden = credential.notes.isEmpty
         if isReused {
@@ -748,7 +733,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         guard let origin else { return }
         [icon, title, subtitle, neverBody, allowButton].forEach { $0.isHidden = false }
         icon.image = SiteIcon.image(for: origin)
-        title.attributedStringValue = Brand.display(origin.displayName, size: Tokens.TypeSize.title, color: Tokens.Color.textPrimary)
+        title.stringValue = origin.displayName
         subtitle.stringValue = origin.description
         neverBody.stringValue = "Zigzag won’t offer to save passwords on this site. Allow it, and the next time you sign in there you’ll be asked again."
         needsLayout = true
@@ -918,19 +903,34 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         Toast.show(text, duration: 2, over: host, area: frame)
     }
 
+    /// A new login chosen: what's shown eases in, so the change reads as a change rather than a flicker.
+    func settle() {
+        guard window != nil else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.35
+        fade.toValue = 1
+        fade.duration = Tokens.Motion.standard
+        fade.timingFunction = Tokens.Motion.easeOut
+        wantsLayer = true
+        layer?.add(fade, forKey: "settle")
+    }
+
     // MARK: Layout
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x6
-        let width = min(bounds.width - pad * 2, 520)
+        // The page's gutter around a column no wider than reading wants.
+        let pad = Tokens.Page.gutter
+        let width = max(0, min(bounds.width - pad * 2, Tokens.Page.detailWidth))
         let x = pad
-        var y: CGFloat = Tokens.Space.x6
-        let side: CGFloat = 44
+        var y: CGFloat = Tokens.Space.x5
+        let side = Tokens.Space.x10
         icon.frame = NSRect(x: x, y: y, width: side, height: side)
-        let textX = icon.frame.maxX + Tokens.Space.x4
-        title.frame = NSRect(x: textX, y: y + (side - title.lineHeight - subtitle.lineHeight) / 2, width: width - (textX - x), height: title.lineHeight)
-        subtitle.frame = NSRect(x: textX, y: title.frame.maxY, width: width - (textX - x), height: subtitle.lineHeight)
+        let textX = icon.frame.maxX + Tokens.Space.x3
+        let textWidth = max(0, width - (textX - x))
+        let block = title.lineHeight + 2 + subtitle.lineHeight
+        title.frame = NSRect(x: textX - Label.inset, y: y + round((side - block) / 2), width: textWidth, height: title.lineHeight)
+        subtitle.frame = NSRect(x: textX - Label.inset, y: title.frame.maxY + 2, width: textWidth, height: subtitle.lineHeight)
         y = icon.frame.maxY + Tokens.Space.x6
 
         if neverOrigin != nil {
@@ -945,22 +945,20 @@ private final class DetailView: NSView, NSTextFieldDelegate {
             warning.frame = NSRect(x: x, y: y, width: width, height: h)
             y = warning.frame.maxY + Tokens.Space.x4
         }
-        let rowHeight = Tokens.Space.x12
-        var cy: CGFloat = 0
-        for view in [usernameRow, passwordRow, websiteRow, notesRow] where !view.isHidden {
-            view.frame = NSRect(x: 0, y: cy, width: width, height: rowHeight)
-            cy += rowHeight
-        }
-        card.frame = NSRect(x: x, y: y, width: width, height: cy)
-        y = card.frame.maxY + Tokens.Space.x5
+        for row in [websiteRow, usernameRow, passwordRow, notesRow] { row.frame.size = NSSize(width: width, height: FieldRow.height) }
+        card.frame = NSRect(x: x, y: y, width: width, height: card.fittingHeight(for: width))
+        y = card.frame.maxY + Tokens.Space.x4
         let h = Tokens.Page.controlHeight
         if isEditing {
-            let sw = max(saveButton.fittingWidth, 80)
+            let sw = max(saveButton.fittingWidth, Tokens.Dialog.minButtonWidth)
             saveButton.frame = NSRect(x: x + width - sw, y: y, width: sw, height: h)
-            cancelButton.frame = NSRect(x: saveButton.frame.minX - Tokens.Space.x2 - cancelButton.fittingWidth, y: y, width: cancelButton.fittingWidth, height: h)
+            let cw = max(cancelButton.fittingWidth, Tokens.Dialog.minButtonWidth)
+            cancelButton.frame = NSRect(x: saveButton.frame.minX - Tokens.Dialog.buttonGap - cw, y: y, width: cw, height: h)
         } else {
-            editButton.frame = NSRect(x: x, y: y, width: max(editButton.fittingWidth, 64), height: h)
-            deleteButton.frame = NSRect(x: editButton.frame.maxX + Tokens.Space.x2, y: y, width: max(deleteButton.fittingWidth, 64), height: h)
+            let ew = max(editButton.fittingWidth, Tokens.Dialog.minButtonWidth)
+            editButton.frame = NSRect(x: x, y: y, width: ew, height: h)
+            let dw = max(deleteButton.fittingWidth, Tokens.Dialog.minButtonWidth)
+            deleteButton.frame = NSRect(x: editButton.frame.maxX + Tokens.Dialog.buttonGap, y: y, width: dw, height: h)
         }
     }
 }
@@ -970,7 +968,8 @@ private final class FieldRow: NSView {
     private let nameLabel: Label
     private let valueLabel = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private var buttons: [IconButton] = []
-    private let line = ColorView(color: Tokens.Color.separator)
+    /// As tall as a row in Settings' groups.
+    static let height: CGFloat = 44
 
     var value: String {
         get { valueLabel.stringValue }
@@ -1008,7 +1007,7 @@ private final class FieldRow: NSView {
         nameLabel = Label(name, font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         valueLabel.isSelectable = false
-        [nameLabel, valueLabel, line].forEach { addSubview($0) }
+        [nameLabel, valueLabel].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1016,8 +1015,8 @@ private final class FieldRow: NSView {
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x4
-        let nameWidth: CGFloat = 80
+        let pad = Tokens.Space.x3
+        let nameWidth: CGFloat = 88
         nameLabel.frame = NSRect(x: pad, y: (bounds.height - nameLabel.lineHeight) / 2, width: nameWidth, height: nameLabel.lineHeight)
         var right = bounds.width - Tokens.Space.x2
         for button in buttons.reversed() where !button.isHidden {
@@ -1027,11 +1026,10 @@ private final class FieldRow: NSView {
         }
         let x = nameLabel.frame.maxX + Tokens.Space.x2
         if let editor {
-            editor.frame = NSRect(x: x - Tokens.Space.x2, y: (bounds.height - Tokens.Space.x8) / 2, width: bounds.width - x - Tokens.Space.x2, height: Tokens.Space.x8)
+            let h = Tokens.Page.controlHeight
+            editor.frame = NSRect(x: x - Tokens.Space.x2, y: (bounds.height - h) / 2, width: bounds.width - x - Tokens.Space.x1, height: h)
         }
         valueLabel.frame = NSRect(x: x, y: (bounds.height - valueLabel.lineHeight) / 2, width: right - x - Tokens.Space.x2, height: valueLabel.lineHeight)
-        line.frame = NSRect(x: pad, y: bounds.height - Tokens.Metric.hairline, width: bounds.width - pad, height: Tokens.Metric.hairline)
-        line.isHidden = superview?.subviews.last(where: { !$0.isHidden && $0.frame.maxY > frame.maxY }) == nil
     }
 }
 
@@ -1068,7 +1066,8 @@ private final class WarningBanner: NSView {
     }
 
     private func updateColors() {
-        effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.withAlphaComponent(0.14).cgColor }
+        // A soft wash of the warning's color: noticed, never loud.
+        effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.withAlphaComponent(0.09).cgColor }
     }
 
     override func viewDidChangeEffectiveAppearance() {
