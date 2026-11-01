@@ -66,6 +66,9 @@ final class DownloadManager: NSObject {
         var completedBytes: Int64?
         var paused: Bool?
         var resumeData: Data?
+        /// A paused download that replaces a file goes on into a hidden one beside it; this is the file it takes the
+        /// place of once done. Missing in lists saved before it was kept.
+        var replaces: URL?
     }
 
     override init() {
@@ -79,6 +82,7 @@ final class DownloadManager: NSObject {
             if entry.paused == true {
                 item.state = .paused
                 item.resumeData = entry.resumeData
+                item.replaces = entry.replaces
                 item.completedBytes = entry.completedBytes ?? 0
                 item.fractionCompleted = entry.totalBytes > 0 ? Double(item.completedBytes) / Double(entry.totalBytes) : 0
             } else {
@@ -100,7 +104,8 @@ final class DownloadManager: NSObject {
         let kept = items.filter { !$0.isPrivate && [.finished, .paused].contains($0.state) }.prefix(50).compactMap { item in
             item.destination.map {
                 Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes,
-                      completedBytes: item.completedBytes, paused: item.state == .paused ? true : nil, resumeData: item.state == .paused ? item.resumeData : nil)
+                      completedBytes: item.completedBytes, paused: item.state == .paused ? true : nil, resumeData: item.state == .paused ? item.resumeData : nil,
+                      replaces: item.state == .paused ? item.replaces : nil)
             }
         }
         JSONStore.save(Array(kept), to: Paths.downloads)
