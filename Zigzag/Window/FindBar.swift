@@ -665,9 +665,10 @@ final class ToastView: FloatingPanelView {
         }
         let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
         if !actionButton.isHidden {
-            // Inset evenly from the toast's edge, top, bottom and right alike, so the pill runs with the capsule.
+            // Inset evenly from the toast's edge, top, bottom and right alike, so the pill runs with the capsule. The
+            // right inset is a one-line toast's, the room `fittingWidth` keeps, so wrapped text never runs under it.
             let h = Tokens.Metric.toastButtonHeight
-            actionButton.frame = NSRect(x: bounds.width - (bounds.height - h) / 2 - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
+            actionButton.frame = NSRect(x: bounds.width - (Self.height - h) / 2 - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
         }
         let textWidth = bounds.width - chromeWidth
         let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
