@@ -42,27 +42,39 @@ class SidebarRowView: InteractiveView {
         title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
     }
 
+    /// The tab you're on is a clear glass card; a row under the pointer, a faint well. Made when first needed, so
+    /// a long list of quiet rows carries no layers of its own.
+    private var card: GlassPlate?
+    private var well: GlassWell?
+
     override func stateDidChange(animated: Bool) {
-        let base: NSColor?
-        if isSelected || isLifted {
-            base = isHovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill
-        } else if isMarked {
-            base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
-        } else if isPressed {
-            base = Tokens.Color.pressedFill
-        } else if isHovered {
-            base = Tokens.Color.hoverFill
-        } else {
-            base = nil
+        let chosen = isSelected || isLifted
+        let fill: NSColor? = chosen ? nil : isMarked ? Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
+            : isPressed ? Tokens.Color.pressedFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
+        if chosen || card != nil {
+            let card = self.card ?? {
+                let plate = GlassPlate()
+                plate.radius = Tokens.Radius.row
+                plate.install(in: self)
+                self.card = plate
+                return plate
+            }()
+            card.tint = siteTint
+            // Carried, it stands up off the list; chosen, it rests on it.
+            card.set(chosen ? (isLifted ? .lifted : isPressed ? .pressed : .rest) : .hidden, finish: .chosen, animated: animated)
         }
-        var fill = base.map { cgColor($0) }
-        // The site's color shows only on the tab you're on.
-        if let siteTint, isSelected || isLifted {
-            fill = cgColor(SidebarRowView.tinted(selectedFill: base ?? Tokens.Color.selectedFill, with: siteTint, appearance: effectiveAppearance))
+        let showsWell = isHovered && !chosen && !isMarked && !isPressed
+        if showsWell || well != nil {
+            let well = self.well ?? {
+                let well = GlassWell(depth: Tokens.Material.rowWellShade, lip: false, opacity: 0.55)
+                well.radius = Tokens.Radius.row
+                well.install(in: self)
+                self.well = well
+                return well
+            }()
+            well.isHidden = !showsWell
         }
-        layer?.set(backgroundColor: fill, animated: animated && !isHovered)
-        // The tab you're on is a soft card: a hairline edge and a faint shadow under it.
-        setLifted(isSelected || isLifted)
         applyFreshness()
     }
 
@@ -478,6 +490,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
             layer?.set(backgroundColor: cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)), animated: animated)
             layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
             layer?.borderWidth = Tokens.Metric.dropEdge
+        } else {
+            layer?.borderWidth = 0
         }
         chevron.alphaValue = isHovered || !isOpen || isDropTarget ? 1 : 0.6
     }
