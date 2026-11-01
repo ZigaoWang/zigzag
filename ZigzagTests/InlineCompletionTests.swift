@@ -184,6 +184,16 @@ struct InlineCompletionTests {
         #expect(InlineCompletion.best(for: "gi", among: sites)?.text == "github.com/zigzag/app")
     }
 
+    @Test func historyKeepsPortsApart() {
+        let store = HistoryStore(path: ":memory:")
+        store.recordVisit(url: URL(string: "http://localhost:3000/app")!, title: "App", at: Date(), count: 5)
+        store.recordVisit(url: URL(string: "http://localhost:8080/")!, title: "Server", at: Date(), count: 2)
+        store.recordVisit(url: URL(string: "http://localhost:8080/admin")!, title: "Admin", at: Date(), count: 1)
+        let found = store.completionSites(for: "local")
+        #expect(found.map(\.entry.url.absoluteString) == ["http://localhost:3000/app", "http://localhost:8080/"])
+        #expect(found.last?.score ?? 0 > 2.9)
+    }
+
     @Test func historyFindsASiteBehindItsSubdomain() {
         let store = HistoryStore(path: ":memory:")
         store.recordVisit(url: URL(string: "https://en.wikipedia.org/wiki/Swift")!, title: "Swift", at: Date(), count: 3)

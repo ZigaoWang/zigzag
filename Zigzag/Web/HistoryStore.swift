@@ -162,9 +162,17 @@ final class HistoryStore {
         SELECT url, title, visit_count, last_visit, score FROM (
             SELECT url, title, visit_count, last_visit,
                 SUM(visit_count) OVER site * 1.0 / (1 + (strftime('%s','now') - MAX(last_visit) OVER site) / 604800.0) AS score,
-                ROW_NUMBER() OVER (PARTITION BY host ORDER BY visit_count DESC, last_visit DESC) AS rank
-            FROM visits WHERE \(match)
-            WINDOW site AS (PARTITION BY host)
+                ROW_NUMBER() OVER (PARTITION BY origin ORDER BY visit_count DESC, last_visit DESC) AS rank
+            FROM (
+                -- One site per host and port, with or without "www.": localhost:3000 and localhost:8080 are two.
+                SELECT url, title, visit_count, last_visit,
+                    CASE WHEN authority LIKE 'www.%' THEN substr(authority, 5) ELSE authority END AS origin
+                FROM (
+                    SELECT url, title, visit_count, last_visit, lower(substr(rest, 1, instr(rest || '/', '/') - 1)) AS authority
+                    FROM (SELECT *, substr(url, instr(url, '://') + 3) AS rest FROM visits WHERE \(match))
+                )
+            )
+            WINDOW site AS (PARTITION BY origin)
         ) WHERE rank = 1 ORDER BY score DESC LIMIT \(limit)
         """) else { return [] }
         defer { sqlite3_finalize(statement) }
