@@ -306,16 +306,18 @@ final class PermissionPrompt: FloatingPanelView {
             // A click anywhere else, outside it and the address it hangs from, puts it off too.
             prompt.clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak prompt, weak controller] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
+                // The command bar over it has its own clicks.
+                if controller?.commandBar.isVisible == true { return event }
                 let inside = prompt.bounds.contains(prompt.convert(event.locationInWindow, from: nil))
                 let address = controller?.sidebar.address
                 let onAddress = address.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
                 if !inside && !onAddress { prompt.finish(.notNow) }
                 return event
             }
-            prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt] event in
+            prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt, weak controller] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
-                // Under notes opened after it, Esc is theirs.
-                if WhatsNewSheet.isShowing(in: prompt.window) { return event }
+                // Under notes or the command bar opened after it, Esc is theirs.
+                if WhatsNewSheet.isShowing(in: prompt.window) || controller?.commandBar.isVisible == true { return event }
                 // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.
                 if event.keyCode == 53 { prompt.finish(.notNow); return nil }
                 return event
