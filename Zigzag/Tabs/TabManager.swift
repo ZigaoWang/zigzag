@@ -639,6 +639,8 @@ final class TabManager {
             return
         }
         let wasSelected = selectedTab === tab
+        // The half of a split that wasn't focused: the pane it was in goes too, though the selection stays.
+        defer { if pair != nil, !wasSelected { changed.send(.selection) } }
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
             // Closing a pinned page closes it, wherever it had got to: one ⌘W, never two. The pin stays, and
