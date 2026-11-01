@@ -96,7 +96,6 @@ final class TabThumbnailView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        layer?.cornerRadius = Tokens.Radius.panel
         layer?.cornerCurve = .continuous
         imageClip.wantsLayer = true
         imageClip.layer?.cornerRadius = Tokens.Radius.thumbnail
@@ -106,7 +105,6 @@ final class TabThumbnailView: InteractiveView {
         imageClip.layer?.addSublayer(picture.layer)
         imageClip.addSubview(placeholder)
         ring.borderWidth = 2.5
-        ring.cornerRadius = Tokens.Radius.thumbnail + 3
         ring.cornerCurve = .continuous
         ring.isHidden = true
         ring.zPosition = 10
@@ -206,11 +204,13 @@ final class TabThumbnailView: InteractiveView {
         return second ? partner : tab
     }
 
-    /// Space around the image so the selection highlight can surround it, like Command+Tab.
-    var inset: CGFloat = Tokens.Space.x2 { didSet { needsLayout = true } }
+    /// Space around the picture, so the card can surround it like Command+Tab. The card's corners are the
+    /// picture's plus this, so the two curves run together.
+    var inset: CGFloat = Tokens.Space.x1 { didSet { needsLayout = true } }
 
     override func layout() {
         super.layout()
+        layer?.cornerRadius = Tokens.Radius.thumbnail + inset
         let titleArea = showsTitle ? Self.titleHeight : 0
         imageClip.frame = NSRect(x: inset, y: inset, width: bounds.width - inset * 2, height: bounds.height - titleArea - inset * (showsTitle ? 1 : 2))
         picture.layout(size: imageClip.bounds.size)
@@ -224,6 +224,7 @@ final class TabThumbnailView: InteractiveView {
         siteName.frame = NSRect(x: Tokens.Space.x2, y: bottom, width: imageClip.bounds.width - Tokens.Space.x4, height: nameHeight)
         let cs = Tokens.Space.x6
         closeButton.frame = NSRect(x: imageClip.frame.maxX - cs - Tokens.Space.x1, y: imageClip.frame.minY + Tokens.Space.x1, width: cs, height: cs)
+        closeButton.radius = cs / 2
         icon.isHidden = !showsTitle
         title.isHidden = !showsTitle
         icon2.isHidden = !showsTitle || partner == nil
@@ -241,7 +242,9 @@ final class TabThumbnailView: InteractiveView {
             place(icon, title, in: NSRect(x: inset, y: imageClip.frame.maxY, width: bounds.width - inset * 2, height: titleArea), audio: audio != nil)
         }
         Tokens.Motion.withoutAnimation {
-            ring.frame = imageClip.frame.insetBy(dx: -4, dy: -4)
+            let around = Tokens.Space.x1
+            ring.frame = imageClip.frame.insetBy(dx: -around, dy: -around)
+            ring.cornerRadius = Tokens.Radius.thumbnail + around
         }
         refreshColors()
     }
@@ -276,14 +279,14 @@ final class TabThumbnailView: InteractiveView {
             ring.borderColor = cgColor(selected ? Tokens.Color.accent : Tokens.Color.accent.withAlphaComponent(0.6))
             ring.borderWidth = selected ? 2.5 : 2
             ring.isHidden = !(selected || isFocused)
-            layer?.borderWidth = isCurrent ? Tokens.Metric.hairline : 0
-            layer?.borderColor = cgColor(Tokens.Color.selectedEdge)
         }
+        // The chosen card (Control+Tab's, or the desk's current tab) is the soft card; hover is the row hover.
         let hovered = isHovered && showsHover
-        let fill: NSColor? = isSelected && !showsRing ? Tokens.Color.pressedFill
-            : isCurrent ? (hovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
+        let card = (isSelected && !showsRing) || isCurrent
+        let fill: NSColor? = card ? (hovered ? Tokens.Color.selectedHoverFill : Tokens.Color.selectedFill)
             : hovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
+        setLifted(card)
     }
 }
 
@@ -301,7 +304,8 @@ final class TabSwitcher {
 
     init(controller: BrowserWindowController) {
         self.controller = controller
-        panel.radius = Tokens.Radius.large
+        // The cards' corners plus the step between them and the panel's edge.
+        panel.radius = Tokens.Radius.thumbnail + Tokens.Space.x1 * 2
     }
 
     /// Returns true if the event was handled.
@@ -358,8 +362,9 @@ final class TabSwitcher {
         thumbs.forEach { $0.removeFromSuperview() }
         let card = controller.root.cardFrame
         let aspect = min(max(card.height / max(card.width, 1), 0.5), 0.8)
+        // Cards side by side, the panel a step in from them: panel, card and picture corners run together.
         let gap = 0 as CGFloat
-        let pad = Tokens.Space.x2
+        let pad = Tokens.Space.x1
         let bounds = controller.root.bounds
         let maxWidth = bounds.width - Tokens.Space.x16
         var thumbWidth = Tokens.Metric.switcherThumbWidth
@@ -367,7 +372,8 @@ final class TabSwitcher {
         if count * thumbWidth + (count - 1) * gap + pad * 2 > maxWidth {
             thumbWidth = floor((maxWidth - pad * 2 - (count - 1) * gap) / count)
         }
-        let thumbHeight = round((thumbWidth - Tokens.Space.x4) * aspect) + TabThumbnailView.titleHeight + Tokens.Space.x2
+        let inset = Tokens.Space.x1
+        let thumbHeight = round((thumbWidth - inset * 2) * aspect) + TabThumbnailView.titleHeight + inset
         thumbs = tabs.enumerated().map { i, tab in
             let thumb = TabThumbnailView()
             if let pair = controller.tabManager.split(for: tab), let left = controller.tabManager.tab(with: pair.left),
