@@ -62,7 +62,8 @@ final class SidebarContainer: NSView {
 
     // MARK: Dropping links and files
 
-    private func droppedURLs(_ info: NSDraggingInfo) -> [URL] {
+    /// The links and files a drag from another app carries, the ones Zigzag opens: shared with the page area.
+    static func droppedURLs(_ info: NSDraggingInfo) -> [URL] {
         let board = info.draggingPasteboard
         // A tab being moved inside Zigzag is its own kind of drag, handled by the list.
         if let source = info.draggingSource as? NSView, source.window?.windowController is BrowserWindowController { return [] }
@@ -76,24 +77,28 @@ final class SidebarContainer: NSView {
         return []
     }
 
-    private func showDropRing(_ on: Bool) {
+    private func showDropRing(_ on: Bool) { Self.showDropRing(dropRing, on, around: bounds.insetBy(dx: 4, dy: 4), in: self) }
+
+    /// The ring that says "let go here": the same for the sidebar and the page.
+    static func showDropRing(_ ring: CALayer, _ on: Bool, around frame: NSRect, in view: NSView) {
         Tokens.Motion.withoutAnimation {
-            dropRing.frame = bounds.insetBy(dx: 4, dy: 4)
-            dropRing.cornerRadius = Tokens.Radius.card
-            dropRing.borderColor = cgColor(Tokens.Color.accent)
+            ring.frame = frame
+            ring.cornerRadius = Tokens.Radius.card
+            ring.borderColor = view.cgColor(Tokens.Color.accent)
         }
         // In and out from wherever it is, so it fades away too instead of vanishing.
         let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = dropRing.presentation()?.opacity ?? dropRing.opacity
+        fade.fromValue = ring.presentation()?.opacity ?? ring.opacity
         fade.toValue = on ? 1 : 0
         fade.duration = Tokens.Motion.selection
         fade.timingFunction = Tokens.Motion.easeOut
-        Tokens.Motion.withoutAnimation { dropRing.opacity = on ? 1 : 0 }
-        dropRing.add(fade, forKey: "fade")
+        Tokens.Motion.withoutAnimation { ring.opacity = on ? 1 : 0 }
+        ring.isHidden = false
+        ring.add(fade, forKey: "fade")
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard !droppedURLs(sender).isEmpty else { return [] }
+        guard !Self.droppedURLs(sender).isEmpty else { return [] }
         showDropRing(true)
         return .copy
     }
@@ -102,9 +107,12 @@ final class SidebarContainer: NSView {
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         showDropRing(false)
-        let urls = droppedURLs(sender)
+        return Self.open(Self.droppedURLs(sender), in: window)
+    }
+
+    /// Dropped links and files as tabs, the first in front and any others behind it.
+    static func open(_ urls: [URL], in window: NSWindow?) -> Bool {
         guard !urls.isEmpty, let controller = window?.windowController as? BrowserWindowController else { return false }
-        // The first opens in front; any others wait behind it.
         for (i, url) in urls.prefix(20).enumerated() {
             controller.open(url, disposition: i == 0 ? .foregroundTab : .backgroundTab, allowSwitch: false)
         }
@@ -366,9 +374,34 @@ final class BrowserRootView: ColorView {
             guard let self else { return }
             self.onSidebarWidthChange?(self.sidebarWidth)
         }
+        // Links and files dropped on the page area open as tabs too: an empty window, or with the sidebar hidden.
+        // A page itself takes its own drops (a file into an upload box), as WebKit does.
+        registerForDraggedTypes([.URL, .fileURL, .string])
+        pageDropRing.isHidden = true
+        pageDropRing.borderWidth = 2
+        pageDropRing.cornerCurve = .continuous
+        pageDropRing.zPosition = 50
+        layer?.addSublayer(pageDropRing)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private let pageDropRing = CALayer()
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !SidebarContainer.droppedURLs(sender).isEmpty else { return [] }
+        SidebarContainer.showDropRing(pageDropRing, true, around: cardFrame.insetBy(dx: 4, dy: 4), in: self)
+        return .copy
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        SidebarContainer.showDropRing(pageDropRing, false, around: cardFrame.insetBy(dx: 4, dy: 4), in: self)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        SidebarContainer.showDropRing(pageDropRing, false, around: cardFrame.insetBy(dx: 4, dy: 4), in: self)
+        return SidebarContainer.open(SidebarContainer.droppedURLs(sender), in: window)
+    }
 
     override var mouseDownCanMoveWindow: Bool { true }
 
