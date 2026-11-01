@@ -377,6 +377,7 @@ enum DebugBridge {
                                         isARepeat: false, keyCode: codes[ch] ?? 0) {
                 NSApp.postEvent(e, atStart: false)
             }
+        case "listscroll": controller.sidebar.debugListScroll(Double(arg).map { CGFloat($0) })
         case "menukey":
             // menukey <char> [cmd|shift|ctrl|opt...]: the key equivalent as the menu bar sees it, then as the window does
             // (which is where a real key press goes), logging which one took it.

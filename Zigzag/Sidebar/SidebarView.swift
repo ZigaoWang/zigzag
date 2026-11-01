@@ -752,7 +752,7 @@ final class SidebarView: NSView {
         let animate = snapshot != nil && direction != 0 && !Tokens.Motion.reduceMotion
         Tokens.Motion.withoutAnimation { scrollView.frame = finalFrame }
         // Mid-drag the list keeps its gap and hidden row; otherwise it simply reloads.
-        if list.isDragging { list.refreshDuringDrag() } else { list.reload(animated: false) }
+        if list.isDragging { list.refreshDuringDrag() } else { list.reload(animated: false); restoreListScroll() }
         guard animate, let snapshot else { return }
         let width = bounds.width
         let ghost = NSImageView(frame: finalFrame)
@@ -1064,8 +1064,32 @@ final class SidebarView: NSView {
         }
     }
 
-    /// The space this sidebar shows; set by the window.
-    var currentSpaceID: UUID?
+    /// The space this sidebar shows; set by the window. Leaving one remembers how far down its list was scrolled.
+    var currentSpaceID: UUID? {
+        didSet {
+            guard let old = oldValue, old != currentSpaceID else { return }
+            listScroll[old] = scrollView.contentView.bounds.origin.y
+        }
+    }
+    /// How far down each space's list was, so coming back to a space finds it where you left it.
+    private var listScroll: [UUID: CGFloat] = [:]
+
+    /// The list where it was when you last left this space, or at the top for one you haven't scrolled.
+    #if DEBUG
+    /// listscroll <y>: the list scrolled to y, or with no number, how far it's scrolled (in debug.log).
+    func debugListScroll(_ y: CGFloat?) {
+        if let y { scrollView.contentView.scroll(to: NSPoint(x: 0, y: y)); scrollView.reflectScrolledClipView(scrollView.contentView) }
+        debugLog("listscroll \(scrollView.contentView.bounds.origin.y) of \(list.frame.height)")
+    }
+    #endif
+
+    private func restoreListScroll() {
+        list.layoutSubtreeIfNeeded()
+        let saved = currentSpaceID.flatMap { listScroll[$0] } ?? 0
+        let maxY = max(0, list.frame.height - scrollView.contentView.bounds.height)
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: min(saved, maxY)))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
 
 }
 
