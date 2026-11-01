@@ -88,14 +88,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !Self.quitConfirmed, !Self.isHostingTests, Self.asksBeforeQuitting else { return .terminateNow }
+        guard !Self.isHostingTests else { return .terminateNow }
+        let downloading = DownloadManager.shared.activeCount
+        // Going for good: downloads still coming in pause first, so they go on from Downloads after the next launch.
+        func quitNow() -> NSApplication.TerminateReply {
+            guard downloading > 0 else { return .terminateNow }
+            DownloadManager.shared.pauseAllForQuit { NSApp.reply(toApplicationShouldTerminate: true) }
+            return .terminateLater
+        }
+        // Asked already, or not asking: downloads are the one thing worth asking about anyway.
+        guard !Self.quitConfirmed, Self.asksBeforeQuitting || downloading > 0 else { return quitNow() }
         // Logging out, restarting or shutting down: the system's own reason is on the quit event.
         if let event = NSAppleEventManager.shared().currentAppleEvent,
-           event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return .terminateNow }
+           event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return quitNow() }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first,
-              let window = controller.window, window.isVisible, let host = window.contentView else { return .terminateNow }
+              let window = controller.window, window.isVisible, let host = window.contentView else { return quitNow() }
         // Already asking: ⌘Q a second time means yes.
-        if host.subviews.contains(where: { $0 is ConfirmSheet }) { return .terminateNow }
+        if host.subviews.contains(where: { $0 is ConfirmSheet }) { return quitNow() }
         window.makeKeyAndOrderFront(nil)
         var answered = false
         var monitor: Any?
@@ -103,11 +112,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !answered else { return }
             answered = true
             if let monitor { NSEvent.removeMonitor(monitor) }
-            if quit { Self.quitConfirmed = true }
-            NSApp.reply(toApplicationShouldTerminate: quit)
+            guard quit else { NSApp.reply(toApplicationShouldTerminate: false); return }
+            Self.quitConfirmed = true
+            if downloading > 0 {
+                DownloadManager.shared.pauseAllForQuit { NSApp.reply(toApplicationShouldTerminate: true) }
+            } else {
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
         }
-        ConfirmSheet.show(in: host, title: "Quit Zigzag?", message: "Your tabs and spaces will be right here when you open it again.",
-                          confirmTitle: "Quit") { answer($0) }
+        let message = downloading == 0 ? "Your tabs and spaces will be right here when you open it again."
+            : downloading == 1 ? "A download is still in progress. It pauses, and you can resume it from Downloads when you open Zigzag again."
+            : "\(downloading) downloads are still in progress. They pause, and you can resume them from Downloads when you open Zigzag again."
+        ConfirmSheet.show(in: host, title: "Quit Zigzag?", message: message, confirmTitle: "Quit") { answer($0) }
         // While it asks, ⌘Q again means yes (macOS doesn't ask the app a second time on its own).
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,

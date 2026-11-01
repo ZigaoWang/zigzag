@@ -249,6 +249,34 @@ final class DownloadManager: NSObject {
         }
     }
 
+    /// Quitting: every download still coming in pauses where it is, and is written down with what's needed to go on
+    /// after the next launch. `done` runs once they've all stopped, or after two seconds at most.
+    func pauseAllForQuit(then done: @escaping () -> Void) {
+        final class Countdown { var left = 0; var finished = false }
+        let countdown = Countdown()
+        let finish = { [weak self] in
+            guard !countdown.finished else { return }
+            countdown.finished = true
+            self?.save()
+            done()
+        }
+        for item in items where !item.isPrivate && canPause(item) {
+            guard let download = item.download else { continue }
+            countdown.left += 1
+            item.state = .paused
+            item.progressObservation = nil
+            download.cancel { data in
+                MainActor.assumeIsolated {
+                    item.resumeData = data
+                    countdown.left -= 1
+                    if countdown.left == 0 { finish() }
+                }
+            }
+        }
+        if countdown.left == 0 { finish(); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { finish() }
+    }
+
     /// Goes on with a paused download in the same row: from where it stopped, or from the start when the server
     /// doesn't allow picking up partway.
     func resume(_ item: DownloadItem) {
