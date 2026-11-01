@@ -25,8 +25,8 @@ final class ExtensionSheet: FloatingPanelView {
     private let limitsBox = ColorView(color: Tokens.Color.fieldFill)
     private let limitsIcon = NSImageView()
     private let limitsText = NSTextField(wrappingLabelWithString: "")
-    private let confirmButton: PrimaryButton
-    private let cancelButton: TextButton
+    private let confirmButton: PillButton
+    private let cancelButton: PillButton
     private var monitor: Any?
     private var onConfirm: () -> Void = {}
     private var onCancel: () -> Void = {}
@@ -44,9 +44,9 @@ final class ExtensionSheet: FloatingPanelView {
         subtitleLabel.font = Tokens.Font.small()
         subtitleLabel.textColor = Tokens.Color.textSecondary
         subtitleLabel.isSelectable = false
-        headingLabel = Label(content.heading, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
-        confirmButton = PrimaryButton(title: content.confirm)
-        cancelButton = TextButton(title: content.cancel, font: Tokens.Font.body(.medium))
+        headingLabel = Label.section(content.heading)
+        confirmButton = PillButton(title: content.confirm, style: .prominent)
+        cancelButton = PillButton(title: content.cancel)
         super.init(frame: .zero)
         iconView.image = content.icon ?? Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.TypeSize.large)
         iconView.imageScaling = .scaleProportionallyUpOrDown
@@ -180,7 +180,7 @@ final class ExtensionSheet: FloatingPanelView {
         } else {
             y += Tokens.Space.x2
         }
-        let buttonHeight = Tokens.Space.x8
+        let buttonHeight = Tokens.Page.controlHeight
         let confirmWidth = confirmButton.fittingWidth
         place(confirmButton, NSRect(x: Self.width - pad - confirmWidth, y: y, width: confirmWidth, height: buttonHeight))
         let cancelWidth = cancelButton.fittingWidth
