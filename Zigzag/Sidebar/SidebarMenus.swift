@@ -120,7 +120,7 @@ enum SidebarMenus {
             menu.addItem(Item("Move Tab to New Window") { controller.moveToNewWindow(tab) })
         }
         menu.addItem(.separator())
-        menu.addItem(Item("Reload") { tab.reload() })
+        menu.addItem(Item("Reload Page") { tab.reload() })
         if tab.isPlayingAudio || tab.isMuted {
             menu.addItem(Item(tab.isMuted ? "Unmute Tab" : "Mute Tab") { tab.setMuted(!tab.isMuted) })
         }

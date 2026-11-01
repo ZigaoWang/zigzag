@@ -350,7 +350,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
-        menu.addItem(SidebarMenus.Item("Edit…") { [weak self] in self?.openEditor() })
+        menu.addItem(SidebarMenus.Item("Edit Space…") { [weak self] in self?.openEditor() })
         if Library.shared.spaces.count > 1 {
             menu.addItem(SidebarMenus.Item("Delete Space…") { [weak self] in
                 guard let self, let host = self.host else { return }
@@ -505,7 +505,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private let engine = DropdownButton()
     private let archiveAfter = DropdownButton()
-    private let defaultButton = PillButton(title: "Make Default")
+    private let defaultButton = PillButton(title: "Set as Default")
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()

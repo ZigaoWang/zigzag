@@ -2204,7 +2204,7 @@ final class LiveBrowser: NSView {
 
 /// The last step: make Zigzag the browser links open in, then start.
 private final class ReadyPicker: StepContent {
-    private let yes = Onboard.outline("Make Default")
+    private let yes = Onboard.outline("Set as Default")
     private let no = Onboard.outline("Not Now")
     private var makeDefault = true { didSet { Onboard.mark(chosen: makeDefault ? yes : no, other: makeDefault ? no : yes) } }
 
