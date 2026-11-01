@@ -181,7 +181,7 @@ enum Tokens {
                 }, completionHandler: completion)
                 return
             }
-            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            if reduceMotion {
                 // Reduce Motion: things move to where they go at once; nothing slides.
                 NSAnimationContext.runAnimationGroup({ ctx in
                     ctx.duration = 0
@@ -198,7 +198,16 @@ enum Tokens {
             }, completionHandler: completion)
         }
 
-        static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+        static var reduceMotion: Bool {
+            #if DEBUG
+            if debugReduceMotion { return true }
+            #endif
+            return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        }
+        #if DEBUG
+        /// Debug builds: Reduce Motion for this app alone, for testing, without changing the Mac's setting.
+        static var debugReduceMotion = false
+        #endif
 
         /// Debug builds: ZIGZAG_SLOW_ANIMATIONS=10 plays animations ten times slower, to look at them.
         static let debugSlowdown: Double = {

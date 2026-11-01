@@ -162,8 +162,19 @@ enum DebugBridge {
                 return ["name": space.name, "tabs": tabs, "pinned": pinned(space.bookmarks.map(\.id)),
                         "folders": (space.folders ?? []).map { f in ["name": f.name, "pages": f.bookmarkIDs.compactMap { Library.shared.bookmark($0)?.title }] }]
             }
+            // Every pinned page and favorite as undo must bring it back, and any tab listed twice.
+            func detail(_ bookmark: Bookmark) -> [String: Any] {
+                ["id": bookmark.id.uuidString, "title": bookmark.title, "url": bookmark.url.absoluteString,
+                 "loaded": m.bookmarkTab(for: bookmark.id) != nil, "folder": Library.shared.folderID(containing: bookmark.id)?.uuidString ?? ""]
+            }
+            let duplicates = m.tabsBySpace.values.reduce(0) { $0 + $1.count - Set($1.map(ObjectIdentifier.init)).count }
             let json: [String: Any] = ["spaces": spaces, "favorites": pinned(Library.shared.favorites.map(\.id)),
-                                       "current": Library.shared.space(m.currentSpaceID)?.name ?? ""]
+                                       "current": Library.shared.space(m.currentSpaceID)?.name ?? "",
+                                       "pins": Library.shared.spaces.flatMap(\.bookmarks).map(detail), "favs": Library.shared.favorites.map(detail),
+                                       "duplicates": duplicates, "windows": WindowManager.shared.controllers.count,
+                                       // Carried copies still on screen: none once every drag is over.
+                                       "carried": NSApp.windows.filter { $0 is NSPanel && $0.isVisible && $0.ignoresMouseEvents && $0.level == .floating }.count,
+                                       "spaceOrder": Library.shared.spaces.map(\.name)]
             if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dump":
             var out = ""
@@ -575,6 +586,37 @@ enum DebugBridge {
                 debugLog("pasteboard=\(NSPasteboard.general.string(forType: .string) ?? "nil")")
             } else { debugLog("menutest: no bookmarks") }
         case "sundo": _ = controller.handleUndoKey(redo: arg == "redo")
+        case "movewindow":
+            // movewindow x y: the key window's top-left corner, in screen points from the top-left of the main screen.
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 2, let window = controller.window, let screen = NSScreen.screens.first {
+                window.setFrameTopLeftPoint(NSPoint(x: n[0], y: screen.frame.height - n[1]))
+            }
+        case "focus":
+            // focus <n>: the nth window comes to the front, for commands that follow.
+            let all = WindowManager.shared.controllers
+            if let n = Int(arg), all.indices.contains(n) { all[n].window?.makeKeyAndOrderFront(nil) }
+        case "reducemotion": Tokens.Motion.debugReduceMotion = arg != "off"
+        case "unload":
+            // unload <title>: a pinned page or favorite goes back to not loaded.
+            if let id = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title == arg })?.id,
+               let tab = controller.tabManager.bookmarkTab(for: id) { controller.tabManager.close(tab) }
+        case "renamepin":
+            // renamepin <old>|<new>
+            let names = arg.components(separatedBy: "|")
+            if names.count == 2, let id = Library.shared.spaces.flatMap(\.bookmarks).first(where: { $0.title == names[0] })?.id {
+                controller.listRenameBookmark(id, to: names[1])
+            }
+        case "settingsrows":
+            // settingsrows <path>: Settings' space rows, as layout writes the sidebar's.
+            func rows(_ v: NSView) -> [SpaceSettingsRow] { (v as? SpaceSettingsRow).map { [$0] } ?? v.subviews.flatMap(rows) }
+            if let root = controller.tabManager.selectedTab?.settingsView, let window = controller.window {
+                let json = rows(root).map { row -> [String: Any] in
+                    let r = row.convert(row.bounds, to: nil).flippedIn(window)
+                    return ["name": "space:" + (Library.shared.space(row.spaceID)?.name ?? ""), "x": r.minX, "y": r.minY, "w": r.width, "h": r.height]
+                }
+                if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
+            }
         case "favorite":
             if let tab = controller.tabManager.selectedTab { controller.tabManager.favoriteTab(tab) }
         case "unfavorite":
