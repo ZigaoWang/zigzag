@@ -67,7 +67,7 @@ class SidebarRowView: InteractiveView {
         let showsWell = isHovered && !chosen && !isMarked && !isPressed
         if showsWell || well != nil {
             let well = self.well ?? {
-                let well = GlassWell(depth: Tokens.Material.rowWellShade, lip: false, opacity: 0.55)
+                let well = GlassWell(opacity: Tokens.Material.rowWell, edges: false)
                 well.radius = Tokens.Radius.row
                 well.install(in: self)
                 self.well = well

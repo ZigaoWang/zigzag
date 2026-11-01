@@ -1156,9 +1156,10 @@ final class SkyBackdrop: NSView {
 
 // MARK: - The browser window
 
-// The same light on the browser's own chrome, as glass rather than plastic, and kept quiet, since the page is what
-// you read: the frame as a soft surface lit from above (`FrameLight`), clear glass for the things you press and the
-// one you're on (`GlassPlate`), and a glass well for the address and a row under the pointer (`GlassWell`). Each
+// The same light on the browser's own chrome, as etched glass rather than plastic, and kept quiet, since the page is
+// what you read: crisp, thin and light, never a shadow. The frame as a soft surface lit from above (`FrameLight`),
+// faint panes for the things you press and the one you're on (`GlassPlate`), and a well for the address and a row
+// under the pointer (`GlassWell`). Each
 // draws in a view of its own behind a control's content, y up as the rest of the kit, its layers set once and
 // changed only by state.
 
@@ -1222,39 +1223,34 @@ final class FrameLight: PassThroughView {
     }
 }
 
-/// A pane of glass in the chrome: a thin wash the frame's color shows through, a specular rim brightest along its
-/// top edge and fading down the sides, a faint refraction line inside its bottom edge, the faintest hairline, and a
-/// large, soft, faint shadow. Under the pointer it rises a point; pressed it settles and dims. `.chosen` is the
-/// clearer card of the one you're on. Put it at the bottom of a control (`install(in:)`); it never takes clicks.
+/// A pane of etched glass in the chrome: a very faint wash the frame's color shows through, one crisp, thin
+/// specular edge along its top, and a hairline. No shadow: it almost disappears but for its edges. Under the pointer
+/// it rises a point; pressed it settles and dims. `.chosen` is the clearer pane of the one you're on. Put it at the
+/// bottom of a control (`install(in:)`); it never takes clicks.
 final class GlassPlate: PassThroughView {
     enum Pose { case hidden, rest, lifted, pressed }
     enum Finish { case clear, chosen }
 
     var radius: CGFloat = Tokens.Radius.control { didSet { needsLayout = true } }
-    /// The site's own color, a breath of it in the chosen card.
+    /// The site's own color, a breath of it in the chosen pane.
     var tint: NSColor? { didSet { refresh(animated: false) } }
     /// A darker hairline: a favorite whose page is open.
     var showsOpenEdge = false { didSet { if oldValue != showsOpenEdge { refresh(animated: false) } } }
     private(set) var pose = Pose.hidden
     private(set) var finish = Finish.clear
 
-    private let cast = CastShadow()
     private let pane = CALayer()
-    private let body = CAGradientLayer()
-    private let rim = GradientStroke(width: 1)
-    private let refraction = GradientStroke(width: 1)
+    private let body = CALayer()
+    private let edge = GradientStroke(width: 1)
     private let hairline = CAShapeLayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         layer?.masksToBounds = false
-        [cast.ambient, cast.contact, pane].forEach { layer?.addSublayer($0) }
-        [body, refraction.layer, rim.layer, hairline].forEach { pane.addSublayer($0) }
-        body.startPoint = CGPoint(x: 0.5, y: 1)
-        body.endPoint = CGPoint(x: 0.5, y: 0)
+        layer?.addSublayer(pane)
+        [body, hairline, edge.layer].forEach { pane.addSublayer($0) }
         body.cornerCurve = .continuous
-        body.masksToBounds = true
         hairline.fillColor = nil
         hairline.lineWidth = 0.5
         alphaValue = 0
@@ -1277,13 +1273,19 @@ final class GlassPlate: PassThroughView {
             pane.position = CGPoint(x: rect.midX, y: rect.midY)
             body.frame = rect
             body.cornerRadius = radius
-            rim.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: 0.5, dy: 0.5), radius: max(0, radius - 0.5)))
-            refraction.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: 1.5, dy: 1.5), radius: max(0, radius - 1.5)))
             hairline.frame = rect
-            hairline.path = MaterialShape.rounded(rect.insetBy(dx: -0.25, dy: -0.25), radius: radius + 0.25)
-            // From well inside the footprint, so the shade reads as depth under the glass rather than a rim around it.
-            cast.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: min(4, rect.width * 0.08), dy: 2), radius: radius))
+            hairline.path = MaterialShape.rounded(rect.insetBy(dx: 0.25, dy: 0.25), radius: max(0, radius - 0.25))
+            // A half-point line just inside the top edge, on the pixel at 2x.
+            edge.set(frame: rect, path: MaterialShape.rounded(rect.insetBy(dx: 0.75, dy: 0.75), radius: max(0, radius - 0.75)))
+            refreshEdgeLength()
         }
+    }
+
+    /// The specular line runs the top edge and only as far down the sides as the corners: the same length on a
+    /// tall tile as on a row.
+    private func refreshEdgeLength() {
+        let reach = bounds.height > 0 ? min(0.5, (radius + 2) / bounds.height) : 0.3
+        edge.layer.locations = [0, NSNumber(value: Double(reach) * 0.5), NSNumber(value: Double(reach))]
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -1318,55 +1320,43 @@ final class GlassPlate: PassThroughView {
         let dark = effectiveAppearance.isDark
         let pressed = pose == .pressed
         MaterialMotion.animate(animated ? duration : 0) {
-            var top = (pressed ? m.glassPressed : finish == .chosen ? m.chosenTop : m.glassTop).cg(dark)
-            var bottom = (pressed ? m.glassPressed : finish == .chosen ? m.chosenBottom : m.glassBottom).cg(dark)
-            if let tint, finish == .chosen, !pressed {
-                // A whisper of the site's color, more of it lower down, away from the light.
-                func lean(_ c: CGColor, _ k: CGFloat) -> CGColor {
-                    guard let base = NSColor(cgColor: c)?.usingColorSpace(.sRGB), let t = tint.usingColorSpace(.sRGB) else { return c }
-                    return (base.withAlphaComponent(1).blended(withFraction: k, of: t) ?? base).withAlphaComponent(base.alphaComponent).cgColor
-                }
-                top = lean(top, dark ? 0.12 : 0.06)
-                bottom = lean(bottom, dark ? 0.2 : 0.12)
+            var wash = (pressed ? m.glassPressed : finish == .chosen ? m.chosenWash : m.glassWash).cg(dark)
+            if let tint, finish == .chosen, !pressed, let base = NSColor(cgColor: wash)?.usingColorSpace(.sRGB), let t = tint.usingColorSpace(.sRGB) {
+                // A whisper of the site's color.
+                wash = (base.withAlphaComponent(1).blended(withFraction: dark ? 0.14 : 0.08, of: t) ?? base).withAlphaComponent(base.alphaComponent).cgColor
             }
-            body.colors = [top, bottom]
+            body.backgroundColor = wash
             let spec = m.specular.cg(dark)
-            // Brightest along the top edge, running a little way down the sides and gone by the middle.
-            rim.set([spec, spec.copy(alpha: spec.alpha * 0.35)!, spec.copy(alpha: 0)!, spec.copy(alpha: 0)!], at: [0, 0.22, 0.5, 1])
-            rim.layer.opacity = pressed ? 0.4 : 1
-            let bend = m.refraction.cg(dark)
-            refraction.set([bend.copy(alpha: 0)!, bend.copy(alpha: 0)!, bend], at: [0, 0.6, 1])
+            edge.layer.colors = [spec, spec.copy(alpha: spec.alpha * 0.4)!, spec.copy(alpha: 0)!]
+            refreshEdgeLength()
+            edge.layer.opacity = pressed ? 0.4 : 1
             hairline.strokeColor = (showsOpenEdge ? m.openHairline : m.glassHairline).cg(dark)
-            cast.apply(pressed ? m.glassSettled : pose == .lifted ? m.glassLifted : m.glassRest, isDark: dark)
             let rise = Tokens.Motion.reduceMotion ? 0 : pose == .lifted ? m.glassLift : pressed ? -m.glassSink : 0
             pane.transform = CATransform3DMakeTranslation(0, rise, 0)
         }
     }
 }
 
-/// Glass set into the frame: a faint darker wash, deeper under its top lip, a soft inner shadow beneath that lip,
-/// and (for the address) its lower edge catching the light. A row under the pointer is the same well, fainter,
-/// without the lip.
+/// Glass set into the frame: a faint darker wash, a hairline, and its lower edge catching the light (the address).
+/// A row under the pointer is the same wash, fainter, with no edges (`edges: false`).
 final class GlassWell: PassThroughView {
     var radius: CGFloat = Tokens.Radius.row { didSet { needsLayout = true } }
-    private let body = CAGradientLayer()
-    private let shade = InnerShadow()
+    private let body = CALayer()
+    private let hairline = CAShapeLayer()
     private let lip = GradientStroke(width: 1)
-    private let depth: Float
 
-    /// `depth`: the inner shadow's strength (`Material.wellShade`, `rowWellShade`); `opacity`: the wash's.
-    init(depth: Float = Tokens.Material.wellShade, lip hasLip: Bool = true, opacity: Float = 1) {
-        self.depth = depth
+    /// `opacity`: the wash's strength; `edges`: the hairline and the lit lower edge.
+    init(opacity: Float = 1, edges: Bool = true) {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = false
-        body.startPoint = CGPoint(x: 0.5, y: 1)
-        body.endPoint = CGPoint(x: 0.5, y: 0)
         body.cornerCurve = .continuous
-        body.masksToBounds = true
         body.opacity = opacity
-        lip.layer.isHidden = !hasLip
-        [lip.layer, body, shade.layer].forEach { layer?.addSublayer($0) }
+        hairline.fillColor = nil
+        hairline.lineWidth = 0.5
+        hairline.isHidden = !edges
+        lip.layer.isHidden = !edges
+        [body, hairline, lip.layer].forEach { layer?.addSublayer($0) }
         refresh()
     }
 
@@ -1384,9 +1374,13 @@ final class GlassWell: PassThroughView {
         Tokens.Motion.withoutAnimation {
             body.frame = rect
             body.cornerRadius = radius
-            shade.set(frame: rect, path: MaterialShape.rounded(rect, radius: radius))
-            let lipRect = rect.insetBy(dx: -0.5, dy: -0.5)
-            lip.set(frame: lipRect, path: MaterialShape.rounded(CGRect(origin: .zero, size: lipRect.size).insetBy(dx: 0.5, dy: 0.5), radius: radius))
+            hairline.frame = rect
+            hairline.path = MaterialShape.rounded(rect.insetBy(dx: 0.25, dy: 0.25), radius: max(0, radius - 0.25))
+            // The lit lower edge: a half-point line just outside the bottom, as a lip catching the light.
+            let lipRect = rect.insetBy(dx: -0.75, dy: -0.75)
+            lip.set(frame: lipRect, path: MaterialShape.rounded(CGRect(origin: .zero, size: lipRect.size).insetBy(dx: 0.5, dy: 0.5), radius: radius + 0.25))
+            let reach = rect.height > 0 ? min(0.5, (radius + 2) / rect.height) : 0.3
+            lip.layer.locations = [0, NSNumber(value: Double(1 - reach)), 1]
         }
     }
 
@@ -1410,10 +1404,10 @@ final class GlassWell: PassThroughView {
         let m = Tokens.Material.self
         let dark = effectiveAppearance.isDark
         Tokens.Motion.withoutAnimation {
-            body.colors = [m.wellTop.cg(dark), m.wellBottom.cg(dark)]
-            shade.set(color: m.recessShade.cg(dark), opacity: depth, radius: 2, drop: 1)
-            let light = m.specular.cg(dark)
-            lip.set([light.copy(alpha: 0)!, light.copy(alpha: 0)!, light.copy(alpha: light.alpha * (dark ? 0.35 : 0.8))!], at: [0, 0.62, 1])
+            body.backgroundColor = m.well.cg(dark)
+            hairline.strokeColor = m.wellHairline.cg(dark)
+            let light = m.wellLip.cg(dark)
+            lip.layer.colors = [light.copy(alpha: 0)!, light.copy(alpha: 0)!, light]
         }
     }
 }

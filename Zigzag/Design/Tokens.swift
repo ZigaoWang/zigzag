@@ -835,44 +835,28 @@ enum Tokens {
         /// The frame's grain: the faintest, enough that it reads as a surface rather than paint.
         static let frameGrain: Float = 0.022
 
-        /// Glass in the chrome (a favorite, the tab you're on, a toolbar button under the pointer): light, not paint.
-        /// A thin wash the space's color shows through, a touch brighter at the top; the chosen one a step clearer.
-        static let glassTop = Tone(light: white(0.46), dark: white(0.085))
-        static let glassBottom = Tone(light: white(0.30), dark: white(0.05))
-        static let chosenTop = Tone(light: white(0.80), dark: white(0.13))
-        static let chosenBottom = Tone(light: white(0.66), dark: white(0.09))
-        /// Pressed, the glass dims a little: the light behind it, not a shade painted on.
-        static let glassPressed = Tone(light: white(0.22), dark: white(0.035))
-        /// The edge that carries the glass: a specular rim brightest along the top, fading down the sides, and a
-        /// faint refraction line just inside the bottom edge.
-        static let specular = Tone(light: white(1), dark: white(0.32))
-        static let refraction = Tone(light: white(0.6), dark: white(0.08))
-        /// The faintest hairline, so white glass still parts from a pale frame.
-        static let glassHairline = Tone(light: ink(0.045), dark: Color.hex(0x000000, alpha: 0.28))
+        /// Glass in the chrome (a favorite, the tab you're on, a toolbar button under the pointer), etched rather
+        /// than raised: a very faint wash the space's color shows through, almost gone but for its edges. The chosen
+        /// one is a step clearer, enough to read at a glance; pressed, the wash dims.
+        static let glassWash = Tone(light: white(0.26), dark: white(0.045))
+        static let chosenWash = Tone(light: white(0.62), dark: white(0.10))
+        static let glassPressed = Tone(light: white(0.14), dark: white(0.025))
+        /// Its one crisp, thin specular edge along the top, gone a little way down the sides.
+        static let specular = Tone(light: white(1), dark: white(0.24))
+        /// The hairline round it, so a faint pane still has an edge on a pale frame.
+        static let glassHairline = Tone(light: ink(0.07), dark: white(0.07))
         /// A favorite whose page is open in the background: its hairline a step darker, to tell at a glance.
-        static let openHairline = Tone(light: ink(0.2), dark: white(0.28))
-        /// Under glass the shadow is large, very soft and faint: depth, not a puff. At rest, under the pointer, and
-        /// pressed (the glass settles onto the frame).
-        static let glassRest = Elevation(ambientRadius: 8, ambientDrop: 3, ambientOpacity: 0.05, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.04)
-        static let glassLifted = Elevation(ambientRadius: 12, ambientDrop: 5, ambientOpacity: 0.08, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.04)
-        static let glassSettled = Elevation(ambientRadius: 4, ambientDrop: 1, ambientOpacity: 0.03, contactRadius: 0.5, contactDrop: 0.5, contactOpacity: 0.05)
-        /// How far glass rises under the pointer and sinks pressed: a point, no more, beside text.
+        static let openHairline = Tone(light: ink(0.2), dark: white(0.24))
+        /// How far glass rises under the pointer and settles pressed: a point, no more, beside text. No shadow.
         static let glassLift: CGFloat = 1
         static let glassSink: CGFloat = 0.5
 
-        /// The address, a pill of glass set into the frame: a faint darker wash, deeper under its top lip, a soft
-        /// inner shadow there, and its lower edge catching the light.
-        static let wellTop = Tone(light: ink(0.06), dark: Color.hex(0x000000, alpha: 0.22))
-        static let wellBottom = Tone(light: ink(0.025), dark: Color.hex(0x000000, alpha: 0.12))
-        static let wellShade: Float = 0.22
-        /// A row under the pointer: the same well, fainter, so a sweep down the list never gets busy.
-        static let rowWellShade: Float = 0.1
-
-        /// The page as a sheet on the frame: a large, faint shade it casts by the sidebar, and a light rim on that
-        /// edge, fading out across this many points.
-        static let pageAmbient = Elevation(ambientRadius: 18, ambientDrop: 2, ambientOpacity: 0.10, contactRadius: 1, contactDrop: 0, contactOpacity: 0.07)
-        static let pageRim = Tone(light: white(0.9), dark: white(0.16))
-        static let pageRimReach: CGFloat = Space.x6
+        /// The address, glass set into the frame: a faint darker wash, a hairline, and its lower edge catching the
+        /// light. A row under the pointer is the same wash, fainter, with no edges.
+        static let well = Tone(light: ink(0.04), dark: Color.hex(0x000000, alpha: 0.16))
+        static let wellHairline = Tone(light: ink(0.06), dark: white(0.06))
+        static let wellLip = Tone(light: white(0.85), dark: white(0.07))
+        static let rowWell: Float = 0.6
 
         /// The keyboard focus ring's soft glow around a field.
         static let focusGlow: CGFloat = 4

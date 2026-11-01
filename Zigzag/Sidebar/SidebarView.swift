@@ -175,12 +175,11 @@ final class SpaceDotView: InteractiveView {
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Metric.iconButton, height: Tokens.Metric.iconButton))
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
-        // The space you're in is a lit bead of glass: a specular light along its top, standing on a soft shade.
+        // The space you're in is a lit bead of glass: a specular light along its top.
         gloss.startPoint = CGPoint(x: 0.5, y: 0)
         gloss.endPoint = CGPoint(x: 0.5, y: 1)
         gloss.masksToBounds = true
         dot.addSublayer(gloss)
-        dot.shadowOffset = .zero
         iconView.imageScaling = .scaleNone
         iconView.isHidden = true
         addSubview(iconView)
@@ -209,8 +208,6 @@ final class SpaceDotView: InteractiveView {
         let spec = Tokens.Material.specular.cg(dark)
         gloss.colors = [spec.copy(alpha: dark ? 0.9 : 0.45)!, spec.copy(alpha: 0)!]
         gloss.locations = [0, 0.6]
-        dot.shadowColor = Tokens.Material.shadowInk.cg(dark)
-        dot.shadowRadius = 2
         let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
         let changed = (wasSelected != nil && wasSelected != isSelected && swipeShare == nil) || settlesFromSwipe
         wasSelected = isSelected
@@ -224,8 +221,6 @@ final class SpaceDotView: InteractiveView {
             self.gloss.frame = rect
             self.gloss.cornerRadius = height / 2
             self.gloss.opacity = Float(share)
-            self.dot.shadowPath = CGPath(roundedRect: rect.insetBy(dx: 1, dy: 0), cornerWidth: height / 2, cornerHeight: height / 2, transform: nil)
-            self.dot.shadowOpacity = Float(share) * (dark ? 0.5 : 0.18)
         }
         iconView.frame = bounds
         iconView.isHidden = icon == nil

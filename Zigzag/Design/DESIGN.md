@@ -153,8 +153,8 @@ something came from, answers at once, and can be interrupted.
   as a quiet section label, pinned rows, the "Tabs" label with Clear, New Tab, tabs. The bottom bar: downloads,
   space dots, +.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
-  meeting the window's edges, a sheet: `Radius.attached` (20) corners, a large faint shade on the frame by the
-  sidebar (`Material.pageAmbient`) and a light rim along that edge (`pageRim`).
+  meeting the window's edges it meets the frame cleanly: `Radius.attached` (20) corners and the faint `cardEdge`
+  hairline, no shadow and no rim.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface`, `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
   quiet rows.
@@ -236,12 +236,13 @@ glass, never plastic (`FrameLight`, `GlassPlate`, `GlassWell`; see "The window a
 
 ### The window as glass
 
-Light, not paint: the chrome is see-through, so the space's color (or the desktop) shows through it. Edges carry
-the glass: a thin specular rim brightest along the top and fading down the sides (`Material.specular`), a faint
-refraction line inside the bottom edge (`refraction`), the faintest hairline (`glassHairline`). No bevels, no glossy
-bodies, no puffy shadows: under glass the shadow is large, soft and faint (`glassRest`, `glassLifted`). Glass rises
-`glassLift` (1pt) under the pointer and settles `glassSink` pressed. Rows at rest stay plain text; only the chosen
-row, a hovered row and the things you press take a material, and each draws its layers only once it's needed.
+Etched glass, never plastic: crisp, thin, light and clean. A pane is a very faint wash the space's color shows
+through (`Material.glassWash`, a step clearer for the one you're on, `chosenWash`), one crisp half-point specular
+edge along its top that ends at the corners (`specular`), and a hairline (`glassHairline`). No shadows, bevels,
+glossy bodies or halos anywhere in the window: the page meets the frame with its corners alone. The address is a
+faint darker wash with a hairline and a lit lower edge (`well`, `wellLip`); a row under the pointer the same wash,
+fainter, with no edges. Glass rises `glassLift` (1pt) under the pointer and settles `glassSink` pressed. Rows at
+rest stay plain text, and a material is only made once a row needs it.
 
 Motion: the material ease-out (`Motion.easeOut`), no bounce, interruptible (each change starts where the last got
 to). A material object's hover moves (`settle`, 0.2) rather than appearing at once, because a thing is moving, not a
