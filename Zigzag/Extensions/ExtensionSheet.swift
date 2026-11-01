@@ -108,7 +108,7 @@ final class ExtensionSheet: FloatingPanelView {
             while let current = view, !(current is WKWebView) { view = current.superview }
             let typing = window.firstResponder is NSTextView || view != nil
             switch event.keyCode {
-            case 36, 76 where !typing: sheet.finish(confirmed: true); return nil   // Return, Enter
+            case 36 where !typing, 76 where !typing: sheet.finish(confirmed: true); return nil   // Return, Enter
             case 53: sheet.finish(confirmed: false); return nil      // Escape
             default: return event
             }
