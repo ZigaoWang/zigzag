@@ -122,6 +122,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tabManager.host = self
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
+        // Reduce Transparency turned on or off while Zigzag is open: the window follows at once.
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(displayOptionsChanged),
+                                                          name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
         tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
             guard let self, window == nil || window === self.window else { return }
@@ -415,6 +418,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.grain = grain
     }
 
+    @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
+
     private func applySpaceColor(animated: Bool) {
         lastSpaceID = tabManager.currentSpaceID
         render(tabManager.currentSpace, animated: animated)
@@ -437,9 +442,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 window?.appearance = name.flatMap(NSAppearance.init(named:))
             }
         }
-        let clear = !tabManager.isPrivate && space.isSeeThrough
-        let color = tabManager.isPrivate ? SpaceColor.graphite.background : space.frameColor
-        let end = tabManager.isPrivate ? nil : space.frameColor2
+        // Reduce Transparency in System Settings: a see-through space shows its color solid instead.
+        let clear = !tabManager.isPrivate && space.isSeeThrough && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        // Solid, the space's own color at full strength; see-through, thinned over the frosting.
+        let reduced = space.isSeeThrough && !clear
+        let color = tabManager.isPrivate ? SpaceColor.graphite.background : reduced ? space.background : space.frameColor
+        let end = tabManager.isPrivate ? nil : reduced ? space.background2 : space.frameColor2
         // See-through: the window lets the frosted desktop through, and the space's color washes over it, thinner the
         // more shows.
         window?.isOpaque = !clear
