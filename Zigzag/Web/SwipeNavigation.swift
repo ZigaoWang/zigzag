@@ -34,6 +34,20 @@ final class SwipeNavigator {
         self.webView = webView
     }
 
+    isolated deinit {
+        watchdog?.cancel()
+        stopWatchingRest()
+    }
+
+    /// The page left its window (another tab came to the front mid-swipe): its gesture's end will never come here,
+    /// so the swipe is dropped now rather than holding over a page that isn't shown.
+    func leftWindow() {
+        watchdog?.cancel()
+        stopWatchingRest()
+        if state == .tracking { cancel() }
+        state = .idle
+    }
+
     /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
     /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
@@ -49,6 +63,7 @@ final class SwipeNavigator {
             if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
             watchdog?.cancel()
             stopWatchingRest()
+            guard webView.window != nil else { state = .idle; return false }
             state = .deciding
             dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; samples = []
             if let room { pageScrolls = room } else { probe(at: webView.convert(event.locationInWindow, from: nil)) }
@@ -122,6 +137,8 @@ final class SwipeNavigator {
         // holds. Anything else the hand does means the gesture ended without saying so, and it's dropped then.
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.state == .tracking else { return }
+            // Not shown any more: there's no resting on a page that's gone.
+            guard self.webView?.window != nil else { self.abandonRest(); return }
             self.restMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
                 MainActor.assumeIsolated { self?.abandonRest() }
                 return event
@@ -231,7 +248,8 @@ final class SwipeNavigator {
     private func go() {
         watchdog?.cancel()
         stopWatchingRest()
-        guard let webView else { return }
+        // Let go after its tab went to the back: it isn't where you're looking, so it doesn't move.
+        guard let webView, webView.window != nil else { cancel(); return }
         if direction < 0 { if let owner = webView.owner { owner.goBack() } else { webView.goBack() } } else { webView.goForward() }
         settlePage()
         arrow?.leave(toward: direction, navigated: true)

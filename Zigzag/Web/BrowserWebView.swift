@@ -24,6 +24,12 @@ final class BrowserWebView: WKWebView {
         return super.becomeFirstResponder()
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // Its tab went to the back mid-swipe: the swipe can't finish here any more.
+        if window == nil { swipe.leftWindow() }
+    }
+
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if swipe.handle(event) { return }
