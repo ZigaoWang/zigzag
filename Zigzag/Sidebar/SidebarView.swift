@@ -116,8 +116,9 @@ final class AddressView: InteractiveView {
 
     override func layout() {
         super.layout()
-        // The host's first letter 10pt in, as an input's text, after the not-secure mark when there is one.
-        let pad = Tokens.Space.x2 + 2
+        // The host's first letter on the icon column (the field's edge plus a row's inset), with the traffic lights,
+        // the icons and the space's name: one edge down the sidebar. After the not-secure mark when there is one.
+        let pad = Tokens.Sidebar.rowInset
         var x = pad
         if !lock.isHidden {
             lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
@@ -191,32 +192,61 @@ final class SpaceDotView: InteractiveView {
         stateDidChange(animated: false)
     }
 
-    /// The space you're in is a short pill in the sidebar's own text color, readable on any space's color; the
-    /// others are small, quieter dots. Switching stretches one and shrinks the other.
+    /// Each space is a small key with its number, set in tabular figures like a dial marking. The space you're in
+    /// is pressed in: a lighter, lit face of the frame's color with a short warm tick under its number (`Color.live`);
+    /// the others are quiet keys, their numbers faint. A space with an icon shows the icon in place of its number.
+    var number = 0 { didSet { if oldValue != number { numberLayer.string = "\(number)"; stateDidChange(animated: false) } } }
+    private lazy var numberLayer: CATextLayer = {
+        let text = CATextLayer()
+        text.alignmentMode = .center
+        text.contentsScale = window?.backingScaleFactor ?? 2
+        text.font = Tokens.Font.figures(10, weight: .regular)
+        text.fontSize = 10
+        layer?.addSublayer(text)
+        return text
+    }()
+    private let tick = CALayer()
     private var wasSelected: Bool?
 
     override func stateDidChange(animated: Bool) {
-        let height = Tokens.Sidebar.spaceDot
+        let side = Tokens.Sidebar.spaceKey
         let share = swipeShare ?? (isSelected ? 1 : 0)
-        let width = height + (Tokens.Sidebar.currentSpaceDot - height) * share
         let ink = Tokens.Color.textPrimary
-        let resting: CGFloat = isHovered ? 0.5 : 0.28
-        let tint = ink.withAlphaComponent(resting + (0.78 - resting) * share)
+        let resting: CGFloat = isHovered ? 0.55 : 0.36
+        let tint = ink.withAlphaComponent(resting + (0.86 - resting) * share)
         let changed = (wasSelected != nil && wasSelected != isSelected && swipeShare == nil) || settlesFromSwipe
         wasSelected = isSelected
         settlesFromSwipe = false
+        let key = CGRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side)
+        let face = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: 0.18 + 0.67 * share), dark: Tokens.Color.hex(0xFFFFFF, alpha: 0.04 + 0.13 * share))
         let apply = {
-            self.dot.bounds = CGRect(x: 0, y: 0, width: width, height: height)
-            self.dot.position = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
-            self.dot.cornerRadius = height / 2
-            self.dot.backgroundColor = self.cgColor(tint)
+            self.dot.frame = key
+            self.dot.cornerRadius = Tokens.Sidebar.spaceKeyRadius
+            self.dot.cornerCurve = .continuous
+            self.dot.backgroundColor = self.cgColor(face)
+            self.dot.borderWidth = Tokens.Metric.hairline
+            self.dot.borderColor = self.cgColor(Tokens.Chrome.keyEdge)
+            // Pressed in: the key you're in sits a touch lower, its shadow tucked under it.
+            self.dot.shadowColor = self.cgColor(Tokens.Chrome.cardShadow)
+            self.dot.shadowOpacity = Float(share)
+            self.dot.shadowRadius = 0.5
+            self.dot.shadowOffset = CGSize(width: 0, height: self.isFlipped ? 0.5 : -0.5)
+            let h: CGFloat = 13
+            self.numberLayer.frame = CGRect(x: key.minX, y: key.midY - h / 2 + (self.isFlipped ? 0 : 0.5), width: key.width, height: h)
+            self.numberLayer.foregroundColor = self.cgColor(tint)
+            self.tick.frame = CGRect(x: key.midX - 2.5, y: self.isFlipped ? key.maxY + 2 : key.minY - 3, width: 5, height: 1)
+            self.tick.cornerRadius = 0.5
+            self.tick.backgroundColor = self.cgColor(Tokens.Color.live)
+            self.tick.opacity = Float(share)
         }
+        if tick.superlayer == nil { layer?.addSublayer(tick) }
+        numberLayer.isHidden = icon != nil
+        numberLayer.contentsScale = window?.backingScaleFactor ?? 2
         iconView.frame = bounds
         iconView.isHidden = icon == nil
         iconView.contentTintColor = tint
         // An emoji keeps its colors, so it says which space is yours by how strongly it shows.
         iconView.alphaValue = icon.map(IconChoice.isSymbol) == false ? 0.45 + 0.55 * share : 1
-        dot.isHidden = icon != nil
         if changed && !Tokens.Motion.reduceMotion {
             CATransaction.begin()
             CATransaction.setAnimationDuration(Tokens.Motion.standard)
@@ -226,7 +256,8 @@ final class SpaceDotView: InteractiveView {
         } else {
             Tokens.Motion.withoutAnimation(apply)
         }
-        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
+        // The key itself is what answers the pointer; a drop over it lights it as the drop target.
+        let fill: NSColor? = isDropTarget ? Tokens.Chrome.pressed : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }
@@ -249,7 +280,11 @@ final class SidebarView: NSView {
     let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: "Hide Sidebar")
+    let sidebarButton: IconButton = {
+        let button = SidebarView.chromeButton("sidebar.left", toolTip: "Hide Sidebar")
+        button.glyph = LineGlyph.sidebar
+        return button
+    }()
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
@@ -270,7 +305,11 @@ final class SidebarView: NSView {
         button.glyph = DownloadGlyph.image(.arrow)
         return button
     }()
-    private let newSpaceButton = SidebarView.chromeButton("plus", toolTip: "New Space")
+    private let newSpaceButton: IconButton = {
+        let button = SidebarView.chromeButton("plus", toolTip: "New Space")
+        button.glyph = LineGlyph.plus
+        return button
+    }()
     private var dots: [SpaceDotView] = []
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
     var isPrivate = false {
@@ -501,8 +540,9 @@ final class SidebarView: NSView {
                 return dot
             }
         }
-        for dot in dots {
+        for (i, dot) in dots.enumerated() {
             guard let space = Library.shared.space(dot.spaceID) else { continue }
+            dot.number = i + 1
             dot.color = space.swatch
             dot.icon = space.icon
             dot.isSelected = space.id == current
@@ -1146,7 +1186,7 @@ enum DownloadGlyph {
     /// Drawn to the size of the bottom bar's other symbols (`Sidebar.glyph`): the circle's diameter through the middle
     /// of its line, and the line, as SF's arrow.down.circle has them.
     static let circle: CGFloat = (Tokens.Sidebar.glyph * 1.046 * 10).rounded() / 10
-    static let line: CGFloat = 1.3
+    static let line: CGFloat = LineGlyph.stroke
     /// The arrow and the check were drawn for a 13.6pt circle; they grow with it.
     private static let k = circle / 13.6
 
