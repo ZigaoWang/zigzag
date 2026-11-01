@@ -562,11 +562,11 @@ final class PassThroughView: NSView {
 
 // MARK: - Wordmark as a material
 
-/// The drawn ZIGZAG as an object: the navy (the ribbon's pale blue in dark mode) running deeper toward the bottom,
-/// beveled (light along the top edges of its strokes, shade along the bottom), with a glint that slides toward
-/// `light`, standing off the surface on its own two shadows.
+/// The drawn ZIGZAG as an object: solid navy with only a fine light along the top edges of its strokes by day; the
+/// ribbon's pale blue, beveled, by night. A glint slides toward `light` while `glints` (the pointer is over it).
 final class EmbossedWordmark: NSView {
     var light = CGPoint.zero { didSet { applyLight(animated: true) } }
+    var glints = false { didSet { if oldValue != glints { MaterialMotion.animate(Tokens.Material.settle) { glint.opacity = glints ? 1 : 0 } } } }
     private let cast = CastShadow()
     private let body = CAGradientLayer()
     private let bodyMask = CAShapeLayer()
@@ -583,6 +583,7 @@ final class EmbossedWordmark: NSView {
         body.endPoint = CGPoint(x: 0.5, y: 0)
         glint.mask = glintMask
         glint.type = .radial
+        glint.opacity = 0
         [cast.ambient, cast.contact, body, bottomShade.layer, topLight.layer, glint].forEach { layer?.addSublayer($0) }
         setAccessibilityElement(true)
         setAccessibilityRole(.image)
@@ -624,15 +625,15 @@ final class EmbossedWordmark: NSView {
         let dark = effectiveAppearance.isDark
         Tokens.Motion.withoutAnimation {
             body.colors = dark ? [Tokens.Color.hex(0xFFFFFF).cgColor, Tokens.Color.hex(0xC3D3E7).cgColor]
-                : [Tokens.Color.hex(0x2F5A8C).cgColor, Brand.navy.cgColor, Tokens.Color.hex(0x152B47).cgColor]
-            body.locations = dark ? [0, 1] : [0, 0.55, 1]
-            topLight.set(color: NSColor.white.cgColor, opacity: dark ? 0.9 : 0.55, radius: 0.6, drop: 1.2)
-            bottomShade.set(color: Tokens.Material.shadowInk.cg(dark), opacity: dark ? 0.35 : 0.45, radius: 1, drop: -1.2)
-            let hot = NSColor.white.withAlphaComponent(dark ? 0.9 : 0.42).cgColor
+                : [Tokens.Color.hex(0x23446B).cgColor, Brand.navy.cgColor]
+            body.locations = [0, 1]
+            topLight.set(color: NSColor.white.cgColor, opacity: dark ? 0.9 : 0.22, radius: 0.4, drop: 0.8)
+            bottomShade.set(color: Tokens.Material.shadowInk.cg(dark), opacity: dark ? 0.35 : 0, radius: 1, drop: -1.2)
+            let hot = NSColor.white.withAlphaComponent(dark ? 0.9 : 0.5).cgColor
             glint.colors = [hot, hot.copy(alpha: 0)!]
-            cast.apply(Tokens.Material.Elevation(ambientRadius: 7, ambientDrop: 5, ambientOpacity: dark ? 0.2 : 0.22,
-                                                   contactRadius: 0.8, contactDrop: 1, contactOpacity: dark ? 0.18 : 0.3),
-                         isDark: dark, color: dark ? nil : Brand.navy.cgColor)
+            cast.apply(Tokens.Material.Elevation(ambientRadius: dark ? 7 : 3, ambientDrop: dark ? 5 : 2, ambientOpacity: dark ? 0.2 : 0.08,
+                                                 contactRadius: 0.5, contactDrop: 0.5, contactOpacity: dark ? 0.18 : 0.12),
+                       isDark: dark, color: dark ? nil : Brand.navy.cgColor)
         }
     }
 
@@ -650,10 +651,14 @@ final class EmbossedWordmark: NSView {
 /// A capsule you can feel: lit along its top edge, a step deeper at the bottom, standing on a contact shadow and a
 /// soft ambient one. Under the pointer it rises a point and its shadow grows; pressed it sinks a point, shrinks a
 /// touch, its gradient turns over and its shadow tightens, as something pushed in. `.primary` is glossy in the
-/// accent with a shadow of its own color (one per surface); `.secondary` is porcelain.
+/// accent with a shadow of its own color (one per surface); `.secondary` is porcelain; `.link` is only words in the
+/// accent, underlined under the pointer, for the quieter way on beside a primary. `.large` is a brand moment's one
+/// big action.
 final class TactileButton: InteractiveView {
-    enum Style { case primary, secondary }
+    enum Style { case primary, secondary, link }
+    enum Size { case regular, large }
     let style: Style
+    let size: Size
     var title: String { didSet { refreshText(); invalidateIntrinsicContentSize(); needsLayout = true } }
     /// The accent for `.primary`; nil takes its window's.
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
@@ -668,10 +673,11 @@ final class TactileButton: InteractiveView {
     private let text = CATextLayer()
     private var hasAppeared = false
 
-    init(title: String, style: Style = .secondary) {
+    init(title: String, style: Style = .secondary, size: Size = .regular) {
         self.title = title
         self.style = style
-        super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Material.controlHeight))
+        self.size = size
+        super.init(frame: NSRect(x: 0, y: 0, width: 0, height: size == .large ? Tokens.Material.largeControlHeight : Tokens.Material.controlHeight))
         [cast.ambient, cast.contact, plate].forEach { layer?.addSublayer($0) }
         [body, gloss, pressShade.layer, rim.layer, outline, text].forEach { plate.addSublayer($0) }
         body.startPoint = CGPoint(x: 0.5, y: 1)
@@ -693,13 +699,17 @@ final class TactileButton: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { false }
 
-    private var font: NSFont { Tokens.Font.row(style == .primary ? .semibold : .medium) }
-
-    var fittingWidth: CGFloat {
-        ceil((title as NSString).size(withAttributes: [.font: font]).width + Tokens.Space.x5 * 2)
+    private var font: NSFont {
+        NSFont.systemFont(ofSize: size == .large ? Tokens.Material.largeText : Tokens.TypeSize.row, weight: style == .primary ? .semibold : .medium)
     }
 
-    override var intrinsicContentSize: NSSize { NSSize(width: fittingWidth, height: Tokens.Material.controlHeight) }
+    var fittingWidth: CGFloat {
+        ceil((title as NSString).size(withAttributes: [.font: font]).width + (style == .link ? Tokens.Space.x3 : Tokens.Space.x6) * 2)
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: fittingWidth, height: size == .large ? Tokens.Material.largeControlHeight : Tokens.Material.controlHeight)
+    }
 
     override func layout() {
         super.layout()
@@ -746,16 +756,24 @@ final class TactileButton: InteractiveView {
         var ink = Tokens.Color.textPrimary
         let duration = !animated || window == nil ? 0 : pressed ? m.pressIn : m.settle
         MaterialMotion.animate(duration) {
+            [cast.ambient, cast.contact, body, gloss, rim.layer, outline].forEach { $0.isHidden = style == .link }
             switch style {
+            case .link:
+                ink = resolved(tint ?? Brand.Theme.for(self).accent)
+                if pressed { ink = ink.withAlphaComponent(0.7) }
             case .primary:
-                let theme = Brand.Theme.for(self)
-                let base = resolved(tint ?? theme.accent)
+                // The deep accent in both modes: glossy and saturated, white text on it at AA.
+                let accent = tint ?? Brand.Theme.for(self).accent
+                var deep = accent.cgColor
+                NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance { deep = accent.cgColor }
+                let base = NSColor(cgColor: deep)?.usingColorSpace(.sRGB) ?? accent
                 let top = base.blended(withFraction: hovered ? 0.3 : 0.22, of: .white) ?? base
                 let bottom = base.blended(withFraction: 0.16, of: .black) ?? base
                 body.colors = pressed ? [bottom.cgColor, base.cgColor] : [top.cgColor, base.cgColor, bottom.cgColor]
                 body.locations = pressed ? [0, 1] : [0, 0.55, 1]
                 let white = NSColor.white
-                gloss.colors = [white.withAlphaComponent(0.34).cgColor, white.withAlphaComponent(0.08).cgColor, white.withAlphaComponent(0).cgColor]
+                // The specular band: bright along the top, gone by the middle.
+                gloss.colors = [white.withAlphaComponent(dark ? 0.4 : 0.34).cgColor, white.withAlphaComponent(0.08).cgColor, white.withAlphaComponent(0).cgColor]
                 gloss.locations = [0, 0.48, 0.62]
                 gloss.opacity = pressed ? 0.35 : 1
                 rim.set([white.withAlphaComponent(0.6).cgColor, white.withAlphaComponent(0.1).cgColor,
@@ -763,7 +781,7 @@ final class TactileButton: InteractiveView {
                 outline.strokeColor = (base.blended(withFraction: 0.5, of: .black) ?? base).withAlphaComponent(0.6).cgColor
                 let shade = (base.blended(withFraction: 0.45, of: .black) ?? base).cgColor
                 cast.apply(pressed ? m.raisedPressed : hovered ? m.raisedHover : m.raisedRest, isDark: dark, color: shade, gain: dark ? 1 : 2.2)
-                ink = resolved(theme.onAccent)
+                ink = m.primaryInk
             case .secondary:
                 body.colors = pressed ? [m.pressedTop.cg(dark), m.pressedBottom.cg(dark)] : [m.raisedTop.cg(dark), m.raisedBottom.cg(dark)]
                 body.locations = [0, 1]
@@ -779,15 +797,17 @@ final class TactileButton: InteractiveView {
             }
             pressShade.set(color: m.recessShade.cg(dark), opacity: 0.5, radius: 3, drop: 1.5)
             pressShade.layer.opacity = pressed ? 1 : 0
-            let rise = pressed ? -m.sink : hovered ? m.lift : 0
+            let rise = style == .link ? 0 : pressed ? -m.sink : hovered ? m.lift : 0
             plate.transform = Tokens.Motion.reduceMotion ? CATransform3DIdentity : MaterialMotion.pose(rise: rise, scale: pressed ? m.pressScale : 1)
         }
         // Letterpress: light text stands on a dark hairline, dark text on a light one.
         let lightInk = Tokens.Color.luminance(of: ink) > 0.5
         Tokens.Motion.withoutAnimation {
-            text.string = NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: ink])
+            var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+            if style == .link, hovered { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
+            text.string = NSAttributedString(string: title, attributes: attributes)
             text.shadowColor = (lightInk ? NSColor.black : NSColor.white).cgColor
-            text.shadowOpacity = lightInk ? 0.25 : (dark ? 0 : 0.6)
+            text.shadowOpacity = style == .link ? 0 : lightInk ? 0.25 : (dark ? 0 : 0.6)
             text.shadowRadius = 0
             text.shadowOffset = CGSize(width: 0, height: lightInk ? 0.5 : -0.5)
         }
@@ -1063,6 +1083,8 @@ final class RecessedField: NSView {
 /// a few soft fields of color drifting in it (`Atmosphere`), grain, and the light everything is lit by, falling from
 /// above. Drifts only while the window is seen, and holds still with Reduce Motion.
 final class SkyBackdrop: NSView {
+    /// A color the sky leans toward (the space in front), easing there over a second; nil is Zigzag's own.
+    var tint: NSColor? { didSet { atmosphere.applyColors(animated: window != nil && !Tokens.Motion.reduceMotion) } }
     private let atmosphere = Atmosphere()
     private let lightView = PassThroughView()
     private let sun = CAGradientLayer()
@@ -1070,7 +1092,7 @@ final class SkyBackdrop: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        atmosphere.customPalette = Self.palette
+        atmosphere.customPalette = { [weak self] dark in Self.palette(dark: dark, tint: self?.tint) }
         lightView.wantsLayer = true
         sun.type = .radial
         lightView.layer?.addSublayer(sun)
@@ -1082,14 +1104,19 @@ final class SkyBackdrop: NSView {
     override var isFlipped: Bool { false }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    private static func palette(dark: Bool) -> Atmosphere.Palette {
+    private static func palette(dark: Bool, tint: NSColor?) -> Atmosphere.Palette {
         let hex = Tokens.Color.hex
+        // The tint colors two of the fields a little: the sky leans toward it rather than turning into it.
+        func lean(_ color: NSColor, _ amount: CGFloat) -> NSColor {
+            guard let tint = tint?.usingColorSpace(.sRGB), let c = color.usingColorSpace(.sRGB) else { return color }
+            return (c.blended(withFraction: amount, of: tint) ?? c).withAlphaComponent(c.alphaComponent)
+        }
         if dark {
             return Atmosphere.Palette(top: hex(0x10213A, 1), bottom: hex(0x050A13, 1),
-                                      fields: [hex(0x1E3A5F, 0.9), hex(0x0A1424, 0.8), hex(0x335E8F, 0.55), hex(0x284B75, 0.6)])
+                                      fields: [lean(hex(0x1E3A5F, 0.9), 0.35), hex(0x0A1424, 0.8), lean(hex(0x335E8F, 0.55), 0.5), hex(0x284B75, 0.6)])
         }
         return Atmosphere.Palette(top: hex(0xE4EDF7, 1), bottom: hex(0xC9D7E8, 1),
-                                  fields: [hex(0xF4F7FB, 0.9), hex(0xB4C8DF, 0.55), hex(0xDAE5F2, 0.9), hex(0xFFFFFF, 0.7)])
+                                  fields: [lean(hex(0xF4F7FB, 0.9), 0.3), hex(0xB4C8DF, 0.55), lean(hex(0xDAE5F2, 0.9), 0.45), hex(0xFFFFFF, 0.7)])
     }
 
     override func layout() {

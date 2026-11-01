@@ -779,6 +779,8 @@ enum Tokens {
         static let glassWashBottom = Tone(light: white(0.20), dark: white(0.02))
         static let glassGlow = Tone(light: white(1), dark: white(0.5))
         static let sheen = Tone(light: white(0.85), dark: white(0.22))
+        /// Text on a tactile primary, which keeps the deep accent in dark mode too, glossy and saturated.
+        static let primaryInk = NSColor.white
         /// Grain over glass, so it reads as a material rather than a screen.
         static let grainOpacity: Float = 0.05
 
@@ -811,6 +813,11 @@ enum Tokens {
         /// A large glass surface on a brand moment, and the height of its tactile controls.
         static let heroRadius: CGFloat = 28
         static let controlHeight: CGFloat = Space.x10
+        /// The one big action on a brand moment ("Get Started"), and its text.
+        static let largeControlHeight: CGFloat = Space.x10 + Space.x1
+        static let largeText: CGFloat = 15
+        /// A brand moment's headline: one line saying what Zigzag is.
+        static let headline: CGFloat = 30
     }
 
     // MARK: - Shadows (purposeful only)

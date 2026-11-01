@@ -203,7 +203,8 @@ objects under one light straight above. `Materials.swift` holds them; every valu
   dark mode (`darkShadowGain`). Every lifted thing has two shadows, a tight contact one and a soft ambient one
   (`CastShadow`, from a path, so they cost nothing to move).
 - **`SkyBackdrop`**: the world they stand in. Zigzag's own colors as a sky (pale ribbon blue by day, deep navy by
-  night), a few soft drifting fields (`Atmosphere`), grain, and a pool of light from above. Never stock gradients.
+  night), a few soft drifting fields (`Atmosphere`), grain, and a pool of light from above. `tint` leans it toward
+  the space in front. Never stock gradients.
 - **`GlassSurface`**: the one panel. Liquid Glass (frost before macOS 26) under a wash brighter at the top, a glow
   inside the edge, a specular rim on the top edge with a faint catch light on the bottom, grain, and a hot spot that
   leans toward `light` (the pointer). `Radius`: `Material.heroRadius`. One per screen; nothing nests in it but
@@ -212,14 +213,19 @@ objects under one light straight above. `Materials.swift` holds them; every valu
   `tileCorner` of its side, a porcelain or colored body, a bevel (light top edge, darker bottom one), a hairline, a
   hot spot that slides toward the pointer. A site's own square icon fills the face (`fillsFace`). Hover lifts it
   `tileLift` and grows its shadow; it turns up to `Material.tilt` degrees toward the pointer.
-- **`TactileButton`**: a capsule `controlHeight` tall. `.primary` is glossy in the accent with a shadow of its own
-  color, one per surface; `.secondary` is porcelain. Hover rises `lift`; pressed it sinks `sink`, shrinks to
+- **`TactileButton`**: a capsule `controlHeight` tall, or `largeControlHeight` with `largeText` for a brand
+  moment's one big action. `.primary` is glossy in the deep accent (in dark mode too) with white text and a shadow
+  of its own color, one per surface; `.secondary` is porcelain; `.link` is words in the accent, underlined under the
+  pointer, for the quieter way on under a primary. Hover rises `lift`; pressed it sinks `sink`, shrinks to
   `pressScale`, its gradient turns over and its shadow tightens.
 - **`TactileToggle`**: a glassy knob on its own shadows in a recessed track; the accent fills the track when on.
   With a title, the whole row is the control. Pressed, the knob stretches toward where it's going.
 - **`RecessedField`**: set into the surface: darker under the top lip, an inner shadow, the lower lip catching
   light. Typing, the accent rings it with a soft glow.
-- **`EmbossedWordmark`**: the drawn ZIGZAG as a beveled object with a glint that follows the pointer.
+- **`EmbossedWordmark`**: the drawn ZIGZAG as an object: solid navy with a fine top light by day, the ribbon's
+  pale blue, beveled, by night; a glint follows the pointer only while it's over the mark.
+- **A brand moment's words**: the wordmark, one headline (`Material.headline`, semibold) saying plainly what Zigzag
+  is, one quiet line (`largeText`, `textSecondary`), then the one big action.
 - **Recipes**: `MaterialShape.rounded` (continuous corners as a path), `GradientStroke` (rims, bevels, lips),
   `InnerShadow` (recesses), `MaterialMotion` (the ease-out, poses, tilt), `OcclusionPause`.
 
