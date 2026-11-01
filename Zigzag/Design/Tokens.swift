@@ -447,6 +447,8 @@ enum Tokens {
         /// settle back over `pressSettle`, eased out, with weight and no bounce (`showSink`).
         static let pressSink: CGFloat = 1
         static let pressSettle: TimeInterval = 0.18
+        /// A download thrown into its button: the one movement past `large`, since it crosses the whole window.
+        static let flight: TimeInterval = 0.45
         /// A menu growing out of the control that opened it: from this scale with a fade, in `menuIn`, eased out;
         /// leaving is quicker and subtler (`menuOut`, toward `menuOutScale`).
         static let menuFrom: CGFloat = 0.96

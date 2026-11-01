@@ -1101,10 +1101,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         flyer.bounds = CGRect(x: 0, y: 0, width: size, height: size)
         flyer.position = end
         flyer.zPosition = 2000
+        // Carried, like a row picked up: the small carry shadow.
         flyer.shadowColor = NSColor.black.cgColor
-        flyer.shadowOpacity = 0.18
-        flyer.shadowRadius = 6
-        flyer.shadowOffset = CGSize(width: 0, height: 3)
+        flyer.shadowOpacity = 0.14
+        flyer.shadowRadius = Tokens.Shadow.carryRadius
+        flyer.shadowOffset = CGSize(width: 0, height: Tokens.Shadow.carryDrop)
         flyer.opacity = 0
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1114,7 +1115,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // the button. Sampled from a real parabola in time, so the speed comes from the arc itself.
         // High enough to read as a throw, never off the top of the page.
         // Started right at the page's top, it still rises a little, so the arc stays an arc.
-        let topY = min(min(start.y, end.y) - 24, max(card.minY + 40, min(start.y, end.y) - max(170, min(280, abs(end.x - start.x) * 0.35 + 110))))
+        let topY = min(min(start.y, end.y) - 24, max(card.minY + 40, min(start.y, end.y) - max(120, min(200, abs(end.x - start.x) * 0.25 + 80))))
         let drop = end.y - start.y, rise = start.y - topY
         // y(t) = a·t² + b·t + y0 through both ends, with its highest point at topY (y grows downward).
         let a = ((2 * drop + 4 * rise) + max(0, (2 * drop + 4 * rise) * (2 * drop + 4 * rise) - 4 * drop * drop).squareRoot()) / 2
@@ -1127,12 +1128,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let side = 1 - pow(1 - t, 1.6)
             points.append(NSValue(point: NSPoint(x: start.x + (end.x - start.x) * side, y: start.y + b * t + a * t * t)))
         }
-        // Long enough to follow the arc, which is the point of it: a download landing is a rare moment, not a
-        // shortcut you press all day.
-        let duration = 0.8 * Tokens.Motion.debugSlowdown
+        // Quick enough to read as a toss rather than a show: the arc leaves fast and settles into the button, eased
+        // out (`Motion.flight`), the one movement allowed past `large` because it crosses the whole window.
+        let duration = Tokens.Motion.flight * Tokens.Motion.debugSlowdown
         let move = CAKeyframeAnimation(keyPath: "position")
         move.values = points
         move.calculationMode = .linear
+        move.timingFunction = Tokens.Motion.easeOut
         let scale = CAKeyframeAnimation(keyPath: "transform.scale")
         // Grows to its size as it leaves and shrinks into the button: no overshoot, no tilt.
         scale.values = [0.6, 1.0, 0.5]
