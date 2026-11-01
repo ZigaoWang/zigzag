@@ -1,16 +1,15 @@
 import AppKit
 import WebKit
 
-/// The peek card's top strip: site, then "Open as Tab" and close.
+/// The peek's top strip, on the panel's glass: the site, then "Open as Tab" and close.
 final class PeekHeaderView: NSView {
     let icon = FaviconView()
-    let host = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: "Open as Tab")
-    let closeButton = IconButton(symbol: "xmark", toolTip: "Close")
+    let host = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", size: Tokens.Page.controlHeight, toolTip: "Open as Tab")
+    let closeButton = IconButton(symbol: "xmark", size: Tokens.Page.controlHeight, toolTip: "Close")
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        wantsLayer = true
         [icon, host, expandButton, closeButton].forEach { addSubview($0) }
         // Out of the strip, "Close" alone doesn't say what closes.
         expandButton.setAccessibilityLabel("Open Peek as Tab")
@@ -20,38 +19,25 @@ final class PeekHeaderView: NSView {
         setAccessibilityLabel("Peek")
     }
 
-    /// Takes the page's own color, so the strip reads as the top of that page, with text that stands out on it.
-    func tint(with color: NSColor?) {
-        guard let color = color?.usingColorSpace(.sRGB) else {
-            layer?.backgroundColor = nil
-            host.textColor = Tokens.Color.textPrimary
-            expandButton.tint = Tokens.Color.icon
-            closeButton.tint = Tokens.Color.icon
-            return
-        }
-        layer?.backgroundColor = color.cgColor
-        let luminance = 0.2126 * color.redComponent + 0.7152 * color.greenComponent + 0.0722 * color.blueComponent
-        let ink: NSColor = luminance < 0.55 ? NSColor(white: 1, alpha: 0.92) : NSColor(white: 0, alpha: 0.82)
-        host.textColor = ink
-        expandButton.tint = ink.withAlphaComponent(0.75)
-        closeButton.tint = ink.withAlphaComponent(0.75)
-    }
-
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x3
+        // Close sits as far from the panel's top and side as the page below sits from its sides, so its corner runs
+        // with the panel's (`FloatingPanelView` fits it).
+        let edge = PeekController.inset + 2
+        let b = Tokens.Page.controlHeight
+        let y = (bounds.height - b) / 2
+        closeButton.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
+        expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: y, width: b, height: b)
+        [expandButton, closeButton].forEach { $0.radius = max(Tokens.Radius.control, Tokens.Radius.large - max(edge, y)) }
         let iconSize = Tokens.Metric.favicon
-        icon.frame = NSRect(x: pad, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
-        let b = Tokens.Metric.iconButton
-        closeButton.frame = NSRect(x: bounds.width - Tokens.Space.x2 - b, y: (bounds.height - b) / 2, width: b, height: b)
-        expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: closeButton.frame.minY, width: b, height: b)
-        let x = icon.frame.maxX + Tokens.Space.x2
+        icon.frame = NSRect(x: PeekController.inset + CardRow.inset, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
+        let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
         let h = host.lineHeight
-        host.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: expandButton.frame.minX - x - Tokens.Space.x2, height: h)
+        host.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, expandButton.frame.minX - x - Tokens.Space.x2), height: h)
     }
 }
 
@@ -87,25 +73,25 @@ final class PeekController {
 
     init(controller: BrowserWindowController) {
         self.controller = controller
-        panel.radius = Tokens.Radius.panel
+        // A big floating surface holding a rounded page: the large radius, the page inset in it concentrically.
+        panel.radius = Tokens.Radius.large
         content.wantsLayer = true
         content.layer?.masksToBounds = true
-        clip.wantsLayer = true
-        clip.layer?.masksToBounds = true
-        clip.layer?.cornerCurve = .continuous
+        content.layer?.cornerCurve = .continuous
         clip.addSubview(header)
         clip.addSubview(content)
         panel.addSubview(clip)
         // A firmer dim than other panels: the peek is a layer above the page, and should read as one.
-        scrim.color = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor.black.withAlphaComponent(0.45) : NSColor.black.withAlphaComponent(0.22) }
+        scrim.color = Tokens.Color.peekScrim
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         scrim.onClick = { [weak self] in self?.close() }
         header.closeButton.onClick = { [weak self] _ in self?.close() }
         header.expandButton.onClick = { [weak self] _ in self?.openAsTab() }
     }
 
-    private var headerHeight: CGFloat { Tokens.Space.x10 }
+    private var headerHeight: CGFloat { Tokens.Metric.peekHeaderHeight }
+    /// From the glass's edge to the page in it, at the sides and bottom.
+    static let inset = Tokens.Space.x1
 
     private func panelFrame() -> NSRect {
         guard let controller else { return .zero }
@@ -117,9 +103,10 @@ final class PeekController {
 
     private func layoutPanel() {
         clip.frame = panel.bounds
-        clip.layer?.cornerRadius = panel.radius
         header.frame = NSRect(x: 0, y: 0, width: panel.bounds.width, height: headerHeight)
-        content.frame = NSRect(x: 0, y: headerHeight, width: panel.bounds.width, height: panel.bounds.height - headerHeight)
+        let inset = Self.inset
+        content.frame = NSRect(x: inset, y: headerHeight, width: panel.bounds.width - inset * 2, height: panel.bounds.height - headerHeight - inset)
+        content.layer?.cornerRadius = panel.radius - inset
         tab?.webView?.frame = content.bounds
     }
 
@@ -142,7 +129,6 @@ final class PeekController {
         // Until the new page paints, show the colour of the page you came from, not a flash of white.
         let behind = opener?.webView.flatMap { $0.themeColor ?? $0.underPageBackgroundColor }
         content.layer?.backgroundColor = behind?.cgColor
-        header.tint(with: behind)
         webView.setValue(false, forKey: "drawsBackground")
         webView.frame = content.bounds
         webView.autoresizingMask = [.width, .height]
@@ -189,10 +175,6 @@ final class PeekController {
         header.host.stringValue = tab.url.map(HistoryStore.normalizedHost) ?? tab.displayTitle
         header.icon.image = tab.favicon
         header.icon.isLoading = tab.isLoading
-        // Once the page has its own colour; until then it keeps the one it opened with.
-        if !tab.isLoading || tab.webView?.themeColor != nil {
-            header.tint(with: tab.webView.flatMap { $0.themeColor ?? $0.underPageBackgroundColor })
-        }
     }
 
     /// The link you clicked, if the pointer is over the page: the peek opens from there.
