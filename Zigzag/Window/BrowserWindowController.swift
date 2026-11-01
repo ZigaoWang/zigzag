@@ -1476,6 +1476,8 @@ extension BrowserWindowController: SidebarDelegate {
     func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {
         guard !tabManager.isPrivate else { return }
         pageChange("Split View") { [tabManager] in
+            // From another space: into the tab's first, so the two end up side by side where the tab is.
+            if Library.shared.spaceID(ofBookmark: bookmarkID) != tab.spaceID { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: tab.spaceID) }
             let index = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab }.map { $0 + 1 }
             if let unpinned = tabManager.unbookmark(bookmarkID, toIndex: index) {
                 tabManager.makeSplit(tab, with: unpinned, otherOnRight: pinnedOnRight)
@@ -1567,7 +1569,12 @@ extension BrowserWindowController: SidebarDelegate {
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) {
         // Pins are shared by every window: a private one doesn't take them away.
         guard !tabManager.isPrivate else { return }
-        unbookmarkWithUndo(bookmarkID, to: index)
+        let space = tabManager.currentSpaceID
+        pageChange("Unpin Tab") { [tabManager] in
+            // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
+            if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
+            tabManager.unbookmark(bookmarkID, toIndex: index)
+        }
     }
     /// A tab in a window of its own, a little down and to the right of this one, so both stay in view.
     func moveToNewWindow(_ tab: Tab) {
