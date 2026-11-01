@@ -292,12 +292,18 @@ final class FavoriteTile: InteractiveView {
     var onClose: (() -> Void)?
     /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
     /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
-    private static let closeSide: CGFloat = 14
+    private static let closeSide: CGFloat = 16
+    /// From the tile's top and right edges to the button: inside the tile's rounded corner, not on it.
+    private static let closeInset: CGFloat = 5
     private lazy var closeButton: IconButton = {
         let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: 7, toolTip: "Unload Page")
         button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
-        button.layer?.cornerRadius = Self.closeSide / 2
+        button.radius = Self.closeSide / 2
+        // A small solid chip with a hairline, so the mark reads cleanly on any icon or tile behind it.
+        button.showsFillAtRest = true
+        button.layer?.borderWidth = Tokens.Metric.hairline
+        button.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
         button.onClick = { [weak self] _ in self?.onClose?() }
         button.isHidden = true
         addSubview(button)
@@ -388,8 +394,8 @@ final class FavoriteTile: InteractiveView {
             let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Tokens.Metric.favicon } == true ? Self.iconSide : Tokens.Metric.favicon
             icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         }
-        let side = Self.closeSide
-        closeButton.frame = NSRect(x: bounds.width - side - 3, y: isFlipped ? 3 : bounds.height - side - 3, width: side, height: side)
+        let side = Self.closeSide, edge = Self.closeInset
+        closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
     }
 
     override func stateDidChange(animated: Bool) {
