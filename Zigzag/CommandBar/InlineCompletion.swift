@@ -102,10 +102,15 @@ enum InlineCompletion {
             if host == bare, exact.map({ site.score > $0.score }) ?? true { exact = site }
             if host.hasPrefix(bare) {
                 consider(site, address, whole: true)
-            } else if let short = shortenedHosts(host).last(where: { $0.hasPrefix(bare) }) {
-                // Shown and opened as the shorter host itself; the site sends you on from there as it likes.
-                guard let url = URL(string: "https://" + (www ? "www." : "") + short) else { continue }
-                consider(Site(url: url, score: site.score), short, whole: false)
+            } else if let short = shortenedHosts(HistoryStore.normalizedHost(site.url)).last(where: { $0.hasPrefix(bare) }) {
+                // Shown and opened as the shorter host itself, on the scheme and port it was visited with; the site
+                // sends you on from there as it likes.
+                var parts = URLComponents()
+                parts.scheme = site.url.scheme?.lowercased() ?? "https"
+                parts.host = (www ? "www." : "") + short
+                parts.port = site.url.port
+                guard let url = parts.url else { continue }
+                consider(Site(url: url, score: site.score), short + (site.url.port.map { ":\($0)" } ?? ""), whole: false)
             }
         }
         if let exact, let front = target(exact.url, wholePage: false) {

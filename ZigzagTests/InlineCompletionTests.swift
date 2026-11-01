@@ -35,6 +35,10 @@ struct InlineCompletionTests {
         #expect(InlineCompletion.best(for: "goo", among: [site("https://docs.google.com")])?.text == "google.com")
         #expect(InlineCompletion.best(for: "bb", among: [site("https://news.bbc.co.uk")])?.text == "bbc.co.uk")
         #expect(InlineCompletion.best(for: "dev", among: [site("https://a.dev.example.com")])?.text == "dev.example.com")
+        // The scheme and port it was visited on come along.
+        let staging = InlineCompletion.best(for: "exa", among: [site("http://staging.example.com:8080/app")])
+        #expect(staging?.text == "example.com:8080")
+        #expect(staging?.url.absoluteString == "http://example.com:8080")
         #expect(InlineCompletion.shortenedHosts("a.b.example.co.uk") == ["b.example.co.uk", "example.co.uk"])
         #expect(InlineCompletion.shortenedHosts("example.com").isEmpty)
         #expect(InlineCompletion.shortenedHosts("192.168.1.1").isEmpty)
