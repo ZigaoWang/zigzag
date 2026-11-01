@@ -437,7 +437,7 @@ final class SidebarListView: NSView {
         }
     }
 
-    /// Starts renaming a folder's row (a new folder, or Rename… in its menu).
+    /// Starts renaming a folder's row (a new folder, or Rename in its menu).
     func renameFolder(_ id: UUID) {
         layoutSubtreeIfNeeded()
         (rows[.folder(id)] as? FolderRowView)?.beginRename()

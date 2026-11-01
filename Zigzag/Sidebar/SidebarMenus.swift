@@ -99,7 +99,7 @@ enum SidebarMenus {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let manager = controller.tabManager
-        menu.addItem(Item("Rename…") { controller.sidebar.list.beginRenaming(tab: tab.id) })
+        menu.addItem(Item("Rename") { controller.sidebar.list.beginRenaming(tab: tab.id) })
         menu.addItem(Item("Copy Link", enabled: tab.url != nil) {
             if let url = tab.url { controller.copyLink(url) }
         })
@@ -152,7 +152,7 @@ enum SidebarMenus {
         let live = manager.bookmarkTab(for: bookmark.id)
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
         // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
-        if pinned == nil { menu.addItem(Item("Rename…") { BookmarkEditor.edit(bookmark.id, in: controller) }) }
+        if pinned == nil { menu.addItem(Item("Rename") { BookmarkEditor.edit(bookmark.id, in: controller) }) }
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(bookmark.id) })
             menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(bookmark.id) })
@@ -228,7 +228,7 @@ enum SidebarMenus {
     static func folderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(Item("Rename…") { controller.sidebar.list.renameFolder(folder.id) })
+        menu.addItem(Item("Rename") { controller.sidebar.list.renameFolder(folder.id) })
         menu.addItem(Item("Change Icon…") { controller.chooseFolderIcon(folder.id) })
         menu.addItem(Item(folder.isOpen ? "Close Folder" : "Open Folder") { controller.listSetFolderOpen(folder.id, !folder.isOpen) })
         menu.addItem(.separator())
