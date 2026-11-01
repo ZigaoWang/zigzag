@@ -1866,14 +1866,13 @@ final class SlidingSwitch: NSView {
         let target = segment(selectedIndex)
         // Concentric with the track: the pill's corners follow the track's at the same inset.
         pill.layer?.cornerRadius = max((track.layer?.cornerRadius ?? 0) - inset, 0)
-        if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Tokens.Motion.standard
-                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1)
-                pill.animator().frame = target
-            }
+        // The same glide as every moving selection: from where it's drawn, eased out; from the keyboard or with
+        // Reduce Motion it simply lands (`Motion.glide` skips the movement then).
+        if animated && !Tokens.Motion.isFromKey && pill.frame.width > 0 {
+            Tokens.Motion.glide(pill, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
         } else {
-            pill.frame = target
+            pill.layer?.removeAnimation(forKey: "glide")
+            Tokens.Motion.withoutAnimation { pill.frame = target }
         }
         for (i, label) in labels.enumerated() {
             label.textColor = i == selectedIndex ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
