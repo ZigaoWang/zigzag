@@ -233,4 +233,16 @@ struct BookmarkFolderTests {
         let forged = ErrorPage.describe(NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted), url: url)
         #expect(forged.0 == "This connection isn’t private")
     }
+
+    @Test func theEmojiFieldTakesEmojiOfEveryKind() {
+        for emoji in ["😀", "❤️", "☀️", "✈️", "✌️", "1️⃣", "👍🏽", "🇯🇵"] {
+            #expect(IconGrid.lastEmoji(in: emoji) == emoji)
+        }
+        // The last one typed.
+        #expect(IconGrid.lastEmoji(in: "😀a🚀b") == "🚀")
+        // A plain digit, "#" or "*" counts as emoji in Unicode, but isn't one to look at.
+        for text in ["abc", "1", "#", "*", "©", ""] {
+            #expect(IconGrid.lastEmoji(in: text) == nil)
+        }
+    }
 }

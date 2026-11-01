@@ -131,11 +131,25 @@ final class IconGrid: NSView, NSTextFieldDelegate {
 
     /// The last emoji typed is the icon; anything that isn't one is left out.
     func controlTextDidChange(_ obj: Notification) {
-        let emoji = emojiField.stringValue.reversed().first { $0.unicodeScalars.contains { $0.properties.isEmojiPresentation } }
-        guard let emoji else { return }
-        emojiField.stringValue = String(emoji)
-        selected = String(emoji)
-        onPick?(String(emoji))
+        guard let emoji = Self.lastEmoji(in: emojiField.stringValue) else {
+            // Letters, or a digit or a symbol on its own, don't stay in the field as if they were the icon.
+            // (Not while an input method is still composing: that text isn't settled.)
+            if (emojiField.currentEditor() as? NSTextView)?.hasMarkedText() != true { emojiField.stringValue = "" }
+            return
+        }
+        emojiField.stringValue = emoji
+        selected = emoji
+        onPick?(emoji)
+    }
+
+    /// The last emoji in some text: one that shows as an emoji on its own (😀), a symbol asked to (❤️ ☀️ ✈️, with
+    /// U+FE0F) or a keycap (1️⃣); never a plain digit, "#" or "*", which Unicode also counts as emoji.
+    static func lastEmoji(in text: String) -> String? {
+        text.reversed().first { character in
+            let scalars = character.unicodeScalars
+            if scalars.contains(where: { $0.properties.isEmojiPresentation }) { return true }
+            return scalars.contains { $0.properties.isEmoji } && scalars.contains { $0.value == 0xFE0F || $0.value == 0x20E3 }
+        }.map(String.init)
     }
 }
 
