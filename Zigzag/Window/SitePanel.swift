@@ -279,11 +279,12 @@ final class SitePanel: FloatingPanelView {
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
         }
-        let zoom = ZoomLevels.zoom(for: url)
+        // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
+        let zoom = tab.webView?.pageZoom ?? ZoomLevels.zoom(for: url)
         if abs(zoom - 1) > 0.001 {
             rows.append(.value("Zoom", "\(Int((zoom * 100).rounded()))%", action: "Reset") { [weak self] in
                 guard let self else { return }
-                ZoomLevels.set(1, for: self.url)
+                if !self.tab.isPrivate { ZoomLevels.set(1, for: self.url) }
                 self.tab.webView?.pageZoom = 1
                 self.rebuildRows()
             })
