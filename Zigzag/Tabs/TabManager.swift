@@ -100,12 +100,20 @@ final class TabManager {
         return tab(with: id)
     }
 
-    func tab(with id: UUID) -> Tab? { allTabs.first { $0.id == id } }
+    /// Asked once per sidebar row on every refresh: looks through the lists in place rather than building `allTabs`.
+    func tab(with id: UUID) -> Tab? {
+        for list in tabsBySpace.values { if let tab = list.first(where: { $0.id == id }) { return tab } }
+        return bookmarkTabs.values.first { $0.id == id }
+    }
 
     func bookmarkTab(for bookmarkID: UUID) -> Tab? { bookmarkTabs[bookmarkID] }
 
     /// Tabs in most-recently-used order across all spaces.
-    var recentTabs: [Tab] { recentTabIDs.compactMap { tab(with: $0) } }
+    var recentTabs: [Tab] {
+        // One pass to index the tabs, not a search for each id.
+        let byID = Dictionary(allTabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return recentTabIDs.compactMap { byID[$0] }
+    }
 
     // MARK: Creating
 
