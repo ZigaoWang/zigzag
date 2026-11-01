@@ -149,6 +149,13 @@ final class PDFViewerView: NSView, PDFViewDelegate {
 
     override var isFlipped: Bool { true }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        // Layers keep the color they were given: light or dark, they take it again.
+        layer?.backgroundColor = cgColor(Self.around(dark: Self.darkPages))
+        sidebar.layer?.backgroundColor = cgColor(Self.backdrop)
+    }
+
     override func layout() {
         super.layout()
         layoutPanes()
@@ -307,6 +314,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { still.animator().alphaValue = 0 }, completion: { still.removeFromSuperview() })
     }
 
+    /// Between the pages: with dark pages, a shade lighter than the dark paper, so each page still reads as one.
+    private static func around(dark: Bool) -> NSColor { dark ? Tokens.Color.hex(0x2A2A2D) : backdrop }
+
     /// Dark pages: each page drawn dark by `DarkablePage` (soft dark paper, light ink, its colors kept), and no
     /// page shadows, which would glow.
     private func applyDarkPages() {
@@ -318,8 +328,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         let changed = darkable.map { $0.isDark != dark } ?? false
         darkable?.isDark = dark
         pdfView.pageShadowsEnabled = !dark
-        // Between the pages: a shade lighter than the dark paper, so each page still reads as one.
-        let around = dark ? Tokens.Color.hex(0x2A2A2D) : Self.backdrop
+        let around = Self.around(dark: dark)
         pdfView.backgroundColor = around
         layer?.backgroundColor = cgColor(around)
         // PDFKit keeps pages it has drawn: the document goes back in, on the same spot at the same zoom, so
