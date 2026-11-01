@@ -651,8 +651,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let old, let new, tabManager.partner(of: old) === new { return }
         if let webView = new?.webView, webView.isPictureInPictureActive, new?.floatedOnSwitch == true {
             webView.togglePictureInPicture()
-            new?.floatedOnSwitch = false
         }
+        // Back on the tab, whether its floating video is still up or you closed it yourself: a later one you float
+        // by hand is yours, and stays.
+        new?.floatedOnSwitch = false
         if let old, old.isPlayingAudio, let webView = old.webView, webView.canTogglePictureInPicture, !webView.isPictureInPictureActive {
             webView.togglePictureInPicture()
             old.floatedOnSwitch = true
