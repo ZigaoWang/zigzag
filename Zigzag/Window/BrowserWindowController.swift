@@ -22,7 +22,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var previews = TabPreviewController(controller: self)
     lazy var switcher = TabSwitcher(controller: self)
     /// ⌘Z for sidebar actions; also the window's undo manager, so page text editing shares it.
-    let sidebarUndo = UndoManager()
+    /// Each step it remembers holds on to the tabs it can bring back, closed ones too, so it keeps the last hundred
+    /// rather than a whole day's worth.
+    let sidebarUndo: UndoManager = {
+        let undo = UndoManager()
+        undo.levelsOfUndo = 100
+        return undo
+    }()
     /// Inside a `pageChange`: the steps it's made of (pin, then into a folder) are its own, one ⌘Z and one redo.
     var isInPageChange = false
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
