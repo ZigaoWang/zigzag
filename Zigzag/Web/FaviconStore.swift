@@ -6,6 +6,8 @@ final class FaviconStore {
     static let shared = FaviconStore()
 
     private var memory: [String: NSImage] = [:]
+    /// Sites with no icon file yet, so asking again (every sidebar refresh) doesn't read the disk each time.
+    private var missing: Set<String> = []
     private var inFlight: Set<String> = []
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -58,10 +60,12 @@ final class FaviconStore {
         if url.scheme == HistoryPage.scheme { return Tokens.Symbol.image("clock.arrow.circlepath", size: Tokens.Symbol.row) }
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }
+        guard !missing.contains(key) else { return nil }
         if let image = NSImage(contentsOf: file(for: key)) {
             memory[key] = image
             return image
         }
+        missing.insert(key)
         return nil
     }
 
@@ -186,6 +190,7 @@ final class FaviconStore {
     private func store(_ image: NSImage, key: String) {
         let normalized = Self.normalize(image)
         memory[key] = normalized
+        missing.remove(key)
         if let tiff = normalized.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
             try? png.write(to: file(for: key), options: .atomic)
