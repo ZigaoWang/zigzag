@@ -87,13 +87,35 @@ enum Brand {
             Tokens.Color.dynamic(light: .white, dark: Brand.color(hue: hue ?? Brand.navyHue, saturation: 0.7, luminance: 0.012))
         }
 
+        /// The hue a floating panel's surface leans toward: the space's own, nil for white, grays and black.
+        var surfaceHue: Double? = nil
+
+        /// A floating panel's surface (the command bar, menus, find, downloads, Peek): nearly white by day and a deep
+        /// gray at night, each leaning just perceptibly toward the space, so a panel belongs to the window it's in
+        /// and its text always reads.
+        var panel: NSColor {
+            guard let h = surfaceHue else { return Tokens.Color.panelBackground }
+            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: Tokens.Frame.panelLightness, chroma: Tokens.Frame.panelChroma),
+                                        dark: SpaceColor.tone(hue: h, lightness: Tokens.Frame.panelDarkLightness, chroma: Tokens.Frame.panelDarkChroma))
+        }
+
+        /// A page's quiet column or header (Settings, History, Passwords): a light tint of the space, between the
+        /// frame and the white page.
+        var wash: NSColor {
+            guard let h = surfaceHue else { return Tokens.Color.formBackground }
+            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: Tokens.Frame.washLightness, chroma: Tokens.Frame.washChroma),
+                                        dark: SpaceColor.tone(hue: h, lightness: Tokens.Frame.washDarkLightness, chroma: Tokens.Frame.washDarkChroma))
+        }
+
         static let navy = Theme(hue: nil)
 
         static func of(_ space: SpaceInfo?) -> Theme {
             // Drawn mostly toward the wheel's middle, a space reads as gray: its hue would be a color it doesn't show.
             guard let space, !space.isNeutral, space.tintAmount >= 0.3 else { return .navy }
-            if let hue = space.hue { return Theme(hue: hue) }
-            return space.color.isNeutral || space.color == .sky ? .navy : Theme(hue: space.color.hue)
+            var theme = Theme.navy
+            if let hue = space.hue { theme = Theme(hue: hue) } else if !(space.color.isNeutral || space.color == .sky) { theme = Theme(hue: space.color.hue) }
+            theme.surfaceHue = space.baseHue
+            return theme
         }
 
         /// Zigzag's own blue, for windows that belong to the app rather than a space (see `Tokens.Color.accent`).

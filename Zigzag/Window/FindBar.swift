@@ -320,17 +320,12 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private static let hideFindUI = NSSelectorFromString("_hideFindUI")
 }
 
-/// A floating surface (the design's top layer, see Design/DESIGN.md): Liquid Glass on macOS 26 (frosted before it)
-/// under a wash of the panel color, a hairline edge, the one panel shadow, `Tokens.Radius.panel` corners, and an
-/// eased arrival. Panels that belong to the sidebar (`liftedFrom`), are tinted (`surfaceTint`) or stand in for
-/// something in place (`isElevated` off) are solid instead.
+/// A floating surface (the design's top layer, see Design/DESIGN.md): an opaque surface leaning toward the window's
+/// space (`Brand.Theme.panel`), a crisp hairline edge, one soft small shadow, `Tokens.Radius.panel` corners, and an
+/// eased arrival out of what opened it. Panels that belong to the sidebar (`liftedFrom`) or are tinted (`surfaceTint`)
+/// take that color instead.
 class FloatingPanelView: NSView {
     private let surface = ColorView(color: Tokens.Color.panelBackground)
-    /// The glass under the surface's wash; nil while the panel is solid.
-    private var material: NSView?
-    /// Off for a panel that must be fully opaque (one showing a picture edge to edge).
-    var isGlass = true { didSet { refreshColors() } }
-    private var showsGlass: Bool { isGlass && isElevated && liftedFrom == nil && surfaceTint == nil && edgeColor == nil }
     var onLayout: (() -> Void)?
     var radius: CGFloat = Tokens.Radius.panel { didSet { needsLayout = true } }
 
@@ -344,9 +339,17 @@ class FloatingPanelView: NSView {
         surface.layer?.borderWidth = Tokens.Metric.hairline
         addSubview(surface)
         refreshColors()
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshColors() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private var themeToken: SignalToken?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshColors()
+    }
 
     override var isFlipped: Bool { true }
 
@@ -355,29 +358,13 @@ class FloatingPanelView: NSView {
 
     /// Content goes in the surface so it is clipped to the rounded shape.
     override func addSubview(_ view: NSView) {
-        if view === surface || view === material { super.addSubview(view) } else { surface.addSubview(view) }
+        if view === surface { super.addSubview(view) } else { surface.addSubview(view) }
     }
 
     override func layout() {
         super.layout()
         surface.frame = bounds
         surface.layer?.cornerRadius = radius
-        if showsGlass, material == nil {
-            let glass = PanelMaterial.make(radius: radius)
-            // Set first: AppKit adds a positioned view through `addSubview(_:)`, which would otherwise put the glass
-            // inside the surface, over the content, taking every click meant for it.
-            material = glass
-            super.addSubview(glass, positioned: .below, relativeTo: surface)
-            // Behind the surface and everything in it, whatever order the effect view's own layer asks for.
-            glass.wantsLayer = true
-            glass.layer?.zPosition = -1
-            surface.layer?.zPosition = 1
-            material = glass
-        }
-        if let material {
-            material.frame = bounds
-            PanelMaterial.setRadius(radius, of: material)
-        }
         layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         onLayout?()
         matchCorners()
@@ -431,11 +418,9 @@ class FloatingPanelView: NSView {
                     surface.color = mixed
                 }
             } else {
-                surface.color = showsGlass ? Tokens.Color.panelWash : Tokens.Color.panelBackground
+                // Opaque, leaning toward the window's space: quiet under any page, never glass to read text through.
+                surface.color = Brand.Theme.for(self).panel
             }
-            // The glass itself is made at layout, once the panel's settings are in: a solid panel never makes one.
-            if showsGlass, material == nil { needsLayout = true }
-            material?.isHidden = !showsGlass
             surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
             surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
