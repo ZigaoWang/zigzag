@@ -457,39 +457,39 @@ final class ReaderControls: FloatingPanelView {
     }
 }
 
-/// How it reads: size, typeface, colours. Three even rows, each one control across the panel.
+/// How it reads: size, typeface, colours. Four even rows, each one control across the panel: the size buttons, two
+/// sliding switches, and the theme swatches.
 private final class ReaderOptions: FloatingPanelView {
     var onChange: ((Reader.Preferences) -> Void)?
     var preferences = Reader.Preferences.saved { didSet { refresh() } }
 
-    private let size = ReaderSegments([.text("A", Tokens.Font.body(.semibold)), .text("A", Tokens.Font.large(.semibold))],
-                                      toggles: false, accessibilityNames: ["Smaller Text", "Larger Text"])
-    private let face = ReaderSegments([.text("Serif", NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
-                                       .text("Sans", Tokens.Font.body(.medium))], toggles: true, accessibilityNames: ["Serif", "Sans Serif"])
-    private let measure = ReaderSegments([.text("Narrow", Tokens.Font.body(.medium)), .text("Medium", Tokens.Font.body(.medium)),
-                                          .text("Wide", Tokens.Font.body(.medium))], toggles: true,
-                                         accessibilityNames: ["Narrow Column", "Medium Column", "Wide Column"])
+    private let size = ReaderSizeButtons()
+    private let face = SlidingSwitch([.styled("Serif", NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
+                                      .text("Sans")])
+    private let measure = SlidingSwitch([.text("Narrow"), .text("Medium"), .text("Wide")])
     private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
 
     static let width: CGFloat = 252
-    private static let pad: CGFloat = 10, row: CGFloat = 36, gap: CGFloat = 8
+    private static let pad = Tokens.Space.x3, row = Tokens.Metric.rowHeight, gap = Tokens.Space.x2
     var panelSize: NSSize { NSSize(width: Self.width, height: Self.pad * 2 + Self.row * 4 + Self.gap * 3) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         radius = Tokens.Radius.large
         [size, face, measure].forEach { addSubview($0) }
+        face.setAccessibilityLabel("Typeface")
+        measure.setAccessibilityLabel("Column Width")
         for theme in Reader.Preferences.Theme.allCases {
             let tile = ThemeTile(theme: theme)
             tile.onClick = { [weak self] _ in self?.change { $0.theme = theme } }
             addSubview(tile)
             tiles.append((theme, tile))
         }
-        size.onPick = { [weak self] index in
-            self?.change { $0.size = index == 0 ? max(Reader.Preferences.sizes.lowerBound, $0.size - 1) : min(Reader.Preferences.sizes.upperBound, $0.size + 1) }
+        size.onPick = { [weak self] larger in
+            self?.change { $0.size = larger ? min(Reader.Preferences.sizes.upperBound, $0.size + 1) : max(Reader.Preferences.sizes.lowerBound, $0.size - 1) }
         }
-        face.onPick = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
-        measure.onPick = { [weak self] index in self?.change { $0.width = Reader.Preferences.Width.allCases[index] } }
+        face.onChange = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
+        measure.onChange = { [weak self] index in self?.change { $0.width = Reader.Preferences.Width.allCases[index] } }
         onLayout = { [weak self] in self?.layoutContent() }
         refresh()
     }
@@ -504,10 +504,10 @@ private final class ReaderOptions: FloatingPanelView {
     }
 
     private func refresh() {
-        face.selected = preferences.face == .serif ? 0 : 1
-        measure.selected = Reader.Preferences.Width.allCases.firstIndex(of: preferences.width) ?? 1
-        size.setEnabled(0, preferences.size > Reader.Preferences.sizes.lowerBound)
-        size.setEnabled(1, preferences.size < Reader.Preferences.sizes.upperBound)
+        face.selectedIndex = preferences.face == .serif ? 0 : 1
+        measure.selectedIndex = Reader.Preferences.Width.allCases.firstIndex(of: preferences.width) ?? 1
+        size.canShrink = preferences.size > Reader.Preferences.sizes.lowerBound
+        size.canGrow = preferences.size < Reader.Preferences.sizes.upperBound
         for (theme, tile) in tiles { tile.isSelected = theme == preferences.theme }
     }
 
@@ -516,7 +516,7 @@ private final class ReaderOptions: FloatingPanelView {
         size.frame = NSRect(x: pad, y: pad, width: inner, height: Self.row)
         face.frame = NSRect(x: pad, y: size.frame.maxY + Self.gap, width: inner, height: Self.row)
         measure.frame = NSRect(x: pad, y: face.frame.maxY + Self.gap, width: inner, height: Self.row)
-        let y = measure.frame.maxY + Self.gap, gap: CGFloat = 6
+        let y = measure.frame.maxY + Self.gap, gap = Tokens.Space.x2
         let w = (inner - gap * CGFloat(tiles.count - 1)) / CGFloat(tiles.count)
         for (i, (_, tile)) in tiles.enumerated() {
             tile.frame = NSRect(x: pad + CGFloat(i) * (w + gap), y: y, width: w, height: Self.row)
@@ -524,99 +524,62 @@ private final class ReaderOptions: FloatingPanelView {
     }
 }
 
-/// A row of equal halves in one soft field: either a choice (one lit, sliding between) or a pair of buttons.
-private final class ReaderSegments: NSView {
-    enum Item { case text(String, NSFont) }
-    var onPick: ((Int) -> Void)?
-    var selected = 0 { didSet { if toggles { moveHighlight(animated: window != nil && oldValue != selected) } } }
-    private let toggles: Bool
-    private let highlight = ColorView(color: Tokens.Color.selectedFill)
-    private var segments: [InteractiveView] = []
-    private var labels: [Label] = []
+/// Smaller and larger text: two buttons in one soft track, shaped like the sliding switches under them.
+private final class ReaderSizeButtons: NSView {
+    var onPick: ((_ larger: Bool) -> Void)?
+    var canShrink = true { didSet { setEnabled(smaller, canShrink) } }
+    var canGrow = true { didSet { setEnabled(larger, canGrow) } }
+    private let smaller = InteractiveView(), larger = InteractiveView()
+    private let smallLabel = Label("A", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+    private let largeLabel = Label("A", font: Tokens.Font.large(.semibold), color: Tokens.Color.textPrimary)
     private let divider = ColorView(color: Tokens.Color.separator)
+    /// The same gap as `SlidingSwitch`'s, so the corners are concentric with the track's.
+    private let inset: CGFloat = 3
 
-    /// What each segment does, for VoiceOver.
-    var accessibilityNames: [String]
-
-    init(_ items: [Item], toggles: Bool, accessibilityNames: [String] = []) {
-        self.toggles = toggles
-        self.accessibilityNames = accessibilityNames
-        super.init(frame: .zero)
+    override init(frame: NSRect) {
+        super.init(frame: frame)
         wantsLayer = true
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = Tokens.Radius.field + inset
         layer?.cornerCurve = .continuous
         layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
-        highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = 8
-        highlight.layer?.cornerCurve = .continuous
-        highlight.isHidden = !toggles
-        addSubview(highlight)
-        divider.isHidden = toggles
         addSubview(divider)
-        for (i, item) in items.enumerated() {
-            let segment = InteractiveView()
-            segment.wantsLayer = true
-            segment.layer?.cornerRadius = 8
-            segment.layer?.cornerCurve = .continuous
-            guard case .text(let text, let font) = item else { continue }
-            let label = Label(text, font: font, color: Tokens.Color.textPrimary)
+        for (button, label, name, larger) in [(smaller, smallLabel, "Smaller Text", false), (self.larger, largeLabel, "Larger Text", true)] {
+            button.wantsLayer = true
+            button.layer?.cornerRadius = Tokens.Radius.field
+            button.layer?.cornerCurve = .continuous
             label.alignment = .center
-            segment.addSubview(label)
-            // Two "A"s read as nothing to VoiceOver: each says what it does.
-            segment.setAccessibilityRole(toggles ? .radioButton : .button)
-            segment.setAccessibilityLabel(accessibilityNames.indices.contains(i) ? accessibilityNames[i] : text)
-            segment.onClick = { [weak self] _ in
-                guard let self, segment.isEnabled else { return }
-                if self.toggles { self.selected = i }
-                self.onPick?(i)
+            button.addSubview(label)
+            button.setAccessibilityRole(.button)
+            button.setAccessibilityLabel(name)
+            button.onClick = { [weak self, weak button] _ in
+                guard let button, button.isEnabled else { return }
+                self?.onPick?(larger)
             }
-            segment.hoverChanged = { [weak segment, weak self] hovering in
-                guard let segment, let self, !self.toggles || self.selected != i else { return }
-                segment.layer?.backgroundColor = hovering && segment.isEnabled ? self.cgColor(Tokens.Color.hoverFill) : nil
+            button.hoverChanged = { [weak button, weak self] hovering in
+                guard let button, let self else { return }
+                button.layer?.backgroundColor = hovering && button.isEnabled ? self.cgColor(Tokens.Color.hoverFill) : nil
             }
-            addSubview(segment)
-            segments.append(segment)
-            labels.append(label)
+            addSubview(button)
         }
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    func setEnabled(_ index: Int, _ enabled: Bool) {
-        guard segments.indices.contains(index) else { return }
-        segments[index].isEnabled = enabled
-        labels[index].textColor = enabled ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
-        if !enabled { segments[index].layer?.backgroundColor = nil }
-    }
-
-    private func frame(of index: Int) -> NSRect {
-        let inset: CGFloat = 3, w = (bounds.width - inset * 2) / CGFloat(max(segments.count, 1))
-        return NSRect(x: inset + CGFloat(index) * w, y: inset, width: w, height: bounds.height - inset * 2)
-    }
-
-    private func moveHighlight(animated: Bool) {
-        guard segments.indices.contains(selected) else { return }
-        for (i, label) in labels.enumerated() { label.textColor = i == selected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary }
-        for (i, segment) in segments.enumerated() { segment.setAccessibilityValue(i == selected ? 1 : 0) }
-        segments[selected].layer?.backgroundColor = nil
-        let target = frame(of: selected)
-        if animated, !Tokens.Motion.reduceMotion {
-            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true) { self.highlight.animator().frame = target }
-        } else {
-            highlight.frame = target
-        }
+    private func setEnabled(_ button: InteractiveView, _ enabled: Bool) {
+        button.isEnabled = enabled
+        (button === smaller ? smallLabel : largeLabel).textColor = enabled ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
+        if !enabled { button.layer?.backgroundColor = nil }
     }
 
     override func layout() {
         super.layout()
-        for (i, segment) in segments.enumerated() {
-            segment.frame = frame(of: i)
-            let label = labels[i]
-            label.frame = NSRect(x: 0, y: (segment.bounds.height - label.lineHeight) / 2, width: segment.bounds.width, height: label.lineHeight)
+        let w = (bounds.width - inset * 2) / 2
+        for (i, (button, label)) in [(smaller, smallLabel), (larger, largeLabel)].enumerated() {
+            button.frame = NSRect(x: inset + CGFloat(i) * w, y: inset, width: w, height: bounds.height - inset * 2)
+            label.frame = NSRect(x: 0, y: (button.bounds.height - label.lineHeight) / 2, width: button.bounds.width, height: label.lineHeight)
         }
-        divider.frame = NSRect(x: bounds.midX, y: 9, width: 1, height: bounds.height - 18)
-        if toggles { moveHighlight(animated: false) }
+        divider.frame = NSRect(x: bounds.midX, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -647,10 +610,10 @@ private final class ThemeTile: InteractiveView {
         wantsLayer = true
         let (paper, ink) = Self.colors(theme)
         layer?.backgroundColor = paper.cgColor
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = Tokens.Radius.field + 3
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
-        layer?.borderWidth = 1
+        layer?.borderWidth = Tokens.Metric.hairline
         layer?.borderColor = NSColor.black.withAlphaComponent(0.1).cgColor
         if theme == .auto {
             darkHalf.backgroundColor = Tokens.Color.hex(0x1B1B1D).cgColor
@@ -667,7 +630,7 @@ private final class ThemeTile: InteractiveView {
         }
         darkInk.isHidden = theme != .auto
         ring.fillColor = nil
-        ring.lineWidth = 2.5
+        ring.lineWidth = 2
         ring.isHidden = true
         layer?.addSublayer(ring)
         toolTip = theme == .auto ? "Auto: follows your Mac" : theme.rawValue.capitalized
@@ -679,6 +642,7 @@ private final class ThemeTile: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         ring.isHidden = !isSelected
+        if isSelected { ring.strokeColor = cgColor(Brand.Theme.for(self).accent) }
     }
 
     override func accessibilityValue() -> Any? { isSelected ? 1 : 0 }
@@ -697,8 +661,10 @@ private final class ThemeTile: InteractiveView {
             } else {
                 lightInk.frame = CGRect(x: 0, y: (h - textH) / 2, width: bounds.width, height: textH)
             }
-            ring.path = CGPath(roundedRect: bounds.insetBy(dx: 1.25, dy: 1.25), cornerWidth: 9, cornerHeight: 9, transform: nil)
-            ring.strokeColor = Tokens.Color.accent.cgColor
+            // Inside the edge, its corners concentric with the swatch's; in the window's accent, as a field's ring is.
+            let r = (layer?.cornerRadius ?? 0) - 1
+            ring.path = CGPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerWidth: r, cornerHeight: r, transform: nil)
+            ring.strokeColor = cgColor(Brand.Theme.for(self).accent)
         }
     }
 }
