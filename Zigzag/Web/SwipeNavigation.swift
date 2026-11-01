@@ -263,11 +263,13 @@ final class SwipeNavigator {
     }
 }
 
-/// The round arrow at the page's edge during a swipe: quiet while you swipe, filled in the accent once letting go
-/// will navigate.
+/// The round arrow at the page's edge during a swipe: a small glass button while you swipe, filled in the accent
+/// once letting go will navigate.
 final class SwipeArrowView: NSView {
-    static let size: CGFloat = 36
-    private let circle = CALayer()
+    static let size = Tokens.Metric.floatingButton
+    private let material = PanelMaterial.make(radius: Tokens.Metric.floatingButton / 2)
+    /// The panel wash over the glass at rest; the accent once armed.
+    private let fill = ColorView()
     private let symbol = NSImageView()
     var progress: CGFloat = 0 { didSet { refresh() } }
     var isArmed = false { didSet { refresh(animated: true) } }
@@ -275,12 +277,12 @@ final class SwipeArrowView: NSView {
     init(back: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: Self.size, height: Self.size))
         wantsLayer = true
-        circle.cornerRadius = Self.size / 2
-        circle.shadowOpacity = 1
-        circle.shadowRadius = 8
-        circle.shadowOffset = CGSize(width: 0, height: -2)
-        layer?.addSublayer(circle)
-        symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: 17)
+        layer?.masksToBounds = false
+        fill.wantsLayer = true
+        fill.layer?.cornerRadius = Self.size / 2
+        fill.layer?.borderWidth = Tokens.Metric.hairline
+        [material, fill].forEach { addSubview($0) }
+        symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: Tokens.TypeSize.heading)
         symbol.imageScaling = .scaleNone
         addSubview(symbol)
         refresh()
@@ -290,17 +292,27 @@ final class SwipeArrowView: NSView {
 
     override func layout() {
         super.layout()
-        Tokens.Motion.withoutAnimation { circle.frame = bounds }
+        material.frame = bounds
+        fill.frame = bounds
         symbol.frame = bounds
+        layer?.shadowPath = CGPath(ellipseIn: bounds, transform: nil)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refresh()
     }
 
     private func refresh(animated: Bool = false) {
-        let accent = Brand.Theme.for(self).accent
+        let theme = Brand.Theme.for(self)
         let apply = {
-            self.circle.backgroundColor = self.cgColor(self.isArmed ? accent : Tokens.Color.panelBackground)
-            self.circle.shadowColor = self.cgColor(Tokens.Color.panelShadow)
-            self.circle.borderWidth = self.isArmed ? 0 : 1
-            self.circle.borderColor = self.cgColor(Tokens.Color.separator)
+            self.fill.layer?.backgroundColor = self.cgColor(self.isArmed ? theme.accent : Tokens.Color.panelWash)
+            self.fill.layer?.borderColor = self.cgColor(self.isArmed ? .clear : Tokens.Color.panelEdge)
+            // The one panel shadow, as every floating thing has.
+            self.layer?.shadowColor = self.cgColor(Tokens.Color.panelShadow)
+            self.layer?.shadowOpacity = 1
+            self.layer?.shadowRadius = Tokens.Shadow.panelRadius / 2
+            self.layer?.shadowOffset = Tokens.Shadow.panelOffset(flipped: self.isFlipped)
         }
         if animated, !Tokens.Motion.reduceMotion {
             CATransaction.begin()
@@ -311,7 +323,7 @@ final class SwipeArrowView: NSView {
         } else {
             Tokens.Motion.withoutAnimation(apply)
         }
-        symbol.contentTintColor = isArmed ? .white : Tokens.Color.textSecondary
+        symbol.contentTintColor = isArmed ? theme.onAccent : Tokens.Color.icon
         // Fades in as you swipe; once letting go will move, it fills.
         alphaValue = min(1, max(0, (progress - 0.1) * 2))
     }
