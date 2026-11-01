@@ -360,8 +360,11 @@ enum DebugBridge {
             for m in f.dropFirst() {
                 switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
             }
-            let chars = ch == "esc" ? "\u{1b}" : ch == "tab" ? "\t" : ch
-            let codes: [String: UInt16] = ["s": 1, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35]
+            let named: [String: String] = ["esc": "\u{1b}", "tab": "\t", "return": "\r", "space": " ",
+                                           "down": String(UnicodeScalar(NSDownArrowFunctionKey)!), "up": String(UnicodeScalar(NSUpArrowFunctionKey)!)]
+            let chars = named[ch] ?? ch
+            let codes: [String: UInt16] = ["s": 1, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35,
+                                          "down": 125, "up": 126, "return": 36, "space": 49]
             if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                         windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
                                         isARepeat: false, keyCode: codes[ch] ?? 0) {
@@ -605,6 +608,28 @@ enum DebugBridge {
                 WindowManager.shared.windowBecameKey(all[n])
             }
         case "reducemotion": Tokens.Motion.debugReduceMotion = arg != "off"
+        case "dropdown":
+            // dropdown <n>: opens the nth dropdown on the page (0 first), as a click would; "close" closes the open menu.
+            if arg == "close" { MenuPanel.current?.close(); break }
+            func all(_ v: NSView) -> [DropdownButton] { (v as? DropdownButton).map { [$0] } ?? v.subviews.flatMap(all) }
+            if let root = controller.window?.contentView {
+                let found = all(root).filter { !$0.isHiddenOrHasHiddenAncestor }
+                if found.indices.contains(Int(arg) ?? 0) { found[Int(arg) ?? 0].openMenu() }
+            }
+        case "keyfocus":
+            // keyfocus <n>: keyboard focus on the nth drawn control in the window, as Tab with Full Keyboard Access gives it.
+            InteractiveView.debugKeyboardAccess = true
+            func all(_ v: NSView) -> [InteractiveView] { ((v as? InteractiveView).map { [$0] } ?? []) + v.subviews.flatMap(all) }
+            if let root = controller.window?.contentView {
+                // keyfocus <n> [Class]: the nth of that kind of control, or of any kind.
+                let f = arg.split(separator: " ").map(String.init)
+                let found = all(root).filter { !$0.isHiddenOrHasHiddenAncestor && $0.onClick != nil && (f.count < 2 || "\(type(of: $0))" == f[1]) }
+                let n = Int(f.first ?? "") ?? 0
+                if found.indices.contains(n) {
+                    let ok = controller.window?.makeFirstResponder(found[n]) ?? false
+                    debugLog("keyfocus \(type(of: found[n])): \(ok)")
+                }
+            }
         case "unload":
             // unload <title>: a pinned page or favorite goes back to not loaded.
             if let id = (Library.shared.spaces.flatMap(\.bookmarks) + Library.shared.favorites).first(where: { $0.title == arg })?.id,
