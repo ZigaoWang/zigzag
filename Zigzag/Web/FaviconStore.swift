@@ -271,8 +271,16 @@ enum SnapshotStore {
     static func load(_ id: UUID) -> NSImage? {
         if let image = memory[id] { return image }
         guard let image = NSImage(contentsOf: file(id)) else { return nil }
-        memory[id] = image
+        // Read back from disk, it counts toward the limit like a fresh one, so the cache never grows without end.
+        remember(image, for: id)
         return image
+    }
+
+    private static func remember(_ image: NSImage, for id: UUID) {
+        memory[id] = image
+        recent.removeAll { $0 == id }
+        recent.append(id)
+        while recent.count > memoryLimit { memory[recent.removeFirst()] = nil }
     }
 
     /// Snapshots kept in memory, most recent last; older ones are read back from disk when needed.
@@ -280,10 +288,7 @@ enum SnapshotStore {
     private static let memoryLimit = 40
 
     static func save(_ image: NSImage, for id: UUID) {
-        memory[id] = image
-        recent.removeAll { $0 == id }
-        recent.append(id)
-        while recent.count > memoryLimit { memory[recent.removeFirst()] = nil }
+        remember(image, for: id)
         // The bitmap is taken here, cheaply; turning it into a JPEG happens off the main thread.
         guard let bitmap = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
         let url = file(id)
