@@ -160,14 +160,22 @@ enum HistoryPage {
         case "yesterday": ("today and yesterday", calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)))
         default: ("all history", nil)
         }
-        let what = since == nil ? "all of your history" : "your history from \(title)"
-        ConfirmSheet.show(in: host, title: "Clear \(title)?", message: "This removes \(what) from Zigzag. Pinned tabs and open tabs stay.",
-                          confirmTitle: "Clear", destructive: true) { confirmed in
+        ConfirmSheet.show(in: host, title: since == nil ? clearTitle : "Clear \(title)?",
+                          message: since == nil ? clearMessage : "Pages you visited \(range == "hour" ? "in the last hour" : title) are forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
+                          confirmTitle: "Clear History", destructive: true) { confirmed in
             if confirmed {
                 if let since { HistoryStore.shared.clear(since: since) } else { HistoryStore.shared.clearAll() }
+                if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView?.window }) { clearedToast(in: controller) }
             }
             reply(confirmed, nil)
         }
+    }
+
+    /// Clearing all history asks the same way, and says it's done the same way, from the menu, Settings and here.
+    static let clearTitle = "Clear all history?"
+    static let clearMessage = "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay."
+    static func clearedToast(in controller: BrowserWindowController) {
+        Toast.show("History cleared", symbol: "clock.arrow.circlepath", duration: 2, in: controller)
     }
 
     // MARK: The page

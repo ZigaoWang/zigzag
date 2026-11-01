@@ -1288,10 +1288,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sitesGroup.removeAllRows()
         let history = PillButton(title: "Clear History…")
         history.onClick = { [weak self, weak history] _ in
-            self?.confirm(title: "Clear all history?", message: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.",
-                          action: "Clear History") {
+            self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage, action: "Clear History") {
                 HistoryStore.shared.clearAll()
-                history?.flash("Cleared")
+                if let controller = self?.browser { HistoryPage.clearedToast(in: controller) } else { history?.flash("Cleared") }
             }
         }
         let showHistory = PillButton(title: "Show History")
