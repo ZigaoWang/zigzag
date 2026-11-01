@@ -1434,9 +1434,25 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate, let frame = window?.frame else { return }
         let target = WindowManager.shared.newWindow(spaceID: tab.spaceID, showCommandBar: false)
         target.window?.setFrame(frame.offsetBy(dx: 30, dy: -30), display: true)
-        tabManager.detach(tab)
-        target.tabManager.insert(tab)
+        transfer(tab, to: target, at: 0)
         target.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// A tab into another window's list. Half of a split of two tabs brings the other half: they arrive as one,
+    /// still side by side.
+    private func transfer(_ tab: Tab, to target: BrowserWindowController, at index: Int) {
+        let pair = tabManager.split(for: tab)
+        let other = tabManager.partner(of: tab).flatMap { $0.bookmarkID == nil ? $0 : nil }
+        tabManager.detach(tab)
+        if let other { tabManager.detach(other) }
+        guard let pair, let other else {
+            target.tabManager.insert(tab, at: index)
+            return
+        }
+        let (left, right) = pair.left == tab.id ? (tab, other) : (other, tab)
+        target.tabManager.insert(right, at: index)
+        target.tabManager.insert(left, at: index)
+        target.tabManager.restoreSplit(pair)
     }
 
     func listDropOutside(_ tab: Tab, at screenPoint: NSPoint) -> Bool {
@@ -1454,8 +1470,7 @@ extension BrowserWindowController: SidebarDelegate {
                 window.setFrame(frame, display: true)
             }
         }
-        tabManager.detach(tab)
-        target.tabManager.insert(tab)
+        transfer(tab, to: target, at: 0)
         target.window?.makeKeyAndOrderFront(nil)
         return true
     }
@@ -1533,8 +1548,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listMoveToWindow(_ tab: Tab, controller: BrowserWindowController, index: Int) -> Bool {
         guard !tabManager.isPrivate, !controller.tabManager.isPrivate else { return false }
-        tabManager.detach(tab)
-        controller.tabManager.insert(tab, at: index)
+        transfer(tab, to: controller, at: index)
         controller.window?.makeKeyAndOrderFront(nil)
         return true
     }
