@@ -11,12 +11,23 @@ final class SidebarContainer: NSView {
     var grain: Double = 0 { didSet { refresh() } }
     private let gradientLayer = CAGradientLayer()
     private let grainLayer = CALayer()
+    /// Floating over the page in a see-through space: the page under it is frosted, the way the desktop is under the
+    /// docked sidebar, so it never reads through the sidebar's own rows.
+    private let frost = NSVisualEffectView()
 
     init(sidebar: SidebarView) {
         self.sidebar = sidebar
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = false
+        frost.blendingMode = .withinWindow
+        frost.material = .sidebar
+        frost.state = .active
+        frost.isHidden = true
+        frost.wantsLayer = true
+        frost.layer?.cornerCurve = .continuous
+        frost.layer?.masksToBounds = true
+        addSubview(frost)
         sidebar.wantsLayer = true
         sidebar.layer?.cornerCurve = .continuous
         addSubview(sidebar)
@@ -115,6 +126,7 @@ final class SidebarContainer: NSView {
     override func layout() {
         super.layout()
         sidebar.frame = bounds
+        frost.frame = bounds
         Tokens.Motion.withoutAnimation {
             backdrop?.frame = sidebar.bounds
             backdrop?.cornerRadius = isFloating ? Tokens.Radius.card : 0
@@ -137,6 +149,8 @@ final class SidebarContainer: NSView {
         Tokens.Motion.withoutAnimation {
             sidebar.layer?.cornerRadius = isFloating ? Tokens.Radius.card : 0
             sidebar.layer?.backgroundColor = isFloating ? cgColor(tint) : nil
+            frost.isHidden = !isFloating || cgColor(tint).alpha > 0.99
+            frost.layer?.cornerRadius = Tokens.Radius.card
             // The grain blends inside this clipped layer, so the color sits here too, under it, as in the window.
             backdrop?.backgroundColor = isFloating ? cgColor(tint) : nil
             backdrop?.isHidden = !isFloating
