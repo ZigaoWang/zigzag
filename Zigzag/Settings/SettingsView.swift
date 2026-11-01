@@ -1369,7 +1369,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     init(title text: String, item: NSMenuItem) {
         self.item = item
         title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 40))
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: Shortcuts.caps(item))
         toolTip = "Click to change"
         onClick = { [weak self] _ in self?.startRecording() }
@@ -1384,7 +1384,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     init(title text: String, keys: [String]) {
         item = nil
         title = Label(text, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: 40))
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: keys)
     }
 
@@ -1393,7 +1393,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
 
     private func setup(keys: [String]) {
         self.keys = keys
-        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerRadius = Tokens.Radius.group
+        layer?.cornerCurve = .continuous
         addSubview(title)
         addSubview(note)
         note.isHidden = true
@@ -1403,9 +1404,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
             caps.append(cap)
         }
         field.wantsLayer = true
-        field.layer?.cornerRadius = Tokens.Radius.control
+        field.layer?.cornerRadius = Tokens.Radius.field
         field.layer?.cornerCurve = .continuous
-        field.layer?.borderWidth = 1.5
         fieldLabel.alignment = .center
         field.addSubview(fieldLabel)
         field.isHidden = true
@@ -1427,35 +1427,36 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
 
     override func layout() {
         super.layout()
-        let pad = Tokens.Space.x3
+        let pad = Tokens.Page.groupPad
+        let h = Tokens.Page.controlHeight
         var x = bounds.width - pad
         if isRecording {
             let w: CGFloat = 168
             x -= w
-            field.frame = NSRect(x: x, y: (bounds.height - 26) / 2, width: w, height: 26)
-            fieldLabel.frame = NSRect(x: Tokens.Space.x2, y: (26 - fieldLabel.lineHeight) / 2, width: w - Tokens.Space.x4, height: fieldLabel.lineHeight)
+            field.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: w, height: h)
+            fieldLabel.frame = NSRect(x: Tokens.Space.x2, y: (h - fieldLabel.lineHeight) / 2, width: w - Tokens.Space.x4, height: fieldLabel.lineHeight)
         } else if caps.isEmpty && item != nil {
             fieldLabel.stringValue = "None"
         } else {
             for cap in caps.reversed() {
                 x -= cap.width
                 cap.frame = NSRect(x: x, y: (bounds.height - KeyHint.height) / 2, width: cap.width, height: KeyHint.height)
-                x -= 4
+                x -= Tokens.Space.x1
             }
         }
         if caps.isEmpty && item != nil && !isRecording {
             // No keys: a quiet "None" where the caps would be.
             let w = fieldLabel.inkWidth + Tokens.Space.x2
             x -= w
-            field.frame = NSRect(x: x, y: (bounds.height - 26) / 2, width: w, height: 26)
-            fieldLabel.frame = NSRect(x: 0, y: (26 - fieldLabel.lineHeight) / 2, width: w, height: fieldLabel.lineHeight)
+            field.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: w, height: h)
+            fieldLabel.frame = NSRect(x: 0, y: (h - fieldLabel.lineHeight) / 2, width: w, height: fieldLabel.lineHeight)
         }
         if !resetButton.isHidden {
             let b = resetButton.frame.width
             x -= b + Tokens.Space.x2
             resetButton.frame.origin = NSPoint(x: x, y: (bounds.height - b) / 2)
         }
-        let width = max(0, x - pad - Tokens.Space.x3)
+        let width = max(0, x - pad - Tokens.Space.x4)
         if note.isHidden {
             title.frame = NSRect(x: pad, y: (bounds.height - title.lineHeight) / 2, width: width, height: title.lineHeight)
         } else {
@@ -1474,10 +1475,11 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         caps.forEach { $0.isHidden = isRecording }
         let none = caps.isEmpty && editable
         field.isHidden = !(isRecording || none)
-        let accent = Brand.Theme.brand.accent
-        field.layer?.borderColor = isRecording ? cgColor(accent) : nil
+        // Recording looks like a field being typed in: the soft fill and the window's accent ring.
+        let accent = Brand.Theme.for(self).accent
+        field.layer?.borderColor = isRecording ? cgColor(accent.withAlphaComponent(0.6)) : nil
         field.layer?.borderWidth = isRecording ? 1.5 : 0
-        field.layer?.backgroundColor = isRecording ? cgColor(accent.withAlphaComponent(0.08)) : nil
+        field.layer?.backgroundColor = isRecording ? cgColor(Tokens.Color.fieldFill) : nil
         if !isRecording && none { fieldLabel.stringValue = "None"; fieldLabel.textColor = Tokens.Color.textTertiary }
         needsLayout = true
     }
