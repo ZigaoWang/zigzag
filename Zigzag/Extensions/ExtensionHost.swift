@@ -945,10 +945,11 @@ enum AttentionHint {
             guard let dot = line.firstIndex(of: "."), Int(line[..<dot]) != nil else { note.append(line); continue }
             number += 1
             let text = line[line.index(after: dot)...].trimmingCharacters(in: .whitespaces)
-            let badge = ColorView(color: Tokens.Color.accent.withAlphaComponent(0.16))
+            let accent = Brand.Theme.for(anchor).accent
+            let badge = ColorView(color: accent.withAlphaComponent(Tokens.Color.selectionAlpha))
             badge.wantsLayer = true
             badge.layer?.cornerRadius = 10
-            let digit = Label("\(number)", font: Tokens.Font.small(.semibold), color: Tokens.Color.accent)
+            let digit = Label("\(number)", font: Tokens.Font.small(.semibold), color: accent)
             digit.alignment = .center
             badge.addSubview(digit)
             let body = NSTextField(wrappingLabelWithString: text)
@@ -975,8 +976,8 @@ enum AttentionHint {
             y = body.frame.maxY + Tokens.Space.x5
         }
 
-        let open = PrimaryButton(title: attention.buttonTitle)
-        open.frame = NSRect(x: pad, y: y, width: inner, height: Tokens.Space.x8)
+        let open = PillButton(title: attention.buttonTitle, style: .prominent)
+        open.frame = NSRect(x: pad, y: y, width: inner, height: Tokens.Page.controlHeight)
         panel.addSubview(open)
         y = open.frame.maxY + pad
         open.onClick = { _ in
