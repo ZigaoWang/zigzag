@@ -354,6 +354,8 @@ final class BrowserRootView: ColorView {
         let inset = Tokens.Metric.cardInset
         if isEdgeToEdge { return bounds }
         if sidebarVisible {
+            // Borderless, the page meets the window's edges and only its side by the sidebar is rounded.
+            if Self.isBorderless { return NSRect(x: sidebarWidth, y: 0, width: max(0, bounds.width - sidebarWidth), height: bounds.height) }
             return NSRect(x: sidebarWidth, y: inset, width: max(0, bounds.width - sidebarWidth - inset), height: max(0, bounds.height - inset * 2))
         }
         return bounds.insetBy(dx: inset, dy: inset)
@@ -391,6 +393,10 @@ final class BrowserRootView: ColorView {
         card.isEdgeToEdge = isEdgeToEdge
         secondCard.isEdgeToEdge = isEdgeToEdge
         card.frame = panes.left
+        // Corners against the window's right edge are the window's own; the rest stay round.
+        let attached = sidebarVisible && Self.isBorderless
+        card.squaresRightCorners = attached && panes.left.maxX >= bounds.maxX - 1
+        secondCard.squaresRightCorners = attached
         if let right = panes.right {
             secondCard.isHidden = false
             secondCard.frame = right

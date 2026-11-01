@@ -1,7 +1,8 @@
 import AppKit
 import WebKit
 
-/// The web page as a card: rounded, inset from the window, lifted by a hairline and a whisper of shadow.
+/// The web page as a card: rounded, lifted by a hairline and a whisper of shadow, inset from the window or, borderless,
+/// meeting its edges.
 final class PageCardView: NSView {
     private let clip = NSView()
     private let edge = CALayer()
@@ -23,6 +24,9 @@ final class PageCardView: NSView {
         set { setEdgeToEdge(newValue, duration: 0) }
     }
     private var edgeToEdge = false
+
+    /// The card runs to the window's right edge, which rounds those corners itself.
+    var squaresRightCorners = false { didSet { if squaresRightCorners != oldValue { needsLayout = true } } }
 
     /// Squares the corners off (or rounds them back) over `duration`, in step with the sidebar sliding away or back.
     func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
@@ -147,6 +151,10 @@ final class PageCardView: NSView {
             edge.frame = clip.bounds
             if progressLine.superlayer != nil { layoutProgress() }
             let radius = isEdgeToEdge ? 0 : Tokens.Radius.card
+            let corners: CACornerMask = squaresRightCorners ? [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+                : [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+            clip.layer?.maskedCorners = corners
+            edge.maskedCorners = corners
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         }
     }
