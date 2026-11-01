@@ -469,7 +469,14 @@ final class Tab: NSObject {
                     if let viewer = self.pdfViewer, viewer.documentTitle != nil, viewer.url == wv.url { return }
                     self.title = title
                     self.changed.send(.title)
-                    if let url = self.url, !self.isPrivate { HistoryStore.shared.updateTitle(title, for: url) }
+                    // Written once the title settles: a page that counts in its title ("(3) Inbox") isn't a database
+                    // write every second.
+                    if let url = self.url, !self.isPrivate {
+                        self.titleWrite?.cancel()
+                        let write = DispatchWorkItem { HistoryStore.shared.updateTitle(title, for: url) }
+                        self.titleWrite = write
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: write)
+                    }
                 }
             },
             webView.observe(\.url, options: [.new]) { [weak self] wv, _ in
@@ -556,6 +563,8 @@ final class Tab: NSObject {
     /// The page and icon links the tab's icon came from, so the second look at the same page (on commit, then on
     /// finish) doesn't fetch and save it again, which redraws every window's sidebar.
     private var iconSource: (page: URL, links: [[String: String]])?
+    /// The title waiting to go into History, a moment after the page last changed it.
+    private var titleWrite: DispatchWorkItem?
 
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
