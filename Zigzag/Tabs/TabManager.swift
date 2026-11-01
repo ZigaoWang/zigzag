@@ -253,8 +253,8 @@ final class TabManager {
     /// Turns a tab into a favorite at a position. Its page stays open behind the tile.
     func favoriteTab(_ tab: Tab, at index: Int? = nil) {
         guard let url = tab.url else { return }
-        // A favorite has no row to carry a split, so it leaves the one it was in.
-        unsplit(tab)
+        // Half of a split brings the other half: the two become one favorite, side by side.
+        if let pair = split(for: tab), let other = partner(of: tab), favoriteSplit(pair, at: index) { return }
         if let bookmarkID = tab.bookmarkID {
             Library.shared.makeFavorite(bookmarkID)
             if let index { Library.shared.moveFavorite(bookmarkID, to: index) }
@@ -267,6 +267,39 @@ final class TabManager {
         tab.isFavorite = true
         bookmarkTabs[id] = tab
         Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), at: index, id: id)
+    }
+
+    /// A split view as one favorite. Pinned halves keep their ids (and so their pages); a tab becomes one. False
+    /// when it can't (a page with no address yet).
+    private func favoriteSplit(_ pair: SplitPair, at index: Int?) -> Bool {
+        guard let left = tab(with: pair.left) ?? bookmarkTabs.values.first(where: { $0.id == pair.left }),
+              let right = tab(with: pair.right) ?? bookmarkTabs.values.first(where: { $0.id == pair.right }),
+              left.url != nil, right.url != nil else { return false }
+        // Already a pinned split: it moves up as it is.
+        if let l = left.bookmarkID, let r = right.bookmarkID, Library.shared.pinnedSplit(containing: l)?.contains(r) == true {
+            if !Library.shared.isFavorite(l) { Library.shared.makeFavorite(l) }
+            if let index { Library.shared.moveFavorite(l, to: index) }
+            left.isFavorite = true
+            right.isFavorite = true
+            return true
+        }
+        var marks: [Bookmark] = []
+        for half in [left, right] {
+            let url = half.url!
+            if let id = half.bookmarkID, let mark = Library.shared.detachBookmark(id) ?? Library.shared.bookmark(id) {
+                marks.append(mark)
+            } else {
+                removeFromList(half)
+                let mark = Bookmark(url: url, title: Self.bookmarkTitle(half.displayTitle, url: url))
+                half.bookmarkID = mark.id
+                bookmarkTabs[mark.id] = half
+                marks.append(mark)
+            }
+            half.isFavorite = true
+        }
+        Library.shared.addFavoriteSplit(marks[0], marks[1], at: index, ratio: pair.ratio, vertical: pair.vertical)
+        changed.send(.structure)
+        return true
     }
 
     // MARK: Spaces
@@ -392,7 +425,7 @@ final class TabManager {
     }
 
     /// A bookmark's live tab, made (not yet shown) if it isn't open.
-    func liveTab(for bookmark: Bookmark) -> Tab {
+    private func liveTab(for bookmark: Bookmark) -> Tab {
         if let tab = bookmarkTabs[bookmark.id] { return tab }
         let spaceID = Library.shared.spaceID(ofBookmark: bookmark.id) ?? currentSpaceID
         let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: spaceID)
@@ -471,6 +504,9 @@ final class TabManager {
             if let tab = bookmarkTabs[id] {
                 bookmarkTabs[id] = nil
                 tab.bookmarkID = nil
+                // A split favorite comes back as tabs in the space you're in.
+                tab.isFavorite = false
+                tab.spaceID = space
                 halves.append((id, tab))
             } else if anyOpen || index != nil, let bookmark = Library.shared.bookmark(id) {
                 let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)

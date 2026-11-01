@@ -132,9 +132,11 @@ extension BrowserWindowController {
     }
 
     func removeFavoriteWithUndo(_ id: UUID) {
+        // A split favorite goes as one: both its pages.
+        let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
         libraryChange("Remove from Favorites") {
-            if let live = tabManager.bookmarkTab(for: id) { tabManager.close(live) }
-            Library.shared.removeBookmark(id)
+            for id in ids { if let live = tabManager.bookmarkTab(for: id) { tabManager.close(live) } }
+            Library.shared.removeBookmarks(ids)
         }
     }
 

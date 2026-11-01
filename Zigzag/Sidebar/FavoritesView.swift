@@ -62,12 +62,17 @@ final class FavoritesView: NSView {
         return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Space.x2
     }
 
-    func reload(favorites: [Bookmark], openIDs: Set<UUID>, selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
-        if tiles.map(\.bookmark?.id) != favorites.map(\.id) {
+    /// One tile per favorite; a split favorite's two pages share one, each half opening its own page.
+    func reload(favorites: [(Bookmark, partner: Bookmark?)], openIDs: Set<UUID>, selectedID: UUID?, tabs: [UUID: Tab] = [:]) {
+        if tiles.map({ [$0.bookmark?.id, $0.partner?.id] }) != favorites.map({ [$0.0.id, $0.partner?.id] }) {
             tiles.forEach { $0.removeFromSuperview() }
-            tiles = favorites.map { favorite in
-                let tile = FavoriteTile(bookmark: favorite)
-                tile.onClick = { [weak self] _ in self?.onOpen?(favorite) }
+            tiles = favorites.map { favorite, partner in
+                let tile = FavoriteTile(bookmark: favorite, partner: partner)
+                tile.onClick = { [weak self, weak tile] event in
+                    guard let self, let tile else { return }
+                    let onRight = tile.convert(event.locationInWindow, from: nil).x > tile.bounds.midX
+                    self.onOpen?(onRight ? partner ?? favorite : favorite)
+                }
                 tile.onRightClick = { [weak self] _ in self?.onMenu?(favorite) }
                 tile.onClose = { [weak self] in self?.onClose?(favorite) }
                 tile.onDragStart = { [weak self, weak tile] event in
@@ -82,8 +87,9 @@ final class FavoritesView: NSView {
         }
         for tile in tiles {
             guard let id = tile.bookmark?.id else { continue }
-            tile.isSelected = id == selectedID
-            tile.isOpen = openIDs.contains(id)
+            let ids = [id] + (tile.partner.map { [$0.id] } ?? [])
+            tile.isSelected = selectedID.map(ids.contains) ?? false
+            tile.isOpen = ids.contains(where: openIDs.contains)
             tile.track(tabs[id])
             tile.refreshIcon()
         }
@@ -240,7 +246,10 @@ final class FavoritesView: NSView {
 
 final class FavoriteTile: InteractiveView {
     let bookmark: Bookmark?
+    /// A split favorite's right page, shown beside the left one in the same tile.
+    let partner: Bookmark?
     private let icon = FaviconView()
+    private let partnerIcon = FaviconView()
     var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     var iconImage: NSImage? { icon.image }
     var onClose: (() -> Void)?
@@ -263,15 +272,19 @@ final class FavoriteTile: InteractiveView {
     private var iconToken: SignalToken?
     var isPlaceholder = false { didSet { icon.isHidden = isPlaceholder; stateDidChange(animated: false) } }
 
-    init(bookmark: Bookmark?) {
+    init(bookmark: Bookmark?, partner: Bookmark? = nil) {
         self.bookmark = bookmark
+        self.partner = partner
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.card
         layer?.cornerCurve = .continuous
         addSubview(icon)
-        toolTip = bookmark?.title
+        partnerIcon.isHidden = partner == nil
+        addSubview(partnerIcon)
+        let name = [bookmark?.title, partner?.title].compactMap { $0 }.joined(separator: " and ")
+        toolTip = name
         setAccessibilityRole(.button)
-        setAccessibilityLabel(bookmark?.title)
+        setAccessibilityLabel(name)
         refreshIcon()
         iconToken = FaviconStore.shared.updated.observe { [weak self] _ in
             guard let self, self.tab?.favicon == nil || self.tab?.isLoading != true else { return }
@@ -298,6 +311,9 @@ final class FavoriteTile: InteractiveView {
 
     func refreshIcon() {
         guard let bookmark else { return }
+        if let partner {
+            if let image = FaviconStore.shared.cachedIcon(for: partner.url) { partnerIcon.image = image } else { FaviconStore.shared.prefetch(for: partner.url) }
+        }
         if let image = FaviconStore.shared.cachedIcon(for: bookmark.url) {
             icon.image = image
             needsLayout = true
@@ -310,8 +326,16 @@ final class FavoriteTile: InteractiveView {
         super.layout()
         // Big enough to read at a glance when the site gives a sharp icon; a small one stays at a tab's 16pt rather
         // than being stretched and blurred.
-        let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Metric.favicon
-        icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
+        if partner != nil {
+            // A split: both pages' icons side by side, at a tab's size, so two fit any tile.
+            let size = Tokens.Metric.favicon, gap = Tokens.Space.x2
+            let x = (bounds.width - size * 2 - gap) / 2, y = (bounds.height - size) / 2
+            icon.frame = NSRect(x: x, y: y, width: size, height: size).integral
+            partnerIcon.frame = NSRect(x: x + size + gap, y: y, width: size, height: size).integral
+        } else {
+            let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Metric.favicon
+            icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
+        }
         let side = Self.closeSide
         closeButton.frame = NSRect(x: bounds.width - side - 3, y: isFlipped ? 3 : bounds.height - side - 3, width: side, height: side)
     }
