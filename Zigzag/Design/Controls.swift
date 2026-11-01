@@ -241,7 +241,7 @@ class InteractiveView: NSView {
 /// A square icon button: back, forward, reload, close, and friends.
 final class IconButton: InteractiveView {
     private let imageView = NSImageView()
-    var symbol: String { didSet { imageView.image = Tokens.Symbol.image(symbol, size: symbolSize) } }
+    var symbol: String { didSet { imageView.image = Tokens.Symbol.image(symbol, size: symbolSize); needsLayout = true } }
     /// A full-color image instead of a symbol (extension icons).
     var image: NSImage? {
         didSet {
@@ -254,6 +254,7 @@ final class IconButton: InteractiveView {
         didSet {
             imageView.image = glyph ?? Tokens.Symbol.image(symbol, size: symbolSize)
             imageView.imageScaling = .scaleNone
+            needsLayout = true
         }
     }
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
@@ -294,6 +295,10 @@ final class IconButton: InteractiveView {
         if image != nil {
             let side = Tokens.Metric.favicon
             imageView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
+        } else if glyph == nil {
+            // The symbol's ink, not its image, in the middle.
+            let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
+            imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         } else {
             imageView.frame = bounds
         }

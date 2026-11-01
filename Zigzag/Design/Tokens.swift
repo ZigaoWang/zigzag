@@ -108,6 +108,45 @@ enum Tokens {
                 .withSymbolConfiguration(config)
             return image ?? NSImage()
         }
+
+        /// How far a symbol's ink sits from the middle of its image, in points (x right, y up). A symbol's image
+        /// keeps room for its neighbors in text, so a chevron leans toward the side it points to; a button
+        /// moves it back so every icon in a row looks evenly spaced.
+        @MainActor static func inkOffset(_ name: String, size: CGFloat = pointSize) -> CGSize {
+            let key = "\(name) \(size)"
+            if let known = inkOffsets[key] { return known }
+            let image = Self.image(name, size: size)
+            let scale: CGFloat = 4
+            let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
+            var offset = CGSize.zero
+            if w > 0, h > 0, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,
+                                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+                image.draw(in: NSRect(x: 0, y: 0, width: w, height: h))
+                NSGraphicsContext.restoreGraphicsState()
+                var minX = w, maxX = -1, minY = h, maxY = -1
+                if let data = rep.bitmapData {
+                    for y in 0..<h {
+                        for x in 0..<w where data[y * rep.bytesPerRow + x * 4 + 3] > 50 {
+                            minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+                        }
+                    }
+                }
+                if maxX >= minX {
+                    // Bitmap rows run top down.
+                    offset = CGSize(width: (CGFloat(minX + maxX + 1) / 2 - CGFloat(w) / 2) / scale,
+                                    height: (CGFloat(h) / 2 - CGFloat(minY + maxY + 1) / 2) / scale)
+                }
+            }
+            // Reload's arrowhead pokes out above its circle, so centering the ink leaves the circle low; it's the
+            // circle that should line up with the chevrons beside it.
+            if name == "arrow.clockwise" { offset.height -= size * 0.1 }
+            inkOffsets[key] = offset
+            return offset
+        }
+        @MainActor private static var inkOffsets: [String: CGSize] = [:]
     }
 
     // MARK: - Motion (short, spring based)
