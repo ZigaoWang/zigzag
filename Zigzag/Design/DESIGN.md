@@ -1,8 +1,10 @@
 # Zigzag's design language
 
-Glassy, deft, calm and confident: a Mac app in the spirit of Apple's own on macOS 26, Aside, Craft and Linear, that
-is still unmistakably Zigzag (space colors and gradients, the see-through frame, the drawn ZIGZAG wordmark, the
-sidebar that carries back, forward, reload and the address).
+Compact, precise and calm: the glass of a Mac app on macOS 26 with the structure of Linear and shadcn/ui (neutral
+zinc grays, 1px edges at low contrast, radii of 6 to 8, at most a shadow-sm, tight 13pt type, muted secondary text,
+clear focus rings), still unmistakably Zigzag (space colors and gradients, the see-through frame, the drawn ZIGZAG
+wordmark, the sidebar that carries back, forward, reload and the address). Nothing is bigger than its role needs, and
+nothing looks heavier than it needs to. Color comes from favicons and the space; everything else is neutral.
 
 Every value lives in `Tokens.swift`. Every shared part lives in `Components.swift`, `Controls.swift` and
 `Page.swift`. A view never invents a color, radius, shadow, size or duration; if the system lacks one, add it to
@@ -20,16 +22,19 @@ Four layers, front to back. Each has one material and one depth cue; nothing els
 | 2. Cards | The selected row, a selected tile, grouped rows on a page | `Color.selectedFill` / `surfaceGroup` | Hairline `selectedEdge` and `liftShadow` (`setLifted`) |
 | 3. Floating | Panels, popovers, menus, the command bar, previews, toasts | Liquid Glass (`.regular`) on macOS 26, `.popover` frost before, under `Color.panelWash` | Hairline `panelEdge` and the one panel shadow (`Shadow.panelRadius`, `panelDrop`) |
 
-The sidebar has no surface of its own: it is the frame. What sits on it is either quiet (rows at rest, labels) or
-soft glass (favorite tiles, `Color.glassFill` with a light `glassEdge`).
+The sidebar has no surface of its own: it is the frame, its color toned toward neutral in light mode
+(`SpaceColor.frame`, `Color.frameChroma`) so the chrome on it reads crisp. What sits on it is quiet (rows at rest,
+labels) or light structure: a faint fill with a 1px edge (`chromeFill`, `chromeEdge`) on the address and the
+favorites, the clear selected fill with a 1px edge on the row you're on. No bevels, no puffy shadows.
 
 Glass is only for floating things. Never on the window background (see-through spaces handle that) and never under
 long reading text without the wash.
 
 ## Size scale
 
-One scale for the whole app, in `Tokens`: the same role is the same size everywhere, on pages, in panels and in
-the sidebar. Nothing else picks a size. Pages read calm, Mac-like; what you press is big and easy to hit.
+One scale for pages and panels, in `Tokens`: the same role is the same size everywhere on them. Pages read calm,
+Mac-like. The browser window's chrome (the sidebar and a split pane's header) is a compact scale of its own,
+`Tokens.Sidebar` and `Tokens.Pane`, in the table after these. Nothing else picks a size.
 
 SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight.
 
@@ -39,7 +44,7 @@ SF Pro, one weight per role. Secondary text is light gray and never bold; select
 | | `Font.detail()` | 12 regular, `textSecondary` | A row's explanation under its title |
 | small | `Font.small()` | 11 | Small print, captions, counts, keycaps |
 | body | `Font.body()`, `Font.control()` | 13 regular; 13 medium | Panels, forms, menus; what a button or dropdown says |
-| row | `Font.row()` | 14 regular | A row's title in any list: sidebar rows and address, Settings' sections and rows, History, Passwords |
+| row | `Font.row()` | 14 regular | A row's title in a list on a page: Settings' sections and rows, History, Passwords |
 | heading | `Font.heading()` | 15 semibold | A panel's title, a section's title on a page |
 | title | `Font.title()` | 17 semibold | A page's title in its header, a big panel's title, the command bar's field |
 | display | `Brand.display`, `TypeSize.display` | 22 heavy | Brand moments only, one line per window |
@@ -56,20 +61,35 @@ SF Pro, one weight per role. Secondary text is light gray and never bold; select
 | icon button | `Metric.iconButton`, `IconButton(.regular)` | 32 | Everything above that takes a `glyph` |
 | compact icon button | `Metric.compactIconButton`, `IconButton(.compact)` | 24 | A tab's close and mute, the address's Reader and extensions, a row's trash |
 | control | `Metric.controlHeight` (`Page.controlHeight`) | 28 | Pill buttons, dropdowns, search fields, a menu's items |
-| row | `Metric.rowHeight` (`Page.rowHeight`) | 34 | A row in the sidebar, a list of places, History |
+| row | `Metric.rowHeight` (`Page.rowHeight`) | 34 | A list of places, History |
 
 Every symbol is regular weight (`Symbol.weight`), a monochrome outline tinted `Color.icon`, centered by its ink
 (`IconButton` measures it with `Symbol.inkOffset`), and the hover fill shows the whole target. A tick small enough to
 need it (a checkbox, a folder's cut-out icon) is the only bolder mark. The sidebar is never narrower than
-`Metric.sidebarMinWidth` (216), the room the traffic lights and the four toolbar buttons need.
+`Metric.sidebarMinWidth` (216), the room the traffic lights and the four toolbar buttons need; it opens at 240.
+
+The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
+
+| Element | Size |
+|---|---|
+| Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
+| Address | 30pt field, radius 8, `chromeFill` and a 1px `chromeEdge`, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
+| Favorites | 4 to a row, 36pt tiles 6pt apart, 18pt icons, radius 8, `chromeFill` and a 1px edge (`openEdge` while the page is open); the × chip 14pt, 3pt inside the corner |
+| Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36 |
+| Selected row | `selectedFill` with a 1px `selectedEdge`, radius 6, no shadow; hover is half of it (`quietHover`) |
+| Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
+| Section labels | 11pt medium, `textTertiary`, in the titles' column, low in a 28pt slot |
+| Bottom bar | 14pt icons in 26pt buttons, 6pt space dots, the current one a 14pt pill |
+| Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field |
 
 ## Spacing
 
 A 4pt grid (`Space.x1`...`x16`). Rhythm:
 
-- Sidebar: 8pt from its edges; rows `Metric.rowHeight` (34) with `Metric.rowGap` (2), so rows sit 36pt apart; 10pt
-  (`CardRow.inset`) from a row's edge to its 18pt icon and from the icon to its title; 16pt (`Metric.sectionGap`)
-  between groups. The toolbar's and bottom bar's buttons are 32pt icon buttons.
+- Sidebar: 6pt from its edges (`Sidebar.edge`); rows 30 with 2 between, so rows sit 32pt apart; 6pt from a row's
+  edge to its 16pt icon and 8pt from the icon to its title, so one left edge runs down the sidebar: the traffic
+  lights and every icon at 12, every title and section label at 36. The address 40pt from the top, the favorites 8pt
+  under it, the list 12pt (`Sidebar.sectionGap`) under them.
 - Sections are separated by space and a quiet label (`Label.section`, in a `Metric.sectionLabelHeight` slot with the
   label low in it), never by divider lines.
 - Panels: 12pt padding (`Space.x3`), 4pt inset for rows inside them so a row's corners run with the panel's.
@@ -87,9 +107,9 @@ One scale, concentric where things nest (inner = outer minus the gap):
 | `small` | 4 | Tiny marks, thumbnails in rows |
 | `control` | 6 | Icon buttons, small controls |
 | `field` | 8 | Fields, menu buttons, page card (`card`) |
-| `row` | 10 | Rows in the sidebar and in panels and menus |
+| `row` | 10 | Rows in panels and menus (the sidebar's are `Sidebar.rowRadius`, 6) |
 | `group` | 10 | Grouped rows on a page |
-| `tile` | 12 | Favorite tiles, glass tiles |
+| `tile` | 12 | Glass tiles (favorites are `Sidebar.favoriteRadius`, 8) |
 | `panel` | 14 | Floating panels, popovers, menus |
 | `large` / `window` | 16 | Big floating surfaces holding rounded things; the window |
 
@@ -100,14 +120,15 @@ Pills (pill buttons, pill fields, the Clear chip) are capsules: radius = height 
 
 One look for each state, everywhere:
 
-- Rest: nothing (rows), `fieldFill` (fields, plain pills), `glassFill` (tiles).
+- Rest: nothing (rows), `fieldFill` (fields, plain pills), `chromeFill` with a 1px `chromeEdge` (the sidebar's address and favorites), `glassFill` (glass tiles).
 - Hover: `Color.hoverFill` (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles),
   a step lighter on the dark primary. Instant, both ways: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`) at once, and buttons and rows give
   under the finger (`InteractiveView.pressScales`, `showPress`): down to `Motion.pressScale` (0.97) around their
   middle, eased out in `pressIn` (80ms), and a critically damped spring back in `pressOut` (200ms) when let go, from
   wherever they are. No bounce, and the action never waits on it. Not from the keyboard, not with Reduce Motion.
-- Selected / current: the soft card, `selectedFill` + `setLifted(true)` (`applyRowStyle`). In a list of places
+- Selected / current: a clear neutral fill, `selectedFill`, with a 1px `selectedEdge`; in the sidebar that's all,
+  on a panel `setLifted(true)` adds a shadow-sm (`applyRowStyle`). In a list of places
   (Settings' sections) and for a keyboard-chosen result: the accent at `Color.selectionAlpha`.
 - Keyboard highlight in a floating list: `Color.highlight`.
 - Focus: never the system's blue. A field shows the accent at `focusAlpha` (60%), 1.5pt, while typing. A drawn
@@ -146,15 +167,17 @@ something came from, answers at once, and can be interrupted.
 
 - **Window frame**: the space's color or gradient, its grain, optionally see-through. The sidebar and the gaps
   around the page are the frame.
-- **Sidebar**: on the frame, calm and roomy, in its own proportions (`Tokens.Sidebar`): rows 40 tall with 16pt
-  titles (`Font.sidebarRow`), section labels at 14 in `textTertiary` (`Font.sidebarLabel`), lots of air and no
-  effects. Top row: traffic lights, `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload
-  at the trailing end, every glyph's ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`,
-  the usual quiet hover fill. The address: a quiet pill (`Color.addressFill`, `Font.sidebarRow`, the host in
-  `textPrimary`, compact buttons, a bright ring from the keyboard). Favorites: soft gray tiles three to a row
-  (`Color.favoriteFill`, `Radius.tile` 14, 22pt icons). The tab you're on: the plain white card (`selectedFill`, a
-  hairline, a barely-there shadow). A pinned page that has wandered reads "<its name> / <the page it's on>". Then
+- **Sidebar**: on the frame, compact (`Tokens.Sidebar`, the table above). Top row: the traffic lights,
+  `Sidebar.lightsGap` (12) to the toggle's glyph, then back, forward and reload at the trailing end, every glyph's
+  ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
+  The address: a quiet field (`chromeFill`, a 1px `chromeEdge`, the host in `textPrimary`, its own small buttons, the
+  accent ring from the keyboard). Favorites: small tiles four to a row in the same look. The tab you're on: the
+  selected fill with its edge. A split row shows both pages, each half with its icon, its title and, while that page
+  plays or is muted, its own speaker. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
+- **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
+  field, and the split's own buttons. Everything in it is its own pane's page: its buttons act on it, its loading
+  line and reload state follow it, and clicking its address focuses that pane and opens the address bar over it.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.
