@@ -550,7 +550,8 @@ final class SidebarView: NSView {
             dot.color = space.swatch
             dot.icon = space.icon
             dot.isSelected = space.id == current
-            dot.toolTip = space.name
+            // The first nine have ⌃1 to ⌃9 (fixed keys, not in Settings › Shortcuts), so the name says which.
+            dot.toolTip = i < 9 ? "\(space.name) (⌃\(i + 1))" : space.name
             dot.setAccessibilityLabel("Space \(space.name)")
         }
         // A single space needs no switcher, and a private window switches nothing.
