@@ -130,14 +130,14 @@ final class PillButton: InteractiveView {
     let style: Style
     private let label: Label
     private let iconView = NSImageView()
-    /// What it says. Settable for a button whose words change (a toast's action).
+    /// What it says, which can change (a toast's action, "Try Again"): the row around it lays out again.
     var title: String {
         get { label.stringValue }
         set {
             label.stringValue = newValue
             label.isHidden = newValue.isEmpty
             setAccessibilityLabel(newValue.isEmpty ? accessibilityLabel() : newValue)
-            invalidateIntrinsicContentSize(); needsLayout = true
+            invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
         }
     }
     /// The accent for `.prominent`; nil takes its window's.
@@ -162,17 +162,6 @@ final class PillButton: InteractiveView {
 
     private var hasIcon: Bool { !iconView.isHidden }
     private var hasTitle: Bool { !label.isHidden }
-
-    /// Its words, which can change ("Try Again"): the button keeps its place and the row around it lays out again.
-    var title: String {
-        get { label.stringValue }
-        set {
-            label.stringValue = newValue
-            label.isHidden = newValue.isEmpty
-            setAccessibilityLabel(newValue)
-            invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
-        }
-    }
 
     /// Says what just happened in place of the title for a moment ("Cleared"), then goes back.
     func flash(_ text: String, for seconds: TimeInterval = 1.6) {
