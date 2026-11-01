@@ -471,10 +471,31 @@ extension DownloadManager: WKDownloadDelegate {
             item.completedBytes = size
         }
         if let destination = item.destination {
+            Self.markDownloaded(destination, from: item.sourceURL, page: download.originalRequest?.mainDocumentURL, isPrivate: item.isPrivate)
             // Bounce the Downloads stack in the Dock, like every Mac browser.
             DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
         }
         changed.send(item)
+    }
+
+    /// Marks a finished file as downloaded from the web by Zigzag, as Safari does. WebKit marks it as from the
+    /// internet but names no app, so opening it asked about a file "created by the app (null)". A private window's
+    /// download names no addresses.
+    static func markDownloaded(_ file: URL, from source: URL?, page: URL?, isPrivate: Bool) {
+        var properties: [String: Any] = [
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeWebDownload as String,
+            kLSQuarantineAgentNameKey as String: "Zigzag",
+            kLSQuarantineAgentBundleIdentifierKey as String: Bundle.main.bundleIdentifier ?? "app.zigzag",
+            kLSQuarantineTimeStampKey as String: Date(),
+        ]
+        if !isPrivate {
+            if let source { properties[kLSQuarantineDataURLKey as String] = source }
+            if let page { properties[kLSQuarantineOriginURLKey as String] = page }
+        }
+        var url = file
+        var values = URLResourceValues()
+        values.quarantineProperties = properties
+        try? url.setResourceValues(values)
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
