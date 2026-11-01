@@ -8,8 +8,6 @@ final class FormGroup: NSView {
     private(set) var rows: [NSView] = []
     private var lines: [NSView] = []
     private let background = ColorView(color: Tokens.Color.formGroup)
-    /// Off while a row is carried: the lines belong between rows at rest, not across ones in motion.
-    var showsDividers = true { didSet { needsLayout = true } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -71,7 +69,7 @@ final class FormGroup: NSView {
             if i < shown.count - 1 {
                 // The divider starts where the text does, past the icons, as the system's settings draw it.
                 let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Space.x3
-                lines[i].isHidden = !showsDividers
+                lines[i].isHidden = false
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
             }
         }
@@ -338,6 +336,14 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             let shape = NSBezierPath(roundedRect: rect, xRadius: 6.5, yRadius: 6.5)
             let base = space.swatch.usingColorSpace(.sRGB) ?? space.swatch
             NSGradient(starting: base.highlight(withLevel: 0.12) ?? base, ending: base)?.draw(in: shape, angle: -90)
+            // A fine edge, so a white or pale space still shows its tile.
+            NSColor.black.withAlphaComponent(0.1).setStroke()
+            let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.25, dy: 0.25), xRadius: 6.25, yRadius: 6.25)
+            edge.lineWidth = 0.5
+            edge.stroke()
+            // White on a color, dark on a pale one.
+            let light = 0.2126 * base.redComponent + 0.7152 * base.greenComponent + 0.0722 * base.blueComponent > 0.7
+            let ink = light ? NSColor(white: 0.2, alpha: 1) : NSColor.white
             // Its icon if it has one, white on the color like the letter; an emoji in its own colors.
             if let icon = space.icon {
                 let image = IconChoice.image(icon, size: 12)
@@ -345,7 +351,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
                 let spot = NSRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height)
                 if IconChoice.isSymbol(icon), let tinted = image.copy() as? NSImage {
                     tinted.lockFocus()
-                    NSColor.white.set()
+                    ink.set()
                     NSRect(origin: .zero, size: size).fill(using: .sourceAtop)
                     tinted.unlockFocus()
                     tinted.draw(in: spot)
@@ -354,7 +360,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
                 }
                 return true
             }
-            let text = NSAttributedString(string: letter, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white])
+            let text = NSAttributedString(string: letter, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: ink])
             let size = text.size()
             text.draw(at: NSPoint(x: (side - size.width) / 2, y: (side - size.height) / 2))
             return true
@@ -1227,53 +1233,47 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // MARK: Reordering spaces
 
-    /// The space follows the pointer; the others slide aside to open the gap it will land in, and on release it
-    /// settles into that gap before the new order is saved, so nothing jumps.
+    /// Spaces drag the way tabs do in the sidebar: the space stays where it is, faint, a see-through copy follows
+    /// the pointer, and a line shows where it will land. Nothing else moves until it's dropped.
     private func beginDrag(_ row: SpaceSettingsRow, event: NSEvent) -> Bool {
         guard let window, let startIndex = spaceRows.firstIndex(where: { $0 === row }) else { return false }
-        let start = spacesGroup.convert(event.locationInWindow, from: nil)
-        let rowHeight = row.frame.height
         SpaceEditorPanel.current?.close()
         SpaceSettingsRow.isReordering = true
         spaceRows.forEach { $0.isHovered = false }
-        spacesGroup.addSubview(row, positioned: .above, relativeTo: nil)
-        spacesGroup.showsDividers = false
+        // Lifted for its picture: its own solid card, so the copy reads off the list.
         row.isLifted = true
-        let originY = row.frame.minY
+        let ghost = DragGhost(of: row, event: event)
+        row.isLifted = false
+        row.alphaValue = 0.35
+        let line = InsertionLineView()
+        line.isHidden = true
+        spacesGroup.addSubview(line)
+        let others = spaceRows.filter { $0 !== row }
         var target = startIndex
-        func place(_ point: NSPoint) {
-            let y = min(max(originY + point.y - start.y, 0), spacesGroup.bounds.height - rowHeight)
-            Tokens.Motion.withoutAnimation { row.frame.origin.y = y }
-            let newTarget = min(max(Int((y + rowHeight / 2) / rowHeight), 0), spaceRows.count - 1)
-            guard newTarget != target else { return }
-            target = newTarget
-            var others = spaceRows.filter { $0 !== row }
-            others.insert(row, at: target)
-            for (i, other) in others.enumerated() where other !== row {
-                var frame = other.frame
-                frame.origin.y = CGFloat(i) * rowHeight
-                Tokens.Motion.glide(other, to: frame)
-            }
-        }
         window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
             if event.type == .leftMouseUp { stop.pointee = true; return }
-            place(self.spacesGroup.convert(event.locationInWindow, from: nil))
+            ghost?.follow(event)
+            self.documentView.autoscroll(with: event)
+            // Its new place: after every other space whose middle is above the pointer.
+            let y = self.spacesGroup.convert(event.locationInWindow, from: nil).y
+            target = others.filter { $0.frame.midY < y }.count
+            line.isHidden = target == startIndex
+            let edge = target < others.count ? others[target].frame.minY : others.last?.frame.maxY ?? 0
+            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.spacesGroup.bounds.width, height: 6) }
         }
-        let spaceID = row.spaceID, moved = target != startIndex
-        var landing = row.frame
-        landing.origin.y = CGFloat(target) * rowHeight
-        Tokens.Motion.glide(row, to: landing, duration: 0.18, timing: Tokens.Motion.easeOut)
-        DispatchQueue.main.asyncAfter(deadline: .now() + (Tokens.Motion.reduceMotion ? 0 : 0.18)) { [weak self] in
-            SpaceSettingsRow.isReordering = false
-            row.isLifted = false
-            self?.spacesGroup.showsDividers = true
-            if moved {
-                BrowserWindowController.undoTarget?.libraryChange("Move Space") { Library.shared.moveSpace(spaceID, to: target) }
-            } else {
-                self?.reloadSpaces()
-            }
-            self?.layoutSubtreeIfNeeded()
+        line.removeFromSuperview()
+        SpaceSettingsRow.isReordering = false
+        let spaceID = row.spaceID
+        if target != startIndex {
+            BrowserWindowController.undoTarget?.libraryChange("Move Space") { Library.shared.moveSpace(spaceID, to: target) }
+        }
+        reloadSpaces()
+        layoutSubtreeIfNeeded()
+        let landed = spaceRows.first { $0.spaceID == spaceID }
+        landed?.alphaValue = 0
+        ghost?.land(on: landed) { [weak self] in
+            landed?.alphaValue = 1
             self?.syncSpaceHover()
         }
         return true
