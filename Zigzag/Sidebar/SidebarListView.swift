@@ -458,7 +458,19 @@ final class SidebarListView: NSView {
                 guard let self, let header else { return }
                 if header.isOnChevron(event) { self.toggleCollapsed() } else { self.delegate?.listEditSpace(anchor: header) }
             }
-            header.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: .header) }
+            header.onToggleCollapsed = { [weak self] in self?.toggleCollapsed() }
+            header.onRightClick = { [weak self, weak header] _ in
+                let menu = self?.delegate?.listMenu(for: .header)
+                guard let header, header.canCollapse else { return menu }
+                // The pinned tabs fold from here too, not only from the chevron.
+                let folding = menu ?? NSMenu()
+                folding.autoenablesItems = false
+                if !folding.items.isEmpty { folding.insertItem(.separator(), at: 0) }
+                folding.insertItem(SidebarMenus.Item(header.isCollapsed ? "Show Pinned Tabs" : "Hide Pinned Tabs") { [weak self] in
+                    self?.toggleCollapsed()
+                }, at: 0)
+                return folding
+            }
             return header
         case .folder(let id):
             let row = FolderRowView()

@@ -531,6 +531,8 @@ final class SpaceHeaderView: InteractiveView {
     var isCollapsed = false { didSet { stateDidChange(animated: false) } }
     /// Only spaces with bookmarks can fold.
     var canCollapse = false { didSet { stateDidChange(animated: false) } }
+    /// Folds or opens the pinned tabs, for VoiceOver (a click on the chevron does too).
+    var onToggleCollapsed: (() -> Void)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -574,6 +576,12 @@ final class SpaceHeaderView: InteractiveView {
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
         setAccessibilityLabel(label.stringValue + (isCollapsed ? ", pinned tabs hidden" : ""))
         setAccessibilityHelp("Edit this space")
+        setAccessibilityCustomActions(canCollapse ? [
+            NSAccessibilityCustomAction(name: isCollapsed ? "Show Pinned Tabs" : "Hide Pinned Tabs") { [weak self] in
+                self?.onToggleCollapsed?()
+                return true
+            },
+        ] : [])
     }
 }
 
