@@ -117,7 +117,7 @@ enum SidebarMenus {
         }
         menu.addItem(Item("Duplicate Tab") { controller.duplicate(tab) })
         if !controller.tabManager.isPrivate, tab.bookmarkID == nil {
-            menu.addItem(Item("Move to New Window") { controller.moveToNewWindow(tab) })
+            menu.addItem(Item("Move Tab to New Window") { controller.moveToNewWindow(tab) })
         }
         menu.addItem(.separator())
         menu.addItem(Item("Reload") { tab.reload() })
@@ -258,7 +258,7 @@ enum SidebarMenus {
         }
         // A split favorite: its two pages go and come as one, and can be parted into two favorites.
         if let pair = Library.shared.pinnedSplit(containing: favorite.id) {
-            menu.addItem(Item("Separate Split View") { controller.separateFavoriteSplitWithUndo(favorite.id) })
+            menu.addItem(Item("Separate Tabs") { controller.separateFavoriteSplitWithUndo(favorite.id) })
             if !manager.isPrivate { menu.addItem(Item("Move to Tabs") { controller.unfavoriteWithUndo(favorite.id, to: 0) }) }
             menu.addItem(.separator())
             let pages = [pair.left, pair.right].compactMap { manager.bookmarkTab(for: $0) }
