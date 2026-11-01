@@ -616,6 +616,13 @@ final class DeskController {
     /// Tabs opened or closed while the desk is up (⌘W, a link opening a tab): the cards follow.
     func tabsChanged() { if isVisible { reload(animated: true) } }
 
+    /// Another space came forward while the desk is open (a shortcut): its color, and its tab as the current card.
+    func spaceChanged() {
+        guard isVisible, let controller else { return }
+        backdrop.color = controller.tabManager.currentSpace.background
+        reload(animated: true)
+    }
+
     private func reload(animated: Bool = false) {
         guard let manager else { return }
         let allTabs = Library.shared.spaces.flatMap { cardTabs(in: $0.id) }

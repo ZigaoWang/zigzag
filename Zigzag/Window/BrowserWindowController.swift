@@ -241,6 +241,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         applySpaceColor(animated: true)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
+        desk.spaceChanged()
     }
 
     /// A favorite held over another space's dot opens that space after a beat, so it can be dropped among that
