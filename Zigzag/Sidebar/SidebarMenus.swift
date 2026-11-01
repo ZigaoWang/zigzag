@@ -43,7 +43,43 @@ enum SidebarMenus {
                 menu.addItem(add)
             }
         }
+        // Picked pinned rows, a pinned split's as one.
+        let pins = items.compactMap { item -> UUID? in if case .bookmark(let id) = item { id } else { nil } }
+        let pages = pins.flatMap { id in Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id] }
+            .compactMap(controller.tabManager.bookmarkTab(for:))
+        if !pins.isEmpty, Library.shared.spaces.count > 1 || !pages.isEmpty || !isPrivate {
+            let manager = controller.tabManager
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
+            if Library.shared.spaces.count > 1 {
+                let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
+                let sub = NSMenu()
+                let current = Library.shared.spaceID(ofBookmark: pins[0])
+                for space in Library.shared.spaces where space.id != current {
+                    sub.addItem(Item(space.name) {
+                        controller.sidebar.list.clearMarks()
+                        controller.libraryChange("Move to Space") { for id in pins { Library.shared.moveBookmark(id, to: Int.max, in: space.id) } }
+                    })
+                }
+                move.submenu = sub
+                menu.addItem(move)
+            }
+            if !pages.isEmpty {
+                menu.addItem(Item(pages.count == 1 ? "Unload Page" : "Unload \(pages.count) Pages") {
+                    controller.sidebar.list.clearMarks()
+                    manager.close(pages)
+                })
+            }
+            // Pins are shared by every window: a private one doesn't take them away.
+            if !isPrivate {
+                menu.addItem(Item(pins.count == 1 ? "Unpin Tab" : "Unpin \(pins.count) Tabs") {
+                    controller.sidebar.list.clearMarks()
+                    // Each comes down to the top of the tabs, the last first, so they keep their order.
+                    for id in pins.reversed() { controller.unbookmarkWithUndo(id, to: 0) }
+                })
+            }
+        }
         if !tabs.isEmpty {
+            if !pins.isEmpty, !menu.items.isEmpty { menu.addItem(.separator()) }
             if !isPrivate {
                 menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") {
                     controller.sidebar.list.clearMarks()
