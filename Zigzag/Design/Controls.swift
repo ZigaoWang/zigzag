@@ -104,7 +104,8 @@ class InteractiveView: NSView {
         // Keep hover honest after scrolling or relayout.
         if let window, window.isVisible {
             let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-            let inside = bounds.contains(point) && !isHiddenOrHasHiddenAncestor
+            // With the button held, something is being dragged: rows sliding under it aren't hovered.
+            let inside = bounds.contains(point) && !isHiddenOrHasHiddenAncestor && NSEvent.pressedMouseButtons == 0
             if inside != isHovered { isHovered = inside }
         }
     }

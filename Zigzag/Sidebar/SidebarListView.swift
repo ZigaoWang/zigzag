@@ -424,7 +424,19 @@ final class SidebarListView: NSView {
 
     /// Over the list: the space header offers Clear.
     private(set) var isPointerInside = false {
-        didSet { (rows[.separator] as? SeparatorRowView)?.showsClear = isPointerInside }
+        didSet { (rows[.separator] as? SeparatorRowView)?.showsClear = showsClear }
+    }
+    /// Clear is offered under the pointer, never while something is being dragged past it.
+    private var showsClear: Bool { isPointerInside && drag == nil }
+
+    /// Hover follows where the pointer really is, once rows have moved under it during a drag.
+    private func syncHover() {
+        guard let window else { return }
+        let mouse = window.mouseLocationOutsideOfEventStream
+        isPointerInside = bounds.contains(convert(mouse, from: nil))
+        for case let row as InteractiveView in rows.values {
+            row.isHovered = row.bounds.contains(row.convert(mouse, from: nil))
+        }
     }
     private var hoverArea: NSTrackingArea?
 
@@ -472,7 +484,7 @@ final class SidebarListView: NSView {
                 self?.delegate?.listClearTabs()
             }
             separator.clearButton.hoverChanged = { [weak self] on in self?.previewClear(on) }
-            separator.showsClear = isPointerInside
+            separator.showsClear = showsClear
             return separator
         case .placeholder:
             // The room the carried row will land in: empty, the row's own size.
@@ -895,6 +907,9 @@ final class SidebarListView: NSView {
         let panel = makePanel(for: view, at: rowScreen)
         drag = DragState(item: item, view: view, grab: NSPoint(x: mouse.x - rowScreen.minX, y: mouse.y - rowScreen.minY),
                          targetSection: section, targetIndex: index, panel: panel)
+        // Nothing in the list reacts to the pointer while a row is carried over it.
+        for case let row as InteractiveView in rows.values { row.isHovered = false }
+        (rows[.separator] as? SeparatorRowView)?.showsClear = false
         // Dragging one of several picked rows carries them all; the others dim where they are until the drop.
         if marked.count > 1, marked.contains(item) {
             drag?.group = marked.filter { $0 != item }
@@ -1205,6 +1220,8 @@ final class SidebarListView: NSView {
         drop(drag, event: event)
         delegate?.listDropFinished()
         settle(drag)
+        layoutSubtreeIfNeeded()
+        syncHover()
     }
 
     /// The lifted row glides into the slot it landed in, then becomes the row again.
