@@ -1227,6 +1227,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         iconPicker?.close()
         // Nor does Reader's key monitor outlive it.
         closeReader()
+        // Nor the key monitors of the command bar, find and this window's panels, which stay installed until they close.
+        commandBar.dismiss(restoringFocus: false)
+        if findBar.isVisible { findBar.hide() }
+        if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
+        if DownloadsPanel.isOpen(in: window) { DownloadsPanel.closeCurrent() }
+        if let editor = SpaceEditorPanel.current, editor.window === window { editor.close() }
         onClose?(self)
     }
 
