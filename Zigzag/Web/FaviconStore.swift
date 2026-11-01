@@ -35,6 +35,12 @@ final class FaviconStore {
             try? FileManager.default.removeItem(at: file(for: "google.com"))
             UserDefaults.standard.set(true, forKey: "faviconGoogleApps")
         }
+        // Icons used to be stretched to 64 pixels, small ones blurred; they're fetched again at their own size.
+        if !UserDefaults.standard.bool(forKey: "faviconNativeSize") {
+            try? FileManager.default.removeItem(at: Paths.favicons)
+            try? FileManager.default.createDirectory(at: Paths.favicons, withIntermediateDirectories: true)
+            UserDefaults.standard.set(true, forKey: "faviconNativeSize")
+        }
     }
 
     private func file(for key: String) -> URL {
@@ -97,15 +103,16 @@ final class FaviconStore {
             if sizes == "any" { return 512 }
             return sizes.split(separator: " ").compactMap { Int($0.split(separator: "x").first ?? "") }.max() ?? 16
         }
-        // Prefer the smallest icon that is at least 32px (crisp at 16pt @2x), then larger, then smaller.
+        // The site's own icon, drawn for small sizes, comes first: an SVG, then the smallest of 64px or more, then of
+        // 32px or more. A touch icon only after those: it's made for a home screen, on a solid square of its own.
         let scored = links.compactMap { link -> (URL, Int)? in
             guard let href = link["href"], let url = URL(string: href) else { return nil }
             let s = size(link)
             let isSVG = (link["type"] ?? "").contains("svg") || url.pathExtension.lowercased() == "svg"
             let isTouch = (link["rel"] ?? "").contains("apple-touch")
-            var score = s >= 32 ? 1000 - s : s
-            if isSVG { score = 1100 }
-            if isTouch { score -= 50 }
+            var score = s >= 64 ? 2000 - s : s >= 32 ? 1000 - s : s
+            if isSVG { score = 2100 }
+            if isTouch { score = s >= 32 ? 500 : s }
             return (url, score)
         }
         var result = scored.sorted { $0.1 > $1.1 }.map(\.0)
@@ -115,24 +122,46 @@ final class FaviconStore {
         components.port = pageURL.port
         components.path = "/favicon.ico"
         if let fallback = components.url, !result.contains(fallback) { result.append(fallback) }
+        components.path = "/apple-touch-icon.png"
+        if let touch = components.url, !result.contains(touch) { result.append(touch) }
         return result
     }
 
     /// Without `save`, the icon is only handed back, for the one page that declared it.
-    private func fetchFirst(_ candidates: [URL], key: String, save: Bool = true, completion: @escaping (NSImage?) -> Void) {
-        guard let next = candidates.first else { completion(nil); return }
+    /// An icon too small to stay sharp on a favorite is kept only until a larger one turns up further down the list.
+    private func fetchFirst(_ candidates: [URL], key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
+        func finish(_ image: NSImage) {
+            if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
+        }
+        func found(_ image: NSImage, rest: [URL]) {
+            // An icon that draws nothing (an SVG styled by the page, which AppKit can't follow) is passed over.
+            if Self.isBlank(image) {
+                fetchFirst(rest, key: key, save: save, small: small, completion: completion)
+                return
+            }
+            let pixels = image.representations.map(\.pixelsWide).max() ?? 0
+            if pixels > 0, pixels < 44, !rest.isEmpty {
+                fetchFirst(rest, key: key, save: save, small: small ?? image, completion: completion)
+            } else {
+                finish(image)
+            }
+        }
+        guard let next = candidates.first else {
+            if let small { finish(small) } else { completion(nil) }
+            return
+        }
         let rest = Array(candidates.dropFirst())
         if next.scheme == "data", let data = try? Data(contentsOf: next), let image = NSImage(data: data), image.isValid {
-            if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
+            found(image, rest: rest)
             return
         }
         Task {
             let result = try? await session.data(from: next)
             let ok = ((result?.1 as? HTTPURLResponse)?.statusCode ?? 200) < 400
             if ok, let data = result?.0, let image = NSImage(data: data), image.isValid, image.size.width > 0 {
-                if save { store(image, key: key); completion(memory[key]) } else { completion(Self.normalize(image)) }
+                found(image, rest: rest)
             } else {
-                fetchFirst(rest, key: key, save: save, completion: completion)
+                fetchFirst(rest, key: key, save: save, small: small, completion: completion)
             }
         }
     }
@@ -153,16 +182,37 @@ final class FaviconStore {
         updated.send(key)
     }
 
-    /// Renders to a 64px bitmap so every icon draws the same, whatever the source format.
+    /// Renders to a square bitmap so every icon draws the same, whatever the source format. It keeps the source's
+    /// own pixels, up to 128: a small icon is never stretched here, so a view can tell how large it stays sharp.
     private static func normalize(_ image: NSImage) -> NSImage {
-        let side: CGFloat = 64
-        let out = NSImage(size: NSSize(width: side, height: side))
-        out.lockFocus()
+        let native = image.representations.map(\.pixelsWide).max() ?? 0
+        // Drawings (SVG, PDF) have no pixels of their own and render sharp at any size.
+        let side = native <= 0 ? 128 : min(max(native, 16), 128)
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
+                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0) else { return image }
+        rep.size = NSSize(width: side, height: side)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
         NSGraphicsContext.current?.imageInterpolation = .high
-        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side), from: .zero, operation: .sourceOver, fraction: 1)
-        out.unlockFocus()
-        out.size = NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        let out = NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon))
+        out.addRepresentation(rep)
         return out
+    }
+
+    private static func isBlank(_ image: NSImage) -> Bool {
+        guard let rep = normalize(image).representations.first as? NSBitmapImageRep, let data = rep.bitmapData else { return false }
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<rep.pixelsWide where data[y * rep.bytesPerRow + x * 4 + 3] > 8 { return false }
+        }
+        return true
+    }
+
+    /// The largest size, in points, an icon shows at without being stretched on a Retina display.
+    static func sharpSide(of image: NSImage) -> CGFloat {
+        CGFloat(image.representations.map(\.pixelsWide).max() ?? 0) / 2
     }
 
     /// A color that represents the icon, used for tinting when a site has no theme color.

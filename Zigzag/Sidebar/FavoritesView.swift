@@ -268,7 +268,8 @@ final class FavoriteTile: InteractiveView {
 
     override func layout() {
         super.layout()
-        let size = Tokens.Metric.favicon + 4
+        // At its own 16pt, like a tab's icon: any other size scales the bitmap unevenly and blurs it.
+        let size = Tokens.Metric.favicon
         icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
         let dot = Self.dotSide
         openDot.frame = NSRect(x: (bounds.width - dot) / 2, y: isFlipped ? bounds.height - dot - 5 : 5, width: dot, height: dot)
