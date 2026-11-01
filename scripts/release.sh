@@ -156,8 +156,19 @@ if [[ "${1:-}" == "--publish" ]]; then
   ssh "$SERVER" "ln -sfn Zigzag-$VERSION.dmg $SITE_ROOT/releases/Zigzag-latest.dmg && ln -sfn Zigzag-$VERSION.zip $SITE_ROOT/releases/Zigzag-latest.zip"
   # The feed goes last, so no Mac is offered an update before its zip is there.
   rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/appcast.xml"
-  # The beta feed carries each stable release too, so anyone on a beta moves on to it.
-  rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
+  # The beta feed carries each stable release too, so anyone on a beta moves on to it, unless its betas already
+  # lead up to a later version (0.5.0-beta.3 leads up to 0.5.0): replacing it then would move them back.
+  if BETA_FEED=$(curl -fsSL "https://$SITE_HOST/updates/beta.xml"); then
+    NEWEST_BETA=$(print -r -- "$BETA_FEED" | grep -oE '[0-9]+(\.[0-9]+)*-beta\.[0-9]+' | sed -E 's/-beta\.[0-9]+$//' \
+      | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 || true)
+    if [[ -z "$NEWEST_BETA" ]] || zsh scripts/version-at-least.sh "$VERSION" "$NEWEST_BETA"; then
+      rsync -a "$OUT/updates/appcast.xml" "$SERVER:$SITE_ROOT/updates/beta.xml"
+    else
+      echo "The beta feed is left as it is: its betas lead up to $NEWEST_BETA, after $VERSION."
+    fi
+  else
+    echo "The beta feed is left as it is: it couldn't be read to check its betas against $VERSION."
+  fi
   # The website's changelog page, with this version on top.
   zsh site/deploy.sh
   # The Homebrew cask, in a checkout of ZigaoWang/homebrew-tap beside this repository. It points at the DMG on
