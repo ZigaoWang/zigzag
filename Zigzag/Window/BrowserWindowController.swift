@@ -354,10 +354,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func libraryChanged() {
-        reloadFavorites()
+        // The list and favorites reload once already: the tab manager hears the same change first and sends
+        // `.structure` (`tabManagerChanged`).
         applySpaceColor(animated: true)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
-        sidebar.list.reload(animated: true)
     }
 
     /// Live preview while dragging the hue slider: recolors without saving.
