@@ -746,7 +746,13 @@ final class SidebarView: NSView {
     /// Slides the old list out and the new one in, in the direction of travel.
     /// If a swipe is in progress, the new list continues from where the fingers left it.
     func transitionList(direction: CGFloat, from snapshot: NSImage?) {
-        let fromSwipe = scrollView.frame.minX - Tokens.Sidebar.edge
+        // A switch on top of a switch: the list carries on from where it's drawn now, and the last ghost goes, so
+        // quick ⌃1 ⌃2 ⌃3 never stacks ghosts or jumps.
+        var fromSwipe = scrollView.frame.minX - Tokens.Sidebar.edge
+        if let layer = scrollView.layer, layer.animation(forKey: "slide") != nil, let drawn = layer.presentation()?.transform {
+            fromSwipe += drawn.m41
+        }
+        if let old = swipeGhost, old !== neighborScroll { old.removeFromSuperview() }
         // Let go of a swipe past the line: the spring carries on at the fingers' speed. Any other switch (a click
         // on a dot, ⌃2) ends a swipe in progress, and the new list simply slides in from where the old one was.
         let landing = landingVelocity
@@ -789,7 +795,8 @@ final class SidebarView: NSView {
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 1
         fade.toValue = 0
-        fade.duration = 0.18
+        fade.duration = Tokens.Motion.slideDuration
+        fade.timingFunction = Tokens.Motion.easeOut
         fade.fillMode = .forwards
         fade.isRemovedOnCompletion = false
         ghost.layer?.add(fade, forKey: "fade")
