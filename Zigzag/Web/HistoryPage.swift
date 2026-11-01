@@ -65,7 +65,7 @@ enum HistoryPage {
     /// takes the page's own muted text color.
     static let globe: Data? = {
         guard let symbol = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 26, weight: .regular)) else { return nil }
+            .withSymbolConfiguration(.init(pointSize: 26, weight: Tokens.Symbol.weight)) else { return nil }
         let side: CGFloat = 32
         let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
             let size = symbol.size
@@ -217,7 +217,9 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .session-head h2 { font-size: inherit; font-weight: inherit; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-head .range { white-space: nowrap; }
 .session-head .count { margin-left: auto; color: var(--faint); font-size: var(--small); white-space: nowrap; }
-.remove { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
+/* A row's own small button, as the sidebar's: a 20px target with a thin drawn ×, the app's one line weight. */
+.remove { flex: none; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border-radius: var(--radius-small); color: var(--muted); }
+.remove svg { width: 10px; height: 10px; }
 .remove:hover { background: var(--hover); color: var(--text); }
 .remove:active { background: var(--pressed); }
 .session-head .remove { align-self: center; }
@@ -314,7 +316,8 @@ const icon = (url) => {
   return img;
 };
 const removeButton = (label, action) => {
-  const b = el('button', 'remove', '×'); b.title = label; b.setAttribute('aria-label', label);
+  const b = el('button', 'remove'); b.title = label; b.setAttribute('aria-label', label);
+  b.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>';
   b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); action(); };
   return b;
 };
@@ -332,7 +335,7 @@ function clusterElement(cluster, session) {
   head.setAttribute('aria-expanded', cluster.open);
   const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   chevron.setAttribute('class', 'chevron'); chevron.setAttribute('viewBox', '0 0 12 12');
-  chevron.innerHTML = '<path d="M4.5 2.5L8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+  chevron.innerHTML = '<path d="M4.5 2.5L8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>';
   const count = cluster.items.length;
   head.append(chevron, icon(cluster.items[0].url), el('span', 'title', cluster.host), el('span', 'where', count + ' pages'),
               el('time', null, span(cluster.items)),
@@ -467,7 +470,12 @@ document.addEventListener('keydown', (e) => {
 const menu = document.getElementById('clearMenu');
 const clearButton = document.getElementById('clearButton');
 const items = [...menu.querySelectorAll('[role="menuitem"]')];
+// It leaves as Zigzag's menus do: quicker and subtler than it came, then gone.
 const setMenu = (open, focusFirst) => {
+  if (!open && menu.classList.contains('open')) {
+    menu.classList.add('closing');
+    setTimeout(() => menu.classList.remove('closing'), 120);
+  }
   menu.classList.toggle('open', open);
   clearButton.setAttribute('aria-expanded', open);
   if (open && focusFirst) items[0].focus();

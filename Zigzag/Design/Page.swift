@@ -261,7 +261,7 @@ enum PageStyle {
 
     /// The search field: a magnifying glass, then the input.
     static func search(id: String, placeholder: String) -> String {
-        #"<label class="search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>"#
+        #"<label class="search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>"#
             + #"<input id="\#(id)" type="search" placeholder="\#(placeholder)" aria-label="\#(placeholder)" autocomplete="off" autofocus></label>"#
     }
 
@@ -361,12 +361,17 @@ enum PageStyle {
     /* A menu, drawn as Zigzag's menus are (MenuPanel): a solid panel with a hairline edge and the one panel shadow,
        body-size items, a soft gray row under the pointer. It arrives with a quick fade from a touch smaller. */
     .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 5; min-width: 200px; padding: var(--space-1); border-radius: var(--radius-float);
-            background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none; }
-    .menu.open { display: block; animation: menu-in .14s cubic-bezier(.23, 1, .32, 1); transform-origin: top right; }
-    @keyframes menu-in { from { opacity: 0; transform: scale(.97); } }
-    @media (prefers-reduced-motion: reduce) { .menu.open { animation-name: menu-fade; } }
+            background: var(--panel); box-shadow: 0 0 0 1px var(--panel-edge), 0 var(--panel-drop) var(--panel-blur) var(--panel-shadow); display: none;
+            transform-origin: top right; }
+    /* In from 96% in 180ms, out toward 98% in 120ms, as MenuPanel (Motion.menuIn, menuOut). */
+    .menu.open { display: block; animation: menu-in .18s cubic-bezier(.23, 1, .32, 1); }
+    .menu.closing:not(.open) { display: block; pointer-events: none; animation: menu-out .12s cubic-bezier(.23, 1, .32, 1) forwards; }
+    @keyframes menu-in { from { opacity: 0; transform: scale(.96); } }
+    @keyframes menu-out { to { opacity: 0; transform: scale(.98); } }
+    @media (prefers-reduced-motion: reduce) { .menu.open { animation-name: menu-fade; } .menu.closing:not(.open) { animation-name: menu-fade-out; } }
     @keyframes menu-fade { from { opacity: 0; } }
-    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control-height); padding: 0 var(--space-3); border-radius: var(--radius-row);
+    @keyframes menu-fade-out { to { opacity: 0; } }
+    .menu [role="menuitem"] { display: block; width: 100%; text-align: left; height: var(--control-height); padding: 0 var(--row-inset); border-radius: var(--radius-row);
                               font-size: var(--body); }
     .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--highlight); outline: none; }
     .menu [role="menuitem"]:active { background: var(--pressed); }
