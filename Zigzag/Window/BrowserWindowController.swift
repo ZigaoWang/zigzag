@@ -143,9 +143,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return SidebarMenus.favoriteMenu(for: favorite, controller: self)
         }
         sidebar.favorites.onDragMove = { [weak self] _, point in
-            guard let self else { return false }
+            guard let self, let window = self.window else { return false }
             let over = self.isOverList(point)
             self.sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
+            self.favoriteSpring(at: window.convertPoint(fromScreen: point))
             return over
         }
         sidebar.favorites.onDrop = { [weak self] favorite, point in
@@ -153,6 +154,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let overList = self.isOverList(point)
             let (section, index) = self.sidebar.list.dropTarget(at: point, allowsPinned: true)
             self.sidebar.list.externalHover(at: nil)
+            let dot = self.window.flatMap { self.sidebar.spaceDot(at: $0.convertPoint(fromScreen: point)) }
+            self.favoriteSpring(at: nil)
+            self.sidebar.clearDropTargets()
+            defer { self.listDropFinished() }
+            // Let go on another space's dot: it becomes a tab there, at the top, and that space shows.
+            if let dot, dot != self.tabManager.currentSpaceID {
+                self.tabManager.showSpaceKeepingPage(dot)
+                self.unfavoriteWithUndo(favorite.id, to: 0)
+                return true
+            }
             guard overList else { return false }
             // Dragged down into the list: a pinned tab among the pinned ones, or a regular tab among the tabs, right
             // where it was dropped.
@@ -223,6 +234,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         applySpaceColor(animated: true)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
+    }
+
+    /// A favorite held over another space's dot opens that space after a beat, so it can be dropped among that
+    /// space's tabs, as a tab can. Nil: the drag is over.
+    private var favoriteSpringTarget: (space: UUID, work: DispatchWorkItem)?
+    private func favoriteSpring(at windowPoint: NSPoint?) {
+        let hovered = windowPoint.flatMap { sidebar.spaceDot(at: $0) }
+        guard hovered != favoriteSpringTarget?.space else { return }
+        favoriteSpringTarget?.work.cancel()
+        favoriteSpringTarget = nil
+        guard let hovered else { return }
+        Haptics.snap()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.tabManager.showSpaceKeepingPage(hovered) }
+        }
+        favoriteSpringTarget = (hovered, work)
+        if hovered != tabManager.currentSpaceID { DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work) }
     }
 
     private func isOverList(_ screenPoint: NSPoint) -> Bool {
