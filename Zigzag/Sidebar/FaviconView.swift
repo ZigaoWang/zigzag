@@ -103,18 +103,22 @@ final class FaviconView: NSView {
         return context.makeImage()
     }
 
-    /// The icon's shape filled with one color, resolved for the view's light or dark look.
+    /// The icon's shape filled with one color, resolved for the view's light or dark look. Done in a bitmap of its
+    /// own (the icon, then the color kept only where it is), so it never depends on where it's later drawn.
     private static func inked(_ image: NSImage, _ color: NSColor, appearance: NSAppearance) -> NSImage {
         var ink = color.cgColor
         appearance.performAsCurrentDrawingAppearance { ink = color.cgColor }
-        return NSImage(size: image.size, flipped: false) { rect in
-            image.draw(in: rect)
-            guard let context = NSGraphicsContext.current?.cgContext else { return true }
-            context.setBlendMode(.sourceIn)
-            context.setFillColor(ink)
-            context.fill(rect)
-            return true
-        }
+        guard let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let context = CGContext(data: nil, width: source.width, height: source.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return image }
+        let rect = CGRect(x: 0, y: 0, width: source.width, height: source.height)
+        context.draw(source, in: rect)
+        context.setBlendMode(.sourceIn)
+        context.setFillColor(ink)
+        context.fill(rect)
+        guard let result = context.makeImage() else { return image }
+        return NSImage(cgImage: result, size: image.size)
     }
 
     /// When loading began, so a page that's done almost at once doesn't flash the loader.
