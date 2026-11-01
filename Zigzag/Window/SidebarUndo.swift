@@ -56,8 +56,12 @@ extension BrowserWindowController {
     /// Runs a change to tabs, pinned pages or favorites. ⌘Z puts the library and this window's tabs back exactly as
     /// they were (the same pages, names and places, open or not); ⇧⌘Z does the change again.
     func pageChange(_ name: String, _ change: @escaping () -> Void) {
+        // One step of a bigger change: the outer one records it all.
+        if isInPageChange { change(); return }
         let before = (library: Library.shared.snapshot, tabs: tabManager.arrangement)
+        isInPageChange = true
         change()
+        isInPageChange = false
         let after = (library: Library.shared.snapshot, tabs: tabManager.arrangement)
         guard before.library != after.library || !before.tabs.isSame(as: after.tabs) else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in

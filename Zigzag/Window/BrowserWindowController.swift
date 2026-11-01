@@ -23,6 +23,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var switcher = TabSwitcher(controller: self)
     /// ⌘Z for sidebar actions; also the window's undo manager, so page text editing shares it.
     let sidebarUndo = UndoManager()
+    /// Inside a `pageChange`: the steps it's made of (pin, then into a folder) are its own, one ⌘Z and one redo.
+    var isInPageChange = false
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
     lazy var peek = PeekController(controller: self)
     var peekController: PeekController? { peek }
@@ -1547,6 +1549,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listRenameFolder(_ id: UUID, to name: String) {
         libraryChange("Rename Folder") { Library.shared.renameFolder(id, to: name) }
     }
+    func listAsOne(_ name: String, _ body: @escaping () -> Void) { pageChange(name, body) }
     func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {
         pageChange(folderID == nil ? "Remove from Folder" : "Add to Folder") { Library.shared.setFolder(of: bookmarkID, to: folderID) }
     }

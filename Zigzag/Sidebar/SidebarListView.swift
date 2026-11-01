@@ -15,6 +15,8 @@ protocol SidebarListDelegate: AnyObject {
     func listRenameFolder(_ id: UUID, to name: String)
     /// Puts a pinned page at the end of a folder, or takes it out of any (nil).
     func listSetFolder(of bookmarkID: UUID, to folderID: UUID?)
+    /// Runs several of these as one change: one ⌘Z takes it all back, and redo does it all again.
+    func listAsOne(_ name: String, _ body: @escaping () -> Void)
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?)
     func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID)
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
@@ -1458,8 +1460,12 @@ final class SidebarListView: NSView {
         let space = manager.currentSpaceID
         // Onto a folder row: in it goes, at its end (a tab is pinned first).
         if let folder = drag.folderTarget {
-            for item in drag.together {
-                if let id = pin(item, in: space) { delegate?.listSetFolder(of: id, to: folder) }
+            let together = drag.together
+            // Pinning a tab and putting it in the folder is one step to undo.
+            delegate?.listAsOne("Add to Folder") { [weak self] in
+                for item in together {
+                    if let id = self?.pin(item, in: space) { self?.delegate?.listSetFolder(of: id, to: folder) }
+                }
             }
             return tab.map(landingView(for:)) ?? rows[drag.item]
         }
@@ -1474,11 +1480,14 @@ final class SidebarListView: NSView {
             if let tab { delegate?.listMove(tab, to: listIndex, in: space) }
         case (.tab, .bookmarks):
             if let tab {
-                if tab.spaceID != space { delegate?.listMove(tab, to: 0, in: space) }
-                delegate?.listBookmark(tab, at: drag.targetIndex, in: space)
-                // Among a folder's pages: into that folder.
-                if let folder = gapFolder, let bookmarkID = tab.bookmarkID {
-                    delegate?.listMoveBookmark(bookmarkID, to: drag.targetIndex, in: space, folder: folder)
+                let index = drag.targetIndex
+                delegate?.listAsOne("Pin Tab") { [weak self] in
+                    if tab.spaceID != space { self?.delegate?.listMove(tab, to: 0, in: space) }
+                    self?.delegate?.listBookmark(tab, at: index, in: space)
+                    // Among a folder's pages: into that folder.
+                    if let folder = gapFolder, let bookmarkID = tab.bookmarkID {
+                        self?.delegate?.listMoveBookmark(bookmarkID, to: index, in: space, folder: folder)
+                    }
                 }
             }
         case (.bookmark(let id), .bookmarks):
