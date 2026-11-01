@@ -780,7 +780,9 @@ final class SidebarListView: NSView {
         let from = cardRow
         cardRow = now
         guard from !== now else { return }
-        guard let now, let from, from.superview === self, drag == nil, window != nil,
+        // A row that's still opening into place carries its own card in with it: a card sliding there ahead of
+        // the row would show empty for a moment.
+        guard let now, let from, from.superview === self, drag == nil, window != nil, now.layer?.mask == nil,
               !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion, abs(from.frame.minY - now.frame.minY) < 600 else {
             // No slide this time: a card still traveling stops where it is, and the row it was going to shows its
             // own at once, so two cards never show together.
