@@ -626,15 +626,17 @@ final class SeparatorRowView: NSView {
 }
 
 enum SiteTint {
-    private static var iconColors: [ObjectIdentifier: NSColor?] = [:]
+    /// Keyed by the icon itself, held, so a new icon at a freed one's address never takes its color.
+    private static var iconColors: [ObjectIdentifier: (icon: NSImage, color: NSColor?)] = [:]
 
     static func color(for tab: Tab) -> NSColor? {
         if let theme = tab.themeColor, let usable = usable(theme) { return usable }
         guard let icon = tab.favicon else { return nil }
         let key = ObjectIdentifier(icon)
-        if let cached = iconColors[key] { return cached }
+        if let cached = iconColors[key], cached.icon === icon { return cached.color }
         let color = FaviconStore.shared.dominantColor(of: icon)
-        iconColors[key] = color
+        if iconColors.count > 500 { iconColors.removeAll() }
+        iconColors[key] = (icon, color)
         return color
     }
 

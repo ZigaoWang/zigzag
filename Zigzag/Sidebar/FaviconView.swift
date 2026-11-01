@@ -14,6 +14,8 @@ final class FaviconView: NSView {
         let dark: Bool, ink: Bool
     }
     private var lastRender: RenderKey?
+    /// The image last drawn, held, so a new image at a reused address is never mistaken for it.
+    private var renderedImage: NSImage?
 
     var image: NSImage? { didSet { refreshImage() } }
     var isLoading = false { didSet { if oldValue != isLoading { refreshLoading() } } }
@@ -74,8 +76,9 @@ final class FaviconView: NSView {
             // only when the icon, its size or its ink changes.
             let key = RenderKey(base: image.map(ObjectIdentifier.init), side: bounds.width,
                                 scale: scale, dark: effectiveAppearance.isDark, ink: isInk)
-            if key != lastRender {
+            if key != lastRender || renderedImage !== image {
                 lastRender = key
+                renderedImage = image
                 let shown = isInk ? image.map { Self.inked($0, Tokens.Color.textPrimary, appearance: effectiveAppearance) } : image
                 imageLayer.contents = shown.flatMap { Self.render($0, side: bounds.width, scale: scale) }
             }
@@ -166,13 +169,15 @@ final class FaviconView: NSView {
         }
     }
 
-    private static var monochromeCache: [ObjectIdentifier: Bool] = [:]
+    /// Keyed by the image itself, held: a freed image's address can be reused by a new one, which must not inherit
+    /// its answer (a colorful icon drawn as a black disc).
+    private static var monochromeCache: [ObjectIdentifier: (image: NSImage, result: Bool)] = [:]
 
     /// True for icons drawn in one colorless ink, black or white, on transparency. A black mark on a white disc
     /// (Apple) is two tones and keeps its own colors.
     static func isMonochrome(_ image: NSImage) -> Bool {
         let key = ObjectIdentifier(image)
-        if let cached = monochromeCache[key] { return cached }
+        if let cached = monochromeCache[key], cached.image === image { return cached.result }
         var result = false
         if let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             let side = 16
@@ -195,7 +200,8 @@ final class FaviconView: NSView {
                     && min(dark, light) * 10 < opaque && colorful * 10 < opaque
             }
         }
-        monochromeCache[key] = result
+        if monochromeCache.count > 500 { monochromeCache.removeAll() }
+        monochromeCache[key] = (image, result)
         return result
     }
 
