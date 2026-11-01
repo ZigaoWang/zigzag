@@ -297,6 +297,7 @@ final class SidebarListView: NSView {
                     if animated {
                         view.alphaValue = 0
                         changes.append { view.animator().alphaValue = 1 }
+                        grow(view)
                     }
                 }
             }
@@ -347,6 +348,21 @@ final class SidebarListView: NSView {
             animation.isRemovedOnCompletion = false
             layer.add(animation, forKey: animation.keyPath)
         }
+        CATransaction.commit()
+    }
+
+    /// A row that arrives (a new tab opened with the pointer) opens its height from nothing as it fades in, in step
+    /// with the rows below making room. From the keyboard or with Reduce Motion it's simply there.
+    private func grow(_ view: NSView) {
+        guard let layer = view.layer, !Tokens.Motion.isFromKey, !Tokens.Motion.reduceMotion else { return }
+        layer.masksToBounds = true
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak layer] in layer?.masksToBounds = false }
+        let open = Tokens.Motion.easeAnimation(keyPath: "bounds.size.height", duration: Tokens.Motion.standard)
+        open.fromValue = 0
+        open.toValue = layer.bounds.height
+        open.fillMode = .backwards
+        layer.add(open, forKey: "grow")
         CATransaction.commit()
     }
 
