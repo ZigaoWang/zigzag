@@ -1421,7 +1421,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private let item: NSMenuItem?
     private let title: Label
     private let note = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
-    private var caps: [KeyHint] = []
+    private var caps: [KeyCap] = []
     private let field = ColorView(color: .clear)
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: .compact, toolTip: "Back to Zigzag’s Shortcut")
@@ -1465,7 +1465,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         addSubview(note)
         note.isHidden = true
         for key in keys {
-            let cap = KeyHint(key)
+            let cap = KeyCap(key)
             addSubview(cap)
             caps.append(cap)
         }
@@ -1506,7 +1506,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         } else {
             for cap in caps.reversed() {
                 x -= cap.width
-                cap.frame = NSRect(x: x, y: (bounds.height - KeyHint.height) / 2, width: cap.width, height: KeyHint.height)
+                cap.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.keyCapHeight) / 2, width: cap.width, height: Tokens.Metric.keyCapHeight)
                 x -= Tokens.Space.x1
             }
         }

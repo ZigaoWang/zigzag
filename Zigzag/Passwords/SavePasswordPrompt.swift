@@ -12,9 +12,8 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     private static weak var current: SavePasswordPrompt?
 
-    private let icon = FaviconView()
-    private let titleLabel = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let siteLabel = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    /// The site's icon, the question and exactly where the password goes: the one header every dialog has.
+    private let header = DialogHeader(title: "")
     private let usernameBox = ColorView(color: Tokens.Color.fieldFill)
     private let usernameField = PlainTextField(font: Tokens.Font.body(), placeholder: "Username")
     private let usernameText = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -36,10 +35,9 @@ final class SavePasswordPrompt: FloatingPanelView {
     private var urlToken: SignalToken?
     private var frameObservers: [Any] = []
 
-    static let width: CGFloat = 320
-    private let pad = Tokens.Space.x4
-    private let headerHeight: CGFloat = 36
-    private let fieldHeight: CGFloat = 36
+    static let width = Tokens.Dialog.width
+    private let pad = Tokens.Dialog.padding
+    private let fieldHeight = Tokens.Metric.controlHeight + Tokens.Space.x1
     private let buttonHeight = DialogButtons.height
 
     private init(kind: Kind, origin: Origin) {
@@ -47,13 +45,16 @@ final class SavePasswordPrompt: FloatingPanelView {
         saveButton = PillButton(title: isUpdate ? "Update" : "Save", style: .prominent)
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: 0))
         radius = Tokens.Radius.panel
-        titleLabel.stringValue = isUpdate ? "Update password?" : "Save password?"
+        header.title.stringValue = isUpdate ? "Update password?" : "Save password?"
         // Exactly where this password goes, in full.
-        siteLabel.stringValue = origin.displayName
-        siteLabel.lineBreakMode = .byTruncatingMiddle
-        siteLabel.toolTip = origin.displayName
+        header.subtitle.stringValue = origin.displayName
+        header.subtitle.toolTip = origin.displayName
         let site = URL(string: "\(origin.scheme)://\(origin.host)")
-        icon.image = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key", size: Tokens.Symbol.row)
+        if let favicon = site.flatMap({ FaviconStore.shared.cachedIcon(for: $0) }) {
+            header.setImage(favicon)
+        } else {
+            header.setSymbol("key", tint: Brand.Theme.current.accent)
+        }
         usernameBox.wantsLayer = true
         usernameBox.layer?.cornerRadius = Tokens.Radius.field
         usernameBox.layer?.cornerCurve = .continuous
@@ -65,7 +66,7 @@ final class SavePasswordPrompt: FloatingPanelView {
             usernameText.stringValue = credential.username.isEmpty ? "No username" : credential.username
             usernameBox.addSubview(usernameText)
         }
-        [icon, titleLabel, siteLabel, usernameBox, buttons].forEach { addSubview($0) }
+        [header, usernameBox, buttons].forEach { addSubview($0) }
         buttons.leading = [neverButton]
         buttons.trailing = [notNowButton, saveButton]
         neverButton.isHidden = isUpdate
@@ -75,7 +76,7 @@ final class SavePasswordPrompt: FloatingPanelView {
     }
 
     private var measuredHeight: CGFloat {
-        pad + headerHeight + Tokens.Space.x3 + fieldHeight + Tokens.Space.x3 + buttonHeight + pad
+        pad + header.height(for: Self.width - pad * 2) + Tokens.Dialog.gap + fieldHeight + Tokens.Dialog.gap + buttonHeight + pad
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -269,67 +270,15 @@ final class SavePasswordPrompt: FloatingPanelView {
     private func layoutContent() {
         let w = bounds.width, inner = w - pad * 2
         // The site's icon, then what's being asked and where.
-        let iconSide: CGFloat = 20
-        icon.frame = NSRect(x: pad, y: pad + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide)
-        let textX = icon.frame.maxX + Tokens.Space.x3
-        let block = titleLabel.lineHeight + siteLabel.lineHeight
-        titleLabel.frame = NSRect(x: textX, y: pad + (headerHeight - block) / 2, width: w - textX - pad, height: titleLabel.lineHeight)
-        siteLabel.frame = NSRect(x: textX, y: titleLabel.frame.maxY, width: w - textX - pad, height: siteLabel.lineHeight)
+        header.frame = NSRect(x: pad, y: pad, width: inner, height: header.height(for: inner))
         // The username, editable before saving.
-        usernameBox.frame = NSRect(x: pad, y: pad + headerHeight + Tokens.Space.x3, width: inner, height: fieldHeight)
+        usernameBox.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Dialog.gap, width: inner, height: fieldHeight)
         let fh = ceil(usernameField.intrinsicContentSize.height)
         usernameField.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - fh) / 2, width: inner - Tokens.Space.x3 * 2, height: fh)
         usernameText.frame = NSRect(x: Tokens.Space.x3, y: (fieldHeight - usernameText.lineHeight) / 2, width: inner - Tokens.Space.x3 * 2, height: usernameText.lineHeight)
         // Never at the left; Not Now and Save at the right.
-        let y = usernameBox.frame.maxY + Tokens.Space.x3
+        let y = usernameBox.frame.maxY + Tokens.Dialog.gap
         buttons.frame = NSRect(x: pad, y: y, width: inner, height: buttonHeight)
-    }
-}
-
-/// A small keycap: on a button, saying which key does the same thing, and in Settings' list of shortcuts.
-final class KeyHint: NSView {
-    static let height: CGFloat = 20
-    private let label: Label
-    var onAccent = false { didSet { refresh() } }
-
-    init(_ key: String) {
-        label = Label(key, font: Tokens.Font.small(.semibold), color: Tokens.Color.textSecondary)
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.cornerRadius = 5
-        layer?.cornerCurve = .continuous
-        label.alignment = .center
-        addSubview(label)
-        refresh()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-    // Clicks go to the button underneath.
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    var width: CGFloat { max(Self.height + 4, label.inkWidth + Tokens.Space.x3) }
-    override var intrinsicContentSize: NSSize { NSSize(width: width, height: Self.height) }
-
-    override func layout() {
-        super.layout()
-        label.frame = NSRect(x: 0, y: (bounds.height - label.lineHeight) / 2, width: bounds.width, height: label.lineHeight)
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        refresh()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refresh()
-    }
-
-    private func refresh() {
-        let ink = onAccent ? Brand.Theme.for(self).onAccent : Tokens.Color.textSecondary
-        label.textColor = ink
-        layer?.backgroundColor = cgColor(onAccent ? ink.withAlphaComponent(0.18) : Tokens.Color.fieldFill)
     }
 }
 
