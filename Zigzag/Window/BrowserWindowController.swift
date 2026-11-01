@@ -176,15 +176,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return true
         }
         sidebar.favorites.onJoin = { [weak self] favorite, targetID, onRight in
-            guard let self, let target = Library.shared.bookmark(targetID) else { return }
-            self.libraryChange("Split View") {
-                Library.shared.addFavoriteSplit(onRight ? target : favorite, onRight ? favorite : target,
-                                                at: Library.shared.snapshot.favoriteIndex(of: targetID))
+            guard let self else { return }
+            self.pageChange("Split View") { [tabManager = self.tabManager] in
+                Library.shared.joinFavorite(favorite, onto: targetID, onRight: onRight)
+                tabManager.openBookmark(favorite)
             }
-            self.tabManager.openBookmark(favorite)
         }
         sidebar.favorites.onReorder = { [weak self] favorite, index in
-            self?.libraryChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
+            self?.pageChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
         }
         reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID

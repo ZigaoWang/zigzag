@@ -401,52 +401,75 @@ final class Library {
         }
     }
 
-    /// Where in `favorites` the tile at `slot` starts (its count for after the last).
-    private func favoriteIndex(forSlot slot: Int) -> Int {
-        let tiles = favoriteTiles
-        guard slot < tiles.count else { return favorites.count }
-        return favorites.firstIndex { $0.id == tiles[max(0, slot)].0.id } ?? favorites.count
-    }
-
-    /// `index` counts tiles, as the grid shows them.
+    /// `slot` counts tiles, as the grid shows them; nil: at the end.
     @discardableResult
-    func addFavorite(url: URL, title: String, at index: Int? = nil, id: UUID = UUID()) -> Bookmark {
+    func addFavorite(url: URL, title: String, at slot: Int? = nil, id: UUID = UUID()) -> Bookmark {
         let favorite = Bookmark(id: id, url: url, title: title)
-        favorites.insert(favorite, at: favoriteIndex(forSlot: index ?? .max))
+        arrangeFavorites(Self.placing([id], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [favorite])
         commit()
         return favorite
     }
 
     /// Two pages as one favorite, side by side, at a tile's place.
     func addFavoriteSplit(_ left: Bookmark, _ right: Bookmark, at slot: Int? = nil, ratio: Double = 0.5, vertical: Bool = false) {
-        favorites.removeAll { $0.id == left.id || $0.id == right.id }
-        favorites.insert(contentsOf: [left, right], at: favoriteIndex(forSlot: slot ?? .max))
+        favoriteSplits.removeAll { $0.contains(left.id) || $0.contains(right.id) }
+        arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [left, right])
         var split = PinnedSplit(left: left.id, right: right.id)
         split.ratio = ratio
         split.vertical = vertical
-        favoriteSplits.removeAll { $0.contains(left.id) || $0.contains(right.id) }
         favoriteSplits.append(split)
+        tidyFavorites()
+        commit()
+    }
+
+    /// A page (a favorite, or one becoming one) joins the favorite `targetID`: the two become one split favorite where
+    /// that favorite's tile is, the page on the right or the left.
+    func joinFavorite(_ page: Bookmark, onto targetID: UUID, onRight: Bool) {
+        guard let target = favorites.first(where: { $0.id == targetID }), page.id != targetID else { return }
+        let (left, right) = onRight ? (target, page) : (page, target)
+        favoriteSplits.removeAll { $0.contains(left.id) || $0.contains(right.id) }
+        arrangeFavorites(Self.placing([left.id, right.id], at: targetID, in: favorites.map(\.id)), adding: [page])
+        favoriteSplits.append(PinnedSplit(left: left.id, right: right.id))
         tidyFavorites()
         commit()
     }
 
     /// Moves a favorite (and its split's other page with it) to a tile's place.
     func moveFavorite(_ id: UUID, to slot: Int) {
-        let pair = favoriteSplits.first { $0.contains(id) }
-        let ids = pair.map { [$0.left, $0.right] } ?? [id]
-        let moving = favorites.filter { ids.contains($0.id) }
-        guard !moving.isEmpty else { return }
-        let tiles = favoriteTiles.map(\.0.id).filter { !ids.contains($0) }
-        favorites.removeAll { ids.contains($0.id) }
-        let at = slot < tiles.count ? favorites.firstIndex { $0.id == tiles[max(0, slot)] } ?? favorites.count : favorites.count
-        favorites.insert(contentsOf: moving, at: at)
-        tidyFavorites()
+        guard isFavorite(id) else { return }
+        let ids = favoriteSplits.first { $0.contains(id) }.map { [$0.left, $0.right] } ?? [id]
+        arrangeFavorites(Self.placing(ids, atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits))
         commit()
     }
 
-    /// Turns a space bookmark into a favorite, keeping its id (and so its live page). Half of a pinned split brings
-    /// the other half: they stay one split, now a favorite.
-    func makeFavorite(_ bookmarkID: UUID) {
+    /// Puts the favorites (and any new ones) in this order.
+    private func arrangeFavorites(_ order: [UUID], adding new: [Bookmark] = []) {
+        let byID = Dictionary((favorites + new).map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+        favorites = order.compactMap { byID[$0] }
+    }
+
+    /// The favorites' ids with `moving` (one tile's pages) put before the tile at `slot` among the rest, or after the
+    /// last (nil, or past the end). A split's right page doesn't count as a tile of its own.
+    nonisolated static func placing(_ moving: [UUID], atSlot slot: Int?, in ids: [UUID], splits: [PinnedSplit]) -> [UUID] {
+        let rights = Set(splits.map(\.right))
+        var rest = ids.filter { !moving.contains($0) }
+        let tiles = rest.filter { !rights.contains($0) }
+        let at = slot.flatMap { $0 >= 0 && $0 < tiles.count ? rest.firstIndex(of: tiles[$0]) : nil } ?? rest.count
+        rest.insert(contentsOf: moving, at: at)
+        return rest
+    }
+
+    /// The favorites' ids with `moving` put where `anchor` is now, counted without the ones that move.
+    nonisolated static func placing(_ moving: [UUID], at anchor: UUID, in ids: [UUID]) -> [UUID] {
+        let at = ids.prefix { $0 != anchor }.filter { !moving.contains($0) }.count
+        var rest = ids.filter { !moving.contains($0) }
+        rest.insert(contentsOf: moving, at: min(at, rest.count))
+        return rest
+    }
+
+    /// Turns a space bookmark into a favorite at a tile's place (nil: the end), keeping its id (and so its live page).
+    /// Half of a pinned split brings the other half: they stay one split, now a favorite.
+    func makeFavorite(_ bookmarkID: UUID, at slot: Int? = nil) {
         guard let bookmark = bookmark(bookmarkID), !isFavorite(bookmarkID) else { return }
         if let pinned = pinnedSplit(containing: bookmarkID), let left = self.bookmark(pinned.left), let right = self.bookmark(pinned.right) {
             for s in spaces.indices {
@@ -455,14 +478,14 @@ final class Library {
                 if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
                 tidyFolders(s)
             }
-            favorites += [left, right]
+            arrangeFavorites(Self.placing([left.id, right.id], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [left, right])
             favoriteSplits.append(pinned)
             tidyFavorites()
             commit()
             return
         }
         for s in spaces.indices { spaces[s].bookmarks.removeAll { $0.id == bookmarkID }; tidyFolders(s) }
-        favorites.append(bookmark)
+        arrangeFavorites(Self.placing([bookmarkID], atSlot: slot, in: favorites.map(\.id), splits: favoriteSplits), adding: [bookmark])
         commit()
     }
 
@@ -846,13 +869,6 @@ final class Library {
         fileprivate let spaces: [SpaceInfo]
         fileprivate let favorites: [Bookmark]
         fileprivate let favoriteSplits: [PinnedSplit]
-
-        /// Its tile's place in the grid, a split counting once.
-        func favoriteIndex(of id: UUID) -> Int? {
-            let rights = Set(favoriteSplits.map(\.right))
-            guard let at = favorites.firstIndex(where: { $0.id == id }) else { return nil }
-            return favorites[..<at].filter { !rights.contains($0.id) }.count
-        }
     }
 
     var snapshot: Snapshot { Snapshot(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits) }
