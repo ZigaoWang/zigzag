@@ -268,8 +268,8 @@ final class FavoritesView: NSView {
     }
 }
 
-/// A favorite: a glass tile with the site's icon, or a split's two icons side by side.
-final class FavoriteTile: GlassTile {
+/// A favorite: a tile of glass (`GlassPlate`) with the site's icon crisp on it, or a split's two icons side by side.
+final class FavoriteTile: InteractiveView {
     let bookmark: Bookmark?
     /// A split favorite's right page, shown beside the left one in the same tile.
     let partner: Bookmark?
@@ -286,7 +286,8 @@ final class FavoriteTile: GlassTile {
         }
     }
     /// Its page is open in the background: a fine edge, so you can tell at a glance which are loaded.
-    var isOpen = false { didSet { showsOpenEdge = isOpen } }
+    var isOpen = false { didSet { plate.showsOpenEdge = isOpen } }
+    private let plate = GlassPlate()
     var iconImage: NSImage? { icon.image }
     var partnerIconImage: NSImage? { partnerIcon.image }
     var onClose: (() -> Void)?
@@ -313,6 +314,10 @@ final class FavoriteTile: GlassTile {
         self.bookmark = bookmark
         self.partner = partner
         super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.tile
+        layer?.cornerCurve = .continuous
+        plate.radius = Tokens.Radius.tile
+        plate.install(in: self)
         addSubview(icon)
         partnerIcon.isHidden = partner == nil
         addSubview(partnerIcon)
@@ -393,15 +398,17 @@ final class FavoriteTile: GlassTile {
     override func stateDidChange(animated: Bool) {
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
-            setLifted(false)
+            plate.set(.hidden, animated: false)
             layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha))
             layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
             layer?.borderWidth = Tokens.Metric.dropEdge
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Resting tiles are soft glass; the one you're on is the same card as the tab you're on.
-        super.stateDidChange(animated: animated)
+        // Resting tiles are clear glass, rising a point under the pointer; the one you're on is the same clearer
+        // card as the tab you're on.
+        let pose: GlassPlate.Pose = isPressed ? .pressed : isHovered ? .lifted : .rest
+        plate.set(isEnabled ? pose : .rest, finish: isSelected ? .chosen : .clear, animated: animated || window != nil)
     }
 
     private static let iconSide: CGFloat = 22
