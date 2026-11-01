@@ -226,9 +226,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
         if mode == .editCurrent, let url = controller.tabManager.selectedTab?.url {
             field.stringValue = url.absoluteString
+        } else if mode == .newTab, let unsent, Date().timeIntervalSince(unsent.at) < Self.unsentMemory {
+            // Closed by a stray click or Esc a moment ago: what you'd typed is still here, selected, so typing replaces it.
+            field.stringValue = unsent.text
         } else {
             field.stringValue = ""
         }
+        unsent = nil
         typed = field.stringValue
         // A site search hint from the last time the bar was open never carries over.
         refreshHint()
@@ -245,9 +249,15 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         field.currentEditor()?.selectAll(nil)
     }
 
+    /// What was typed into the new tab bar when it closed without opening anything, for a few seconds.
+    private var unsent: (text: String, at: Date)?
+    private static let unsentMemory: TimeInterval = 10
+
     func dismiss(restoringFocus: Bool = true) {
         guard isVisible, let controller else { return }
         isVisible = false
+        // Kept only for the new tab bar; opening something clears it (`activate`).
+        unsent = mode == .newTab && !typed.isEmpty ? (typed, Date()) : nil
         if let typingMonitor { NSEvent.removeMonitor(typingMonitor) }
         typingMonitor = nil
         fetcher.cancel()
@@ -756,6 +766,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let forceNew = modifiers.contains(.option)
         let inCurrent = mode == .editCurrent && manager.selectedTab != nil
         dismiss(restoringFocus: false)
+        unsent = nil
         func open(_ url: URL, search: Bool = false) {
             if !inCurrent { Tutorial.complete("newTab") }
             if inCurrent {
