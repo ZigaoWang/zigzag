@@ -27,20 +27,24 @@ enum Tokens {
 
     // MARK: - Corner radii
 
+    /// One scale, a step apart: small 4, control 6, field 8, row 10, tile 12, panel 14, large 16.
     enum Radius {
         /// The web page card. Concentric with the window corner at an 8pt inset.
         static let card: CGFloat = 8
         /// The window's own corner. A page that meets the window's edges takes it, so the two curves match.
         static let window: CGFloat = 16
-        static let row: CGFloat = 8
+        /// A row in the sidebar or a floating list: soft enough that the selected one reads as a card.
+        static let row: CGFloat = 10
+        /// A favorite's tile.
+        static let tile: CGFloat = 12
         static let control: CGFloat = 6
         /// Fields, pills, menu buttons and filter segments: a step rounder than a plain control.
         static let field: CGFloat = 8
         static let small: CGFloat = 4
         /// Grouped cards on a window's background: Settings and Passwords groups, the site panel's sections.
         static let group: CGFloat = 10
-        /// Floating surfaces: command bar, peek, previews.
-        static let panel: CGFloat = 12
+        /// Floating surfaces: command bar, peek, previews, menus.
+        static let panel: CGFloat = 14
         /// Large floating surfaces that hold rounded things of their own: the tab switcher, Reader's options, the tour.
         static let large: CGFloat = 16
         static let thumbnail: CGFloat = 8
@@ -56,11 +60,15 @@ enum Tokens {
         static let sidebarPadding: CGFloat = Space.x2
         /// Height of the sidebar's top row (traffic lights + navigation).
         static let topRowHeight: CGFloat = Space.x10
-        static let rowHeight: CGFloat = Space.x8
+        /// A sidebar row: relaxed, with room around 14pt text. With `rowGap` the rows sit 36pt apart.
+        static let rowHeight: CGFloat = Space.x8 + 2
+        static let rowGap: CGFloat = 2
+        /// A section's quiet label (the space's name, Tabs): the label sits low, with generous room above it.
+        static let sectionLabelHeight: CGFloat = Space.x8
         static let addressHeight: CGFloat = Space.x8 + Space.x1
         static let iconButton: CGFloat = Space.x6 + Space.x1
         static let favicon: CGFloat = Space.x4
-        static let sectionGap: CGFloat = Space.x3
+        static let sectionGap: CGFloat = Space.x4
         static let edgeRevealWidth: CGFloat = Space.x2
         static let resizeHandleWidth: CGFloat = Space.x2
         static let hairline: CGFloat = 1
@@ -119,6 +127,10 @@ enum Tokens {
         static let large: CGFloat = 18
         /// A page's or panel's own title, in semibold: History, Settings, a section of Settings.
         static let heading: CGFloat = 15
+        /// The sidebar's rows and address: a size up from body, for a relaxed list that reads at a glance.
+        static let row: CGFloat = 14
+        /// A section's label: small, gray, never bold.
+        static let label: CGFloat = 12
         /// Display headings in heavy type (`Brand.display`): a window's or a card's one big line.
         static let title: CGFloat = 22
         /// The count on an extension's button: the one place text has to fit a 10pt capsule.
@@ -130,12 +142,16 @@ enum Tokens {
         static func body(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.body, weight: weight) }
         static func large(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.large, weight: weight) }
         static func heading(_ weight: NSFont.Weight = .semibold) -> NSFont { .systemFont(ofSize: TypeSize.heading, weight: weight) }
+        static func row(_ weight: NSFont.Weight = .regular) -> NSFont { .systemFont(ofSize: TypeSize.row, weight: weight) }
+        /// A quiet section label: "Tabs", the space's name over its pinned tabs.
+        static func label() -> NSFont { .systemFont(ofSize: TypeSize.label, weight: .medium) }
     }
 
     // MARK: - Symbols (one weight everywhere)
 
     enum Symbol {
-        static let weight: NSFont.Weight = .medium
+        /// Regular, not medium: icons sit as lightly as the text beside them.
+        static let weight: NSFont.Weight = .regular
         static let pointSize: CGFloat = TypeSize.body
 
         static func image(_ name: String, size: CGFloat = pointSize) -> NSImage {
@@ -429,9 +445,18 @@ enum Tokens {
         /// Row and button overlays drawn on top of the window background.
         static let hoverFill = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0xFFFFFF, alpha: 0.06))
         static let pressedFill = dynamic(light: hex(0x000000, alpha: 0.09), dark: hex(0xFFFFFF, alpha: 0.10))
-        static let selectedFill = dynamic(light: hex(0xFFFFFF, alpha: 0.78), dark: hex(0xFFFFFF, alpha: 0.16))
-        static let selectedHoverFill = dynamic(light: hex(0xFFFFFF, alpha: 0.92), dark: hex(0xFFFFFF, alpha: 0.19))
-        static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.04))
+        /// The selected row: a soft card floating on the sidebar, white or a lighter surface in dark mode, with a
+        /// hairline edge (`selectedEdge`) and a faint shadow (`liftShadow`).
+        static let selectedFill = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.13))
+        static let selectedHoverFill = dynamic(light: hex(0xFFFFFF, alpha: 0.97), dark: hex(0xFFFFFF, alpha: 0.16))
+        static let selectedEdge = dynamic(light: hex(0x000000, alpha: 0.06), dark: hex(0xFFFFFF, alpha: 0.07))
+        static let liftShadow = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0x000000, alpha: 0.3))
+        /// A favorite's tile: soft glass, a see-through fill with a faint light edge.
+        static let glassFill = dynamic(light: hex(0xFFFFFF, alpha: 0.32), dark: hex(0xFFFFFF, alpha: 0.06))
+        static let glassHover = dynamic(light: hex(0xFFFFFF, alpha: 0.5), dark: hex(0xFFFFFF, alpha: 0.1))
+        static let glassEdge = dynamic(light: hex(0xFFFFFF, alpha: 0.55), dark: hex(0xFFFFFF, alpha: 0.08))
+        /// The sidebar's address: quieter than a field, there without asking to be looked at.
+        static let addressFill = dynamic(light: hex(0x000000, alpha: 0.035), dark: hex(0xFFFFFF, alpha: 0.05))
         /// The keyboard-selected row in floating lists (command bar, downloads).
         static let highlight = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0xFFFFFF, alpha: 0.09))
         static let fieldFill = dynamic(light: hex(0x000000, alpha: 0.045), dark: hex(0xFFFFFF, alpha: 0.06))
@@ -486,9 +511,12 @@ enum Tokens {
         /// Card: barely there, separates page from frame.
         static let cardRadius: CGFloat = 2
         static let cardOffset = CGSize(width: 0, height: -1)
-        /// Floating panels sit just above the page: a soft, short shadow that falls below them, never above.
-        static let panelRadius: CGFloat = 16
-        static let panelDrop: CGFloat = 3
+        /// Floating panels sit just above the page: a soft, wide shadow that falls below them, never above.
+        static let panelRadius: CGFloat = 24
+        static let panelDrop: CGFloat = 4
+        /// The selected row's card and a selected tile: a faint shadow just under them.
+        static let liftRadius: CGFloat = 3
+        static let liftDrop: CGFloat = 1
 
         /// The drop as a layer offset: flipped views measure y downward, so the sign follows the view.
         static func panelOffset(flipped: Bool) -> CGSize { CGSize(width: 0, height: flipped ? panelDrop : -panelDrop) }

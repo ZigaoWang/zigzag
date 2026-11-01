@@ -7,6 +7,21 @@ extension NSView {
         effectiveAppearance.performAsCurrentDrawingAppearance { result = color.cgColor }
         return result
     }
+
+    /// The selected card's edge and shadow: a hairline and a faint shadow just under it, or neither. Its fill is
+    /// the caller's (`Tokens.Color.selectedFill`, or a tint of it).
+    func setLifted(_ lifted: Bool) {
+        guard let layer else { return }
+        Tokens.Motion.withoutAnimation {
+            layer.borderWidth = lifted ? Tokens.Metric.hairline : 0
+            layer.borderColor = cgColor(Tokens.Color.selectedEdge)
+            layer.shadowOpacity = lifted ? 1 : 0
+            layer.shadowColor = cgColor(Tokens.Color.liftShadow)
+            layer.shadowRadius = Tokens.Shadow.liftRadius
+            // A layer's y runs up unless its view is flipped: either way the shadow falls below.
+            layer.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.liftDrop : -Tokens.Shadow.liftDrop)
+        }
+    }
 }
 
 extension CALayer {
