@@ -54,11 +54,6 @@ private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
         Updater.getsBetas ? Updater.betaFeed : nil
     }
 
-    /// Your spaces, tabs, favorites and history are copied aside first, so a version that goes wrong can be undone.
-    func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
-        ProfileBackup.make()
-    }
-
     /// Restarting to finish an update isn't a quit to ask about.
     func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
         MainActor.assumeIsolated { AppDelegate.quitConfirmed = true }
@@ -72,16 +67,18 @@ nonisolated enum ProfileBackup {
     private static let files = ["Library.json", "Session.json", "Downloads.json", "History.sqlite", "History.sqlite-wal", "History.sqlite-shm"]
     private static let kept = 3
     private static let restoreMarker = "Restore"
+    private static let lastBuildKey = "LastRunBuild"
+    private static let lastVersionKey = "LastRunVersion"
 
-    private static var folder: URL { Paths.support.appendingPathComponent("Backups", isDirectory: true) }
+    private static func folder(in root: URL) -> URL { root.appendingPathComponent("Backups", isDirectory: true) }
 
     /// The backups, newest first.
-    static var all: [URL] {
-        let found = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+    static func all(in root: URL = Paths.support) -> [URL] {
+        let found = (try? FileManager.default.contentsOfDirectory(at: folder(in: root), includingPropertiesForKeys: nil)) ?? []
         return found.filter(\.hasDirectoryPath).sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
-    static var latest: URL? { all.first }
+    static var latest: URL? { all().first }
 
     /// When the newest backup was made, from its name.
     static var latestDate: Date? {
@@ -95,24 +92,40 @@ nonisolated enum ProfileBackup {
         return formatter
     }()
 
-    /// Named for when it was made and the version it was made from.
-    static func make() {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-        let target = folder.appendingPathComponent("\(stamp.string(from: Date())) \(version)", isDirectory: true)
+    /// At launch, before anything reads the profile: the first run of a new build backs up what the last one left,
+    /// named for the version it came from. Sparkle installs most updates quietly on quit, so this is the one moment
+    /// every update passes through.
+    static func backUpIfUpdated(build: String, version: String, defaults: UserDefaults = .standard, root: URL = Paths.support) {
+        let lastBuild = defaults.string(forKey: lastBuildKey)
+        guard lastBuild != build else { return }
+        // A first run has no profile yet; one from before builds were recorded is backed up all the same.
+        if lastBuild != nil || FileManager.default.fileExists(atPath: root.appendingPathComponent("Library.json").path) {
+            make(from: defaults.string(forKey: lastVersionKey), in: root)
+        }
+        defaults.set(build, forKey: lastBuildKey)
+        defaults.set(version, forKey: lastVersionKey)
+    }
+
+    /// Named for when it was made and the version it was made from, when that's known.
+    @discardableResult
+    static func make(from version: String?, in root: URL = Paths.support) -> URL? {
+        let name = [stamp.string(from: Date()), version].compactMap { $0 }.joined(separator: " ")
+        let target = folder(in: root).appendingPathComponent(name, isDirectory: true)
         let manager = FileManager.default
-        guard (try? manager.createDirectory(at: target, withIntermediateDirectories: true)) != nil else { return }
+        guard (try? manager.createDirectory(at: target, withIntermediateDirectories: true)) != nil else { return nil }
         for name in files {
-            let source = Paths.support.appendingPathComponent(name)
+            let source = root.appendingPathComponent(name)
             if manager.fileExists(atPath: source.path) { try? manager.copyItem(at: source, to: target.appendingPathComponent(name)) }
         }
-        for old in all.dropFirst(kept) { try? manager.removeItem(at: old) }
+        for old in all(in: root).dropFirst(kept) { try? manager.removeItem(at: old) }
+        return target
     }
 
     /// Puts the newest backup back the next time Zigzag starts, before anything reads the profile, then restarts
     /// Zigzag so that's now.
     @MainActor static func restoreLatestAndRelaunch() {
         guard let latest else { return }
-        try? latest.lastPathComponent.write(to: folder.appendingPathComponent(restoreMarker), atomically: true, encoding: .utf8)
+        try? latest.lastPathComponent.write(to: folder(in: Paths.support).appendingPathComponent(restoreMarker), atomically: true, encoding: .utf8)
         let app = Bundle.main.bundleURL
         AppDelegate.quitConfirmed = true
         // The new copy waits for this one to finish saving before it starts reading.
@@ -124,15 +137,15 @@ nonisolated enum ProfileBackup {
     }
 
     /// At launch: if a restore was asked for, the backup's files replace the profile's.
-    static func restoreIfAsked() {
+    static func restoreIfAsked(root: URL = Paths.support) {
         let manager = FileManager.default
-        let marker = folder.appendingPathComponent(restoreMarker)
+        let marker = folder(in: root).appendingPathComponent(restoreMarker)
         guard let name = try? String(contentsOf: marker, encoding: .utf8) else { return }
         try? manager.removeItem(at: marker)
-        let source = folder.appendingPathComponent(name, isDirectory: true)
+        let source = folder(in: root).appendingPathComponent(name, isDirectory: true)
         guard manager.fileExists(atPath: source.path) else { return }
         for file in files {
-            let from = source.appendingPathComponent(file), to = Paths.support.appendingPathComponent(file)
+            let from = source.appendingPathComponent(file), to = root.appendingPathComponent(file)
             try? manager.removeItem(at: to)
             if manager.fileExists(atPath: from.path) { try? manager.copyItem(at: from, to: to) }
         }

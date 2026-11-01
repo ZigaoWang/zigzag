@@ -7,8 +7,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var blockerToken: SignalToken?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // A restore asked for before restarting: the backed-up profile goes back before anything reads it.
-        if !Self.isHostingTests { ProfileBackup.restoreIfAsked() }
+        if !Self.isHostingTests {
+            // A new version backs up the profile the last one left, and a restore asked for before restarting puts
+            // a backup back, both before anything reads it.
+            let info = Bundle.main.infoDictionary
+            ProfileBackup.backUpIfUpdated(build: info?["CFBundleVersion"] as? String ?? "", version: info?["CFBundleShortVersionString"] as? String ?? "")
+            ProfileBackup.restoreIfAsked()
+        }
         NSApp.mainMenu = MainMenu.build()
         Shortcuts.apply()
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleGetURL(_:withReply:)),
