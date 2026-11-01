@@ -45,7 +45,7 @@ final class SidebarContainer: NSView {
         self.backdrop = backdrop
         // Links and files dropped on the sidebar open as tabs.
         registerForDraggedTypes([.URL, .fileURL, .string])
-        dropRing.isHidden = true
+        dropRing.opacity = 0
         dropRing.borderWidth = 2
         dropRing.cornerCurve = .continuous
         dropRing.zPosition = 50
@@ -82,12 +82,14 @@ final class SidebarContainer: NSView {
             dropRing.cornerRadius = Tokens.Radius.card
             dropRing.borderColor = cgColor(Tokens.Color.accent)
         }
+        // In and out from wherever it is, so it fades away too instead of vanishing.
         let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = on ? 0 : 1
+        fade.fromValue = dropRing.presentation()?.opacity ?? dropRing.opacity
         fade.toValue = on ? 1 : 0
-        fade.duration = 0.15
+        fade.duration = Tokens.Motion.selection
+        fade.timingFunction = Tokens.Motion.easeOut
+        Tokens.Motion.withoutAnimation { dropRing.opacity = on ? 1 : 0 }
         dropRing.add(fade, forKey: "fade")
-        dropRing.isHidden = !on
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
