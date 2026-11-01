@@ -210,6 +210,9 @@ final class SpaceDotView: InteractiveView {
     private var wasSelected: Bool?
 
     override func stateDidChange(animated: Bool) {
+        // VoiceOver says which space you're in.
+        setAccessibilityValue(isSelected ? "current space" : nil)
+        setAccessibilitySelected(isSelected)
         let side = Tokens.Sidebar.spaceKey
         let share = swipeShare ?? (isSelected ? 1 : 0)
         let ink = Tokens.Color.textPrimary

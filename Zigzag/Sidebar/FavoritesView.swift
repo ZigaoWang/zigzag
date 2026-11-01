@@ -422,6 +422,9 @@ final class FavoriteTile: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
+        // VoiceOver says which favorite you're on and which are open, as it does for tab rows.
+        setAccessibilityValue(isSelected ? "current tab" : isOpen ? "open" : nil)
+        setAccessibilitySelected(isSelected)
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
             layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha))
