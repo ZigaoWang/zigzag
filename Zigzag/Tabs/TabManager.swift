@@ -720,10 +720,14 @@ final class TabManager {
         return close(tabs)
     }
 
+    /// Where you land after closing the tab you were on: the page it was opened from, else the tab you were on before
+    /// it in this space (as a browser's Back would), else its neighbor in the list.
     private func selectAfterClosing(_ closed: Tab, index: Int) {
         let list = tabs(in: closed.spaceID)
         if let opener = closed.opener, list.contains(where: { $0 === opener }) {
             select(opener)
+        } else if let previous = recentTabs.first(where: { $0 !== closed && $0.spaceID == closed.spaceID && !$0.isClosed }) {
+            select(previous)
         } else if !list.isEmpty {
             select(list[min(index, list.count - 1)])
         } else if !leavesSpaceEmpty, let recent = recentTabs.first(where: { $0.spaceID == closed.spaceID }) {
