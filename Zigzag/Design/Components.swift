@@ -212,11 +212,14 @@ final class PillButton: InteractiveView {
     let style: Style
     private let label: Label
     private let iconView = NSImageView()
-    /// What it says, which can change (a toast's action, "Try Again"): the row around it lays out again.
+    /// What it says, which can change (a toast's action, "Try Again"): the row around it lays out again. Shown in
+    /// lowercase, the app's own voice; VoiceOver reads it as written.
+    private var written = ""
     var title: String {
-        get { label.stringValue }
+        get { written }
         set {
-            label.stringValue = newValue
+            written = newValue
+            label.stringValue = newValue.lowercased()
             label.isHidden = newValue.isEmpty
             setAccessibilityLabel(newValue.isEmpty ? accessibilityLabel() : newValue)
             invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
@@ -232,7 +235,8 @@ final class PillButton: InteractiveView {
 
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
-        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
+        written = title
+        label = Label(title.lowercased(), font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Page.controlHeight))
         pressScales = true
         layer?.cornerCurve = .continuous
@@ -357,6 +361,45 @@ final class KeyCap: NSView {
             layer?.backgroundColor = cgColor(Tokens.Color.keyCapFill)
             layer?.borderColor = cgColor(Tokens.Color.keyCapEdge)
         }
+    }
+}
+
+// MARK: - Line drawings
+
+/// Zigzag's own glyphs where a stock symbol says too little: thin precise lines, one stroke (`stroke`), round caps and
+/// joins, on a 16pt square with the same 1.5pt margin, so they sit together like one set of drawings. Templates, so
+/// they take whatever ink they're given.
+enum LineGlyph {
+    static let stroke: CGFloat = 1.1
+    static let side: CGFloat = 16
+
+    private static func draw(_ body: @escaping (NSBezierPath) -> Void) -> NSImage {
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: true) { _ in
+            NSColor.black.setStroke()
+            let path = NSBezierPath()
+            path.lineWidth = stroke
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            body(path)
+            path.stroke()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    /// The sidebar: a window, its sidebar ruled off at the left, a short line in it for the list.
+    static let sidebar = draw { path in
+        path.appendRoundedRect(NSRect(x: 1.5, y: 2.5, width: 13, height: 11), xRadius: 2.6, yRadius: 2.6)
+        path.move(to: NSPoint(x: 6, y: 2.5)); path.line(to: NSPoint(x: 6, y: 13.5))
+        path.move(to: NSPoint(x: 3.3, y: 5.3)); path.line(to: NSPoint(x: 4.2, y: 5.3))
+        path.move(to: NSPoint(x: 3.3, y: 7.3)); path.line(to: NSPoint(x: 4.2, y: 7.3))
+    }
+
+    /// Something new: a plus, shorter and lighter than type's, its arms the same length.
+    static let plus = draw { path in
+        path.move(to: NSPoint(x: 8, y: 3.5)); path.line(to: NSPoint(x: 8, y: 12.5))
+        path.move(to: NSPoint(x: 3.5, y: 8)); path.line(to: NSPoint(x: 12.5, y: 8))
     }
 }
 
