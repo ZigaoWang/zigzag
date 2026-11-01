@@ -111,7 +111,7 @@ final class SettingsBrandRow: NSView, SettingsSearchable {
         refreshTheme()
     }
 
-    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).mark }
+    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).accent }
 
     override func layout() {
         super.layout()
