@@ -614,7 +614,7 @@ private final class ImportHero: NSView {
     static let height: CGFloat = 168
     private let surface = BrandSurface()
     private let wordmark = WordmarkView()
-    private let count = Label("", font: .systemFont(ofSize: 60, weight: .heavy), color: Brand.ribbon)
+    private let count = Label("", font: Brand.displayFont(Tokens.Welcome.countSize), color: Brand.ribbon)
     private let caption = Label("", font: Tokens.Font.title(.semibold), color: Brand.ribbon)
     private let detail = Label("", font: Tokens.Font.body(), color: Brand.ribbon.withAlphaComponent(0.7))
 
