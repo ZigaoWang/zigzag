@@ -201,11 +201,11 @@ final class FavoriteTile: InteractiveView {
     private let icon = FaviconView()
     var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
     var onClose: (() -> Void)?
-    /// Shown on an open favorite under the pointer: a small ×, inside the tile's top-right corner, so nothing hangs
-    /// past the tile to be cut off by the sidebar's edge.
-    private static let closeSide: CGFloat = 16
+    /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
+    /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
+    private static let closeSide: CGFloat = 14
     private lazy var closeButton: IconButton = {
-        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: 8, toolTip: "Unload Page")
+        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: 7, toolTip: "Unload Page")
         button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
         button.layer?.cornerRadius = Self.closeSide / 2
@@ -270,7 +270,7 @@ final class FavoriteTile: InteractiveView {
         let size = icon.image.map { FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Metric.favicon
         icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
         let side = Self.closeSide
-        closeButton.frame = NSRect(x: bounds.width - side - 4, y: isFlipped ? 4 : bounds.height - side - 4, width: side, height: side)
+        closeButton.frame = NSRect(x: bounds.width - side - 3, y: isFlipped ? 3 : bounds.height - side - 3, width: side, height: side)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -281,8 +281,7 @@ final class FavoriteTile: InteractiveView {
             return
         }
         closeButton.isHidden = !(isOpen && isHovered)
-        // Every favorite looks the same at rest, as in Arc: the one you're on is lit, and one that's open shows its ×
-        // under the pointer.
+        // Every favorite looks the same at rest: the one you're on is lit.
         icon.alphaValue = 1
         let fill: NSColor
         if isSelected {
