@@ -68,9 +68,10 @@ enum ImportCoordinator {
     static func detectedSources() -> [Source] {
         var sources: [Source] = []
         #if DEBUG
-        // A debug copy checked by script lists each browser once, by name: its profiles' names (often email
-        // addresses) never show in a capture.
-        let plainNames = !(ProcessInfo.processInfo.environment["ZIGZAG_FAKE_BROWSERS"] ?? "").isEmpty
+        // A debug copy checked by script (its own data folder or debug channel) lists each browser once, by name:
+        // its profiles' names, often email addresses, never show in a capture, even if the run forgot to ask.
+        let env = ProcessInfo.processInfo.environment
+        let plainNames = ["ZIGZAG_FAKE_BROWSERS", "ZIGZAG_DATA_DIR", "ZIGZAG_DEBUG_CHANNEL"].contains { !(env[$0] ?? "").isEmpty }
         #else
         let plainNames = false
         #endif
