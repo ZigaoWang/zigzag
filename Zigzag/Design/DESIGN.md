@@ -377,3 +377,14 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
 - **Empty states are one quiet line**, never a big icon and sentence ("Nothing downloaded yet").
 - **The address bar over the page** is the same sheet: the address in large light type, suggestions as plain rows
   below, the chosen row a soft wash, no dark slab.
+
+## The voice
+
+Zigzag speaks in one type style: SF Pro Light, tracked in by 2.3% of its size, in lowercase. It's what makes the app
+feel like itself, so it's used only where the app is naming something: a space's name (26), a page's title (26), a
+panel's title (Downloads, 26), the welcome (`Welcome.titleSize`), and in its own case the address bar's text (22 for a
+new tab, the sidebar's size over the address). Everything else is SF Pro Regular in normal case.
+
+Always set it through `Tokens.Font.voice(_:)` and `Tokens.Font.voiceText(_:)`, and `letter-spacing: -0.023em` on the
+HTML pages, so its weight, tracking and case never drift between screens. Never in bold, never in caps, never for
+body text or controls.
