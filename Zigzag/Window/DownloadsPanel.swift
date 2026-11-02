@@ -235,13 +235,13 @@ final class DownloadsPanelView: FloatingPanelView {
     fileprivate var focused: DownloadItem?
     /// How many it lists when you open it yourself; the rest are in the folder.
     private static let recentCount = 5
-    private let title = Label("Downloads", font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+    private let title = Label("downloads", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
     private let clearButton = PillButton(title: "Clear", style: .quiet)
     /// The last row: the folder, or the whole list when the panel opened on one download.
     private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.display))
-    private let emptyNote = Label("Your downloads show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let emptyNote = Label("Nothing downloaded yet", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
     /// More: where new downloads are saved (the same choice as in Settings), in a menu rather than on the panel.
     private let more = IconButton(symbol: "ellipsis", toolTip: "More")
     private var token: SignalToken?
@@ -253,7 +253,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private let header = Tokens.Space.x10 + Tokens.Space.x1
     private let inset = Tokens.Space.x1
     private var footer: CGFloat { Tokens.Space.x1 + Tokens.Metric.rowHeight + inset }
-    private let emptyHeight = Tokens.Space.x16 + Tokens.Space.x4
+    private let emptyHeight = Tokens.Space.x10
     /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
     private var sidebarLane: (x: CGFloat, width: CGFloat)? {
         guard let controller else { return nil }
@@ -268,7 +268,7 @@ final class DownloadsPanelView: FloatingPanelView {
         [title, clearButton, more, folderButton, emptyIcon, emptyNote].forEach { addSubview($0) }
         more.onClick = { [weak self] _ in self?.showMoreMenu() }
         emptyIcon.contentTintColor = Tokens.Color.textTertiary
-        emptyNote.alignment = .center
+        emptyNote.alignment = .left
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             guard let self else { return }
@@ -413,7 +413,7 @@ final class DownloadsPanelView: FloatingPanelView {
         clearButton.isEnabled = all.contains { ![.downloading, .paused].contains($0.state) }
         clearButton.isHidden = items.isEmpty
         emptyNote.isHidden = !items.isEmpty
-        emptyIcon.isHidden = !items.isEmpty
+        emptyIcon.isHidden = true
         reposition()
         needsLayout = true
     }
@@ -444,12 +444,14 @@ final class DownloadsPanelView: FloatingPanelView {
         // The title lines up with the rows' icons below it.
         let h = title.lineHeight
         let x = inset + CardRow.inset - 2 - Label.inset
-        title.frame = NSRect(x: x, y: more.frame.midY - h / 2, width: max(0, clearButton.frame.minX - x - Tokens.Space.x2), height: h)
+        let end = clearButton.isHidden ? more.frame.minX : clearButton.frame.minX
+        title.frame = NSRect(x: x, y: more.frame.midY - h / 2, width: max(0, end - x - Tokens.Space.x2), height: h)
         var y = header
         if rows.isEmpty {
             let icon = Tokens.Space.x8
             emptyIcon.frame = NSRect(x: (bounds.width - icon) / 2, y: y + Tokens.Space.x2, width: icon, height: icon)
-            emptyNote.frame = NSRect(x: Tokens.Space.x3, y: emptyIcon.frame.maxY + Tokens.Space.x2, width: bounds.width - Tokens.Space.x6, height: emptyNote.lineHeight)
+            // One quiet line, no picture.
+            emptyNote.frame = NSRect(x: x, y: y + (emptyHeight - emptyNote.lineHeight) / 2, width: bounds.width - x - Tokens.Space.x3, height: emptyNote.lineHeight)
             y += emptyHeight
         }
         for row in rows {
