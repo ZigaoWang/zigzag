@@ -338,6 +338,19 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 /// take that color instead.
 class FloatingPanelView: NSView {
     private let surface = ColorView(color: Tokens.Color.panelBackground)
+    /// The Mac's own popover material under the surface: a panel reads as part of macOS, softly showing what's
+    /// behind it, with the space's color washed thinly over it.
+    private let material: NSVisualEffectView = {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .withinWindow
+        view.state = .active
+        view.wantsLayer = true
+        view.layer?.cornerCurve = .continuous
+        view.layer?.masksToBounds = true
+        view.layer?.zPosition = -1
+        return view
+    }()
     var onLayout: (() -> Void)?
     var radius: CGFloat = Tokens.Radius.panel { didSet { needsLayout = true } }
 
@@ -349,6 +362,8 @@ class FloatingPanelView: NSView {
         surface.layer?.cornerCurve = .continuous
         surface.layer?.masksToBounds = true
         surface.layer?.borderWidth = Tokens.Metric.hairline
+        surface.layer?.zPosition = 1
+        super.addSubview(material)
         addSubview(surface)
         refreshColors()
         themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshColors() }
@@ -377,6 +392,8 @@ class FloatingPanelView: NSView {
         super.layout()
         surface.frame = bounds
         surface.layer?.cornerRadius = radius
+        material.frame = bounds
+        material.layer?.cornerRadius = radius
         layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         onLayout?()
         matchCorners()
@@ -417,6 +434,7 @@ class FloatingPanelView: NSView {
 
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
+            material.isHidden = liftedFrom != nil || surfaceTint != nil
             if let base = liftedFrom {
                 effectiveAppearance.performAsCurrentDrawingAppearance {
                     let under = base.usingColorSpace(.sRGB) ?? base
@@ -430,8 +448,9 @@ class FloatingPanelView: NSView {
                     surface.color = mixed
                 }
             } else {
-                // Opaque, leaning toward the window's space: quiet under any page, never glass to read text through.
-                surface.color = Brand.Theme.for(self).panel
+                // The Mac's popover material with the space's panel color thinly over it: native, calm, and opaque
+                // enough that text never fights the page behind.
+                surface.color = Brand.Theme.for(self).panel.withAlphaComponent(0.72)
             }
             surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
             surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
