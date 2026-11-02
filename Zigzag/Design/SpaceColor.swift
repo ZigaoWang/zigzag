@@ -49,9 +49,10 @@ enum SpaceColor: String, Codable, CaseIterable {
     /// hue at night.
     var background: NSColor {
         switch self {
-        case .snow: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xFBFBFA), dark: Tokens.Color.hex(0x2A2A2C))
+        // White and black are pure, day and night alike: the two you can count on to be exactly that.
+        case .snow: return Tokens.Color.hex(0xFFFFFF)
         case .graphite: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xE4E4E2), dark: Tokens.Color.hex(0x1F1F21))
-        case .ink: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x101011))
+        case .ink: return Tokens.Color.hex(0x000000)
         default:
             let h = wheelHue ?? 0.6
             // Blue reads louder than the others at the same chroma on a screen: sky is a step dustier.
