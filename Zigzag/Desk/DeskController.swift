@@ -50,6 +50,70 @@ final class DeskHeaderView: InteractiveView {
     override func stateDidChange(animated: Bool) { applyRowStyle(animated: animated) }
 }
 
+/// The desk stands on the window's own frame, painted as the window paints it: the frosted desktop for a see-through
+/// space with the space's color washed over it, or the color solid, with its gradient and grain. So the desk reads as
+/// the sidebar opened up to fill the window, not a different surface laid over it.
+final class DeskFrameView: NSView {
+    private let glass: NSVisualEffectView = {
+        let glass = NSVisualEffectView()
+        glass.blendingMode = .behindWindow
+        glass.material = .sidebar
+        glass.state = .active
+        return glass
+    }()
+    private let wash = CAGradientLayer()
+    private let grain = CALayer()
+    /// Holds the wash and grain in a view of its own, so AppKit keeps them above the glass.
+    private let paint = NSView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        glass.autoresizingMask = [.width, .height]
+        addSubview(glass)
+        paint.wantsLayer = true
+        paint.autoresizingMask = [.width, .height]
+        addSubview(paint)
+        wash.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        grain.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        paint.layer?.addSublayer(wash)
+        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
+        grain.compositingFilter = "overlayBlendMode"
+        paint.layer?.addSublayer(grain)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        glass.frame = bounds
+        paint.frame = bounds
+        Tokens.Motion.withoutAnimation { wash.frame = bounds; grain.frame = bounds }
+    }
+
+    /// The same choices `BrowserWindowController.render` makes for the frame.
+    func paint(_ space: SpaceInfo, isPrivate: Bool) {
+        let clear = !isPrivate && space.isSeeThrough && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let reduced = space.isSeeThrough && !clear
+        let color = isPrivate ? SpaceColor.graphite.background : reduced ? space.background : space.frameColor
+        let end = isPrivate ? nil : reduced ? space.background2 : space.frameColor2
+        glass.isHidden = !clear
+        glass.frame = bounds
+        paint.frame = bounds
+        Tokens.Motion.withoutAnimation { wash.frame = bounds; grain.frame = bounds }
+        let r = space.gradientAngle * .pi / 180
+        let dx = cos(r) / 2, dy = sin(r) / 2
+        Tokens.Motion.withoutAnimation {
+            wash.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 - dy)
+            wash.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 + dy)
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                wash.colors = [color.cgColor, (end ?? color).cgColor]
+            }
+            grain.opacity = Float(min(max(isPrivate ? 0 : space.grain ?? 0, 0), 1) * 0.22)
+        }
+    }
+}
+
 /// The desk's content: every tab as a card, grouped by space, in sidebar order.
 final class DeskCanvasView: NSView {
     weak var desk: DeskController?
@@ -127,6 +191,7 @@ final class DeskFlightView: NSView {
 final class DeskController {
     private weak var controller: BrowserWindowController?
     private let backdrop = ColorView()
+    private let frameView = DeskFrameView()
     private let scrollView = NSScrollView()
     private let canvas = DeskCanvasView()
     private let actionBar = FloatingPanelView()
@@ -254,7 +319,13 @@ final class DeskController {
         controller.linkStatus.show(nil, in: controller.root.cardFrame)
         controller.commandBar.dismiss(restoringFocus: false)
         let root = controller.root
-        backdrop.color = controller.tabManager.currentSpace.background
+        backdrop.color = .clear
+        if frameView.superview == nil {
+            frameView.autoresizingMask = [.width, .height]
+            backdrop.addSubview(frameView, positioned: .below, relativeTo: nil)
+        }
+        frameView.frame = root.bounds
+        frameView.paint(controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
         backdrop.frame = root.bounds
         backdrop.autoresizingMask = [.width, .height]
         scrollView.autoresizingMask = [.width, .height]
@@ -645,7 +716,13 @@ final class DeskController {
     /// Another space came forward while the desk is open (a shortcut): its color, and its tab as the current card.
     func spaceChanged() {
         guard isVisible, let controller else { return }
-        backdrop.color = controller.tabManager.currentSpace.background
+        backdrop.color = .clear
+        if frameView.superview == nil {
+            frameView.autoresizingMask = [.width, .height]
+            backdrop.addSubview(frameView, positioned: .below, relativeTo: nil)
+        }
+        frameView.frame = backdrop.bounds
+        frameView.paint(controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
         reload(animated: true)
     }
 
