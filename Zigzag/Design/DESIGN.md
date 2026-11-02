@@ -358,3 +358,22 @@ window is out of sight. Text stays on the wash or a solid surface, at AA contras
 ## Words
 
 US English. No em dashes, no "A · B · C" lines, no filler. Labels say what a thing is; nothing explains itself.
+
+## Next: panels rebuilt in the TE language
+
+The floating panels (Downloads, Site Controls, the address bar opened over the page) are still the old card UI with a
+new material. They get rebuilt from scratch to match the sidebar's language, not adapted:
+
+- **One sheet, no boxes inside.** A panel is a single calm sheet of the space's own color family (a lighter step of
+  the frame by day, a deeper one by night), with one hairline edge and the one panel shadow. No tiles, no grouped
+  cards, no outlined buttons inside it.
+- **Type does the structure.** A large light title in the space's ink, like the sidebar's space name ("downloads",
+  "avoidxray.com"), then plain rows. Secondary words are small and quiet. Normal case for words; only the big title
+  is lowercase, as the space name is.
+- **Actions are a row of thin line glyphs with small labels under them**, set on a grid like the markings on a TE
+  device (share, copy link, screenshot), not three big rounded buttons.
+- **Settings for the site are plain rows** with the slide switch at the end, separated by space, not by a card.
+- **One warm thing:** only what's live (a switch that's on, a download in progress) gets the warm accent.
+- **Empty states are one quiet line**, never a big icon and sentence ("Nothing downloaded yet").
+- **The address bar over the page** is the same sheet: the address in large light type, suggestions as plain rows
+  below, the chosen row a soft wash, no dark slab.
