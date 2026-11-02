@@ -235,14 +235,13 @@ final class PillButton: InteractiveView {
     let style: Style
     private let label: Label
     private let iconView = NSImageView()
-    /// What it says, which can change (a toast's action, "Try Again"): the row around it lays out again. Shown in
-    /// lowercase, the app's own voice; VoiceOver reads it as written.
+    /// What it says, which can change (a toast's action, "Try Again"): the row around it lays out again.
     private var written = ""
     var title: String {
         get { written }
         set {
             written = newValue
-            label.stringValue = newValue.lowercased()
+            label.stringValue = newValue
             label.isHidden = newValue.isEmpty
             setAccessibilityLabel(newValue.isEmpty ? accessibilityLabel() : newValue)
             invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
@@ -259,7 +258,7 @@ final class PillButton: InteractiveView {
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
         written = title
-        label = Label(title.lowercased(), font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
+        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Page.controlHeight))
         pressSinks = true
         layer?.cornerCurve = .continuous

@@ -156,14 +156,14 @@ final class Tab: NSObject {
     var displayTitle: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
         // Zigzag's own pages are named in its own voice, lowercase, wherever the chrome names them.
-        if SettingsPage.isSettings(url) { return "settings" }
-        if HistoryPage.isHistory(url) { return "history" }
+        if SettingsPage.isSettings(url) { return "Settings" }
+        if HistoryPage.isHistory(url) { return "History" }
         if !title.isEmpty { return title }
         // A file on your Mac, or a PDF from the web, is called by its name: it has no title of its own.
         if let url, url.isFileURL || url.pathExtension.lowercased() == "pdf", !url.lastPathComponent.isEmpty, url.lastPathComponent != "/" {
             return url.lastPathComponent
         }
-        return url?.host() ?? "new tab"
+        return url?.host() ?? "New Tab"
     }
     var isBlank: Bool { url == nil }
 

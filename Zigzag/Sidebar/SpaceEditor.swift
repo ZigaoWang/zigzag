@@ -981,13 +981,13 @@ final class SpaceLookEditor: NSView {
     private let dial = DirectionKnob()
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     /// Gradient, see-through and grain: there when you want them, folded away until then.
-    private let effects = DisclosureRow(title: "effects")
+    private let effects = DisclosureRow(title: "Effects")
     private var showsEffects = false
-    private let shadeLabel = SpaceLookEditor.rowLabel("shade")
+    private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
     private let shadeSlider = LookSlider(.shade)
-    private let clearLabel = SpaceLookEditor.rowLabel("see-through")
+    private let clearLabel = SpaceLookEditor.rowLabel("See-through")
     private let clearSlider = LookSlider(.seeThrough)
-    private let grainLabel = SpaceLookEditor.rowLabel("grain")
+    private let grainLabel = SpaceLookEditor.rowLabel("Grain")
     private let grainSlider = LookSlider(.grain)
 
     var onPreview: ((SpaceInfo) -> Void)?

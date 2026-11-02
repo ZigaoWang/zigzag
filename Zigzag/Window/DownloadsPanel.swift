@@ -238,7 +238,7 @@ final class DownloadsPanelView: FloatingPanelView {
     private let title = Label("Downloads", font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
     private let clearButton = PillButton(title: "Clear", style: .quiet)
     /// The last row: the folder, or the whole list when the panel opened on one download.
-    private let folderButton = CardRow(title: "open downloads folder", symbol: "folder", font: Tokens.Font.body())
+    private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.display))
     private let emptyNote = Label("Your downloads show up here.", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
@@ -379,7 +379,7 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
         let more = focused != nil && all.count > items.count
-        folderButton.title.stringValue = more ? "show all downloads" : "open downloads folder"
+        folderButton.title.stringValue = more ? "Show All Downloads" : "Open Downloads Folder"
         folderButton.symbol = more ? "list.bullet" : "folder"
         folderButton.setAccessibilityLabel(folderButton.title.stringValue)
         while rows.count < items.count {
