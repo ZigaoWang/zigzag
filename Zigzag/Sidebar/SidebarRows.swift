@@ -484,7 +484,7 @@ final class NewTabRowView: SidebarRowView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        title.stringValue = "new tab"
+        title.stringValue = "New Tab"
         icon.isHidden = true
         plus.image = LineGlyph.plus
         plus.imageScaling = .scaleNone
@@ -625,7 +625,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     }
 }
 
-/// The space name above its bookmarks. Click the name to edit the space; click the chevron beside it to fold the
+/// The space name above its bookmarks. Click it, or the chevron beside it, to fold the
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
@@ -689,7 +689,12 @@ final class SpaceHeaderView: InteractiveView {
             iconView.frame = NSRect(x: SidebarRowView.inset, y: mid - side / 2, width: side, height: side)
         }
         label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
-        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x1, y: mid - Tokens.Space.x2, width: Tokens.Space.x3, height: Tokens.Space.x4)
+        // Centered on the lowercase letters' middle (the x-height), not the text box, so it sits level with "personal".
+        let font = Tokens.Font.spaceName()
+        let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
+        let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
+        let side = Tokens.Space.x4
+        chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: xMiddle - side / 2, width: side, height: side)
     }
 
     /// Whether a click lands on the chevron (or just past the name, where it shows), rather than on the name.
@@ -705,11 +710,11 @@ final class SpaceHeaderView: InteractiveView {
             .foregroundColor: isHovered ? ink : ink.withAlphaComponent(0.86),
         ])
         iconView.contentTintColor = Tokens.Color.textSecondary
-        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.Symbol.inline)
+        chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
         setAccessibilityLabel(label.stringValue + (isCollapsed ? ", pinned tabs hidden" : ""))
-        setAccessibilityHelp("Edit this space")
+        setAccessibilityHelp(isCollapsed ? "Show pinned tabs" : "Hide pinned tabs")
         setAccessibilityCustomActions(canCollapse ? [
             NSAccessibilityCustomAction(name: isCollapsed ? "Show Pinned Tabs" : "Hide Pinned Tabs") { [weak self] in
                 self?.onToggleCollapsed?()
@@ -723,7 +728,7 @@ final class SpaceHeaderView: InteractiveView {
 /// as in Arc: on a line of its own, apart from New Tab and the pinned tabs it leaves alone, and only while the
 /// pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
-    private let label = Label("tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    private let label = Label("Tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
     /// The label in the space's quiet ink.
     func refreshInk() { label.textColor = Brand.Theme.for(self).quietInk }
@@ -842,7 +847,7 @@ final class InsertionLineView: NSView {
 final class ClearTabsButton: InteractiveView {
     /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
     private let arrow = NSImageView()
-    private let label = Label("clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    private let label = Label("Clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     private static let arrowSide: CGFloat = Tokens.Symbol.inline
 
     override init(frame: NSRect) {
@@ -866,7 +871,7 @@ final class ClearTabsButton: InteractiveView {
                 label.stringValue = "clear old"
                 toolTip = n == 1 ? "Close the tab you haven’t used in a while" : "Close the \(n) tabs you haven’t used in a while"
             case .others(let n):
-                label.stringValue = "clear"
+                label.stringValue = "Clear"
                 toolTip = n == 1 ? "Close the other tab" : "Close the other \(n) tabs"
             }
             setAccessibilityLabel(toolTip)
