@@ -450,7 +450,7 @@ class FloatingPanelView: NSView {
             } else {
                 // The Mac's popover material with the space's panel color thinly over it: native, calm, and opaque
                 // enough that text never fights the page behind.
-                surface.color = Brand.Theme.for(self).panel.withAlphaComponent(0.72)
+                surface.color = Brand.Theme.for(self).panel.withAlphaComponent(0.88)
             }
             surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
             surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
