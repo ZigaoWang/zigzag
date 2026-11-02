@@ -9,7 +9,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - A new look across Zigzag: each space fills the window with its own soft color, the tab you're on is a card that slides as you switch, and rows, favorites and panels move calmly into place.
-- Pick a space's color from a row of curated colors, try one on just by pointing at it, or use the wheel. Gradients and see-through are tucked under effects.
+- Pick a space's color from a row of curated colors, including pure white and pure black, or use the wheel. Gradients and see-through are tucked under effects.
+- The address bar, Downloads, Site Controls, Settings and History share one look: your space's color, light large titles, plain rows and thin line icons.
 - The address bar does more: type a few letters for actions like pin, split, move to another space or close other tabs. ([#3](https://github.com/ZigaoWang/zigzag/issues/3))
 - The page meets the window's edges beside the sidebar. Turn off Borderless page in Settings to float it again.
 - Beta updates: try new versions first, on your own tabs and data. Your profile is saved before every update, so one can be undone.
@@ -24,6 +25,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A closed tab comes back into its split view. Separate Tabs is ⌥⌘\.
 
 ### Changed
+- Your spaces show as quiet dots at the bottom of the sidebar, the one you're in a short pill.
+- Clicking a space's name folds its pinned tabs. Edit the space from its menu.
+- A switch that's on takes your space's color.
 - Favorites have bigger icons, and an open one has a fine edge. Point at it to close it.
 - Swiping back or forward holds while your fingers rest, so you can keep reading before you let go.
 - Permission requests hang from the site's address and go away when the site does.
