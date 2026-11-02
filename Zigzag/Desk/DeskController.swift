@@ -1,11 +1,20 @@
 import AppKit
 
-/// A space's heading in desk view, a row on the frame: the space's dot, its name, and a quiet count. Clicking it
-/// selects every tab in the space.
+/// A space's heading in desk view, as the sidebar names a space: its name in large light lowercase, then a quiet
+/// count on its baseline. Clicking it selects every tab in the space.
 final class DeskHeaderView: InteractiveView {
     let dot = ColorView()
-    let label = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
-    let count = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
+    let count = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    var name: String {
+        get { label.stringValue }
+        set {
+            label.attributedStringValue = NSAttributedString(string: newValue.lowercased(), attributes: [
+                .font: Tokens.Font.spaceName(), .kern: Tokens.Sidebar.spaceNameKern, .foregroundColor: Tokens.Color.textPrimary,
+            ])
+            setAccessibilityLabel(newValue)
+        }
+    }
     private static let dotSize = Tokens.Space.x2
 
     override init(frame: NSRect) {
@@ -22,15 +31,21 @@ final class DeskHeaderView: InteractiveView {
 
     override func layout() {
         super.layout()
-        let d = Self.dotSize
-        dot.frame = NSRect(x: CardRow.inset, y: (bounds.height - d) / 2, width: d, height: d)
-        let h = label.lineHeight, ch = count.lineHeight
-        label.frame = NSRect(x: dot.frame.maxX + Tokens.Space.x2 - Label.inset, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        // No dot: the name alone says which space, as it does in the sidebar.
+        dot.isHidden = true
+        let h = label.lineHeight
+        label.frame = NSRect(x: CardRow.inset - Label.inset, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
         // The count sits on the name's baseline, not centered against it.
-        count.frame = NSRect(x: label.frame.maxX + 2, y: label.frame.maxY - ch - 1, width: count.textWidth, height: ch)
+        let nameFont = Tokens.Font.spaceName(), countFont = count.font ?? Tokens.Font.body()
+        let baseline = label.frame.minY + (h + nameFont.ascender + nameFont.descender) / 2
+        let ch = count.lineHeight
+        let countTop = baseline - (ch + countFont.ascender + countFont.descender) / 2
+        count.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: countTop, width: count.textWidth, height: ch)
     }
 
-    var fittingWidth: CGFloat { CardRow.inset * 2 + Self.dotSize + Tokens.Space.x2 - Label.inset + label.textWidth + 2 + count.textWidth }
+    override var isFlipped: Bool { true }
+
+    var fittingWidth: CGFloat { CardRow.inset * 2 - Label.inset + label.textWidth + Tokens.Space.x2 + count.textWidth }
 
     override func stateDidChange(animated: Bool) { applyRowStyle(animated: animated) }
 }
@@ -524,7 +539,7 @@ final class DeskController {
             if ids.isEmpty && dragging == nil && !query.isEmpty { continue }
             groups.append((space.id, ids))
         }
-        let heading = Tokens.Space.x8 + Tokens.Space.x3
+        let heading = Tokens.Space.x12 + Tokens.Space.x2
         func widthOfCards(_ columns: Int) -> CGFloat {
             let fit = floor((width - margin * 2 - CGFloat(columns - 1) * gap) / CGFloat(columns))
             // One card on its own is never taller than the desk.
@@ -712,7 +727,7 @@ final class DeskController {
         canvas.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: max(layout.height, scrollView.contentSize.height))
         for (id, header) in headers {
             guard let space = Library.shared.space(id) else { continue }
-            header.label.stringValue = space.name
+            header.name = space.name
             let count = manager?.tabs(in: id).count ?? 0
             header.count.stringValue = count == 0 ? "" : count == 1 ? "1 tab" : "\(count) tabs"
             if let empty = empties[id] {
