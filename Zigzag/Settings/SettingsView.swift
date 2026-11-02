@@ -3,8 +3,8 @@ import WebKit
 
 // MARK: - Groups of rows
 
-/// A group of rows on the page: one quiet card (`Tokens.Color.surfaceGroup`, a hairline edge, `Tokens.Radius.group`)
-/// with hairlines between its rows, starting where their text does.
+/// A group of rows on the page: plain rows on the page's surface with hairlines between them, starting where their
+/// text does. No card behind them.
 final class FormGroup: NSView {
     private(set) var rows: [NSView] = []
     private var lines: [NSView] = []
@@ -12,10 +12,8 @@ final class FormGroup: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        background.wantsLayer = true
-        background.layer?.cornerRadius = Tokens.Radius.group
-        background.layer?.cornerCurve = .continuous
-        background.layer?.borderWidth = Tokens.Metric.hairline
+        // No card: the rows sit on the page itself, a hairline between them. Space and type do the grouping.
+        background.isHidden = true
         addSubview(background)
     }
 
@@ -69,7 +67,7 @@ final class FormGroup: NSView {
                 // The hairline starts where the text does, past any picture, and runs to the group's edge.
                 let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Page.groupPad
                 lines[i].isHidden = false
-                lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x, height: Tokens.Metric.hairline)
+                lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x - Tokens.Page.groupPad, height: Tokens.Metric.hairline)
             }
         }
     }
@@ -469,7 +467,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
     /// The wordmark and "Settings" at the top of the column, where History has its own.
-    private let columnTitle = PageTitleView("Settings")
+    private let columnTitle = PageTitleView("")
     /// Over the chosen section: its name, and the search at the right, as History's header has them.
     private let header = PageHeader()
     private let paneTitle = PageTitleView("")
@@ -713,7 +711,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let top = arrangement == .row ? area.minY : headerHeight
         scroll.frame = NSRect(x: area.minX, y: top, width: area.width, height: max(0, bounds.height - top))
         let span = contentSpan(in: header.frame.width)
-        header.contentFrame = (span.x, span.x + span.width)
+        // Rows have no card now, so their text sits a group's padding in: the title and search line up with it.
+        header.contentFrame = (span.x + Tokens.Page.groupPad, span.x + span.width - Tokens.Page.groupPad)
         // With no column to carry it, the wordmark heads the pane's own title.
         paneTitle.showsWordmark = arrangement != .column
         refreshTitle()
