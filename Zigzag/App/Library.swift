@@ -87,7 +87,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var isSeeThrough: Bool { seeThrough > 0.005 }
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
     /// never below two fifths, so the space keeps its color all the way up.
-    var coverage: CGFloat { CGFloat(1 - 0.6 * seeThrough) }
+    var coverage: CGFloat { CGFloat(1 - 0.75 * seeThrough) }
 
     /// The window frame color for this space, solid.
     var background: NSColor {
@@ -135,7 +135,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 
     /// How see-through a space saved as glass before 0.4 becomes: its old wash covered the desktop by half, so it
     /// lands where `coverage` is a half.
-    static let glassTranslucency = 0.5 / 0.6
+    static let glassTranslucency = 0.5 / 0.75
 
     /// The space as this version keeps it, looking just as it did: white, grays and black get no tint, and glass
     /// becomes a see-through gray at the shade it had.
