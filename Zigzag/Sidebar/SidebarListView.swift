@@ -509,7 +509,8 @@ final class SidebarListView: NSView {
             let header = SpaceHeaderView()
             header.onClick = { [weak self, weak header] event in
                 guard let self, let header else { return }
-                if header.isOnChevron(event) { self.toggleCollapsed() } else { self.delegate?.listEditSpace(anchor: header) }
+                // The name folds the pinned tabs away, as the chevron does; the space itself is edited from its menu.
+                self.toggleCollapsed()
             }
             header.onToggleCollapsed = { [weak self] in self?.toggleCollapsed() }
             header.onRightClick = { [weak self, weak header] _ in
