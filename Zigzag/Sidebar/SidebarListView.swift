@@ -471,10 +471,16 @@ final class SidebarListView: NSView {
 
     /// Over the list: the space header offers Clear.
     private(set) var isPointerInside = false {
-        didSet { (rows[.separator] as? SeparatorRowView)?.showsClear = showsClear }
+        didSet {
+            if !isPointerInside { clearedThisVisit = false }
+            (rows[.separator] as? SeparatorRowView)?.showsClear = showsClear
+        }
     }
-    /// Clear is offered under the pointer, never while something is being dragged past it.
-    private var showsClear: Bool { isPointerInside && drag == nil }
+    /// Set by a clear: the button stays away until the pointer leaves the list, so a second click on the same spot
+    /// never goes on to close the tabs that were kept.
+    private var clearedThisVisit = false
+    /// Clear is offered under the pointer, never while something is being dragged past it, nor again right after it.
+    private var showsClear: Bool { isPointerInside && drag == nil && !clearedThisVisit }
 
     /// Hover follows where the pointer really is, once rows have moved under it during a drag.
     private func syncHover() {
@@ -544,6 +550,8 @@ final class SidebarListView: NSView {
             separator.clearButton.onClick = { [weak self, weak separator] _ in
                 guard separator?.clearIsArmed == true else { return }
                 self?.previewClear(false)
+                self?.clearedThisVisit = true
+                separator?.showsClear = false
                 self?.delegate?.listClearTabs()
             }
             separator.clearButton.hoverChanged = { [weak self] on in self?.previewClear(on) }
