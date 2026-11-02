@@ -7,16 +7,25 @@ import AppKit
 
 // MARK: - Native
 
-/// The top left of a page: the drawn wordmark in the space's accent, a hairline, and the page's title.
+/// The top left of a page: the drawn wordmark in the space's accent, a hairline, and the page's title in large light
+/// lowercase, like a space's name.
 final class PageTitleView: NSView {
     private let wordmark = WordmarkView()
     private let divider = ColorView(color: Tokens.Color.separator)
-    private let label = Label("", font: Tokens.Font.title(), color: Tokens.Color.textPrimary)
+    /// Light and lowercase, the space name's voice: the one signature moment on a page.
+    private let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
     private var themeToken: SignalToken?
 
+    private var written = ""
     var title: String {
-        get { label.stringValue }
-        set { label.stringValue = newValue; setAccessibilityLabel(newValue); needsLayout = true }
+        get { written }
+        set {
+            written = newValue
+            label.attributedStringValue = NSAttributedString(string: newValue.lowercased(), attributes: [
+                .font: Tokens.Font.spaceName(), .kern: Tokens.Sidebar.spaceNameKern, .foregroundColor: Tokens.Color.textPrimary,
+            ])
+            setAccessibilityLabel(newValue); needsLayout = true
+        }
     }
 
     /// Off when the wordmark is shown elsewhere on the page, or there's no room for it.
@@ -55,7 +64,8 @@ final class PageTitleView: NSView {
         // Too narrow for the wordmark and some of the title: the title alone, rather than the two overlapping.
         let roomy = bounds.width >= Self.wordmarkWidth + Tokens.Space.x6 + min(label.textWidth, Tokens.Space.x16)
         wordmark.isHidden = !showsWordmark || !roomy
-        divider.isHidden = wordmark.isHidden
+        // With no title (a column that only carries the wordmark), the hairline after it goes too.
+        divider.isHidden = wordmark.isHidden || written.isEmpty
         if !wordmark.isHidden {
             let h = Tokens.Page.wordmarkHeight
             wordmark.frame = NSRect(x: 0, y: round((bounds.height - h) / 2), width: Self.wordmarkWidth, height: h)
@@ -332,7 +342,7 @@ enum PageStyle {
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); margin-right: auto; min-width: 0; }
     .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
     .page-title .divider { width: 1px; height: 20px; background: var(--line); flex: none; }
-    .page-title h1 { font-size: var(--title); font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.6px; text-transform: lowercase; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
     .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control-height) / 2); padding: 0 14px 0 10px;
