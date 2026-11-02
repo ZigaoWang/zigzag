@@ -388,7 +388,7 @@ struct SpaceLook {
     }
 
     /// One row of curated colors that sit well together: white, the seven soft hues around the wheel, and graphite.
-    static let presets: [SpaceLook] = [SpaceColor.snow, .sky, .lavender, .rose, .peach, .sand, .sage, .mint, .graphite].map { curated($0) }
+    static let presets: [SpaceLook] = [SpaceColor.snow, .ink, .sky, .lavender, .rose, .peach, .sand, .sage, .mint, .graphite].map { curated($0) }
 }
 
 /// A small checkerboard, the usual sign for see-through.
@@ -1054,17 +1054,6 @@ final class SpaceLookEditor: NSView {
                 self.selected = 0
                 self.colorChosen = true
                 self.changed(final: true, animated: true)
-            }
-            // Pointing at a preset tries it on the window; moving away puts back what you have.
-            swatch.hoverChanged = { [weak self, weak swatch] hovered in
-                guard let self, let look = swatch?.look else { return }
-                if hovered, !look.matches(self.look) {
-                    var trial = self.draft
-                    look.apply(to: &trial)
-                    self.onPreview?(trial)
-                } else if !hovered {
-                    self.onPreview?(self.look)
-                }
             }
         }
         effects.onClick = { [weak self] _ in
