@@ -159,7 +159,7 @@ final class SitePanel: FloatingPanelView {
             self.close()
         }))
         if PageScreenshot.canTake(tab), !readerOn {
-            specs.append(("camera.viewfinder", "Screenshot", "Screenshot of the Whole Page", false, { [weak self] in
+            specs.append(("camera.viewfinder", "Capture", "Screenshot of the Whole Page", false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 PageScreenshot.take(self.tab, in: controller)
@@ -355,7 +355,7 @@ final class SitePanel: FloatingPanelView {
         y += headerHeight + Tokens.Space.x4
 
         // Actions are named tiles, as many to a row as fit; extensions are icons on the same rhythm below.
-        let gap = Tokens.Space.x2
+        var gap = Tokens.Space.x2
         func grid(_ tiles: [PanelTile], columns: Int, height: ((CGFloat) -> CGFloat)? = nil) {
             let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
             let h = height?(side) ?? side
@@ -367,11 +367,11 @@ final class SitePanel: FloatingPanelView {
         }
         let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
         if !actionTiles.isEmpty {
-            // As many across as fit with every name whole, up to four; never so few that one sits alone.
-            let needed = actionTiles.map(\.captionWidth).max() ?? 0
-            var across = max(2, min(4, Int((inner + gap) / (needed + gap))))
-            if actionTiles.count % across == 1, across > 2, actionTiles.count > 1 { across -= 1 }
-            grid(actionTiles, columns: min(across, actionTiles.count)) { _ in PanelTile.captionedHeight }
+            // One row, like the markings along a device's edge: every action side by side.
+            let spacing = gap
+            gap = 0
+            grid(actionTiles, columns: actionTiles.count) { _ in PanelTile.captionedHeight }
+            gap = spacing
             y += Tokens.Space.x5
         }
         if !extensionTiles.isEmpty {
@@ -421,7 +421,7 @@ final class PanelTile: GlassTile {
     static let captionedHeight = Tokens.Space.x12 + Tokens.Space.x2
 
     init(image: NSImage? = nil, symbol: String, caption text: String?) {
-        caption = text.map { Label($0, font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary) }
+        caption = text.map { Label($0, font: .systemFont(ofSize: Tokens.TypeSize.small), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
         iconView.image = image ?? Tokens.Symbol.image(symbol, size: text == nil ? Tokens.TypeSize.body : Tokens.TypeSize.title)
         iconView.imageScaling = .scaleProportionallyUpOrDown
@@ -450,7 +450,7 @@ final class PanelTile: GlassTile {
             let iconY = isFlipped ? top : bounds.height - top - side
             let captionY = isFlipped ? top + side + Tokens.Space.x1 : top
             iconView.frame = NSRect(x: (bounds.width - side) / 2, y: iconY, width: side, height: side)
-            caption.frame = NSRect(x: 2, y: captionY, width: bounds.width - 4, height: caption.lineHeight)
+            caption.frame = NSRect(x: 0, y: captionY, width: bounds.width, height: caption.lineHeight)
         } else {
             iconView.frame = NSRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
         }
@@ -494,9 +494,8 @@ final class PanelGroup: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        fill.wantsLayer = true
-        fill.layer?.cornerRadius = Tokens.Radius.group
-        fill.layer?.cornerCurve = .continuous
+        // Plain rows on the panel itself, no card behind them: space and a hairline between them are enough.
+        fill.isHidden = true
         addSubview(fill)
     }
 
@@ -506,7 +505,7 @@ final class PanelGroup: NSView {
     override func layout() {
         super.layout()
         fill.frame = bounds
-        let inset = Tokens.Space.x3
+        let inset: CGFloat = 0
         for (i, row) in rows.enumerated() {
             row.frame = NSRect(x: inset, y: CGFloat(i) * PanelRow.height, width: bounds.width - inset * 2, height: PanelRow.height)
         }
