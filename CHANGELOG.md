@@ -30,6 +30,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A switch that's on takes your space's color.
 - Swiping between spaces no longer catches as the new space's page comes in.
 - The tab overview stands on the same color and see-through as the sidebar, and names each space the way the sidebar does.
+- Names and titles share one light, lowercase type across the sidebar, pages, panels and the address bar.
+- After you clear tabs, Clear goes away until you move off the tab list, so a second click can't close the tabs you kept.
 - Favorites have bigger icons, and an open one has a fine edge. Point at it to close it.
 - Swiping back or forward holds while your fingers rest, so you can keep reading before you let go.
 - Permission requests hang from the site's address and go away when the site does.
