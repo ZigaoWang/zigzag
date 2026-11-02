@@ -92,9 +92,9 @@ final class AddressView: InteractiveView {
             // An extension's own page (its settings) is named after the extension, not its random address.
             label.stringValue = context.webExtension.displayName ?? "Extension"
         } else if HistoryPage.isHistory(url) {
-            label.stringValue = "history"
+            label.stringValue = "History"
         } else if SettingsPage.isSettings(url) {
-            label.stringValue = "settings"
+            label.stringValue = "Settings"
         } else if let url, let host = url.host() {
             label.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         } else if let url, url.isFileURL {
@@ -221,33 +221,25 @@ final class SpaceDotView: InteractiveView {
         let changed = (wasSelected != nil && wasSelected != isSelected && swipeShare == nil) || settlesFromSwipe
         wasSelected = isSelected
         settlesFromSwipe = false
-        let key = CGRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side)
-        // Pressed, the face goes a step darker as the key sinks.
-        let held: CGFloat = isPressed ? 0.75 : 1
-        let face = Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF, alpha: (0.18 + 0.67 * share) * held),
-                                        dark: Tokens.Color.hex(0xFFFFFF, alpha: (0.04 + 0.13 * share) * held))
+        // A quiet dot per space; the one you're in stretches into a short pill in full ink. No boxes, no numbers:
+        // the dot's tooltip names the space and its ⌃ key.
+        _ = side
+        let dotSide: CGFloat = 6
+        let width = dotSide + 10 * share
+        let key = CGRect(x: bounds.midX - width / 2, y: bounds.midY - dotSide / 2, width: width, height: dotSide)
+        let dotFill = ink.withAlphaComponent((isPressed ? 0.6 : 1) * (resting * 0.8 + (0.86 - resting * 0.8) * share))
         let apply = {
             self.dot.frame = key
-            self.dot.cornerRadius = Tokens.Sidebar.spaceKeyRadius
+            self.dot.cornerRadius = dotSide / 2
             self.dot.cornerCurve = .continuous
-            self.dot.backgroundColor = self.cgColor(face)
-            self.dot.borderWidth = Tokens.Metric.hairline
-            self.dot.borderColor = self.cgColor(Tokens.Chrome.keyEdge)
-            // Pressed in: the key you're in sits a touch lower, its shadow tucked under it.
-            self.dot.shadowColor = self.cgColor(Tokens.Chrome.cardShadow)
-            self.dot.shadowOpacity = Float(share)
-            self.dot.shadowRadius = 0.5
-            self.dot.shadowOffset = CGSize(width: 0, height: self.isFlipped ? 0.5 : -0.5)
-            let h: CGFloat = 13
-            self.numberLayer.frame = CGRect(x: key.minX, y: key.midY - h / 2 + (self.isFlipped ? 0 : 0.5), width: key.width, height: h)
-            self.numberLayer.foregroundColor = self.cgColor(tint)
-            self.tick.frame = CGRect(x: key.midX - 2.5, y: self.isFlipped ? key.maxY + 2 : key.minY - 3, width: 5, height: 1)
-            self.tick.cornerRadius = 0.5
-            self.tick.backgroundColor = self.cgColor(Tokens.Color.live)
-            self.tick.opacity = Float(share)
+            self.dot.backgroundColor = self.cgColor(dotFill)
+            self.dot.borderWidth = 0
+            self.dot.shadowOpacity = 0
+            self.numberLayer.isHidden = true
+            self.tick.opacity = 0
         }
         if tick.superlayer == nil { layer?.addSublayer(tick) }
-        numberLayer.isHidden = icon != nil
+        numberLayer.isHidden = true
         numberLayer.contentsScale = window?.backingScaleFactor ?? 2
         iconView.frame = bounds
         iconView.isHidden = icon == nil
