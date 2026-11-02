@@ -462,14 +462,12 @@ final class PanelTile: GlassTile {
 
     override func stateDidChange(animated: Bool) {
         let accent = Brand.Theme.for(self).accent
-        if isOn {
-            let alpha = Tokens.Color.selectionAlpha + (isPressed ? 0.08 : isHovered ? 0.04 : 0)
-            layer?.set(backgroundColor: cgColor(accent.withAlphaComponent(alpha)), animated: animated && !isHovered, duration: Tokens.Motion.selection)
-            layer?.borderWidth = 0
-            setLifted(false)
-        } else {
-            super.stateDidChange(animated: animated)
-        }
+        // No box: a thin line glyph over its small name, like a marking on a device. Only the pointer or a press
+        // shows a soft wash behind it.
+        let wash: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: wash.map { cgColor($0) }, animated: false)
+        layer?.borderWidth = 0
+        setLifted(false)
         iconView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
         iconView.contentTintColor = isOn ? accent : Tokens.Color.icon
         caption?.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
