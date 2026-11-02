@@ -9,9 +9,7 @@ final class DeskHeaderView: InteractiveView {
     var name: String {
         get { label.stringValue }
         set {
-            label.attributedStringValue = NSAttributedString(string: newValue.lowercased(), attributes: [
-                .font: Tokens.Font.spaceName(), .kern: Tokens.Sidebar.spaceNameKern, .foregroundColor: Tokens.Color.textPrimary,
-            ])
+            label.attributedStringValue = Tokens.Font.voiceText(newValue)
             setAccessibilityLabel(newValue)
         }
     }

@@ -235,7 +235,11 @@ final class DownloadsPanelView: FloatingPanelView {
     fileprivate var focused: DownloadItem?
     /// How many it lists when you open it yourself; the rest are in the folder.
     private static let recentCount = 5
-    private let title = Label("downloads", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
+    private let title: Label = {
+        let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
+        label.attributedStringValue = Tokens.Font.voiceText("Downloads")
+        return label
+    }()
     private let clearButton = PillButton(title: "Clear", style: .quiet)
     /// The last row: the folder, or the whole list when the panel opened on one download.
     private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())

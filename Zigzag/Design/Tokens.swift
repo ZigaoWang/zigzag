@@ -169,7 +169,6 @@ enum Tokens {
         static let spaceNameText: CGFloat = 26
         static let spaceNameHeight: CGFloat = 40
         /// Tracking for the space's name, in points: display type sits tighter.
-        static let spaceNameKern: CGFloat = -0.6
         /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
         static let spaceNameBearing: CGFloat = 1
         /// A space key in the bottom bar: a small rounded key with its number, 4pt between keys.
@@ -394,8 +393,22 @@ enum Tokens {
         /// The sidebar's rows and address (13 regular), and its section labels (11 medium): `Tokens.Sidebar`.
         static func sidebarRow() -> NSFont { .systemFont(ofSize: Sidebar.rowText) }
         static func sidebarLabel() -> NSFont { .systemFont(ofSize: Sidebar.labelText, weight: .medium) }
-        /// The space's name in the sidebar: 26 light, SF's display cut, set tight (`Sidebar.spaceNameKern`).
-        static func spaceName() -> NSFont { .systemFont(ofSize: Sidebar.spaceNameText, weight: .light) }
+        /// Zigzag's voice: SF Pro Light, set a touch tight, in lowercase. The one type style that's ours, for every
+        /// name and title that speaks for the app (a space's name, a page's title, a panel's title, the welcome) and,
+        /// in its own case, the address bar's text. Always through `voice` and `voiceText`, so its size, weight and
+        /// tracking never drift from place to place.
+        static func voice(_ size: CGFloat = Sidebar.spaceNameText) -> NSFont { .systemFont(ofSize: size, weight: .light) }
+        /// The voice's tracking: 2.3% of the size, tight enough to read as one shape, never so tight letters touch.
+        static func voiceKern(_ size: CGFloat = Sidebar.spaceNameText) -> CGFloat { -size * 0.023 }
+        /// Text in the voice. Lowercase unless it's something you typed or a name that isn't the app's own.
+        static func voiceText(_ text: String, size: CGFloat = Sidebar.spaceNameText, color: NSColor = Color.textPrimary,
+                              lowercase: Bool = true, paragraph: NSParagraphStyle? = nil) -> NSAttributedString {
+            var attributes: [NSAttributedString.Key: Any] = [.font: voice(size), .kern: voiceKern(size), .foregroundColor: color]
+            if let paragraph { attributes[.paragraphStyle] = paragraph }
+            return NSAttributedString(string: lowercase ? text.lowercased() : text, attributes: attributes)
+        }
+        /// The space's name in the sidebar: the voice at 26.
+        static func spaceName() -> NSFont { voice() }
         /// Numbers that count something on a control (a space key): tabular figures, so they sit like dial markings.
         static func figures(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont { .monospacedDigitSystemFont(ofSize: size, weight: weight) }
     }

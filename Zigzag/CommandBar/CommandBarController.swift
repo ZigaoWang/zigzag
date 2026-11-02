@@ -224,11 +224,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // From the address: the sidebar's own size, so the text doesn't change as you click in; the centered bar for
         // a new tab is large. Regular weight both ways: what you type reads as text, not a heading.
         // Light type, the space name's voice: the sidebar's size over the address, large and airy for a new tab.
-        let font = isAnchored ? NSFont.systemFont(ofSize: Tokens.Font.sidebarRow().pointSize, weight: .light)
-                              : NSFont.systemFont(ofSize: 22, weight: .light)
+        let font = Tokens.Font.voice(isAnchored ? Tokens.Font.sidebarRow().pointSize : 22)
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
-                                                               attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
+                                                               attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
         if mode == .editCurrent, let url = controller.tabManager.selectedTab?.url {
             field.stringValue = url.absoluteString
         } else if mode == .newTab, let unsent, Date().timeIntervalSince(unsent.at) < Self.unsentMemory {
@@ -547,7 +546,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         }
         let font = field.font ?? Tokens.Font.title(.regular)
         field.placeholderAttributedString = NSAttributedString(string: site.map { "Search \($0.name)" } ?? (mode == .history ? "Search history" : "Search or enter address"),
-                                                               attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
+                                                               attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
         if let site { FaviconStore.shared.prefetch(for: site.home) }
         refreshHint()
         refreshResults(animated: true)

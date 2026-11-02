@@ -402,10 +402,7 @@ private enum Onboard {
         field.isSelectable = false
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        field.attributedStringValue = NSAttributedString(string: text.lowercased(), attributes: [
-            .font: NSFont.systemFont(ofSize: Tokens.Welcome.titleSize, weight: .light), .kern: Tokens.Sidebar.spaceNameKern,
-            .foregroundColor: Brand.ribbon, .paragraphStyle: paragraph,
-        ])
+        field.attributedStringValue = Tokens.Font.voiceText(text, size: Tokens.Welcome.titleSize, color: Brand.ribbon, paragraph: paragraph)
         return field
     }
 

@@ -21,9 +21,7 @@ final class PageTitleView: NSView {
         get { written }
         set {
             written = newValue
-            label.attributedStringValue = NSAttributedString(string: newValue.lowercased(), attributes: [
-                .font: Tokens.Font.spaceName(), .kern: Tokens.Sidebar.spaceNameKern, .foregroundColor: Tokens.Color.textPrimary,
-            ])
+            label.attributedStringValue = Tokens.Font.voiceText(newValue)
             setAccessibilityLabel(newValue); needsLayout = true
         }
     }
@@ -342,7 +340,7 @@ enum PageStyle {
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); margin-right: auto; min-width: 0; }
     .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
     .page-title .divider { width: 1px; height: 20px; background: var(--line); flex: none; }
-    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.6px; text-transform: lowercase; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; text-transform: lowercase; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
     .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control-height) / 2); padding: 0 14px 0 10px;

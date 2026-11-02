@@ -705,10 +705,7 @@ final class SpaceHeaderView: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // The name in light type and the space's own ink, quietly fuller under the pointer; its icon a step back.
         let ink = Brand.Theme.for(self).ink
-        label.attributedStringValue = NSAttributedString(string: label.stringValue, attributes: [
-            .font: Tokens.Font.spaceName(), .kern: Tokens.Sidebar.spaceNameKern,
-            .foregroundColor: isHovered ? ink : ink.withAlphaComponent(0.86),
-        ])
+        label.attributedStringValue = Tokens.Font.voiceText(label.stringValue, color: isHovered ? ink : ink.withAlphaComponent(0.86))
         iconView.contentTintColor = Tokens.Color.textSecondary
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
