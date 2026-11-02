@@ -116,9 +116,9 @@ final class AddressView: InteractiveView {
 
     override func layout() {
         super.layout()
-        // The host's first letter on the icon column (the field's edge plus a row's inset), with the traffic lights,
-        // the icons and the space's name: one edge down the sidebar. After the not-secure mark when there is one.
-        let pad = Tokens.Sidebar.rowInset
+        // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
+        // text has room to breathe. After the not-secure mark when there is one.
+        let pad = Tokens.Space.x3
         var x = pad
         if !lock.isHidden {
             lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
