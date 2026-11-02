@@ -868,7 +868,7 @@ final class ClearTabsButton: InteractiveView {
         didSet {
             switch step {
             case .old(let n):
-                label.stringValue = "clear old"
+                label.stringValue = "Clear Old"
                 toolTip = n == 1 ? "Close the tab you haven’t used in a while" : "Close the \(n) tabs you haven’t used in a while"
             case .others(let n):
                 label.stringValue = "Clear"
