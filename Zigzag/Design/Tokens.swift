@@ -917,10 +917,10 @@ enum Tokens {
         static let darkLightness = 0.27
         static let darkChroma = 0.04
         /// A floating panel: near white with a breath of the space by day, a deep gray of it at night.
-        static let panelLightness = 0.985
-        static let panelChroma = 0.008
-        static let panelDarkLightness = 0.255
-        static let panelDarkChroma = 0.014
+        static let panelLightness = 0.975
+        static let panelChroma = 0.02
+        static let panelDarkLightness = 0.27
+        static let panelDarkChroma = 0.04
         /// A page's quiet column (Settings' sections, Passwords' list): halfway between the frame and the white page.
         static let washLightness = 0.962
         static let washChroma = 0.016
