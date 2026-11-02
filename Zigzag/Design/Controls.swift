@@ -963,7 +963,7 @@ final class SegmentedPills: NSView {
 /// knob that slides across. The knob settles in `Motion.standard` with no bounce, and stretches a little while held,
 /// so a press reads at once; with Reduce Motion it moves at once and only the color fades.
 /// A slide switch, as on a good piece of hardware: a small round knob in a recessed track. Off, the knob is matte
-/// porcelain on the left; on, it slides right and turns the one warm color (`Color.live`). The track never lights up:
+/// porcelain on the left; on, it slides right and takes the space's own accent. The track never lights up:
 /// what's on is the knob.
 final class Toggle: InteractiveView {
     private let knob = CALayer()
@@ -1045,7 +1045,7 @@ final class Toggle: InteractiveView {
         typealias S = Tokens.Switch
         let track = isPressed ? S.trackPressed : isHovered ? S.trackHover : S.track
         layer?.set(backgroundColor: cgColor(track), animated: fading, duration: Tokens.Motion.standard)
-        knob.set(backgroundColor: cgColor(isOn ? Tokens.Color.live : S.knob), animated: fading, duration: Tokens.Motion.standard)
+        knob.set(backgroundColor: cgColor(isOn ? Brand.Theme.for(self).accent : S.knob), animated: fading, duration: Tokens.Motion.standard)
         Tokens.Motion.withoutAnimation {
             layer?.borderColor = cgColor(S.edge)
             recess.colors = [cgColor(S.recess), cgColor(NSColor.clear)]
