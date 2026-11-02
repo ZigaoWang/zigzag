@@ -167,7 +167,7 @@ enum Tokens {
         static let labelHeight: CGFloat = 28
         /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.
         static let spaceNameText: CGFloat = 26
-        static let spaceNameHeight: CGFloat = 52
+        static let spaceNameHeight: CGFloat = 40
         /// Tracking for the space's name, in points: display type sits tighter.
         static let spaceNameKern: CGFloat = -0.6
         /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
