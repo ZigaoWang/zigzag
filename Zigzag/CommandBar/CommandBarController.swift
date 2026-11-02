@@ -1,7 +1,7 @@
 import AppKit
 
 /// One result row: an icon, the title, quiet detail after it, and on the chosen row what Return does, with its key.
-/// The chosen row is the neutral highlight menus use (`Tokens.Color.highlight`), so you always see where Return goes.
+/// The chosen row is a soft wash of the space's accent, so you always see where Return goes.
 final class CommandRowView: InteractiveView {
     private let icon = FaviconView()
     private let symbolView = NSImageView()
@@ -72,8 +72,11 @@ final class CommandRowView: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         // The chosen row in the neutral highlight, as a menu's; hover moves the choice, so it has no fill of its own.
-        let fill: NSColor? = isSelected ? (isPressed ? Tokens.Color.pressedFill : Tokens.Color.highlight) : nil
+        // The chosen row on a soft wash of the space's accent, its title in the space's ink; the rest stay plain.
+        let theme = Brand.Theme.for(self)
+        let fill: NSColor? = isSelected ? theme.accent.withAlphaComponent(isPressed ? 0.26 : 0.18) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
+        title.textColor = isSelected ? theme.rowInk : Tokens.Color.textPrimary
         needsLayout = true
     }
 }
@@ -220,7 +223,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         applySpaceTheme()
         // From the address: the sidebar's own size, so the text doesn't change as you click in; the centered bar for
         // a new tab is large. Regular weight both ways: what you type reads as text, not a heading.
-        let font = isAnchored ? Tokens.Font.sidebarRow() : Tokens.Font.title(.regular)
+        // Light type, the space name's voice: the sidebar's size over the address, large and airy for a new tab.
+        let font = isAnchored ? NSFont.systemFont(ofSize: Tokens.Font.sidebarRow().pointSize, weight: .light)
+                              : NSFont.systemFont(ofSize: 22, weight: .light)
         field.font = font
         field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
                                                                attributes: [.font: font, .foregroundColor: Tokens.Color.textTertiary])
@@ -383,7 +388,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         field.frame = NSRect(x: fieldX - textInset, y: (fieldHeight - boxHeight) / 2, width: max(40, fieldRight - fieldX) + textInset * 2, height: boxHeight)
         // A hairline between what you type and what it finds, held in from the edges like the rows.
         divider.frame = NSRect(x: Tokens.Space.x3, y: fieldHeight - Tokens.Metric.hairline, width: b.width - Tokens.Space.x3 * 2, height: Tokens.Metric.hairline)
-        divider.isHidden = results.isEmpty
+        // No rule between what you type and what it finds: the space between them is enough.
+        divider.isHidden = true
         var y = fieldHeight + inset
         for row in rows {
             row.frame = NSRect(x: inset, y: y, width: b.width - inset * 2, height: Tokens.Metric.commandBarRowHeight)
@@ -520,14 +526,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let before = field.frame
         scope = site
         if leaving { fadeOutChip() } else { chip.isHidden = site == nil }
-        chip.color = site?.color ?? .clear
-        // Ink that reads on the site's own color: dark on light brands (IMDb, Amazon), white on the rest; a hairline
-        // so near-black brands (X, MDN) still show on dark glass.
-        if let fill = site?.color {
-            chipLabel.textColor = Tokens.Color.ink(on: fill)
-            chip.layer?.borderWidth = Tokens.Color.luminance(of: fill) < 0.15 ? Tokens.Metric.hairline : 0
-            chip.edgeColor = Tokens.Color.panelEdge
-        }
+        // The site's name on a soft wash of the space's accent, in the space's ink: one family with the rest of the
+        // bar, never a brand's loud capsule.
+        let theme = Brand.Theme.for(panel)
+        chip.color = theme.accent.withAlphaComponent(0.2)
+        chip.layer?.borderWidth = 0
+        chipLabel.textColor = theme.rowInk
         chipLabel.stringValue = site?.name ?? ""
         completion = nil
         if site != nil {
