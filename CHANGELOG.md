@@ -28,6 +28,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Your spaces show as quiet dots at the bottom of the sidebar, the one you're in a short pill.
 - Clicking a space's name folds its pinned tabs. Edit the space from its menu.
 - A switch that's on takes your space's color.
+- Swiping between spaces no longer catches as the new space's page comes in.
+- The tab overview stands on the same color and see-through as the sidebar, and names each space the way the sidebar does.
 - Favorites have bigger icons, and an open one has a fine edge. Point at it to close it.
 - Swiping back or forward holds while your fingers rest, so you can keep reading before you let go.
 - Permission requests hang from the site's address and go away when the site does.
