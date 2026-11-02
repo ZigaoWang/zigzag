@@ -8,8 +8,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.5.0] - 2026-11-01
 
 ### New
-- A new look across Zigzag: calmer, roomier rows with quiet section labels, a soft card for the tab you're on, glass favorites and glass panels.
-- One color wheel for every space: drag toward the middle for white, gray or black, add a second color for a gradient, and make any look see-through so your desktop shows behind it. ([#3](https://github.com/ZigaoWang/zigzag/issues/3))
+- A new look across Zigzag: each space fills the window with its own soft color, the tab you're on is a card that slides as you switch, and rows, favorites and panels move calmly into place.
+- Pick a space's color from a row of curated colors, try one on just by pointing at it, or use the wheel. Gradients and see-through are tucked under effects.
+- The address bar does more: type a few letters for actions like pin, split, move to another space or close other tabs. ([#3](https://github.com/ZigaoWang/zigzag/issues/3))
 - The page meets the window's edges beside the sidebar. Turn off Borderless page in Settings to float it again.
 - Beta updates: try new versions first, on your own tabs and data. Your profile is saved before every update, so one can be undone.
 - The address bar fills in sites you've been to as you type, so "wiki" becomes wikipedia.org and Return goes there.
