@@ -10,9 +10,9 @@ final class GuidedTour: NSView {
     private let dim = CAShapeLayer()
     private let ring = CAShapeLayer()
     private let card = FloatingPanelView()
-    private let step = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textTertiary)
+    private let step = Label("", font: Tokens.Font.figures(Tokens.TypeSize.small), color: Tokens.Color.textTertiary)
     private let check = NSImageView()
-    private let title = Label("", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.title(.regular), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
@@ -72,7 +72,7 @@ final class GuidedTour: NSView {
         dim.fillRule = .evenOdd
         layer?.addSublayer(dim)
         ring.fillColor = nil
-        ring.lineWidth = 2.5
+        ring.lineWidth = Tokens.Metric.focusRing
         layer?.addSublayer(ring)
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
@@ -111,7 +111,8 @@ final class GuidedTour: NSView {
     private func applyColors() {
         let accent = Brand.Theme.for(self).accent
         dim.fillColor = cgColor(Tokens.Color.scrim)
-        ring.strokeColor = cgColor(accent)
+        // What to click next is the live thing on screen: the one warm color rings it.
+        ring.strokeColor = cgColor(Tokens.Color.live)
         check.contentTintColor = accent
     }
 
@@ -416,7 +417,7 @@ final class GuidedTour: NSView {
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
-        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : Tokens.Font.title(.semibold)
+        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : Tokens.Font.title(.regular)
         if animated {
             let fade = CATransition()
             fade.type = .fade
