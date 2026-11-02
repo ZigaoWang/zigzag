@@ -257,6 +257,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
         desk.spaceChanged()
+        // Hand the slide and the color change to Core Animation now, before the new space's page is put in (tens of
+        // milliseconds of WebKit work): they run on their own from here, so a swipe never catches on that work.
+        CATransaction.flush()
     }
 
     /// A favorite held over another space's dot opens that space after a beat, so it can be dropped among that
