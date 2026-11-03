@@ -5,6 +5,20 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-03
+
+### Fixed
+- What's New shows its notes as plain words, without link code.
+- The main button in every window, switches and the guided tour take your space's color. There's no orange accent anymore.
+- Import, What's New and onboarding headings use the same light lowercase type as the rest of Zigzag, and pages name themselves without the wordmark beside them.
+- Searching a site from the address bar shows its name and a thin rule instead of a colored capsule, and the address bar opens centered over the page.
+- Import's choices are simpler, and the browser you pick is softly highlighted.
+- Permission prompts use a thin icon and a lighter title.
+- A space's icon sits with its name and shows small at the bottom of the sidebar.
+- A download flies into its button on a slow, high arc.
+- A tab that leaves Settings for a page shows the page's own icon.
+- Small fixes to Settings and the space editor.
+
 ## [0.5.0] - 2026-11-03
 
 ### New
@@ -320,7 +334,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/ZigaoWang/zigzag/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ZigaoWang/zigzag/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/ZigaoWang/zigzag/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ZigaoWang/zigzag/compare/v0.2.1...v0.3.0
