@@ -973,7 +973,7 @@ final class DisclosureRow: InteractiveView {
 /// `onCommit` when you let go or pick something.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
-    private let colorsLabel = SpaceLookEditor.rowLabel("colors")
+    private let colorsLabel = SpaceLookEditor.rowLabel("Colors")
     /// The space's colors, one per knob on the wheel; clicking one selects its knob.
     private let chips = [ColorChip(label: "Color"), ColorChip(label: "Second color")]
     /// Adds a second color for a gradient; the second chip's × takes it away again.
