@@ -27,11 +27,15 @@ final class PageTitleView: NSView {
     }
 
     /// Off when the wordmark is shown elsewhere on the page, or there's no room for it.
-    var showsWordmark = true { didSet { wordmark.isHidden = !showsWordmark; divider.isHidden = !showsWordmark; needsLayout = true } }
+    var showsWordmark = false { didSet { wordmark.isHidden = !showsWordmark; divider.isHidden = !showsWordmark; needsLayout = true } }
 
     init(_ title: String) {
         super.init(frame: .zero)
         [wordmark, divider, label].forEach { addSubview($0) }
+        // A page names itself in the voice alone, as the sidebar names a space; the heavy wordmark is kept for the
+        // brand's own moments (the welcome, About), where it doesn't sit beside light type.
+        wordmark.isHidden = true
+        divider.isHidden = true
         self.title = title
         setAccessibilityElement(false)
         label.setAccessibilityRole(.staticText)
@@ -264,7 +268,7 @@ enum PageStyle {
 
     /// The wordmark and title, for the page's header.
     static func title(_ text: String) -> String {
-        #"<div class="page-title">"# + WordmarkView.svg(class: "wordmark") + #"<span class="divider"></span><h1>"# + text + "</h1></div>"
+        #"<div class="page-title"><h1>"# + text + "</h1></div>"
     }
 
     /// The search field: a magnifying glass, then the input.

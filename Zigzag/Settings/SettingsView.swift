@@ -467,7 +467,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
     /// The wordmark and "Settings" at the top of the column, where History has its own.
-    private let columnTitle = PageTitleView("")
+    private let columnTitle = PageTitleView("Settings")
     /// Over the chosen section: its name, and the search at the right, as History's header has them.
     private let header = PageHeader()
     private let paneTitle = PageTitleView("")
@@ -714,7 +714,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Rows have no card now, so their text sits a group's padding in: the title and search line up with it.
         header.contentFrame = (span.x + Tokens.Page.groupPad, span.x + span.width - Tokens.Page.groupPad)
         // With no column to carry it, the wordmark heads the pane's own title.
-        paneTitle.showsWordmark = arrangement != .column
         refreshTitle()
         settingSearch.tint = Brand.Theme.for(self).accent
         layoutColumn(arrangement)

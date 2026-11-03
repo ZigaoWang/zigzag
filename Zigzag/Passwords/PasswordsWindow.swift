@@ -585,7 +585,9 @@ private final class PageEmptyView: NSView {
     override func layout() {
         super.layout()
         let width = min(bounds.width - Tokens.Space.x8 * 2, Tokens.EmptyState.textWidth)
-        let markHeight = ceil(Self.markWidth / WordmarkView.aspect)
+        // No watermark: the sentence and the one thing to do, as every other empty list says it.
+        markHolder.isHidden = true
+        let markHeight: CGFloat = -Tokens.EmptyState.markGap
         let textHeight = ceil(label.sizeThatFits(NSSize(width: width, height: 400)).height)
         let showsButton = action != nil && showsAction
         let total = markHeight + Tokens.EmptyState.markGap + textHeight + (showsButton ? Tokens.EmptyState.actionGap + Tokens.Page.controlHeight : 0)
