@@ -189,22 +189,18 @@ enum Brand {
 
     // MARK: Type
 
-    /// Display type for brand moments: SF Pro, heavy, tight.
+    /// Display type for brand moments: the app's voice (light, tight, lowercase).
     /// `wraps` lets a heading run onto more lines instead of ending in "…"; use it wherever the text is a
     /// sentence or a name of unknown length.
     /// The display face on its own, for labels that set their own text.
-    static func displayFont(_ size: CGFloat) -> NSFont { .systemFont(ofSize: size, weight: .heavy) }
+    static func displayFont(_ size: CGFloat) -> NSFont { Tokens.Font.voice(size) }
 
     static func display(_ text: String, size: CGFloat, color: NSColor, alignment: NSTextAlignment = .natural, wraps: Bool = false) -> NSAttributedString {
+        // The app's voice (`Tokens.Font.voiceText`): light, tracked by its size, lowercase.
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = alignment
         paragraph.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
-        return NSAttributedString(string: text, attributes: [
-            .font: NSFont.systemFont(ofSize: size, weight: .heavy),
-            .kern: -size * 0.025,
-            .foregroundColor: color,
-            .paragraphStyle: paragraph,
-        ])
+        return Tokens.Font.voiceText(text, size: size, color: color, paragraph: paragraph)
     }
 
     // MARK: The ribbon
