@@ -180,7 +180,10 @@ final class SpaceDotView: InteractiveView {
         pressSinks = true
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
-        iconView.imageScaling = .scaleNone
+        // Every icon fit to the same square and centered in it, whatever its drawing's own width (a book is wider
+        // than a flame), so the row reads as evenly spaced marks.
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.imageAlignment = .alignCenter
         iconView.isHidden = true
         addSubview(iconView)
         setAccessibilityRole(.button)
