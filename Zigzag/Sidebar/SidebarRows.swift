@@ -661,7 +661,8 @@ final class SpaceHeaderView: InteractiveView {
         super.init(frame: frame)
         chevron.imageScaling = .scaleNone
         chevron.contentTintColor = Tokens.Color.textTertiary
-        iconView.imageScaling = .scaleNone
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.imageAlignment = .alignCenter
         iconView.contentTintColor = Tokens.Color.textTertiary
         iconView.isHidden = true
         addSubview(iconView)
@@ -688,8 +689,11 @@ final class SpaceHeaderView: InteractiveView {
         var x = SidebarRowView.inset - Label.inset - Tokens.Sidebar.spaceNameBearing
         if icon != nil {
             // The space's icon leads the name at the name's own scale, as one mark, not a row icon beside a heading.
-            let side = Self.iconSide
-            iconView.frame = NSRect(x: SidebarRowView.inset, y: xMiddle - side / 2, width: side, height: side)
+            // As tall as the name's capitals, its middle on the lowercase letters' middle, and fit to that square
+            // whatever its drawing's shape; centered over the rows' icon column, so it lines up with the + below.
+            let side = ceil(font.capHeight) + 2
+            let column = SidebarRowView.inset + Tokens.Sidebar.favicon / 2
+            iconView.frame = NSRect(x: round(column - side / 2), y: round(xMiddle - side / 2), width: side, height: side)
             x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset
         }
         label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
