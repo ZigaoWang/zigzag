@@ -472,15 +472,11 @@ final class SidebarListView: NSView {
     /// Over the list: the space header offers Clear.
     private(set) var isPointerInside = false {
         didSet {
-            if !isPointerInside { clearedThisVisit = false }
             (rows[.separator] as? SeparatorRowView)?.showsClear = showsClear
         }
     }
-    /// Set by a clear: the button stays away until the pointer leaves the list, so a second click on the same spot
-    /// never goes on to close the tabs that were kept.
-    private var clearedThisVisit = false
     /// Clear is offered under the pointer, never while something is being dragged past it, nor again right after it.
-    private var showsClear: Bool { isPointerInside && drag == nil && !clearedThisVisit }
+    private var showsClear: Bool { isPointerInside && drag == nil }
 
     /// Hover follows where the pointer really is, once rows have moved under it during a drag.
     private func syncHover() {
@@ -550,8 +546,6 @@ final class SidebarListView: NSView {
             separator.clearButton.onClick = { [weak self, weak separator] _ in
                 guard separator?.clearIsArmed == true else { return }
                 self?.previewClear(false)
-                self?.clearedThisVisit = true
-                separator?.showsClear = false
                 self?.delegate?.listClearTabs()
             }
             separator.clearButton.hoverChanged = { [weak self] on in self?.previewClear(on) }
@@ -653,7 +647,9 @@ final class SidebarListView: NSView {
             // Clear is there only when it has something to close, and says which: the old tabs, or all the others.
             (view as? SeparatorRowView)?.hasTabs = !closing.isEmpty
             (view as? SeparatorRowView)?.refreshInk()
-            (view as? SeparatorRowView)?.clearButton.step = faded ? .old(closing.count) : .others(closing.count)
+            let current = manager.selectedTab(in: space)
+            (view as? SeparatorRowView)?.clearButton.step = faded ? .old(closing.count)
+                : closing.contains { $0 === current } ? .last(closing.count) : .others(closing.count)
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }

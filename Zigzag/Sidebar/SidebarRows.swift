@@ -868,7 +868,7 @@ final class ClearTabsButton: InteractiveView {
 
     /// What a click does now, and its label says so: the old (faded) tabs while there are any, then every tab but
     /// the one you're on. Never yours.
-    enum Step: Equatable { case old(Int), others(Int) }
+    enum Step: Equatable { case old(Int), others(Int), last(Int) }
     var step: Step = .others(0) {
         didSet {
             switch step {
@@ -878,6 +878,9 @@ final class ClearTabsButton: InteractiveView {
             case .others(let n):
                 label.stringValue = "Clear"
                 toolTip = n == 1 ? "Close the other tab" : "Close the other \(n) tabs"
+            case .last(let n):
+                label.stringValue = "Clear"
+                toolTip = n == 1 ? "Close this tab too, leaving the space empty" : "Close these tabs too, leaving the space empty"
             }
             setAccessibilityLabel(toolTip)
             if oldValue != step { needsLayout = true; superview?.needsLayout = true }

@@ -385,9 +385,9 @@ final class TabManager {
         changed.send(.selection)
     }
 
-    /// What Clear closes in a space, in steps: first the faded tabs (unseen long enough to fade, not playing), keeping
-    /// today's; once none are faded, every tab but the one you're on; once that's the last, it too. `faded` says
-    /// which step it is, so the button can say so.
+    /// What Clear closes in a space, in steps, one click each: first the faded tabs (unseen long enough to fade, not
+    /// playing), keeping today's; once none are faded, every tab but the one you're on; once that's the last, it too,
+    /// leaving the space empty. `faded` says which step it is, so the button can say so.
     func tabsToClear(in spaceID: UUID, now: Date = Date()) -> (tabs: [Tab], faded: Bool) {
         let tabs = self.tabs(in: spaceID)
         let current = selectedTab(in: spaceID)
@@ -395,8 +395,9 @@ final class TabManager {
         let others = tabs.filter { $0 !== current && $0 !== partner }
         let faded = others.filter { now.timeIntervalSince($0.lastActivated) > Tokens.Fade.start && !$0.isPlayingAudio }
         if !faded.isEmpty { return (faded, true) }
-        // Never the tab you're on: with nothing else left, there's nothing to clear (⌘W closes that one).
-        return (others, false)
+        if !others.isEmpty { return (others, false) }
+        // Last, the tab you're on (and the page beside it in a split).
+        return ([current, partner].compactMap { $0 }.filter { tabs.contains($0) }, false)
     }
 
     /// Ends a drag that opened another space and was dropped there: it becomes the space you're in, its colors and
