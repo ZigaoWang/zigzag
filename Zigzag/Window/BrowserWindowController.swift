@@ -1156,7 +1156,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // the button. Sampled from a real parabola in time, so the speed comes from the arc itself.
         // High enough to read as a throw, never off the top of the page.
         // Started right at the page's top, it still rises a little, so the arc stays an arc.
-        let topY = min(min(start.y, end.y) - 24, max(card.minY + 40, min(start.y, end.y) - max(120, min(200, abs(end.x - start.x) * 0.25 + 80))))
+        let topY = min(min(start.y, end.y) - 40, max(card.minY + 40, min(start.y, end.y) - max(200, min(340, abs(end.x - start.x) * 0.4 + 140))))
         let drop = end.y - start.y, rise = start.y - topY
         // y(t) = a·t² + b·t + y0 through both ends, with its highest point at topY (y grows downward).
         let a = ((2 * drop + 4 * rise) + max(0, (2 * drop + 4 * rise) * (2 * drop + 4 * rise) - 4 * drop * drop).squareRoot()) / 2
@@ -1166,16 +1166,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         for i in 0...samples {
             let t = CGFloat(i) / CGFloat(samples)
             // Sideways it eases a little, so the throw leaves quickly and settles straight down into the button.
-            let side = 1 - pow(1 - t, 1.6)
+            let side = 1 - pow(1 - t, 1.25)
             points.append(NSValue(point: NSPoint(x: start.x + (end.x - start.x) * side, y: start.y + b * t + a * t * t)))
         }
-        // Quick enough to read as a toss rather than a show: the arc leaves fast and settles into the button, eased
-        // out (`Motion.flight`), the one movement allowed past `large` because it crosses the whole window.
+        // Slow and high, like Arc's: a lob you watch all the way down (`Motion.flight`), the one movement allowed past
+        // `large` because it crosses the whole window. The parabola is sampled evenly in time, so its own shape sets
+        // the speed: slowing as it rises, hanging at the top, quickening as it drops in.
         let duration = Tokens.Motion.flight * Tokens.Motion.debugSlowdown
         let move = CAKeyframeAnimation(keyPath: "position")
         move.values = points
         move.calculationMode = .linear
-        move.timingFunction = Tokens.Motion.easeOut
+        move.timingFunction = CAMediaTimingFunction(name: .linear)
         let scale = CAKeyframeAnimation(keyPath: "transform.scale")
         // Grows to its size as it leaves and shrinks into the button: no overshoot, no tilt.
         scale.values = [0.6, 1.0, 0.5]
