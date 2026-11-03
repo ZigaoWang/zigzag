@@ -12,6 +12,14 @@ struct CommandActionTests {
         CommandRanker.commands(for: query, context: context).map(\.title)
     }
 
+    @Test func onlyANamedCommandLeadsTheSearch() {
+        let feedback = CommandRanker.commands(for: "contact", context: Context()).first { $0.title == "Send Feedback…" }
+        #expect(feedback != nil)
+        #expect(!CommandRanker.isNamed(feedback!, by: ["contact"]))
+        let importing = CommandRanker.commands(for: "imp", context: Context()).first { $0.title.hasPrefix("Import") }
+        #expect(importing.map { CommandRanker.isNamed($0, by: ["imp"]) } == true)
+    }
+
     private var onATab: Context {
         var c = Context()
         c.hasPage = true

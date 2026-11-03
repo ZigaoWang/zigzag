@@ -185,6 +185,13 @@ enum CommandRanker {
         return list
     }
 
+    /// Whether every word you typed starts a word of the command's own name ("imp" for Import, "pin t" for Pin Tab),
+    /// rather than only one of its hidden keywords.
+    static func isNamed(_ action: Action, by words: [String]) -> Bool {
+        let titleWords = action.title.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        return !words.isEmpty && words.allSatisfy { word in titleWords.contains { $0.hasPrefix(word) } }
+    }
+
     /// The commands every word you typed starts a keyword of. The ones about this page and window (Pin Tab, Close
     /// Other Tabs) wait for three letters, so a site's first letter and Return never pins or closes anything.
     static func commands(for query: String, context: Context) -> [Action] {
@@ -259,15 +266,20 @@ enum CommandRanker {
         let words = query.lowercased().split(separator: " ").map(String.init)
         let engine = Library.shared.searchEngine
 
-        // Zigzag's own commands, when the words fit one. They come first: typing "import" means the command.
-        if !historyOnly {
-            for action in commands(for: query, context: context(for: manager)) {
+        // Zigzag's own commands, when the words fit one. One you've named ("import", "pin tab") comes first: typing
+        // its name means the command. One the words only touch through a keyword ("contact" for Send Feedback) waits
+        // after the search, so Return still searches for what you typed.
+        let matched = historyOnly ? [] : commands(for: query, context: context(for: manager))
+        let named = matched.filter { Self.isNamed($0, by: words) }
+        func addActions(_ list: [Action]) {
+            for action in list {
                 // Split View says which page it puts beside this one.
                 let partner = action.id == "split" ? manager.selectedTab.flatMap { splitPartner(for: $0, in: manager) } : nil
                 add(CommandResult(kind: .action(action.id), title: action.title, detail: partner.map { "with \($0.displayTitle)" } ?? "",
                                   symbol: action.symbol), key: "action:\(action.id)")
             }
         }
+        addActions(named)
 
         if !historyOnly {
             if let url = url(from: query) {
@@ -277,6 +289,7 @@ enum CommandRanker {
                 add(CommandResult(kind: .search(query), title: query, detail: engine.name, symbol: "magnifyingglass"), key: "search:\(query)")
             }
         }
+        addActions(matched.filter { !Self.isNamed($0, by: words) })
 
         if !historyOnly {
             var tabCount = 0
