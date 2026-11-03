@@ -253,7 +253,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let snapshot = sidebar.listSnapshot()
         lastSpaceID = tabManager.currentSpaceID
         sidebar.currentSpaceID = tabManager.currentSpaceID
-        applySpaceColor(animated: true)
+        // No window-wide cross-fade on a switch: the list is already sliding in with its new colors, and a fade
+        // through a picture of the window would freeze that slide and ghost the traffic lights.
+        applySpaceColor(animated: true, crossFadesMode: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
         desk.spaceChanged()
@@ -438,19 +440,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isKeyWindow == true { handoff?.becomeCurrent() }
     }
 
-    private func applySpaceColor(animated: Bool) {
+    private func applySpaceColor(animated: Bool, crossFadesMode: Bool = true) {
         lastSpaceID = tabManager.currentSpaceID
-        render(tabManager.currentSpace, animated: animated)
+        render(tabManager.currentSpace, animated: animated, crossFadesMode: crossFadesMode)
     }
 
     /// Draws the window for a space: its mode, color, gradient, how see-through it is, and grain.
-    private func render(_ space: SpaceInfo, animated: Bool) {
+    private func render(_ space: SpaceInfo, animated: Bool, crossFadesMode: Bool = true) {
         if !tabManager.isPrivate {
             let mode = space.readableAppearance
             let name: NSAppearance.Name? = mode == "light" ? .aqua : mode == "dark" ? .darkAqua : nil
             if window?.appearance?.name != name {
                 // Light to dark and back cross-fades with the color, rather than snapping.
-                if animated, !Tokens.Motion.reduceMotion, let frameLayer = window?.contentView?.superview?.layer {
+                if animated, crossFadesMode, !Tokens.Motion.reduceMotion, let frameLayer = window?.contentView?.superview?.layer {
                     let fade = CATransition()
                     fade.type = .fade
                     fade.duration = Tokens.Motion.standard
