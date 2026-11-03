@@ -301,7 +301,14 @@ final class DownloadsPanelView: FloatingPanelView {
     private func showMoreMenu() {
         let folder = DownloadManager.folder
         let asks = DownloadManager.asksWhereToSave
+        let all = DownloadManager.shared.items(isPrivate: isPrivate)
+        let clearable = all.contains { ![.downloading, .paused].contains($0.state) }
         MenuPanel.show([
+            // Clear lives here rather than beside the title, so the title always has its room.
+            .item(.init(title: "Clear Finished Downloads", isEnabled: clearable) { [weak self] in
+                DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false)
+            }),
+            .separator,
             .header("Save Downloads To"),
             .item(.init(title: FileManager.default.displayName(atPath: folder.path), isChecked: !asks) { DownloadPlace.pick(0) }),
             .item(.init(title: "Ask Each Time", isChecked: asks) { DownloadPlace.pick(1) }),
@@ -415,7 +422,7 @@ final class DownloadsPanelView: FloatingPanelView {
             row.configure(item)
         }
         clearButton.isEnabled = all.contains { ![.downloading, .paused].contains($0.state) }
-        clearButton.isHidden = items.isEmpty
+        clearButton.isHidden = true
         emptyNote.isHidden = !items.isEmpty
         emptyIcon.isHidden = true
         reposition()
