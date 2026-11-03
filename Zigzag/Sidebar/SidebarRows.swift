@@ -646,7 +646,7 @@ final class SpaceHeaderView: InteractiveView {
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.Symbol.inline) }
+            iconView.image = icon.map { IconChoice.image($0, size: Self.iconSide - 2) }
             iconView.isHidden = icon == nil
             needsLayout = true
         }
@@ -675,27 +675,30 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        // In the rows' text column, its icon (if any) in their icon column.
-        // Large, it stands flush with the icons' edge, the way a heading does; with an icon of its own, beside it.
-        // At 26pt the first letter's own side bearing sets its ink a point in: pulled back so the ink, not the box,
-        // meets the icons' edge.
-        let x = icon == nil ? SidebarRowView.inset - Label.inset - Tokens.Sidebar.spaceNameBearing : SidebarRowView.textX - Label.inset
+        // Large, the name stands flush with the icons' edge, the way a heading does. At 26pt the first letter's own
+        // side bearing sets its ink a point in: pulled back so the ink, not the box, meets the icons' edge.
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
         let y = isFlipped ? bounds.height - h - pad : pad
-        let mid = y + h / 2
-        if icon != nil {
-            let side = Tokens.Sidebar.favicon
-            iconView.frame = NSRect(x: SidebarRowView.inset, y: mid - side / 2, width: side, height: side)
-        }
-        label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
-        // Centered on the lowercase letters' middle (the x-height), not the text box, so it sits level with "personal".
+        // Icons and the chevron center on the lowercase letters' middle (the x-height), not the text box, so they sit
+        // level with the name.
         let font = Tokens.Font.spaceName()
         let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
         let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
+        var x = SidebarRowView.inset - Label.inset - Tokens.Sidebar.spaceNameBearing
+        if icon != nil {
+            // The space's icon leads the name at the name's own scale, as one mark, not a row icon beside a heading.
+            let side = Self.iconSide
+            iconView.frame = NSRect(x: SidebarRowView.inset, y: xMiddle - side / 2, width: side, height: side)
+            x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset
+        }
+        label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         let side = Tokens.Space.x4
         chevron.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: xMiddle - side / 2, width: side, height: side)
     }
+
+    /// The icon before a space's name: about the name's x-height and a little more, so the two read as one.
+    static let iconSide: CGFloat = 20
 
     /// Whether a click lands on the chevron (or just past the name, where it shows), rather than on the name.
     func isOnChevron(_ event: NSEvent) -> Bool {
@@ -706,7 +709,8 @@ final class SpaceHeaderView: InteractiveView {
         // The name in light type and the space's own ink, quietly fuller under the pointer; its icon a step back.
         let ink = Brand.Theme.for(self).ink
         label.attributedStringValue = Tokens.Font.voiceText(label.stringValue, color: isHovered ? ink : ink.withAlphaComponent(0.86))
-        iconView.contentTintColor = Tokens.Color.textSecondary
+        // A symbol takes the name's own ink; an emoji keeps its colors.
+        iconView.contentTintColor = ink.withAlphaComponent(0.86)
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
