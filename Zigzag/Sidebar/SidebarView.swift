@@ -223,11 +223,11 @@ final class SpaceDotView: InteractiveView {
         settlesFromSwipe = false
         // A quiet dot per space; the one you're in stretches into a short pill in full ink. No boxes, no numbers:
         // the dot's tooltip names the space and its ⌃ key.
-        // A space with an icon shows the icon, small, in place of its dot; the one you're in gets a short bar under it.
+        // A space with an icon shows the icon, small, in place of its dot; the one you're in is simply the brightest.
         _ = side
         let iconSide: CGFloat = 14
         let dotSide: CGFloat = icon == nil ? 6 : 2
-        let width = icon == nil ? dotSide + 10 * share : 10 * share
+        let width = icon == nil ? dotSide + 10 * share : 0
         let dotY = icon == nil ? bounds.midY - dotSide / 2
             : (isFlipped ? bounds.midY + iconSide / 2 + 3 : bounds.midY - iconSide / 2 - 3 - dotSide)
         let key = CGRect(x: bounds.midX - width / 2, y: dotY, width: width, height: dotSide)
