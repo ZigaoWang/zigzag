@@ -566,10 +566,11 @@ private final class SourceRow: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isChosen ? Tokens.Color.fieldFill : isHovered ? Tokens.Color.hoverFill : nil
+        // The chosen browser on a soft wash of the accent, as the address bar marks its choice; no outline.
+        let accent = Brand.Theme.for(self).accent
+        let fill: NSColor? = isChosen ? accent.withAlphaComponent(isHovered ? 0.22 : 0.16) : isHovered ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated)
-        layer?.borderWidth = isChosen ? 1 : 0
-        layer?.borderColor = cgColor(Brand.Theme.brand.accent.withAlphaComponent(0.55))
+        layer?.borderWidth = 0
     }
 }
 
