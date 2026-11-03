@@ -5,7 +5,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-11-01
+## [0.5.0] - 2026-11-03
 
 ### New
 - A new look across Zigzag: each space fills the window with its own soft color, the tab you're on is a card that slides as you switch, and rows, favorites and panels move calmly into place.
@@ -320,7 +320,9 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ZigaoWang/zigzag/compare/v0.3.1...v0.5.0
+[0.3.1]: https://github.com/ZigaoWang/zigzag/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ZigaoWang/zigzag/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ZigaoWang/zigzag/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ZigaoWang/zigzag/compare/v0.1.12...v0.2.0
