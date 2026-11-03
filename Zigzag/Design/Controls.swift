@@ -852,10 +852,10 @@ final class ChoicePill: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
+        // A check and a word, nothing behind them until the pointer comes: the choice reads from the check alone.
         let tint = tint ?? Brand.Theme.for(self).accent
-        let fill = isOn ? tint.withAlphaComponent(isPressed ? 0.26 : isHovered ? 0.2 : 0.14)
-            : (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : Tokens.Color.fieldFill)
-        layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
+        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.hoverFill : nil
+        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         label.textColor = isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.Symbol.inline)
         check.contentTintColor = isOn ? tint : Tokens.Color.textTertiary

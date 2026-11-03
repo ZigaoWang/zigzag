@@ -56,6 +56,8 @@ final class ImportView: NSView {
             title.stringValue = ""
             subtitle.stringValue = ""
             banner.title = "Bring your stuff over"
+            // Words only: the ribbon stays the app's icon, not a decoration on a form.
+            banner.ribbonMark.isHidden = true
             banner.subtitle = "Passwords, bookmarks and history, from any browser on this Mac."
             addSubview(banner)
         }
