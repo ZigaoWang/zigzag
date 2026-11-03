@@ -611,8 +611,10 @@ final class PrimaryButton: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : nil)
-        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : nil))
+        // The space's own accent unless told otherwise, as `PillButton(.prominent)`.
+        let theme = Brand.Theme.for(self)
+        let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
+        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : theme.onAccent))
     }
 }
 
@@ -819,7 +821,7 @@ final class ChoicePill: InteractiveView {
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
 
     init(title: String) {
-        label = Label(title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+        label = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
         super.init(frame: .zero)
         layer?.cornerRadius = Tokens.Radius.field
         layer?.cornerCurve = .continuous

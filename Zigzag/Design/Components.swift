@@ -323,7 +323,8 @@ final class PillButton: InteractiveView {
             ink = applyButtonLook(.primary, tint: customFill, ink: customInk ?? Tokens.Color.textPrimary)
         case .prominent:
             ink = isDestructive ? applyButtonLook(.primary, tint: Tokens.Color.destructive, ink: .white)
-                : applyButtonLook(.primary, tint: tint, ink: tint.map { _ in .white })
+                // The space's own accent, as a switch that's on: one color for "this is the thing to do".
+                : applyButtonLook(.primary, tint: tint ?? Brand.Theme.for(self).accent, ink: tint.map { _ in .white } ?? Brand.Theme.for(self).onAccent)
         case .plain: ink = applyButtonLook(.secondary)
         case .quiet: ink = applyButtonLook(.quiet)
         }
