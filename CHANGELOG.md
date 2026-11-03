@@ -5,6 +5,18 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-04
+
+### Changed
+- Clicking the address edits it in place, at the field's own size, with suggestions the size of your tabs below it.
+- Clear goes in steps, one click each: old tabs first, then every other tab, then the one you're on.
+- The new tab bar is centered on the window again.
+
+### Fixed
+- Switching spaces no longer flickers the colors or the window's buttons.
+- Typing a word that only relates to a command, like "contact", searches for it instead of running the command.
+- A space's icon lines up with its name and with the icons below it, and space icons at the bottom of the sidebar are evenly spaced.
+
 ## [0.5.1] - 2026-11-03
 
 ### Fixed
@@ -334,7 +346,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/ZigaoWang/zigzag/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ZigaoWang/zigzag/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ZigaoWang/zigzag/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/ZigaoWang/zigzag/compare/v0.3.0...v0.3.1
