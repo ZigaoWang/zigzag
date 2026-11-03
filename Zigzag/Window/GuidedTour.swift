@@ -111,8 +111,8 @@ final class GuidedTour: NSView {
     private func applyColors() {
         let accent = Brand.Theme.for(self).accent
         dim.fillColor = cgColor(Tokens.Color.scrim)
-        // What to click next is the live thing on screen: the one warm color rings it.
-        ring.strokeColor = cgColor(Tokens.Color.live)
+        // What to click next is ringed in the space's own accent.
+        ring.strokeColor = cgColor(accent)
         check.contentTintColor = accent
     }
 

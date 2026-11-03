@@ -28,8 +28,8 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 - **Line drawings** (`LineGlyph`): where a stock symbol says too little, Zigzag draws its own on a 16pt square with
   one 1.1pt stroke, round caps and joins, 1.5pt margins: the sidebar toggle, the plus for new tab and new space,
   downloads (its circle shares the stroke, so the progress ring lies on it). Every other symbol is SF's light weight.
-- **One warm accent on what's live** (`Color.live`, a matte persimmon): the knob of a switch that's on, the tick under
-  the space you're in. Never on anything at rest, never a fill.
+- **No extra accent color.** What's on or chosen takes the space's own accent (`Brand.Theme.accent`); there is no
+  separate warm or orange accent anywhere.
 - **Small details that work:** the space keys' numbers set in tabular figures like a dial's markings; the tick under
   the current key; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
   hairline under the toolbar only while the list is scrolled under it.
@@ -306,8 +306,8 @@ something came from, answers at once, and can be interrupted.
   - Quiet (`.quiet`): no fill until the pointer is over it.
   `PrimaryButton` and `TextButton` draw the same looks for the forms that still use them; new code uses `PillButton`.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
-  around it) and a small round 14pt knob. Off, the knob is porcelain on the left; on, it slides right and turns the
-  one warm color (`Color.live`). The track never lights up: what's on is the knob, so on and off differ by place
+  around it) and a small round 14pt knob. Off, the knob is porcelain on the left; on, it slides right and takes the
+  space's accent. The track never lights up: what's on is the knob, so on and off differ by place
   and by color. The knob settles in 200ms on a critically damped spring and stretches
   4pt while held; the track's color fades over the same time. Reduce Motion: the knob jumps, the color fades.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
@@ -373,7 +373,7 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
 - **Actions are a row of thin line glyphs with small labels under them**, set on a grid like the markings on a TE
   device (share, copy link, screenshot), not three big rounded buttons.
 - **Settings for the site are plain rows** with the slide switch at the end, separated by space, not by a card.
-- **One warm thing:** only what's live (a switch that's on, a download in progress) gets the warm accent.
+- **One accent:** only what's on or chosen (a switch that's on, the main button) takes the space's accent.
 - **Empty states are one quiet line**, never a big icon and sentence ("Nothing downloaded yet").
 - **The address bar over the page** is the same sheet: the address in large light type, suggestions as plain rows
   below, the chosen row a soft wash, no dark slab.

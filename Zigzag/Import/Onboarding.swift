@@ -308,8 +308,8 @@ private final class StepPage: NSView {
         for (i, dot) in dots.enumerated() {
             let w: CGFloat = i == index ? 22 : 6
             dot.frame = NSRect(x: dx, y: dotY, width: w, height: 6)
-            // The step you're on is the live one, in the warm color, like the tick under the space you're in.
-            dot.color = i == index ? Tokens.Color.live : Brand.ribbon
+            // The step you're on is a short pill, as the sidebar marks the space you're in; all in the ribbon's color.
+            dot.color = Brand.ribbon
             dot.alphaValue = i == index ? 1 : i < index ? 0.55 : 0.28
             dx += w + 6
         }
@@ -440,9 +440,8 @@ private enum Onboard {
     static func mark(chosen: PrimaryButton, other: PrimaryButton) {
         chosen.customFill = Brand.ribbon.withAlphaComponent(0.2)
         chosen.customInk = Brand.ribbon
-        // The answer you're on is live: the one warm color rings it.
-        chosen.layer?.borderWidth = Tokens.Metric.fieldRing
-        chosen.layer?.borderColor = Tokens.Color.live.cgColor
+        // The answer you're on is the fuller of the two; no ring.
+        chosen.layer?.borderWidth = 0
         other.customFill = Brand.ribbon.withAlphaComponent(0.07)
         other.customInk = Brand.ribbon.withAlphaComponent(0.7)
         other.layer?.borderWidth = 0

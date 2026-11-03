@@ -194,7 +194,7 @@ final class SpaceDotView: InteractiveView {
     }
 
     /// Each space is a small key with its number, set in tabular figures like a dial marking. The space you're in
-    /// is pressed in: a lighter, lit face of the frame's color with a short warm tick under its number (`Color.live`);
+    /// is pressed in: a lighter, lit face of the frame's color;
     /// the others are quiet keys, their numbers faint. A space with an icon shows the icon in place of its number.
     var number = 0 { didSet { if oldValue != number { numberLayer.string = "\(number)"; stateDidChange(animated: false) } } }
     private lazy var numberLayer: CATextLayer = {

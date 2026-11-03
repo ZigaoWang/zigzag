@@ -831,9 +831,6 @@ enum Tokens {
         /// Passwords, Import, About, the welcome) take the brand's, `Brand.Theme.brand`. This is the front browser
         /// window's; a view that can show in either kind of window asks `Brand.Theme.for(self)` instead.
         @MainActor static var accent: NSColor { Brand.Theme.current.accent }
-        /// The one warm mark on what's live: an on switch's knob, the tick under the space you're in. A matte
-        /// persimmon that sits well on every space's color and never on anything at rest.
-        static let live = dynamic(light: hex(0xE2683C), dark: hex(0xF07A4E))
         /// Counts on extension buttons: quiet, never competing with the page.
         static let badge = dynamic(light: hex(0x6E6E73), dark: hex(0x8E8E93))
 
@@ -903,7 +900,7 @@ enum Tokens {
 
     /// `Toggle`, a slide switch: a recessed matte track (`Metric.toggleSize`, 34 by 20) with a hairline edge and shade
     /// under its upper lip, and a small round knob (`Metric.toggleKnob`, 14) that is porcelain when off and the one
-    /// warm color (`Color.live`) when on. The track never lights up; on and off differ by the knob's place and color.
+    /// space's accent when on. The track never lights up; on and off differ by the knob's place and color.
     enum Switch {
         private static func ink(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
         static let track = Color.dynamic(light: ink(0.075), dark: ink(0.32))
