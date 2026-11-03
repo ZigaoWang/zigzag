@@ -157,7 +157,7 @@ final class SpaceDotView: InteractiveView {
     var icon: String? {
         didSet {
             guard icon != oldValue else { return }
-            iconView.image = icon.map { IconChoice.image($0, size: Tokens.Sidebar.glyph) }
+            iconView.image = icon.map { IconChoice.image($0, size: 12) }
             stateDidChange(animated: false)
         }
     }
@@ -223,10 +223,14 @@ final class SpaceDotView: InteractiveView {
         settlesFromSwipe = false
         // A quiet dot per space; the one you're in stretches into a short pill in full ink. No boxes, no numbers:
         // the dot's tooltip names the space and its ⌃ key.
+        // A space with an icon shows the icon, small, in place of its dot; the one you're in gets a short bar under it.
         _ = side
-        let dotSide: CGFloat = 6
-        let width = dotSide + 10 * share
-        let key = CGRect(x: bounds.midX - width / 2, y: bounds.midY - dotSide / 2, width: width, height: dotSide)
+        let iconSide: CGFloat = 14
+        let dotSide: CGFloat = icon == nil ? 6 : 2
+        let width = icon == nil ? dotSide + 10 * share : 10 * share
+        let dotY = icon == nil ? bounds.midY - dotSide / 2
+            : (isFlipped ? bounds.midY + iconSide / 2 + 3 : bounds.midY - iconSide / 2 - 3 - dotSide)
+        let key = CGRect(x: bounds.midX - width / 2, y: dotY, width: width, height: dotSide)
         let dotFill = ink.withAlphaComponent((isPressed ? 0.6 : 1) * (resting * 0.8 + (0.86 - resting * 0.8) * share))
         let apply = {
             self.dot.frame = key
@@ -241,7 +245,7 @@ final class SpaceDotView: InteractiveView {
         if tick.superlayer == nil { layer?.addSublayer(tick) }
         numberLayer.isHidden = true
         numberLayer.contentsScale = window?.backingScaleFactor ?? 2
-        iconView.frame = bounds
+        iconView.frame = NSRect(x: bounds.midX - iconSide / 2, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
         iconView.isHidden = icon == nil
         iconView.contentTintColor = tint
         // An emoji keeps its colors, so it says which space is yours by how strongly it shows.
