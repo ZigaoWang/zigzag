@@ -999,6 +999,10 @@ extension Tab {
             if settingsView != nil {
                 settingsView = nil
                 changed.send(.settings)
+                // Leaving Settings for a page: the gear goes with it, and the page's own icon comes in.
+                favicon = url.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
+                changed.send(.favicon)
+                if favicon == nil { refreshFavicon() }
             }
             return
         }
