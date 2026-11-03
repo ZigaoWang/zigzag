@@ -119,6 +119,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private var typedBeforeScope = ""
     /// The site's own color, a capsule in front of the field.
     private let chip = ColorView(color: .clear)
+    /// The hairline between the site's name and what you type.
+    private let chipRule = ColorView(color: Tokens.Color.separator)
     private let chipLabel = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     /// "Search YouTube  Tab", at the right of the field, when what you've typed names a site.
     private let hint = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
@@ -160,7 +162,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         hint.alignment = .right
         hint.isHidden = true
         hintKey.isHidden = true
-        [chip, hint, hintKey].forEach { panel.addSubview($0) }
+        [chip, chipRule, hint, hintKey].forEach { panel.addSubview($0) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         scrim.onClick = { [weak self] in self?.dismiss() }
     }
@@ -319,8 +321,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let width = min(Tokens.Metric.commandBarWidth, card.width - margin * 2)
         let height = Tokens.Metric.commandBarFieldHeight + listHeight
         let top = panelTop(in: card)
-        // Centered on the whole window, not just the page beside the sidebar, but never tight against either edge.
-        let x = min(max(card.minX + margin, floor(controller.root.bounds.midX - width / 2)), card.maxX - width - margin)
+        // Centered over the page it opens in, like everything else on it (the empty page's mark), never tight against
+        // either edge.
+        let x = min(max(card.minX + margin, floor(card.midX - width / 2)), card.maxX - width - margin)
         return NSRect(x: x, y: top, width: width, height: height)
     }
 
@@ -364,16 +367,24 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // label's 12pt, its own inset, less the gap the field's editor adds.
         var fieldX = isAnchored ? Tokens.Space.x3 + Label.inset + 3 : inset + CommandRowView.titleX
         if scope != nil {
-            // In the sidebar's address it's sized to the sidebar's text, not the big bar's.
-            chipLabel.font = isAnchored ? Tokens.Font.small(.medium) : Tokens.Font.body(.medium)
-            let ch = isAnchored ? Tokens.Metric.chipHeightSmall : Tokens.Metric.chipHeight
-            let cw = chipLabel.inkWidth + (isAnchored ? Tokens.Space.x2 : Tokens.Space.x3) * 2
-            chip.frame = NSRect(x: fieldX - (isAnchored ? 0 : Tokens.Space.x1), y: round((fieldHeight - ch) / 2), width: cw, height: ch)
-            chip.layer?.cornerRadius = ch / 2
+            // The site's name in the field's own type, so it reads as the start of the line, then a hairline.
+            let font = field.font ?? Tokens.Font.voice(22)
+            chipLabel.font = font
+            chipLabel.attributedStringValue = NSAttributedString(string: chipLabel.stringValue, attributes: [
+                .font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: chipLabel.textColor ?? Tokens.Color.textPrimary,
+            ])
+            let ch = textHeight
+            let cw = ceil(chipLabel.inkWidth) + Label.inset * 2
+            chip.frame = NSRect(x: fieldX - Label.inset, y: round((fieldHeight - ch) / 2), width: cw, height: ch)
+            chip.layer?.cornerRadius = 0
             chipLabel.frame = NSRect(x: 0, y: (ch - chipLabel.lineHeight) / 2, width: cw, height: chipLabel.lineHeight)
-            chipLabel.alignment = .center
-            fieldX = chip.frame.maxX + Tokens.Space.x2
+            chipLabel.alignment = .left
+            let ruleHeight = round(font.pointSize * 0.9)
+            chipRule.frame = NSRect(x: chip.frame.maxX + Tokens.Space.x2, y: round((fieldHeight - ruleHeight) / 2),
+                                    width: Tokens.Metric.hairline, height: ruleHeight)
+            fieldX = chipRule.frame.maxX + Tokens.Space.x2 + 2
         }
+        chipRule.isHidden = scope == nil
         var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : Tokens.Space.x4)
         if !hint.isHidden {
             let kw = hintKey.width, kh = Tokens.Metric.keyCapHeight
@@ -525,12 +536,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let before = field.frame
         scope = site
         if leaving { fadeOutChip() } else { chip.isHidden = site == nil }
-        // The site's name on a soft wash of the space's accent, in the space's ink: one family with the rest of the
-        // bar, never a brand's loud capsule.
+        // The site's name in the space's accent, then a hairline, as a page heads itself ("zigzag | history"):
+        // no capsule, no brand color.
         let theme = Brand.Theme.for(panel)
-        chip.color = theme.accent.withAlphaComponent(0.2)
+        chip.color = .clear
         chip.layer?.borderWidth = 0
-        chipLabel.textColor = theme.rowInk
+        chipLabel.textColor = theme.accent
         chipLabel.stringValue = site?.name ?? ""
         completion = nil
         if site != nil {
