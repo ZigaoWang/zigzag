@@ -195,7 +195,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// The app's own icon when it's an app that would open, else the request's symbol on a soft circle.
     private let picture = NSImageView()
     private let badge = ColorView(color: .clear)
-    private let request = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+    private let request = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let closeButton = IconButton(symbol: "xmark", toolTip: "Not Now")
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
@@ -283,10 +283,13 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.image = icon
                 prompt.badge.isHidden = true
             } else {
-                prompt.picture.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.heading)
+                // A thin line drawing of what's asked for, in the text's own ink, with nothing behind it: the same
+                // glyphs as the rest of the app, not a filled badge.
+                let line = symbol.replacingOccurrences(of: ".fill", with: "")
+                prompt.picture.image = Tokens.Symbol.image(line, size: Tokens.TypeSize.heading)
                 prompt.picture.imageScaling = .scaleNone
-                prompt.picture.contentTintColor = accent
-                prompt.badge.color = accent.withAlphaComponent(0.16)
+                prompt.picture.contentTintColor = Tokens.Color.textPrimary
+                prompt.badge.color = .clear
             }
             let deny = PillButton(title: denyTitle, style: .plain)
             deny.onClick = { [weak prompt] _ in prompt?.finish(.deny) }
