@@ -1073,7 +1073,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         var y: CGFloat = Tokens.Space.x3
 
         // A section: a quiet label low in its slot, standing in for a divider, then the group. A button that acts on the
-        // whole group (New Space, Reset All) sits at the label's right, at the group's edge.
+        // whole group (New Space, Reset All) sits at the label's right, lined up with the rows' own controls.
         func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
             if title != nil || accessory != nil {
                 let size = accessory.map { $0.fittingSize } ?? .zero
@@ -1084,7 +1084,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                      width: max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad), height: label.lineHeight)
                 documentView.addSubview(label)
                 if let accessory {
-                    accessory.frame = NSRect(x: pad + contentWidth - size.width, y: round(label.frame.midY - size.height / 2),
+                    accessory.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - size.width, y: round(label.frame.midY - size.height / 2),
                                              width: size.width, height: size.height)
                     documentView.addSubview(accessory)
                 }
