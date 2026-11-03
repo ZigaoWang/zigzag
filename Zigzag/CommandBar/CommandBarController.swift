@@ -335,9 +335,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let width = min(Tokens.Metric.commandBarWidth, card.width - margin * 2)
         let height = Tokens.Metric.commandBarFieldHeight + listHeight
         let top = panelTop(in: card)
-        // Centered over the page it opens in, like everything else on it (the empty page's mark), never tight against
-        // either edge.
-        let x = min(max(card.minX + margin, floor(card.midX - width / 2)), card.maxX - width - margin)
+        // Centered on the whole window, not just the page beside the sidebar, but never tight against either edge.
+        let x = min(max(card.minX + margin, floor(controller.root.bounds.midX - width / 2)), card.maxX - width - margin)
         return NSRect(x: x, y: top, width: width, height: height)
     }
 
