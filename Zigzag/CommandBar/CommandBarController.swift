@@ -322,7 +322,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let bounds = controller.root.bounds
             let font = field.font ?? Tokens.Font.sidebarRow()
             let textWidth = ceil((field.stringValue as NSString).size(withAttributes: [.font: font]).width)
-            let needed = textWidth + Tokens.Space.x3 * 2 + Tokens.Space.x4
+            // The same 12pt on both sides of the text as the resting field, and a hair for the caret.
+            let needed = textWidth + Tokens.Space.x3 * 2 - 1
             let wanted = results.isEmpty ? needed : max(needed, Tokens.Metric.commandBarWidth * 0.7)
             let wide = min(max(wanted, address.width), Tokens.Metric.commandBarWidth, bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
             let x = max(Tokens.Space.x2, min(address.minX, bounds.maxX - Tokens.Space.x4 - wide))
@@ -381,9 +382,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // Anchored there's no icon: the text starts exactly where the address's own text was.
         fieldIcon.isHidden = isAnchored
         let textHeight = ceil(field.intrinsicContentSize.height)
-        // Anchored, the text starts exactly where the resting address's does, so nothing moves as you click in: the
-        // label's 12pt, its own inset, less the gap the field's editor adds.
-        var fieldX = isAnchored ? Tokens.Space.x3 + Label.inset + 3 : inset + CommandRowView.titleX
+        // Anchored, the text's first letter lands exactly where the resting address's does (12pt in), so nothing moves
+        // as you click in; the field's own text inset and its editor's padding make up the rest.
+        var fieldX = isAnchored ? Tokens.Space.x3 - 4 : inset + CommandRowView.titleX
         if scope != nil {
             // The site's name in the field's own type, so it reads as the start of the line, then a hairline.
             let font = field.font ?? Tokens.Font.voice(22)
