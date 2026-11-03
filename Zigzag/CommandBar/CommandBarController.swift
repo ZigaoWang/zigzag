@@ -7,6 +7,15 @@ final class CommandRowView: InteractiveView {
     private let symbolView = NSImageView()
     private let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let detail = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    /// The sidebar's row size, for suggestions under the sidebar's address.
+    var isCompact = false {
+        didSet {
+            guard oldValue != isCompact else { return }
+            title.font = isCompact ? Tokens.Font.sidebarRow() : Tokens.Font.row()
+            detail.font = isCompact ? Tokens.Font.small() : Tokens.Font.body()
+            needsLayout = true
+        }
+    }
     private let action = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let returnKey = KeyCap(symbol: "return")
 
@@ -284,7 +293,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private var listHeight: CGFloat {
         guard !results.isEmpty else { return 0 }
-        return CGFloat(results.count) * Tokens.Metric.commandBarRowHeight + Self.listInset * 2
+        return CGFloat(results.count) * rowHeight + Self.listInset * 2
     }
 
     /// Editing the address you're on opens right where it is: over the address field in the sidebar, reaching
@@ -308,12 +317,16 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             // From the address's own corner, wide enough for the whole address at once, reaching over the page;
             // suggestions continue below in the same panel. Never past the window's right edge: a pane's address
             // on the right opens toward the left.
+            // The address field itself, opened in place: its own height and corners, as wide as it is unless the
+            // address needs more room (then only as wide as the address), suggestions below once you type.
             let bounds = controller.root.bounds
-            let wide = min(max(Tokens.Metric.commandBarWidth * 0.85, address.width), bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
+            let font = field.font ?? Tokens.Font.sidebarRow()
+            let textWidth = ceil((field.stringValue as NSString).size(withAttributes: [.font: font]).width)
+            let needed = textWidth + Tokens.Space.x3 * 2 + Tokens.Space.x4
+            let wanted = results.isEmpty ? needed : max(needed, Tokens.Metric.commandBarWidth * 0.7)
+            let wide = min(max(wanted, address.width), Tokens.Metric.commandBarWidth, bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
             let x = max(Tokens.Space.x2, min(address.minX, bounds.maxX - Tokens.Space.x4 - wide))
-            // Taller than the address, it grows evenly above and below it, so the text stays on the address's line.
-            let top = max(Tokens.Space.x1, address.minY - floor((fieldHeight - address.height) / 2))
-            return NSRect(x: x, y: top, width: wide, height: fieldHeight + listHeight)
+            return NSRect(x: x, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
         let card = controller.root.cardFrame
         // Room to breathe on both sides of the page, however narrow the window.
@@ -342,18 +355,23 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             bottom = card.maxY
         }
         let room = bottom - Tokens.Space.x4 - top - fieldHeight - Self.listInset * 2
-        return max(1, min(Tokens.Metric.commandBarMaxRows, Int(room / Tokens.Metric.commandBarRowHeight)))
+        return max(1, min(Tokens.Metric.commandBarMaxRows, Int(room / rowHeight)))
     }
 
-    /// Opened from the address it keeps the sidebar's text size, but the line you type on is as tall as a suggestion
-    /// and a little more, so it never looks squeezed above them.
-    private var fieldHeight: CGFloat { isAnchored ? Tokens.Metric.commandBarRowHeight + Tokens.Space.x2 : Tokens.Metric.commandBarFieldHeight }
+    /// Opened from the address it's the address field's own height, so clicking in changes nothing but the width.
+    private var fieldHeight: CGFloat { isAnchored ? Tokens.Sidebar.addressHeight : Tokens.Metric.commandBarFieldHeight }
+
+    /// Hanging from the sidebar's address, the suggestions are the sidebar's own rows in size; over the page, the
+    /// larger rows of the new tab bar.
+    private var rowHeight: CGFloat { isAnchored ? Tokens.Sidebar.rowHeight : Tokens.Metric.commandBarRowHeight }
 
     /// Rows sit this far in from the panel's edges, so their corners run with the panel's.
     private static let listInset = Tokens.Space.x1
 
     private func layoutPanel() {
         let b = panel.bounds
+        // Over the address with nothing below it, it keeps the field's corners; with suggestions, the panel's.
+        panel.radius = isAnchored && results.isEmpty ? Tokens.Sidebar.addressRadius : Tokens.Radius.panel
         let fieldHeight = self.fieldHeight
         let inset = Self.listInset
         // The glass lines up with the rows under it: its middle over their icons, the text where their titles start.
@@ -402,8 +420,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         divider.isHidden = true
         var y = fieldHeight + inset
         for row in rows {
-            row.frame = NSRect(x: inset, y: y, width: b.width - inset * 2, height: Tokens.Metric.commandBarRowHeight)
-            y += Tokens.Metric.commandBarRowHeight
+            row.frame = NSRect(x: inset, y: y, width: b.width - inset * 2, height: rowHeight)
+            y += rowHeight
         }
     }
 
@@ -471,7 +489,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             panel.addSubview(row)
         }
         while rows.count > results.count { rows.removeLast().removeFromSuperview() }
-        for (row, result) in zip(rows, results) { row.configure(result) }
+        for (row, result) in zip(rows, results) { row.isCompact = isAnchored; row.configure(result) }
         selectedIndex = min(selectedIndex, max(0, results.count - 1))
         if !results.isEmpty { selectedIndex = 0 }
         updateSelection()
