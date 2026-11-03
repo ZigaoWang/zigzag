@@ -170,7 +170,16 @@ if [[ "${1:-}" == "--publish" ]]; then
     echo "The beta feed is left as it is: it couldn't be read to check its betas against $VERSION."
   fi
   # The website's changelog page, with this version on top.
-  zsh site/deploy.sh
+  # deploy.sh holds the server's details, so it's kept out of git: a clean checkout (a release worktree) uses the one
+  # in the main checkout, with this checkout's site files.
+  DEPLOY=site/deploy.sh
+  [[ -f "$DEPLOY" ]] || DEPLOY="$(git rev-parse --path-format=absolute --git-common-dir)/../site/deploy.sh"
+  if [[ -f "$DEPLOY" ]]; then
+    [[ "$DEPLOY" == site/deploy.sh ]] || cp "$DEPLOY" site/deploy.sh
+    zsh site/deploy.sh
+  else
+    echo "No site/deploy.sh found: the website wasn't updated."
+  fi
   # The Homebrew cask, in a checkout of ZigaoWang/homebrew-tap beside this repository. It points at the DMG on
   # GitHub Releases, so push the tap only after `gh release create`.
   TAP="${ZIGZAG_TAP:-../homebrew-tap}"
