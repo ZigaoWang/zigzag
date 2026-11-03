@@ -33,10 +33,18 @@ enum WhatsNew {
             } else if inVersion, line.hasPrefix("### ") {
                 sections.append(Section(title: String(line.dropFirst(4)), items: []))
             } else if inVersion, line.hasPrefix("- "), !sections.isEmpty {
-                sections[sections.count - 1].items.append(String(line.dropFirst(2)))
+                sections[sections.count - 1].items.append(plain(String(line.dropFirst(2))))
             }
         }
         return sections.filter { !$0.items.isEmpty }
+    }
+
+    /// A note as it reads in the app: issue references ("([#3](…))") are for GitHub and the website, so they go,
+    /// and any other link keeps only its words.
+    static func plain(_ item: String) -> String {
+        var text = item.replacingOccurrences(of: #"\s*\((\[#\d+\]\([^)]*\)(,\s*)?)+\)"#, with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: #"\[([^\]]+)\]\([^)]*\)"#, with: "$1", options: .regularExpression)
+        return text
     }
 
     private static let lastVersionKey = "LastRunVersion"
@@ -72,7 +80,12 @@ enum WhatsNew {
 final class WhatsNewSheet: NSView {
     private let panel = FloatingPanelView()
     private let icon = NSImageView(image: NSApp.applicationIconImage)
-    private let titleLabel = Label("What’s New in Zigzag", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
+    /// In the app's voice, as a page names itself.
+    private let titleLabel: Label = {
+        let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
+        label.attributedStringValue = Tokens.Font.voiceText("What’s new")
+        return label
+    }()
     private let versionLabel = Label("Version \(WhatsNew.version)", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var headings: [Label] = []
     private var points: [(dot: ColorView, text: NSTextField)] = []
