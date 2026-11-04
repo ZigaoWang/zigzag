@@ -104,6 +104,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var tint2: Double? = nil
     /// How much of the desktop shows through the frame, from 0 (solid) to 1 (the most). Nil: solid.
     var translucency: Double? = nil
+    /// See-through without the frosting thinning: the desktop shows clearly instead of softly blurred. Nil: frosted.
+    var clearGlass: Bool? = nil
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
 
@@ -119,9 +121,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
     /// never below a half, so the space keeps its color all the way up; the frosting thins too (`frostStrength`).
     var coverage: CGFloat { CGFloat(1 - 0.5 * seeThrough) }
-    /// How much of the frosting a see-through frame keeps: all of it a little see-through, thinning to under half at
-    /// the most, so the desktop really shows, softened, rather than turning the frame gray.
-    var frostStrength: CGFloat { CGFloat(1 - 0.55 * seeThrough * seeThrough) }
+    /// How much of the frosting a see-through frame keeps. Frosted (the default): all of it, the desktop softly
+    /// blurred behind the space's color. Clear: thinning to under half at the most, so the desktop shows plainly.
+    var frostStrength: CGFloat { clearGlass == true ? CGFloat(1 - 0.55 * seeThrough * seeThrough) : 1 }
 
     /// The window frame color for this space, solid.
     var background: NSColor {
@@ -395,6 +397,7 @@ final class Library {
         spaces[i].tint = look.tint
         spaces[i].tint2 = look.tint2
         spaces[i].translucency = look.translucency
+        spaces[i].clearGlass = look.clearGlass
         spaces[i].glass = nil
         spaces[i].grain = look.grain
         spaces[i].appearance = look.appearance

@@ -983,10 +983,15 @@ final class SpaceLookEditor: NSView {
     /// Gradient, see-through and grain: there when you want them, folded away until then.
     private let effects = DisclosureRow(title: "Effects")
     private var showsEffects = false
+    /// Whether the Frosted or Clear row is out (a see-through space with Effects open).
+    private var showsGlass = false
     private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
     private let shadeSlider = LookSlider(.shade)
     private let clearLabel = SpaceLookEditor.rowLabel("See-through")
     private let clearSlider = LookSlider(.seeThrough)
+    /// Frosted or clear glass, for a see-through space.
+    private let glassLabel = SpaceLookEditor.rowLabel("Glass")
+    private let glassSwitch = SlidingSwitch([.text("Frosted"), .text("Clear")])
     private let grainLabel = SpaceLookEditor.rowLabel("Grain")
     private let grainSlider = LookSlider(.grain)
 
@@ -1013,7 +1018,7 @@ final class SpaceLookEditor: NSView {
         colorChosen = space.brightness != nil
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, grainLabel, grainSlider, effects]
+        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, grainLabel, grainSlider, effects]
         showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
         (views + chips + swatches).forEach { addSubview($0) }
 
@@ -1067,6 +1072,11 @@ final class SpaceLookEditor: NSView {
             guard let self else { return }
             self.draft.translucency = value > 0.005 ? value : nil
             self.changed(final: final, animated: false)
+        }
+        glassSwitch.onChange = { [weak self] index in
+            guard let self else { return }
+            self.draft.clearGlass = index == 1 ? true : nil
+            self.changed(final: true, animated: false)
         }
         grainSlider.onChange = { [weak self] grain, final in
             guard let self else { return }
@@ -1183,6 +1193,7 @@ final class SpaceLookEditor: NSView {
         shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
         clearSlider.value = space.seeThrough
         clearSlider.colors = colors
+        glassSwitch.selectedIndex = space.clearGlass == true ? 1 : 0
         grainSlider.value = space.grain ?? 0
         grainSlider.colors = colors
         dial.angle = space.gradientAngle
@@ -1195,6 +1206,10 @@ final class SpaceLookEditor: NSView {
         dial.colors = (colors[0], colors.last ?? colors[0])
         effects.isOpen = showsEffects
         for view in [colorsLabel, chips[0], clearLabel, clearSlider, grainLabel, grainSlider] as [NSView] { view.isHidden = !showsEffects }
+        // Frosted or clear only matters once the space is see-through.
+        let glassShown = showsEffects && space.isSeeThrough
+        for view in [glassLabel, glassSwitch] as [NSView] { view.isHidden = !glassShown }
+        if glassShown != showsGlass { showsGlass = glassShown; onResize?() }
         if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }
         showDial(two && showsEffects, animated: animated)
         needsLayout = true
@@ -1236,12 +1251,13 @@ final class SpaceLookEditor: NSView {
     var preferredHeight: CGFloat {
         var h = swatchSize + Tokens.Space.x4 + wheelHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x3 + disclosureHeight
         if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
+        if showsGlass { h += sliderHeight + Tokens.Space.x3 }
         return h
     }
 
     /// Wide enough for the longest name, so every control starts at the same line.
     private var labelWidth: CGFloat {
-        let widest = [colorsLabel, shadeLabel, clearLabel, grainLabel].map { ceil($0.intrinsicContentSize.width) }.max() ?? 0
+        let widest = [colorsLabel, shadeLabel, clearLabel, glassLabel, grainLabel].map { ceil($0.intrinsicContentSize.width) }.max() ?? 0
         return max(72, widest + Tokens.Space.x3)
     }
 
@@ -1273,10 +1289,14 @@ final class SpaceLookEditor: NSView {
         x += chipSize + Tokens.Space.x3
         dial.frame = NSRect(x: x, y: y, width: dialSize, height: dialSize)
         y += dialSize + Tokens.Space.x3
-        for (label, slider) in [(clearLabel, clearSlider), (grainLabel, grainSlider)] {
-            row(label, slider, y: y, height: sliderHeight)
+        row(clearLabel, clearSlider, y: y, height: sliderHeight)
+        y += sliderHeight + Tokens.Space.x3
+        if showsGlass {
+            row(glassLabel, glassSwitch, y: y, height: sliderHeight)
             y += sliderHeight + Tokens.Space.x3
         }
+        row(grainLabel, grainSlider, y: y, height: sliderHeight)
+        y += sliderHeight + Tokens.Space.x3
     }
 
     /// A name on the left and its control beside it, every control starting at the same line.
