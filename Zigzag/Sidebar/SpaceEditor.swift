@@ -442,8 +442,8 @@ final class LookSwatch: InteractiveView {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 ring.frame = bounds
                 ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 1.25
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.7) : .clear).cgColor
+                ring.borderWidth = 2
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : .clear).cgColor
                 // Chosen, the swatch sits inside a fine ring; under the pointer it swells to meet the edge.
                 let inset: CGFloat = isSelected ? 3.5 : (isHovered ? 0 : 2)
                 fill.frame = bounds.insetBy(dx: inset, dy: inset)
@@ -451,7 +451,9 @@ final class LookSwatch: InteractiveView {
                 checker.frame = fill.frame
                 checker.cornerRadius = fill.cornerRadius
                 let space = look.space
-                let start = space.frameColor
+                // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
+                // mode, where every frame color is deep; white, grays and black as they are.
+                let start = space.isNeutral ? space.frameColor : space.swatch
                 fill.colors = [start, space.frameColor2 ?? start].map(\.cgColor)
                 fill.startPoint = CGPoint(x: 0.2, y: 0.1)
                 fill.endPoint = CGPoint(x: 0.8, y: 0.9)
@@ -942,21 +944,9 @@ final class DisclosureRow: InteractiveView {
         turn(animated: false)
     }
 
-    /// The chevron points right when folded and down when open, turning about its own middle.
+    /// The chevron points right when folded and down when open, as the space name's does.
     private func turn(animated: Bool) {
-        guard let layer = chevron.layer else { return }
-        let frame = chevron.frame
-        Tokens.Motion.withoutAnimation {
-            layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            layer.position = CGPoint(x: frame.midX, y: frame.midY)
-        }
-        let angle: CGFloat = isOpen ? -.pi / 2 : 0
-        CATransaction.begin()
-        CATransaction.setDisableActions(!animated || Tokens.Motion.reduceMotion)
-        CATransaction.setAnimationDuration(Tokens.Motion.selection)
-        CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
-        layer.setAffineTransform(CGAffineTransform(rotationAngle: angle))
-        CATransaction.commit()
+        chevron.image = Tokens.Symbol.image(isOpen ? "chevron.down" : "chevron.right", size: Tokens.Symbol.inline)
         setAccessibilityValue(isOpen ? 1 : 0)
     }
 
@@ -973,7 +963,7 @@ final class DisclosureRow: InteractiveView {
 /// `onCommit` when you let go or pick something.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
-    private let colorsLabel = SpaceLookEditor.rowLabel("Colors")
+    private let colorsLabel = SpaceLookEditor.rowLabel("Gradient")
     /// The space's colors, one per knob on the wheel; clicking one selects its knob.
     private let chips = [ColorChip(label: "Color"), ColorChip(label: "Second color")]
     /// Adds a second color for a gradient; the second chip's × takes it away again.
@@ -1052,6 +1042,8 @@ final class SpaceLookEditor: NSView {
         }
         chips[1].onRemove = { [weak self] in self?.toggleSecondColor() }
         addSlot.onClick = { [weak self] _ in self?.toggleSecondColor() }
+        addSlot.toolTip = "Add a second color to fade into"
+        dial.toolTip = "Which way the colors fade"
         for swatch in swatches {
             swatch.onClick = { [weak self, weak swatch] _ in
                 guard let self, let look = swatch?.look else { return }
@@ -1313,7 +1305,8 @@ final class SpaceLookEditor: NSView {
 final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
-    private let nameField = PlainTextField(font: Tokens.Font.heading(), placeholder: "Name this space")
+    /// The name in the app's voice, as the sidebar shows it.
+    private let nameField = PlainTextField(font: Tokens.Font.voice(20), placeholder: "Name this space")
     /// The name sits on a soft field, so it reads as something you can type into.
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let editor: SpaceLookEditor
