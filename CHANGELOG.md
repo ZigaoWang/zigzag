@@ -5,6 +5,18 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-11-05
+
+### New
+- New looks for spaces in the space editor, in two rows: white, black, clear and smoky glass, deep charcoal, espresso, oxblood, pine and slate, then paper with grain and soft fades like oat, butter, clay, rose, matcha, mint and sky, with a frosted glass to finish.
+
+### Changed
+- A space's name shows exactly as you typed it, with no lowercasing.
+
+### Fixed
+- A black space keeps light text and a white space keeps dark text, whatever your Mac's light or dark setting.
+- The loading bar keeps moving while a slow page loads, instead of stopping partway.
+
 ## [0.5.8] - 2026-11-04
 
 ### New
@@ -429,7 +441,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.8...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.9...HEAD
+[0.5.9]: https://github.com/ZigaoWang/zigzag/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/ZigaoWang/zigzag/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/ZigaoWang/zigzag/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/ZigaoWang/zigzag/compare/v0.5.5...v0.5.6
