@@ -344,7 +344,7 @@ class FloatingPanelView: NSView {
         let view = NSVisualEffectView()
         view.material = .popover
         view.blendingMode = .withinWindow
-        view.state = .active
+        view.state = .followsWindowActiveState
         view.wantsLayer = true
         view.layer?.cornerCurve = .continuous
         view.layer?.masksToBounds = true

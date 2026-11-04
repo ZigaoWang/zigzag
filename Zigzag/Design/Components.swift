@@ -434,7 +434,7 @@ enum PanelMaterial {
         let frost = PanelFrost()
         frost.material = .popover
         frost.blendingMode = .withinWindow
-        frost.state = .active
+        frost.state = .followsWindowActiveState
         frost.wantsLayer = true
         frost.layer?.cornerRadius = radius
         frost.layer?.cornerCurve = .continuous
