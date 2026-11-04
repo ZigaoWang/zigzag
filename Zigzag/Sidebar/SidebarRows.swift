@@ -630,6 +630,19 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// The space name above its bookmarks. Click it, or the chevron beside it, to fold the
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
+    /// The space's name large, light and lowercase (Zigzag's own style), or at row size in its own case. A setting.
+    static var isLarge: Bool {
+        get { UserDefaults.standard.object(forKey: "LargeSpaceNames") as? Bool ?? true }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "LargeSpaceNames")
+            NotificationCenter.default.post(name: styleChanged, object: nil)
+        }
+    }
+    static let styleChanged = Notification.Name("SpaceNameStyleChanged")
+    /// The name's font for the style in use.
+    static var nameFont: NSFont { isLarge ? Tokens.Font.spaceName() : .systemFont(ofSize: Tokens.Sidebar.rowText, weight: .semibold) }
+    /// How tall the name's row is for the style in use.
+    static var rowHeight: CGFloat { isLarge ? Tokens.Sidebar.spaceNameHeight : Tokens.Sidebar.rowHeight }
     let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
     /// After the space's color changes: the name takes its new ink.
     func refreshInk() { stateDidChange(animated: false) }
@@ -683,23 +696,25 @@ final class SpaceHeaderView: InteractiveView {
         // side bearing sets its ink a point in: pulled back so the ink, not the box, meets the icons' edge.
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
-        let y = isFlipped ? bounds.height - h - pad : pad
+        // Large, low in its slot; at row size, centered in its row like the rows below it.
+        let y = !Self.isLarge ? round((bounds.height - h) / 2) : isFlipped ? bounds.height - h - pad : pad
         // Icons and the chevron center on the lowercase letters' middle (the x-height), not the text box, so they sit
         // level with the name.
-        let font = Tokens.Font.spaceName()
+        let font = Self.nameFont
         let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
         let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
-        var x = SidebarRowView.inset - Label.inset - Tokens.Sidebar.spaceNameBearing
+        let bearing = Self.isLarge ? Tokens.Sidebar.spaceNameBearing : 0
+        var x = SidebarRowView.inset - Label.inset - bearing
         if icon != nil {
             // The space's icon leads the name at the name's own scale, as one mark, not a row icon beside a heading.
             // As tall as the name's capitals, its middle on the lowercase letters' middle, and fit to that square
             // whatever its drawing's shape; centered over the rows' icon column, so it lines up with the + below.
-            let side = ceil(font.capHeight) + 2
+            let side = Self.isLarge ? ceil(font.capHeight) + 2 : Tokens.Sidebar.favicon
             let column = SidebarRowView.inset + Tokens.Sidebar.favicon / 2
             // Its bottom on the name's baseline and its top at the capitals', so it stands in the line like a letter.
             let capMiddle = isFlipped ? baseline - font.capHeight / 2 : baseline + font.capHeight / 2
             iconView.frame = NSRect(x: round(column - side / 2), y: round(capMiddle - side / 2), width: side, height: side)
-            x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset - Tokens.Sidebar.spaceNameBearing - 2
+            x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset - bearing - (Self.isLarge ? 2 : 0)
         }
         label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         let side = Tokens.Space.x4
@@ -717,7 +732,11 @@ final class SpaceHeaderView: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // The name in light type and the space's own ink, quietly fuller under the pointer; its icon a step back.
         let ink = Brand.Theme.for(self).ink
-        label.attributedStringValue = Tokens.Font.voiceText(label.stringValue, color: isHovered ? ink : ink.withAlphaComponent(0.86))
+        let color = isHovered ? ink : ink.withAlphaComponent(0.86)
+        // The label measures by its own font, so it follows the style in use.
+        if label.font != Self.nameFont { label.font = Self.nameFont; needsLayout = true }
+        label.attributedStringValue = Self.isLarge ? Tokens.Font.voiceText(label.stringValue, color: color)
+            : NSAttributedString(string: label.stringValue, attributes: [.font: Self.nameFont, .foregroundColor: color])
         // A symbol takes the name's own ink; an emoji keeps its colors.
         iconView.contentTintColor = ink.withAlphaComponent(0.86)
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)

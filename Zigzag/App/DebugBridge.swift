@@ -448,6 +448,7 @@ enum DebugBridge {
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsPage.open(in: controller)
         case "engine": if let engine = SearchEngine(rawValue: arg) { Library.shared.searchEngine = engine }
+        case "largenames": SpaceHeaderView.isLarge = arg != "off"
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         case "cancelsheet":
             // Cancels any open confirmation, in every window, without confirming it.

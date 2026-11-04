@@ -84,7 +84,7 @@ enum SidebarItem: Hashable {
 
     var height: CGFloat {
         switch self {
-        case .header: Tokens.Sidebar.spaceNameHeight
+        case .header: SpaceHeaderView.rowHeight
         // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
         case .separator: Tokens.Sidebar.labelHeight
         case .placeholder, .bookmark, .folder, .newTab, .tab: Tokens.Sidebar.rowHeight
@@ -108,6 +108,16 @@ enum SidebarItem: Hashable {
 
 /// The scrolling list of bookmarks and tabs. Rows are reused by identity and animate between layouts.
 final class SidebarListView: NSView {
+    /// Re-lays the list when the space name's style changes in Settings.
+    private lazy var nameStyleObserver: NSObjectProtocol = NotificationCenter.default.addObserver(forName: SpaceHeaderView.styleChanged, object: nil, queue: .main) { [weak self] _ in
+        MainActor.assumeIsolated {
+            guard let self else { return }
+            (self.rows[.header] as? SpaceHeaderView)?.stateDidChange(animated: false)
+            self.rows[.header]?.needsLayout = true
+            self.reload(animated: false)
+            self.needsLayout = true
+        }
+    }
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
@@ -888,6 +898,7 @@ final class SidebarListView: NSView {
     }
 
     override func viewDidMoveToWindow() {
+        _ = nameStyleObserver
         super.viewDidMoveToWindow()
         _ = iconToken
     }

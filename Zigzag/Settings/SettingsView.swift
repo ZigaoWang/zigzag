@@ -525,6 +525,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let pipToggle = Toggle()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
+    private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
@@ -641,6 +642,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
         windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", control: borderlessToggle))
+        largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
+        windowGroup.add(FormRow(title: "Large space names", detail: "The space’s name in large, light lowercase above its tabs. Off, it’s a plain heading.", control: largeNamesToggle))
         windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
 
         // Passwords
@@ -1266,6 +1269,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         pipToggle.isOn = PictureInPicture.followsTabs
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
+        largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
