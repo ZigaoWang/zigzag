@@ -17,7 +17,7 @@ enum Tutorial {
 
     /// Each step is the keys, a few words, and one short line on why: a glance, nothing to read.
     static let tasks: [Task] = [
-        Task(id: "newTab", title: "Search YouTube", keys: ["⌘", "T"], note: "Open a new tab to start",
+        Task(id: "newTab", title: "Open a new tab", keys: ["⌘", "T"], note: "Press these keys, then search YouTube",
              done: "You searched YouTube from here", doneNote: "Type any site’s name, then Tab, to search it"),
         Task(id: "pin", title: "Pin this page", keys: ["⌘", "D"], note: "Pinned pages stay, even after you quit",
              done: "Pinned", doneNote: "It stays at the top of this space"),

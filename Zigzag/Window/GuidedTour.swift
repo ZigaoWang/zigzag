@@ -10,9 +10,9 @@ final class GuidedTour: NSView {
     private let dim = CAShapeLayer()
     private let ring = CAShapeLayer()
     private let card = FloatingPanelView()
-    private let step = Label("", font: Tokens.Font.figures(Tokens.TypeSize.small), color: Tokens.Color.textTertiary)
+    private let step = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let check = NSImageView()
-    private let title = Label("", font: Tokens.Font.title(.regular), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: Tokens.Font.title(.medium), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
@@ -72,7 +72,11 @@ final class GuidedTour: NSView {
         dim.fillRule = .evenOdd
         layer?.addSublayer(dim)
         ring.fillColor = nil
-        ring.lineWidth = Tokens.Metric.focusRing
+        // Bold enough to find at a glance, with a soft glow of its color around it.
+        ring.lineWidth = 3
+        ring.shadowOpacity = 0.6
+        ring.shadowRadius = 8
+        ring.shadowOffset = .zero
         layer?.addSublayer(ring)
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
@@ -113,6 +117,7 @@ final class GuidedTour: NSView {
         dim.fillColor = cgColor(Tokens.Color.scrim)
         // What to click next is ringed in the space's own accent.
         ring.strokeColor = cgColor(accent)
+        ring.shadowColor = cgColor(accent)
         check.contentTintColor = accent
     }
 
@@ -270,7 +275,7 @@ final class GuidedTour: NSView {
         guard let task = Tutorial.current, let index = Tutorial.tasks.firstIndex(where: { $0.id == task.id }) else {
             return Display(keys: [], title: "You’re all set", note: "", count: "", isDone: false, isFinal: true, target: "")
         }
-        let count = "\(index + 1)/\(Tutorial.tasks.count)"
+        let count = "Step \(index + 1) of \(Tutorial.tasks.count)"
         // Mid-step hints, where you are, for the moment you'd otherwise stall.
         // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
@@ -417,7 +422,7 @@ final class GuidedTour: NSView {
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
-        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : Tokens.Font.title(.regular)
+        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : Tokens.Font.title(.medium)
         if animated {
             let fade = CATransition()
             fade.type = .fade
@@ -466,7 +471,8 @@ final class GuidedTour: NSView {
         // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
         let radius = max(hole.width, hole.height) < Tokens.Tour.ringRoundBelow ? min(hole.width, hole.height) / 2 : Tokens.Radius.tile
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
-        pulse(ringed)
+        // Pulses only when it lands on something new, never on every layout.
+        if ringed, d.target != pulsedTarget { pulsedTarget = d.target; pulse(true) } else if !ringed { pulsedTarget = nil; pulse(false) }
         let curve = Tokens.Motion.gentle
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {
@@ -530,14 +536,29 @@ final class GuidedTour: NSView {
     }
 
     static let cardWidth = Tokens.Tour.cardWidth
+    /// The step whose ring last pulsed.
+    private var pulsedTarget: String?
 
     /// The recording shows unless a peek covers the page (the card would sit on it).
     private func showsVideo(_ d: Display) -> Bool { d.clip != nil && d.target != "peek" }
 
-    /// The ring holds still: its color is enough to find it, and nothing on screen loops forever.
+    /// When a ring lands somewhere new it pulses three times, so the eye goes to it, then holds still: nothing on
+    /// screen loops forever.
     private func pulse(_ on: Bool) {
-        if ring.animation(forKey: "pulse") != nil { ring.removeAnimation(forKey: "pulse") }
-        if ring.opacity != 1 { ring.opacity = 1 }
+        guard on, !Tokens.Motion.reduceMotion else {
+            if ring.animation(forKey: "pulse") != nil { ring.removeAnimation(forKey: "pulse") }
+            if ring.opacity != 1 { ring.opacity = 1 }
+            return
+        }
+        guard ring.animation(forKey: "pulse") == nil else { return }
+        let beat = CABasicAnimation(keyPath: "opacity")
+        beat.fromValue = 1
+        beat.toValue = 0.25
+        beat.duration = 0.45
+        beat.autoreverses = true
+        beat.repeatCount = 3
+        beat.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        ring.add(beat, forKey: "pulse")
     }
 
     /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.
