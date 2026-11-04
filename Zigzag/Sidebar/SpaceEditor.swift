@@ -1452,8 +1452,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         growsFrom = anchor is SpaceDotView ? CGPoint(x: 0.1, y: 1) : CGPoint(x: 0, y: 0.1)
         present(arrival: .pop)
         controller.window?.makeFirstResponder(nameField)
-        // The cursor at the end, not the whole name selected: you came to change the color as often as the name.
-        if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }
+        // The cursor at the end, not the whole name selected: you came to change the color as often as the name. A
+        // name Zigzag made up ("Space 2") is selected instead, so typing replaces it.
+        if let editor = nameField.currentEditor() {
+            let placeholder = nameField.stringValue.range(of: #"^Space \d+$"#, options: .regularExpression) != nil
+            editor.selectedRange = placeholder ? NSRange(location: 0, length: nameField.stringValue.utf16.count)
+                                               : NSRange(location: nameField.stringValue.utf16.count, length: 0)
+        }
         controller.root.holdReveal = true
         startMonitoring()
     }
