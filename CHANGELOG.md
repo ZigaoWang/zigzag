@@ -5,6 +5,23 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-04
+
+### New
+- The getting-started guide is a clear dark bar at the bottom of the page, with big instructions and the keys to press in your space's color. While you type, it sits right under the address bar.
+- New short videos in the guide for the steps that are hard to put in words: Shift-clicking a link, dragging a tab into a split, making a space and going back.
+- Large Space Names can be turned on or off from a space's right-click menu.
+
+### Changed
+- Onboarding no longer has the screen explaining how Zigzag works. The guide shows it in the browser instead.
+
+### Fixed
+- The pinned tab you're on is a light card again, not a dark one.
+- Typing a new space's name replaces "Space 2" instead of adding to it.
+- An empty see-through space shows its glass across the whole window, and a split view's gap no longer shows the desktop behind it.
+- The sidebar on Clear glass is a little clearer.
+- The guide skips one step per click, never asks you to drag a tab that's already in a split, and its cards sit where ⌘T's bar opens.
+
 ## [0.5.7] - 2026-11-04
 
 ### New
@@ -412,7 +429,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.7...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.8...HEAD
+[0.5.8]: https://github.com/ZigaoWang/zigzag/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/ZigaoWang/zigzag/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/ZigaoWang/zigzag/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/ZigaoWang/zigzag/compare/v0.5.4...v0.5.5
