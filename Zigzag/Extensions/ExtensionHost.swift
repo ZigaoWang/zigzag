@@ -893,8 +893,9 @@ enum ExtensionLog {
             let text = Data("\(now) \(line)\n".utf8)
             let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
             if size < limit, let handle = try? FileHandle(forWritingTo: url) {
-                handle.seekToEndOfFile()
-                handle.write(text)
+                // The throwing calls: the old ones raise an exception a full disk can't recover from.
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: text)
                 try? handle.close()
             } else {
                 try? text.write(to: url)
@@ -909,8 +910,8 @@ func debugLog(_ message: String) {
     let line = "\(Date()) \(message)\n"
     let url = Paths.support.appendingPathComponent("debug.log")
     if let handle = try? FileHandle(forWritingTo: url) {
-        handle.seekToEndOfFile()
-        handle.write(Data(line.utf8))
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data(line.utf8))
         try? handle.close()
     } else {
         try? Data(line.utf8).write(to: url)
