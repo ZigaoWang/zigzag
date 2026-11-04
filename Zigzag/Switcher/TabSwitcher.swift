@@ -85,6 +85,8 @@ final class TabThumbnailView: InteractiveView {
     /// Desk view: an × on the card while the pointer is over it.
     var onClose: (() -> Void)? { didSet { closeButton.isHidden = true } }
     private let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Close Tab")
+    /// A dark disc under the close button, so its white × reads on any page, light or busy.
+    private let closeDisc = ColorView(color: NSColor(white: 0, alpha: 0.62))
     /// A page with no picture yet, or only a blank one (asleep, or caught before it drew): its site instead.
     private let siteName = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     static let titleHeight = Tokens.Space.x8
@@ -111,8 +113,15 @@ final class TabThumbnailView: InteractiveView {
         siteName.alignment = .center
         siteName.lineBreakMode = .byTruncatingMiddle
         imageClip.addSubview(siteName)
-        closeButton.showsFillAtRest = true
+        closeButton.showsFillAtRest = false
+        closeButton.tint = .white
         closeButton.isHidden = true
+        closeDisc.wantsLayer = true
+        closeDisc.isHidden = true
+        closeDisc.layer?.shadowColor = NSColor.black.cgColor
+        closeDisc.layer?.shadowOpacity = 0.25
+        closeDisc.layer?.shadowRadius = 3
+        closeDisc.layer?.shadowOffset = .zero
         closeButton.onClick = { [weak self] _ in self?.onClose?() }
         audioButton.isHidden = true
         audioButton.onClick = { [weak self] _ in
@@ -120,7 +129,7 @@ final class TabThumbnailView: InteractiveView {
             page.setMuted(!page.isMuted)
             self.refreshAudio()
         }
-        [imageClip, icon, title, icon2, title2, audioButton, closeButton].forEach { addSubview($0) }
+        [imageClip, icon, title, icon2, title2, audioButton, closeDisc, closeButton].forEach { addSubview($0) }
         layer?.addSublayer(ring)
         setAccessibilityRole(.button)
     }
@@ -228,8 +237,10 @@ final class TabThumbnailView: InteractiveView {
         placeholder.frame = NSRect(x: (imageClip.bounds.width - p) / 2, y: bottom + nameHeight + Tokens.Space.x2, width: p, height: p)
         siteName.frame = NSRect(x: Tokens.Space.x2, y: bottom, width: imageClip.bounds.width - Tokens.Space.x4, height: nameHeight)
         let cs = Tokens.Metric.compactIconButton
-        closeButton.frame = NSRect(x: imageClip.frame.maxX - cs - Tokens.Space.x1, y: imageClip.frame.minY + Tokens.Space.x1, width: cs, height: cs)
+        closeButton.frame = NSRect(x: imageClip.frame.maxX - cs - Tokens.Space.x2, y: imageClip.frame.minY + Tokens.Space.x2, width: cs, height: cs)
         closeButton.radius = cs / 2
+        closeDisc.frame = closeButton.frame
+        closeDisc.layer?.cornerRadius = cs / 2
         icon.isHidden = !showsTitle
         title.isHidden = !showsTitle
         icon2.isHidden = !showsTitle || partner == nil
@@ -272,6 +283,7 @@ final class TabThumbnailView: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         closeButton.isHidden = onClose == nil || !isHovered
+        closeDisc.isHidden = closeButton.isHidden
         refreshColors()
     }
 
