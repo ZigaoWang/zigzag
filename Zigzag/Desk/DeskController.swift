@@ -818,7 +818,12 @@ final class DeskController {
         for space in Library.shared.spaces where headers[space.id] == nil {
             let header = DeskHeaderView()
             header.onClick = { [weak self] _ in self?.selectSpace(space.id) }
-            header.duplicatesButton.onClick = { [weak self] _ in self?.closeDuplicates(in: space.id) }
+            header.duplicatesButton.onClick = { [weak self] _ in self?.previewClosing([]); self?.closeDuplicates(in: space.id) }
+            // Pointing at it, the cards it would close fade back, as Clear's rows do in the sidebar.
+            header.duplicatesButton.hoverChanged = { [weak self] on in
+                guard let self else { return }
+                self.previewClosing(on ? Set(self.duplicateTabs(in: space.id).map(\.id)) : [])
+            }
             headers[space.id] = header
             canvas.addSubview(header)
         }
@@ -1031,6 +1036,13 @@ final class DeskController {
         return groups.values.filter { $0.count > 1 }.flatMap { group -> [Tab] in
             let keep = group.first { $0 === current } ?? group.max { $0.lastActivated < $1.lastActivated }
             return group.filter { $0 !== keep }
+        }
+    }
+
+    /// Fades the cards of these tabs, or brings every card back with none.
+    private func previewClosing(_ ids: Set<UUID>) {
+        Tokens.Motion.animate(Tokens.Motion.feedback) {
+            for (id, card) in self.cards { card.animator().alphaValue = ids.contains(id) ? 0.2 : 1 }
         }
     }
 
