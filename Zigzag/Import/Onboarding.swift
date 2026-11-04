@@ -6,7 +6,7 @@ final class OnboardingView: NSView {
     var onFinish: (() -> Void)?
 
     /// The space's color comes later, in the browser itself, where you can see it on the real thing.
-    enum Step: Int, CaseIterable { case hello, bring, layout, sites, ads, ready }
+    enum Step: Int, CaseIterable { case hello, bring, sites, ads, ready }
     private(set) var step = Step.hello
 
     private let surface = BrandSurface()
@@ -83,10 +83,6 @@ final class OnboardingView: NSView {
             content = BringPicker()
             title = "Bring your stuff over"
             body = "Passwords, bookmarks and history. Your old browser stays as it is."
-        case .layout:
-            content = HowItWorks()
-            title = "Your tabs are on the left"
-            body = "Like Chrome, just down the side."
         case .sites:
             content = SitesPicker()
             title = "Pin the sites you use"
@@ -1876,56 +1872,6 @@ private final class ExtensionRow: InteractiveView {
 
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
-/// For anyone coming from Chrome or Safari, one thing, shown rather than told: the tabs are down the side. A Zigzag
-/// window with its tab list ringed and named.
-private final class HowItWorks: StepContent {
-    private let sketch = LiveBrowser()
-    private let ring = CAShapeLayer()
-    private let nameTag: NSView = {
-        let chip = ColorView(color: Onboard.accent)
-        chip.wantsLayer = true
-        chip.layer?.cornerRadius = 12
-        let label = Label("Your tabs", font: Tokens.Font.body(.medium), color: .white)
-        label.alignment = .center
-        label.frame = NSRect(x: 0, y: 3, width: 96, height: 18)
-        chip.addSubview(label)
-        return chip
-    }()
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        sketch.page = .wikipedia
-        sketch.tabs = ["Wikipedia", "Recipes", "Trip ideas", "Weather"]
-        // One row of favorites, so the tab list sits where the ring expects it.
-        sketch.favorites = Array(Library.shared.favorites.prefix(4).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) })
-        addSubview(sketch)
-        sketch.wantsLayer = true
-        ring.fillColor = nil
-        ring.strokeColor = Onboard.accent.cgColor
-        ring.lineWidth = 3
-        sketch.layer?.addSublayer(ring)
-        sketch.addSubview(nameTag)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    override func preferredHeight(for width: CGFloat) -> CGFloat { 250 }
-
-    override func layout() {
-        super.layout()
-        sketch.frame = bounds
-        // Around the drawing's tab list (its sidebar is 170 wide; the tabs start under one row of favorites).
-        let list = NSRect(x: 6, y: 124, width: 164, height: 4 * 26 + 8)
-        Tokens.Motion.withoutAnimation {
-            ring.frame = sketch.bounds
-            ring.path = CGPath(roundedRect: list, cornerWidth: 10, cornerHeight: 10, transform: nil)
-        }
-        nameTag.frame = NSRect(x: list.maxX + 10, y: list.midY - 12, width: 96, height: 24)
-    }
-}
-
 private final class AdsPicker: StepContent {
     private let yes = Onboard.outline("Block Ads")
     private let no = Onboard.outline("Show Ads")
