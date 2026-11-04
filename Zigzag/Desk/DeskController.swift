@@ -1111,6 +1111,15 @@ final class DeskController {
     }
 
     /// Return: the card the arrow keys are on, or the first match.
+    /// ⌘1 to ⌘8 open the card in that place, ⌘9 the last, as tabs do in the window.
+    func openCard(number: Int) {
+        let order = orderedCardIDs
+        guard !order.isEmpty else { return }
+        let id = number == 9 ? order[order.count - 1] : order.indices.contains(number - 1) ? order[number - 1] : nil
+        guard let id, let tab = cards[id]?.tab else { return }
+        hide(openingTab: tab)
+    }
+
     private func openFocused() {
         guard let id = focused ?? orderedCardIDs.first, let tab = cards[id]?.tab else { return }
         hide(openingTab: tab)

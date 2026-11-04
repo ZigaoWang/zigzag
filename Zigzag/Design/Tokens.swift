@@ -107,7 +107,7 @@ enum Tokens {
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         static let windowDefaultSize = NSSize(width: 1280, height: 820)
         static let windowMinSize = NSSize(width: 560, height: 400)
-        static let deskCardWidth: CGFloat = 208
+        static let deskCardWidth: CGFloat = 176
         static let deskCardMaxWidth: CGFloat = 440
         /// The find bar, a floating capsule over the page's top right.
         static let findBarHeight: CGFloat = Space.x10

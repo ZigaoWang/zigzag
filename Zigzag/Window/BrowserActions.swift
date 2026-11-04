@@ -349,6 +349,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func selectPreviousTab(_ sender: Any?) { tabManager.selectNext(offset: -1) }
     /// ⌘1–⌘9: numbered as the sidebar shows them, each favorite tile, then each pinned and tab row, open or not.
     @objc func selectTabByNumber(_ sender: NSMenuItem) {
+        // In the tab overview, the number picks the card in that place, as you see them.
+        if desk.isVisible { desk.openCard(number: sender.tag); return }
         let rows = Library.shared.favoriteTiles.map { SidebarItem.bookmark($0.0.id) } + sidebar.list.pageRows
         guard !rows.isEmpty else { return }
         // Cmd+9 always means the last tab, like every browser. An index past the end means the last too.
