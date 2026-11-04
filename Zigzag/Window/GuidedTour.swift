@@ -289,12 +289,12 @@ final class GuidedTour: NSView {
         // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
             if controller.commandBar.isSearchingSite {
-                return Display(keys: ["↩"], title: "Type what to find, then Return", note: "For example: lofi music", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
+                return Display(keys: ["↩"], title: "Type what to find, then Return", note: "For example: lofi music", count: "", isDone: false, isFinal: false, target: "bar")
             }
             if controller.commandBar.isOfferingSiteSearch {
-                return Display(keys: ["Tab"], title: "Press Tab", note: "Now you’re searching on YouTube", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
+                return Display(keys: ["Tab"], title: "Press Tab", note: "Now you’re searching on YouTube", count: "", isDone: false, isFinal: false, target: "bar")
             }
-            return Display(keys: [], title: "Type “youtube”", note: "Just the word", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
+            return Display(keys: [], title: "Type “youtube”", note: "Just the word", count: "", isDone: false, isFinal: false, target: "bar")
         }
         if task.id == "peek", controller.peek.isVisible {
             return Display(keys: ["Esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek", clip: "peek")
@@ -305,7 +305,7 @@ final class GuidedTour: NSView {
             return Display(keys: [], title: "Drag the ringed tab onto the page", note: "It opens side by side with this one",
                            count: count, isDone: false, isFinal: false, target: "split", clip: "split")
         }
-        let clips = ["newTab": "search", "pin": "pin", "space": "spaces", "switch": "switch"]
+        let clips = ["space": "spaces", "switch": "switch"]
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id, clip: clips[task.id])
     }
 
@@ -561,8 +561,12 @@ final class GuidedTour: NSView {
     private var pulsedTarget: String?
 
     /// The recording shows unless a peek covers the page (the card would sit on it).
-    /// No recording while you do a step: one instruction, big, is easier to follow than a video of a whole window.
-    private func showsVideo(_ d: Display) -> Bool { false }
+    /// A recording only where words aren't enough (a Shift-click, a drag, the + and a swipe). Keys say it themselves,
+    /// and while the bar, a peek or the editor is open, what you need is already on screen.
+    private func showsVideo(_ d: Display) -> Bool {
+        guard let clip = d.clip, !d.isDone, !d.isFinal else { return false }
+        return ["peek", "split", "spaces", "switch"].contains(clip) && !["bar", "peek", "editor"].contains(d.target)
+    }
 
     /// When a ring lands somewhere new it pulses three times, so the eye goes to it, then holds still: nothing on
     /// screen loops forever.
