@@ -535,7 +535,7 @@ final class BrowserRootView: ColorView {
             }()
             glass.isHidden = !on
             glass.tintColor = tint
-            if on { glass.frame = bounds }
+            if on { glass.frame = glassFrame }
             // The glass draws over the frame's own grain, so it carries its own, kept in step by `setGrain`.
             if glass.contentView == nil {
                 let content = NSView()
@@ -543,14 +543,23 @@ final class BrowserRootView: ColorView {
                 content.layer?.addSublayer(glassGrain)
                 glass.contentView = content
             }
-            Tokens.Motion.withoutAnimation { glassGrain.frame = bounds }
+            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
             return
         }
         clearGlass?.isHidden = true
         glassView.isHidden = !on
         glassView.material = .sidebar
-        if on { glassView.frame = bounds }
+        if on { glassView.frame = glassFrame }
     }
+    /// Where the glass needs to be: only what you can see through. With the page meeting the sidebar, that's the
+    /// sidebar alone; the page covers the rest, and a live blur under it would cost the window server a fresh blur
+    /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
+    private var glassFrame: NSRect {
+        guard sidebarVisible, card.isAttached, !card.isHidden else { return bounds }
+        return NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height)
+    }
+    private var glassGrainBounds: NSRect { NSRect(origin: .zero, size: glassFrame.size) }
+
     /// The clear glass, once a clear space has asked for it.
     private var clearGlass: NSView?
     /// Grain inside the clear glass, matching the frame's.
@@ -633,10 +642,10 @@ final class BrowserRootView: ColorView {
     override func layout() {
         super.layout()
         Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
-        if !glassView.isHidden { glassView.frame = bounds }
+        if !glassView.isHidden { glassView.frame = glassFrame }
         if let clearGlass, !clearGlass.isHidden {
-            clearGlass.frame = bounds
-            Tokens.Motion.withoutAnimation { glassGrain.frame = bounds }
+            clearGlass.frame = glassFrame
+            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
         }
         layoutCards()
         sidebarContainer.frame = sidebarFrame
