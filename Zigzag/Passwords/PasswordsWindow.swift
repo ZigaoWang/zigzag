@@ -120,7 +120,6 @@ final class PasswordsView: NSView {
         }
         ([columnTitle] + items as [NSView]).forEach { column.addSubview($0) }
         [column, columnEdge, header, listScroll, listEdge, detail, empty, locked].forEach { addSubview($0) }
-        paneTitle.showsWordmark = false
         header.leading = paneTitle
         header.trailing = [search, importButton, exportButton]
         importButton.toolTip = "Import passwords from another browser or a file"

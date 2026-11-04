@@ -1,22 +1,17 @@
 import AppKit
 
 // Zigzag's page design, shared by its built-in pages (History in HTML, Settings in AppKit) and meant for its other
-// surfaces too: one plain surface, the small wordmark and a semibold title at the top left, the search field and
+// surfaces too: one plain surface, the title in the app's voice at the top left, the search field and
 // actions at the top right, quiet rows under it. The values live in `Tokens.Page` and `Tokens.Color`; the HTML pages
 // get them from `PageStyle`, generated at serve time, so the two can't drift.
 
 // MARK: - Native
 
-/// The top left of a page: the drawn wordmark in the space's accent, a hairline, and the page's title in large light
-/// lowercase, like a space's name.
+/// The top left of a page: its title in the app's voice, large, light and lowercase, as the sidebar names a space.
 final class PageTitleView: NSView {
-    private let wordmark = WordmarkView()
-    private let divider = ColorView(color: Tokens.Color.separator)
-    /// Light and lowercase, the space name's voice: the one signature moment on a page.
-    private let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
-    private var themeToken: SignalToken?
-
+    private let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
     private var written = ""
+
     var title: String {
         get { written }
         set {
@@ -26,58 +21,25 @@ final class PageTitleView: NSView {
         }
     }
 
-    /// Off when the wordmark is shown elsewhere on the page, or there's no room for it.
-    var showsWordmark = false { didSet { wordmark.isHidden = !showsWordmark; divider.isHidden = !showsWordmark; needsLayout = true } }
-
     init(_ title: String) {
         super.init(frame: .zero)
-        [wordmark, divider, label].forEach { addSubview($0) }
-        // A page names itself in the voice alone, as the sidebar names a space; the heavy wordmark is kept for the
-        // brand's own moments (the welcome, About), where it doesn't sit beside light type.
-        wordmark.isHidden = true
-        divider.isHidden = true
+        addSubview(label)
         self.title = title
         setAccessibilityElement(false)
         label.setAccessibilityRole(.staticText)
-        themeToken = Brand.themeChanged.observe { [weak self] in self?.refreshTheme() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
 
-    static var wordmarkWidth: CGFloat { ceil(Tokens.Page.wordmarkHeight * WordmarkView.aspect) }
-
     /// The width it needs.
-    var fittingWidth: CGFloat {
-        (showsWordmark ? Self.wordmarkWidth + Tokens.Space.x3 * 2 + Tokens.Metric.hairline : 0) + label.textWidth
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshTheme()
-    }
-
-    private func refreshTheme() { wordmark.color = Brand.Theme.for(self).accent }
+    var fittingWidth: CGFloat { label.textWidth }
 
     override func layout() {
         super.layout()
-        var x: CGFloat = 0
-        // Too narrow for the wordmark and some of the title: the title alone, rather than the two overlapping.
-        let roomy = bounds.width >= Self.wordmarkWidth + Tokens.Space.x6 + min(label.textWidth, Tokens.Space.x16)
-        wordmark.isHidden = !showsWordmark || !roomy
-        // With no title (a column that only carries the wordmark), the hairline after it goes too.
-        divider.isHidden = wordmark.isHidden || written.isEmpty
-        if !wordmark.isHidden {
-            let h = Tokens.Page.wordmarkHeight
-            wordmark.frame = NSRect(x: 0, y: round((bounds.height - h) / 2), width: Self.wordmarkWidth, height: h)
-            x = wordmark.frame.maxX + Tokens.Space.x3
-            let lineHeight: CGFloat = Tokens.Space.x5
-            divider.frame = NSRect(x: x, y: round((bounds.height - lineHeight) / 2), width: Tokens.Metric.hairline, height: lineHeight)
-            x = divider.frame.maxX + Tokens.Space.x3
-        }
-        label.frame = NSRect(x: x - Label.inset, y: round((bounds.height - label.lineHeight) / 2),
-                             width: max(0, bounds.width - x + Label.inset), height: label.lineHeight)
+        label.frame = NSRect(x: -Label.inset, y: round((bounds.height - label.lineHeight) / 2),
+                             width: max(0, bounds.width + Label.inset), height: label.lineHeight)
     }
 }
 
@@ -342,8 +304,6 @@ enum PageStyle {
     .page-header > .inner { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); margin-right: auto; min-width: 0; }
-    .page-title .wordmark { height: var(--wordmark); width: auto; flex: none; color: var(--accent); display: block; }
-    .page-title .divider { width: 1px; height: 20px; background: var(--line); flex: none; }
     .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; text-transform: lowercase; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
