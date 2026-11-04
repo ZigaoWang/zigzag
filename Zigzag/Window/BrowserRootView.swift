@@ -565,6 +565,20 @@ final class BrowserRootView: ColorView {
 
     /// Whether the space wants glass; `refreshGlassOcclusion` keeps it off while the window can't be seen.
     private var glassWanted = false
+    /// Follows the window's visibility for as long as the view is in one, so the glass comes back the moment the
+    /// window shows (at launch, from behind another window, back from the Dock).
+    private var occlusionObserver: NSObjectProtocol?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+        occlusionObserver = nil
+        guard let window else { return }
+        occlusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshGlassOcclusion() }
+        }
+        refreshGlassOcclusion()
+    }
 
     /// A window you can't see (behind others, minimized, on another desktop) needs no live blur: the glass goes
     /// until it shows again, so the window server isn't re-blurring a window nobody is looking at.
@@ -757,7 +771,7 @@ final class BrowserRootView: ColorView {
         for (names, object) in [(app, nil as NSWindow?), (own, window)] {
             for name in names {
                 pointerObservers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.pacePointer(); self?.refreshGlassOcclusion() }
+                    MainActor.assumeIsolated { self?.pacePointer() }
                 })
             }
         }
@@ -785,6 +799,7 @@ final class BrowserRootView: ColorView {
         pointerTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
+        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
     }
 
     private func followPointer() {
