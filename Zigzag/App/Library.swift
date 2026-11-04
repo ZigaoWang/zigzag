@@ -222,7 +222,11 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// harder end of a gradient. See-through spaces are judged the same way: the frosting under them follows the
     /// mode chosen, so it lands on the same side. Spaces that follow the Mac keep what they were given.
     var readableAppearance: String? {
-        guard brightness != nil else { return appearance }
+        guard brightness != nil else {
+            // White and black stay themselves day and night, so the window's mode stays with them, never black text on black.
+            if appearance == nil, hue == nil, !isSeeThrough { if color == .ink { return "dark" }; if color == .snow { return "light" } }
+            return appearance
+        }
         let colors = [background] + (background2.map { [$0] } ?? [])
         func luminance(_ color: NSColor) -> Double {
             guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
