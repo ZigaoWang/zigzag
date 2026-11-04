@@ -784,10 +784,11 @@ final class SeparatorRowView: NSView {
 
     override func layout() {
         super.layout()
-        // The label sits low, nearer the tabs it names than the pinned tabs above.
+        // The label sits low, nearer the tabs it names than the pinned tabs above, on the sidebar's left edge with
+        // the icons and the space's name.
         let h = label.lineHeight
         let mid = bounds.height - Tokens.Space.x3
-        label.frame = NSRect(x: SidebarRowView.textX - Label.inset, y: floor(mid - h / 2), width: label.inkWidth + Label.inset * 2, height: h)
+        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: floor(mid - h / 2), width: label.inkWidth + Label.inset * 2, height: h)
         let cw = clearButton.fittingWidth, ch: CGFloat = 20
         clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()
