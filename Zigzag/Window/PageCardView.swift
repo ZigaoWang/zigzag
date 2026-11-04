@@ -150,6 +150,10 @@ final class PageCardView: NSView {
         }
     }
 
+    /// Out of sight under something opaque (the tab overview): the page is hidden, not just see-through, so WebKit
+    /// knows it isn't shown and throttles it.
+    var isCoveredOver = false { didSet { clip.isHidden = isCoveredOver } }
+
     /// Shown while a suspended tab wakes up so the card never flashes blank.
     private let placeholder = NSImageView()
     /// Beside the sidebar, the page's second shadow: wide and faint, spreading onto the sidebar under the tight one

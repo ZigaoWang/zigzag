@@ -242,6 +242,7 @@ final class BrowserRootView: ColorView {
                 card.alphaValue = isEmpty || pagesHidden ? 0 : 1
                 secondCard.alphaValue = pagesHidden ? 0 : 1
             }
+            refreshGlassOcclusion()
         }
     }
     /// The second page in split view.
@@ -565,6 +566,16 @@ final class BrowserRootView: ColorView {
 
     /// Whether the space wants glass; `refreshGlassOcclusion` keeps it off while the window can't be seen.
     private var glassWanted = false
+    /// Set while something opaque with glass of its own covers the whole window (the tab overview): the window's
+    /// glass rests and the pages under it are hidden, so neither costs anything while out of sight.
+    var glassCovered = false {
+        didSet {
+            guard oldValue != glassCovered else { return }
+            card.isCoveredOver = glassCovered
+            secondCard.isCoveredOver = glassCovered
+            refreshGlassOcclusion()
+        }
+    }
     /// Follows the window's visibility for as long as the view is in one, so the glass comes back the moment the
     /// window shows (at launch, from behind another window, back from the Dock).
     private var occlusionObserver: NSObjectProtocol?
@@ -584,7 +595,9 @@ final class BrowserRootView: ColorView {
     /// until it shows again, so the window server isn't re-blurring a window nobody is looking at.
     func refreshGlassOcclusion() {
         let visible = window?.occlusionState.contains(.visible) ?? true
-        let on = glassWanted && visible
+        // Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
+        let covered = (isEdgeToEdge && !card.isHidden && !isEmpty) || glassCovered
+        let on = glassWanted && visible && !covered
         if let clearGlass, !clearGlass.isHidden || on { clearGlass.alphaValue = on ? 1 : 0 }
         glassView.alphaValue = on ? 1 : 0
     }
@@ -713,6 +726,7 @@ final class BrowserRootView: ColorView {
         secondCard.isAttached = visible && Self.isBorderless
         card.setEdgeToEdge(isEdgeToEdge, duration: duration)
         secondCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
+        refreshGlassOcclusion()
         Tokens.Motion.animate(Tokens.Motion.slide, evenFromKeyboard: true, moves: true, {
             self.card.animator().frame = self.paneFrames.left
             self.emptyHint.animator().frame = Self.markFrame(in: self.paneFrames.left)

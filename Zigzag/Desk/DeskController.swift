@@ -74,7 +74,7 @@ final class DeskFrameView: NSView {
         let glass = NSVisualEffectView()
         glass.blendingMode = .behindWindow
         glass.material = .sidebar
-        glass.state = .active
+        glass.state = .followsWindowActiveState
         return glass
     }()
     private let wash = CAGradientLayer()
@@ -393,7 +393,9 @@ final class DeskController {
         if !reopening, let card = currentCard { canvas.scrollToVisible(card.frame.insetBy(dx: 0, dy: -margin)) }
 
         guard !Tokens.Motion.reduceMotion else {
-            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true) { self.backdrop.animator().alphaValue = 1 }
+            Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 1 }) {
+                if self.isVisible { controller.root.glassCovered = true }
+            }
             return
         }
         if reopening {
@@ -512,6 +514,8 @@ final class DeskController {
         flight?.layer.removeFromSuperlayer()
         flight = nil
         controller?.root.pagesHidden = false
+        // Open and settled: the window under the desk rests.
+        if isVisible { controller?.root.glassCovered = true }
     }
 
     /// The picture a card's first page shows, or none for one that hasn't drawn.
@@ -567,6 +571,8 @@ final class DeskController {
         isVisible = false
         transition += 1
         let id = transition
+        // The window wakes under the desk before it goes, so the page is live where it lands.
+        controller.root.glassCovered = false
         actionBar.removeFromSuperview()
         // The window's controls go back to how the sidebar has them.
         controller.layoutTrafficLights()
