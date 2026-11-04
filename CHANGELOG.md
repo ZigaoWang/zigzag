@@ -5,6 +5,24 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-04
+
+### New
+- See-through spaces can use clear or frosted glass. Clear is the default on macOS 26 and later.
+- The tab overview offers to close duplicate tabs, and shows which ones will close before you do.
+
+### Changed
+- The page meets the sidebar with a soft shadow.
+- The space editor shows its preset colors at full strength, and Colors is now called Gradient.
+
+### Fixed
+- The toolbar buttons match, and the reload icon is redrawn.
+- See-through spaces keep their color, and grain shows on clear glass.
+- The tab overview matches the window's glass, closes when you open the address bar, and its close button shows on any page.
+- Tabs without a preview show a tinted card instead of a blank one.
+- Suggestions in the address bar use the current space's color.
+- A space's icon lines up with its name.
+
 ## [0.5.3] - 2026-11-04
 
 ### New
@@ -359,7 +377,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/ZigaoWang/zigzag/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/ZigaoWang/zigzag/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ZigaoWang/zigzag/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ZigaoWang/zigzag/compare/v0.5.0...v0.5.1
