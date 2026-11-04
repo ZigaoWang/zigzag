@@ -708,9 +708,10 @@ enum DebugBridge {
                 Library.shared.setLook(look)
             }
         case "spacelook":
-            // spacelook <hue 0-360> <second hue or -> <see-through 0-1>: the current space's color, gradient and glass.
+            // spacelook <hue 0-360> <second hue or -> <see-through 0-1> [clear]: the current space's color, gradient and glass.
             let f = arg.split(separator: " ").map(String.init)
-            guard f.count == 3, var look = Library.shared.space(controller.tabManager.currentSpaceID) else { break }
+            guard f.count >= 3, var look = Library.shared.space(controller.tabManager.currentSpaceID) else { break }
+            look.clearGlass = f.count > 3 && f[3] == "clear" ? true : nil
             look.hue = Double(f[0]).map { $0 / 360 }
             look.intensity = look.hue == nil ? nil : 0.6
             look.hue2 = Double(f[1]).map { $0 / 360 }

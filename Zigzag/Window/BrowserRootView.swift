@@ -516,12 +516,33 @@ final class BrowserRootView: ColorView {
 
     /// The frosting always covers all of what's behind: anything thinner lets it through sharp, and its text then
     /// reads under the sidebar's own. See-through spaces thin their color over the blur instead.
-    /// `clear`: a thinner glass, still fully blurred, so the desktop's colors come through without its detail.
-    func setGlass(_ on: Bool, clear: Bool = false) {
+    /// `clear`: Liquid Glass's clear style, really transparent, tinted with `tint` (it draws over the frame's own
+    /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
+    func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
+        if #available(macOS 26.0, *), clear {
+            glassView.isHidden = true
+            let glass = clearGlass as? NSGlassEffectView ?? {
+                let made = NSGlassEffectView()
+                made.style = .clear
+                made.cornerRadius = 0
+                made.wantsLayer = true
+                made.layer?.zPosition = -3
+                addSubview(made, positioned: .below, relativeTo: nil)
+                clearGlass = made
+                return made
+            }()
+            glass.isHidden = !on
+            glass.tintColor = tint
+            if on { glass.frame = bounds }
+            return
+        }
+        clearGlass?.isHidden = true
         glassView.isHidden = !on
-        glassView.material = clear ? .fullScreenUI : .sidebar
+        glassView.material = .sidebar
         if on { glassView.frame = bounds }
     }
+    /// The clear glass, once a clear space has asked for it.
+    private var clearGlass: NSView?
 
     /// A second color the frame fades into, corner to corner, under the grain.
     private lazy var gradientLayer: CAGradientLayer = {
@@ -594,6 +615,7 @@ final class BrowserRootView: ColorView {
         super.layout()
         Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
         if !glassView.isHidden { glassView.frame = bounds }
+        if let clearGlass, !clearGlass.isHidden { clearGlass.frame = bounds }
         layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible
