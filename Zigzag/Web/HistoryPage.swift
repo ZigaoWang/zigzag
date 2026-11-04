@@ -40,7 +40,8 @@ enum HistoryPage {
             let data: Data
             let type: String
             if url.host() == "icon", let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value.flatMap(URL.init(string:)),
-               let png = FaviconStore.shared.cachedIcon(for: target).flatMap(HistoryPage.png) {
+               let icon = FaviconStore.shared.cachedIcon(for: target),
+               let png = HistoryPage.png(FaviconView.isMonochrome(icon) ? HistoryPage.inked(icon, dark: webView.effectiveAppearance.isDark) : icon) {
                 data = png
                 type = "image/png"
             } else if url.host() == "history" {
@@ -77,6 +78,18 @@ enum HistoryPage {
         }
         return png(image)
     }()
+
+    /// An icon in one colorless ink (GitHub, ChatGPT) redrawn in the page's text color, as the sidebar draws it, so
+    /// a white mark never sits on a white page or a black one on a dark page.
+    private static func inked(_ icon: NSImage, dark: Bool) -> NSImage {
+        let size = NSSize(width: 32, height: 32)
+        return NSImage(size: size, flipped: false) { rect in
+            icon.draw(in: rect)
+            (dark ? NSColor(white: 0.92, alpha: 1) : NSColor(white: 0.12, alpha: 1)).setFill()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+    }
 
     private static func png(_ image: NSImage) -> Data? {
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
@@ -237,8 +250,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
 .row img, .row .dot { grid-column: 2; width: var(--favicon); height: var(--favicon); border-radius: var(--radius-small); }
 .row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 17px no-repeat; }
-/* Dark: icons drawn in black (GitHub, Wikipedia) sit on a light tile, as in the sidebar. */
-@media (prefers-color-scheme: dark) { .row img { background: #fff; padding: 1px; } }
+/* One-color icons (GitHub, ChatGPT) come drawn in the page's own ink, so no icon needs a tile. */
 .row .title { grid-column: 3; font-size: var(--row-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .where { grid-column: 4; color: var(--faint); font-size: var(--label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row time { grid-column: 5; color: var(--faint); font-size: var(--small); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
