@@ -114,7 +114,7 @@ final class GuidedTour: NSView {
     /// set again whenever either changes.
     private func applyColors() {
         let accent = Brand.Theme.for(self).accent
-        dim.fillColor = cgColor(Tokens.Color.scrim)
+        dim.fillColor = cgColor(NSColor.black.withAlphaComponent(0.28))
         // What to click next is ringed in the space's own accent.
         ring.strokeColor = cgColor(accent)
         ring.shadowColor = cgColor(accent)
@@ -471,6 +471,12 @@ final class GuidedTour: NSView {
         // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
         let radius = max(hole.width, hole.height) < Tokens.Tour.ringRoundBelow ? min(hole.width, hole.height) / 2 : Tokens.Radius.tile
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
+        // A spotlight: everything but the thing to click dims a little, so the eye goes straight to it. Only the dim
+        // is drawn; clicks pass through it as ever.
+        if ringed {
+            cut.addRect(bounds)
+            cut.addPath(ringPath)
+        }
         // Pulses only when it lands on something new, never on every layout.
         if ringed, d.target != pulsedTarget { pulsedTarget = d.target; pulse(true) } else if !ringed { pulsedTarget = nil; pulse(false) }
         let curve = Tokens.Motion.gentle
