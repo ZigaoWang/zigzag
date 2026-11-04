@@ -124,8 +124,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var isSeeThrough: Bool { seeThrough > 0.005 }
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
     /// never below a half, so the space keeps its color all the way up.
-    /// Clear glass lets more of the blurred desktop through: the color thins further, to a fifth at the most.
-    var coverage: CGFloat { CGFloat(1 - (usesClearGlass ? 0.8 : 0.5) * seeThrough) }
+    /// Clear glass lets more of the blurred desktop through: the color thins further, to about a third at the most,
+    /// so the space still reads as its color over a light desktop.
+    var coverage: CGFloat { CGFloat(1 - (usesClearGlass ? 0.65 : 0.5) * seeThrough) }
 
     /// The window frame color for this space, solid.
     var background: NSColor {
