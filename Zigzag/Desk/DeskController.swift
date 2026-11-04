@@ -63,6 +63,8 @@ final class DeskFrameView: NSView {
     private let grain = CALayer()
     /// Holds the wash and grain in a view of its own, so AppKit keeps them above the glass.
     private let paint = NSView()
+    /// Liquid Glass for a clear space, once one asks for it.
+    private var clearGlass: NSView?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -97,6 +99,33 @@ final class DeskFrameView: NSView {
         let end = isPrivate ? nil : reduced ? space.background2 : space.frameColor2
         glass.isHidden = !clear
         glass.frame = bounds
+        // Clear glass, as the window has it: Liquid Glass tinted with the space's color, the grain inside it.
+        let liquid = clear && space.clearGlass == true
+        if #available(macOS 26.0, *), liquid {
+            glass.isHidden = true
+            let view = clearGlass as? NSGlassEffectView ?? {
+                let made = NSGlassEffectView()
+                made.style = .regular
+                made.cornerRadius = 0
+                made.autoresizingMask = [.width, .height]
+                let content = NSView()
+                content.wantsLayer = true
+                made.contentView = content
+                addSubview(made, positioned: .above, relativeTo: glass)
+                clearGlass = made
+                return made
+            }()
+            view.isHidden = false
+            view.frame = bounds
+            view.tintColor = color
+            if grain.superlayer !== view.contentView?.layer { view.contentView?.layer?.addSublayer(grain) }
+            // The color is in the glass; no wash on top of it.
+            Tokens.Motion.withoutAnimation { wash.opacity = 0 }
+        } else {
+            clearGlass?.isHidden = true
+            Tokens.Motion.withoutAnimation { wash.opacity = 1 }
+            if grain.superlayer !== paint.layer { paint.layer?.addSublayer(grain) }
+        }
         paint.frame = bounds
         Tokens.Motion.withoutAnimation { wash.frame = bounds; grain.frame = bounds }
         let r = space.gradientAngle * .pi / 180
