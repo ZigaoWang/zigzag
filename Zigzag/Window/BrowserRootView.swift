@@ -227,6 +227,7 @@ final class BrowserRootView: ColorView {
     var isEmpty = false {
         didSet {
             guard oldValue != isEmpty else { return }
+            refreshGlassFrame()
             Tokens.Motion.animate(Tokens.Motion.feedback) {
                 self.card.animator().alphaValue = self.isEmpty || self.pagesHidden ? 0 : 1
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
@@ -559,10 +560,20 @@ final class BrowserRootView: ColorView {
     /// sidebar alone; the page covers the rest, and a live blur under it would cost the window server a fresh blur
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
     private var glassFrame: NSRect {
-        guard sidebarVisible, card.isAttached, !card.isHidden else { return bounds }
+        // An empty space shows the frame where the page would be: glass under all of it.
+        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty else { return bounds }
         return NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height)
     }
     private var glassGrainBounds: NSRect { NSRect(origin: .zero, size: glassFrame.size) }
+
+    /// Puts the glass where it needs to be now (after a space empties or fills).
+    private func refreshGlassFrame() {
+        if !glassView.isHidden { glassView.frame = glassFrame }
+        if let clearGlass, !clearGlass.isHidden {
+            clearGlass.frame = glassFrame
+            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
+        }
+    }
 
     /// Whether the space wants glass; `refreshGlassOcclusion` keeps it off while the window can't be seen.
     private var glassWanted = false
