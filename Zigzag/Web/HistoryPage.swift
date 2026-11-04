@@ -37,6 +37,13 @@ enum HistoryPage {
 
         func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
             guard let url = task.request.url else { return }
+            // Only Zigzag's own pages may load from here. A web page embedding zigzag://icon could otherwise learn which
+            // sites are in the icon cache, and so which you've visited.
+            let document = task.request.mainDocumentURL ?? url
+            guard document.scheme == HistoryPage.scheme else {
+                task.didFailWithError(URLError(.noPermissionsToReadFile))
+                return
+            }
             let data: Data
             let type: String
             if url.host() == "icon", let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value.flatMap(URL.init(string:)),
