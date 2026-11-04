@@ -271,9 +271,9 @@ enum Tokens {
         static let cardWidth: CGFloat = 520
         /// A step's row: one line, or the line and its why.
         static let rowHeight: CGFloat = Space.x16
-        static let rowWithNoteHeight: CGFloat = Space.x16 + Space.x3
+        static let rowWithNoteHeight: CGFloat = Space.x16 + Space.x6
         /// A key to press: at least this wide and tall, `Space.x1` from the next.
-        static let keySide: CGFloat = Space.x8 + 2
+        static let keySide: CGFloat = 44
         static let keyGap: CGFloat = Space.x1
         /// The done mark in place of the keys.
         static let checkSide: CGFloat = Space.x5

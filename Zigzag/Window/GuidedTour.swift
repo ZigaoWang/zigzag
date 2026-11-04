@@ -80,7 +80,11 @@ final class GuidedTour: NSView {
         layer?.addSublayer(ring)
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
-        skip.textColor = Tokens.Color.textTertiary
+        skip.textColor = NSColor.white.withAlphaComponent(0.6)
+        // Dark, whatever the page: a white card on a white page disappears.
+        card.surfaceTint = NSColor(white: 0.1, alpha: 1)
+        card.tintStrength = 0.94
+        card.appearance = NSAppearance(named: .darkAqua)
         card.radius = Tokens.Radius.large
         header.cornerRadius = 0
         header.layer?.borderWidth = 0
@@ -400,11 +404,12 @@ final class GuidedTour: NSView {
         caps.forEach { $0.0.removeFromSuperview() }
         caps = []
         for key in d.keys {
-            let cap = ColorView(color: Tokens.Color.fieldFill)
+            // The keys in the space's accent, white on it: what to press stands out first.
+            let cap = ColorView(color: Brand.Theme.for(self).accent)
             cap.wantsLayer = true
             cap.layer?.cornerRadius = Tokens.Radius.control
             cap.layer?.cornerCurve = .continuous
-            let label = Label(key, font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+            let label = Label(key, font: .systemFont(ofSize: 18, weight: .semibold), color: Brand.Theme.for(self).onAccent)
             label.alignment = .center
             cap.addSubview(label)
             card.addSubview(cap)
@@ -473,10 +478,7 @@ final class GuidedTour: NSView {
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
         // A spotlight: everything but the thing to click dims a little, so the eye goes straight to it. Only the dim
         // is drawn; clicks pass through it as ever.
-        if ringed {
-            cut.addRect(bounds)
-            cut.addPath(ringPath)
-        }
+        _ = cut
         // Pulses only when it lands on something new, never on every layout.
         if ringed, d.target != pulsedTarget { pulsedTarget = d.target; pulse(true) } else if !ringed { pulsedTarget = nil; pulse(false) }
         let curve = Tokens.Motion.gentle
@@ -502,11 +504,12 @@ final class GuidedTour: NSView {
         let size = pillSize(d)
         var frame: NSRect
         if !d.isFinal {
-            // In the middle of the page, where nobody can miss it; for a step about the bar or a panel, clear of it
-            // underneath, so you can see both.
-            frame = NSRect(x: page.midX - size.width / 2, y: page.midY - size.height / 2, width: size.width, height: size.height)
-            if hole != .zero, frame.insetBy(dx: -Tokens.Space.x3, dy: -Tokens.Space.x3).intersects(hole) {
-                frame.origin.y = min(page.maxY - size.height - Tokens.Space.x5, hole.maxY + Tokens.Space.x4)
+            // Right under the address bar while it's open (where your eyes are), otherwise a bar at the bottom middle of
+            // the page, never over what you need to click.
+            if d.target == "bar", hole != .zero {
+                frame = NSRect(x: hole.midX - size.width / 2, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
+            } else {
+                frame = NSRect(x: page.midX - size.width / 2, y: page.maxY - size.height - Tokens.Space.x8, width: size.width, height: size.height)
             }
         } else if d.clip != nil {
             // With a recording: tucked in the page's bottom right, clear of what's lit.
@@ -550,7 +553,8 @@ final class GuidedTour: NSView {
     private var pulsedTarget: String?
 
     /// The recording shows unless a peek covers the page (the card would sit on it).
-    private func showsVideo(_ d: Display) -> Bool { d.clip != nil && d.target != "peek" }
+    /// No recording while you do a step: one instruction, big, is easier to follow than a video of a whole window.
+    private func showsVideo(_ d: Display) -> Bool { false }
 
     /// When a ring lands somewhere new it pulses three times, so the eye goes to it, then holds still: nothing on
     /// screen loops forever.
