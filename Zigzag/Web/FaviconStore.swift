@@ -94,7 +94,51 @@ final class FaviconStore {
               !key.contains("/") else { return }
         inFlight.insert(key)
         let (icons, touch) = Self.rank(links: [], pageURL: url)
-        fetchFirst(icons, touch: touch, key: key) { [weak self] _ in self?.inFlight.remove(key) }
+        fetchFirst(icons, touch: touch, key: key) { [weak self] image in
+            guard let self else { return }
+            guard image == nil else { self.inFlight.remove(key); return }
+            // Nothing at the usual addresses (Brave Search keeps its icons on a CDN): the icons the home page lists.
+            self.declaredIcons(of: url) { [weak self] links in
+                guard let self else { return }
+                guard !links.isEmpty else { self.inFlight.remove(key); return }
+                let (icons, touch) = Self.rank(links: links, pageURL: url)
+                self.fetchFirst(icons, touch: touch, key: key) { [weak self] _ in self?.inFlight.remove(key) }
+            }
+        }
+    }
+
+    /// The icon links a page's head declares, read from its HTML without loading it in a web view.
+    private func declaredIcons(of url: URL, completion: @escaping @MainActor ([[String: String]]) -> Void) {
+        var request = URLRequest(url: url, timeoutInterval: 10)
+        request.setValue("text/html", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            let html = data.flatMap { String(data: $0.prefix(200_000), encoding: .utf8) } ?? ""
+            // Made absolute, as a page's own script reports them.
+            let links = Self.iconLinks(in: html).map { link -> [String: String] in
+                var link = link
+                link["href"] = link["href"].flatMap { URL(string: $0, relativeTo: url)?.absoluteString }
+                return link
+            }
+            Task { @MainActor in completion(links) }
+        }.resume()
+    }
+
+    /// `<link rel="…icon…" href="…" sizes="…">` tags, as the page's own icon script reports them.
+    nonisolated static func iconLinks(in html: String) -> [[String: String]] {
+        guard let tag = try? NSRegularExpression(pattern: "<link\\b[^>]*>", options: .caseInsensitive),
+              let attribute = try? NSRegularExpression(pattern: "([a-zA-Z-]+)\\s*=\\s*[\"']([^\"']*)[\"']") else { return [] }
+        let range = NSRange(html.startIndex..., in: html)
+        return tag.matches(in: html, range: range).compactMap { match in
+            guard let r = Range(match.range, in: html) else { return nil }
+            let text = String(html[r])
+            var fields: [String: String] = [:]
+            for a in attribute.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                guard let k = Range(a.range(at: 1), in: text), let v = Range(a.range(at: 2), in: text) else { continue }
+                fields[text[k].lowercased()] = String(text[v])
+            }
+            guard let rel = fields["rel"]?.lowercased(), rel.contains("icon"), fields["href"] != nil else { return nil }
+            return fields
+        }
     }
 
     /// Where to look for a page's icon, best first: the site's own icons, and apart from them its home-screen ones,
