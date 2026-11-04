@@ -536,6 +536,14 @@ final class BrowserRootView: ColorView {
             glass.isHidden = !on
             glass.tintColor = tint
             if on { glass.frame = bounds }
+            // The glass draws over the frame's own grain, so it carries its own, kept in step by `setGrain`.
+            if glass.contentView == nil {
+                let content = NSView()
+                content.wantsLayer = true
+                content.layer?.addSublayer(glassGrain)
+                glass.contentView = content
+            }
+            Tokens.Motion.withoutAnimation { glassGrain.frame = bounds }
             return
         }
         clearGlass?.isHidden = true
@@ -545,6 +553,14 @@ final class BrowserRootView: ColorView {
     }
     /// The clear glass, once a clear space has asked for it.
     private var clearGlass: NSView?
+    /// Grain inside the clear glass, matching the frame's.
+    private lazy var glassGrain: CALayer = {
+        let grain = CALayer()
+        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
+        grain.compositingFilter = "overlayBlendMode"
+        grain.opacity = 0
+        return grain
+    }()
 
     /// A second color the frame fades into, corner to corner, under the grain.
     private lazy var gradientLayer: CAGradientLayer = {
@@ -605,11 +621,12 @@ final class BrowserRootView: ColorView {
     /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
     func setGrain(_ amount: Double, animated: Bool) {
         let target = Float(min(max(amount, 0), 1) * 0.22)
-        guard grainLayer.opacity != target else { return }
+        guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
         CATransaction.setAnimationDuration(Tokens.Motion.standard)
         grainLayer.opacity = target
+        glassGrain.opacity = target
         CATransaction.commit()
     }
 
@@ -617,7 +634,10 @@ final class BrowserRootView: ColorView {
         super.layout()
         Tokens.Motion.withoutAnimation { grainLayer.frame = bounds; gradientLayer.frame = bounds }
         if !glassView.isHidden { glassView.frame = bounds }
-        if let clearGlass, !clearGlass.isHidden { clearGlass.frame = bounds }
+        if let clearGlass, !clearGlass.isHidden {
+            clearGlass.frame = bounds
+            Tokens.Motion.withoutAnimation { glassGrain.frame = bounds }
+        }
         layoutCards()
         sidebarContainer.frame = sidebarFrame
         sidebarContainer.isFloating = !sidebarVisible
