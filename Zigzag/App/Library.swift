@@ -104,7 +104,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var tint2: Double? = nil
     /// How much of the desktop shows through the frame, from 0 (solid) to 1 (the most). Nil: solid.
     var translucency: Double? = nil
-    /// See-through without the frosting thinning: the desktop shows clearly instead of softly blurred. Nil: frosted.
+    /// See-through on a clearer, less milky glass with less of the space's color over it, so the desktop's own colors
+    /// and light come through, still blurred. Nil: frosted.
     var clearGlass: Bool? = nil
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
@@ -119,11 +120,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var seeThrough: Double { min(max(translucency ?? 0, 0), 1) }
     var isSeeThrough: Bool { seeThrough > 0.005 }
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
-    /// never below a half, so the space keeps its color all the way up; the frosting thins too (`frostStrength`).
-    var coverage: CGFloat { CGFloat(1 - 0.5 * seeThrough) }
-    /// How much of the frosting a see-through frame keeps. Frosted (the default): all of it, the desktop softly
-    /// blurred behind the space's color. Clear: thinning to under half at the most, so the desktop shows plainly.
-    var frostStrength: CGFloat { clearGlass == true ? CGFloat(1 - 0.55 * seeThrough * seeThrough) : 1 }
+    /// never below a half, so the space keeps its color all the way up.
+    /// Clear glass lets more of the blurred desktop through: the color thins further, to a fifth at the most.
+    var coverage: CGFloat { CGFloat(1 - (clearGlass == true ? 0.8 : 0.5) * seeThrough) }
 
     /// The window frame color for this space, solid.
     var background: NSColor {
