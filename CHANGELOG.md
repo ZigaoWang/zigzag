@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - Zigzag uses much less energy with a see-through space: the glass only sits behind the sidebar, and pauses when the window can't be seen.
 - Background timers wake the Mac less often.
+- A see-through space shows its glass as soon as Zigzag opens.
 
 ## [0.5.4] - 2026-11-04
 
