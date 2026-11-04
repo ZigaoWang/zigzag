@@ -637,7 +637,8 @@ final class SpaceHeaderView: InteractiveView {
     var name = "" {
         didSet {
             guard name != oldValue else { return }
-            label.stringValue = name.lowercased()
+            // Set in the voice by `stateDidChange`, which lowercases it.
+            label.stringValue = name
             stateDidChange(animated: false)
             needsLayout = true
         }
