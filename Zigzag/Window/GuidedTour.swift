@@ -103,7 +103,12 @@ final class GuidedTour: NSView {
         letter.stringValue = "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way."
         
         addSubview(card)
-        skip.onClick = { _ in Tutorial.skip() }
+        // One skip per step: a burst of clicks never runs past steps you haven't seen.
+        skip.onClick = { [weak self] _ in
+            guard let self, Date().timeIntervalSince(self.lastSkip) > 0.6 else { return }
+            self.lastSkip = Date()
+            Tutorial.skip()
+        }
         finish.onClick = { [weak self] _ in self?.end() }
         tokens.append(Tutorial.changed.observe { [weak self] in self?.stepDone() })
         tokens.append(Brand.themeChanged.observe { [weak self] in self?.applyColors() })
@@ -284,12 +289,12 @@ final class GuidedTour: NSView {
         // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
             if controller.commandBar.isSearchingSite {
-                return Display(keys: ["lofi music", "↩"], title: "Now type what to find", note: "Anything works. Then press Return", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
+                return Display(keys: ["↩"], title: "Type what to find, then Return", note: "For example: lofi music", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
             }
             if controller.commandBar.isOfferingSiteSearch {
-                return Display(keys: ["Tab"], title: "Press Tab", note: "To search right on YouTube", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
+                return Display(keys: ["Tab"], title: "Press Tab", note: "Now you’re searching on YouTube", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
             }
-            return Display(keys: ["youtube"], title: "Type this", note: "Just the word, then you’ll press Tab", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
+            return Display(keys: [], title: "Type “youtube”", note: "Just the word", count: "", isDone: false, isFinal: false, target: "bar", clip: "search")
         }
         if task.id == "peek", controller.peek.isVisible {
             return Display(keys: ["Esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek", clip: "peek")
@@ -297,7 +302,7 @@ final class GuidedTour: NSView {
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article", clip: "peek") }
         // Names the very tab to drag, lit up in the sidebar, so there's nothing to work out.
         if task.id == "split" {
-            return Display(keys: ["Drag"], title: "Drag the lit tab onto the page", note: "Like in the video",
+            return Display(keys: [], title: "Drag the ringed tab onto the page", note: "It opens side by side with this one",
                            count: count, isDone: false, isFinal: false, target: "split", clip: "split")
         }
         let clips = ["newTab": "search", "pin": "pin", "space": "spaces", "switch": "switch"]
@@ -374,7 +379,8 @@ final class GuidedTour: NSView {
     /// A tab that can go beside this page: an ordinary one (pinned pages can't split), not the one you're on.
     private var splitCandidate: Tab? {
         guard let controller, let current = controller.tabManager.selectedTab else { return nil }
-        return controller.tabManager.tabs(in: controller.tabManager.currentSpaceID).first { $0 !== current && controller.tabManager.canSplit(current, with: $0) }
+        let manager = controller.tabManager
+        return manager.tabs(in: manager.currentSpaceID).first { $0 !== current && manager.split(for: $0) == nil && manager.canSplit(current, with: $0) }
     }
 
     /// Split View needs a second ordinary tab; the earlier steps may have pinned the only one.
@@ -549,6 +555,8 @@ final class GuidedTour: NSView {
     }
 
     static let cardWidth = Tokens.Tour.cardWidth
+    /// When Skip was last pressed.
+    private var lastSkip = Date.distantPast
     /// The step whose ring last pulsed.
     private var pulsedTarget: String?
 

@@ -23,11 +23,11 @@ enum Tutorial {
              done: "Pinned", doneNote: "It stays at the top of this space"),
         Task(id: "peek", title: "Shift-click a blue link", keys: ["⇧", "Click"], note: "Here’s an article to try it on",
              done: "That’s Peek", doneNote: "A quick look, without losing your place"),
-        Task(id: "split", title: "Drag the lit tab onto the page", keys: ["Drag"], note: "Two pages, side by side",
+        Task(id: "split", title: "Drag the ringed tab onto the page", keys: [], note: "Two pages, side by side",
              done: "That’s Split View", doneNote: "To part them, use the button at the top right of either page"),
         Task(id: "space", title: "Make a space", keys: ["+"], note: "One for work, one for fun, each with its own color",
              done: "Your new space", doneNote: "Its own tabs and pins, in its own color"),
-        Task(id: "switch", title: "Go back to your first space", keys: ["Swipe"], note: "Two fingers across the sidebar, or click its dot",
+        Task(id: "switch", title: "Go back to your first space", keys: [], note: "Swipe two fingers across the sidebar, or click its dot",
              done: "That’s switching spaces", doneNote: "Swipe or click a dot anytime, or press ⌥⌘← and ⌥⌘→"),
     ]
 
