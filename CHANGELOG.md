@@ -5,6 +5,19 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-04
+
+### New
+- Onboarding shows how Zigzag works for anyone coming from Chrome or Safari: where your tabs are, where to type, and your everyday sites.
+- The getting-started guide is easier to follow, with bigger instructions, a step count and a clearer highlight on what to click.
+- A setting for large space names: keep the big lowercase name, or show it as a plain heading.
+- Clear glass switches to frosted on battery or in Low Power Mode, and back when you plug in.
+- In the tab overview, ⌘1 to ⌘9 open a card, and more cards fit at once.
+
+### Fixed
+- The custom search address only shows when Custom is chosen.
+- Onboarding's yes-or-no questions show which answer is picked.
+
 ## [0.5.6] - 2026-11-04
 
 ### New
@@ -399,7 +412,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/ZigaoWang/zigzag/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/ZigaoWang/zigzag/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/ZigaoWang/zigzag/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/ZigaoWang/zigzag/compare/v0.5.3...v0.5.4
