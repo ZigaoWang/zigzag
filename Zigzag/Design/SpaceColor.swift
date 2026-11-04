@@ -92,11 +92,17 @@ enum SpaceColor: String, Codable, CaseIterable {
     /// mode can follow depth alone.
     static func paint(hue: Double, depth: Double, tint: Double = 1) -> NSColor {
         let d = min(max(depth, 0), 1)
-        let lightness = 0.975 - 0.69 * d
+        // Soft through the middle; the very ends of the range run out to pure white and true black, so the lightest
+        // and darkest a space can be are exactly that.
+        let lightness: Double
+        if d < 0.04 { lightness = 1 - (1 - 0.94740) * d / 0.04 }
+        else if d > 0.9 { lightness = 0.354 * (1 - d) / 0.1 }
+        else { lightness = 0.975 - 0.69 * d }
         // A whisper of color when pale, richest around halfway, a little quieter again in the deep.
         let rise = min(d / 0.5, 1)
         let most = 0.02 + 0.13 * rise * rise * (3 - 2 * rise) - 0.03 * max(0, d - 0.65) / 0.35
-        var chroma = most * min(max(tint, 0), 1)
+        // The color fades out into true black at the very end, as it does into white at the other.
+        var chroma = most * min(max(tint, 0), 1) * min(1, lightness / 0.12) * min(1, (1 - lightness) / 0.04)
         let angle = okHue(hue)
         // Some hues can't be that rich at that lightness on a screen: back off until it fits.
         var rgb = OKLab.rgb(l: lightness, a: chroma * cos(angle), b: chroma * sin(angle))
@@ -112,6 +118,9 @@ enum SpaceColor: String, Codable, CaseIterable {
     /// before 0.4, washed in plain white to black, keep their shade.
     static func depth(ofWhite white: Double) -> Double {
         let lightness = cbrt(OKLab.decode(CGFloat(min(max(white, 0), 1))))
+        // `paint`'s lightness, run backward, ends and all.
+        if lightness > 0.9474 { return min(max(0.04 * (1 - lightness) / (1 - 0.9474), 0), 0.04) }
+        if lightness < 0.354 { return min(max(1 - 0.1 * lightness / 0.354, 0.9), 1) }
         return min(max((0.975 - lightness) / 0.69, 0), 1)
     }
 
