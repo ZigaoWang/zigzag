@@ -166,6 +166,7 @@ final class TabThumbnailView: InteractiveView {
         let showsPage = !Self.isBlank(tab.snapshot) || partner != nil
         placeholder.isHidden = showsPage
         siteName.isHidden = showsPage
+        refreshColors()
         needsLayout = true
     }
 
@@ -276,7 +277,9 @@ final class TabThumbnailView: InteractiveView {
 
     private func refreshColors() {
         Tokens.Motion.withoutAnimation {
-            imageClip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+            // With no picture yet, a soft wash of the space instead of a blank white page.
+            let empty = !placeholder.isHidden
+            imageClip.layer?.backgroundColor = cgColor(empty ? Brand.Theme.for(self).wash : Tokens.Color.cardBackground)
             imageClip.layer?.borderColor = cgColor(Tokens.Color.cardEdge)
             picture.divider.backgroundColor = cgColor(Tokens.Color.cardEdge)
             let selected = isSelected && showsRing
