@@ -379,7 +379,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func refreshAccessories() {
-        let showClose = (isHovered || isSelected) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil
+        // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
+        // pointer. A plain tab you're on keeps its close button in view.
+        let showClose = (isHovered || (isSelected && !isBookmark)) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil
         closeButton.isHidden = !showClose
         closeButton.toolTip = isAway ? "Back to Pinned Page" : isBookmark ? "Unload Page" : "Close Tab"
         audioButton.isHidden = !showsAudio || renameField != nil
