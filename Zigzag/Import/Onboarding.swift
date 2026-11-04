@@ -442,13 +442,15 @@ private enum Onboard {
     /// The picked answer is the light one; the other goes quiet.
     /// The picked answer is outlined and lit; the other stays quiet. Neither looks like Continue, which is solid.
     static func mark(chosen: PrimaryButton, other: PrimaryButton) {
-        chosen.customFill = Brand.ribbon.withAlphaComponent(0.2)
-        chosen.customInk = Brand.ribbon
-        // The answer you're on is the fuller of the two; no ring.
+        // The answer you're on is plainly picked: solid, in the ribbon's pale with deep ink. The other is just its
+        // outline, so there's no doubt which Continue goes with.
+        chosen.customFill = Brand.ribbon
+        chosen.customInk = Onboard.tint.blended(withFraction: 0, of: .black) ?? Onboard.tint
         chosen.layer?.borderWidth = 0
-        other.customFill = Brand.ribbon.withAlphaComponent(0.07)
-        other.customInk = Brand.ribbon.withAlphaComponent(0.7)
-        other.layer?.borderWidth = 0
+        other.customFill = .clear
+        other.customInk = Brand.ribbon.withAlphaComponent(0.85)
+        other.layer?.borderWidth = 1
+        other.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.45).cgColor
     }
 
     /// A question's answers, side by side in the middle, the same width.
