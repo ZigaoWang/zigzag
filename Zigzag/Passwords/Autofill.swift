@@ -209,13 +209,16 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Fills a new strong password into the form's new-password fields, and saves it right away, so it's never
     /// lost if the sign-up's submit goes unnoticed. The username is added when the form is sent.
     private func fillGenerated() {
-        guard let target else { return }
+        // As the other fills do: only into the page the menu was for, still on that site.
+        guard let target, Origin(target.webView.url) == target.origin else { hide(); return }
         let origin = target.origin
         let webView = target.webView
         hide()
         let candidates = PasswordGenerator.candidates(rules, count: 6)
         Task {
             let arguments: [String: Any] = ["candidates": candidates.map { $0.withUnsafeString { String($0) } }]
+            // Checked again right before filling: the page may have moved on while the menu was open.
+            guard Origin(webView.url) == origin else { return }
             let result = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
             let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
             guard let index = result?["index"] as? Int, candidates.indices.contains(index) else {
