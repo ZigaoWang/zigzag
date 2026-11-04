@@ -358,19 +358,19 @@ enum PageStyle {
     @media (max-width: 520px) { .search { order: 3; width: 100%; } }
 
     /* A pill button (PillButton): the secondary look, white with a hairline edge and a faint shadow. `.quiet` shows a
-       fill only under the pointer; `.prominent` is the primary, a dark filled pill, one per page. Hover and press are
+       fill only under the pointer; `.prominent` is the primary, filled with the space's accent, one per page. Hover and press are
        instant; press darkens, never scales. */
     .button { height: var(--control-height); padding: 0 14px; border-radius: calc(var(--control-height) / 2); background: var(--control); color: var(--text);
               box-shadow: inset 0 0 0 1px var(--control-edge), 0 0.5px 1.5px var(--control-shadow); font-size: var(--control-text);
-              font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+              font-weight: 400; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
     .button:hover, .button[aria-expanded="true"] { background: var(--control-hover); }
     .button:active { background: var(--control-pressed); }
     .button.quiet { background: none; box-shadow: none; padding: 0 var(--space-3); }
     .button.quiet:hover, .button.quiet[aria-expanded="true"] { background: var(--hover); }
     .button.quiet:active { background: var(--pressed); }
-    .button.prominent { background: var(--primary); color: var(--on-primary); box-shadow: none; }
-    .button.prominent:hover { background: var(--primary-hover); }
-    .button.prominent:active { background: var(--primary-pressed); }
+    .button.prominent { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+    .button.prominent:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+    .button.prominent:active { background: color-mix(in srgb, var(--accent) 78%, black); }
     .button:disabled { opacity: var(--disabled); }
 
     /* A menu, drawn as Zigzag's menus are (MenuPanel): a solid panel with a hairline edge and the one panel shadow,
