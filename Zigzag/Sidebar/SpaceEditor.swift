@@ -368,7 +368,8 @@ struct SpaceLook {
         space.intensity = nil
         space.brightness = depth
         space.hue2 = hue2
-        space.tint2 = nil
+        // The second color as quiet as the first.
+        space.tint2 = hue2 == nil || tint > 0.995 ? nil : tint
         space.intensity2 = nil
         space.brightness2 = hue2 == nil ? nil : depth2
         if hue2 != nil { space.angle = angle }
@@ -389,16 +390,30 @@ struct SpaceLook {
         }
         guard let hue2 else { return space.hue2 == nil }
         guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005,
-              space.tintAmount2 > 0.99 else { return false }
+              abs(space.tintAmount2 - min(tint, 1)) < 0.01 else { return false }
         return true
     }
 
-    /// One row of looks that sit well together: white, black, glass and paper, then the seven soft hues around the
-    /// wheel (every color a new space is given, so it's always one of these).
+    /// Two rows of quiet looks. First white, black, clear and smoky glass and paper, then four deep ones that sink a
+    /// shade darker within one hue. Then soft gradients, each a near white fading into one gentle tint, one of them glass.
     static let presets: [SpaceLook] = [
-        curated(.snow), curated(.ink), curated(.graphite, name: "Glass", seeThrough: 0.7), curated(.sand, name: "Paper", grain: 0.5),
-        curated(.sky), curated(.lavender), curated(.rose), curated(.peach), curated(.sand), curated(.sage), curated(.mint),
+        curated(.snow), curated(.ink), curated(.graphite, name: "Glass", seeThrough: 0.7),
+        SpaceLook(name: "Smoke", tint: 0, depth: 0.9, seeThrough: 0.6), curated(.sand, name: "Paper", grain: 0.5),
+        deep("Espresso", hue: 0.07), deep("Pine", hue: 0.42), deep("Ink Blue", hue: 0.64), deep("Aubergine", hue: 0.88),
+        soft("Matcha", hue: 0.27), soft("Sea Glass", hue: 0.46), soft("Cloud", hue: 0.6), soft("Lavender", hue: 0.77),
+        soft("Sakura", hue: 0.95), soft("Apricot", hue: 0.07), soft("Butter", hue: 0.125, depth2: 0.2), soft("Oat", hue: 0.1, tint: 0.5),
+        SpaceLook(name: "Frost", hue: 0.6, tint: 0.6, depth: 0.02, hue2: 0.6, depth2: 0.26, angle: 90, seeThrough: 0.5),
     ]
+
+    /// A near white at the top fading into a gentle tint of one hue at the bottom.
+    private static func soft(_ name: String, hue: Double, tint: Double = 1, depth2: Double = 0.27) -> SpaceLook {
+        SpaceLook(name: name, hue: hue, tint: tint, depth: 0.0, hue2: hue, depth2: depth2, angle: 90)
+    }
+
+    /// A deep, quiet color that sinks a shade darker toward the bottom.
+    private static func deep(_ name: String, hue: Double) -> SpaceLook {
+        SpaceLook(name: name, hue: hue, tint: 0.5, depth: 0.8, hue2: hue, depth2: 0.94, angle: 90)
+    }
 }
 
 /// A small checkerboard, the usual sign for see-through.
@@ -435,7 +450,7 @@ final class LookSwatch: InteractiveView {
         grain.isHidden = look.grain == 0
         grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
         grain.compositingFilter = "softLightBlendMode"
-        grain.opacity = Float(min(1, look.grain * 0.8))
+        grain.opacity = Float(min(1, look.grain * 0.5))
         fill.addSublayer(grain)
         toolTip = look.name
         setAccessibilityRole(.radioButton)
@@ -470,7 +485,8 @@ final class LookSwatch: InteractiveView {
                 let space = look.space
                 // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
                 // mode, where every frame color is deep; white, grays and black as they are.
-                let start = space.isNeutral ? space.frameColor : space.swatch
+                // A designed look (a gradient, smoke) shows its real frame colors.
+                let start = space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
                 // See-through shows the checkerboard through the color, as the window shows the desktop.
                 let alpha = 1 - 0.45 * look.seeThrough
                 fill.colors = [start, space.frameColor2 ?? start].map { $0.withAlphaComponent(alpha).cgColor }
@@ -1252,6 +1268,12 @@ final class SpaceLookEditor: NSView {
     // MARK: Layout
 
     private let swatchSize: CGFloat = 24
+    /// The presets sit in rows of nine.
+    private static let swatchesPerRow = 9
+    private var swatchRowsHeight: CGFloat {
+        let rows = CGFloat((swatches.count + Self.swatchesPerRow - 1) / Self.swatchesPerRow)
+        return rows * swatchSize + (rows - 1) * Tokens.Space.x2
+    }
     private let chipSize: CGFloat = 26
     private let sliderHeight: CGFloat = 30
     /// The Colors row: as tall as the dial, a little more than a slider.
@@ -1262,7 +1284,7 @@ final class SpaceLookEditor: NSView {
 
     /// The presets first, one tap each; the wheel and Shade for a color of your own; then Effects, folded.
     var preferredHeight: CGFloat {
-        var h = swatchSize + Tokens.Space.x4 + wheelHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x3 + disclosureHeight
+        var h = swatchRowsHeight + Tokens.Space.x4 + wheelHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x3 + disclosureHeight
         if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
         if showsGlass { h += sliderHeight + Tokens.Space.x3 }
         return h
@@ -1278,12 +1300,13 @@ final class SpaceLookEditor: NSView {
         super.layout()
         let width = bounds.width
         var y: CGFloat = 0
-        let count = CGFloat(swatches.count)
-        let gap = (width - count * swatchSize) / max(count - 1, 1)
+        let perRow = Self.swatchesPerRow
+        let gap = (width - CGFloat(perRow) * swatchSize) / CGFloat(max(perRow - 1, 1))
         for (i, swatch) in swatches.enumerated() {
-            swatch.frame = NSRect(x: CGFloat(i) * (swatchSize + gap), y: y, width: swatchSize, height: swatchSize)
+            swatch.frame = NSRect(x: CGFloat(i % perRow) * (swatchSize + gap), y: y + CGFloat(i / perRow) * (swatchSize + Tokens.Space.x2),
+                                  width: swatchSize, height: swatchSize)
         }
-        y += swatchSize + Tokens.Space.x4
+        y += swatchRowsHeight + Tokens.Space.x4
         wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
         y += wheelHeight + Tokens.Space.x3
         row(shadeLabel, shadeSlider, y: y, height: sliderHeight)
