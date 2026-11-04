@@ -281,29 +281,13 @@ final class SidebarView: NSView {
         button.isChrome = true
         return button
     }
-    // The four top controls are drawn as one set (`LineGlyph`): one stroke, one box, one middle line.
-    let backButton: IconButton = {
-        let button = SidebarView.chromeButton("chevron.left", toolTip: "Back")
-        button.glyph = LineGlyph.back
-        return button
-    }()
-    let forwardButton: IconButton = {
-        let button = SidebarView.chromeButton("chevron.right", toolTip: "Forward")
-        button.glyph = LineGlyph.forward
-        return button
-    }()
-    let reloadButton: IconButton = {
-        let button = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
-        button.glyph = LineGlyph.reload
-        return button
-    }()
+    // The four top controls are one set: Apple's own symbols, drawn at one size and weight, so they match and line up.
+    let backButton = SidebarView.chromeButton("chevron.left", toolTip: "Back")
+    let forwardButton = SidebarView.chromeButton("chevron.right", toolTip: "Forward")
+    let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton: IconButton = {
-        let button = SidebarView.chromeButton("sidebar.left", toolTip: "Hide Sidebar")
-        button.glyph = LineGlyph.sidebar
-        return button
-    }()
+    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: "Hide Sidebar")
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
@@ -531,7 +515,7 @@ final class SidebarView: NSView {
         backButton.isEnabled = tab?.canGoBackOrReturn ?? false
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
-        reloadButton.glyph = (tab?.isLoading ?? false) ? LineGlyph.stop : LineGlyph.reload
+        reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, isSecure: tab?.url?.scheme == "https")
     }

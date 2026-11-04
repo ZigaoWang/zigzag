@@ -411,45 +411,6 @@ enum LineGlyph {
         return image
     }
 
-    /// The sidebar: a window, its sidebar ruled off at the left, a short line in it for the list.
-    static let sidebar = draw { path in
-        path.appendRoundedRect(NSRect(x: 1.5, y: 2.5, width: 13, height: 11), xRadius: 2.6, yRadius: 2.6)
-        path.move(to: NSPoint(x: 6, y: 2.5)); path.line(to: NSPoint(x: 6, y: 13.5))
-        path.move(to: NSPoint(x: 3.3, y: 5.3)); path.line(to: NSPoint(x: 4.2, y: 5.3))
-        path.move(to: NSPoint(x: 3.3, y: 7.3)); path.line(to: NSPoint(x: 4.2, y: 7.3))
-    }
-
-    /// Back and forward: a chevron as tall as the sidebar glyph's window, its arms meeting at the middle.
-    static let back = draw { path in
-        path.move(to: NSPoint(x: 10, y: 3.5)); path.line(to: NSPoint(x: 5.5, y: 8)); path.line(to: NSPoint(x: 10, y: 12.5))
-    }
-    static let forward = draw { path in
-        path.move(to: NSPoint(x: 6, y: 3.5)); path.line(to: NSPoint(x: 10.5, y: 8)); path.line(to: NSPoint(x: 6, y: 12.5))
-    }
-
-    /// Reload: a circle turning clockwise, the chevrons' height and centered as they are, open between twelve and two
-    /// o'clock with a small head at twelve pointing on round.
-    static let reload = draw { path in
-        let center = NSPoint(x: 8, y: 8), r: CGFloat = 4.6
-        func point(_ degrees: CGFloat) -> NSPoint {
-            let t = degrees * .pi / 180
-            return NSPoint(x: center.x + cos(t) * r, y: center.y + sin(t) * r)
-        }
-        // The view is flipped: angles grow clockwise on screen, -90 is twelve o'clock.
-        path.move(to: point(-30))
-        for d in stride(from: -30, through: 265, by: 5) { path.line(to: point(CGFloat(d))) }
-        let tip = point(268)
-        path.move(to: NSPoint(x: tip.x - 2.1, y: tip.y - 2.1))
-        path.line(to: tip)
-        path.line(to: NSPoint(x: tip.x - 2.1, y: tip.y + 2.1))
-    }
-
-    /// Stop loading: a cross the size of the chevrons.
-    static let stop = draw { path in
-        path.move(to: NSPoint(x: 4.5, y: 4.5)); path.line(to: NSPoint(x: 11.5, y: 11.5))
-        path.move(to: NSPoint(x: 11.5, y: 4.5)); path.line(to: NSPoint(x: 4.5, y: 11.5))
-    }
-
     /// Something new: a plus, shorter and lighter than type's, its arms the same length.
     static let plus = draw { path in
         path.move(to: NSPoint(x: 8, y: 3.5)); path.line(to: NSPoint(x: 8, y: 12.5))
