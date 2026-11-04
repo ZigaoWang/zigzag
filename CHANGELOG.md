@@ -5,6 +5,21 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-04
+
+### New
+- More search engines: Startpage, Perplexity, Yahoo, Baidu and Yandex, or your own with Custom.
+
+### Fixed
+- Opening Settings from a private window no longer replaces your saved windows.
+- Zigzag keeps your spaces if it finds settings from a newer version, and logging can't crash it on a full disk.
+- Web pages can no longer tell which sites you've visited, and Clear History also clears the site icons it kept.
+- A strong password only fills on the site it was made for.
+- Clear runs one step per click, and folders inside folders keep their place when you add to or move them.
+- Zigzag uses less energy: the window's glass rests when nothing shows through it or the tab overview is open, and blurs go still behind other apps.
+- Search engines show their icons before you visit them, and Clear glass carries more of the space's color.
+- Buttons on Zigzag's own pages use the space's color, and media controls use thin outline icons.
+
 ## [0.5.5] - 2026-11-04
 
 ### Fixed
@@ -384,7 +399,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/ZigaoWang/zigzag/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/ZigaoWang/zigzag/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/ZigaoWang/zigzag/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/ZigaoWang/zigzag/compare/v0.5.2...v0.5.3
