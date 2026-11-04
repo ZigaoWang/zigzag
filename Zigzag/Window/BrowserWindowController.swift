@@ -472,7 +472,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // more shows.
         window?.isOpaque = !clear
         window?.backgroundColor = clear ? .clear : .windowBackgroundColor
-        root.setGlass(clear)
+        root.setGlass(clear, strength: space.frostStrength)
         // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
         // sits under it and would be hidden); a single color washes as a gradient of itself.
         root.setColor(clear ? .clear : color, animated: animated)
