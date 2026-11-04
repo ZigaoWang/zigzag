@@ -100,6 +100,39 @@ struct BookmarkFolderTests {
         #expect(list.map(\.title) == ["a", "c", "b", "d"])
     }
 
+    @Test func keepsASubfolderInsideItsParent() {
+        let b = pages("a", "b", "c", "d", "e")
+        let outer = BookmarkFolder(name: "Outer", bookmarkIDs: [b[1].id])
+        var inner = BookmarkFolder(name: "Inner", bookmarkIDs: [b[4].id, b[3].id])
+        inner.parentID = outer.id
+        let (list, folders) = Library.tidied(b, [outer, inner])
+        // Outer's own page, then Inner's pages, all together where Outer's first page was.
+        #expect(list.map(\.title) == ["a", "b", "d", "e", "c"])
+        #expect(folders.pages(in: outer.id) == Set([b[1].id, b[3].id, b[4].id]))
+        #expect(folders.depth(of: inner.id) == 1)
+    }
+
+    @Test func aFolderNeverEndsUpInsideItself() {
+        let b = pages("a", "b")
+        var one = BookmarkFolder(name: "1", bookmarkIDs: [b[0].id])
+        var two = BookmarkFolder(name: "2", bookmarkIDs: [b[1].id])
+        one.parentID = two.id
+        two.parentID = one.id
+        let (list, folders) = Library.tidied(b, [one, two])
+        #expect(list.count == 2)
+        #expect(folders.contains { $0.parentID == nil })
+    }
+
+    @Test func anEmptySubfolderSitsAtTheTopOfItsParent() {
+        let b = pages("a", "b")
+        let outer = BookmarkFolder(name: "Outer", bookmarkIDs: [b[0].id, b[1].id])
+        var empty = BookmarkFolder(name: "Empty")
+        empty.parentID = outer.id
+        let (list, folders) = Library.tidied(b, [outer, empty])
+        #expect(list.map(\.title) == ["a", "b"])
+        #expect(folders.children(of: outer.id).map(\.name) == ["Empty"])
+    }
+
     @Test func olderLibrariesWithoutFoldersStillLoad() throws {
         let json = Data(#"{"id":"6B1E4C1E-0000-4000-8000-000000000002","name":"Home","color":"sky","bookmarks":[]}"#.utf8)
         let space = try JSONDecoder().decode(SpaceInfo.self, from: json)

@@ -7,7 +7,7 @@ struct Bookmark: Codable, Identifiable, Equatable {
 }
 
 /// A named group of a space's pinned pages, folded open or shut in the sidebar. Its pages stay in the space's own list
-/// (kept next to each other); the folder only says which ones it holds.
+/// (kept next to each other, its subfolders' with them); the folder only says which ones it holds directly.
 struct BookmarkFolder: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
@@ -15,6 +15,37 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     var isOpen = true
     /// Drawn inside the folder: an SF Symbol's name, or an emoji. Nil: a plain folder.
     var icon: String? = nil
+    /// The folder this one is inside. Nil: it sits among the space's pinned pages.
+    var parentID: UUID? = nil
+}
+
+extension Array where Element == BookmarkFolder {
+    /// The folders directly inside `parent` (nil: the top level).
+    nonisolated func children(of parent: UUID?) -> [BookmarkFolder] { filter { $0.parentID == parent } }
+
+    /// Every folder inside `id`, at any depth.
+    nonisolated func descendants(of id: UUID) -> [UUID] {
+        var result: [UUID] = [], queue = [id]
+        while let next = queue.popLast() {
+            for child in children(of: next) where !result.contains(child.id) { result.append(child.id); queue.append(child.id) }
+        }
+        return result
+    }
+
+    /// Every pinned page in a folder or its subfolders.
+    nonisolated func pages(in id: UUID) -> Set<UUID> {
+        var ids = Set(first { $0.id == id }?.bookmarkIDs ?? [])
+        for sub in descendants(of: id) { ids.formUnion(first { $0.id == sub }?.bookmarkIDs ?? []) }
+        return ids
+    }
+
+    /// How many folders a folder is inside (0 at the top level).
+    nonisolated func depth(of id: UUID) -> Int {
+        var depth = 0, seen: Set<UUID> = [id]
+        var parent = first { $0.id == id }?.parentID
+        while let p = parent, seen.insert(p).inserted { depth += 1; parent = first { $0.id == p }?.parentID }
+        return depth
+    }
 }
 
 /// Two pinned pages that open side by side, as the split view they were pinned from. Its pages stay in the space's
@@ -678,13 +709,43 @@ final class Library {
 
     private func spaceIndex(ofFolder id: UUID) -> Int? { spaces.firstIndex { $0.folders?.contains { $0.id == id } == true } }
 
-    /// A new folder in a space, holding these pinned pages (gathered where the first of them is).
+    /// Every pinned page in a folder and its subfolders, in the list's order.
+    func allBookmarkIDs(inFolder id: UUID) -> [UUID] {
+        guard let s = spaceIndex(ofFolder: id) else { return [] }
+        let inside = (spaces[s].folders ?? []).pages(in: id)
+        return spaces[s].bookmarks.map(\.id).filter { inside.contains($0) }
+    }
+
+    /// Every folder inside this one, at any depth.
+    func subfolderIDs(of id: UUID) -> [UUID] {
+        guard let s = spaceIndex(ofFolder: id) else { return [] }
+        return (spaces[s].folders ?? []).descendants(of: id)
+    }
+
+    /// How many folders a folder sits inside.
+    func depth(ofFolder id: UUID) -> Int {
+        guard let s = spaceIndex(ofFolder: id) else { return 0 }
+        return (spaces[s].folders ?? []).depth(of: id)
+    }
+
+    /// A new folder in a space, holding these pinned pages (gathered where the first of them is). `parent`: the
+    /// folder it goes in; left out, it goes in the folder its pages share, if they all share one.
     @discardableResult
-    func addFolder(named name: String, with bookmarkIDs: [UUID], in spaceID: UUID) -> BookmarkFolder? {
+    func addFolder(named name: String, with bookmarkIDs: [UUID], in spaceID: UUID, parent: UUID?? = .none) -> BookmarkFolder? {
         guard let s = self.index(of: spaceID) else { return nil }
         let members = spaces[s].bookmarks.map(\.id).filter { bookmarkIDs.contains($0) }
+        let shared: UUID? = {
+            let homes = Set(members.map { id in spaces[s].folders?.first { $0.bookmarkIDs.contains(id) }?.id })
+            return homes.count == 1 ? homes.first ?? nil : nil
+        }()
+        let inside: UUID? = switch parent { case .some(let chosen): chosen; case .none: shared }
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { members.contains($0) } }
-        let folder = BookmarkFolder(name: name, bookmarkIDs: members)
+        var folder = BookmarkFolder(name: name, bookmarkIDs: members)
+        if let inside, spaces[s].folders?.contains(where: { $0.id == inside }) == true {
+            folder.parentID = inside
+            // Open on the way in, so the new folder shows.
+            if let p = spaces[s].folders?.firstIndex(where: { $0.id == inside }) { spaces[s].folders?[p].isOpen = true }
+        }
         spaces[s].folders = (spaces[s].folders ?? []) + [folder]
         tidyFolders(s)
         commit()
@@ -710,26 +771,45 @@ final class Library {
         commit()
     }
 
-    /// The folder goes; the pinned pages in it stay where they are.
+    /// The folder goes; what was in it (pages and folders) stays where it was, one level up.
     func removeFolder(_ id: UUID) {
-        guard let s = spaceIndex(ofFolder: id) else { return }
+        guard let s = spaceIndex(ofFolder: id), let gone = spaces[s].folders?.first(where: { $0.id == id }) else { return }
+        for f in (spaces[s].folders ?? []).indices where spaces[s].folders?[f].parentID == id {
+            spaces[s].folders?[f].parentID = gone.parentID
+        }
+        if let parent = gone.parentID, let p = spaces[s].folders?.firstIndex(where: { $0.id == parent }) {
+            spaces[s].folders?[p].bookmarkIDs.append(contentsOf: gone.bookmarkIDs)
+        }
         spaces[s].folders?.removeAll { $0.id == id }
+        tidyFolders(s)
         commit()
     }
 
-    /// Moves a folder and its pages to a place in a space's list, counted in pinned pages without its own. It never
-    /// lands between another folder's pages or a pinned split's two; its own pinned splits go along.
-    func moveFolder(_ id: UUID, to index: Int, in spaceID: UUID) {
+    /// Moves a folder, with everything inside it, to a place in a space's list, counted in pinned pages without its
+    /// own. `parent`: the folder it goes into (nil: the top level); left out, it stays in the one it's in when it stays
+    /// in its space. At the top level it never lands between another folder's pages or a pinned split's two; its own
+    /// pinned splits go along.
+    func moveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?? = .none) {
         guard let s = spaceIndex(ofFolder: id), let target = self.index(of: spaceID),
-              let f = spaces[s].folders?.firstIndex(where: { $0.id == id }), let folder = spaces[s].folders?[f] else { return }
-        let at = folderDropIndex(index, moving: id, in: spaceID)
-        let members = Set(folder.bookmarkIDs)
+              let f = spaces[s].folders?.firstIndex(where: { $0.id == id }), var folder = spaces[s].folders?[f] else { return }
+        let inner = (spaces[s].folders ?? []).descendants(of: id)
+        // Never into itself or a folder inside it, and only into a folder of the space it lands in.
+        var into: UUID? = switch parent { case .some(let chosen): chosen; case .none: s == target ? folder.parentID : nil }
+        if let p = into, p == id || inner.contains(p) || spaces[target].folders?.contains(where: { $0.id == p }) != true { into = folder.parentID.flatMap { s == target ? $0 : nil } }
+        let at = into == nil ? folderDropIndex(index, moving: id, in: spaceID) : index
+        let members = (spaces[s].folders ?? []).pages(in: id)
         let moving = spaces[s].bookmarks.filter { members.contains($0.id) }
         spaces[s].bookmarks.removeAll { members.contains($0.id) }
         spaces[target].bookmarks.insert(contentsOf: moving, at: min(at, spaces[target].bookmarks.count))
+        folder.parentID = into
+        spaces[s].folders?[f] = folder
+        if let p = into, let pi = spaces[target].folders?.firstIndex(where: { $0.id == p }) { spaces[target].folders?[pi].isOpen = true }
         if s != target {
-            spaces[s].folders?.remove(at: f)
-            spaces[target].folders = (spaces[target].folders ?? []) + [folder]
+            // Its subfolders go along.
+            let travelling = Set([id] + inner)
+            let carried = (spaces[s].folders ?? []).filter { travelling.contains($0.id) }
+            spaces[s].folders?.removeAll { travelling.contains($0.id) }
+            spaces[target].folders = (spaces[target].folders ?? []) + carried
             let splits = spaces[s].pinnedSplits?.filter { members.contains($0.left) } ?? []
             spaces[s].pinnedSplits?.removeAll { members.contains($0.left) }
             if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
@@ -743,15 +823,23 @@ final class Library {
     /// Where a folder dropped at `index` in a space's list lands (see `moveFolder`).
     func folderDropIndex(_ index: Int, moving folderID: UUID, in spaceID: UUID) -> Int {
         guard let space = space(spaceID) else { return index }
-        let moving = Set(folder(folderID)?.bookmarkIDs ?? [])
+        let all = space.folders ?? []
+        let moving = all.pages(in: folderID)
+        let travelling = Set([folderID] + all.descendants(of: folderID))
         return Self.folderDropIndex(index, in: space.bookmarks.map(\.id).filter { !moving.contains($0) },
-                                    folders: (space.folders ?? []).filter { $0.id != folderID }, splits: space.pinnedSplits ?? [])
+                                    folders: all.filter { !travelling.contains($0.id) }, splits: space.pinnedSplits ?? [])
     }
 
     /// Between pages that belong together (one folder's, or a pinned split's two), a folder goes to the nearer end.
     nonisolated static func folderDropIndex(_ index: Int, in ids: [UUID], folders: [BookmarkFolder], splits: [PinnedSplit]) -> Int {
+        // A page belongs to its outermost folder: a folder at the top level never lands inside another's subfolders.
+        func root(_ id: UUID) -> UUID {
+            var current = id, seen: Set<UUID> = [id]
+            while let parent = folders.first(where: { $0.id == current })?.parentID, seen.insert(parent).inserted { current = parent }
+            return current
+        }
         var group: [UUID: UUID] = [:]
-        for folder in folders { for id in folder.bookmarkIDs { group[id] = folder.id } }
+        for folder in folders { let r = root(folder.id); for id in folder.bookmarkIDs { group[id] = r } }
         for split in splits where group[split.left] == nil { group[split.left] = split.left; group[split.right] = split.left }
         let at = max(0, min(index, ids.count))
         guard at > 0, at < ids.count, let g = group[ids[at - 1]], group[ids[at]] == g else { return at }
@@ -909,19 +997,50 @@ final class Library {
             folders[f].bookmarkIDs = ids.filter { folders[f].bookmarkIDs.contains($0) && !claimed.contains($0) }
             claimed.formUnion(folders[f].bookmarkIDs)
         }
+        // A folder's parent is a folder that's here, and never itself or one inside it.
+        let known = Set(folders.map(\.id))
+        for f in folders.indices {
+            guard let parent = folders[f].parentID else { continue }
+            var seen: Set<UUID> = [folders[f].id], p: UUID? = parent, loops = false
+            while let q = p {
+                if !known.contains(q) || !seen.insert(q).inserted { loops = true; break }
+                p = folders.first { $0.id == q }?.parentID
+            }
+            if loops { folders[f].parentID = nil }
+        }
+        // Each level in the order its first page comes; an empty folder at the top of where it sits. Pages of a folder
+        // and of all its subfolders end up side by side, each subfolder's inside its parent's.
+        let position = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        var folderOf: [UUID: UUID] = [:]
+        for folder in folders { for id in folder.bookmarkIDs { folderOf[id] = folder.id } }
+        var firstAt: [UUID: Int] = [:]
+        func first(_ id: UUID) -> Int {
+            if let known = firstAt[id] { return known }
+            firstAt[id] = -1
+            let own = folders.first { $0.id == id }?.bookmarkIDs.compactMap { position[$0] } ?? []
+            let inner = folders.children(of: id).map { first($0.id) }.filter { $0 >= 0 }
+            let at = (own + inner).min() ?? -1
+            firstAt[id] = at
+            return at
+        }
+        let byID = Dictionary(bookmarks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var result: [Bookmark] = []
         var placed: Set<UUID> = []
-        let byID = Dictionary(bookmarks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        for bookmark in bookmarks where !placed.contains(bookmark.id) {
-            if let folder = folders.first(where: { $0.bookmarkIDs.contains(bookmark.id) }) {
-                for id in folder.bookmarkIDs where !placed.contains(id) {
-                    if let b = byID[id] { result.append(b); placed.insert(id) }
-                }
-            } else {
-                result.append(bookmark)
-                placed.insert(bookmark.id)
+        var emitted: Set<UUID> = []
+        func emit(_ parent: UUID?) {
+            var units: [(at: Int, order: Int, page: UUID?, folder: UUID?)] = []
+            for (i, id) in ids.enumerated() where folderOf[id] == parent { units.append((i, i, id, nil)) }
+            for (i, folder) in folders.enumerated() where folder.parentID == parent { units.append((first(folder.id), ids.count + i, nil, folder.id)) }
+            units.sort { ($0.at, $0.order) < ($1.at, $1.order) }
+            for unit in units {
+                if let page = unit.page, !placed.contains(page), let b = byID[page] { result.append(b); placed.insert(page) }
+                if let folder = unit.folder, emitted.insert(folder).inserted { emit(folder) }
             }
         }
+        emit(nil)
+        // Anything a broken record left out still stays pinned, at the end.
+        for bookmark in bookmarks where !placed.contains(bookmark.id) { result.append(bookmark) }
+        for f in folders.indices { folders[f].bookmarkIDs = result.map(\.id).filter { folders[f].bookmarkIDs.contains($0) } }
         return (result, folders)
     }
 
