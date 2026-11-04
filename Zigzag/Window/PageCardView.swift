@@ -64,10 +64,12 @@ final class PageCardView: NSView {
         needsLayout = true
     }
 
-    /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades when done.
+    /// Page loading, in the space's accent: a thin line along the card's top edge that grows with the load and fades
+    /// when done. Between WebKit's steps it keeps creeping on, so a slow page never looks stuck.
     private let progressLine = CALayer()
     private var progress: CGFloat = 0
     private var isShowingProgress = false
+    private var creep: Timer?
 
     /// The page whose load the line shows: the one in this card, whichever tab is selected. In split view each card
     /// follows its own pane's page.
@@ -91,6 +93,7 @@ final class PageCardView: NSView {
     /// The line gone at once, wherever it was.
     private func resetLoading() {
         progressLine.removeAllAnimations()
+        stopCreeping()
         isShowingProgress = false
         progress = 0
         Tokens.Motion.withoutAnimation {
@@ -107,7 +110,7 @@ final class PageCardView: NSView {
             progressLine.zPosition = 100
             clip.layer?.addSublayer(progressLine)
         }
-        Tokens.Motion.withoutAnimation { progressLine.backgroundColor = cgColor(Brand.Theme.current.accent) }
+        paintProgress()
         let target = loading ? max(0.08, CGFloat(value)) : 1
         guard loading || isShowingProgress else { return }
         if loading && !isShowingProgress {
@@ -115,6 +118,7 @@ final class PageCardView: NSView {
             isShowingProgress = true
             progress = 0
             Tokens.Motion.withoutAnimation { progressLine.opacity = 1; layoutProgress() }
+            startCreeping()
         }
         guard target >= progress || !loading else { return }
         progress = target
@@ -125,6 +129,7 @@ final class PageCardView: NSView {
         CATransaction.commit()
         guard !loading else { return }
         isShowingProgress = false
+        stopCreeping()
         CATransaction.begin()
         CATransaction.setAnimationDuration(Tokens.Motion.large)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
@@ -136,6 +141,35 @@ final class PageCardView: NSView {
         let top = showsHeader ? PaneHeaderView.height : 0
         progressLine.bounds = CGRect(x: 0, y: 0, width: clip.bounds.width * progress, height: 2)
         progressLine.position = CGPoint(x: 0, y: clip.bounds.height - top)
+    }
+
+    private func paintProgress() {
+        Tokens.Motion.withoutAnimation { progressLine.backgroundColor = cgColor(Brand.Theme.current.accent) }
+    }
+
+    /// While the page loads, the line inches toward 90% between WebKit's steps, slower the further it gets. Not with
+    /// Reduce Motion.
+    private func startCreeping() {
+        stopCreeping()
+        guard !Tokens.Motion.reduceMotion else { return }
+        creep = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isShowingProgress else { return }
+                let next = self.progress + (0.9 - self.progress) * 0.05
+                guard next > self.progress else { return }
+                self.progress = next
+                CATransaction.begin()
+                CATransaction.setAnimationDuration(0.5)
+                CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
+                self.layoutProgress()
+                CATransaction.commit()
+            }
+        }
+    }
+
+    private func stopCreeping() {
+        creep?.invalidate()
+        creep = nil
     }
 
     func setOverlay(_ view: NSView?) {
@@ -233,9 +267,9 @@ final class PageCardView: NSView {
     }
 
     private func refreshColors() {
+        paintProgress()
         Tokens.Motion.withoutAnimation {
             clip.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
-            progressLine.backgroundColor = cgColor(Brand.Theme.current.accent)
             edge.borderColor = cgColor(Tokens.Color.cardEdge)
             // Meeting the window's edges, the page's own edge is its outline: a drawn one runs along the window's edge
             // and round the corners as an extra line.
