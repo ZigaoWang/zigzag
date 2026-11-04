@@ -19,8 +19,12 @@ final class CommandRowView: InteractiveView {
     private let action = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let returnKey = KeyCap(symbol: "return")
 
+    private var themeToken: SignalToken?
+
     override init(frame: NSRect) {
         super.init(frame: frame)
+        // Its colors are the space's: worked out again once it's in a window, and when the space's look changes.
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.stateDidChange(animated: false) }
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         symbolView.imageScaling = .scaleNone
@@ -47,6 +51,11 @@ final class CommandRowView: InteractiveView {
         setAccessibilityRole(result.isActionable ? .button : .staticText)
         setAccessibilityLabel(result.detail.isEmpty ? result.title : "\(result.title), \(result.detail)")
         needsLayout = true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        stateDidChange(animated: false)
     }
 
     /// Where a row's title starts, from the row's edge: the field's text lines up with it.
