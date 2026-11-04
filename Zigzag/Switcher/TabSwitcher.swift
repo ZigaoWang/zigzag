@@ -73,7 +73,7 @@ final class TabThumbnailView: InteractiveView {
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let ring = CALayer()
     /// A page playing sound: a speaker after its title, as in the sidebar. Clicking it mutes the page, or unmutes it.
-    private let audioButton = IconButton(symbol: "speaker.wave.2.fill", size: .compact, toolTip: "Mute Tab")
+    private let audioButton = IconButton(symbol: "speaker.wave.2", size: .compact, toolTip: "Mute Tab")
     var showsTitle = true { didSet { needsLayout = true } }
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
     var showsRing = false
@@ -164,7 +164,7 @@ final class TabThumbnailView: InteractiveView {
 
     private func refreshAudio() {
         let page = audioTab
-        audioButton.symbol = page?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        audioButton.symbol = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         audioButton.toolTip = page?.isMuted == true ? "Unmute Tab" : "Mute Tab"
         needsLayout = true
     }

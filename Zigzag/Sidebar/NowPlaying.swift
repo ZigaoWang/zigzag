@@ -5,8 +5,8 @@ import AppKit
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
-    let playButton = TabRowView.rowButton("pause.fill", toolTip: "Pause")
-    let muteButton = TabRowView.rowButton("speaker.wave.2.fill", toolTip: "Mute")
+    let playButton = TabRowView.rowButton("pause", toolTip: "Pause")
+    let muteButton = TabRowView.rowButton("speaker.wave.2", toolTip: "Mute")
     private(set) weak var tab: Tab?
     var isPaused = false { didSet { refresh() } }
 
@@ -30,9 +30,9 @@ final class NowPlayingView: InteractiveView {
         guard let tab else { return }
         icon.image = tab.favicon
         title.stringValue = tab.displayTitle
-        playButton.symbol = isPaused ? "play.fill" : "pause.fill"
+        playButton.symbol = isPaused ? "play" : "pause"
         playButton.toolTip = isPaused ? "Play" : "Pause"
-        muteButton.symbol = tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        muteButton.symbol = tab.isMuted ? "speaker.slash" : "speaker.wave.2"
         muteButton.toolTip = tab.isMuted ? "Unmute" : "Mute"
         needsLayout = true
     }

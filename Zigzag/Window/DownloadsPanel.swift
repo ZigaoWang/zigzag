@@ -12,7 +12,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     private let fill = ColorView(color: Tokens.Color.accent)
     let actionButton = IconButton(symbol: "magnifyingglass", size: .compact, toolTip: "Show in Finder")
     /// Pause or resume, beside Cancel, while a download is under way or paused.
-    let pauseButton = IconButton(symbol: "pause.fill", size: .compact, toolTip: "Pause")
+    let pauseButton = IconButton(symbol: "pause", size: .compact, toolTip: "Pause")
     private(set) var item: DownloadItem?
     /// The newest download, finished in the last few minutes: the one you're looking for. Its status says so, in
     /// the space's accent; nothing else about the row changes.
@@ -109,14 +109,14 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
             status.stringValue = item.secondsLeft.map { "\(amount), \(Self.timeLeft($0))" } ?? amount
             actionButton.symbol = "xmark"
             actionButton.toolTip = "Cancel"
-            pauseButton.symbol = "pause.fill"
+            pauseButton.symbol = "pause"
             pauseButton.toolTip = "Pause"
         case .paused:
             let done = formatter.string(fromByteCount: item.completedBytes)
             status.stringValue = item.totalBytes > 0 ? "Paused, \(done) of \(formatter.string(fromByteCount: item.totalBytes))" : "Paused"
             actionButton.symbol = "xmark"
             actionButton.toolTip = "Cancel"
-            pauseButton.symbol = "play.fill"
+            pauseButton.symbol = "play"
             pauseButton.toolTip = "Resume"
         case .finished where item.fileIsMissing:
             // Deleted or moved since: say so, and offer to fetch it again when that's possible.

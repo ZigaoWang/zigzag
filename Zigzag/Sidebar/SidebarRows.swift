@@ -136,8 +136,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     let closeButton = TabRowView.rowButton("xmark", toolTip: "Close Tab")
     /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
     /// the partner's half. Clicking one mutes or unmutes that page.
-    let audioButton = TabRowView.rowButton("speaker.wave.2.fill", toolTip: "Mute Tab")
-    let partnerAudioButton = TabRowView.rowButton("speaker.wave.2.fill", toolTip: "Mute Tab")
+    let audioButton = TabRowView.rowButton("speaker.wave.2", toolTip: "Mute Tab")
+    let partnerAudioButton = TabRowView.rowButton("speaker.wave.2", toolTip: "Mute Tab")
 
     static func rowButton(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: Tokens.Sidebar.rowButton, symbolSize: Tokens.Sidebar.rowGlyph, toolTip: toolTip)
@@ -295,7 +295,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
         partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
-        partnerAudioButton.symbol = partner?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        partnerAudioButton.symbol = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         partnerAudioButton.toolTip = partner?.isMuted == true ? "Unmute Tab" : "Mute Tab"
         refreshAccessories()
         refreshAccessibilityLabel()
@@ -359,7 +359,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
         icon.image = tab?.favicon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        audioButton.symbol = tab?.isMuted == true ? "speaker.slash.fill" : "speaker.wave.2.fill"
+        audioButton.symbol = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
         audioButton.toolTip = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
         refreshAccessibilityLabel()
         refreshTitleColor()
