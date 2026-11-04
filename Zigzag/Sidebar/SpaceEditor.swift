@@ -981,7 +981,7 @@ final class SpaceLookEditor: NSView {
     private let clearSlider = LookSlider(.seeThrough)
     /// Frosted or clear glass, for a see-through space.
     private let glassLabel = SpaceLookEditor.rowLabel("Glass")
-    private let glassSwitch = SlidingSwitch([.text("Frosted"), .text("Clear")])
+    private let glassSwitch = SlidingSwitch([.text("Clear"), .text("Frosted")])
     private let grainLabel = SpaceLookEditor.rowLabel("Grain")
     private let grainSlider = LookSlider(.grain)
 
@@ -1067,7 +1067,7 @@ final class SpaceLookEditor: NSView {
         }
         glassSwitch.onChange = { [weak self] index in
             guard let self else { return }
-            self.draft.clearGlass = index == 1 ? nil : false
+            self.draft.clearGlass = index == 0 ? nil : false
             self.changed(final: true, animated: false)
         }
         grainSlider.onChange = { [weak self] grain, final in
@@ -1185,7 +1185,7 @@ final class SpaceLookEditor: NSView {
         shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
         clearSlider.value = space.seeThrough
         clearSlider.colors = colors
-        glassSwitch.selectedIndex = space.usesClearGlass ? 1 : 0
+        glassSwitch.selectedIndex = space.usesClearGlass ? 0 : 1
         grainSlider.value = space.grain ?? 0
         grainSlider.colors = colors
         dial.angle = space.gradientAngle
