@@ -643,7 +643,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
         windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", control: borderlessToggle))
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
-        windowGroup.add(FormRow(title: "Large space names", detail: "The space’s name in large, light lowercase above its tabs. Off, it’s a plain heading.", control: largeNamesToggle))
+        windowGroup.add(FormRow(title: "Large space names", detail: "The space’s name large and light above its tabs. Off, it’s a plain heading.", control: largeNamesToggle))
         windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
 
         // Passwords

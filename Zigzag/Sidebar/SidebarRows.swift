@@ -646,7 +646,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 /// The space name above its bookmarks. Click it, or the chevron beside it, to fold the
 /// bookmarks away.
 final class SpaceHeaderView: InteractiveView {
-    /// The space's name large, light and lowercase (Zigzag's own style), or at row size in its own case. A setting.
+    /// The space's name large and light (Zigzag's own style), or at row size. Always as typed: it's yours. A setting.
     static var isLarge: Bool {
         get { UserDefaults.standard.object(forKey: "LargeSpaceNames") as? Bool ?? true }
         set {
@@ -751,7 +751,7 @@ final class SpaceHeaderView: InteractiveView {
         let color = isHovered ? ink : ink.withAlphaComponent(0.86)
         // The label measures by its own font, so it follows the style in use.
         if label.font != Self.nameFont { label.font = Self.nameFont; needsLayout = true }
-        label.attributedStringValue = Self.isLarge ? Tokens.Font.voiceText(label.stringValue, color: color)
+        label.attributedStringValue = Self.isLarge ? Tokens.Font.voiceText(label.stringValue, color: color, lowercase: false)
             : NSAttributedString(string: label.stringValue, attributes: [.font: Self.nameFont, .foregroundColor: color])
         // A symbol takes the name's own ink; an emoji keeps its colors.
         iconView.contentTintColor = ink.withAlphaComponent(0.86)

@@ -18,7 +18,7 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
   script a page title can be in, and its display cut is the Univers-like grotesque this direction wants. What makes it
   ours is how it's set: light weights, one large display size against small text, display type tracked tight
   (`Font.voiceKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
-- **Case, decided once.** Names and titles in the app's voice are lowercase (see The voice): a space's name, a
+- **Case, decided once.** Titles in the app's voice are lowercase (see The voice): a
   page's title, a panel's title. Every other word Zigzag says is in its normal case: buttons, labels, menu items,
   tooltips ("New Tab", "Clear", "Close Duplicates"). Content keeps its own case: a page's title, a site's name, what
   you typed.
@@ -91,7 +91,7 @@ Mac-like. The browser window's chrome (the sidebar and a split pane's header) is
 `Tokens.Sidebar` and `Tokens.Pane`, in the table after these. Nothing else picks a size.
 
 SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight. The
-space's name in the sidebar is the one heading there: 26 light, lowercase, tracked tight (`Font.spaceName`), in the
+space's name in the sidebar is the one heading there: 26 light, tracked tight, in the case you typed it (`Font.spaceName`), in the
 space's own ink (`Brand.Theme.ink`), low in a 52pt slot.
 
 | Text | Token | Size, weight | For |
@@ -131,7 +131,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
 | Favorites | 4 to a row, 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
-| Space name | 26 light lowercase (`Font.spaceName`), kern -0.6, 52pt slot, its ink on the icon column |
+| Space name | 26 light, as typed (`Font.spaceName`), kern -0.6, 52pt slot, its ink on the icon column |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36 |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
 | Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
@@ -251,7 +251,7 @@ something came from, answers at once, and can be interrupted.
   ink centered on the lights' line (`Symbol.inkOffset`), in `Color.chromeIcon`, no fill until the pointer is on it.
   The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons,
   the accent ring from the keyboard). Favorites: small soft tiles four to a row in the same look. The space's name,
-  26 light and lowercase, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
+  26 light, over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
   plays or is muted, its own speaker. A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +.
 - **Pane header** (split view): on the page card, 30 tall: back, forward and reload, the address centered in a small
@@ -367,7 +367,7 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
   cards, no outlined buttons inside it.
 - **Type does the structure.** A large light title in the space's ink, like the sidebar's space name ("downloads",
   "avoidxray.com"), then plain rows. Secondary words are small and quiet. Normal case for words; only the big title
-  is lowercase, as the space name is.
+  is lowercase. A space's name is the one exception: it's yours, so it shows as typed.
 - **Actions are a row of thin line glyphs with small labels under them**, set on a grid (share, copy link, screenshot), not three big rounded buttons.
 - **Settings for the site are plain rows** with the slide switch at the end, separated by space, not by a card.
 - **One accent:** only what's on or chosen (a switch that's on, the main button) takes the space's accent.
