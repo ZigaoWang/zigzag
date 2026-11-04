@@ -104,9 +104,12 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var tint2: Double? = nil
     /// How much of the desktop shows through the frame, from 0 (solid) to 1 (the most). Nil: solid.
     var translucency: Double? = nil
-    /// See-through on a clearer, less milky glass with less of the space's color over it, so the desktop's own colors
-    /// and light come through, still blurred. Nil: frosted.
+    /// False: frosted glass, milkier and softer. Nil or true: clear glass where the Mac has it (`usesClearGlass`).
     var clearGlass: Bool? = nil
+    /// Whether this Mac has clear glass (Liquid Glass, macOS 26 and later).
+    static var hasClearGlass: Bool { if #available(macOS 26.0, *) { true } else { false } }
+    /// Clear glass, the default where the Mac has it; frosted when chosen, or before macOS 26.
+    var usesClearGlass: Bool { Self.hasClearGlass && clearGlass != false }
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
 
@@ -121,8 +124,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var isSeeThrough: Bool { seeThrough > 0.005 }
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
     /// never below a half, so the space keeps its color all the way up.
-    /// Clear glass lets more of the blurred desktop through: the color thins further, to about a third at the most.
-    var coverage: CGFloat { CGFloat(1 - (clearGlass == true ? 0.65 : 0.5) * seeThrough) }
+    /// Clear glass lets more of the blurred desktop through: the color thins further, to a fifth at the most.
+    var coverage: CGFloat { CGFloat(1 - (usesClearGlass ? 0.8 : 0.5) * seeThrough) }
 
     /// The window frame color for this space, solid.
     var background: NSColor {
@@ -203,6 +206,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         if glass == true {
             space.glass = nil
             space.translucency = translucency ?? Self.glassTranslucency
+            // It was frosted, and stays so: the new clear default is for spaces made see-through from now on.
+            space.clearGlass = false
             space.tint = 0
             space.hue2 = nil
             space.brightness2 = nil

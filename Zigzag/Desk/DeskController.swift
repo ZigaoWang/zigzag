@@ -118,7 +118,7 @@ final class DeskFrameView: NSView {
         glass.isHidden = !clear
         glass.frame = bounds
         // Clear glass, as the window has it: Liquid Glass tinted with the space's color, the grain inside it.
-        let liquid = clear && space.clearGlass == true
+        let liquid = clear && space.usesClearGlass
         if #available(macOS 26.0, *), liquid {
             glass.isHidden = true
             let view = clearGlass as? NSGlassEffectView ?? {

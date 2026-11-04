@@ -1067,7 +1067,7 @@ final class SpaceLookEditor: NSView {
         }
         glassSwitch.onChange = { [weak self] index in
             guard let self else { return }
-            self.draft.clearGlass = index == 1 ? true : nil
+            self.draft.clearGlass = index == 1 ? nil : false
             self.changed(final: true, animated: false)
         }
         grainSlider.onChange = { [weak self] grain, final in
@@ -1185,7 +1185,7 @@ final class SpaceLookEditor: NSView {
         shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
         clearSlider.value = space.seeThrough
         clearSlider.colors = colors
-        glassSwitch.selectedIndex = space.clearGlass == true ? 1 : 0
+        glassSwitch.selectedIndex = space.usesClearGlass ? 1 : 0
         grainSlider.value = space.grain ?? 0
         grainSlider.colors = colors
         dial.angle = space.gradientAngle
@@ -1199,7 +1199,7 @@ final class SpaceLookEditor: NSView {
         effects.isOpen = showsEffects
         for view in [colorsLabel, chips[0], clearLabel, clearSlider, grainLabel, grainSlider] as [NSView] { view.isHidden = !showsEffects }
         // Frosted or clear only matters once the space is see-through.
-        let glassShown = showsEffects && space.isSeeThrough
+        let glassShown = showsEffects && space.isSeeThrough && SpaceInfo.hasClearGlass
         for view in [glassLabel, glassSwitch] as [NSView] { view.isHidden = !glassShown }
         if glassShown != showsGlass { showsGlass = glassShown; onResize?() }
         if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }
