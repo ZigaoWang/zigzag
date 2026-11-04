@@ -1,8 +1,8 @@
 import AppKit
 
 /// A space's heading in desk view, as the sidebar names a space: its name in large light lowercase, a quiet count on
-/// its baseline, its pinned pages as icons to open in one click, and, when the same page is open more than once, a
-/// way to close the extra copies. Clicking the name selects every tab in the space.
+/// its baseline, and, when the same page is open more than once, a quiet way to close the extra copies. Clicking the
+/// name selects every tab in the space.
 final class DeskHeaderView: InteractiveView {
     let dot = ColorView()
     let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
@@ -15,28 +15,11 @@ final class DeskHeaderView: InteractiveView {
         }
     }
     private static let dotSize = Tokens.Space.x2
-    /// The space's pinned pages, opened by a click.
-    var onOpenPin: ((Bookmark) -> Void)?
-    private var pinButtons: [IconButton] = []
-    private(set) var pins: [Bookmark] = []
-    func setPins(_ bookmarks: [Bookmark]) {
-        guard bookmarks.map(\.id) != pins.map(\.id) else { return }
-        pins = bookmarks
-        pinButtons.forEach { $0.removeFromSuperview() }
-        pinButtons = bookmarks.map { bookmark in
-            let button = IconButton(symbol: "globe", size: .compact, toolTip: bookmark.title)
-            button.image = FaviconStore.shared.cachedIcon(for: bookmark.url)
-            button.onClick = { [weak self] _ in self?.onOpenPin?(bookmark) }
-            addSubview(button)
-            return button
-        }
-        needsLayout = true
-    }
     /// "Close 3 Duplicates", when the space has the same page open more than once.
-    let duplicatesButton = PillButton(title: "", style: .quiet)
+    let duplicatesButton = TextButton(title: "", font: Tokens.Font.body())
     var duplicates = 0 {
         didSet {
-            duplicatesButton.title = duplicates == 1 ? "Close Duplicate" : "Close \(duplicates) Duplicates"
+            duplicatesButton.title = duplicates == 1 ? "Close duplicate" : "Close \(duplicates) duplicates"
             duplicatesButton.isHidden = duplicates == 0
             needsLayout = true
         }
@@ -49,7 +32,6 @@ final class DeskHeaderView: InteractiveView {
         dot.wantsLayer = true
         dot.layer?.cornerRadius = Self.dotSize / 2
         duplicatesButton.isHidden = true
-        duplicatesButton.toolTip = "Close the extra copies of pages open more than once, keeping the one you used last"
         [dot, label, count, duplicatesButton].forEach { addSubview($0) }
         setAccessibilityRole(.button)
     }
@@ -68,30 +50,20 @@ final class DeskHeaderView: InteractiveView {
         let ch = count.lineHeight
         let countTop = baseline - (ch + countFont.ascender + countFont.descender) / 2
         count.frame = NSRect(x: label.frame.maxX + Tokens.Space.x2, y: countTop, width: count.textWidth, height: ch)
-        // Pinned pages after the count, then the duplicates button at the row's end.
-        var x = count.frame.maxX + Tokens.Space.x4
-        let side = Tokens.Metric.iconButton
-        for button in pinButtons {
-            button.frame = NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side)
-            x += side + Tokens.Space.x1
-        }
+        // Close duplicates, a quiet word on the count's line.
         let bw = duplicatesButton.fittingWidth, bh = Tokens.Page.controlHeight
-        duplicatesButton.frame = NSRect(x: bounds.width - bw - CardRow.inset, y: (bounds.height - bh) / 2, width: bw, height: bh)
-    }
-
-    /// Only the name and count answer a click on the row itself (selecting the space); the rest is its controls'.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let hit = super.hitTest(point)
-        guard hit === self else { return hit }
-        let local = convert(point, from: superview)
-        return local.x <= count.frame.maxX + Tokens.Space.x2 ? self : nil
+        duplicatesButton.frame = NSRect(x: count.frame.maxX + Tokens.Space.x3, y: countTop + (ch - bh) / 2, width: bw, height: bh)
     }
 
     override var isFlipped: Bool { true }
 
-    var fittingWidth: CGFloat { CardRow.inset * 2 - Label.inset + label.textWidth + Tokens.Space.x2 + count.textWidth }
+    var fittingWidth: CGFloat {
+        CardRow.inset * 2 - Label.inset + label.textWidth + Tokens.Space.x2 + count.textWidth
+            + (duplicates > 0 ? Tokens.Space.x3 + duplicatesButton.fittingWidth : 0)
+    }
 
-    override func stateDidChange(animated: Bool) { applyRowStyle(animated: animated) }
+    /// No fill: the heading is words, not a row. The name fills in a little under the pointer.
+    override func stateDidChange(animated: Bool) { label.alphaValue = isHovered ? 1 : 0.92 }
 }
 
 /// The desk stands on the window's own frame, painted as the window paints it: the frosted desktop for a see-through
@@ -846,7 +818,6 @@ final class DeskController {
         for space in Library.shared.spaces where headers[space.id] == nil {
             let header = DeskHeaderView()
             header.onClick = { [weak self] _ in self?.selectSpace(space.id) }
-            header.onOpenPin = { [weak self] bookmark in self?.openPin(bookmark, in: space.id) }
             header.duplicatesButton.onClick = { [weak self] _ in self?.closeDuplicates(in: space.id) }
             headers[space.id] = header
             canvas.addSubview(header)
@@ -882,7 +853,6 @@ final class DeskController {
             header.name = space.name
             let count = manager?.tabs(in: id).count ?? 0
             header.count.stringValue = count == 0 ? "" : count == 1 ? "1 tab" : "\(count) tabs"
-            header.setPins(query.isEmpty ? Library.shared.bookmarks(in: id).filter { Library.shared.pinnedSplit(containing: $0.id)?.right != $0.id } : [])
             header.duplicates = query.isEmpty ? duplicateTabs(in: id).count : 0
             if let empty = empties[id] {
                 // Where its first card would be, as long as there's none and nothing is being dragged in.
@@ -897,8 +867,7 @@ final class DeskController {
             if let frame = layout.headers[id] {
                 header.isHidden = false
                 var f = frame
-                // Across the row, so its pinned pages and the duplicates button have room.
-                f.size.width = max(header.fittingWidth, canvas.bounds.width - frame.minX * 2)
+                f.size.width = header.fittingWidth
                 if animated && !header.isHidden && header.frame != .zero { move(header, to: f) } else { header.frame = f }
             } else {
                 header.isHidden = true
@@ -1047,15 +1016,7 @@ final class DeskController {
 
     /// Closes the tabs behind these cards, a split's two pages together. ⌘Z brings them back, like closing them
     /// from the sidebar. The arrow keys move on to the next card, or the one before at the end.
-    // MARK: Pinned pages and duplicates
-
-    /// A pinned page opened from its space's row: the desk closes onto it, in its space.
-    private func openPin(_ bookmark: Bookmark, in space: UUID) {
-        guard let manager else { return }
-        if manager.currentSpaceID != space { manager.switchToSpace(space) }
-        manager.openBookmark(bookmark)
-        hide(openingTab: manager.selectedTab)
-    }
+    // MARK: Duplicates
 
     /// Tabs in a space showing a page another tab there already shows: all but the one used last (or the one
     /// you're on). Split views are left alone.
