@@ -444,7 +444,13 @@ final class SidebarListView: NSView {
         // The folder a row is inside: a page's own folder, or a folder's parent.
         func folder(of item: SidebarItem?) -> UUID? {
             switch item {
-            case .bookmark(let id)?: return (rowDepth[.bookmark(id)] ?? 0) > 0 ? Library.shared.folderID(containing: id) : nil
+            case .bookmark(let id)?:
+                // The folder it's drawn in: its own, or for a page shown under a shut folder, that shut folder, never one
+                // hidden inside it.
+                let depth = rowDepth[.bookmark(id)] ?? 0
+                guard depth > 0, var folder = Library.shared.folderID(containing: id) else { return nil }
+                while Library.shared.depth(ofFolder: folder) + 1 > depth, let up = Library.shared.folder(folder)?.parentID { folder = up }
+                return folder
             case .folder(let id)?: return Library.shared.folder(id)?.parentID
             default: return nil
             }
