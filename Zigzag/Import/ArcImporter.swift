@@ -116,6 +116,14 @@ enum ArcImporter {
         var items: [String: [String: Any]] = [:]
         for item in itemList { if let id = item["id"] as? String { items[id] = item } }
 
+        /// A pinned tab's page, if it's a web page.
+        func tabPage(_ node: [String: Any]) -> [Bookmark] {
+            guard let data = node["data"] as? [String: Any], let tab = data["tab"] as? [String: Any],
+                  let urlString = tab["savedURL"] as? String, let url = URL(string: urlString), url.scheme == "http" || url.scheme == "https" else { return [] }
+            let title = (node["title"] as? String) ?? (tab["savedTitle"] as? String) ?? url.host() ?? urlString
+            return [Bookmark(url: url, title: TabManager.bookmarkTitle(title, url: url))]
+        }
+
         func bookmarks(under id: String, depth: Int = 0) -> [Bookmark] {
             guard depth < 8, let item = items[id] else { return [] }
             var result: [Bookmark] = []
@@ -143,8 +151,26 @@ enum ArcImporter {
             }
             var info = SpaceInfo(name: name, color: color(of: space))
             if let pinnedID, let pinned = items[pinnedID] {
-                // Arc's pinned folders come over as folders (anything nested deeper goes into the outer one).
+                // Arc's pinned folders come over as folders, nested as they were.
                 var folders: [BookmarkFolder] = []
+                func addFolder(_ id: String, parent: UUID?, depth: Int) {
+                    guard depth < 8, let node = items[id] else { return }
+                    var folder = BookmarkFolder(name: (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder")
+                    folder.parentID = parent
+                    let at = folders.count
+                    folders.append(folder)
+                    for child in node["childrenIds"] as? [String] ?? [] {
+                        guard let inner = items[child], let data = inner["data"] as? [String: Any] else { continue }
+                        if data["tab"] != nil || data["splitView"] != nil {
+                            // A page, or a split view's pages, pinned in this folder.
+                            let pages = data["tab"] != nil ? tabPage(inner) : bookmarks(under: child)
+                            info.bookmarks += pages
+                            folders[at].bookmarkIDs += pages.map(\.id)
+                        } else {
+                            addFolder(child, parent: folder.id, depth: depth + 1)
+                        }
+                    }
+                }
                 for child in pinned["childrenIds"] as? [String] ?? [] {
                     guard let node = items[child] else { continue }
                     let isTab = (node["data"] as? [String: Any])?["tab"] != nil
@@ -159,11 +185,11 @@ enum ArcImporter {
                         // A split view isn't a folder: its pages are pinned on their own.
                         info.bookmarks += inside
                     } else if !inside.isEmpty {
-                        let folderName = (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"
-                        info.bookmarks += inside
-                        folders.append(BookmarkFolder(name: folderName, bookmarkIDs: inside.map(\.id)))
+                        addFolder(child, parent: nil, depth: 0)
                     }
                 }
+                // A folder with no pages anywhere inside it doesn't come over.
+                folders = folders.filter { !folders.pages(in: $0.id).isEmpty }
                 if !folders.isEmpty { info.folders = folders }
             }
             spaces.append(info)

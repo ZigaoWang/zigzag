@@ -98,7 +98,7 @@ struct PinnedSplitTests {
     }
 }
 
-/// Arc's pinned folders come over as folders; a pinned split view is just its pages.
+/// Arc's pinned folders come over as folders, nested as they were; a pinned split view is just its pages.
 struct ArcFolderTests {
     @Test func foldersAndSplitViews() throws {
         func tab(_ id: String, _ url: String) -> [String: Any] {
@@ -123,8 +123,11 @@ struct ArcFolderTests {
         let space = try #require(spaces.first)
         #expect(space.bookmarks.map(\.url.lastPathComponent) == ["1", "2", "3", "4", "5"])
         let folders = space.folders ?? []
-        #expect(folders.map(\.name) == ["Reading"])
-        #expect(folders.first?.bookmarkIDs == space.bookmarks[1...2].map(\.id))
+        // Nested as in Arc: Inner inside Reading, each holding its own page.
+        #expect(folders.map(\.name) == ["Reading", "Inner"])
+        #expect(folders.first?.bookmarkIDs == [space.bookmarks[1].id])
+        #expect(folders.last?.bookmarkIDs == [space.bookmarks[2].id])
+        #expect(folders.last?.parentID == folders.first?.id)
     }
 
     @Test func movedFolderLandsBetweenGroups() {
