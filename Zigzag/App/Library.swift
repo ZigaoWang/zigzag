@@ -109,7 +109,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// Whether this Mac has clear glass (Liquid Glass, macOS 26 and later).
     static var hasClearGlass: Bool { if #available(macOS 26.0, *) { true } else { false } }
     /// Clear glass, the default where the Mac has it; frosted when chosen, or before macOS 26.
-    var usesClearGlass: Bool { Self.hasClearGlass && clearGlass != false }
+    var usesClearGlass: Bool { Self.hasClearGlass && clearGlass != false && !PowerSaving.isOn }
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
 

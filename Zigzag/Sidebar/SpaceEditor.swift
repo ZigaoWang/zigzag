@@ -1185,7 +1185,8 @@ final class SpaceLookEditor: NSView {
         shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
         clearSlider.value = space.seeThrough
         clearSlider.colors = colors
-        glassSwitch.selectedIndex = space.usesClearGlass ? 0 : 1
+        // What you chose, even while battery saving shows frosted for now.
+        glassSwitch.selectedIndex = space.clearGlass != false ? 0 : 1
         grainSlider.value = space.grain ?? 0
         grainSlider.colors = colors
         dial.angle = space.gradientAngle

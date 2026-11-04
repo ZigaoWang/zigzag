@@ -125,6 +125,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Reduce Transparency turned on or off while Zigzag is open: the window follows at once.
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(displayOptionsChanged),
                                                           name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+        // Plugged in or on battery, Low Power Mode on or off: clear glass comes and goes with it.
+        PowerSaving.start()
+        NotificationCenter.default.addObserver(self, selector: #selector(displayOptionsChanged), name: PowerSaving.changed, object: nil)
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
         tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
             guard let self, window == nil || window === self.window else { return }
