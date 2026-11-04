@@ -27,7 +27,9 @@ enum SettingsPage {
             let normal = NSApp.orderedWindows.lazy.compactMap { window in
                 WindowManager.shared.controllers.first { $0.window === window && !$0.tabManager.isPrivate }
             }.first
-            open(pane, in: normal ?? WindowManager.shared.newWindow(showCommandBar: false))
+            // With none open, your saved windows come back first, so a new empty one never stands in for (and saves over)
+            // the session you left.
+            open(pane, in: normal ?? WindowManager.shared.restoreIfNoWindows() ?? WindowManager.shared.newWindow(showCommandBar: false))
             return
         }
         let manager = controller.tabManager
