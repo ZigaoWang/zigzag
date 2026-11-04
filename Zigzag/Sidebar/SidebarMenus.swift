@@ -303,6 +303,10 @@ enum SidebarMenus {
             let anchor = controller.sidebar.dot(for: id) ?? controller.sidebar.list.headerView
             controller.openSpaceEditor(id, anchor: anchor)
         })
+        // How every space's name shows, large and lowercase or a plain heading, right where you see it.
+        let large = Item("Large Space Names") { SpaceHeaderView.isLarge.toggle() }
+        large.state = SpaceHeaderView.isLarge ? .on : .off
+        menu.addItem(large)
         _ = space
         if id == controller.tabManager.currentSpaceID {
             menu.addItem(Item("New Folder") { controller.newFolder() })
