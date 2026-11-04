@@ -394,23 +394,24 @@ struct SpaceLook {
         return true
     }
 
-    /// Two rows of looks taken from real materials, each muted and fading only a little, one per family. First white,
-    /// black, clear and smoky glass, paper, then four deep ones. Then the light ones, one of them glass.
+    /// Two rows of looks taken from real materials, muted, each its own color. First white, black, clear and smoky
+    /// glass, then the deep ones. Then paper and the light ones, warm to cool, the last of them glass.
     static let presets: [SpaceLook] = [
         curated(.snow), curated(.ink), curated(.graphite, name: "Glass", seeThrough: 0.7),
-        SpaceLook(name: "Smoke", tint: 0, depth: 0.9, seeThrough: 0.6), curated(.sand, name: "Paper", grain: 0.5),
+        SpaceLook(name: "Smoke", tint: 0, depth: 0.9, seeThrough: 0.6),
         fade("Charcoal", 0.08, 0.84, 0.08, 0.94, tint: 0.12, grain: 0.2),
         fade("Espresso", 0.07, 0.8, 0.07, 0.93, tint: 0.45),
+        fade("Oxblood", 0.99, 0.78, 0.99, 0.92, tint: 0.5),
         fade("Pine", 0.42, 0.8, 0.42, 0.93, tint: 0.45),
         fade("Slate", 0.62, 0.76, 0.62, 0.9, tint: 0.35),
-        fade("Matcha", 0.12, 0.02, 0.27, 0.3),
-        fade("Oat", 0.1, 0.02, 0.1, 0.22, tint: 0.45),
-        fade("Stone", 0.1, 0.06, 0.1, 0.22, tint: 0.15),
-        fade("Butter", 0.13, 0.02, 0.13, 0.18),
-        fade("Clay", 0.075, 0.06, 0.06, 0.28, tint: 0.5),
-        fade("Blush", 0.97, 0.04, 0.97, 0.22, tint: 0.45),
-        fade("Mist", 0.58, 0.04, 0.58, 0.24, tint: 0.4),
-        fade("Sea Salt", 0.47, 0.03, 0.47, 0.22, tint: 0.45),
+        curated(.sand, name: "Paper", grain: 0.5),
+        fade("Oat", 0.1, 0.02, 0.1, 0.26, tint: 0.45),
+        fade("Butter", 0.13, 0.02, 0.13, 0.26),
+        fade("Clay", 0.075, 0.06, 0.06, 0.36, tint: 0.55),
+        fade("Rose", 0.97, 0.04, 0.97, 0.32, tint: 0.55),
+        fade("Matcha", 0.12, 0.02, 0.27, 0.32),
+        fade("Mint", 0.46, 0.03, 0.46, 0.32, tint: 0.55),
+        fade("Sky", 0.6, 0.04, 0.6, 0.34, tint: 0.6),
         fade("Frost", 0.6, 0.02, 0.6, 0.18, tint: 0.3, seeThrough: 0.5),
     ]
 
