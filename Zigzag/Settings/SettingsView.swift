@@ -45,7 +45,11 @@ final class FormGroup: NSView {
     func filter(_ words: [String], names: [String] = []) -> Int {
         func has(_ text: String) -> Bool { words.allSatisfy { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil } }
         let all = words.isEmpty || has(names.joined(separator: " "))
-        for row in rows { row.isHidden = !all && !has((row as? SettingsSearchable)?.searchText ?? "") }
+        for row in rows {
+            // A row that's off for now (the custom search address, until Custom is chosen) stays hidden whatever matches.
+            let available = (row as? FormRow)?.isAvailable ?? true
+            row.isHidden = !available || (!all && !has((row as? SettingsSearchable)?.searchText ?? ""))
+        }
         needsLayout = true
         return rows.filter { !$0.isHidden }.count
     }
@@ -85,6 +89,8 @@ protocol SettingsSearchable { var searchText: String { get } }
 /// to fit what they say, so nothing is cut off. A picture goes before the name only where the row is a thing with a
 /// face of its own: an extension, a site.
 final class FormRow: NSView, SettingsSearchable {
+    /// Off for now: hidden, and kept hidden by "Find a setting".
+    var isAvailable = true { didSet { isHidden = !isAvailable } }
     var searchText: String { [title.stringValue, detail.stringValue, keywords].joined(separator: " ") }
     /// More words "Find a setting" knows the row by, like its button's.
     var keywords = ""
@@ -1231,8 +1237,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The custom address row shows only with Custom chosen.
     private func refreshCustomSearch() {
         let shown = Library.shared.searchEngine == .custom
-        guard customSearchRow.isHidden == shown else { return }
-        customSearchRow.isHidden = !shown
+        guard customSearchRow.isAvailable != shown else { return }
+        customSearchRow.isAvailable = shown
         // A row came or went: the page lays out again, not just stretched.
         laidOutWidth = -1
         needsLayout = true
