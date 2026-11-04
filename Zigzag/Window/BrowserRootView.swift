@@ -38,8 +38,7 @@ final class SidebarContainer: NSView {
         // Top-down, like the window, so the gradient's slice lines up with the window around it.
         backdrop.isGeometryFlipped = true
         backdrop.addSublayer(gradientLayer)
-        grainLayer.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
-        grainLayer.compositingFilter = "overlayBlendMode"
+        grainLayer.backgroundColor = MaterialImages.grain.cgColor
         backdrop.addSublayer(grainLayer)
         sidebar.layer?.insertSublayer(backdrop, at: 0)
         self.backdrop = backdrop
@@ -175,7 +174,7 @@ final class SidebarContainer: NSView {
             } else {
                 gradientLayer.isHidden = true
             }
-            grainLayer.opacity = Float(min(max(grain, 0), 1) * 0.22)
+            grainLayer.opacity = Float(min(max(grain, 0), 1) * 0.18)
             sidebar.layer?.borderWidth = isFloating ? Tokens.Metric.hairline : 0
             sidebar.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
@@ -619,8 +618,7 @@ final class BrowserRootView: ColorView {
     /// Grain inside the clear glass, matching the frame's.
     private lazy var glassGrain: CALayer = {
         let grain = CALayer()
-        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
-        grain.compositingFilter = "overlayBlendMode"
+        grain.backgroundColor = MaterialImages.grain.cgColor
         grain.opacity = 0
         return grain
     }()
@@ -673,8 +671,7 @@ final class BrowserRootView: ColorView {
     /// The frame's grain, under everything else: the same fine noise as Zigzag's own branded screens.
     private lazy var grainLayer: CALayer = {
         let grain = CALayer()
-        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
-        grain.compositingFilter = "overlayBlendMode"
+        grain.backgroundColor = MaterialImages.grain.cgColor
         grain.opacity = 0
         grain.zPosition = -1
         layer?.insertSublayer(grain, at: 0)
@@ -683,7 +680,7 @@ final class BrowserRootView: ColorView {
 
     /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
     func setGrain(_ amount: Double, animated: Bool) {
-        let target = Float(min(max(amount, 0), 1) * 0.22)
+        let target = Float(min(max(amount, 0), 1) * 0.18)
         guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
