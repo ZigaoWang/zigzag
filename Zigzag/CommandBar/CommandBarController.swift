@@ -222,7 +222,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let card = controller.root.cardFrame
         let opening = !isVisible
         if !isVisible {
-            // One floating thing at a time.
+            // One floating thing at a time. Over the tab overview, the overview steps aside: whatever you open or
+            // search for shows in the window, not behind the overview.
+            if controller.desk.isVisible { controller.desk.hide(openingTab: nil) }
             SitePanel.closeCurrent()
             DownloadsPanel.closeCurrent()
             SpaceEditorPanel.current?.close()
