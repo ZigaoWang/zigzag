@@ -394,25 +394,30 @@ struct SpaceLook {
         return true
     }
 
-    /// Two rows of quiet looks. First white, black, clear and smoky glass and paper, then four deep ones that sink a
-    /// shade darker within one hue. Then soft gradients, each a near white fading into one gentle tint, one of them glass.
+    /// Two rows of looks. First white, black, clear and smoky glass, then textured ones with grain: paper, terracotta,
+    /// moss, and two deep fades. Then soft fades between two neighboring colors, a couple of them glass.
     static let presets: [SpaceLook] = [
         curated(.snow), curated(.ink), curated(.graphite, name: "Glass", seeThrough: 0.7),
         SpaceLook(name: "Smoke", tint: 0, depth: 0.9, seeThrough: 0.6), curated(.sand, name: "Paper", grain: 0.5),
-        deep("Espresso", hue: 0.07), deep("Pine", hue: 0.42), deep("Ink Blue", hue: 0.64), deep("Aubergine", hue: 0.88),
-        soft("Matcha", hue: 0.27), soft("Sea Glass", hue: 0.46), soft("Cloud", hue: 0.6), soft("Lavender", hue: 0.77),
-        soft("Sakura", hue: 0.95), soft("Apricot", hue: 0.07), soft("Butter", hue: 0.125, depth2: 0.2), soft("Oat", hue: 0.1, tint: 0.5),
-        SpaceLook(name: "Frost", hue: 0.6, tint: 0.6, depth: 0.02, hue2: 0.6, depth2: 0.26, angle: 90, seeThrough: 0.5),
+        fade("Terracotta", 0.07, 0.66, 0.02, 0.78, tint: 0.7, grain: 0.35),
+        fade("Moss", 0.22, 0.68, 0.32, 0.82, tint: 0.55, grain: 0.35),
+        fade("Dusk", 0.64, 0.8, 0.84, 0.9, tint: 0.6, grain: 0.25),
+        fade("Forest", 0.44, 0.8, 0.36, 0.93, tint: 0.5, grain: 0.25),
+        fade("Matcha", 0.12, 0.02, 0.28, 0.3),
+        fade("Sorbet", 0.07, 0.08, 0.95, 0.26),
+        fade("Sea Glass", 0.42, 0.06, 0.58, 0.28),
+        fade("Lilac", 0.93, 0.06, 0.76, 0.28),
+        fade("Honey", 0.14, 0.04, 0.07, 0.26),
+        fade("Blue Hour", 0.58, 0.1, 0.72, 0.3),
+        fade("Linen", 0.1, 0.04, 0.3, 0.26, tint: 0.5, grain: 0.25),
+        fade("Rose Glass", 0.95, 0.12, 0.05, 0.28, seeThrough: 0.5),
+        fade("Aqua Glass", 0.5, 0.1, 0.6, 0.3, seeThrough: 0.5),
     ]
 
-    /// A near white at the top fading into a gentle tint of one hue at the bottom.
-    private static func soft(_ name: String, hue: Double, tint: Double = 1, depth2: Double = 0.27) -> SpaceLook {
-        SpaceLook(name: name, hue: hue, tint: tint, depth: 0.0, hue2: hue, depth2: depth2, angle: 90)
-    }
-
-    /// A deep, quiet color that sinks a shade darker toward the bottom.
-    private static func deep(_ name: String, hue: Double) -> SpaceLook {
-        SpaceLook(name: name, hue: hue, tint: 0.5, depth: 0.8, hue2: hue, depth2: 0.94, angle: 90)
+    /// A fade from one color to a neighbor, corner to corner.
+    private static func fade(_ name: String, _ hue: Double, _ depth: Double, _ hue2: Double, _ depth2: Double, tint: Double = 1,
+                             grain: Double = 0, seeThrough: Double = 0) -> SpaceLook {
+        SpaceLook(name: name, hue: hue, tint: tint, depth: depth, hue2: hue2, depth2: depth2, angle: 45, seeThrough: seeThrough, grain: grain)
     }
 }
 
