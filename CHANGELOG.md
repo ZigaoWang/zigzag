@@ -5,6 +5,19 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-04
+
+### New
+- Folders can hold folders. Right-click a folder and choose New Folder Inside, or drag a folder onto another one. Closing a folder hides everything inside it. ([#6](https://github.com/ZigaoWang/zigzag/issues/6))
+- Nested folders in Arc come over nested when you import. ([#6](https://github.com/ZigaoWang/zigzag/issues/6))
+
+### Fixed
+- The pinned tab you're on shows its button only when you point at it. ([#4](https://github.com/ZigaoWang/zigzag/issues/4))
+- Back, forward, reload and the sidebar button match.
+- GitHub, ChatGPT and other one-color icons show in History in dark mode.
+- The Tabs label lines up with the edge of the sidebar.
+- Searching in Settings is titled Results.
+
 ## [0.5.2] - 2026-11-04
 
 ### Changed
@@ -346,7 +359,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/ZigaoWang/zigzag/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ZigaoWang/zigzag/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ZigaoWang/zigzag/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ZigaoWang/zigzag/compare/v0.3.1...v0.5.0
