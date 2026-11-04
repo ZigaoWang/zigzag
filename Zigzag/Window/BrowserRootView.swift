@@ -22,7 +22,7 @@ final class SidebarContainer: NSView {
         layer?.masksToBounds = false
         frost.blendingMode = .withinWindow
         frost.material = .sidebar
-        frost.state = .active
+        frost.state = .followsWindowActiveState
         frost.isHidden = true
         frost.wantsLayer = true
         frost.layer?.cornerCurve = .continuous
@@ -798,13 +798,16 @@ final class BrowserRootView: ColorView {
         pointerTimer?.invalidate()
         pointerTimer = nil
         guard let window, !sidebarVisible, sidebarRevealed, window.occlusionState.contains(.visible) else { return }
+        // Every frame only once the pointer has left, to time the hide exactly; while it rests on the sidebar a tenth of
+        // a second is quick enough to notice it leave, and doesn't wake the Mac sixty times a second meanwhile.
         let attentive = NSApp.isActive && window.isKeyWindow
-        let timer = Timer(timeInterval: attentive ? 1.0 / 60 : 0.5, repeats: true) { [weak self] timer in
+        let interval = !attentive ? 0.5 : pointerLeftAt == nil ? 0.1 : 1.0 / 60
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] timer in
             // The view went away while the sidebar floated: nothing left to follow for.
             guard let self else { timer.invalidate(); return }
             MainActor.assumeIsolated { self.followPointer() }
         }
-        timer.tolerance = attentive ? 0.004 : 0.25
+        timer.tolerance = interval < 0.05 ? 0.004 : interval / 2
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
     }
@@ -824,11 +827,12 @@ final class BrowserRootView: ColorView {
         let keep = sidebar.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
             || (point.x < sidebar.minX && point.y >= bounds.minY && point.y <= bounds.maxY)
         if keep || isHeld || NSEvent.pressedMouseButtons != 0 {
-            pointerLeftAt = nil
+            if pointerLeftAt != nil { pointerLeftAt = nil; pacePointer() }
         } else if let left = pointerLeftAt {
             if Date().timeIntervalSince(left) > Tokens.Motion.edgeHideDelay { reveal(false) }
         } else {
             pointerLeftAt = Date()
+            pacePointer()
         }
     }
 
