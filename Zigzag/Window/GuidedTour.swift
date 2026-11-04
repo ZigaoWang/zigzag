@@ -12,7 +12,7 @@ final class GuidedTour: NSView {
     private let card = FloatingPanelView()
     private let step = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let check = NSImageView()
-    private let title = Label("", font: Tokens.Font.title(.medium), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: .systemFont(ofSize: 22, weight: .semibold), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
@@ -422,7 +422,7 @@ final class GuidedTour: NSView {
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
-        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : Tokens.Font.title(.medium)
+        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : .systemFont(ofSize: 22, weight: .semibold)
         if animated {
             let fade = CATransition()
             fade.type = .fade
@@ -502,8 +502,12 @@ final class GuidedTour: NSView {
         let size = pillSize(d)
         var frame: NSRect
         if !d.isFinal {
-            // Always the same place: the page's bottom right corner, growing upward. It never moves around.
-            frame = NSRect(x: page.maxX - size.width - Tokens.Space.x5, y: page.maxY - size.height - Tokens.Space.x5, width: size.width, height: size.height)
+            // In the middle of the page, where nobody can miss it; for a step about the bar or a panel, clear of it
+            // underneath, so you can see both.
+            frame = NSRect(x: page.midX - size.width / 2, y: page.midY - size.height / 2, width: size.width, height: size.height)
+            if hole != .zero, frame.insetBy(dx: -Tokens.Space.x3, dy: -Tokens.Space.x3).intersects(hole) {
+                frame.origin.y = min(page.maxY - size.height - Tokens.Space.x5, hole.maxY + Tokens.Space.x4)
+            }
         } else if d.clip != nil {
             // With a recording: tucked in the page's bottom right, clear of what's lit.
             frame = NSRect(x: page.maxX - size.width - Tokens.Space.x5, y: page.maxY - size.height - Tokens.Space.x5, width: size.width, height: size.height)
