@@ -8,13 +8,15 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.5.9] - 2026-11-05
 
 ### New
-- New looks for spaces in the space editor, in two rows: white, black, clear and smoky glass, deep charcoal, espresso, oxblood, pine and slate, then paper with grain and soft fades like oat, butter, clay, rose, matcha, mint and sky, with a frosted glass to finish.
+- New looks for spaces in the space editor, in two rows: white, black, clear and smoky glass, deep charcoal, espresso, oxblood, pine and slate, then paper with grain and soft fades like oat, butter, clay, rose, matcha, mint and sky, with a frosted glass to finish. Each one is a spot on the color wheel with a shade and effects, so after picking one you can adjust it from there.
 
 ### Changed
 - A space's name shows exactly as you typed it, with no lowercasing.
+- Shade runs all the way from pure white to true black.
 
 ### Fixed
 - A black space keeps light text and a white space keeps dark text, whatever your Mac's light or dark setting.
+- Grain shows on dark colors too, not only light ones.
 - The loading bar keeps moving while a slow page loads, instead of stopping partway.
 
 ## [0.5.8] - 2026-11-04
