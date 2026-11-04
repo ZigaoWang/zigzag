@@ -281,9 +281,22 @@ final class SidebarView: NSView {
         button.isChrome = true
         return button
     }
-    let backButton = SidebarView.chromeButton("chevron.left", toolTip: "Back")
-    let forwardButton = SidebarView.chromeButton("chevron.right", toolTip: "Forward")
-    let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
+    // The four top controls are drawn as one set (`LineGlyph`): one stroke, one box, one middle line.
+    let backButton: IconButton = {
+        let button = SidebarView.chromeButton("chevron.left", toolTip: "Back")
+        button.glyph = LineGlyph.back
+        return button
+    }()
+    let forwardButton: IconButton = {
+        let button = SidebarView.chromeButton("chevron.right", toolTip: "Forward")
+        button.glyph = LineGlyph.forward
+        return button
+    }()
+    let reloadButton: IconButton = {
+        let button = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
+        button.glyph = LineGlyph.reload
+        return button
+    }()
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
     let sidebarButton: IconButton = {
@@ -518,7 +531,7 @@ final class SidebarView: NSView {
         backButton.isEnabled = tab?.canGoBackOrReturn ?? false
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
-        reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
+        reloadButton.glyph = (tab?.isLoading ?? false) ? LineGlyph.stop : LineGlyph.reload
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, isSecure: tab?.url?.scheme == "https")
     }
