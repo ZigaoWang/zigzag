@@ -17,13 +17,11 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 - **Typeface: SF Pro, tuned.** Zigzag keeps the system face on purpose: it renders natively at every size, covers every
   script a page title can be in, and its display cut is the Univers-like grotesque this direction wants. What makes it
   ours is how it's set: light weights, one large display size against small text, display type tracked tight
-  (`Sidebar.spaceNameKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
-- **Case, decided once.** Words Zigzag says itself, in the window's chrome, are lowercase: the space's name in the
-  sidebar, "tabs", "new tab", "clear", every pill button's title and a panel's action words (the site panel's tiles, "open downloads folder"; `PillButton` shows its title lowercase, VoiceOver reads it
-  as written), the space editor's labels, and the names of Zigzag's own pages wherever the chrome names them
-  ("settings", "history" in a tab's row and the address, `Tab.displayTitle`). Everything else keeps its case:
-  content (a web page's title, a site's name, what you typed: the space's name in its own field reads as you wrote
-  it), the headings inside a page (a built-in page's title and its sections), and the system's menus.
+  (`Font.voiceKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
+- **Case, decided once.** Names and titles in the app's voice are lowercase (see The voice): a space's name, a
+  page's title, a panel's title. Every other word Zigzag says is in its normal case: buttons, labels, menu items,
+  tooltips ("New Tab", "Clear", "Close Duplicates"). Content keeps its own case: a page's title, a site's name, what
+  you typed.
 - **Confident contrast.** The space's name is 26 light against 13pt rows and 11pt labels, nothing in between.
 - **Line drawings** (`LineGlyph`): where a stock symbol says too little, Zigzag draws its own on a 16pt square with
   one 1.1pt stroke, round caps and joins, 1.5pt margins: the sidebar toggle, the plus for new tab and new space,
@@ -370,8 +368,7 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
 - **Type does the structure.** A large light title in the space's ink, like the sidebar's space name ("downloads",
   "avoidxray.com"), then plain rows. Secondary words are small and quiet. Normal case for words; only the big title
   is lowercase, as the space name is.
-- **Actions are a row of thin line glyphs with small labels under them**, set on a grid like the markings on a TE
-  device (share, copy link, screenshot), not three big rounded buttons.
+- **Actions are a row of thin line glyphs with small labels under them**, set on a grid (share, copy link, screenshot), not three big rounded buttons.
 - **Settings for the site are plain rows** with the slide switch at the end, separated by space, not by a card.
 - **One accent:** only what's on or chosen (a switch that's on, the main button) takes the space's accent.
 - **Empty states are one quiet line**, never a big icon and sentence ("Nothing downloaded yet").
