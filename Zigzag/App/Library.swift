@@ -238,12 +238,25 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 }
 
 enum SearchEngine: String, Codable, CaseIterable {
-    case google, duckDuckGo, brave, bing, kagi, ecosia
+    case google, duckDuckGo, brave, bing, kagi, ecosia, startpage, perplexity, yahoo, baidu, yandex, custom
 
     /// An engine this version doesn't know (saved by a newer one) reads as Google, rather than making the whole
     /// library unreadable and losing every space with it.
     init(from decoder: Decoder) throws {
         self = SearchEngine(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .google
+    }
+
+    /// A search address of your own, with %s where the words go ("https://example.com/search?q=%s").
+    static var customTemplate: String {
+        get { UserDefaults.standard.string(forKey: "CustomSearchTemplate") ?? "" }
+        set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "CustomSearchTemplate") }
+    }
+
+    /// Whether a custom address can search: http or https, with a host and a %s for the words.
+    static func isValidTemplate(_ template: String) -> Bool {
+        guard template.contains("%s"), let url = URL(string: template.replacingOccurrences(of: "%s", with: "q")),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return false }
+        return true
     }
 
     var name: String {
@@ -254,11 +267,18 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .bing: "Bing"
         case .kagi: "Kagi"
         case .ecosia: "Ecosia"
+        case .startpage: "Startpage"
+        case .perplexity: "Perplexity"
+        case .yahoo: "Yahoo"
+        case .baidu: "Baidu"
+        case .yandex: "Yandex"
+        case .custom: Self.isValidTemplate(Self.customTemplate) ? (URL(string: Self.customTemplate.replacingOccurrences(of: "%s", with: "q"))?.host() ?? "Custom") : "Custom"
         }
     }
 
     func searchURL(_ query: String) -> URL {
         var components: URLComponents
+        var key = "q"
         switch self {
         case .google: components = URLComponents(string: "https://www.google.com/search")!
         case .duckDuckGo: components = URLComponents(string: "https://duckduckgo.com/")!
@@ -266,8 +286,19 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .bing: components = URLComponents(string: "https://www.bing.com/search")!
         case .kagi: components = URLComponents(string: "https://kagi.com/search")!
         case .ecosia: components = URLComponents(string: "https://www.ecosia.org/search")!
+        case .startpage: components = URLComponents(string: "https://www.startpage.com/sp/search")!; key = "query"
+        case .perplexity: components = URLComponents(string: "https://www.perplexity.ai/search")!
+        case .yahoo: components = URLComponents(string: "https://search.yahoo.com/search")!; key = "p"
+        case .baidu: components = URLComponents(string: "https://www.baidu.com/s")!; key = "wd"
+        case .yandex: components = URLComponents(string: "https://yandex.com/search/")!; key = "text"
+        case .custom:
+            // The words go where %s is, encoded; an address that can't search falls back to Google.
+            let template = Self.customTemplate
+            let words = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+?#"))) ?? query
+            if Self.isValidTemplate(template), let url = URL(string: template.replacingOccurrences(of: "%s", with: words)) { return url }
+            return SearchEngine.google.searchURL(query)
         }
-        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        components.queryItems = [URLQueryItem(name: key, value: query)]
         return components.url!
     }
 
@@ -280,6 +311,15 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .bing: URL(string: "https://www.bing.com")!
         case .kagi: URL(string: "https://kagi.com")!
         case .ecosia: URL(string: "https://www.ecosia.org")!
+        case .startpage: URL(string: "https://www.startpage.com")!
+        case .perplexity: URL(string: "https://www.perplexity.ai")!
+        case .yahoo: URL(string: "https://search.yahoo.com")!
+        case .baidu: URL(string: "https://www.baidu.com")!
+        case .yandex: URL(string: "https://yandex.com")!
+        case .custom:
+            URL(string: Self.customTemplate.replacingOccurrences(of: "%s", with: "q")).flatMap { url in
+                url.host().flatMap { URL(string: "\(url.scheme ?? "https")://\($0)") }
+            } ?? URL(string: "https://www.google.com")!
         }
     }
 
@@ -304,6 +344,9 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .ecosia:
             components = URLComponents(string: "https://ac.ecosia.org/autocomplete")!
             components.queryItems = [.init(name: "q", value: query), .init(name: "type", value: "list")]
+        case .startpage, .perplexity, .yahoo, .baidu, .yandex, .custom:
+            // No suggestions service these engines offer in a form Zigzag reads: what you type stays on your Mac.
+            return nil
         }
         return components.url
     }

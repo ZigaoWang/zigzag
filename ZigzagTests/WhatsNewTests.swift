@@ -32,8 +32,22 @@ struct WhatsNewTests {
     }
 
     /// Every build carries notes for its own version: a release without them can't go out.
+    @Test func iconLinksAreReadFromAPage() {
+        let html = #"<head><link rel="icon" type="image/png" href="https://cdn.x.com/f.png" sizes="96x96"/><link rel="stylesheet" href="a.css"><LINK REL='apple-touch-icon' HREF='/t.png'></head>"#
+        let links = FaviconStore.iconLinks(in: html)
+        #expect(links.count == 2)
+        #expect(links.first?["href"] == "https://cdn.x.com/f.png" && links.first?["sizes"] == "96x96")
+        #expect(links.last?["rel"] == "apple-touch-icon")
+    }
+
+    @Test func customSearchNeedsAPlaceForTheWords() {
+        #expect(SearchEngine.isValidTemplate("https://example.com/search?q=%s"))
+        #expect(!SearchEngine.isValidTemplate("https://example.com/search"))
+        #expect(!SearchEngine.isValidTemplate("javascript:alert(%s)"))
+    }
+
     @Test func unknownSearchEngineKeepsTheLibrary() throws {
-        let engine = try JSONDecoder().decode([SearchEngine].self, from: Data(#"["perplexity","kagi"]"#.utf8))
+        let engine = try JSONDecoder().decode([SearchEngine].self, from: Data(#"["notanengine","kagi"]"#.utf8))
         #expect(engine == [.google, .kagi])
     }
 

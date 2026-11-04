@@ -502,6 +502,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var shortcutGroups: [(String, FormGroup)] = []
 
     private let engine = DropdownButton()
+    /// Your own search address, shown when the engine is Custom.
+    private let customSearch: FilledField = {
+        let field = FilledField(placeholder: "https://example.com/search?q=%s")
+        // Rows size their control by its fitting size: a fixed width, wide enough for a typical address.
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        field.heightAnchor.constraint(equalToConstant: Tokens.Page.controlHeight).isActive = true
+        return field
+    }()
+    private lazy var customSearchRow = FormRow(title: "Search address", detail: "Put %s where the words you search for go.", control: customSearch)
     private let archiveAfter = DropdownButton()
     private let defaultButton = PillButton(title: "Set as Default")
     private let defaultStatus = StatusLabel("Zigzag is your default browser")
@@ -579,9 +589,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         themeToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
 
         // General
-        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: Self.engineIcon($0)) }
         SearchEngine.allCases.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
-        engine.onSelect = { index in Library.shared.searchEngine = SearchEngine.allCases[index] }
+        engine.onSelect = { [weak self] index in
+            Library.shared.searchEngine = SearchEngine.allCases[index]
+            self?.refreshCustomSearch()
+            // Choosing Custom with no address yet: straight into the field to type one.
+            if SearchEngine.allCases[index] == .custom, SearchEngine.customTemplate.isEmpty {
+                DispatchQueue.main.async { self?.window?.makeFirstResponder(self?.customSearch.field) }
+            }
+        }
+        customSearch.stringValue = SearchEngine.customTemplate
+        customSearch.field.target = self
+        customSearch.field.action = #selector(customSearchChanged)
         defaultButton.onClick = { [weak self] _ in self?.makeDefault() }
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
@@ -589,6 +609,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         versionGroup.add(SettingsVersionRow.betas())
         if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
         generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
+        generalGroup.add(customSearchRow)
+        refreshCustomSearch()
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
         generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", control: suggestionsToggle))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
@@ -1197,8 +1219,39 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func refreshDownloadPlace() { DownloadPlace.configure(downloadPlace) }
 
+    /// An engine's icon: its site's, or for Custom with no address yet, a plain magnifying glass (never Google's).
+    private static func engineIcon(_ engine: SearchEngine) -> NSImage? {
+        if engine == .custom, !SearchEngine.isValidTemplate(SearchEngine.customTemplate) {
+            return Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline)
+        }
+        return FaviconStore.shared.cachedIcon(for: engine.homeURL).map(menuIcon)
+            ?? (engine == .custom ? Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline) : nil)
+    }
+
+    /// The custom address row shows only with Custom chosen.
+    private func refreshCustomSearch() {
+        let shown = Library.shared.searchEngine == .custom
+        guard customSearchRow.isHidden == shown else { return }
+        customSearchRow.isHidden = !shown
+        // A row came or went: the page lays out again, not just stretched.
+        laidOutWidth = -1
+        needsLayout = true
+    }
+
+    @objc private func customSearchChanged() {
+        let text = customSearch.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.isEmpty || SearchEngine.isValidTemplate(text) else {
+            Toast.show("Use a web address with %s where the words go.", symbol: "exclamationmark.triangle", duration: 3, over: self, area: bounds)
+            return
+        }
+        SearchEngine.customTemplate = text
+        // Its name and icon come from the address.
+        FaviconStore.shared.prefetch(for: SearchEngine.custom.homeURL)
+        refresh()
+    }
+
     private func refresh() {
-        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: Self.engineIcon($0)) }
         engine.selectedIndex = SearchEngine.allCases.firstIndex(of: Library.shared.searchEngine) ?? 0
         let isDefault = DefaultBrowser.isDefault
         defaultStatus.isHidden = !isDefault
