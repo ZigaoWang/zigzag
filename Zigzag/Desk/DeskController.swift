@@ -19,7 +19,7 @@ final class DeskHeaderView: InteractiveView {
     let duplicatesButton = TextButton(title: "", font: Tokens.Font.body())
     var duplicates = 0 {
         didSet {
-            duplicatesButton.title = duplicates == 1 ? "Close duplicate" : "Close \(duplicates) duplicates"
+            duplicatesButton.title = duplicates == 1 ? "Close Duplicate" : "Close \(duplicates) Duplicates"
             duplicatesButton.isHidden = duplicates == 0
             needsLayout = true
         }
