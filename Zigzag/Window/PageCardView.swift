@@ -42,9 +42,9 @@ final class PageCardView: NSView {
     #else
     static let attachedRadius = Tokens.Radius.attached
     #endif
-    /// Beside the sidebar it meets the frame cleanly, its corners and a faint hairline only; floating, the card
-    /// keeps its whisper of shadow.
-    private var castsShadow: Bool { !edgeToEdge && !isAttached }
+    /// Beside the sidebar the page rests on the frame as a sheet: a soft shadow falls onto the sidebar along its edge
+    /// (the window's own edges hide it everywhere else); floating, the card keeps its whisper of shadow.
+    private var castsShadow: Bool { !edgeToEdge }
 
     /// Squares the corners off (or rounds them back) over `duration`, in step with the sidebar sliding away or back.
     func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
@@ -226,8 +226,10 @@ final class PageCardView: NSView {
             // and round the corners as an extra line.
             edge.borderWidth = isAttached ? 0 : Tokens.Metric.hairline
             header.alphaValue = isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1
-            layer?.shadowColor = cgColor(Tokens.Color.cardShadow)
+            layer?.shadowColor = cgColor(isAttached ? Tokens.Color.sheetShadow : Tokens.Color.cardShadow)
             layer?.shadowOpacity = castsShadow ? 1 : 0
+            layer?.shadowRadius = isAttached ? Tokens.Shadow.sheetRadius : Tokens.Shadow.cardRadius
+            layer?.shadowOffset = isAttached ? .zero : Tokens.Shadow.cardOffset
         }
     }
 
