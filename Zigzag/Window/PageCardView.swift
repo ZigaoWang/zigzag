@@ -59,6 +59,7 @@ final class PageCardView: NSView {
         edge.cornerRadius = radius
         edge.opacity = on ? 0 : 1
         layer?.shadowOpacity = castsShadow ? 1 : 0
+        ambient.shadowOpacity = castsShadow && isAttached ? 1 : 0
         CATransaction.commit()
         needsLayout = true
     }
@@ -151,11 +152,17 @@ final class PageCardView: NSView {
 
     /// Shown while a suspended tab wakes up so the card never flashes blank.
     private let placeholder = NSImageView()
+    /// Beside the sidebar, the page's second shadow: wide and faint, spreading onto the sidebar under the tight one
+    /// the card itself casts at its edge, the way a sheet of paper lies on a table.
+    private let ambient = CALayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         layer?.masksToBounds = false
+        ambient.zPosition = -1
+        ambient.backgroundColor = .clear
+        layer?.addSublayer(ambient)
         layer?.shadowOpacity = 1
         layer?.shadowRadius = Tokens.Shadow.cardRadius
         layer?.shadowOffset = Tokens.Shadow.cardOffset
@@ -209,6 +216,10 @@ final class PageCardView: NSView {
             clip.layer?.maskedCorners = corners
             edge.maskedCorners = corners
             layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+            Tokens.Motion.withoutAnimation {
+                ambient.frame = bounds
+                ambient.shadowPath = layer?.shadowPath
+            }
         }
     }
 
@@ -226,10 +237,14 @@ final class PageCardView: NSView {
             // and round the corners as an extra line.
             edge.borderWidth = isAttached ? 0 : Tokens.Metric.hairline
             header.alphaValue = isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1
-            layer?.shadowColor = cgColor(isAttached ? Tokens.Color.sheetShadow : Tokens.Color.cardShadow)
+            layer?.shadowColor = cgColor(isAttached ? Tokens.Color.sheetContact : Tokens.Color.cardShadow)
             layer?.shadowOpacity = castsShadow ? 1 : 0
-            layer?.shadowRadius = isAttached ? Tokens.Shadow.sheetRadius : Tokens.Shadow.cardRadius
+            layer?.shadowRadius = isAttached ? Tokens.Shadow.sheetContact : Tokens.Shadow.cardRadius
             layer?.shadowOffset = isAttached ? .zero : Tokens.Shadow.cardOffset
+            ambient.shadowColor = cgColor(Tokens.Color.sheetShadow)
+            ambient.shadowRadius = Tokens.Shadow.sheetRadius
+            ambient.shadowOffset = CGSize(width: -2, height: 0)
+            ambient.shadowOpacity = castsShadow && isAttached ? 1 : 0
         }
     }
 
