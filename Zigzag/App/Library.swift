@@ -830,7 +830,19 @@ final class Library {
         // Never into itself or a folder inside it, and only into a folder of the space it lands in.
         var into: UUID? = switch parent { case .some(let chosen): chosen; case .none: s == target ? folder.parentID : nil }
         if let p = into, p == id || inner.contains(p) || spaces[target].folders?.contains(where: { $0.id == p }) != true { into = folder.parentID.flatMap { s == target ? $0 : nil } }
-        let at = into == nil ? folderDropIndex(index, moving: id, in: spaceID) : index
+        // Into a folder with no place given: at the end of that folder's pages, or where it sits if it has none.
+        var at = into == nil ? folderDropIndex(index, moving: id, in: spaceID) : index
+        if let p = into, index == Int.max {
+            let members = (spaces[target].folders ?? []).pages(in: id)
+            let others = spaces[target].bookmarks.filter { !members.contains($0.id) }
+            let inside = (spaces[target].folders ?? []).pages(in: p)
+            if let last = others.lastIndex(where: { inside.contains($0.id) }) { at = last + 1 }
+            else {
+                at = insertionIndex(intoEmptyFolder: p, space: target)
+                // Counted without the moving folder's own pages, as `index` is.
+                at -= spaces[target].bookmarks.prefix(at).filter { members.contains($0.id) }.count
+            }
+        }
         let members = (spaces[s].folders ?? []).pages(in: id)
         let moving = spaces[s].bookmarks.filter { members.contains($0.id) }
         spaces[s].bookmarks.removeAll { members.contains($0.id) }
@@ -890,9 +902,11 @@ final class Library {
         guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == bookmarkID } }) else { return }
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == bookmarkID } }
         if let folderID, let f = spaces[s].folders?.firstIndex(where: { $0.id == folderID }) {
-            // An empty folder sits at the top of the pins: its first page goes up there with it.
-            if spaces[s].folders?[f].bookmarkIDs.isEmpty == true, let from = spaces[s].bookmarks.firstIndex(where: { $0.id == bookmarkID }) {
-                spaces[s].bookmarks.insert(spaces[s].bookmarks.remove(at: from), at: 0)
+            // An empty folder sits at the top of where it is: its first page goes there with it, at the top of the
+            // pins, or at the start of its parent folder's pages.
+            if (spaces[s].folders ?? []).pages(in: folderID).isEmpty, let from = spaces[s].bookmarks.firstIndex(where: { $0.id == bookmarkID }) {
+                let page = spaces[s].bookmarks.remove(at: from)
+                spaces[s].bookmarks.insert(page, at: insertionIndex(intoEmptyFolder: folderID, space: s))
             }
             // To the end of the folder: after its last page in the list.
             spaces[s].folders?[f].bookmarkIDs.append(bookmarkID)
@@ -904,6 +918,19 @@ final class Library {
         }
         tidyFolders(s)
         commit()
+    }
+
+    /// Where a page goes to be the first one in an empty folder: the top of the pins, or the start of its parent's pages
+    /// (the parent's own place, for a parent that's empty too).
+    private func insertionIndex(intoEmptyFolder id: UUID, space s: Int) -> Int {
+        let folders = spaces[s].folders ?? []
+        var parent = folders.first { $0.id == id }?.parentID
+        while let p = parent {
+            let inside = folders.pages(in: p)
+            if let at = spaces[s].bookmarks.firstIndex(where: { inside.contains($0.id) }) { return at }
+            parent = folders.first { $0.id == p }?.parentID
+        }
+        return 0
     }
 
     /// Keeps folders honest: only pages still in the space, and each folder's pages side by side in the list, where

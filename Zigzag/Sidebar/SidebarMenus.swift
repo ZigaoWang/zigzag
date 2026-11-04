@@ -240,7 +240,12 @@ enum SidebarMenus {
                 let own = Set(Library.shared.allBookmarkIDs(inFolder: folder.id))
                 let after = Library.shared.allBookmarkIDs(inFolder: parent).last { !own.contains($0) }
                 let order = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).map(\.id).filter { !own.contains($0) }
-                let at = after.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 } ?? Int.max
+                // Just after the folder it leaves; with nothing else in that folder, where the folder itself sits.
+                let first = Library.shared.allBookmarkIDs(inFolder: parent).first { !own.contains($0) }
+                let at = after.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 }
+                    ?? first.flatMap { order.firstIndex(of: $0) }
+                    ?? Library.shared.allBookmarkIDs(inFolder: folder.id).first.flatMap { id in Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).map(\.id).firstIndex(of: id) }
+                    ?? 0
                 controller.listMoveFolder(folder.id, to: at, in: controller.tabManager.currentSpaceID, parent: up)
             })
         }
