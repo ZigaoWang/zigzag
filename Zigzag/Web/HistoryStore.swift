@@ -103,6 +103,7 @@ final class HistoryStore {
         exec("DELETE FROM visits")
         PDFViewerView.forgetPlaces()
         TabArchive.shared.clear()
+        FaviconStore.shared.forgetVisited()
     }
 
     /// Everything visited since `date` (Clear Last Hour, Today…).
@@ -113,6 +114,7 @@ final class HistoryStore {
         sqlite3_step(statement)
         PDFViewerView.forgetPlaces(since: date)
         TabArchive.shared.clear(since: date)
+        FaviconStore.shared.forgetVisited(since: date)
     }
 
     func delete(_ url: URL) {
