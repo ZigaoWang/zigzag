@@ -240,6 +240,12 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 enum SearchEngine: String, Codable, CaseIterable {
     case google, duckDuckGo, brave, bing, kagi, ecosia
 
+    /// An engine this version doesn't know (saved by a newer one) reads as Google, rather than making the whole
+    /// library unreadable and losing every space with it.
+    init(from decoder: Decoder) throws {
+        self = SearchEngine(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .google
+    }
+
     var name: String {
         switch self {
         case .google: "Google"

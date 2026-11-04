@@ -32,6 +32,11 @@ struct WhatsNewTests {
     }
 
     /// Every build carries notes for its own version: a release without them can't go out.
+    @Test func unknownSearchEngineKeepsTheLibrary() throws {
+        let engine = try JSONDecoder().decode([SearchEngine].self, from: Data(#"["perplexity","kagi"]"#.utf8))
+        #expect(engine == [.google, .kagi])
+    }
+
     @Test func linksReadAsPlainWords() {
         #expect(WhatsNew.plain("Spaces can have an icon. ([#1](https://x/1), [#7](https://x/7))") == "Spaces can have an icon.")
         #expect(WhatsNew.plain("See the [release notes](https://x) page.") == "See the release notes page.")
