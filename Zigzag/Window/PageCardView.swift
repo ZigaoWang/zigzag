@@ -243,7 +243,7 @@ final class PageCardView: NSView {
             layer?.shadowOffset = isAttached ? .zero : Tokens.Shadow.cardOffset
             ambient.shadowColor = cgColor(Tokens.Color.sheetShadow)
             ambient.shadowRadius = Tokens.Shadow.sheetRadius
-            ambient.shadowOffset = CGSize(width: -2, height: 0)
+            ambient.shadowOffset = .zero
             ambient.shadowOpacity = castsShadow && isAttached ? 1 : 0
         }
     }

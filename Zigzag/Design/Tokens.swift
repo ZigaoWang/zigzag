@@ -817,9 +817,9 @@ enum Tokens {
         /// Only shadow in the window: lifts the page off the frame.
         static let cardShadow = dynamic(light: hex(0x000000, alpha: 0.07), dark: hex(0x000000, alpha: 0.28))
         /// The page beside the sidebar, resting on the frame: soft, falling onto the sidebar along the page's edge.
-        static let sheetShadow = dynamic(light: hex(0x000000, alpha: 0.1), dark: hex(0x000000, alpha: 0.38))
+        static let sheetShadow = dynamic(light: hex(0x000000, alpha: 0.05), dark: hex(0x000000, alpha: 0.32))
         /// Right at the page's edge beside the sidebar: tight and a little darker, so the edge reads crisp.
-        static let sheetContact = dynamic(light: hex(0x000000, alpha: 0.16), dark: hex(0x000000, alpha: 0.55))
+        static let sheetContact = dynamic(light: hex(0x000000, alpha: 0.12), dark: hex(0x000000, alpha: 0.5))
 
         /// A floating surface in a window with no space color (or a white, gray or black one): opaque. Panels in a
         /// colored space lean toward it (`Brand.Theme.panel`).
@@ -1081,8 +1081,8 @@ enum Tokens {
         static let cardRadius: CGFloat = 2
         static let cardOffset = CGSize(width: 0, height: -1)
         /// The page beside the sidebar: a wide, soft fall onto the sidebar.
-        static let sheetRadius: CGFloat = 16
-        static let sheetContact: CGFloat = 1.5
+        static let sheetRadius: CGFloat = 8
+        static let sheetContact: CGFloat = 1
         /// Floating panels sit just above the page: one soft, small shadow that falls below them, never above.
         static let panelRadius: CGFloat = 16
         static let panelDrop: CGFloat = 3
