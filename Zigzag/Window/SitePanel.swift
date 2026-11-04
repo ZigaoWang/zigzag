@@ -25,7 +25,7 @@ final class SitePanel: FloatingPanelView {
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
 
     private let icon = FaviconView()
-    private let siteName = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+    private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
     private let security = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let securityIcon = NSImageView()
     private let moreButton = IconButton(symbol: "ellipsis", toolTip: "More")
@@ -56,7 +56,8 @@ final class SitePanel: FloatingPanelView {
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         icon.image = tab.favicon
-        siteName.stringValue = site
+        // In the app's voice, as a page names itself; a site's name keeps its own spelling.
+        siteName.attributedStringValue = Tokens.Font.voiceText(site, size: 20, lowercase: false)
         let page = self.url
         let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
         if page.scheme == "webkit-extension" {
