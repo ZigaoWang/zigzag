@@ -749,6 +749,8 @@ final class SeparatorRowView: NSView {
     /// a moment before (New Tab, just below), so it counts only once Clear has been there a beat.
     private var clearShownAt = Date.distantPast
     var clearIsArmed: Bool { clearButton.hasKeyboardFocus || (clearShown && Date().timeIntervalSince(clearShownAt) > 0.35) }
+    /// After a step, the next one waits a beat, so a double-click never runs two steps at once.
+    func rearmClear() { clearShownAt = Date() }
     /// With Full Keyboard Access on, Clear stays in the Tab order while there are tabs to clear, see-through until
     /// focus reaches it; otherwise it's hidden whenever it isn't shown.
     private var clearInTabOrder: Bool { NSApp.isFullKeyboardAccessEnabled && hasTabs }

@@ -572,7 +572,9 @@ final class SidebarListView: NSView {
         case .separator:
             let separator = SeparatorRowView()
             separator.clearButton.onClick = { [weak self, weak separator] _ in
-                guard separator?.clearIsArmed == true else { return }
+                // One step per deliberate click: the second click of a double-click is ignored, and each step re-arms.
+                guard separator?.clearIsArmed == true, (NSApp.currentEvent?.clickCount ?? 1) <= 1 else { return }
+                separator?.rearmClear()
                 self?.previewClear(false)
                 self?.delegate?.listClearTabs()
             }
