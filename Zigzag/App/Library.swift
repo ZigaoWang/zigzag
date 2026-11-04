@@ -121,8 +121,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var isSeeThrough: Bool { seeThrough > 0.005 }
     /// How much the space's color covers the frosted desktop behind a see-through frame. It thins as more shows but
     /// never below a half, so the space keeps its color all the way up.
-    /// Clear glass lets more of the blurred desktop through: the color thins further, to a fifth at the most.
-    var coverage: CGFloat { CGFloat(1 - (clearGlass == true ? 0.8 : 0.5) * seeThrough) }
+    /// Clear glass lets more of the blurred desktop through: the color thins further, to about a third at the most.
+    var coverage: CGFloat { CGFloat(1 - (clearGlass == true ? 0.65 : 0.5) * seeThrough) }
 
     /// The window frame color for this space, solid.
     var background: NSColor {
@@ -155,8 +155,31 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var gradientAngle: Double { angle ?? 45 }
 
     /// The frame as the window lays it down: the color, thinned when see-through so the desktop shows under it.
-    var frameColor: NSColor { Self.covering(background, by: isSeeThrough ? coverage : 1) }
-    var frameColor2: NSColor? { background2.map { Self.covering($0, by: isSeeThrough ? coverage : 1) } }
+    /// Over glass the color leans toward the space's strong version (its dot's) the more shows through, so a thin
+    /// wash still reads as the space's color instead of gray.
+    var frameColor: NSColor {
+        guard isSeeThrough else { return background }
+        return Self.covering(Self.richer(background, toward: swatch, by: isNeutral ? 0 : 0.6 * seeThrough), by: coverage)
+    }
+    var frameColor2: NSColor? {
+        guard isSeeThrough else { return background2 }
+        return background2.map { Self.covering($0, by: coverage) }
+    }
+
+    /// `color` moved part of the way to `strong`, light and dark alike.
+    private static func richer(_ color: NSColor, toward strong: NSColor, by amount: Double) -> NSColor {
+        guard amount > 0 else { return color }
+        return NSColor(name: nil) { appearance in
+            var a = color, b = strong
+            appearance.performAsCurrentDrawingAppearance {
+                a = color.usingColorSpace(.sRGB) ?? color
+                b = strong.usingColorSpace(.sRGB) ?? strong
+            }
+            // At night the color is already deep and rich: only a touch, so the frame stays dark under light text.
+            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return a.blended(withFraction: CGFloat(dark ? amount * 0.3 : amount), of: b) ?? a
+        }
+    }
 
     /// `color` at `alpha`, still following light and dark when it does.
     private static func covering(_ color: NSColor, by alpha: CGFloat) -> NSColor {
