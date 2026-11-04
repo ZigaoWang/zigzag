@@ -6,7 +6,7 @@ final class OnboardingView: NSView {
     var onFinish: (() -> Void)?
 
     /// The space's color comes later, in the browser itself, where you can see it on the real thing.
-    enum Step: Int, CaseIterable { case hello, bring, sites, ads, ready }
+    enum Step: Int, CaseIterable { case hello, bring, layout, sites, ads, ready }
     private(set) var step = Step.hello
 
     private let surface = BrandSurface()
@@ -83,6 +83,10 @@ final class OnboardingView: NSView {
             content = BringPicker()
             title = "Bring your stuff over"
             body = "Passwords, bookmarks and history. Your old browser stays as it is."
+        case .layout:
+            content = HowItWorks()
+            title = "Here’s how Zigzag works"
+            body = "Three things to know, coming from Chrome or Safari."
         case .sites:
             content = SitesPicker()
             title = "Pin the sites you use"
@@ -1870,6 +1874,77 @@ private final class ExtensionRow: InteractiveView {
 
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
+/// For anyone coming from Chrome or Safari: a small Zigzag window with the three places that differ marked on it,
+/// and what each one is for, in their words.
+private final class HowItWorks: StepContent {
+    private let sketch = LiveBrowser()
+    private let points: [(title: String, detail: String)] = [
+        ("Your tabs are on the left", "The tabs you know, down the side instead of across the top."),
+        ("Type here to search or go", "The address bar. ⌘T opens a new tab, just like in Chrome."),
+        ("Your everyday sites, one click away", "Drag a tab up here to keep it. You’ll pick a few next."),
+    ]
+    private var markers: [NSView] = []
+    private var rows: [(badge: NSView, title: Label, detail: NSTextField)] = []
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        sketch.page = .wikipedia
+        // One row of favorites, so the marks land where the drawing puts the address, the favorites and the tabs.
+        sketch.favorites = Array(Library.shared.favorites.prefix(4).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) })
+        sketch.tabs = ["Wikipedia", "Recipes", "Trip ideas"]
+        addSubview(sketch)
+        for (i, point) in points.enumerated() {
+            markers.append(Self.badge(i + 1))
+            let title = Label(point.title, font: Tokens.Font.body(.medium), color: Onboard.ink)
+            let detail = NSTextField(wrappingLabelWithString: point.detail)
+            detail.font = Tokens.Font.small()
+            detail.textColor = Tokens.Color.textSecondary
+            detail.isSelectable = false
+            rows.append((Self.badge(i + 1), title, detail))
+        }
+        markers.forEach { sketch.addSubview($0) }
+        rows.forEach { [$0.badge, $0.title, $0.detail].forEach(addSubview) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    /// A number in a small disc of the accent, the same on the sketch and beside what it means.
+    private static func badge(_ n: Int) -> NSView {
+        let disc = ColorView(color: Onboard.accent)
+        disc.wantsLayer = true
+        disc.layer?.cornerRadius = 10
+        let label = Label("\(n)", font: Tokens.Font.small(.semibold), color: .white)
+        label.alignment = .center
+        label.frame = NSRect(x: 0, y: 2, width: 20, height: 16)
+        disc.addSubview(label)
+        return disc
+    }
+
+    private static let windowHeight: CGFloat = 190
+    private static let rowHeight: CGFloat = 44
+
+    override func preferredHeight(for width: CGFloat) -> CGFloat { Self.windowHeight + 14 + CGFloat(points.count) * Self.rowHeight }
+
+    override func layout() {
+        super.layout()
+        sketch.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Self.windowHeight)
+        // On the window: beside the tab list, the address and the favorites (the drawing's sidebar is 170 wide).
+        let spots = [NSPoint(x: 168, y: 139), NSPoint(x: 168, y: 44), NSPoint(x: 168, y: 80)]
+        for (marker, spot) in zip(markers, spots) { marker.frame = NSRect(x: spot.x - 10, y: spot.y - 10, width: 20, height: 20) }
+        var y = Self.windowHeight + 14
+        for row in rows {
+            row.badge.frame = NSRect(x: 0, y: y + 1, width: 20, height: 20)
+            let x: CGFloat = 32
+            row.title.frame = NSRect(x: x - Label.inset, y: y, width: bounds.width - x, height: row.title.lineHeight)
+            let h = ceil(row.detail.sizeThatFits(NSSize(width: bounds.width - x, height: 100)).height)
+            row.detail.frame = NSRect(x: x - 2, y: row.title.frame.maxY + 2, width: bounds.width - x, height: h)
+            y += Self.rowHeight
+        }
+    }
+}
+
 private final class AdsPicker: StepContent {
     private let yes = Onboard.outline("Block Ads")
     private let no = Onboard.outline("Show Ads")
