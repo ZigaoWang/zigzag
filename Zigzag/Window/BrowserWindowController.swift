@@ -1600,8 +1600,8 @@ extension BrowserWindowController: SidebarDelegate {
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
         pageChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
     }
-    func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID) {
-        pageChange("Move Folder") { Library.shared.moveFolder(id, to: index, in: spaceID) }
+    func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?) {
+        pageChange(parent == nil ? "Move Folder" : "Move into Folder") { Library.shared.moveFolder(id, to: index, in: spaceID, parent: .some(parent)) }
     }
     func listSetFolderOpen(_ id: UUID, _ open: Bool) {
         // Opening and closing isn't an edit to undo.
@@ -1616,9 +1616,13 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     /// A new folder in the current space, holding these pinned pages (or none), named right away in the sidebar.
-    func newFolder(with bookmarkIDs: [UUID] = []) {
+    /// `inside`: the folder it goes in; left out, the folder its pages share, if any.
+    func newFolder(with bookmarkIDs: [UUID] = [], inside: UUID? = nil) {
         var made: BookmarkFolder?
-        libraryChange("New Folder") { made = Library.shared.addFolder(named: "New Folder", with: bookmarkIDs, in: tabManager.currentSpaceID) }
+        libraryChange("New Folder") {
+            made = Library.shared.addFolder(named: "New Folder", with: bookmarkIDs, in: tabManager.currentSpaceID,
+                                            parent: inside.map { .some($0) } ?? .none)
+        }
         guard let made else { return }
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
         sidebar.list.reload(animated: true)

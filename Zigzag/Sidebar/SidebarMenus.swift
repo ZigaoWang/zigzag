@@ -231,6 +231,19 @@ enum SidebarMenus {
         menu.addItem(Item("Rename") { controller.sidebar.list.renameFolder(folder.id) })
         menu.addItem(Item("Change Icon…") { controller.chooseFolderIcon(folder.id) })
         menu.addItem(Item(folder.isOpen ? "Close Folder" : "Open Folder") { controller.listSetFolderOpen(folder.id, !folder.isOpen) })
+        menu.addItem(Item("New Folder Inside") { controller.newFolder(inside: folder.id) })
+        // Out of the folder it's in, to the level above.
+        if let parent = folder.parentID {
+            menu.addItem(Item("Move Out of Folder") {
+                let up = Library.shared.folder(parent)?.parentID
+                // Just after the folder it leaves, counted without its own pages (as moving a folder counts).
+                let own = Set(Library.shared.allBookmarkIDs(inFolder: folder.id))
+                let after = Library.shared.allBookmarkIDs(inFolder: parent).last { !own.contains($0) }
+                let order = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).map(\.id).filter { !own.contains($0) }
+                let at = after.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 } ?? Int.max
+                controller.listMoveFolder(folder.id, to: at, in: controller.tabManager.currentSpaceID, parent: up)
+            })
+        }
         menu.addItem(.separator())
         // The folder goes; what was in it stays pinned, where it was.
         menu.addItem(Item("Remove Folder") {
