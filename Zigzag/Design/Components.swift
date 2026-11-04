@@ -427,22 +427,21 @@ enum LineGlyph {
         path.move(to: NSPoint(x: 6, y: 3.5)); path.line(to: NSPoint(x: 10.5, y: 8)); path.line(to: NSPoint(x: 6, y: 12.5))
     }
 
-    /// Reload: a circle turning clockwise, open at the top with a small head on its end.
+    /// Reload: a circle turning clockwise, the chevrons' height and centered as they are, open between twelve and two
+    /// o'clock with a small head at twelve pointing on round.
     static let reload = draw { path in
-        let center = NSPoint(x: 8, y: 8.4), r: CGFloat = 5
+        let center = NSPoint(x: 8, y: 8), r: CGFloat = 4.6
         func point(_ degrees: CGFloat) -> NSPoint {
             let t = degrees * .pi / 180
             return NSPoint(x: center.x + cos(t) * r, y: center.y + sin(t) * r)
         }
-        // The view is flipped: angles grow clockwise on screen. From one o'clock round to eleven.
-        path.move(to: point(-55))
-        for d in stride(from: -55, through: 235, by: 5) { path.line(to: point(CGFloat(d))) }
-        let tip = point(235)
-        let t: CGFloat = 235 * .pi / 180
-        let along = NSPoint(x: -sin(t), y: cos(t)), across = NSPoint(x: cos(t), y: sin(t))
-        path.move(to: NSPoint(x: tip.x - along.x * 2.6 + across.x * 2.1, y: tip.y - along.y * 2.6 + across.y * 2.1))
+        // The view is flipped: angles grow clockwise on screen, -90 is twelve o'clock.
+        path.move(to: point(-30))
+        for d in stride(from: -30, through: 265, by: 5) { path.line(to: point(CGFloat(d))) }
+        let tip = point(268)
+        path.move(to: NSPoint(x: tip.x - 2.1, y: tip.y - 2.1))
         path.line(to: tip)
-        path.line(to: NSPoint(x: tip.x - along.x * 2.6 - across.x * 2.1, y: tip.y - along.y * 2.6 - across.y * 2.1))
+        path.line(to: NSPoint(x: tip.x - 2.1, y: tip.y + 2.1))
     }
 
     /// Stop loading: a cross the size of the chevrons.
