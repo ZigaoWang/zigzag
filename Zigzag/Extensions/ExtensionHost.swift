@@ -875,17 +875,30 @@ final class NativeMessagingHost {
 /// A few lines about extensions, in every build, for finding out why one isn't working: what was clicked, whether
 /// a popup opened, how many messages a companion app sent. Never what any message said.
 enum ExtensionLog {
+    /// Written off the main thread, one line at a time, so a chatty extension never stalls the app or wakes the disk.
+    nonisolated private static let queue = DispatchQueue(label: "app.zigzag.extension-log", qos: .utility)
+    /// The last line and how often it's been said in a row: a line repeating within a minute is written once.
+    nonisolated(unsafe) private static var last: (line: String, at: Date)?
+    /// The file stays small: past this size it starts over.
+    nonisolated private static let limit = 1_000_000
+
     nonisolated static func write(_ line: String) {
-        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true ? "Library/Logs/Zigzag Dev" : "Library/Logs/Zigzag", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent("extensions.log")
-        let text = "\(Date()) \(line)\n"
-        if let handle = try? FileHandle(forWritingTo: url) {
-            handle.seekToEndOfFile()
-            handle.write(Data(text.utf8))
-            try? handle.close()
-        } else {
-            try? Data(text.utf8).write(to: url)
+        let now = Date()
+        queue.async {
+            if let last, last.line == line, now.timeIntervalSince(last.at) < 60 { return }
+            last = (line, now)
+            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true ? "Library/Logs/Zigzag Dev" : "Library/Logs/Zigzag", isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = folder.appendingPathComponent("extensions.log")
+            let text = Data("\(now) \(line)\n".utf8)
+            let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+            if size < limit, let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(text)
+                try? handle.close()
+            } else {
+                try? text.write(to: url)
+            }
         }
     }
 }
