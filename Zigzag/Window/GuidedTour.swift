@@ -19,7 +19,6 @@ final class GuidedTour: NSView {
     private let finish = PrimaryButton(title: "Start Browsing")
     // The last card: a note from the person who made Zigzag.
     private let wordmark = WordmarkView()
-    private let header = BrandSurface()
     private let letter = NSTextField(wrappingLabelWithString: "")
     private let signature = Label("Zigao, who makes Zigzag", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
     /// A short real recording of the step being done, on a loop, above what to do.
@@ -86,20 +85,19 @@ final class GuidedTour: NSView {
         card.tintStrength = 0.94
         card.appearance = NSAppearance(named: .darkAqua)
         card.radius = Tokens.Radius.large
-        header.cornerRadius = 0
-        header.layer?.borderWidth = 0
-        header.showsWatermark = false
-        [header, step, check, title, note, skip, finish, wordmark, letter, signature, video].forEach { card.addSubview($0) }
+        [step, check, title, note, skip, finish, wordmark, letter, signature, video].forEach { card.addSubview($0) }
         video.wantsLayer = true
         video.layer?.cornerRadius = Tokens.Radius.row
         video.layer?.cornerCurve = .continuous
         video.layer?.masksToBounds = true
         videoLayer.videoGravity = .resizeAspectFill
         video.layer?.addSublayer(videoLayer)
-        wordmark.color = Brand.ribbon
+        wordmark.color = .white
         letter.isSelectable = false
         letter.font = Tokens.Font.body()
         letter.textColor = Tokens.Color.textPrimary
+        letter.alignment = .center
+        signature.alignment = .center
         letter.stringValue = "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way."
         
         addSubview(card)
@@ -432,7 +430,8 @@ final class GuidedTour: NSView {
         step.isHidden = d.isDone || d.isFinal || d.count.isEmpty
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
-        [wordmark, letter, signature, header].forEach { $0.isHidden = !d.isFinal }
+        [wordmark, letter, signature].forEach { $0.isHidden = !d.isFinal }
+        title.alignment = d.isFinal ? .center : .left
         title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : .systemFont(ofSize: 22, weight: .semibold)
         if animated {
             let fade = CATransition()
@@ -453,8 +452,8 @@ final class GuidedTour: NSView {
             typealias F = Tokens.Tour
             let inner = F.finalWidth - F.finalPad * 2
             let lh = ceil(letter.sizeThatFits(NSSize(width: inner, height: 400)).height)
-            return NSSize(width: F.finalWidth, height: F.finalHeader + Tokens.Space.x6 + 2 + F.finalTitleHeight + Tokens.Space.x2 + 2 + lh
-                          + Tokens.Space.x3 + signature.lineHeight + Tokens.Space.x6 + Tokens.Space.x10 + Tokens.Space.x6 + Tokens.Space.x1)
+            return NSSize(width: F.finalWidth, height: F.finalPad + F.finalWordmark + Tokens.Space.x6 + F.finalTitleHeight + Tokens.Space.x3 + lh
+                          + Tokens.Space.x3 + signature.lineHeight + Tokens.Space.x8 + Tokens.Space.x10 + F.finalPad)
         }
         let keys = caps.map { max(Tokens.Tour.keySide, $0.1.inkWidth + Tokens.Space.x4) }.reduce(0, +) + CGFloat(max(caps.count - 1, 0)) * Tokens.Tour.keyGap
         let text = max(title.textWidth, d.note.isEmpty ? 0 : note.textWidth)
@@ -515,7 +514,7 @@ final class GuidedTour: NSView {
             if d.target == "bar", hole != .zero {
                 frame = NSRect(x: hole.midX - size.width / 2, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
             } else {
-                frame = NSRect(x: page.midX - size.width / 2, y: page.maxY - size.height - Tokens.Space.x8, width: size.width, height: size.height)
+                frame = NSRect(x: windowCentered(size.width, in: page), y: page.maxY - size.height - Tokens.Space.x8, width: size.width, height: size.height)
             }
         } else if d.clip != nil {
             // With a recording: tucked in the page's bottom right, clear of what's lit.
@@ -529,7 +528,9 @@ final class GuidedTour: NSView {
                 }
             }
         } else if hole == .zero {
-            frame = NSRect(x: page.midX - size.width / 2, y: page.midY - size.height / 2, width: size.width, height: size.height)
+            // Where ⌘T's bar opens: centered on the whole window, a little above the middle of the page.
+            frame = NSRect(x: windowCentered(size.width, in: page), y: page.minY + max(Tokens.Space.x12, floor(page.height * 0.18)),
+                           width: size.width, height: size.height)
         } else if d.target == "bar" || d.target == "editor" {
             // Right under the bar or the editor: next to what you're looking at.
             frame = NSRect(x: d.target == "bar" ? hole.midX - size.width / 2 : hole.minX, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
@@ -587,6 +588,12 @@ final class GuidedTour: NSView {
         ring.add(beat, forKey: "pulse")
     }
 
+    /// Like ⌘T's bar: centered on the whole window, not just the page beside the sidebar, but kept inside the page.
+    private func windowCentered(_ width: CGFloat, in page: NSRect) -> CGFloat {
+        let margin = Tokens.Space.x8
+        return min(max(page.minX + margin, floor(bounds.midX - width / 2)), page.maxX - width - margin)
+    }
+
     /// The recordings are a 1120 by 720 window, inset 8 from the card's edges.
     private static func videoHeight(for width: CGFloat) -> CGFloat {
         let inset = Tokens.Tour.videoInset
@@ -608,15 +615,14 @@ final class GuidedTour: NSView {
         if d.isFinal {
             typealias F = Tokens.Tour
             let pad = F.finalPad, inner = width - pad * 2
-            // The brand across the top, the note beneath it.
-            header.frame = NSRect(x: 0, y: 0, width: width, height: F.finalHeader)
+            // One calm surface, centered: the wordmark, the title, the note and who wrote it, then the way out.
             let wh = F.finalWordmark
-            wordmark.frame = NSRect(x: (width - wh * WordmarkView.aspect) / 2, y: (F.finalHeader - wh) / 2, width: wh * WordmarkView.aspect, height: wh)
-            title.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Space.x6 + 2, width: inner, height: F.finalTitleHeight)
+            wordmark.frame = NSRect(x: (width - wh * WordmarkView.aspect) / 2, y: pad, width: wh * WordmarkView.aspect, height: wh)
+            title.frame = NSRect(x: pad, y: wordmark.frame.maxY + Tokens.Space.x6, width: inner, height: F.finalTitleHeight)
             let lh = ceil(letter.sizeThatFits(NSSize(width: inner, height: 400)).height)
-            letter.frame = NSRect(x: pad, y: title.frame.maxY + Tokens.Space.x2 + 2, width: inner, height: lh)
+            letter.frame = NSRect(x: pad, y: title.frame.maxY + Tokens.Space.x3, width: inner, height: lh)
             signature.frame = NSRect(x: pad, y: letter.frame.maxY + Tokens.Space.x3, width: inner, height: signature.lineHeight)
-            finish.frame = NSRect(x: pad, y: signature.frame.maxY + Tokens.Space.x6, width: inner, height: Tokens.Space.x10)
+            finish.frame = NSRect(x: pad, y: signature.frame.maxY + Tokens.Space.x8, width: inner, height: Tokens.Space.x10)
             return
         }
         var x = Tokens.Space.x4
