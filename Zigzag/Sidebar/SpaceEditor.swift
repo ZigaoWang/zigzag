@@ -382,6 +382,11 @@ struct SpaceLook {
             return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil
                 && abs(space.seeThrough - seeThrough) < 0.01 && (curated.isNeutral || space.tintAmount > 0.99)
         }
+        // A space saved as the old white or black (no Shade of its own) is the White or Black here.
+        if space.brightness == nil, space.hue == nil, space.hue2 == nil, hue2 == nil, tint < 0.005, seeThrough == 0, !space.isSeeThrough,
+           space.color == .snow || space.color == .ink {
+            return depth == (space.color == .snow ? 0 : 1)
+        }
         guard let b = space.brightness, abs(b - depth) < 0.005, abs(space.seeThrough - seeThrough) < 0.01 else { return false }
         if tint < 0.005 {
             guard space.isNeutral else { return false }
@@ -395,16 +400,19 @@ struct SpaceLook {
     }
 
     /// Two rows of looks taken from real materials, muted, each its own color. First white, black, clear and smoky
-    /// glass, then the deep ones. Then paper and the light ones, warm to cool, the last of them glass.
+    /// glass, then the deep ones. Then paper and the light ones, warm to cool, the last of them glass. Every one is a
+    /// spot on the wheel, a Shade and the effects, so whatever a preset gives, the controls show and can reach.
     static let presets: [SpaceLook] = [
-        curated(.snow), curated(.ink), curated(.graphite, name: "Glass", seeThrough: 0.7),
+        SpaceLook(name: "White", tint: 0, depth: 0),
+        SpaceLook(name: "Black", tint: 0, depth: 1),
+        SpaceLook(name: "Glass", tint: 0, depth: 0.02, seeThrough: 0.7),
         SpaceLook(name: "Smoke", tint: 0, depth: 0.9, seeThrough: 0.6),
-        fade("Charcoal", 0.08, 0.84, 0.08, 0.94, tint: 0.12, grain: 0.2),
+        fade("Charcoal", 0.08, 0.84, 0.08, 0.94, tint: 0.12, grain: 0.3),
         fade("Espresso", 0.07, 0.8, 0.07, 0.93, tint: 0.45),
         fade("Oxblood", 0.99, 0.78, 0.99, 0.92, tint: 0.5),
         fade("Pine", 0.42, 0.8, 0.42, 0.93, tint: 0.45),
         fade("Slate", 0.62, 0.76, 0.62, 0.9, tint: 0.35),
-        curated(.sand, name: "Paper", grain: 0.5),
+        SpaceLook(name: "Paper", hue: 0.11, tint: 0.55, depth: 0.1, grain: 0.5),
         fade("Oat", 0.1, 0.02, 0.1, 0.26, tint: 0.45),
         fade("Butter", 0.13, 0.02, 0.13, 0.26),
         fade("Clay", 0.075, 0.06, 0.06, 0.36, tint: 0.55),
@@ -454,8 +462,7 @@ final class LookSwatch: InteractiveView {
         checker.isHidden = look.seeThrough == 0
         checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
         grain.isHidden = look.grain == 0
-        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
-        grain.compositingFilter = "softLightBlendMode"
+        grain.backgroundColor = MaterialImages.grain.cgColor
         grain.opacity = Float(min(1, look.grain * 0.5))
         fill.addSublayer(grain)
         toolTip = look.name
@@ -538,9 +545,9 @@ final class LookSlider: NSView {
         track.startPoint = CGPoint(x: 0, y: 0.5)
         track.endPoint = CGPoint(x: 1, y: 0.5)
         // The texture builds from the left, clearly: smooth at 0, heavy grain at the far end.
-        for (layer, mask, mode) in [(texture, ramp, "overlayBlendMode"), (texture2, ramp2, "softLightBlendMode")] where kind == .grain {
-            layer.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
-            layer.compositingFilter = mode
+        // Light and dark specks, as in the window, so it shows on black as well as white.
+        for (layer, mask) in [(texture, ramp), (texture2, ramp2)] where kind == .grain {
+            layer.backgroundColor = MaterialImages.grain.cgColor
             mask.startPoint = CGPoint(x: 0, y: 0.5)
             mask.endPoint = CGPoint(x: 1, y: 0.5)
             mask.colors = [NSColor.clear.cgColor, NSColor.black.withAlphaComponent(0.35).cgColor, NSColor.black.cgColor]
@@ -1135,6 +1142,9 @@ final class SpaceLookEditor: NSView {
 
     /// Where the knob starts for a space that follows the Mac: about how it looks right now, so nothing jumps.
     private static func startingDepth(_ space: SpaceInfo, dark: Bool) -> Double {
+        // White and black are the two ends of Shade.
+        if space.hue == nil, space.brightness == nil, space.color == .snow { return 0 }
+        if space.hue == nil, space.brightness == nil, space.color == .ink { return 1 }
         if space.isNeutral { return dark ? 0.9 : 0.06 }
         let strength = space.intensity ?? SpaceColor.defaultIntensity
         return dark ? 0.86 : 0.06 + 0.2 * strength

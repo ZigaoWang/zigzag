@@ -71,6 +71,7 @@ enum DebugBridge {
         case "markrow": controller.sidebar.list.debugMark(Int(arg.prefix { $0.isNumber }) ?? 0, shift: arg.hasSuffix("s"))
         case "markedfolder": controller.newFolder(with: controller.pinnedIDs(for: controller.sidebar.list.marked)); controller.sidebar.list.clearMarks()
         case "newspaceui": controller.newSpace(nil)
+        case "editspace": SpaceEditorPanel.toggle(spaceID: controller.tabManager.currentSpaceID, in: controller)
         case "closeeditor": SpaceEditorPanel.current?.close()
         case "canceleditor": SpaceEditorPanel.current?.cancel()
         case "tourskip": Tutorial.skip()

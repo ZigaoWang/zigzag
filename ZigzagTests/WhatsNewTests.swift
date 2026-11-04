@@ -166,3 +166,35 @@ struct SpaceLookUpgradeTests {
         #expect(half[2] > half[0] + 0.02)
     }
 }
+
+@MainActor
+struct SpacePresetTests {
+    private func rgb(_ color: NSColor) -> [Double] {
+        let c = color.usingColorSpace(.sRGB)!
+        return [c.redComponent, c.greenComponent, c.blueComponent].map(Double.init)
+    }
+
+    @Test func shadeRunsFromWhiteToBlack() {
+        #expect(rgb(SpaceColor.paint(hue: 0.6, depth: 0, tint: 0)).allSatisfy { $0 > 0.999 })
+        #expect(rgb(SpaceColor.paint(hue: 0.6, depth: 1, tint: 0)).allSatisfy { $0 < 0.001 })
+        #expect(rgb(SpaceColor.paint(hue: 0.3, depth: 1)).allSatisfy { $0 < 0.001 })
+    }
+
+    @Test func everyPresetIsPickedOnceApplied() {
+        for look in SpaceLook.presets {
+            var space = SpaceInfo(name: "Test", color: .sky)
+            space.grain = 0.7
+            space.translucency = 0.4
+            look.apply(to: &space)
+            #expect(look.matches(space), "\(look.name)")
+            #expect(SpaceLook.presets.filter { $0.matches(space) }.count == 1, "\(look.name)")
+        }
+    }
+
+    @Test func oldWhiteAndBlackAreThePresets() {
+        let white = SpaceLook.presets.first { $0.name == "White" }!
+        let black = SpaceLook.presets.first { $0.name == "Black" }!
+        #expect(white.matches(SpaceInfo(name: "Old", color: .snow)))
+        #expect(black.matches(SpaceInfo(name: "Old", color: .ink)))
+    }
+}
