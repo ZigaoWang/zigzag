@@ -561,7 +561,8 @@ final class BrowserRootView: ColorView {
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
     private var glassFrame: NSRect {
         // An empty space shows the frame where the page would be: glass under all of it.
-        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty else { return bounds }
+        // A split view's seam between its two pages shows the frame too: glass under all of it then.
+        guard sidebarVisible, card.isAttached, !card.isHidden, !isEmpty, secondCard.isHidden || secondCard.alphaValue == 0 else { return bounds }
         return NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height)
     }
     private var glassGrainBounds: NSRect { NSRect(origin: .zero, size: glassFrame.size) }
