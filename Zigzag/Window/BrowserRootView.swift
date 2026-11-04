@@ -506,7 +506,8 @@ final class BrowserRootView: ColorView {
         let glass = NSVisualEffectView()
         glass.blendingMode = .behindWindow
         glass.material = .sidebar
-        glass.state = .active
+        // Live while the window is in front; a still frosting behind other apps' windows, as macOS's own sidebars.
+        glass.state = .followsWindowActiveState
         glass.isHidden = true
         addSubview(glass, positioned: .below, relativeTo: nil)
         glass.wantsLayer = true
@@ -519,6 +520,8 @@ final class BrowserRootView: ColorView {
     /// `clear`: Liquid Glass, really transparent and still blurred, tinted with `tint` (it draws over the frame's own
     /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
     func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
+        glassWanted = on
+        defer { refreshGlassOcclusion() }
         if #available(macOS 26.0, *), clear {
             glassView.isHidden = true
             let glass = clearGlass as? NSGlassEffectView ?? {
@@ -559,6 +562,18 @@ final class BrowserRootView: ColorView {
         return NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height)
     }
     private var glassGrainBounds: NSRect { NSRect(origin: .zero, size: glassFrame.size) }
+
+    /// Whether the space wants glass; `refreshGlassOcclusion` keeps it off while the window can't be seen.
+    private var glassWanted = false
+
+    /// A window you can't see (behind others, minimized, on another desktop) needs no live blur: the glass goes
+    /// until it shows again, so the window server isn't re-blurring a window nobody is looking at.
+    func refreshGlassOcclusion() {
+        let visible = window?.occlusionState.contains(.visible) ?? true
+        let on = glassWanted && visible
+        if let clearGlass, !clearGlass.isHidden || on { clearGlass.alphaValue = on ? 1 : 0 }
+        glassView.alphaValue = on ? 1 : 0
+    }
 
     /// The clear glass, once a clear space has asked for it.
     private var clearGlass: NSView?
@@ -742,7 +757,7 @@ final class BrowserRootView: ColorView {
         for (names, object) in [(app, nil as NSWindow?), (own, window)] {
             for name in names {
                 pointerObservers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.pacePointer() }
+                    MainActor.assumeIsolated { self?.pacePointer(); self?.refreshGlassOcclusion() }
                 })
             }
         }

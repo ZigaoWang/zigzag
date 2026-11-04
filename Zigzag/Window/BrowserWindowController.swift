@@ -138,6 +138,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.sidebar.list.refreshRows() }
         }
+        fadeTimer?.tolerance = 10
 
         if tabManager.isPrivate {
             // Private windows are always dark and say so, so you never wonder which one you're in.

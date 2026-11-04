@@ -82,6 +82,8 @@ final class TabManager {
         suspendTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.suspendIdleTabs() }
         }
+        // Slack, so the system can fold it into other wake-ups instead of waking the Mac for it.
+        suspendTimer?.tolerance = 10
     }
 
     func invalidate() {
