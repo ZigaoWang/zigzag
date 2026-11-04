@@ -726,9 +726,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// The header's title: the chosen section, or Settings while a search goes through all of them.
+    /// The header's title: the chosen section, or "results" while a search goes through all of them (the column
+    /// already says "settings").
     private func refreshTitle() {
-        paneTitle.title = isSearching ? "Settings" : pane.title
+        paneTitle.title = isSearching ? "Results" : pane.title
         header.needsLayout = true
     }
 
