@@ -516,14 +516,16 @@ final class BrowserRootView: ColorView {
 
     /// The frosting always covers all of what's behind: anything thinner lets it through sharp, and its text then
     /// reads under the sidebar's own. See-through spaces thin their color over the blur instead.
-    /// `clear`: Liquid Glass's clear style, really transparent, tinted with `tint` (it draws over the frame's own
+    /// `clear`: Liquid Glass, really transparent and still blurred, tinted with `tint` (it draws over the frame's own
     /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
     func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
         if #available(macOS 26.0, *), clear {
             glassView.isHidden = true
             let glass = clearGlass as? NSGlassEffectView ?? {
                 let made = NSGlassEffectView()
-                made.style = .clear
+                // Regular, not the clear style: still plainly see-through, but blurred enough that what's behind reads
+                // as color and shape, never as text under the sidebar's own.
+                made.style = .regular
                 made.cornerRadius = 0
                 made.wantsLayer = true
                 made.layer?.zPosition = -3
