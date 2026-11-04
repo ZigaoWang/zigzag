@@ -325,6 +325,7 @@ struct SpaceLook {
     var depth2: Double = 0
     var angle: Double = 90
     var seeThrough: Double = 0
+    var grain: Double = 0
 
     /// How it looks as a space.
     var space: SpaceInfo {
@@ -333,11 +334,15 @@ struct SpaceLook {
         return space
     }
 
-    /// A curated color, as a preset: the color alone, light by day and deep at night with the Mac.
-    static func curated(_ color: SpaceColor) -> SpaceLook { SpaceLook(name: color.name, curated: color, depth: 0) }
+    /// A curated color, as a preset: light by day and deep at night with the Mac, with any see-through and grain.
+    static func curated(_ color: SpaceColor, name: String? = nil, seeThrough: Double = 0, grain: Double = 0) -> SpaceLook {
+        SpaceLook(name: name ?? color.name, curated: color, depth: 0, seeThrough: seeThrough, grain: grain)
+    }
 
+    /// A preset is the whole look: its see-through and grain come with it, and one without them is solid and smooth.
     func apply(to space: inout SpaceInfo) {
         space.glass = nil
+        space.grain = grain > 0 ? grain : nil
         if let curated {
             space.color = curated
             space.hue = nil
@@ -348,7 +353,7 @@ struct SpaceLook {
             space.tint2 = nil
             space.intensity2 = nil
             space.brightness2 = nil
-            space.translucency = nil
+            space.translucency = seeThrough > 0 ? seeThrough : nil
             space.appearance = nil
             return
         }
@@ -371,9 +376,10 @@ struct SpaceLook {
     }
 
     func matches(_ space: SpaceInfo) -> Bool {
+        guard abs((space.grain ?? 0) - grain) < 0.01 else { return false }
         if let curated {
-            return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil && !space.isSeeThrough
-                && (curated.isNeutral || space.tintAmount > 0.99)
+            return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil
+                && abs(space.seeThrough - seeThrough) < 0.01 && (curated.isNeutral || space.tintAmount > 0.99)
         }
         guard let b = space.brightness, abs(b - depth) < 0.005, abs(space.seeThrough - seeThrough) < 0.01 else { return false }
         if tint < 0.005 {
@@ -387,8 +393,12 @@ struct SpaceLook {
         return true
     }
 
-    /// One row of curated colors that sit well together: white, the seven soft hues around the wheel, and graphite.
-    static let presets: [SpaceLook] = [SpaceColor.snow, .ink, .sky, .lavender, .rose, .peach, .sand, .sage, .mint, .graphite].map { curated($0) }
+    /// One row of looks that sit well together: white, black, glass and paper, then the seven soft hues around the
+    /// wheel (every color a new space is given, so it's always one of these).
+    static let presets: [SpaceLook] = [
+        curated(.snow), curated(.ink), curated(.graphite, name: "Glass", seeThrough: 0.7), curated(.sand, name: "Paper", grain: 0.5),
+        curated(.sky), curated(.lavender), curated(.rose), curated(.peach), curated(.sand), curated(.sage), curated(.mint),
+    ]
 }
 
 /// A small checkerboard, the usual sign for see-through.
@@ -403,11 +413,13 @@ enum Checker {
     }
 }
 
-/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard.
+/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard,
+/// a grainy one with its grain.
 final class LookSwatch: InteractiveView {
     let look: SpaceLook
     private let fill = CAGradientLayer()
     private let checker = CALayer()
+    private let grain = CALayer()
     private let ring = CALayer()
 
     init(look: SpaceLook) {
@@ -420,6 +432,11 @@ final class LookSwatch: InteractiveView {
         checker.masksToBounds = true
         checker.isHidden = look.seeThrough == 0
         checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
+        grain.isHidden = look.grain == 0
+        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
+        grain.compositingFilter = "softLightBlendMode"
+        grain.opacity = Float(min(1, look.grain * 0.8))
+        fill.addSublayer(grain)
         toolTip = look.name
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(look.name)
@@ -454,7 +471,10 @@ final class LookSwatch: InteractiveView {
                 // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
                 // mode, where every frame color is deep; white, grays and black as they are.
                 let start = space.isNeutral ? space.frameColor : space.swatch
-                fill.colors = [start, space.frameColor2 ?? start].map(\.cgColor)
+                // See-through shows the checkerboard through the color, as the window shows the desktop.
+                let alpha = 1 - 0.45 * look.seeThrough
+                fill.colors = [start, space.frameColor2 ?? start].map { $0.withAlphaComponent(alpha).cgColor }
+                grain.frame = fill.bounds
                 fill.startPoint = CGPoint(x: 0.2, y: 0.1)
                 fill.endPoint = CGPoint(x: 0.8, y: 0.9)
                 fill.borderWidth = Tokens.Metric.hairline

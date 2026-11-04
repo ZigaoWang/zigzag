@@ -709,6 +709,12 @@ enum DebugBridge {
                 SpaceLook.curated(color).apply(to: &look)
                 Library.shared.setLook(look)
             }
+        case "spacepreset":
+            // spacepreset <index>: the current space takes that preset from the editor's row.
+            if let i = Int(arg), SpaceLook.presets.indices.contains(i), var look = Library.shared.space(controller.tabManager.currentSpaceID) {
+                SpaceLook.presets[i].apply(to: &look)
+                Library.shared.setLook(look)
+            }
         case "spacelook":
             // spacelook <hue 0-360> <second hue or -> <see-through 0-1> [clear]: the current space's color, gradient and glass.
             let f = arg.split(separator: " ").map(String.init)
