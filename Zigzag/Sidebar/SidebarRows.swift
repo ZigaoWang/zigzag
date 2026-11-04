@@ -51,6 +51,12 @@ class SidebarRowView: InteractiveView {
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
         title.frame = NSRect(x: titleX, y: (bounds.height - titleHeight) / 2, width: max(0, bounds.width - titleX - trailing), height: titleHeight)
         if layer?.sublayers?.contains(where: { $0.name == "rim" && !$0.isHidden }) == true { setCardRim(true) }
+        refreshCardShadowPath()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        refreshCardShadowPath()
     }
 
     override func stateDidChange(animated: Bool) {
@@ -113,6 +119,16 @@ final class SelectionCardView: NSView {
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        refreshCardShadowPath()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        refreshCardShadowPath()
+    }
 
     func refresh() {
         Tokens.Motion.withoutAnimation {

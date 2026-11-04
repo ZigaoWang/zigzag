@@ -33,6 +33,25 @@ extension NSView {
         layer.shadowColor = cgColor(Tokens.Chrome.cardShadow)
         layer.shadowRadius = Tokens.Shadow.liftRadius
         layer.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.liftDrop : -Tokens.Shadow.liftDrop)
+        refreshCardShadowPath()
+    }
+
+    /// The card is see-through: a shadow cast by its whole shape would show through it and darken it to a slab.
+    /// It's cast from a ring along the edge instead, so it only falls outside. Called again whenever the card is
+    /// sized; before it has a size, it casts none.
+    func refreshCardShadowPath() {
+        guard let layer, layer.shadowOpacity > 0 else { return }
+        let b = layer.bounds
+        guard b.width > 4, b.height > 4 else { layer.shadowPath = CGMutablePath(); return }
+        let r = min(layer.cornerRadius, b.height / 2), inner = b.insetBy(dx: 2, dy: 2)
+        let ring = CGMutablePath()
+        ring.addRoundedRect(in: b, cornerWidth: r, cornerHeight: r)
+        // The inner edge runs the other way round, so the shadow's nonzero fill leaves the middle empty.
+        var flip = CGAffineTransform(translationX: inner.midX * 2, y: 0).scaledBy(x: -1, y: 1)
+        if let reversed = CGPath(roundedRect: inner, cornerWidth: max(0, r - 2), cornerHeight: max(0, r - 2), transform: &flip) as CGPath? {
+            ring.addPath(reversed)
+        }
+        layer.shadowPath = ring
     }
 }
 

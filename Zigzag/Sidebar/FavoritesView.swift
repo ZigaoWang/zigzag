@@ -398,6 +398,7 @@ final class FavoriteTile: InteractiveView {
 
     override func layout() {
         super.layout()
+        refreshCardShadowPath()
         // Big enough to read at a glance when the site gives a sharp icon; a small one stays at a tab's 16pt rather
         // than being stretched and blurred.
         let inset = Tokens.Metric.dropInset
