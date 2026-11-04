@@ -695,8 +695,10 @@ final class SpaceHeaderView: InteractiveView {
             // whatever its drawing's shape; centered over the rows' icon column, so it lines up with the + below.
             let side = ceil(font.capHeight) + 2
             let column = SidebarRowView.inset + Tokens.Sidebar.favicon / 2
-            iconView.frame = NSRect(x: round(column - side / 2), y: round(xMiddle - side / 2), width: side, height: side)
-            x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset
+            // Its bottom on the name's baseline and its top at the capitals', so it stands in the line like a letter.
+            let capMiddle = isFlipped ? baseline - font.capHeight / 2 : baseline + font.capHeight / 2
+            iconView.frame = NSRect(x: round(column - side / 2), y: round(capMiddle - side / 2), width: side, height: side)
+            x = iconView.frame.maxX + Tokens.Space.x2 - Label.inset - Tokens.Sidebar.spaceNameBearing - 2
         }
         label.frame = NSRect(x: x, y: y, width: min(label.textWidth, bounds.width - x - Tokens.Space.x6), height: h)
         let side = Tokens.Space.x4
