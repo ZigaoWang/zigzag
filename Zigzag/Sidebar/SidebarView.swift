@@ -271,7 +271,7 @@ final class SpaceDotView: InteractiveView {
 /// The sidebar: navigation, address, bookmarks, tabs and spaces. Drawn entirely by us.
 final class SidebarView: NSView {
     weak var delegate: SidebarDelegate? {
-        didSet { list.delegate = delegate; neighborList.delegate = delegate }
+        didSet { list.delegate = delegate; panes.left.list.delegate = delegate; panes.right.list.delegate = delegate }
     }
 
     /// The top row's and bottom bar's buttons: 26pt, 14pt glyphs, every glyph's ink on the traffic lights' line.
@@ -294,10 +294,10 @@ final class SidebarView: NSView {
     private let scrollView = NSScrollView()
     /// Tabs running on below the bottom of the list fade out there, rather than being sliced off by the footer.
     private let bottomFade = CAGradientLayer()
-    /// The space next door, which slides in beside the current one while you swipe.
-    private let neighborList = SidebarListView()
-    private let neighborScroll = NSScrollView()
-    private let neighborFade = CAGradientLayer()
+    /// The spaces either side, each in a list of its own: the one a swipe pulls in beside the current list, and the
+    /// one a switch slides in. Made ahead of time, so a swipe never waits for a list to be built.
+    private let panes = (left: SpacePane(), right: SpacePane())
+    private func pane(_ side: CGFloat) -> SpacePane { side < 0 ? panes.left : panes.right }
 
     private let bottomBar = NSView()
     let nowPlaying = NowPlayingView()
@@ -353,15 +353,8 @@ final class SidebarView: NSView {
         addSubview(scrollView)
         scrollView.wantsLayer = true
         scrollView.layer?.mask = bottomFade
-        neighborScroll.drawsBackground = false
-        neighborScroll.hasVerticalScroller = false
-        neighborScroll.hasHorizontalScroller = false
-        neighborScroll.automaticallyAdjustsContentInsets = false
-        neighborScroll.documentView = neighborList
-        neighborScroll.isHidden = true
-        neighborScroll.wantsLayer = true
-        neighborScroll.layer?.mask = neighborFade
-        addSubview(neighborScroll)
+        addSubview(panes.left.scroll)
+        addSubview(panes.right.scroll)
         topSeparator.alphaValue = 0
         addSubview(topSeparator)
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
@@ -456,7 +449,7 @@ final class SidebarView: NSView {
         }
         layoutBottomBar()
         updateBottomFade()
-        if !neighborScroll.isHidden { placeNeighbor() }
+        placePanes()
     }
 
     private func updateBottomFade() {
@@ -726,79 +719,218 @@ final class SidebarView: NSView {
 
     // MARK: Space transition
 
-    /// Slides the old list out and the new one in, in the direction of travel.
-    /// If a swipe is in progress, the new list continues from where the fingers left it.
-    func transitionList(direction: CGFloat, from snapshot: NSImage?) {
-        // A switch on top of a switch: the list carries on from where it's drawn now, and the last ghost goes, so
-        // quick ⌃1 ⌃2 ⌃3 never stacks ghosts or jumps.
-        var fromSwipe = scrollView.frame.minX - Tokens.Sidebar.edge
-        if let layer = scrollView.layer, layer.animation(forKey: "slide") != nil, let drawn = layer.presentation()?.transform {
-            fromSwipe += drawn.m41
+    /// Slides the old list out and the new one in, in the direction of travel. Both are real lists, not pictures of
+    /// them: the new space comes in on the pane beside the list (already there mid-swipe, so it carries on from the
+    /// fingers), and the list keeps showing the space you left until it's out of sight. Then the list takes the new
+    /// space and the pane goes, a swap that doesn't show, made once nothing is moving. `snapshot`, a picture of the old
+    /// list, is only for a switch in the middle of a drag, when the list itself has to change at once.
+    func transitionList(direction: CGFloat, from old: UUID?, snapshot: NSImage? = nil) {
+        let width = bounds.width
+        let home = Tokens.Sidebar.edge
+        // Where the list on screen is now: as the fingers left it, or partway through the last switch.
+        var from = scrollView.frame.minX - home + Self.shownSlide(scrollView)
+        if let pending = handOff {
+            // A switch on top of a switch: the space coming in is the one on screen, and it leaves from where it is.
+            from = pending.pane.scroll.frame.minX - home + Self.shownSlide(pending.pane.scroll)
+            endHandOff(showing: old)
         }
-        if let old = swipeGhost, old !== neighborScroll { old.removeFromSuperview() }
-        // Let go of a swipe past the line: the spring carries on at the fingers' speed. Any other switch (a click
-        // on a dot, ⌃2) ends a swipe in progress, and the new list simply slides in from where the old one was.
+        swipeGhost?.removeFromSuperview()
         let landing = landingVelocity
         landingVelocity = nil
         if swipeState == .tracking { swipeState = .finished }
         swipeEndWork?.cancel()
         swipeOffset = 0
-        neighborScroll.isHidden = true
         clearSwipeDots()
-        var finalFrame = scrollView.frame
-        finalFrame.origin.x = Tokens.Sidebar.edge
-        // Space switches slide even from the keyboard (⌃1, ⌃2…): the motion tells you which way you went.
-        let animate = snapshot != nil && direction != 0
-        Tokens.Motion.withoutAnimation { scrollView.frame = finalFrame }
-        // Mid-drag the list keeps its gap and hidden row; otherwise it simply reloads.
-        if list.isDragging { list.refreshDuringDrag() } else { list.reload(animated: false); restoreListScroll() }
-        guard animate, let snapshot else { return }
+        scrollView.layer?.removeAnimation(forKey: "slide")
+        Tokens.Motion.withoutAnimation { scrollView.frame.origin.x = home }
+        let side: CGFloat = direction < 0 ? -1 : 1
+        let incoming = pane(side)
+        hidePane(pane(-side))
+
+        // In the middle of a drag the list itself takes the new space at once, so the drag carries on in it.
+        if list.isDragging {
+            hidePane(incoming)
+            list.refreshDuringDrag()
+            if let snapshot, direction != 0 { slideGhost(snapshot, direction: direction, from: from) }
+            return
+        }
+        guard direction != 0, let old, let target = currentSpaceID, width > 0 else {
+            hidePane(incoming)
+            list.reload(animated: false)
+            restoreListScroll()
+            updateBottomFade()
+            scheduleNeighbors()
+            return
+        }
+
+        // The new space beside the list, where the fingers had it, or a width away.
+        if incoming.scroll.isHidden || incoming.space != target { load(incoming, space: target) }
+        incoming.scroll.isHidden = false
+        incoming.scroll.layer?.removeAnimation(forKey: "slide")
+        incoming.scroll.layer?.removeAnimation(forKey: "fade")
+        Tokens.Motion.withoutAnimation { incoming.scroll.frame = scrollView.frame }
+        // The list holds on to the space you left while it goes.
+        list.spaceOverride = old
+        let work = DispatchWorkItem { [weak self] in self?.endHandOff(showing: nil) }
+        handOff = (incoming, work)
+
+        if Tokens.Motion.reduceMotion {
+            // Nothing slides: the new list fades in over the old where it stands.
+            Self.fadeIn(incoming.scroll, duration: Tokens.Motion.standard)
+            DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.standard + 0.02, execute: work)
+            return
+        }
+        let curve = landing == nil ? Tokens.Motion.spaceSwitch : Tokens.Motion.swipeSettle
+        let velocity = landing ?? 0
+        // The new list arrives from beside the old, at the fingers' speed after a swipe.
+        let duration = Tokens.Motion.slide(incoming.scroll, fromOffsetX: side * width + from, curve: curve, fromKeyboard: true, velocity: velocity)
+        // The old one leaves the other way, a width over, side by side with it.
+        Self.slideOut(scrollView, from: from, to: -side * width, like: incoming.scroll)
+        // A swipe keeps both lists solid, as the fingers had them; otherwise the one leaving fades, so the two never
+        // compete.
+        if landing == nil { Self.fadeOut(scrollView, duration: Tokens.Motion.slideDuration) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(duration, Tokens.Motion.slideDuration) + 0.02, execute: work)
+    }
+
+    /// A switch in progress: the pane bringing the new space in, and the swap to make once it's home.
+    private var handOff: (pane: SpacePane, work: DispatchWorkItem)?
+
+    /// The swap: the list takes the space the pane brought in (or `showing`, when another switch is already on its
+    /// way and the list has to stand in for the space on screen), in the same place and scrolled the same, and the pane
+    /// goes.
+    private func endHandOff(showing space: UUID?) {
+        guard let pending = handOff else { return }
+        handOff = nil
+        pending.work.cancel()
+        let shown = pending.pane.scroll.contentView.bounds.origin.y
+        scrollView.layer?.removeAnimation(forKey: "slide")
+        scrollView.layer?.removeAnimation(forKey: "fade")
+        list.spaceOverride = space == currentSpaceID ? nil : space
+        Tokens.Motion.withoutAnimation {
+            scrollView.frame.origin.x = Tokens.Sidebar.edge
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let maxY = max(0, list.frame.height - scrollView.contentView.bounds.height)
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: min(shown, maxY)))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+            updateBottomFade()
+            hidePane(pending.pane)
+        }
+        if space == nil { scheduleNeighbors() }
+    }
+
+    /// How far a view is drawn from its frame by a slide still running.
+    private static func shownSlide(_ view: NSView) -> CGFloat {
+        guard let layer = view.layer, layer.animation(forKey: "slide") != nil else { return 0 }
+        return layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat ?? 0
+    }
+
+    /// Moves a view from `from` to `to` (offsets from where it stands) on the same curve and in the same time as
+    /// `partner`'s slide, staying there until the swap takes it back.
+    private static func slideOut(_ view: NSView, from: CGFloat, to: CGFloat, like partner: NSView) {
+        guard let layer = view.layer else { return }
+        let animation: CABasicAnimation
+        if let lead = partner.layer?.animation(forKey: "slide") as? CABasicAnimation, let copy = lead.copy() as? CABasicAnimation {
+            animation = copy
+        } else {
+            animation = CABasicAnimation()
+            animation.duration = Tokens.Motion.slideDuration
+        }
+        animation.keyPath = "transform.translation.x"
+        animation.fromValue = from
+        animation.toValue = to
+        animation.fillMode = .both
+        animation.isRemovedOnCompletion = false
+        layer.add(animation, forKey: "slide")
+    }
+
+    private static func fadeOut(_ view: NSView, duration: TimeInterval) {
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = duration
+        fade.timingFunction = Tokens.Motion.easeOut
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        view.layer?.add(fade, forKey: "fade")
+    }
+
+    private static func fadeIn(_ view: NSView, duration: TimeInterval) {
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = duration
+        fade.timingFunction = Tokens.Motion.easeOut
+        fade.fillMode = .backwards
+        view.layer?.add(fade, forKey: "fade")
+    }
+
+    /// Mid-drag only: a picture of the old list slides out and fades, and the list, already the new space's, comes in.
+    private func slideGhost(_ snapshot: NSImage, direction: CGFloat, from: CGFloat) {
         let width = bounds.width
-        let ghost = NSImageView(frame: finalFrame)
+        var end = scrollView.frame
+        end.origin.x -= direction * width
+        let ghost = NSImageView(frame: end)
         ghost.image = snapshot
         ghost.imageScaling = .scaleNone
         ghost.imageAlignment = .alignTopLeft
         ghost.wantsLayer = true
         addSubview(ghost)
         swipeGhost = ghost
-        // Reduce Motion: nothing slides, but the old list still fades into the new one where it stands.
-        if Tokens.Motion.reduceMotion {
-            CATransaction.begin()
-            CATransaction.setCompletionBlock { ghost.removeFromSuperview() }
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 1
-            fade.toValue = 0
-            fade.duration = Tokens.Motion.standard
-            fade.timingFunction = Tokens.Motion.easeOut
-            fade.fillMode = .forwards
-            fade.isRemovedOnCompletion = false
-            ghost.layer?.add(fade, forKey: "fade")
-            CATransaction.commit()
-            return
+        guard !Tokens.Motion.reduceMotion else { ghost.removeFromSuperview(); return }
+        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + from, curve: Tokens.Motion.spaceSwitch, fromKeyboard: true)
+        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + from, curve: Tokens.Motion.spaceSwitch, fromKeyboard: true)
+        Self.fadeOut(ghost, duration: Tokens.Motion.slideDuration)
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(duration, Tokens.Motion.slideDuration) + 0.02) { ghost.removeFromSuperview() }
+    }
+
+    /// Fills a pane with a space's list, scrolled where you left that space.
+    private func load(_ pane: SpacePane, space: UUID) {
+        pane.list.privateLabel = list.privateLabel
+        Tokens.Motion.withoutAnimation {
+            pane.scroll.frame = scrollView.frame
+            pane.list.spaceOverride = space
+            pane.list.setFrameSize(NSSize(width: pane.scroll.contentSize.width, height: max(pane.list.frame.height, pane.scroll.contentSize.height)))
+            pane.list.reload(animated: false)
+            pane.list.layoutSubtreeIfNeeded()
+            let maxY = max(0, pane.list.frame.height - pane.scroll.contentView.bounds.height)
+            pane.scroll.contentView.scroll(to: NSPoint(x: 0, y: min(listScroll[space] ?? 0, maxY)))
+            pane.scroll.reflectScrolledClipView(pane.scroll.contentView)
+            Self.fade(pane.fade, for: pane.scroll, list: pane.list)
         }
-        // The old list leaves from where it is; the new one arrives from the other side.
-        var ghostEnd = finalFrame
-        ghostEnd.origin.x -= direction * width
-        Tokens.Motion.withoutAnimation { ghost.frame = ghostEnd }
-        let curve = landing == nil ? Tokens.Motion.spaceSwitch : Tokens.Motion.swipeSettle
-        let velocity = landing ?? 0
-        let duration = Tokens.Motion.slide(ghost, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true, velocity: velocity)
-        Tokens.Motion.slide(scrollView, fromOffsetX: direction * width + fromSwipe, curve: curve, fromKeyboard: true, velocity: velocity)
-        // A landing swipe keeps both lists solid, side by side as the fingers had them. Otherwise the outgoing list
-        // fades as it leaves, so the two never compete.
-        guard landing == nil else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) { ghost.removeFromSuperview() }
-            return
+    }
+
+    private func hidePane(_ pane: SpacePane) {
+        pane.scroll.layer?.removeAnimation(forKey: "slide")
+        pane.scroll.layer?.removeAnimation(forKey: "fade")
+        pane.scroll.isHidden = true
+    }
+
+    private var neighborWork: DispatchWorkItem?
+
+    /// After a switch, once things are still, the spaces either side are put in their panes, out of sight, so the next
+    /// swipe finds them made and only has to bring them up to date.
+    private func scheduleNeighbors() {
+        neighborWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.prepareNeighbors(next: 0) }
+        neighborWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    /// One side per turn of the run loop, so neither holds up a scroll that has just started.
+    private func prepareNeighbors(next index: Int) {
+        guard index < 2, handOff == nil, swipeState != .tracking, let current = currentSpaceID else { return }
+        let spaces = Library.shared.spaces
+        guard let at = spaces.firstIndex(where: { $0.id == current }) else { return }
+        let side: CGFloat = index == 0 ? 1 : -1
+        let neighbor = at + Int(side)
+        let pane = pane(side)
+        if pane.scroll.isHidden, spaces.indices.contains(neighbor), pane.space != spaces[neighbor].id || pane.list.subviews.isEmpty {
+            load(pane, space: spaces[neighbor].id)
         }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 1
-        fade.toValue = 0
-        fade.duration = Tokens.Motion.slideDuration
-        fade.timingFunction = Tokens.Motion.easeOut
-        fade.fillMode = .forwards
-        fade.isRemovedOnCompletion = false
-        ghost.layer?.add(fade, forKey: "fade")
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) { ghost.removeFromSuperview() }
+        let work = DispatchWorkItem { [weak self] in self?.prepareNeighbors(next: index + 1) }
+        neighborWork = work
+        DispatchQueue.main.async(execute: work)
     }
 
     func listSnapshot() -> NSImage? {
@@ -935,8 +1067,6 @@ final class SidebarView: NSView {
     private var swipeSamples: [(time: TimeInterval, dx: CGFloat)] = []
     /// The spaces on either side of the one this gesture started in.
     private var swipeNeighbors: (left: UUID?, right: UUID?) = (nil, nil)
-    /// -1 when the neighbor showing is the space on the left, 1 on the right.
-    private var neighborSide: CGFloat = 0
     /// Set while a swipe lands, so the new list carries on at the fingers' speed.
     private var landingVelocity: CGFloat?
     private weak var swipeGhost: NSView?
@@ -966,13 +1096,14 @@ final class SidebarView: NSView {
     private func startTracking() {
         swipeState = .tracking
         swipeSamples = []
-        var shown: CGFloat = 0
-        if let layer = scrollView.layer, layer.animation(forKey: "slide") != nil,
-           let x = layer.presentation()?.value(forKeyPath: "transform.translation.x") as? CGFloat {
-            shown = x
+        var shown = Self.shownSlide(scrollView)
+        if let pending = handOff {
+            // Still sliding in from the last switch: the space coming in is the one picked up, from where it is.
+            shown = pending.pane.scroll.frame.minX - Tokens.Sidebar.edge + Self.shownSlide(pending.pane.scroll) - swipeOffset
+            endHandOff(showing: nil)
         }
         scrollView.layer?.removeAnimation(forKey: "slide")
-        neighborScroll.layer?.removeAnimation(forKey: "slide")
+        for pane in [panes.left, panes.right] { pane.scroll.layer?.removeAnimation(forKey: "slide") }
         swipeGhost?.removeFromSuperview()
         swipeTravel = SpaceSwipe.travel(toOffset: swipeOffset + shown, width: bounds.width,
                                         hasLeft: swipeNeighbors.left != nil, hasRight: swipeNeighbors.right != nil)
@@ -1001,31 +1132,33 @@ final class SidebarView: NSView {
     /// The dots go back to showing only the space you're in.
     private func clearSwipeDots() { dots.forEach { $0.swipeShare = nil } }
 
-    /// Puts the space the fingers are pulling in one sidebar width beside the current list.
+    /// Puts the space the fingers are pulling in one sidebar width beside the current list. Its pane was filled ahead
+    /// of time; here it's only brought up to date, a row at a time where anything changed.
     private func showNeighbor() {
         let side: CGFloat = swipeOffset > 0 ? -1 : 1
+        if !pane(-side).scroll.isHidden { hidePane(pane(-side)) }
+        let shown = pane(side)
         guard swipeOffset != 0, let neighbor = side < 0 ? swipeNeighbors.left : swipeNeighbors.right else {
-            neighborScroll.isHidden = true
+            if !shown.scroll.isHidden { hidePane(shown) }
             return
         }
-        if neighborScroll.isHidden || neighborList.spaceOverride != neighbor {
-            neighborSide = side
-            neighborScroll.frame = scrollView.frame
-            neighborList.spaceOverride = neighbor
-            neighborList.privateLabel = list.privateLabel
-            neighborList.setFrameSize(neighborScroll.contentSize)
-            neighborList.reload(animated: false)
-            neighborScroll.contentView.scroll(to: .zero)
-            Self.fade(neighborFade, for: neighborScroll, list: neighborList)
-            neighborScroll.isHidden = false
+        if shown.scroll.isHidden {
+            load(shown, space: neighbor)
+            shown.scroll.isHidden = false
+        } else if shown.space != neighbor {
+            load(shown, space: neighbor)
         }
-        placeNeighbor()
+        placePanes()
     }
 
-    private func placeNeighbor() {
-        var frame = scrollView.frame
-        frame.origin.x += neighborSide * bounds.width
-        neighborScroll.frame = frame
+    /// Each pane out during a swipe sits a sidebar width beside the list, on its side; one bringing a switch in is
+    /// where the list is.
+    private func placePanes() {
+        for (side, pane) in [(CGFloat(-1), panes.left), (1, panes.right)] where !pane.scroll.isHidden {
+            var frame = scrollView.frame
+            if handOff?.pane !== pane { frame.origin.x += side * bounds.width }
+            pane.scroll.frame = frame
+        }
     }
 
     /// A safety net for an end that never arrives (macOS sometimes drops it): resting fingers send nothing, so it
@@ -1061,20 +1194,21 @@ final class SidebarView: NSView {
         swipeOffset = 0
         swipeTarget = 0
         clearSwipeDots()
-        guard offset != 0 else { neighborScroll.isHidden = true; return }
+        let out = [panes.left, panes.right].filter { !$0.scroll.isHidden }
+        guard offset != 0 else { out.forEach(hidePane); return }
         Tokens.Motion.withoutAnimation {
             scrollView.frame.origin.x = Tokens.Sidebar.edge
-            placeNeighbor()
+            placePanes()
         }
         let curve = Tokens.Motion.swipeSettle
         Tokens.Motion.slide(scrollView, fromOffsetX: offset, curve: curve, velocity: velocity)
-        guard !neighborScroll.isHidden else { return }
-        let duration = Tokens.Motion.slide(neighborScroll, fromOffsetX: offset, curve: curve, velocity: velocity)
-        // Hidden once home, unless a new swipe has it out again: a hidden neighbor is reloaded when it next shows,
-        // so it never comes back with old rows.
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
-            guard let self, self.swipeState != .tracking else { return }
-            self.neighborScroll.isHidden = true
+        guard let pane = out.first else { return }
+        let duration = Tokens.Motion.slide(pane.scroll, fromOffsetX: offset, curve: curve, velocity: velocity)
+        // Hidden once home, unless a new swipe has it out again; it stays filled, and is brought up to date when it
+        // next shows.
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak pane] in
+            guard let self, let pane, self.swipeState != .tracking, self.handOff?.pane !== pane else { return }
+            self.hidePane(pane)
         }
     }
 
@@ -1082,7 +1216,12 @@ final class SidebarView: NSView {
     var currentSpaceID: UUID? {
         didSet {
             guard let old = oldValue, old != currentSpaceID else { return }
-            listScroll[old] = scrollView.contentView.bounds.origin.y
+            // Mid-switch the space on screen is the one in the pane coming in.
+            if let pending = handOff, pending.pane.space == old {
+                listScroll[old] = pending.pane.scroll.contentView.bounds.origin.y
+            } else {
+                listScroll[old] = scrollView.contentView.bounds.origin.y
+            }
         }
     }
     /// How far down each space's list was, so coming back to a space finds it where you left it.
@@ -1255,4 +1394,27 @@ enum DownloadGlyph {
         image.isTemplate = true
         return image
     }
+}
+
+/// A space's list, beside the sidebar's own: where a swipe shows the space it's pulling in, and where a switch slides
+/// the next space in from.
+@MainActor
+private final class SpacePane {
+    let list = SidebarListView()
+    let scroll = NSScrollView()
+    let fade = CAGradientLayer()
+
+    init() {
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = false
+        scroll.hasHorizontalScroller = false
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.documentView = list
+        scroll.isHidden = true
+        scroll.wantsLayer = true
+        scroll.layer?.mask = fade
+    }
+
+    /// The space it shows, once loaded.
+    var space: UUID? { list.spaceOverride }
 }

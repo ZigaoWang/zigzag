@@ -252,19 +252,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func spaceChanged() {
         let spaces = Library.shared.spaces
-        let oldIndex = lastSpaceID.flatMap { id in spaces.firstIndex { $0.id == id } } ?? 0
+        let old = lastSpaceID
+        let oldIndex = old.flatMap { id in spaces.firstIndex { $0.id == id } } ?? 0
         let newIndex = spaces.firstIndex { $0.id == tabManager.currentSpaceID } ?? 0
-        let snapshot = sidebar.listSnapshot()
+        // Only a drag needs a picture of the list: otherwise the old list itself slides away.
+        let snapshot = sidebar.list.isDragging ? sidebar.listSnapshot() : nil
         lastSpaceID = tabManager.currentSpaceID
         sidebar.currentSpaceID = tabManager.currentSpaceID
-        // No window-wide cross-fade on a switch: the list is already sliding in with its new colors, and a fade
-        // through a picture of the window would freeze that slide and ghost the traffic lights.
-        applySpaceColor(animated: true, crossFadesMode: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
-        sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: snapshot)
+        sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: snapshot)
+        // The slide goes to Core Animation first, so it carries on from the fingers at once: the new color (and with
+        // it light or dark, which restyles everything) follows a moment later, and the page after that (tens of
+        // milliseconds of WebKit work). From here they run on their own, so a swipe never catches on that work.
+        CATransaction.flush()
+        // No window-wide cross-fade on a switch: the list is already sliding in, and a fade through a picture of the
+        // window would freeze that slide and ghost the traffic lights.
+        applySpaceColor(animated: true, crossFadesMode: false)
         desk.spaceChanged()
-        // Hand the slide and the color change to Core Animation now, before the new space's page is put in (tens of
-        // milliseconds of WebKit work): they run on their own from here, so a swipe never catches on that work.
         CATransaction.flush()
     }
 
