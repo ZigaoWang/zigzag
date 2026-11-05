@@ -492,13 +492,15 @@ final class Label: NSTextField {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     /// Exact width of the text, plus the cell's own padding.
-    var textWidth: CGFloat {
-        let width = (stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width
-        return ceil(width) + Tokens.Space.x2
-    }
+    var textWidth: CGFloat { inkWidth + Tokens.Space.x2 }
 
-    /// The text's own width, without the padding `textWidth` adds: for laying out text inside a pill.
-    var inkWidth: CGFloat { ceil((stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width) }
+    /// The text's own width, without the padding `textWidth` adds: for laying out text inside a pill. Set as
+    /// styled text (a space's name, set tight), it's measured as drawn, tracking included.
+    var inkWidth: CGFloat {
+        let styled = attributedStringValue
+        if styled.length > 0, styled.attribute(.kern, at: 0, effectiveRange: nil) != nil { return ceil(styled.size().width) }
+        return ceil((stringValue as NSString).size(withAttributes: [.font: font ?? Tokens.Font.body()]).width)
+    }
 
     /// The label's built-in inset on each side, so text can sit exactly where it's placed.
     static let inset: CGFloat = 2
