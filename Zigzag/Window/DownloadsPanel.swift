@@ -13,6 +13,8 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     let actionButton = IconButton(symbol: "magnifyingglass", size: .compact, toolTip: "Show in Finder")
     /// Pause or resume, beside Cancel, while a download is under way or paused.
     let pauseButton = IconButton(symbol: "pause", size: .compact, toolTip: "Pause")
+    /// What the trailing button does for this download: Show in Finder, Cancel, Try Again…
+    var onAction: (() -> Void)?
     private(set) var item: DownloadItem?
     /// The newest download, finished in the last few minutes: the one you're looking for. Its status says so, in
     /// the space's accent; nothing else about the row changes.
@@ -38,6 +40,10 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         fill.layer?.cornerRadius = Self.barHeight / 2
         bar.addSubview(fill)
         [icon, name, status, bar, actionButton, pauseButton].forEach { addSubview($0) }
+        // Tabbing onto the row brings its button out, so the keyboard reaches it as the pointer does.
+        keyboardFocusChanged = { [weak self] _ in self?.refreshAction() }
+        actionButton.onClick = { [weak self] _ in self?.onAction?() }
+        actionButton.keyboardFocusChanged = { [weak self] _ in self?.refreshAction() }
         // A finished file drags out of the list, into Finder, Mail or any app, like a file in Finder.
         onDragStart = { [weak self] event in
             guard let self, let item = self.item, item.state == .finished, let url = item.destination,
@@ -151,6 +157,12 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         alphaValue = (item.state == .cancelled || missing) ? 0.6 : 1
         setAccessibilityRole(.button)
         setAccessibilityLabel(item.filename + ", " + status.stringValue)
+        // VoiceOver offers the row's button as an action, hidden or not.
+        let title = actionButton.toolTip ?? ""
+        setAccessibilityCustomActions(title.isEmpty ? nil : [NSAccessibilityCustomAction(name: title) { [weak self] in
+            MainActor.assumeIsolated { self?.onAction?() }
+            return true
+        }])
         needsLayout = true
     }
 
@@ -184,7 +196,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// Anything that needs you (under way, paused, failed, missing) keeps its button in view.
     private func refreshAction() {
         let quiet = item?.state == .finished && item?.fileIsMissing == false
-        actionButton.isHidden = quiet && !isHovered
+        actionButton.isHidden = quiet && !isHovered && !hasKeyboardFocus && !actionButton.hasKeyboardFocus
     }
 
     override func stateDidChange(animated: Bool) {
@@ -399,7 +411,7 @@ final class DownloadsPanelView: FloatingPanelView {
         while rows.count < items.count {
             let row = DownloadRowView()
             row.onClick = { [weak row] _ in if let item = row?.item { DownloadManager.shared.open(item) } }
-            row.actionButton.onClick = { [weak row] _ in
+            row.onAction = { [weak row] in
                 guard let item = row?.item else { return }
                 switch item.state {
                 case .downloading, .paused: DownloadManager.shared.cancel(item)
