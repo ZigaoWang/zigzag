@@ -933,7 +933,8 @@ private final class BringPicker: StepContent {
             pills.append((choice, pill))
         }
         fileLink.onClick = { [weak self] _ in self?.pickFile() }
-        // Everything comes over; choosing what (and password files) lives in the Import window in Settings.
+        // Everything comes over; choosing what lives in the Import window in Settings. The file link shows once
+        // Safari's passwords are the only thing left, which only come over as a file.
         pills.forEach { $0.1.isHidden = true }
         fileLink.isHidden = true
         bringLabel.isHidden = true
@@ -1051,6 +1052,7 @@ private final class BringPicker: StepContent {
                 row.state = .done(summary)
                 if isSafari, choice.contains(.passwords), summary.problems.isEmpty {
                     row.note("Safari’s passwords are in the Passwords app. Export them there, then use Import a password file.")
+                    self.fileLink.isHidden = false
                 }
                 self.needsLayout = true
             }
@@ -1130,7 +1132,7 @@ private final class BringPicker: StepContent {
 
     /// A CSV from a password manager (1Password, Bitwarden…) or Safari's export.
     private func pickFile() {
-        guard let window else { return }
+        guard let window, !isImporting else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .zip]
         panel.message = "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)."
@@ -1144,8 +1146,11 @@ private final class BringPicker: StepContent {
 
     override func preferredHeight(for width: CGFloat) -> CGFloat {
         let list = rows.isEmpty ? 40 : rows.map { $0.height(for: width) }.reduce(0, +)
-        return list + (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
+        return list + linkHeight + (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
     }
+
+    /// Room for the file link under the list, while it shows.
+    private var linkHeight: CGFloat { fileLink.isHidden ? 0 : Tokens.Space.x3 + Tokens.Space.x8 }
 
     override func layout() {
         super.layout()
@@ -1158,22 +1163,14 @@ private final class BringPicker: StepContent {
             ry += h
             if i < separators.count { separators[i].frame = NSRect(x: 62, y: ry, width: width - 62, height: Tokens.Metric.hairline) }
         }
-        // The list, the choice of what to bring, and the file link, as one block in the middle.
-        let block = ry + Tokens.Space.x5 + Tokens.Space.x8 + Tokens.Space.x3 + Tokens.Space.x8
-        var y: CGFloat = 0
-        _ = block
         scroll.isHidden = rows.isEmpty
-        let room = bounds.height - (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
-        scroll.frame = NSRect(x: pad, y: y, width: width, height: min(ry, max(room, 0)))
+        let room = bounds.height - linkHeight - (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
+        scroll.frame = NSRect(x: pad, y: 0, width: width, height: min(ry, max(room, 0)))
         list.frame = NSRect(x: 0, y: 0, width: width, height: ry)
-        if rows.isEmpty {
-            empty.frame = NSRect(x: pad, y: y, width: width, height: 40)
-            ry = 40
-        }
-        y += ry + Tokens.Space.x5
-        _ = y
-        let fw = fileLink.fittingWidth
-        fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: fw, height: Tokens.Space.x8)
+        if rows.isEmpty { empty.frame = NSRect(x: pad, y: 0, width: width, height: 40) }
+        // Right under the list, lined up with its text.
+        let below = rows.isEmpty ? 40 : scroll.frame.maxY
+        fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: below + Tokens.Space.x3, width: fileLink.fittingWidth, height: Tokens.Space.x8)
         hint.alignment = .left
         hint.frame = NSRect(x: 0, y: bounds.height - hint.lineHeight, width: width, height: hint.lineHeight)
     }
