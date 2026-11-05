@@ -5,6 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-11-05
+
+### Fixed
+- Swiping between spaces no longer catches: the next space is ready before you swipe, and its list slides in the moment you let go.
+- The tab overview shows the space's color exactly as the window does, gradient and grain included.
+- The tab overview shows space names as you typed them, with no lowercasing.
+- Grain is even across the whole window, with no repeating pattern.
+
 ## [0.5.9] - 2026-11-05
 
 ### New
@@ -443,7 +451,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.9...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.10...HEAD
+[0.5.10]: https://github.com/ZigaoWang/zigzag/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/ZigaoWang/zigzag/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/ZigaoWang/zigzag/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/ZigaoWang/zigzag/compare/v0.5.6...v0.5.7
