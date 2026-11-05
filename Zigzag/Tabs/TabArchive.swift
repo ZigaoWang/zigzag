@@ -76,16 +76,34 @@ final class TabArchive {
         if entries.count != before { save() }
     }
 
-    func clear() {
-        entries = []
+    /// Clearing history clears archived tabs too (the address bar suggests them): all of them, or those archived
+    /// since `date`. Handed back so ⌘Z can put them back.
+    func take(since date: Date?) -> [ArchivedTab] {
+        let goes = { (entry: ArchivedTab) in date.map { entry.archivedAt >= $0 } ?? true }
+        let taken = entries.filter(goes)
+        guard !taken.isEmpty else { return [] }
+        entries.removeAll(where: goes)
         save()
+        return taken
     }
 
-    /// Clearing history since a moment clears tabs archived since then too: the address bar suggests them.
-    func clear(since date: Date) {
-        let before = entries.count
-        entries.removeAll { $0.archivedAt >= date }
-        if entries.count != before { save() }
+    /// Pages taken out of History take their archived tabs with them.
+    func take(_ urls: [URL]) -> [ArchivedTab] {
+        let gone = Set(urls.map(TabManager.normalize))
+        let taken = entries.filter { gone.contains(TabManager.normalize($0.url)) }
+        guard !taken.isEmpty else { return [] }
+        entries.removeAll { gone.contains(TabManager.normalize($0.url)) }
+        save()
+        return taken
+    }
+
+    /// Back as they were, in their places by when they were archived.
+    func putBack(_ taken: [ArchivedTab]) {
+        guard !taken.isEmpty else { return }
+        let urls = Set(taken.map(\.url))
+        entries = (entries.filter { !urls.contains($0.url) } + taken).sorted { $0.archivedAt > $1.archivedAt }
+        prune()
+        save()
     }
 
     func search(_ words: [String], limit: Int) -> [ArchivedTab] {

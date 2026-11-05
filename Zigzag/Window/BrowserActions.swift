@@ -53,12 +53,12 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func clearCookies(_ sender: Any?) { confirmClearCookies() }
 
-    /// History can't come back once it's gone, so it asks first.
+    /// It's all of it, so it asks first; ⌘Z (or Undo on the toast) brings it back.
     @objc func clearHistory(_ sender: Any?) {
         ConfirmSheet.show(in: root.overlay, title: HistoryPage.clearTitle, message: HistoryPage.clearMessage,
                           confirmTitle: "Clear History", destructive: true) { [weak self] confirmed in
             guard confirmed, let self else { return }
-            HistoryStore.shared.clearAll()
+            self.historyChange("Clear History") { HistoryStore.shared.remove() }
             HistoryPage.clearedToast(in: self)
         }
     }

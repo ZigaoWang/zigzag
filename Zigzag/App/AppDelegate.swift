@@ -34,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         _ = Library.shared
         _ = HistoryStore.shared
+        // Icons clearing history set aside, if Zigzag didn't get to remove them when it quit.
+        try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
         EnergyWatch.shared.start()
@@ -138,6 +140,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
         WindowManager.shared.prepareForTermination()
+        // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
+        try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Password managers' helpers end with Zigzag, so none are left running.
         if #available(macOS 15.4, *) { NativeMessagingHost.terminateAll() }
     }

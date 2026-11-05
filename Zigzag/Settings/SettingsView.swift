@@ -1351,7 +1351,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let history = PillButton(title: "Clear History…")
         history.onClick = { [weak self, weak history] _ in
             self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage, action: "Clear History") {
-                HistoryStore.shared.clearAll()
+                BrowserWindowController.historyChange("Clear History") { HistoryStore.shared.remove() }
                 if let controller = self?.browser { HistoryPage.clearedToast(in: controller) } else { history?.flash("Cleared") }
             }
         }

@@ -27,6 +27,8 @@ nonisolated enum Paths {
     static let downloads = file("Downloads.json")
     static let history = file("History.sqlite")
     static let favicons = directory("Favicons")
+    /// Icons that clearing history set aside, so ⌘Z can put them back. Emptied when Zigzag starts.
+    static let setAsideIcons = support.appendingPathComponent("Cleared Icons", isDirectory: true)
     static let tabState = directory("TabState")
     static let snapshots = directory("Snapshots")
 }

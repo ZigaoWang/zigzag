@@ -8,6 +8,16 @@ struct HistoryEntry {
     let lastVisit: Date
 }
 
+/// What taking pages out of History took with them, kept so ⌘Z can put it all back (`HistoryStore.restore`).
+struct HistoryRemoval {
+    let visits: [HistoryEntry]
+    let archive: [ArchivedTab]
+    let pdfPlaces: [String: Any]
+    /// The sites' icons, set aside rather than deleted; gone for good when Zigzag next starts.
+    let icons: URL?
+    var isEmpty: Bool { visits.isEmpty && archive.isEmpty }
+}
+
 /// Every page visited, kept locally in SQLite. Used by the command bar.
 final class HistoryStore {
     static let shared = HistoryStore(path: Paths.history.path)
@@ -98,32 +108,52 @@ final class HistoryStore {
         exec("COMMIT")
     }
 
-    /// Archived tabs go with it: they're pages you visited, and the address bar suggests them.
-    func clearAll() {
-        exec("DELETE FROM visits")
-        PDFViewerView.forgetPlaces()
-        TabArchive.shared.clear()
-        FaviconStore.shared.forgetVisited()
+    /// Takes everything visited out of History, or everything since `date`. Archived tabs go with it (they're pages
+    /// you visited, and the address bar suggests them), and so do where you were in PDFs and the icons saved for those
+    /// sites. All of it comes back as `HistoryRemoval`, so ⌘Z can put it back.
+    func remove(since date: Date? = nil) -> HistoryRemoval {
+        let visits = select(date.map { _ in "last_visit >= ?1" }) { statement in
+            if let date { sqlite3_bind_double(statement, 1, date.timeIntervalSince1970) }
+        }
+        if let date, let statement = prepare("DELETE FROM visits WHERE last_visit >= ?1") {
+            defer { sqlite3_finalize(statement) }
+            sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
+            sqlite3_step(statement)
+        } else if date == nil {
+            exec("DELETE FROM visits")
+        }
+        return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date),
+                              pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date))
     }
 
-    /// Everything visited since `date` (Clear Last Hour, Today…).
-    func clear(since date: Date) {
-        guard let statement = prepare("DELETE FROM visits WHERE last_visit >= ?1") else { return }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
-        sqlite3_step(statement)
-        PDFViewerView.forgetPlaces(since: date)
-        TabArchive.shared.clear(since: date)
-        FaviconStore.shared.forgetVisited(since: date)
+    /// Takes these pages out of History, and their archived tabs with them.
+    func remove(_ urls: [URL]) -> HistoryRemoval {
+        var visits: [HistoryEntry] = []
+        for url in urls {
+            visits += select("url = ?1") { sqlite3_bind_text($0, 1, url.absoluteString, -1, self.transient) }
+            guard let statement = prepare("DELETE FROM visits WHERE url = ?1") else { continue }
+            sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
+            sqlite3_step(statement)
+            sqlite3_finalize(statement)
+        }
+        return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls), pdfPlaces: [:], icons: nil)
     }
 
-    func delete(_ url: URL) {
-        TabArchive.shared.remove(url: url)
-        guard let statement = prepare("DELETE FROM visits WHERE url = ?1") else { return }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
-        sqlite3_step(statement)
+    /// Puts back what a removal took, as it was.
+    func restore(_ removal: HistoryRemoval) {
+        importVisits(removal.visits.map { ($0.url, $0.title, $0.visitCount, $0.lastVisit) })
+        TabArchive.shared.putBack(removal.archive)
+        PDFViewerView.putBackPlaces(removal.pdfPlaces)
+        if let icons = removal.icons { FaviconStore.shared.putBack(icons) }
     }
+
+    private func select(_ condition: String?, bind: (OpaquePointer) -> Void) -> [HistoryEntry] {
+        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits" + (condition.map { " WHERE " + $0 } ?? "")) else { return [] }
+        defer { sqlite3_finalize(statement) }
+        bind(statement)
+        return collect(statement)
+    }
+
 
     /// Newest first, for the History window; `before` pages further back.
     func page(before date: Date? = nil, limit: Int = 300) -> [HistoryEntry] {

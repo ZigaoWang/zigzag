@@ -212,6 +212,29 @@ extension BrowserWindowController {
 
 /// When the sidebar and the page last recorded something undoable, so ⌘Z undoes the newer one.
 @MainActor
+extension BrowserWindowController {
+    /// Takes pages out of History (`HistoryStore.remove`); ⌘Z puts back everything it took, ⇧⌘Z takes it out again.
+    /// Open History pages show each undo and redo; a History page making the change itself has already shown it,
+    /// so only a change from elsewhere (`refresh`) redraws them.
+    func historyChange(_ name: String, refresh: Bool = true, _ take: @escaping () -> HistoryRemoval) {
+        let removal = take()
+        if refresh { HistoryPage.refreshOpenPages() }
+        guard !removal.isEmpty else { return }
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            HistoryStore.shared.restore(removal)
+            HistoryPage.refreshOpenPages()
+            controller.sidebarUndo.registerUndo(withTarget: controller) { $0.historyChange(name, take) }
+            controller.sidebarUndo.setActionName(name)
+        }
+        sidebarUndo.setActionName(name)
+    }
+
+    /// The same, from outside a browser window (Settings): undoable from the front one, done all the same if none.
+    static func historyChange(_ name: String, _ take: @escaping () -> HistoryRemoval) {
+        if let undoTarget { undoTarget.historyChange(name, take) } else { _ = take(); HistoryPage.refreshOpenPages() }
+    }
+}
+
 enum UndoClock {
     static var lastSidebarEdit = Date.distantPast
     /// Set by typing into a page (see BrowserWindow.sendEvent).

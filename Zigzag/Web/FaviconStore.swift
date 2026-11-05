@@ -231,15 +231,30 @@ final class FaviconStore {
     /// Keeps an icon we already have (onboarding's site logos), so the sidebar never starts with a globe.
     /// Clearing history: the icons saved for sites you visited go too (all of them, or those saved since `date`), so
     /// the icon folder never stands in for the history you cleared. Icons of your pinned pages and favorites stay.
-    func forgetVisited(since date: Date? = nil) {
+    /// They're set aside rather than deleted, so ⌘Z can put them back, and are gone for good the next time Zigzag
+    /// starts (`Paths.setAsideIcons`).
+    func setAsideVisited(since date: Date? = nil) -> URL? {
         let kept = Set((Library.shared.favorites + Library.shared.allBookmarks.map(\.0)).compactMap { key(for: $0.url) }.map { file(for: $0).lastPathComponent })
         let files = (try? FileManager.default.contentsOfDirectory(at: Paths.favicons, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let aside = Paths.setAsideIcons.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
         for file in files where !kept.contains(file.lastPathComponent) {
             if let date, let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate, modified < date { continue }
-            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.moveItem(at: file, to: aside.appendingPathComponent(file.lastPathComponent))
         }
         // Read again from disk as needed: what's left is what you kept.
         memory.removeAll()
+        missing.removeAll()
+        return aside
+    }
+
+    /// Icons set aside by clearing history, back where they were (any saved again since stay as they are now).
+    func putBack(_ aside: URL) {
+        let files = (try? FileManager.default.contentsOfDirectory(at: aside, includingPropertiesForKeys: nil)) ?? []
+        for file in files {
+            try? FileManager.default.moveItem(at: file, to: Paths.favicons.appendingPathComponent(file.lastPathComponent))
+        }
+        try? FileManager.default.removeItem(at: aside)
         missing.removeAll()
     }
 

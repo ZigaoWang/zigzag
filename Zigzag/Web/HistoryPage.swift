@@ -126,7 +126,10 @@ enum HistoryPage {
             case "delete":
                 // One page, or every page in a cluster.
                 let strings = (body["urls"] as? [String]) ?? [body["url"] as? String].compactMap { $0 }
-                for url in strings.compactMap(URL.init(string:)) { HistoryStore.shared.delete(url) }
+                let urls = strings.compactMap(URL.init(string:))
+                HistoryPage.change(urls.count == 1 ? "Remove Page from History" : "Remove Pages from History", from: message.webView) {
+                    HistoryStore.shared.remove(urls)
+                }
                 replyHandler(true, nil)
             case "clear":
                 HistoryPage.confirmClear(body["range"] as? String ?? "all", from: message.webView, reply: replyHandler)
@@ -188,8 +191,8 @@ enum HistoryPage {
                           message: since == nil ? clearMessage : "Pages you visited \(range == "hour" ? "in the last hour" : title) are forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
                           confirmTitle: "Clear History", destructive: true) { confirmed in
             if confirmed {
-                if let since { HistoryStore.shared.clear(since: since) } else { HistoryStore.shared.clearAll() }
-                if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView?.window }) { clearedToast(in: controller) }
+                change("Clear History", from: webView) { HistoryStore.shared.remove(since: since) }
+                if let controller = controller(for: webView) { clearedToast(in: controller) }
             }
             reply(confirmed, nil)
         }
@@ -201,7 +204,7 @@ enum HistoryPage {
         ConfirmSheet.show(in: host, title: "Remove \(pages) from History?",
                           message: "They’re forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
                           confirmTitle: "Remove", destructive: true) { confirmed in
-            if confirmed { urls.forEach(HistoryStore.shared.delete) }
+            if confirmed { change("Remove Pages from History", from: webView) { HistoryStore.shared.remove(urls) } }
             reply(confirmed, nil)
         }
     }
@@ -209,8 +212,28 @@ enum HistoryPage {
     /// Clearing all history asks the same way, and says it's done the same way, from the menu, Settings and here.
     static let clearTitle = "Clear all history?"
     static let clearMessage = "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay."
+    /// With Undo right there, as ⌘Z does.
     static func clearedToast(in controller: BrowserWindowController) {
-        Toast.show("History cleared", symbol: "clock.arrow.circlepath", duration: 2, in: controller)
+        Toast.show("History cleared", symbol: "clock.arrow.circlepath", action: ("Undo", { [weak controller] in
+            guard let undo = controller?.sidebarUndo, undo.canUndo, undo.undoActionName == "Clear History" else { return }
+            undo.undo()
+        }), duration: 5, in: controller)
+    }
+
+    private static func controller(for webView: WKWebView?) -> BrowserWindowController? {
+        WindowManager.shared.controllers.first { $0.window != nil && $0.window === webView?.window }
+    }
+
+    /// A change to History from this page, undoable with ⌘Z in its window. The page shows it itself.
+    private static func change(_ name: String, from webView: WKWebView?, _ take: @escaping () -> HistoryRemoval) {
+        if let controller = controller(for: webView) { controller.historyChange(name, refresh: false, take) } else { BrowserWindowController.historyChange(name, take) }
+    }
+
+    /// Every open History page shows History as it is now, after a change made elsewhere or undone.
+    static func refreshOpenPages() {
+        for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) where isHistory(tab.url) {
+            tab.webView?.evaluateJavaScript("window.zigzagRefresh && window.zigzagRefresh()")
+        }
     }
 
     // MARK: The page
@@ -461,6 +484,9 @@ async function loadMore() {
 }
 
 async function reload() { sessions = []; done = false; list.textContent = ''; await loadMore(); }
+// The browser asks after History changed (a clear, or ⌘Z bringing pages back): shown again as it is now, the search
+// kept.
+window.zigzagRefresh = () => { selectAll(false); return query.value.trim() ? search() : reload(); };
 
 let timer;
 // Shows what matches the search field now. Typing waits a moment before calling it; Return calls it at once.
