@@ -277,8 +277,6 @@ enum Tokens {
         static let keyGap: CGFloat = Space.x1
         /// The done mark in place of the keys.
         static let checkSide: CGFloat = Space.x5
-        /// The recording, inset from the card's edges.
-        static let videoInset: CGFloat = Space.x2
         /// The last step: its width, padding, the band the wordmark sits in, and the wordmark's height.
         static let finalWidth: CGFloat = 380
         static let finalPad: CGFloat = Space.x8
