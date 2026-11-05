@@ -664,11 +664,11 @@ final class SpaceHeaderView: InteractiveView {
     let label = Label("", font: Tokens.Font.spaceName(), color: Tokens.Color.textPrimary)
     /// After the space's color changes: the name takes its new ink.
     func refreshInk() { stateDidChange(animated: false) }
-    /// The space's name, set large, light and lowercase, a little tight, in the space's own ink.
+    /// The space's name, set large and light, a little tight, in the space's own ink.
     var name = "" {
         didSet {
             guard name != oldValue else { return }
-            // Set in the voice by `stateDidChange`, which lowercases it.
+            // Set in the voice by `stateDidChange`.
             label.stringValue = name
             stateDidChange(animated: false)
             needsLayout = true
@@ -753,7 +753,7 @@ final class SpaceHeaderView: InteractiveView {
         let color = isHovered ? ink : ink.withAlphaComponent(0.86)
         // The label measures by its own font, so it follows the style in use.
         if label.font != Self.nameFont { label.font = Self.nameFont; needsLayout = true }
-        label.attributedStringValue = Self.isLarge ? Tokens.Font.voiceText(label.stringValue, color: color, lowercase: false)
+        label.attributedStringValue = Self.isLarge ? Tokens.Font.voiceText(label.stringValue, color: color)
             : NSAttributedString(string: label.stringValue, attributes: [.font: Self.nameFont, .foregroundColor: color])
         // A symbol takes the name's own ink; an emoji keeps its colors.
         iconView.contentTintColor = ink.withAlphaComponent(0.86)

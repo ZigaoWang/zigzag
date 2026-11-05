@@ -10,18 +10,17 @@ address.
 
 ## Character
 
-Arc's warmth and a color per space, set with the care of a good piece of hardware: light lowercase words with a
+Arc's warmth and a color per space, set with the care of a good piece of hardware: light words with a
 confident jump in size, thin precise line drawings, a few small details that each do something, and controls you want
 to touch. Warm and friendly, never techy: no monospace, no capitals for effect, no readouts.
 
 - **Typeface: SF Pro, tuned.** Zigzag keeps the system face on purpose: it renders natively at every size, covers every
   script a page title can be in, and its display cut is the Univers-like grotesque this direction wants. What makes it
   ours is how it's set: light weights, one large display size against small text, display type tracked tight
-  (`Font.voiceKern`), tabular figures where numbers mark something (`Font.figures`), and lowercase.
-- **Case, decided once.** Titles in the app's voice are lowercase (see The voice): a
-  page's title, a panel's title. Every other word Zigzag says is in its normal case: buttons, labels, menu items,
-  tooltips ("New Tab", "Clear", "Close Duplicates"). Content keeps its own case: a page's title, a site's name, what
-  you typed.
+  (`Font.voiceKern`), and tabular figures where numbers mark something (`Font.figures`).
+- **Case, decided once.** Every word Zigzag says is in its normal case, titles included: "History", "Downloads",
+  buttons, labels, menu items, tooltips ("New Tab", "Clear", "Close Duplicates"). No lowercase styling. Content keeps
+  its own case: a page's title, a site's name, what you typed.
 - **Confident contrast.** The space's name is 26 light against 13pt rows and 11pt labels, nothing in between.
 - **Line drawings** (`LineGlyph`): where a stock symbol says too little, Zigzag draws its own on a 16pt square with
   one 1.1pt stroke, round caps and joins, 1.5pt margins: the sidebar toggle, the plus for new tab and new space,
@@ -365,9 +364,9 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
 - **One sheet, no boxes inside.** A panel is a single calm sheet of the space's own color family (a lighter step of
   the frame by day, a deeper one by night), with one hairline edge and the one panel shadow. No tiles, no grouped
   cards, no outlined buttons inside it.
-- **Type does the structure.** A large light title in the space's ink, like the sidebar's space name ("downloads",
-  "avoidxray.com"), then plain rows. Secondary words are small and quiet. Normal case for words; only the big title
-  is lowercase. A space's name is the one exception: it's yours, so it shows as typed.
+- **Type does the structure.** A large light title in the space's ink, like the sidebar's space name ("Downloads",
+  "avoidxray.com"), then plain rows. Secondary words are small and quiet. Normal case throughout; a space's name shows
+  as you typed it.
 - **Actions are a row of thin line glyphs with small labels under them**, set on a grid (share, copy link, screenshot), not three big rounded buttons.
 - **Settings for the site are plain rows** with the slide switch at the end, separated by space, not by a card.
 - **One accent:** only what's on or chosen (a switch that's on, the main button) takes the space's accent.
@@ -377,7 +376,7 @@ new material. They get rebuilt from scratch to match the sidebar's language, not
 
 ## The voice
 
-Zigzag speaks in one type style: SF Pro Light, tracked in by 2.3% of its size, in lowercase. It's what makes the app
+Zigzag speaks in one type style: SF Pro Light, tracked in by 2.3% of its size, in normal case. It's what makes the app
 feel like itself, so it's used only where the app is naming something: a space's name (26), a page's title (26), a
 panel's title (Downloads, 26), the welcome (`Welcome.titleSize`), and in its own case the address bar's text (22 for a
 new tab, the sidebar's size over the address). Everything else is SF Pro Regular in normal case.

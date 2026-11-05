@@ -396,7 +396,7 @@ private enum Onboard {
     static let tint = Tokens.Color.dynamic(light: Tokens.Color.hex(0x1E3A5F), dark: Tokens.Color.hex(0xDAE5F2))
     static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Tokens.Color.textPrimary.withAlphaComponent(alpha * 0.85) }
 
-    /// A step's title, on the blue: large, light and lowercase, set a little tight, as the space's name is.
+    /// A step's title, on the blue: large and light, set a little tight, as the space's name is.
     static func title(_ text: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: "")
         field.isSelectable = false

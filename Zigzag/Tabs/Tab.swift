@@ -155,7 +155,7 @@ final class Tab: NSObject {
 
     var displayTitle: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
-        // Zigzag's own pages are named in its own voice, lowercase, wherever the chrome names them.
+        // Zigzag's own pages go by their names wherever the chrome names them.
         if SettingsPage.isSettings(url) { return "Settings" }
         if HistoryPage.isHistory(url) { return "History" }
         if !title.isEmpty { return title }

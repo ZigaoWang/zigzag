@@ -1,6 +1,6 @@
 import AppKit
 
-/// A space's heading in desk view, as the sidebar names a space: its name in large light lowercase, a quiet count on
+/// A space's heading in desk view, as the sidebar names a space: its name, large and light, a quiet count on
 /// its baseline, and, when the same page is open more than once, a quiet way to close the extra copies. Clicking the
 /// name selects every tab in the space.
 final class DeskHeaderView: InteractiveView {
@@ -10,7 +10,7 @@ final class DeskHeaderView: InteractiveView {
     var name: String {
         get { label.stringValue }
         set {
-            label.attributedStringValue = Tokens.Font.voiceText(newValue, lowercase: false)
+            label.attributedStringValue = Tokens.Font.voiceText(newValue)
             setAccessibilityLabel(newValue)
         }
     }

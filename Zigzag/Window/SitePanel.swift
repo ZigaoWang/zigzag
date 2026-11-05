@@ -57,7 +57,7 @@ final class SitePanel: FloatingPanelView {
         radius = Tokens.Radius.panel
         icon.image = tab.favicon
         // In the app's voice, as a page names itself; a site's name keeps its own spelling.
-        siteName.attributedStringValue = Tokens.Font.voiceText(site, size: 20, lowercase: false)
+        siteName.attributedStringValue = Tokens.Font.voiceText(site, size: 20)
         let page = self.url
         let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
         if page.scheme == "webkit-extension" {
@@ -177,7 +177,7 @@ final class SitePanel: FloatingPanelView {
             specs.append(("pip", "Float", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
         actionTiles = specs.map { symbol, caption, title, on, run in
-            // The panel's own action words, lowercase like every button; the tooltip and VoiceOver keep the full name.
+            // The panel's own short action words; the tooltip and VoiceOver keep the full name.
             let tile = PanelTile(symbol: symbol, caption: caption)
             tile.toolTip = title
             tile.setAccessibilityLabel(title)

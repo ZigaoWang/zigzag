@@ -7,7 +7,7 @@ import AppKit
 
 // MARK: - Native
 
-/// The top left of a page: its title in the app's voice, large, light and lowercase, as the sidebar names a space.
+/// The top left of a page: its title in the app's voice, large and light, as the sidebar names a space.
 final class PageTitleView: NSView {
     private let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
     private var written = ""
@@ -304,7 +304,7 @@ enum PageStyle {
     .page-header > .inner { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
                             gap: 8px; padding: var(--header-top) var(--gutter) var(--header-bottom); }
     .page-title { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); margin-right: auto; min-width: 0; }
-    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; text-transform: lowercase; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page-title h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.023em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* A page's search: the outlined pill, white with a hairline edge and a faint shadow, the accent's ring while typing. */
     .search { display: flex; align-items: center; gap: 4px; background: var(--control); border-radius: calc(var(--control-height) / 2); padding: 0 14px 0 10px;
