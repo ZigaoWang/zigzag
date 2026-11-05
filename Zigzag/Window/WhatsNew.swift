@@ -150,10 +150,11 @@ final class WhatsNewSheet: NSView {
         host.addSubview(sheet)
         sheet.layer?.backgroundColor = sheet.cgColor(Tokens.Color.scrim)
         sheet.alphaValue = 0
-        Tokens.Motion.animate(Tokens.Motion.feedback, { sheet.animator().alphaValue = 1 })
+        // It eases in and out even from a key, as a confirmation does (`ConfirmSheet`).
+        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { sheet.animator().alphaValue = 1 })
         sheet.layoutSubtreeIfNeeded()
         sheet.panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
-        sheet.panel.present(arrival: .pop)
+        sheet.panel.present(always: true, arrival: .pop)
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
             guard let sheet, event.window === host.window else { return event }
             if [36, 76, 53].contains(event.keyCode) { sheet.close(); return nil }
@@ -177,7 +178,8 @@ final class WhatsNewSheet: NSView {
     private func close() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
+        panel.dismiss(always: true)
+        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
     }
 
     /// Gone, closed or with its window: what was waiting goes ahead.

@@ -61,10 +61,12 @@ final class ConfirmSheet: NSView {
         host.addSubview(sheet)
         sheet.updateBackdrop()
         sheet.alphaValue = 0
-        Tokens.Motion.animate(Tokens.Motion.feedback, { sheet.animator().alphaValue = 1 })
+        // A question that interrupts you always eases in and out, even when a key brought it: unlike a menu you call
+        // up many times a day, it should never just snap onto the window.
+        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { sheet.animator().alphaValue = 1 })
         sheet.layoutSubtreeIfNeeded()
         sheet.panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
-        sheet.panel.present(arrival: .pop)
+        sheet.panel.present(always: true, arrival: .pop)
         // The keyboard comes to the sheet, so typing doesn't go on into the page or field behind it.
         if let window = host.window {
             sheet.previousResponder = window.firstResponder
@@ -159,7 +161,8 @@ final class ConfirmSheet: NSView {
         giveBackKeyboard()
         let completion = self.completion
         self.completion = { _ in }
-        Tokens.Motion.animate(Tokens.Motion.feedback, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
+        panel.dismiss(always: true)
+        Tokens.Motion.animate(Tokens.Motion.feedback, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
         completion(choice)
     }
 
