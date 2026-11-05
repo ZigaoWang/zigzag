@@ -187,14 +187,17 @@ final class CastShadow {
 }
 
 enum MaterialImages {
-    /// Fine, even grain with its own transparency: random light and dark specks, made once and tiled.
+    /// Fine, even grain with its own transparency: random light and dark specks, made once and tiled. The tile is
+    /// large (256 points) so its repeat never shows as a pattern across a window.
     static let grain: NSColor = {
-        let side = 128
+        let side = 512
         var bytes = [UInt8](repeating: 0, count: side * side * 4)
-        var generator = SystemRandomNumberGenerator()
+        // A quick generator: a quarter of a million specks from the system's would hold up launch.
+        var state = UInt64.random(in: 1...UInt64.max)
         for i in stride(from: 0, to: bytes.count, by: 4) {
-            let v: UInt8 = Bool.random(using: &generator) ? 255 : 0
-            let a = UInt8.random(in: 0...255, using: &generator)
+            state ^= state << 13; state ^= state >> 7; state ^= state << 17
+            let v: UInt8 = state & 1 == 0 ? 255 : 0
+            let a = UInt8(truncatingIfNeeded: state >> 8)
             // Premultiplied.
             let c = UInt8((Int(v) * Int(a)) / 255)
             bytes[i] = c; bytes[i + 1] = c; bytes[i + 2] = c; bytes[i + 3] = a
