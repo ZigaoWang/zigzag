@@ -368,10 +368,14 @@ final class SitePanel: FloatingPanelView {
         }
         let columns = inner >= 260 ? 6 : inner >= 200 ? 5 : 4
         if !actionTiles.isEmpty {
-            // One row, like the markings along a device's edge: every action side by side.
+            // One row, like the markings along a device's edge: every action side by side. In a narrow panel,
+            // where a name wouldn't show whole, they share two even rows instead.
             let spacing = gap
             gap = 0
-            grid(actionTiles, columns: actionTiles.count) { _ in PanelTile.captionedHeight }
+            let widest = actionTiles.map(\.captionWidth).max() ?? 0
+            let fit = max(1, Int(inner / max(widest, 1)))
+            let rows = fit >= actionTiles.count ? 1 : (actionTiles.count + fit - 1) / fit
+            grid(actionTiles, columns: (actionTiles.count + rows - 1) / rows) { _ in PanelTile.captionedHeight }
             gap = spacing
             y += Tokens.Space.x5
         }
