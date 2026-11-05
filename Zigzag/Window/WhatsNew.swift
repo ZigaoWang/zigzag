@@ -68,6 +68,8 @@ enum WhatsNew {
     }
 
     static func show(in controller: BrowserWindowController) {
+        // No notes for this version in the app (a build between releases): every release's notes, on the site.
+        guard !sections.isEmpty else { controller.open(allNotes, disposition: .foregroundTab); return }
         guard let host = controller.window?.contentView else { return }
         WhatsNewSheet.present(in: host)
     }
