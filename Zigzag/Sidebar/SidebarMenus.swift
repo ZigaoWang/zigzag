@@ -357,7 +357,7 @@ enum BookmarkEditor {
         if controller.sidebar.list.beginRenaming(bookmark: id) { return }
         guard let bookmark = Library.shared.bookmark(id) else { return }
         RenamePanel.show(title: bookmark.title, in: controller) { title in
-            controller.libraryChange("Rename Pinned Tab") { Library.shared.updateBookmark(id, title: title) }
+            controller.libraryChange(Library.shared.isFavorite(id) ? "Rename Favorite" : "Rename Pinned Tab") { Library.shared.updateBookmark(id, title: title) }
         }
     }
 }

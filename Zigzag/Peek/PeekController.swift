@@ -5,8 +5,8 @@ import WebKit
 final class PeekHeaderView: NSView {
     let icon = FaviconView()
     let host = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: "Open as Tab")
-    let closeButton = IconButton(symbol: "xmark", toolTip: "Close")
+    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: "Open Peek as Tab")
+    let closeButton = IconButton(symbol: "xmark", toolTip: "Close Peek")
 
     override init(frame: NSRect) {
         super.init(frame: frame)

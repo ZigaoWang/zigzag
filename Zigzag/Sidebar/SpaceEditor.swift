@@ -925,7 +925,7 @@ final class AddColorSlot: InteractiveView {
         plus.lineWidth = 1.5
         plus.lineCap = .round
         layer?.addSublayer(plus)
-        toolTip = "Add a Second Color"
+        toolTip = "Add Second Color"
         setAccessibilityRole(.button)
         setAccessibilityLabel("Add a second color")
     }
@@ -1091,8 +1091,6 @@ final class SpaceLookEditor: NSView {
         }
         chips[1].onRemove = { [weak self] in self?.toggleSecondColor() }
         addSlot.onClick = { [weak self] _ in self?.toggleSecondColor() }
-        addSlot.toolTip = "Add a second color to fade into"
-        dial.toolTip = "Which way the colors fade"
         for swatch in swatches {
             swatch.onClick = { [weak self, weak swatch] _ in
                 guard let self, let look = swatch?.look else { return }
