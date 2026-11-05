@@ -702,11 +702,23 @@ private final class BrowserRow: InteractiveView {
     /// Access was just allowed: the list may now split this browser into its profiles.
     var onGranted: (() -> Void)?
     private var waitingForSettings = false
+    private var returnObserver: NSObjectProtocol?
 
+    /// System Settings is open on the switch: coming back to Zigzag checks again by itself, as Check Again does.
     func awaitSettings() {
         waitingForSettings = true
         refresh()
+        guard returnObserver == nil else { return }
+        returnObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil,
+                                                                queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.waitingForSettings, self.window != nil else { return }
+                self.recheckAccess()
+            }
+        }
     }
+
+    isolated deinit { returnObserver.map(NotificationCenter.default.removeObserver) }
 
     /// Opens one of the browser's files for real, so macOS records the attempt (and lists the browser under
     /// Zigzag in Files & Folders) instead of only being asked whether it would be allowed.
