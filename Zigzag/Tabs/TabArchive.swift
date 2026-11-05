@@ -29,9 +29,9 @@ final class TabArchive {
 
         var title: String {
             switch self {
-            case .twelveHours: "After 12 hours"
-            case .day: "After a day"
-            case .week: "After a week"
+            case .twelveHours: "After 12 Hours"
+            case .day: "After a Day"
+            case .week: "After a Week"
             case .never: "Never"
             }
         }

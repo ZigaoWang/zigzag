@@ -386,7 +386,7 @@ final class ReaderControls: FloatingPanelView {
     var preferences = Reader.Preferences.saved { didSet { options.preferences = preferences } }
 
     private let style = IconButton(symbol: "textformat.size", toolTip: "Text and Colors")
-    private let close = IconButton(symbol: "xmark", toolTip: "Hide Reader (esc)")
+    private let close = IconButton(symbol: "xmark", toolTip: "Hide Reader")
     private let options = ReaderOptions()
     private var monitor: Any?
 

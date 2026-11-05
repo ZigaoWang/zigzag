@@ -492,7 +492,7 @@ private enum Onboard {
 /// "Welcome to", then the wordmark writing itself in, then one button. Nothing else on the screen moves.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let welcome = Label("welcome to", font: Tokens.Font.title(.light), color: Brand.ribbon.withAlphaComponent(0.78))
+    private let welcome = Label("Welcome to", font: Tokens.Font.title(.light), color: Brand.ribbon.withAlphaComponent(0.78))
     private let wordmark = WordmarkView()
     private let start = Onboard.light("Get Started")
     private var drewIn = false
@@ -924,7 +924,7 @@ private final class BringPicker: StepContent {
             add(source, chosen: suggested.contains(source.id))
         }
         if rows.isEmpty { addSubview(empty) }
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces and Tabs")] {
             let pill = DataToggle(name)
             pill.onChange = { [weak self] in self?.refresh() }
             addSubview(pill)

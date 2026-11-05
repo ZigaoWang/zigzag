@@ -83,7 +83,7 @@ final class WhatsNewSheet: NSView {
     /// In the app's voice, as a page names itself.
     private let titleLabel: Label = {
         let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
-        label.attributedStringValue = Tokens.Font.voiceText("What’s new")
+        label.attributedStringValue = Tokens.Font.voiceText("What’s New")
         return label
     }()
     private let versionLabel = Label("Version \(WhatsNew.version)", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)

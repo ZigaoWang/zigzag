@@ -75,7 +75,7 @@ final class ImportView: NSView {
         rowScroll.contentView.drawsBackground = false
         rowScroll.documentView = rowList
         [title, subtitle, rowScroll, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces & tabs")] {
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces and Tabs")] {
             let box = ChoicePill(title: name)
             box.tint = Brand.Theme.brand.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }

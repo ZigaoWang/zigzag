@@ -1001,7 +1001,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         alwaysReset = always.isEmpty ? nil : reset
         alwaysGroup.add(always.isEmpty
-            ? FormRow(title: "None yet", detail: "Turn on Always Translate from a page’s site controls.", control: NSView())
+            ? FormRow(title: "None yet", detail: "Choose a language to always translate in a page’s site controls.", control: NSView())
             : FormRow(title: ListFormatter.localizedString(byJoining: always), detail: "Translated as soon as they open.", control: NSView()))
     }
 
@@ -1083,10 +1083,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
         case .general: [(nil, generalGroup), ("Tabs", tabsGroup), ("Window", windowGroup), ("Downloads", downloadsGroup), (nil, importGroup), (nil, versionGroup)]
-        case .spaces: [("Your spaces", spacesGroup)]
+        case .spaces: [("Your Spaces", spacesGroup)]
         case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
-        case .privacy: [(nil, blockingGroup), ("Browsing data", privacyGroup), ("Sites", sitesGroup)]
-        case .translation: [(nil, translationGroup), ("Always translate", alwaysGroup)]
+        case .privacy: [(nil, blockingGroup), ("Browsing Data", privacyGroup), ("Sites", sitesGroup)]
+        case .translation: [(nil, translationGroup), ("Always Translate", alwaysGroup)]
         case .extensions: [("Installed", extensionsGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         }
@@ -1164,7 +1164,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(nil, importGroup)
             section(nil, versionGroup)
         case .spaces:
-            section("Your spaces", spacesGroup, accessory: addSpaceButton)
+            section("Your Spaces", spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
                 let hint = Label("Drag a space to change its order.", font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
@@ -1178,11 +1178,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(nil, passwordsWindowGroup)
         case .privacy:
             section(nil, blockingGroup)
-            section("Browsing data", privacyGroup)
+            section("Browsing Data", privacyGroup)
             section("Sites", sitesGroup, accessory: sitesReset)
         case .translation:
             section(nil, translationGroup)
-            section("Always translate", alwaysGroup, accessory: alwaysReset)
+            section("Always Translate", alwaysGroup, accessory: alwaysReset)
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
