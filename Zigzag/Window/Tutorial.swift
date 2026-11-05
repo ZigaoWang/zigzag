@@ -1,6 +1,6 @@
 import AppKit
 
-/// Getting started: six things to do once, in order, each building on the last, on real pages. The guide in the window
+/// Getting started: seven things to do once, in order, each building on the last, on real pages. The guide in the window
 /// (GuidedTour) shows them one at a time; each ticks off when you actually do it.
 enum Tutorial {
     struct Task {
@@ -25,6 +25,8 @@ enum Tutorial {
              done: "That’s Peek", doneNote: "A quick look, without losing your place"),
         Task(id: "split", title: "Drag a tab onto the page", keys: [], note: "Two pages, side by side",
              done: "That’s Split View", doneNote: "To part them, use the button at the top right of either page"),
+        Task(id: "overview", title: "See all your tabs", keys: ["⌘", "⇧", "\\"], note: "Or pinch in on the trackpad",
+             done: "Every tab, at a glance", doneNote: "Click one to go to it, or pinch out to go back"),
         Task(id: "space", title: "Make a space", keys: ["+"], note: "One for work, one for fun, each with its own color",
              done: "Your new space", doneNote: "Its own tabs and pins, in its own color"),
         Task(id: "switch", title: "Go back to your first space", keys: [], note: "Swipe two fingers across the sidebar, or click its dot",
@@ -38,8 +40,8 @@ enum Tutorial {
     static var done: Set<String> {
         get {
             var done = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
-            // Finished before Split View was a step: it doesn't come back to teach just that.
-            if done.contains("space") { done.insert("split") }
+            // Finished before Split View or the overview were steps: it doesn't come back to teach just those.
+            if done.contains("space") { done.formUnion(["split", "overview"]) }
             return done
         }
         set { UserDefaults.standard.set(Array(newValue), forKey: key) }

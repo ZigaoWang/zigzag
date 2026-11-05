@@ -360,6 +360,7 @@ final class DeskController {
         guard !isVisible, let controller else { return }
         isVisible = true
         transition += 1
+        Tutorial.complete("overview")
         selection = []
         controller.previews.hide()
         // The page's link preview would float over the cards.
