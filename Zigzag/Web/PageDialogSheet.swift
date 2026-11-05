@@ -81,6 +81,25 @@ final class PageDialogSheet: NSView {
                     showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil) async -> Result {
         // Over the page that asked, so it stays with its tab; a dialog without a page covers the window.
         guard let host = page ?? window.contentView else { return .cancelled }
+        // One at a time on a page: a second question (two sign-ins at once) waits for the first, never stacks on it.
+        let key = ObjectIdentifier(host)
+        let before = queue[key]
+        let task = Task { @MainActor in
+            _ = await before?.value
+            return await present(in: window, host: host, title: title, message: message, fields: fields, confirmTitle: confirmTitle,
+                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page)
+        }
+        queue[key] = task
+        let result = await task.value
+        if queue[key] == task { queue[key] = nil }
+        return result
+    }
+
+    private static var queue: [ObjectIdentifier: Task<Result, Never>] = [:]
+
+    @MainActor
+    private static func present(in window: NSWindow, host: NSView, title: String, message: String, fields: [Field], confirmTitle: String,
+                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?) async -> Result {
         return await withCheckedContinuation { continuation in
             let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle,
                                         showsCancel: showsCancel, offersBlock: offersBlock) { continuation.resume(returning: $0) }

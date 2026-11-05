@@ -141,6 +141,22 @@ enum AuthenticationPrompt {
             return (.useCredential, saved)
         }
         guard let window else { return (.cancelAuthenticationChallenge, nil) }
+        // Several loads asking for the same sign-in at once (a page and its images): one question, one answer for all.
+        let space = challenge.protectionSpace
+        let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
+        if challenge.previousFailureCount == 0, let asking = signingIn[key] { return await asking.value }
+        let task = Task { @MainActor in await ask(challenge, window: window, page: page) }
+        signingIn[key] = task
+        let answer = await task.value
+        if signingIn[key] == task { signingIn[key] = nil }
+        return answer
+    }
+
+    @MainActor private static var signingIn: [String: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>] = [:]
+
+    @MainActor
+    private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
+                            page: WKWebView?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let message = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
         let result = await PageDialogSheet.ask(in: window, title: "Sign in to \(challenge.protectionSpace.host)", message: message,
                                                fields: [.init(placeholder: "Username"), .init(placeholder: "Password", secure: true)],
