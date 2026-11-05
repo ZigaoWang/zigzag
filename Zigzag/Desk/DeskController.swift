@@ -10,7 +10,7 @@ final class DeskHeaderView: InteractiveView {
     var name: String {
         get { label.stringValue }
         set {
-            label.attributedStringValue = Tokens.Font.voiceText(newValue)
+            label.attributedStringValue = Tokens.Font.voiceText(newValue, lowercase: false)
             setAccessibilityLabel(newValue)
         }
     }
