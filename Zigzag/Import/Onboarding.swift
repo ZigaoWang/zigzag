@@ -435,13 +435,12 @@ private enum Onboard {
 
     static let answerHeight: CGFloat = 44
 
-    /// The picked answer is the light one; the other goes quiet.
     /// The picked answer is outlined and lit; the other stays quiet. Neither looks like Continue, which is solid.
     static func mark(chosen: PrimaryButton, other: PrimaryButton) {
         // The answer you're on is plainly picked: solid, in the ribbon's pale with deep ink. The other is just its
         // outline, so there's no doubt which Continue goes with.
         chosen.customFill = Brand.ribbon
-        chosen.customInk = Onboard.tint.blended(withFraction: 0, of: .black) ?? Onboard.tint
+        chosen.customInk = Brand.navy
         chosen.layer?.borderWidth = 0
         other.customFill = .clear
         other.customInk = Brand.ribbon.withAlphaComponent(0.85)
