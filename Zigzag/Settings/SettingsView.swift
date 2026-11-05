@@ -527,6 +527,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let borderlessToggle = Toggle()
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
+    private let motionToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
     private var downloadPlaceToken: SignalToken?
@@ -645,6 +646,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         windowGroup.add(FormRow(title: "Large space names", detail: "The space’s name large and light above its tabs. Off, it’s a plain heading.", control: largeNamesToggle))
         windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
+        motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
+        windowGroup.add(FormRow(title: "Reduce motion", detail: "Things appear in place instead of sliding or growing. Fades stay.", control: motionToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -1274,6 +1277,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.isOn = BrowserRootView.isBorderless
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
+        motionToggle.isOn = Tokens.Motion.reducesMotionHere
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave
