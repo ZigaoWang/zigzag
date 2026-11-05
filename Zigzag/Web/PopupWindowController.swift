@@ -143,6 +143,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard PopupNotice.allows(navigationAction, from: webView.url, isPrivate: isPrivate) else { return nil }
+        // A plain link (a help page, the terms) opens as a tab in the browser window, brought forward, as a
+        // browser would; only another sized window.open() is a popup of its own.
+        let sized = windowFeatures.width != nil || windowFeatures.height != nil || windowFeatures.toolbarsVisibility?.boolValue == false
+        if !sized, let controller = WindowManager.shared.controllers.first(where: { $0.window === parentWindow }) {
+            let tab = controller.tabManager.newTab(url: navigationAction.request.url, configuration: configuration)
+            controller.window?.makeKeyAndOrderFront(nil)
+            return tab.ensureWebView()
+        }
         return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window)
     }
 
