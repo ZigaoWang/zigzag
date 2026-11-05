@@ -25,8 +25,10 @@ enum ExternalLinks {
         let scheme = url.scheme?.lowercased() ?? ""
         // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
         // front one, so the link never just does nothing.
+        let popup = PopupWindowController.all.first { $0.webView === webView }
         let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
             ?? ((webView as? BrowserWebView)?.owner?.host as? BrowserWindowController)
+            ?? popup.flatMap { p in WindowManager.shared.controllers.first { $0.window === p.parentWindow } }
             ?? WindowManager.shared.keyController
         guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
             if isMainFrame, webView.window != nil, let controller {
@@ -48,6 +50,8 @@ enum ExternalLinks {
         let saves = !isPrivate && !host.isEmpty
         let tab = (webView as? BrowserWebView)?.owner
         asking.insert(key)
+        // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
+        if popup != nil { controller.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: host.isEmpty ? "This page" : host, what: name, symbol: "arrow.up.forward.app",
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: controller,
