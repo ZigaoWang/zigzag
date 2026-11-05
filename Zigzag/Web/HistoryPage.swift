@@ -130,6 +130,10 @@ enum HistoryPage {
                 replyHandler(true, nil)
             case "clear":
                 HistoryPage.confirmClear(body["range"] as? String ?? "all", from: message.webView, reply: replyHandler)
+            case "forget":
+                // Every page a search found, selected with ⌘A: asked first, as clearing is.
+                let urls = ((body["urls"] as? [String]) ?? []).compactMap(URL.init(string:))
+                HistoryPage.confirmForget(urls, from: message.webView, reply: replyHandler)
             default:
                 replyHandler(nil, "Unknown")
             }
@@ -187,6 +191,17 @@ enum HistoryPage {
                 if let since { HistoryStore.shared.clear(since: since) } else { HistoryStore.shared.clearAll() }
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView?.window }) { clearedToast(in: controller) }
             }
+            reply(confirmed, nil)
+        }
+    }
+
+    private static func confirmForget(_ urls: [URL], from webView: WKWebView?, reply: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
+        guard let host = webView?.window?.contentView, !urls.isEmpty else { reply(false, nil); return }
+        let pages = urls.count == 1 ? "this page" : "these \(urls.count) pages"
+        ConfirmSheet.show(in: host, title: "Remove \(pages) from History?",
+                          message: "They’re forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
+                          confirmTitle: "Remove", destructive: true) { confirmed in
+            if confirmed { urls.forEach(HistoryStore.shared.delete) }
             reply(confirmed, nil)
         }
     }
@@ -254,7 +269,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .row:hover { background: var(--hover); }
 .row:active { background: var(--pressed); }
 /* Reached with the keyboard: chosen, as a section is in Settings. */
-.row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
+.row:focus-visible, .all-selected .row { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
 .row img, .row .dot { grid-column: 2; width: var(--favicon); height: var(--favicon); border-radius: var(--radius-small); }
 .row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 17px no-repeat; }
 /* One-color icons (GitHub, ChatGPT) come drawn in the page's own ink, so no icon needs a tile. */
@@ -484,6 +499,31 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown') rows[Math.min(at + 1, rows.length - 1)].focus();
   else if (at === 0) query.focus(); else rows[at - 1].focus();
 });
+
+// ⌘A selects every row, as in Safari, and Delete then clears them, after asking: all of History, or while searching,
+// just what it found. Esc, a click or typing lets go. In the search field with something typed, ⌘A selects that text.
+let allSelected = false;
+const selectAll = (on) => { allSelected = on; list.classList.toggle('all-selected', on); };
+document.addEventListener('keydown', async (e) => {
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'a') {
+    if ((document.activeElement === query && query.value) || !list.querySelector('.row')) return;
+    e.preventDefault();
+    if (document.activeElement === query) query.blur();
+    selectAll(true);
+    return;
+  }
+  if (!allSelected) return;
+  if (e.key === 'Escape') { e.preventDefault(); selectAll(false); return; }
+  if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+  e.preventDefault();
+  const urls = sessions.flatMap((s) => s.clusters.flatMap((c) => c.items.map((i) => i.url)));
+  const cleared = searching ? await ask({ action: 'forget', urls }) : await ask({ action: 'clear', range: 'all' });
+  selectAll(false);
+  if (cleared) { searching = ''; query.value = ''; await reload(); }
+});
+document.addEventListener('mousedown', () => { if (allSelected) selectAll(false); });
+query.addEventListener('input', () => selectAll(false));
 
 // Clear History…: a menu as Zigzag's panels draw it, opened by click, Return or the arrow keys, walked with the arrows.
 const menu = document.getElementById('clearMenu');
