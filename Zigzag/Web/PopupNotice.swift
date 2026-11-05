@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// Pop-ups a page opens on its own, without a click, are blocked, as in every browser. Rather than failing in silence
-/// (a payment or a sign-in that just doesn't appear), Zigzag says so and offers to open it.
+/// (a payment or a sign-in that just doesn't appear), Zigzag says so and offers to allow them.
 @MainActor
 final class PopupNotice: NSObject, WKScriptMessageHandler {
     static let shared = PopupNotice()
@@ -23,9 +23,10 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
       let last = 0;
       window.open = function (url, ...rest) {
         const opened = open.call(window, url, ...rest);
-        if (!opened && url && Date.now() - last > 1500) {
+        // Reported with no address too: pages often open an empty window, then send it where it goes.
+        if (!opened && Date.now() - last > 1500) {
           last = Date.now();
-          try { window.webkit.messageHandlers.\(messageName).postMessage(String(new URL(url, location.href))); } catch (_) {}
+          try { window.webkit.messageHandlers.\(messageName).postMessage(url ? String(new URL(url, location.href)) : ''); } catch (_) {}
         }
         return opened;
       };
@@ -33,8 +34,9 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
     """
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, let text = message.body as? String, let url = URL(string: text),
-              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+        guard message.frameInfo.isMainFrame, let text = message.body as? String else { return }
+        let url = URL(string: text).flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil }
+        guard url != nil || text.isEmpty else { return }
         // From a sign-in popup's own page: said in the browser window behind it, the one that opened it.
         if let popup = PopupWindowController.all.first(where: { $0.webView === message.webView }) {
             guard let browser = popup.parentWindow?.windowController as? BrowserWindowController else { return }
@@ -69,19 +71,27 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
     }
 
     /// A pop-up the page opened on its own: on a site you've allowed, it opens; elsewhere a toast offers to allow
-    /// the site's pop-ups from now on, this one included. Site Controls takes it back.
-    static func blocked(_ url: URL, from page: URL?, opener: Tab?, in controller: BrowserWindowController) {
+    /// the site's pop-ups from now on. A pop-up opened later than asked can't report back to the page (a sign-in or a
+    /// payment would never finish), so allowing doesn't open this one: the page's own button, clicked again, opens a
+    /// real one. A private window remembers nothing about a site, so there it offers to open this one in a tab.
+    /// Site Controls takes it back.
+    static func blocked(_ url: URL?, from page: URL?, opener: Tab?, in controller: BrowserWindowController) {
         let host = page?.host()?.lowercased() ?? ""
         let isPrivate = controller.tabManager.isPrivate
         if !host.isEmpty, !isPrivate, SitePermissions.popups(host: host) {
-            controller.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false)
+            if let url { controller.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false) }
             return
         }
-        // A private window remembers nothing about a site, so it only offers to open this one.
-        let allow = !host.isEmpty && !isPrivate
-        Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: (allow ? "Always Allow" : "Open", { [weak controller, weak opener] in
-            if allow { SitePermissions.setPopups(true, host: host) }
-            controller?.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false)
-        }), duration: 6, in: controller)
+        if !host.isEmpty, !isPrivate {
+            Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: ("Always Allow", { [weak controller] in
+                SitePermissions.setPopups(true, host: host)
+                guard let controller else { return }
+                Toast.show("Pop-ups allowed. Click the button again.", symbol: "macwindow.badge.plus", duration: 4, in: controller)
+            }), duration: 6, in: controller)
+        } else if let url {
+            Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: ("Open in New Tab", { [weak controller, weak opener] in
+                controller?.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false)
+            }), duration: 6, in: controller)
+        }
     }
 }
