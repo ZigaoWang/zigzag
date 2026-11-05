@@ -498,6 +498,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let passwordsWindowGroup = FormGroup()
     private let privacyGroup = FormGroup()
     private let sitesGroup = FormGroup()
+    /// Each site keeping cookies, storage or a cache on this Mac, to remove one at a time.
+    private let siteDataGroup = FormGroup()
+    private var siteDataShowsAll = false
+    private var siteDataTask: Task<Void, Never>?
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
     private var alwaysReset: PillButton?
@@ -1088,7 +1092,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .general: [(nil, generalGroup), ("Tabs", tabsGroup), ("Window", windowGroup), ("Downloads", downloadsGroup), (nil, importGroup), (nil, versionGroup)]
         case .spaces: [("Your Spaces", spacesGroup)]
         case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
-        case .privacy: [(nil, blockingGroup), ("Browsing Data", privacyGroup), ("Sites", sitesGroup)]
+        case .privacy: [(nil, blockingGroup), ("Browsing Data", privacyGroup), ("Site Data", siteDataGroup), ("Sites", sitesGroup)]
         case .translation: [(nil, translationGroup), ("Always Translate", alwaysGroup)]
         case .extensions: [("Installed", extensionsGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
@@ -1182,6 +1186,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .privacy:
             section(nil, blockingGroup)
             section("Browsing Data", privacyGroup)
+            section("Site Data", siteDataGroup)
             section("Sites", sitesGroup, accessory: sitesReset)
         case .translation:
             section(nil, translationGroup)
@@ -1377,6 +1382,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 Task { @MainActor in
                     await WebsiteData.clear(.cache)
                     cache?.flash("Cleared")
+                    self?.reloadSiteData()
                 }
             }
         }
@@ -1386,6 +1392,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies)
                     cookies?.flash("Cleared")
+                    self?.reloadSiteData()
                 }
             }
         }
@@ -1448,6 +1455,61 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", icon: favicon, control: forget))
         }
+        reloadSiteData()
+    }
+
+    /// What each site keeps on this Mac, read from WebKit (it takes a moment, so the list fills in when it's ready),
+    /// with Remove for that site alone. The first 30 by name, then the rest on request.
+    private func reloadSiteData() {
+        siteDataTask?.cancel()
+        siteDataTask = Task { @MainActor [weak self] in
+            let records = await WKWebsiteDataStore.default().dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
+            guard let self, !Task.isCancelled else { return }
+            self.siteDataGroup.removeAllRows()
+            let sorted = records.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+            if sorted.isEmpty {
+                self.siteDataGroup.add(FormRow(title: "None yet", detail: "Sites you visit can keep cookies and files here, to keep you signed in and load faster.", control: NSView()))
+            }
+            let shown = self.siteDataShowsAll ? sorted[...] : sorted.prefix(30)
+            for record in shown {
+                let site = record.displayName
+                let remove = PillButton(title: "Remove…")
+                let signsOut = record.dataTypes.contains(WKWebsiteDataTypeCookies)
+                remove.onClick = { [weak self] _ in
+                    self?.confirm(title: "Remove data for \(site)?",
+                                  message: signsOut ? "You’ll be signed out of \(site), and its pages load fresh next time." : "Its pages load fresh next time.",
+                                  action: "Remove") {
+                        Task { @MainActor in
+                            await WKWebsiteDataStore.default().removeData(ofTypes: record.dataTypes, for: [record])
+                            self?.reloadSiteData()
+                        }
+                    }
+                }
+                let icon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+                self.siteDataGroup.add(FormRow(title: site, detail: Self.describe(record.dataTypes), icon: icon, control: remove))
+            }
+            if shown.count < sorted.count {
+                let more = PillButton(title: "Show All")
+                more.onClick = { [weak self] _ in
+                    self?.siteDataShowsAll = true
+                    self?.reloadSiteData()
+                }
+                self.siteDataGroup.add(FormRow(title: "\(sorted.count - shown.count) more sites", control: more))
+            }
+            self.layoutDocument()
+        }
+    }
+
+    /// What a site keeps, in a few plain words: "Cookies, saved data and cache."
+    private static func describe(_ types: Set<String>) -> String {
+        let cache: Set<String> = [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache, WKWebsiteDataTypeOfflineWebApplicationCache]
+        var parts: [String] = []
+        if types.contains(WKWebsiteDataTypeCookies) { parts.append("cookies") }
+        if !types.subtracting(cache).subtracting([WKWebsiteDataTypeCookies]).isEmpty { parts.append("saved data") }
+        if !types.isDisjoint(with: cache) { parts.append("cache") }
+        guard !parts.isEmpty else { return "Data." }
+        let list = parts.count > 1 ? parts.dropLast().joined(separator: ", ") + " and " + parts.last! : parts[0]
+        return list.prefix(1).uppercased() + list.dropFirst() + "."
     }
 
     private func confirm(title: String, message: String, action: String, destructive: Bool = true, then run: @escaping () -> Void) {
