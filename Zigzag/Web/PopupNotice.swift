@@ -1,3 +1,4 @@
+import AppKit
 import WebKit
 
 /// Pop-ups a page opens on its own, without a click, are blocked, as in every browser. Rather than failing in silence
@@ -45,6 +46,26 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
         // It did open, the page just doesn't get it back (noopener).
         if let opened = tab.lastOpenedWindow, Date().timeIntervalSince(opened) < 2 { return }
         Self.blocked(url, from: tab.url, opener: tab, in: controller)
+    }
+
+    /// Whether a page may open the window it asks for. WebKit hands every request here (its own blocker is off, as
+    /// it can only say yes or no for every site at once): one that comes from a click opens, and so does any from a
+    /// site you've allowed pop-ups for, as a real pop-up the page can talk to. That's what sign-ins need, such as
+    /// Teams asking for permission after a click inside one of its apps, a step WebKit no longer counts as the
+    /// click. Anything else returns nothing, and the page's own script reports it blocked.
+    static func allows(_ action: WKNavigationAction, from page: URL?, isPrivate: Bool) -> Bool {
+        if isUserInitiated(action) { return true }
+        guard !isPrivate, let host = page?.host()?.lowercased(), !host.isEmpty else { return false }
+        return SitePermissions.popups(host: host)
+    }
+
+    /// WebKit's own record of whether a click or a key started it (not public API, but long-standing); without
+    /// it, whether the last thing you did was a click or a key a moment ago.
+    private static func isUserInitiated(_ action: WKNavigationAction) -> Bool {
+        let selector = NSSelectorFromString("_isUserInitiated")
+        if action.responds(to: selector), let initiated = action.value(forKey: "_isUserInitiated") as? Bool { return initiated }
+        guard let event = NSApp.currentEvent, ProcessInfo.processInfo.systemUptime - event.timestamp < 1 else { return false }
+        return [.leftMouseUp, .leftMouseDown, .otherMouseUp, .keyDown].contains(event.type)
     }
 
     /// A pop-up the page opened on its own: on a site you've allowed, it opens; elsewhere a toast offers to allow

@@ -128,7 +128,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window)
+        guard PopupNotice.allows(navigationAction, from: webView.url, isPrivate: isPrivate) else { return nil }
+        return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
