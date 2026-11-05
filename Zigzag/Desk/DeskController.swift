@@ -43,7 +43,11 @@ final class DeskHeaderView: InteractiveView {
         // No dot: the name alone says which space, as it does in the sidebar.
         dot.isHidden = true
         let h = label.lineHeight
-        label.frame = NSRect(x: CardRow.inset - Label.inset, y: (bounds.height - h) / 2, width: label.textWidth, height: h)
+        // A long name gives way to the count and the button after it, ending in "…" rather than running under them.
+        let after = Tokens.Space.x2 + count.textWidth + (duplicates > 0 ? Tokens.Space.x3 + duplicatesButton.fittingWidth : 0)
+        let room = bounds.width - CardRow.inset * 2 + Label.inset - after
+        label.lineBreakMode = .byTruncatingTail
+        label.frame = NSRect(x: CardRow.inset - Label.inset, y: (bounds.height - h) / 2, width: max(0, min(label.textWidth, room)), height: h)
         // The count sits on the name's baseline, not centered against it.
         let nameFont = Tokens.Font.spaceName(), countFont = count.font ?? Tokens.Font.body()
         let baseline = label.frame.minY + (h + nameFont.ascender + nameFont.descender) / 2
@@ -726,7 +730,8 @@ final class DeskController {
         var headerFrames: [UUID: NSRect] = [:]
         var cardFrames: [UUID: NSRect] = [:]
         for group in groups {
-            headerFrames[group.space] = NSRect(x: left - Tokens.Space.x2, y: y, width: 320, height: Tokens.Space.x8)
+            // As wide as it may run, to the desk's margin; the header is only as wide as its words within that.
+            headerFrames[group.space] = NSRect(x: left - Tokens.Space.x2, y: y, width: width - margin - left + Tokens.Space.x2, height: Tokens.Space.x8)
             y += heading
             for (i, id) in group.ids.enumerated() {
                 let col = i % columns, row = i / columns
@@ -919,7 +924,7 @@ final class DeskController {
             if let frame = layout.headers[id] {
                 header.isHidden = false
                 var f = frame
-                f.size.width = header.fittingWidth
+                f.size.width = min(header.fittingWidth, frame.width)
                 if animated && !header.isHidden && header.frame != .zero { move(header, to: f) } else { header.frame = f }
             } else {
                 header.isHidden = true
