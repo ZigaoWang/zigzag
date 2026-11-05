@@ -152,9 +152,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.favorites.onOpen = { [weak self] favorite in self?.tabManager.openBookmark(favorite) }
+        // A split favorite unloads both its pages, as its Unload Pages does.
         sidebar.favorites.onClose = { [weak self] favorite in
-            guard let self, let live = self.tabManager.bookmarkTab(for: favorite.id) else { return }
-            self.tabManager.close(live)
+            guard let self else { return }
+            let ids = Library.shared.pinnedSplit(containing: favorite.id).map { [$0.left, $0.right] } ?? [favorite.id]
+            let pages = ids.compactMap(self.tabManager.bookmarkTab(for:))
+            if !pages.isEmpty { self.tabManager.close(pages) }
         }
         sidebar.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }
