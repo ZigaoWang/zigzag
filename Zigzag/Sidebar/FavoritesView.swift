@@ -163,16 +163,17 @@ final class FavoritesView: NSView {
             tiles = favorites.map { favorite, partner in
                 if let tile = kept[[favorite.id, partner?.id]] { return tile }
                 let tile = FavoriteTile(bookmark: favorite, partner: partner)
+                // Each reads the tile's favorite when it happens, never the one it was made with.
                 tile.onClick = { [weak self, weak tile] event in
-                    guard let self, let tile else { return }
+                    guard let self, let tile, let favorite = tile.bookmark else { return }
                     let onRight = tile.convert(event.locationInWindow, from: nil).x > tile.bounds.midX
-                    self.onOpen?(onRight ? partner ?? favorite : favorite)
+                    self.onOpen?(onRight ? tile.partner ?? favorite : favorite)
                 }
-                tile.onRightClick = { [weak self] _ in self?.onMenu?(favorite) }
-                tile.onClose = { [weak self] in self?.onClose?(favorite) }
+                tile.onRightClick = { [weak self, weak tile] _ in tile?.bookmark.flatMap { self?.onMenu?($0) } }
+                tile.onClose = { [weak self, weak tile] in if let favorite = tile?.bookmark { self?.onClose?(favorite) } }
                 tile.onMiddleClick = tile.onClose
                 tile.onDragStart = { [weak self, weak tile] event in
-                    guard let self, let tile else { return false }
+                    guard let self, let tile, let favorite = tile.bookmark else { return false }
                     self.drag(tile, favorite: favorite, event: event)
                     return true
                 }
@@ -185,6 +186,7 @@ final class FavoritesView: NSView {
             }
             relayout(gliding: animated)
         }
+        for (tile, favorite) in zip(tiles, favorites) { tile.update(favorite.0, partner: favorite.partner) }
         for tile in tiles {
             guard let id = tile.bookmark?.id else { continue }
             let ids = [id] + (tile.partner.map { [$0.id] } ?? [])
@@ -292,9 +294,10 @@ final class FavoritesView: NSView {
 
 /// A favorite: a soft gray tile with the site's icon, or a split's two icons side by side.
 final class FavoriteTile: InteractiveView {
-    let bookmark: Bookmark?
+    /// The favorite as it is now: renamed or moved to another address, the same tile shows and opens the new one.
+    private(set) var bookmark: Bookmark?
     /// A split favorite's right page, shown beside the left one in the same tile.
-    let partner: Bookmark?
+    private(set) var partner: Bookmark?
     private let icon = FaviconView()
     private let partnerIcon = FaviconView()
     /// While a tab is held over this tile's middle: the half it would open in, as a tab row shows it.
@@ -353,9 +356,23 @@ final class FavoriteTile: InteractiveView {
         dropHalf.layer?.borderWidth = Tokens.Metric.dropEdge
         dropHalf.isHidden = true
         addSubview(dropHalf, positioned: .below, relativeTo: icon)
+        setAccessibilityRole(.button)
+        describe()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// The same favorite, changed (renamed, another address): its name and icon follow.
+    func update(_ bookmark: Bookmark, partner: Bookmark?) {
+        let changed = bookmark != self.bookmark || partner != self.partner
+        self.bookmark = bookmark
+        self.partner = partner
+        if changed { describe() }
+    }
+
+    private func describe() {
         let name = [bookmark?.title, partner?.title].compactMap { $0 }.joined(separator: " and ")
         toolTip = name
-        setAccessibilityRole(.button)
         setAccessibilityLabel(name)
         refreshIcon()
         // Only its own sites' icons arriving redraw it.
@@ -365,8 +382,6 @@ final class FavoriteTile: InteractiveView {
             self.refreshIcon()
         }
     }
-
-    required init?(coder: NSCoder) { fatalError() }
 
     /// Follows the favorite's page, so the tile shows the loading ribbon while it loads, like a tab does.
     func track(_ tab: Tab?) {
