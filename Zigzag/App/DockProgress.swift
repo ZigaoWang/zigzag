@@ -23,21 +23,37 @@ final class DockProgress {
             tile.badgeLabel = nil
         }
         tile.display()
-        // A finished download says so once, in the window you're using, unless the downloads panel is open there and
-        // already shows it. One still flying to the button is announced after it lands, when that panel has opened.
-        if let item, item.state == .finished, !announced.contains(item.id), let controller = WindowManager.shared.keyController {
-            announced.insert(item.id)
-            let announce = { [weak controller] in
-                guard let controller, !DownloadsPanel.isOpen(in: controller.window) else { return }
+        // A finished download says so once, in a window of its own kind (a private one's name never shows in a
+        // normal window, nor the other way round), unless the downloads panel is open there and already shows it. One
+        // still flying to the button is announced after it lands, when that panel has opened. A failed one says so
+        // too, with Try Again: otherwise it would only stop, unnoticed.
+        guard let item, item.state == .finished || item.state == .failed, !announced.contains(item.id),
+              let controller = Self.window(for: item) else { return }
+        announced.insert(item.id)
+        let failed = item.state == .failed
+        let announce = { [weak controller] in
+            guard let controller, !DownloadsPanel.isOpen(in: controller.window) else { return }
+            if failed {
+                Toast.show("Couldn’t download \(item.filename)", symbol: "exclamationmark.triangle",
+                           action: DownloadManager.shared.canRetry(item) ? ("Try Again", { DownloadManager.shared.retry(item) }) : nil,
+                           duration: 5, in: controller)
+            } else {
                 Toast.show("Downloaded \(item.filename)", symbol: "arrow.down.circle",
                            action: ("Show", { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
             }
-            if controller.flyingDownloads.contains(item.id) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4 * Tokens.Motion.debugSlowdown, execute: announce)
-            } else {
-                announce()
-            }
         }
+        if !failed, controller.flyingDownloads.contains(item.id) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4 * Tokens.Motion.debugSlowdown, execute: announce)
+        } else {
+            announce()
+        }
+    }
+
+    /// The window you're using if it's private when the download is (or isn't when it isn't), else another that is.
+    private static func window(for item: DownloadItem) -> BrowserWindowController? {
+        let all = WindowManager.shared.controllers.filter { $0.tabManager.isPrivate == item.isPrivate }
+        if let key = WindowManager.shared.keyController, all.contains(where: { $0 === key }) { return key }
+        return all.first
     }
 
     private var announced: Set<UUID> = []
