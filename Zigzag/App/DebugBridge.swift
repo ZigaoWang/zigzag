@@ -57,11 +57,11 @@ enum DebugBridge {
         case "permprompt":
             if arg == "app" {
                 Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",
-                                                      icon: NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app"), isPrivate: false,
+                                                      icon: NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app"),
                                                       in: controller, title: "Open Calendar", allowTitle: "Open",
-                                                      alwaysTitle: "Always open on this site", denyTitle: "Don’t Open") }
+                                                      denyTitle: "Don’t Open") }
             } else {
-                Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", isPrivate: false, in: controller) }
+                Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", in: controller) }
             }
         case "renamepanel": RenamePanel.show(title: "Google", in: controller) { _ in }
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)

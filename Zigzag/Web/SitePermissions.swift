@@ -115,11 +115,11 @@ enum SitePermissions {
     static func requestNotifications(host: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(host: host) { return known }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return nil }
-        let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", isPrivate: isPrivate, in: controller, tab: tab,
-                                                title: "Show notifications", alwaysTitle: nil,
+        let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
+                                                title: "Show notifications",
                                                 answered: { notifications(host: host).map { $0 ? .allow : .deny } })
         switch answer {
-        case .allow, .allowOnce, .deny:
+        case .allow, .deny:
             if !isPrivate { setNotifications(answer == .allow, host: host) }
             return answer == .allow
         case .notNow:
@@ -133,7 +133,7 @@ enum SitePermissions {
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         if let known = all["\(host)|location"] { return known ? .grant : .deny }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return .deny }
-        let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", isPrivate: isPrivate, in: controller, tab: tab,
+        let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", in: controller, tab: tab,
                                                 answered: {
                                                     let now = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
                                                     return now["\(host)|location"].map { $0 ? .allow : .deny }
@@ -146,8 +146,6 @@ enum SitePermissions {
                 UserDefaults.standard.set(all, forKey: key)
             }
             return answer == .allow ? .grant : .deny
-        case .allowOnce:
-            return .grant
         case .notNow:
             return .deny
         }
@@ -168,14 +166,12 @@ enum SitePermissions {
             return .deny
         }
         let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
-                                                isPrivate: isPrivate, in: controller, tab: tab,
+                                                in: controller, tab: tab,
                                                 answered: { decision(host: host, type: type).map { $0 ? .allow : .deny } })
         // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
         switch answer {
         case .allow:
             if !isPrivate { remember(true, host: host, type: type) }
-            return .grant
-        case .allowOnce:
             return .grant
         case .deny:
             if !isPrivate { remember(false, host: host, type: type) }
@@ -211,7 +207,7 @@ final class PermissionPrompt: FloatingPanelView {
     private weak var controller: BrowserWindowController?
     private var tabsToken: SignalToken?
 
-    enum Answer { case allow, allowOnce, deny, notNow }
+    enum Answer { case allow, deny, notNow }
 
     private static var queue: [ObjectIdentifier: Task<Answer, Never>] = [:]
     /// The question on screen in each window, so it can follow the sidebar.
@@ -237,24 +233,20 @@ final class PermissionPrompt: FloatingPanelView {
         layer.add(move, forKey: "follow")
     }
 
-    /// `title` is the request ("Use your camera" by default). `alwaysTitle` is the box that keeps a yes: ticked,
-    /// Allow answers `.allow`, else `.allowOnce`. Nil leaves it out, for things that only make sense kept
-    /// (notifications) or are asked every time anyway (sharing your screen), and Allow is `.allow`.
-    /// A private window keeps nothing, so it has no box either. `icon` stands in for the symbol (an app's icon).
+    /// `title` is the request ("Use your camera" by default). Whether an answer is kept is the caller's choice:
+    /// one Allow, changed later in the site panel. `icon` stands in for the symbol (an app's icon).
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
-    static func ask(host: String, what: String, symbol: String, icon: NSImage? = nil, isPrivate: Bool,
+    static func ask(host: String, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: BrowserWindowController, tab: Tab? = nil, title: String? = nil, allowTitle: String = "Allow",
-                    alwaysTitle: String? = "Always allow on this site", denyTitle: String = "Don’t Allow",
-                    answered: @escaping () -> Answer? = { nil }) async -> Answer {
-        let alwaysTitle = isPrivate ? nil : alwaysTitle
+                    denyTitle: String = "Don’t Allow", answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
         let task = Task { @MainActor in
             _ = await before?.value
             if let known = answered() { return known }
             return await show(host: host, request: title ?? "Use \(what)", symbol: symbol, icon: icon, allowTitle: allowTitle,
-                              alwaysTitle: alwaysTitle, denyTitle: denyTitle, in: controller, tab: tab)
+                              denyTitle: denyTitle, in: controller, tab: tab)
         }
         queue[key] = task
         let answer = await task.value
@@ -263,7 +255,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
-                             alwaysTitle: String?, denyTitle: String, in controller: BrowserWindowController, tab: Tab?) async -> Answer {
+                             denyTitle: String, in controller: BrowserWindowController, tab: Tab?) async -> Answer {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }

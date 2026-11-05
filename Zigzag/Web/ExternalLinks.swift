@@ -44,22 +44,20 @@ enum ExternalLinks {
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
-        // Nothing to keep the answer under (a private window, or a page with no host): no Always Open, just Open.
+        // Nothing to keep the answer under (a private window, or a page with no host): Open is for this time only.
         let saves = !isPrivate && !host.isEmpty
         let tab = (webView as? BrowserWebView)?.owner
         asking.insert(key)
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: host.isEmpty ? "This page" : host, what: name, symbol: "arrow.up.forward.app",
-                                                    icon: NSWorkspace.shared.icon(forFile: app.path), isPrivate: false, in: controller,
+                                                    icon: NSWorkspace.shared.icon(forFile: app.path), in: controller,
                                                     tab: tab, title: "Open \(name)", allowTitle: "Open",
-                                                    alwaysTitle: saves ? "Always open on this site" : nil, denyTitle: "Don’t Open",
+                                                    denyTitle: "Don’t Open",
                                                     answered: { !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
             asking.remove(key)
             switch answer {
             case .allow:
                 if saves { SitePermissions.allowOpeningApp(host: host, scheme: scheme) }
-                NSWorkspace.shared.open(url)
-            case .allowOnce:
                 NSWorkspace.shared.open(url)
             case .deny:
                 declined.insert(key)
