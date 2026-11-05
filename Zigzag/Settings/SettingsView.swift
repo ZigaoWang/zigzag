@@ -992,8 +992,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
         translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", control: translateOffer))
         let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
-        // Laid out like Sites in Privacy: a heading, Reset beside it only when there's something to reset.
-        let reset = PillButton(title: "Reset")
+        // Laid out like Sites in Privacy: a heading, Reset All beside it only when there's something to reset.
+        let reset = PillButton(title: "Reset All")
         reset.onClick = { [weak self] _ in
             PageTranslator.alwaysLanguages = []
             self?.reloadTranslation()
@@ -1193,11 +1193,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .shortcuts:
             let resetAll = PillButton(title: "Reset All")
             resetAll.isHidden = !Shortcuts.hasChanges
+            // Every shortcut you set, back to how Zigzag comes: asked first, as Sites' Reset All is.
             resetAll.onClick = { [weak self] _ in
-                Shortcuts.resetAll()
-                ShortcutRow.lastTaken = nil
-                self?.reloadShortcuts()
-                self?.layoutDocument()
+                self?.confirm(title: "Reset all shortcuts?", message: "Every shortcut you changed goes back to how Zigzag comes.", action: "Reset All") {
+                    Shortcuts.resetAll()
+                    ShortcutRow.lastTaken = nil
+                    self?.reloadShortcuts()
+                    self?.layoutDocument()
+                }
             }
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
