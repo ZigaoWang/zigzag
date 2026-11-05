@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
         EnergyWatch.shared.start()
+        // Crash and freeze reports from macOS, kept here for Help › Report a Problem.
+        CrashReports.shared.start()
         // New lists or settings reach open pages on their next load.
         blockerToken = ContentBlocker.changed.observe {
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
