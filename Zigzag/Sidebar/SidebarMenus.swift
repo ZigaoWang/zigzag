@@ -371,12 +371,16 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
 
     static func show(title: String, in controller: BrowserWindowController, done: @escaping (String) -> Void) {
         controller.closeFloatingPanels()
-        let panel = RenamePanel(frame: NSRect(x: 0, y: 0, width: Tokens.Dialog.width, height: Tokens.Metric.controlHeight + Tokens.Space.x3 * 2))
+        let card = controller.root.cardFrame
+        // Never wider than the page it's over, in a small window or one side of a split.
+        let width = min(Tokens.Dialog.width, card.width - Tokens.Space.x6)
+        let panel = RenamePanel(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.controlHeight + Tokens.Space.x3 * 2))
         panel.done = done
         panel.field.stringValue = title
-        let card = controller.root.cardFrame
+        panel.field.field.delegate = panel
+        panel.refreshSave()
         // Where the command bar opens, the other place you type a name.
-        panel.frame.origin = NSPoint(x: round(card.midX - Tokens.Dialog.width / 2), y: card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)))
+        panel.frame.origin = NSPoint(x: round(card.midX - width / 2), y: card.minY + max(Tokens.Space.x12, floor(card.height * 0.18)))
         controller.root.overlay.addSubview(panel)
         panel.present(arrival: .fade)
         controller.window?.makeFirstResponder(panel.field.field)
@@ -410,11 +414,18 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    private var name: String { field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// A name is needed: with the field empty, Rename waits, and Return does nothing.
+    fileprivate func refreshSave() { save.isEnabled = !name.isEmpty }
+
+    func controlTextDidChange(_ obj: Notification) { refreshSave() }
+
     private func close(commit: Bool) {
+        if commit, name.isEmpty { return }
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if commit, !text.isEmpty { done?(text) }
+        if commit { done?(name) }
         done = nil
         dismiss()
     }
