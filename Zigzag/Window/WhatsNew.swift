@@ -159,9 +159,35 @@ final class WhatsNewSheet: NSView {
         sheet.panel.present(always: true, arrival: .pop)
         sheet.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak sheet] event in
             guard let sheet, event.window === host.window else { return event }
-            if [36, 76, 53].contains(event.keyCode) { sheet.close(); return nil }
-            return event
+            return sheet.handle(event)
         }
+    }
+
+    /// As a confirmation does (`ConfirmSheet`), no key gets past it to the window behind: Return, Esc and ⌘W close it,
+    /// the arrows, Space and the page keys scroll the notes, and ⌘Q still quits.
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        let mods = event.modifierFlags.intersection([.command, .option, .control])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+        if mods == .command, key == "q" { return event }
+        if mods.isEmpty && [36, 76, 53].contains(event.keyCode) || mods == .command && key == "w" { close(); return nil }
+        guard mods.isEmpty || mods == .command else { return nil }
+        let clip = scroll.contentView
+        let line = Tokens.Space.x8, page = max(line, clip.bounds.height - line)
+        var y = clip.bounds.minY
+        switch event.keyCode {
+        case 125: y += mods.isEmpty ? line : .greatestFiniteMagnitude
+        case 126: y -= mods.isEmpty ? line : .greatestFiniteMagnitude
+        case 49: y += event.modifierFlags.contains(.shift) ? -page : page
+        case 121: y += page
+        case 116: y -= page
+        case 119: y = .greatestFiniteMagnitude
+        case 115: y = 0
+        default: return nil
+        }
+        y = min(max(0, y), max(0, notes.frame.height - clip.bounds.height))
+        clip.scroll(to: NSPoint(x: 0, y: y))
+        scroll.reflectScrolledClipView(clip)
+        return nil
     }
 
     /// True while the notes cover `window`: anything else there waits, and leaves the keys to them.
