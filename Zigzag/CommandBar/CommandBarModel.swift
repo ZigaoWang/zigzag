@@ -216,9 +216,11 @@ enum CommandRanker {
         c.canSplitWithRecent = splitPartner(for: tab, in: manager) != nil
         c.canMove = tab.bookmarkID == nil && tab.url != nil
         // On a pinned page or favorite, every tab is another tab, and all of them are below it.
-        let index = tabs.firstIndex { $0 === tab }
-        c.hasOtherTabs = tabs.contains { $0 !== tab }
-        c.hasTabsBelow = tabs.count > (index.map { $0 + 1 } ?? 0)
+        // Its split partner is part of it, as Close Other Tabs and Close Tabs Below count it.
+        let partner = manager.partner(of: tab)
+        let last = tabs.lastIndex { $0 === tab || $0 === partner }
+        c.hasOtherTabs = tabs.contains { $0 !== tab && $0 !== partner }
+        c.hasTabsBelow = tabs.count > (last.map { $0 + 1 } ?? 0)
         return c
     }
 

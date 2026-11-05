@@ -135,11 +135,13 @@ enum SidebarMenus {
         }
         menu.addItem(.separator())
         menu.addItem(Item("Close Tab") { controller.closeWithUndo(tab) })
+        // As in the menu bar: the tab's split partner is part of it, so neither closes it.
         let tabs = manager.tabs(in: tab.spaceID)
-        if let index = tabs.firstIndex(where: { $0 === tab }) {
-            let below = Array(tabs.dropFirst(index + 1))
+        let partner = manager.partner(of: tab)
+        if let last = tabs.lastIndex(where: { $0 === tab || $0 === partner }) {
+            let below = Array(tabs.dropFirst(last + 1))
             menu.addItem(Item("Close Tabs Below", enabled: !below.isEmpty) { controller.closeManyWithUndoToast(below) })
-            let others = tabs.filter { $0 !== tab }
+            let others = tabs.filter { $0 !== tab && $0 !== partner }
             menu.addItem(Item("Close Other Tabs", enabled: !others.isEmpty) { controller.closeManyWithUndoToast(others) })
         }
         return menu
