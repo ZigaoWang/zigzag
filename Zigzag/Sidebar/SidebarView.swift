@@ -300,6 +300,9 @@ final class SidebarView: NSView {
     private func pane(_ side: CGFloat) -> SpacePane { side < 0 ? panes.left : panes.right }
 
     private let bottomBar = NSView()
+    /// The dots, between Downloads and +. Too many to fit at a size you can click, they scroll sideways, keeping
+    /// the space you're in in view, with their ends faded.
+    private let dotStrip = DotStrip()
     let nowPlaying = NowPlayingView()
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
@@ -362,6 +365,7 @@ final class SidebarView: NSView {
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
 
+        bottomBar.addSubview(dotStrip)
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
@@ -484,13 +488,17 @@ final class SidebarView: NSView {
         downloadsButton.frame = NSRect(x: pad, y: (h - button) / 2, width: button, height: button)
         newSpaceButton.frame = NSRect(x: bottomBar.bounds.width - pad - button, y: (h - button) / 2, width: button, height: button)
         let available = newSpaceButton.frame.minX - downloadsButton.frame.maxX - Tokens.Space.x2
-        let dotSize = min(Tokens.Sidebar.button, floor(available / CGFloat(max(dots.count, 1))))
+        dotStrip.frame = NSRect(x: downloadsButton.frame.maxX + Tokens.Space.x1, y: 0, width: max(0, available), height: h)
+        // Never smaller than a comfortable target; past that, the row scrolls.
+        let dotSize = max(DotStrip.smallest, min(Tokens.Sidebar.button, floor(available / CGFloat(max(dots.count, 1)))))
         let total = CGFloat(dots.count) * dotSize
-        var x = downloadsButton.frame.maxX + Tokens.Space.x1 + (available - total) / 2
+        dotStrip.contentWidth = total
+        var x = max(0, (available - total) / 2)
         for dot in dots {
             dot.frame = NSRect(x: x, y: (h - dotSize) / 2, width: dotSize, height: dotSize)
             x += dotSize
         }
+        if let current = dots.first(where: \.isSelected) { dotStrip.reveal(current.frame) }
     }
 
     func showTrafficLightsPicture(_ image: NSImage?) {
@@ -532,7 +540,7 @@ final class SidebarView: NSView {
                 }
                 dot.onDoubleClick = { [weak self] in self?.onEditSpace?(space.id) }
                 dot.onRightClick = { [weak self] _ in self?.delegate?.sidebarSpaceMenu(for: space.id) }
-                bottomBar.addSubview(dot)
+                dotStrip.addSubview(dot)
                 return dot
             }
         }
@@ -1417,4 +1425,69 @@ private final class SpacePane {
 
     /// The space it shows, once loaded.
     var space: UUID? { list.spaceOverride }
+}
+
+/// The space dots' row: it clips them, and scrolls sideways (a trackpad swipe or the wheel) when there are more than
+/// fit, its ends fading so you can tell there's more.
+private final class DotStrip: NSView {
+    /// The smallest a dot's target gets before the row scrolls instead.
+    static let smallest = Tokens.Space.x4
+    private let content = NSView()
+    private let fade = CAGradientLayer()
+    var contentWidth: CGFloat = 0 { didSet { scroll(to: offset, animated: false) } }
+    private var offset: CGFloat = 0
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        super.addSubview(content)
+        fade.startPoint = CGPoint(x: 0, y: 0.5)
+        fade.endPoint = CGPoint(x: 1, y: 0.5)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { true }
+    override func addSubview(_ view: NSView) { content.addSubview(view) }
+
+    override func layout() {
+        super.layout()
+        scroll(to: offset, animated: false)
+    }
+
+    /// Brings a dot (in the row's own terms) into view, as little as it takes.
+    func reveal(_ rect: NSRect) {
+        var target = offset
+        if rect.minX < target { target = rect.minX - Self.smallest / 2 }
+        if rect.maxX > target + bounds.width { target = rect.maxX - bounds.width + Self.smallest / 2 }
+        scroll(to: target, animated: window != nil)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard contentWidth > bounds.width else { super.scrollWheel(with: event); return }
+        // Sideways or up and down, both move along the row.
+        let delta = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
+        scroll(to: offset - delta * (event.hasPreciseScrollingDeltas ? 1 : Tokens.Space.x4), animated: false)
+    }
+
+    private func scroll(to target: CGFloat, animated: Bool) {
+        offset = min(max(0, target), max(0, contentWidth - bounds.width))
+        let frame = NSRect(x: -offset, y: 0, width: max(contentWidth, bounds.width), height: bounds.height)
+        if animated, !Tokens.Motion.reduceMotion {
+            Tokens.Motion.animate(Tokens.Motion.snappy) { self.content.animator().frame = frame }
+        } else {
+            content.frame = frame
+        }
+        // A soft edge only where more dots wait past it.
+        guard contentWidth > bounds.width, bounds.width > 0 else { layer?.mask = nil; return }
+        let edge = min(Self.smallest / bounds.width, 0.3)
+        let start = offset > 0.5 ? 0.0 : 1.0, end = offset < contentWidth - bounds.width - 0.5 ? 0.0 : 1.0
+        let opaque = NSColor.black.cgColor
+        fade.colors = [NSColor.black.withAlphaComponent(start).cgColor, opaque, opaque, NSColor.black.withAlphaComponent(end).cgColor]
+        fade.locations = [0, NSNumber(value: edge), NSNumber(value: 1 - edge), 1]
+        Tokens.Motion.withoutAnimation { fade.frame = bounds }
+        layer?.mask = fade
+    }
 }
