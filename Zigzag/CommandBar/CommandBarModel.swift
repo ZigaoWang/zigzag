@@ -124,7 +124,8 @@ enum CommandRanker {
         Action(id: "settings", title: "Settings", keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
         Action(id: "passwords", title: "Passwords", keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key"),
         Action(id: "import", title: "Import from Another Browser…", keywords: ["import", "bring", "move", "switch", "passwords", "bookmarks", "arc", "chrome", "safari", "firefox"], symbol: "square.and.arrow.down"),
-        Action(id: "feedback", title: "Send Feedback…", keywords: ["feedback", "send", "report", "bug", "issue", "problem", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
+        Action(id: "feedback", title: "Send Feedback…", keywords: ["feedback", "send", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
+        Action(id: "report", title: "Report a Problem…", keywords: ["report", "bug", "issue", "problem", "crash", "freeze", "broken", "help"], symbol: "exclamationmark.bubble"),
     ]
 
     /// What the bar needs to know about the window to offer only the commands that would do something.

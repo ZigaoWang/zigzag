@@ -201,6 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showHistory(_ sender: Any?) { frontBrowserWindow().map(HistoryPage.open) }
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
+    @objc func reportProblem(_ sender: Any?) { frontBrowserWindow().map(ProblemReport.show) }
 
     /// ⌘W in a window without tabs (Passwords, Import) closes that window, as on any Mac.
     @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
