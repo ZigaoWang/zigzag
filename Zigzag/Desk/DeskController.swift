@@ -92,11 +92,11 @@ final class DeskFrameView: NSView {
         paint.wantsLayer = true
         paint.autoresizingMask = [.width, .height]
         addSubview(paint)
-        wash.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
-        grain.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        // Sized by hand in `layout` and `paint` only: resizing with the layer too would add each change twice, and the
+        // wash would grow past the window, showing only part of the fade.
         paint.layer?.addSublayer(wash)
-        grain.backgroundColor = NSColor(patternImage: BrandSurface.noise).cgColor
-        grain.compositingFilter = "overlayBlendMode"
+        // The window's own grain, so the overview's color and texture are the frame's exactly.
+        grain.backgroundColor = MaterialImages.grain.cgColor
         paint.layer?.addSublayer(grain)
     }
 
@@ -147,14 +147,15 @@ final class DeskFrameView: NSView {
         paint.frame = bounds
         Tokens.Motion.withoutAnimation { wash.frame = bounds; grain.frame = bounds }
         let r = space.gradientAngle * .pi / 180
-        let dx = cos(r) / 2, dy = sin(r) / 2
+        // The window's frame is flipped and this view isn't: y runs the other way here, so the fade goes the same way.
+        let dx = cos(r) / 2, dy = -sin(r) / 2
         Tokens.Motion.withoutAnimation {
             wash.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 - dy)
             wash.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 + dy)
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 wash.colors = [color.cgColor, (end ?? color).cgColor]
             }
-            grain.opacity = Float(min(max(isPrivate ? 0 : space.grain ?? 0, 0), 1) * 0.22)
+            grain.opacity = Float(min(max(isPrivate ? 0 : space.grain ?? 0, 0), 1) * 0.18)
         }
     }
 }
@@ -369,10 +370,11 @@ final class DeskController {
             frameView.autoresizingMask = [.width, .height]
             backdrop.addSubview(frameView, positioned: .below, relativeTo: nil)
         }
-        frameView.frame = root.bounds
-        frameView.paint(controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
+        // The backdrop first: sizing it resizes the frame along with it, so the frame is fitted after, not grown twice.
         backdrop.frame = root.bounds
         backdrop.autoresizingMask = [.width, .height]
+        frameView.frame = backdrop.bounds
+        frameView.paint(controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
         scrollView.autoresizingMask = [.width, .height]
         // Opened again while still closing: the desk is there, and carries on from where it is.
         let reopening = backdrop.superview != nil
