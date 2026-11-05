@@ -269,7 +269,11 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .row:hover { background: var(--hover); }
 .row:active { background: var(--pressed); }
 /* Reached with the keyboard: chosen, as a section is in Settings. */
-.row:focus-visible, .all-selected .row { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
+.row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
+/* Everything selected (⌘A): each session's pages as one lit block, as Finder shows a selection, not a stack of pills. */
+.rows { border-radius: var(--radius-row); }
+.all-selected .rows { background: color-mix(in srgb, var(--accent) var(--selection), transparent); }
+.all-selected .row:hover, .all-selected .row:focus-visible { background: none; }
 .row img, .row .dot { grid-column: 2; width: var(--favicon); height: var(--favicon); border-radius: var(--radius-small); }
 .row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 17px no-repeat; }
 /* One-color icons (GitHub, ChatGPT) come drawn in the page's own ink, so no icon needs a tile. */
@@ -405,8 +409,9 @@ function sessionElement(session) {
   head.append(el('h2', null, session.title), el('span', 'range', span(items)),
               el('span', 'count', items.length === 1 ? '1 page' : items.length + ' pages'),
               removeButton('Remove Session from History', () => forget(items.map((i) => i.url), session)));
-  section.append(head);
-  for (const c of session.clusters) section.append(c.items.length > 1 ? clusterElement(c, session) : page(c.items[0], session));
+  const rows = el('div', 'rows');
+  for (const c of session.clusters) rows.append(c.items.length > 1 ? clusterElement(c, session) : page(c.items[0], session));
+  section.append(head, rows);
   return section;
 }
 
