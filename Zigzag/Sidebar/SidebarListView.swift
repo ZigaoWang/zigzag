@@ -620,8 +620,6 @@ final class SidebarListView: NSView {
             row.onDoubleClick = { [weak row] in row?.beginRename() }
             row.onRename = { [weak row] name in row?.tab?.customTitle = name.isEmpty ? nil : name }
             row.onClose = { [weak self, weak row] in
-                // Away from its page, the button says "Back to Pinned Page", and does that.
-                if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
                 guard let tab = row?.tab else { return }
                 // A split row closes both its pages, as the desk's card does.
                 if let partner = row?.partner { self?.delegate?.listClose([tab, partner]) } else { self?.delegate?.listClose(tab) }
@@ -653,15 +651,19 @@ final class SidebarListView: NSView {
                 }
                 if let bookmark = Library.shared.bookmark(opening) { self.delegate?.listOpenBookmark(bookmark) }
             }
-            row.onClose = { [weak self, weak row] in
+            // A pinned split row unloads both its pages, the one you're not on first.
+            let unload = { [weak self, weak row] in
                 guard let self, let row else { return }
-                // A pinned split row unloads both its pages, the one you're not on first.
                 let selected = self.manager?.selectedTab
                 for tab in [row.partner, row.tab].compactMap({ $0 }).sorted(by: { $1 === selected && $0 !== selected }) {
                     self.delegate?.listClose(tab)
                 }
             }
-            row.onMiddleClick = row.onClose
+            // Away from its page, the button says "Back to Pinned Page", and does that; a middle-click still unloads.
+            row.onClose = { [weak self] in
+                if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id) } else { unload() }
+            }
+            row.onMiddleClick = unload
             row.onRightClick = { [weak self] _ in self?.menu(for: item) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
