@@ -747,6 +747,8 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
+        // Its dialogs start over: blocking them was for the page you blocked, not a reload of it.
+        PageDialogs.pageLoaded(webView)
         let fresh = pdfFreshLoad
         pdfFreshLoad = false
         // A new page: a PDF that couldn't open before gets another try.

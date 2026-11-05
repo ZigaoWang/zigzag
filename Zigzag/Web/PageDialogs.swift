@@ -11,19 +11,22 @@ enum PageDialogs {
 
     /// Dialogs shown per page (web view and the address it's on), and pages whose dialogs were blocked.
     private static var shown: [ObjectIdentifier: (url: URL?, count: Int)] = [:]
-    private static var blocked: [ObjectIdentifier: URL?] = [:]
+    private static var blocked: [ObjectIdentifier: Bool] = [:]
+
+    /// A page loaded (a reload included): its count and any block are forgotten, as in Safari.
+    static func pageLoaded(_ webView: WKWebView) {
+        shown[ObjectIdentifier(webView)] = nil
+        blocked[ObjectIdentifier(webView)] = nil
+    }
 
     /// Asks in Zigzag's own sheet. A page whose dialogs were blocked gets its quiet default at once, until it
-    /// loads something new.
+    /// loads again.
     private static func ask(_ frame: WKFrameInfo, window: NSWindow?, message: String, fields: [PageDialogSheet.Field] = [],
                             showsCancel: Bool) async -> PageDialogSheet.Result {
         guard let window else { return .cancelled }
         let page = frame.webView.map(ObjectIdentifier.init)
         let url = frame.webView?.url
-        if let page, let blockedURL = blocked[page] {
-            if blockedURL == url { return .cancelled }
-            blocked[page] = nil
-        }
+        if let page, blocked[page] != nil { return .cancelled }
         var count = 1
         if let page {
             count = shown[page].map { $0.url == url ? $0.count + 1 : 1 } ?? 1
@@ -31,7 +34,7 @@ enum PageDialogs {
         }
         let result = await PageDialogSheet.ask(in: window, title: "\(originText(frame)) says", message: message, fields: fields,
                                                showsCancel: showsCancel, offersBlock: count >= 2, page: frame.webView)
-        if case .blocked = result, let page { blocked[page] = url }
+        if case .blocked = result, let page { blocked[page] = true }
         return result
     }
 

@@ -180,6 +180,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return .allow
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        PageDialogs.pageLoaded(webView)
+    }
+
     /// A page that never arrived says why, as a tab does, rather than leave the window blank.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
