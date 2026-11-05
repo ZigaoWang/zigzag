@@ -501,6 +501,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Each site keeping cookies, storage or a cache on this Mac, to remove one at a time.
     private let siteDataGroup = FormGroup()
     private var siteDataShowsAll = false
+    /// Every site with a choice made for it, not only the first 30.
+    private var sitesShowAll = false
     private var siteDataTask: Task<Void, Never>?
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
@@ -1424,7 +1426,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // Then each site, with what was chosen for it, and a way to forget just that one.
         let sites = SitePermissions.sites.union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
-        for site in sites.sorted().prefix(40) {
+        var listed = 0, more = 0
+        for site in sites.sorted() {
             var said: [String] = []
             let choices = SitePermissions.choices(host: site)
             for (kind, name) in [("camera", "camera"), ("microphone", "microphone"), ("cameraAndMicrophone", "camera and microphone"),
@@ -1438,6 +1441,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if ExtensionStore.extensionsOffSites.contains(site) { said.append("extensions off") }
             if let zoom = ZoomLevels.all[site] { said.append("zoom \(Int((zoom * 100).rounded()))%") }
             guard !said.isEmpty else { continue }
+            // The first 30 by name, as with site data, then the rest on request.
+            guard sitesShowAll || listed < 30 else { more += 1; continue }
+            listed += 1
             let forget = PillButton(title: "Forget")
             forget.onClick = { [weak self] _ in
                 SitePermissions.forgetEverything(host: site)
@@ -1454,6 +1460,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let siteURL = URL(string: "https://\(site)")
             let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", icon: favicon, control: forget))
+        }
+        if more > 0 {
+            let all = PillButton(title: "Show All")
+            all.onClick = { [weak self] _ in
+                self?.sitesShowAll = true
+                self?.reloadPrivacy()
+                self?.layoutDocument()
+            }
+            sitesGroup.add(FormRow(title: more == 1 ? "1 more site" : "\(more) more sites", control: all))
         }
         reloadSiteData()
     }
@@ -1494,7 +1509,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     self?.siteDataShowsAll = true
                     self?.reloadSiteData()
                 }
-                self.siteDataGroup.add(FormRow(title: "\(sorted.count - shown.count) more sites", control: more))
+                let rest = sorted.count - shown.count
+                self.siteDataGroup.add(FormRow(title: rest == 1 ? "1 more site" : "\(rest) more sites", control: more))
             }
             self.layoutDocument()
         }
