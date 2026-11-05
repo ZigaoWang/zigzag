@@ -35,14 +35,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let width = features.width.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.width
         let height = features.height.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.height
         let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
-        let size = NSSize(width: max(320, width), height: max(240, height) + headerHeight)
-
-        var origin = NSPoint.zero
-        if let x = features.x, let y = features.y, let screen = parent?.screen ?? NSScreen.main {
-            origin = NSPoint(x: CGFloat(x.doubleValue), y: screen.frame.maxY - CGFloat(y.doubleValue) - size.height)
-        } else if let parent {
-            origin = NSPoint(x: parent.frame.midX - size.width / 2, y: parent.frame.midY - size.height / 2)
-        }
+        let placed = Self.frame(for: NSSize(width: max(320, width), height: max(240, height) + headerHeight), features: features, parent: parent)
+        let size = placed.size
+        let origin = placed.origin
 
         let window = PopupWindow(contentRect: NSRect(origin: origin, size: size),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -92,6 +87,25 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Where the page asked for it, else centered on the window that opened it; always whole on one screen, made
+    /// smaller if it's bigger than the screen. A page's screenX and screenY count from the top left of the main display.
+    private static func frame(for size: NSSize, features: WKWindowFeatures, parent: NSWindow?) -> NSRect {
+        var frame = NSRect(origin: .zero, size: size)
+        if let x = features.x, let y = features.y, let top = NSScreen.screens.first?.frame.maxY {
+            frame.origin = NSPoint(x: CGFloat(x.doubleValue), y: top - CGFloat(y.doubleValue) - size.height)
+        } else if let around = parent?.frame ?? NSScreen.main?.visibleFrame {
+            frame.origin = NSPoint(x: around.midX - size.width / 2, y: around.midY - size.height / 2)
+        }
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        guard let area = (NSScreen.screens.first { $0.frame.contains(center) } ?? parent?.screen ?? NSScreen.main)?.visibleFrame else {
+            return frame
+        }
+        frame.size = NSSize(width: min(frame.width, area.width), height: min(frame.height, area.height))
+        frame.origin.x = min(max(frame.minX, area.minX), area.maxX - frame.width)
+        frame.origin.y = min(max(frame.minY, area.minY), area.maxY - frame.height)
+        return frame
+    }
 
     private func tellExtensions(_ change: WKWebExtension.TabChangedProperties) {
         guard #available(macOS 15.4, *), !isPrivate, Self.open.contains(self) else { return }
