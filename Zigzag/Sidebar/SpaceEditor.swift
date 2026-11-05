@@ -1567,9 +1567,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     var onCancel: (() -> Void)?
     private var cancelled = false
 
-    /// Esc: closes, and a space just made goes away again. Return or a click outside keeps it.
+    /// Esc: closes, and a space just made goes away again, unless you've already named it or picked its look: that
+    /// work is kept, as Return or a click outside keeps it.
     func cancel() {
-        guard let onCancel else { close(); return }
+        guard let onCancel, !edited else { close(); return }
         cancelled = true
         close()
         onCancel()
