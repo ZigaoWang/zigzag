@@ -5,6 +5,42 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.12] - 2026-11-05
+
+### New
+- ⌘Z brings back pages you removed from History, and even a whole Clear History, with your archived tabs, places in PDFs and site icons. The "History cleared" notice has Undo too.
+- Select everything in History with ⌘A, then press Delete to clear it. It asks first, and your cookies and passwords stay. While searching, only the results go.
+- Site Data in Settings › Privacy lists every site that keeps cookies, saved data or a cache on this Mac, with Remove for each one.
+- Reduce motion in Settings › General: things appear in place instead of sliding or growing, for Zigzag alone.
+- The getting-started guide shows each step being done right in your window: a cursor drags a tab into Split View, Shift-clicks a link and clicks +, and two fingertips swipe between spaces. Rings and demos keep going until you do the step. They replace the videos.
+- A new step in the guide: see all your tabs with ⌘⇧\ or a pinch.
+- The guide can be closed for good with its ×. Help › Getting Started brings it back.
+- Open pinned pages show a fine edge, as favorites do, so you can tell which are loaded.
+
+### Changed
+- Titles show in normal case everywhere: History, Settings, Downloads, What's New and the rest.
+- The tab you're on stands out more in the sidebar.
+- Confirmations ease in and out, even when a key opened them.
+- The guide names the tab to drag into Split View, and opens its own page for it.
+
+### Fixed
+- Teams Assignments loads. Sign-ins that check in a hidden frame now get their cookies, as in Chrome and Arc; private windows still keep none.
+- Allowing a blocked pop-up no longer breaks the sign-in or payment it was for: the page's own button, clicked again, opens a real pop-up.
+- A page that opens a blank pop-up and fills it in afterward now says when it's blocked.
+- In setup, the answer you picked is readable in dark mode.
+- Back to Pinned Page goes back to the pinned page instead of unloading it.
+- The × on a favorite holding two pages unloads both.
+- Close Other Tabs and Close Tabs Below keep the tab's split partner, from the sidebar and the command bar alike.
+- A peek goes away when you switch tabs or spaces, or open the tab overview.
+- Esc keeps a new space once you've named it or picked its look.
+- Edit Space is off in private windows.
+- Show All Downloads shows them, instead of opening Finder.
+- A download that fails says so, with Try Again, and a download's notice shows only in a window of its kind, private or not.
+- Removing an extension from its own menu asks first, as Settings does.
+- Reset All for shortcuts asks first.
+- A notice with Undo stays while the pointer is on it.
+- The same actions have the same names everywhere, like Mute Tab and Rename Favorite.
+
 ## [0.5.11] - 2026-11-05
 
 ### Fixed
@@ -457,7 +493,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.11...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.12...HEAD
+[0.5.12]: https://github.com/ZigaoWang/zigzag/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/ZigaoWang/zigzag/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/ZigaoWang/zigzag/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/ZigaoWang/zigzag/compare/v0.5.8...v0.5.9
