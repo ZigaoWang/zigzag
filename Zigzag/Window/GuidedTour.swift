@@ -77,6 +77,7 @@ final class GuidedTour: NSView {
         ring.shadowRadius = 8
         ring.shadowOffset = .zero
         layer?.addSublayer(ring)
+        layer?.addSublayer(ghost)
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
         skip.textColor = NSColor.white.withAlphaComponent(0.6)
@@ -298,10 +299,12 @@ final class GuidedTour: NSView {
             return Display(keys: ["Esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek", clip: "peek")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article", clip: "peek") }
-        // Names the very tab to drag, lit up in the sidebar, so there's nothing to work out.
+        // Names the very tab to drag, and a cursor in the window shows the drag on it: a ring alone reads as the tab
+        // you're on. That shows it better than a recording, so there's none.
         if task.id == "split" {
-            return Display(keys: [], title: "Drag the ringed tab onto the page", note: "It opens side by side with this one",
-                           count: count, isDone: false, isFinal: false, target: "split", clip: "split")
+            let title = splitCandidate.map { "Drag “\(Self.shortName($0.title))” onto the page" } ?? task.title
+            return Display(keys: [], title: title, note: "It opens beside this one",
+                           count: count, isDone: false, isFinal: false, target: "split")
         }
         let clips = ["space": "spaces", "switch": "switch"]
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id, clip: clips[task.id])
@@ -374,17 +377,40 @@ final class GuidedTour: NSView {
         controller.open(url, disposition: .foregroundTab, allowSwitch: false)
     }
 
-    /// A tab that can go beside this page: an ordinary one (pinned pages can't split), not the one you're on.
+    /// The page the guide opens to go beside yours: its own, so the step never names some other tab of yours.
+    /// Wikipedia sends it on to "Split screen (computing)", so any of its Split screen pages counts.
+    private static let splitPartnerURL = URL(string: "https://en.wikipedia.org/wiki/Split_screen_(computer_graphics)")!
+
+    /// The guide's own page, once open, if it can go beside the one you're on.
     private var splitCandidate: Tab? {
         guard let controller, let current = controller.tabManager.selectedTab else { return nil }
         let manager = controller.tabManager
-        return manager.tabs(in: manager.currentSpaceID).first { $0 !== current && manager.split(for: $0) == nil && manager.canSplit(current, with: $0) }
+        return manager.tabs(in: manager.currentSpaceID).first {
+            $0 !== current && $0.url?.host()?.hasSuffix("wikipedia.org") == true && $0.url?.path.hasPrefix("/wiki/Split_screen") == true
+                && manager.split(for: $0) == nil && manager.canSplit(current, with: $0)
+        }
     }
 
-    /// Split View needs a second ordinary tab; the earlier steps may have pinned the only one.
+    /// A tab's title without its site's name or an aside ("Split screen (computing) - Wikipedia" is "Split screen"),
+    /// short enough for the card.
+    private static func shortName(_ title: String) -> String {
+        var name = title
+        for separator in [" - ", " – ", " — ", " | "] {
+            if let range = name.range(of: separator, options: .backwards), range.lowerBound > name.startIndex {
+                name = String(name[..<range.lowerBound])
+                break
+            }
+        }
+        if name.hasSuffix(")"), let open = name.range(of: " (", options: .backwards), open.lowerBound > name.startIndex {
+            name = String(name[..<open.lowerBound])
+        }
+        return name.count > 28 ? String(name.prefix(27)).trimmingCharacters(in: .whitespaces) + "…" : name
+    }
+
+    /// Split View needs a second ordinary tab: the guide opens its own, behind this one.
     private func openSplitPartner() {
-        guard let controller, splitCandidate == nil, let url = URL(string: "https://en.wikipedia.org/wiki/Split_screen_(computer_graphics)") else { return }
-        controller.open(url, disposition: .backgroundTab, allowSwitch: false)
+        guard let controller, splitCandidate == nil else { return }
+        controller.open(Self.splitPartnerURL, disposition: .backgroundTab, allowSwitch: false)
     }
 
     /// Starts the step's recording on a loop (muted), or stops it when the step has none.
@@ -486,6 +512,8 @@ final class GuidedTour: NSView {
         _ = cut
         // Pulses only when it lands on something new, never on every layout.
         if ringed, d.target != pulsedTarget { pulsedTarget = d.target; pulse(true) } else if !ringed { pulsedTarget = nil; pulse(false) }
+        // Split View is a drag, which a ring can't show: a cursor picks up the tab and carries it onto the page.
+        showDrag(ringed && d.target == "split" ? target : nil, from: hole, to: page)
         let curve = Tokens.Motion.gentle
         if animated, ring.path != ringPath, !Tokens.Motion.reduceMotion {
             for (layer, path) in [(dim, cut as CGPath), (ring, ringPath)] {
@@ -586,6 +614,85 @@ final class GuidedTour: NSView {
         beat.repeatCount = 3
         beat.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         ring.add(beat, forKey: "pulse")
+    }
+
+    /// The drag a step asks for, shown in the window itself: a cursor goes to the tab, picks it up and carries a
+    /// copy of it onto the page, three times over, then rests, like the ring's pulse.
+    private let ghost = CALayer()
+    private var ghostRoute: (from: NSRect, to: NSRect)?
+
+    private func showDrag(_ row: NSView?, from hole: NSRect, to page: NSRect) {
+        guard let row, !Tokens.Motion.reduceMotion else {
+            ghostRoute = nil
+            ghost.removeAllAnimations()
+            ghost.sublayers?.forEach { $0.removeFromSuperlayer() }
+            return
+        }
+        if let route = ghostRoute, route.from == hole, route.to == page { return }
+        ghostRoute = (hole, page)
+        ghost.removeAllAnimations()
+        ghost.sublayers?.forEach { $0.removeFromSuperlayer() }
+
+        // The tab as it looks lifted to drag: its own picture on the card, with the card's shadow.
+        let copy = CALayer()
+        copy.frame = CGRect(origin: .zero, size: row.bounds.size)
+        if let image = row.bitmapImageRepForCachingDisplay(in: row.bounds) {
+            row.cacheDisplay(in: row.bounds, to: image)
+            copy.contents = image.cgImage
+        }
+        copy.contentsGravity = .resize
+        copy.backgroundColor = cgColor(Tokens.Chrome.card)
+        copy.cornerRadius = Tokens.Sidebar.rowRadius
+        copy.cornerCurve = .continuous
+        copy.borderWidth = Tokens.Metric.hairline
+        copy.borderColor = cgColor(Tokens.Chrome.cardEdge)
+        copy.shadowOpacity = 0.3
+        copy.shadowRadius = 10
+        copy.shadowOffset = CGSize(width: 0, height: 4)
+        let cursorImage = NSCursor.arrow.image
+        let cursor = CALayer()
+        cursor.contents = cursorImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        cursor.contentsScale = window?.backingScaleFactor ?? 2
+        // The pointer's tip at the ghost's origin, where it holds the tab: on its title, a little in.
+        let tip = NSCursor.arrow.hotSpot
+        let grab = CGPoint(x: Tokens.Sidebar.favicon * 2.5, y: row.bounds.height / 2)
+        cursor.frame = CGRect(x: grab.x - tip.x, y: grab.y - tip.y, width: cursorImage.size.width, height: cursorImage.size.height)
+        ghost.addSublayer(copy)
+        ghost.addSublayer(cursor)
+        ghost.bounds = CGRect(origin: .zero, size: row.bounds.size)
+        ghost.anchorPoint = .zero
+
+        let start = CGPoint(x: hole.minX + Tokens.Tour.ringOutset, y: hole.minY + Tokens.Tour.ringOutset)
+        // Into the page's upper part, clear of this card at the bottom.
+        let end = CGPoint(x: page.midX, y: page.minY + page.height * 0.3)
+        let cycle: CFTimeInterval = 3.2
+        // Arrive and press, carry it across, let go, fade.
+        let times: [NSNumber] = [0, 0.12, 0.22, 0.62, 0.76, 0.86, 1]
+        let move = CAKeyframeAnimation(keyPath: "position")
+        move.values = [start, start, start, end, end, end, end].map { NSValue(point: $0) }
+        move.keyTimes = times
+        move.timingFunctions = (0..<6).map { _ in CAMediaTimingFunction(name: .easeInEaseOut) }
+        let fade = CAKeyframeAnimation(keyPath: "opacity")
+        fade.values = [0, 1, 1, 1, 1, 0, 0]
+        fade.keyTimes = times
+        let lift = CAKeyframeAnimation(keyPath: "opacity")
+        lift.values = [0, 0, 0.92, 0.92, 0.92, 0, 0]
+        lift.keyTimes = times
+        let press = CAKeyframeAnimation(keyPath: "transform.scale")
+        press.values = [1, 1, 0.85, 0.85, 1, 1, 1]
+        press.keyTimes = times
+        for (layer, animation) in [(ghost, move), (ghost, fade), (copy, lift), (cursor, press)] as [(CALayer, CAKeyframeAnimation)] {
+            animation.duration = cycle
+            animation.repeatCount = 3
+            animation.beginTime = CACurrentMediaTime() + 0.6
+            animation.fillMode = .both
+            layer.add(animation, forKey: animation.keyPath)
+        }
+        Tokens.Motion.withoutAnimation {
+            ghost.position = end
+            ghost.opacity = 0
+            copy.opacity = 0
+        }
     }
 
     /// Like ⌘T's bar: centered on the whole window, not just the page beside the sidebar, but kept inside the page.
