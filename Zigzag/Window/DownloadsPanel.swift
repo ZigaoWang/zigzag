@@ -243,6 +243,8 @@ final class DownloadsPanelView: FloatingPanelView {
     private let clearButton = PillButton(title: "Clear", style: .quiet)
     /// The last row: the folder, or the whole list when the panel opened on one download.
     private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())
+    /// The folder button shows the rest of the list here, rather than opening the folder.
+    private var offersAll = false
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.display))
     private let emptyNote = Label("Nothing downloaded yet", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
@@ -276,7 +278,7 @@ final class DownloadsPanelView: FloatingPanelView {
         clearButton.onClick = { [weak self] _ in DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false) }
         folderButton.onClick = { [weak self] _ in
             guard let self else { return }
-            if self.focused != nil, self.folderButton.title.stringValue == "show all downloads" {
+            if self.focused != nil, self.offersAll {
                 self.focused = nil
                 self.touched = true
                 self.reload()
@@ -390,6 +392,7 @@ final class DownloadsPanelView: FloatingPanelView {
         }
         // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
         let more = focused != nil && all.count > items.count
+        offersAll = more
         folderButton.title.stringValue = more ? "Show All Downloads" : "Open Downloads Folder"
         folderButton.symbol = more ? "list.bullet" : "folder"
         folderButton.setAccessibilityLabel(folderButton.title.stringValue)
