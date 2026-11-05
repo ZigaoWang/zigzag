@@ -778,16 +778,21 @@ enum Toast {
         // A repeat that's still up (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         state.toast = toast
         state.hideWork?.cancel()
-        // Toasts with an action wait for the pointer to leave before going.
+        // Toasts with an action wait for the pointer to leave before going, however long it stays, so Undo never
+        // slips away from under it.
+        @MainActor func hideWhenClear(_ toast: ToastView?) {
+            // Shown again since (a repeat toast): that showing decides when it goes.
+            guard let toast, toast.superview != nil, state.hideWork == nil else { return }
+            if action != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak toast] in hideWhenClear(toast) }
+                return
+            }
+            toast.dismiss(always: true)
+        }
         let work = DispatchWorkItem { [weak toast] in
             MainActor.assumeIsolated {
-                guard let toast, toast.superview != nil else { return }
-                if action != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
-                    state.hideWork = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak toast] in toast?.dismiss(always: true) }
-                    return
-                }
-                toast.dismiss(always: true)
+                state.hideWork = nil
+                hideWhenClear(toast)
             }
         }
         state.hideWork = work
