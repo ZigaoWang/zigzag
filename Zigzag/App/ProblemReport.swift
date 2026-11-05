@@ -1,9 +1,8 @@
 import AppKit
-import OSLog
 
 /// Help › Report a Problem: a plain text report to go with an email, so a bug arrives with what's needed to find it.
-/// It holds which Zigzag, macOS and Mac, how much is open, a few settings, the extensions, crash and freeze reports
-/// (`CrashReports`), and Zigzag's own recent log. Never a page, a tab's address, history or anything else from your
+/// It holds which Zigzag, macOS and Mac, how much is open, a few settings, the extensions, and crash and freeze
+/// reports (`CrashReports`). Never a page, a tab's address, history or anything else from your
 /// browsing. It's written to a file you can read first, and goes nowhere until you send it.
 @MainActor
 enum ProblemReport {
@@ -11,7 +10,7 @@ enum ProblemReport {
 
     static func show(in controller: BrowserWindowController) {
         ConfirmSheet.choose(in: controller.root.overlay, title: "Report a problem",
-                            message: "Zigzag writes a short report for your email: its version, your Mac, crash and freeze reports, and its own recent log. Never your pages, tabs or history. Show Report lets you read it first.",
+                            message: "Zigzag writes a short report for your email: its version, your Mac, and crash and freeze reports. Never your pages, tabs or history. Show Report lets you read it first.",
                             confirmTitle: "Email Report", alternateTitle: "Show Report") { choice in
             guard choice != .cancel, let report = write() else { return }
             switch choice {
@@ -86,9 +85,6 @@ enum ProblemReport {
             lines.append("\(report.date.formatted(date: .abbreviated, time: .shortened)): \(report.summary)")
         }
 
-        lines += ["", "Zigzag’s log, last 30 minutes"]
-        let log = recentLog
-        lines += log.isEmpty ? ["Nothing logged"] : log
         return lines.joined(separator: "\n") + "\n"
     }
 
@@ -100,19 +96,6 @@ enum ProblemReport {
         let started = Date(timeIntervalSince1970: TimeInterval(info.kp_proc.p_starttime.tv_sec))
         return ProcessInfo.processInfo.systemUptime - Date().timeIntervalSince(started)
     }()
-
-    /// Zigzag's own messages only (not WebKit's or the system's), as macOS stored them: anything personal in them
-    /// shows as <private>.
-    private static var recentLog: [String] {
-        guard let store = try? OSLogStore(scope: .currentProcessIdentifier) else { return [] }
-        let since = store.position(date: Date().addingTimeInterval(-30 * 60))
-        let ours = NSPredicate(format: "subsystem BEGINSWITH %@", "wang.zigao.zigzag")
-        guard let entries = try? store.getEntries(at: since, matching: ours) else { return [] }
-        let lines = entries.compactMap { $0 as? OSLogEntryLog }.map { entry in
-            "\(entry.date.formatted(date: .omitted, time: .standard)) [\(entry.category)] \(entry.composedMessage)"
-        }
-        return Array(lines.suffix(300))
-    }
 
     private static func systemValue(_ name: String) -> String? {
         var size = 0
