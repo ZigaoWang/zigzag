@@ -16,6 +16,8 @@ class SidebarRowView: InteractiveView {
     var holdsCardBack = false { didSet { if oldValue != holdsCardBack { stateDidChange(animated: false) } } }
     /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
     var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
+    /// A pinned page that's open: a fine edge, as on a favorite's tile, so you can tell which are loaded.
+    var showsOpenEdge = false { didSet { if oldValue != showsOpenEdge { stateDidChange(animated: false) } } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -81,8 +83,8 @@ class SidebarRowView: InteractiveView {
             setLifted(true)
         } else {
             Tokens.Motion.withoutAnimation {
-                layer?.borderWidth = showsCard ? Tokens.Metric.hairline : 0
-                layer?.borderColor = cgColor(Tokens.Chrome.cardEdge)
+                layer?.borderWidth = showsCard || showsOpenEdge ? Tokens.Metric.hairline : 0
+                layer?.borderColor = cgColor(showsCard ? Tokens.Chrome.cardEdge : Tokens.Chrome.openEdge)
                 setCardShadow(showsCard)
             }
             setCardRim(showsCard)
@@ -227,7 +229,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         layer?.addSublayer(mark)
         return mark
     }()
-    var isUnloaded = false { didSet { refreshTitleColor() } }
+    var isUnloaded = false { didSet { refreshTitleColor(); showsOpenEdge = isBookmark && !isUnloaded } }
     /// The other half of a split: shown in the same row, to the right.
     private(set) var partner: Tab?
     /// A pinned split's other page, by its pinned name and icon: there whether or not its page is open.

@@ -132,7 +132,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
 | Favorites | 4 to a row, 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
 | Space name | 26 light, as typed (`Font.spaceName`), kern -0.6, 52pt slot, its ink on the icon column |
-| Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36 |
+| Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
 | Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
 | Section labels | 11pt medium, `textTertiary`, in the titles' column, low in a 28pt slot |
