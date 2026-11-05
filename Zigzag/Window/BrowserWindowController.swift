@@ -885,7 +885,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         menu.addItem(siteAccessItem(for: id))
         menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
-        menu.addItem(SidebarMenus.Item("Remove from Zigzag", symbol: "trash") { ExtensionStore.uninstall(id) })
+        menu.addItem(SidebarMenus.Item("Remove from Zigzag…", symbol: "trash") { [weak self] in
+            guard let self else { return }
+            ConfirmSheet.removeExtension(id: id, name: context.webExtension.displayName, in: self.root.overlay)
+        })
         guard footer else { return menu }
         menu.addItem(.separator())
         extensionsFooterMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }

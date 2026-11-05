@@ -145,6 +145,15 @@ final class ConfirmSheet: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// Removing an extension deletes its data too, and can't be undone, so it asks first, from Settings and from the
+    /// extension's own menu alike.
+    static func removeExtension(id: String, name: String?, in host: NSView) {
+        show(in: host, title: "Remove \(name ?? "this extension")?", message: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.",
+             confirmTitle: "Remove", destructive: true) { confirmed in
+            if confirmed { ExtensionStore.uninstall(id) }
+        }
+    }
+
     /// Something that didn't work, said plainly, with one button to acknowledge it.
     static func notice(in host: NSView, title: String, message: String) {
         show(in: host, title: title, message: message, confirmTitle: "OK") { _ in }

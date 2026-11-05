@@ -903,7 +903,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.append(reload)
         }
         let remove = IconButton(symbol: "trash", size: .compact, toolTip: "Remove from Zigzag")
-        remove.onClick = { [weak self] _ in self?.confirmRemove(id: id, name: ext.displayName ?? "this extension") }
+        remove.onClick = { [weak self] _ in if let self { ConfirmSheet.removeExtension(id: id, name: ext.displayName, in: self) } }
         controls.append(remove)
         let toggle = Toggle(isOn: ExtensionStore.isEnabled(id))
         toggle.onChange = { on in ExtensionStore.setEnabled(id, on) }
@@ -1449,13 +1449,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Removing an extension deletes its data too, and can't be undone, so it asks first.
-    private func confirmRemove(id: String, name: String) {
-        ConfirmSheet.show(in: self, title: "Remove \(name)?", message: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.",
-                          confirmTitle: "Remove", destructive: true) { confirmed in
-            if confirmed { ExtensionStore.uninstall(id) }
-        }
-    }
 
     private func getExtensions() {
         guard let controller = browser else { return }
