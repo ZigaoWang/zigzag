@@ -5,6 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-11-05
+
+### Fixed
+- Pinching in to open the tab overview no longer leaves the page shrunk and shifted toward the corner. The page now shrinks with your fingers and flows straight into its card.
+- Pop-ups you've allowed for a site open as real pop-up windows, so sign-ins and permission steps finish, like the "Almost there!" step in Teams Assignments.
+
 ## [0.5.10] - 2026-11-05
 
 ### Fixed
@@ -451,7 +457,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.10...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.11...HEAD
+[0.5.11]: https://github.com/ZigaoWang/zigzag/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/ZigaoWang/zigzag/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/ZigaoWang/zigzag/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/ZigaoWang/zigzag/compare/v0.5.7...v0.5.8
