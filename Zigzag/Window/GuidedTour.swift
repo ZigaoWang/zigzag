@@ -15,6 +15,8 @@ final class GuidedTour: NSView {
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
+    /// Ends the guide for good; Help › Getting Started brings it back.
+    private let close = IconButton(symbol: "xmark", size: .compact, toolTip: "End Getting Started")
     private let finish = PrimaryButton(title: "Start Browsing")
     // The last card: a note from the person who made Zigzag.
     private let wordmark = WordmarkView()
@@ -84,7 +86,7 @@ final class GuidedTour: NSView {
         card.tintStrength = 0.94
         card.appearance = NSAppearance(named: .darkAqua)
         card.radius = Tokens.Radius.large
-        [step, check, title, note, skip, finish, wordmark, letter, signature].forEach { card.addSubview($0) }
+        [step, check, title, note, skip, close, finish, wordmark, letter, signature].forEach { card.addSubview($0) }
         wordmark.color = .white
         letter.isSelectable = false
         letter.font = Tokens.Font.body()
@@ -101,6 +103,10 @@ final class GuidedTour: NSView {
             Tutorial.skip()
         }
         finish.onClick = { [weak self] _ in self?.end() }
+        close.onClick = { [weak self] _ in
+            Tutorial.isHidden = true
+            self?.end()
+        }
         tokens.append(Tutorial.changed.observe { [weak self] in self?.stepDone() })
         tokens.append(Brand.themeChanged.observe { [weak self] in self?.applyColors() })
         tokens.append(controller.tabManager.changed.observe { [weak self] _ in
@@ -413,6 +419,7 @@ final class GuidedTour: NSView {
         // Naming a new space is the middle of a step: nothing to skip there.
         // Mid-step hints (no count) are part of a step: nothing to skip there, and the pill stays small.
         skip.isHidden = d.isDone || d.isFinal || d.count.isEmpty
+        close.isHidden = d.isFinal
         step.isHidden = d.isDone || d.isFinal || d.count.isEmpty
         finish.isHidden = !d.isFinal
         note.isHidden = d.isFinal || d.note.isEmpty
@@ -445,6 +452,7 @@ final class GuidedTour: NSView {
         let text = max(title.textWidth, d.note.isEmpty ? 0 : note.textWidth)
         var width = Tokens.Space.x4 + (d.isDone ? Tokens.Tour.checkSide : keys) + Tokens.Space.x3 + text + Tokens.Space.x5
         if !skip.isHidden { width += skip.fittingWidth - Tokens.Space.x2 }
+        if !close.isHidden { width += close.frame.width + Tokens.Space.x1 }
         if !step.isHidden { width += step.textWidth + Tokens.Space.x3 }
         let row = d.note.isEmpty ? Tokens.Tour.rowHeight : Tokens.Tour.rowWithNoteHeight
         // One width for every step, so the card never jumps.
@@ -656,7 +664,10 @@ final class GuidedTour: NSView {
             note.frame = NSRect(x: x, y: title.frame.maxY + 2, width: note.textWidth + 4, height: note.lineHeight)
         }
         let sw = skip.fittingWidth
-        skip.frame = NSRect(x: width - Tokens.Space.x2 - sw, y: top + (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        let cs = IconButton.Size.compact.side
+        close.frame = NSRect(x: width - Tokens.Space.x3 - cs, y: top + (height - cs) / 2, width: cs, height: cs)
+        let end = close.isHidden ? width - Tokens.Space.x2 : close.frame.minX - Tokens.Space.x1
+        skip.frame = NSRect(x: end - sw, y: top + (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
         let cw = step.textWidth + 2
         step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: top + (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
     }
