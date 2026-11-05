@@ -486,7 +486,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
-        case #selector(newSpace(_:)): return !tabManager.isPrivate
+        case #selector(newSpace(_:)), #selector(renameSpace(_:)): return !tabManager.isPrivate
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? "Hide Reader" : "Show Reader"
