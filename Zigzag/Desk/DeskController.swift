@@ -901,7 +901,10 @@ final class DeskController {
             guard let space = Library.shared.space(id) else { continue }
             header.name = space.name
             let count = manager?.tabs(in: id).count ?? 0
-            header.count.stringValue = count == 0 ? "" : count == 1 ? "1 tab" : "\(count) tabs"
+            // While searching, how many of them match: a split that matches is both its tabs.
+            let shown = query.isEmpty ? count : cardTabs(in: id).reduce(0) { $0 + (partner(of: $1) == nil ? 1 : 2) }
+            let tabs = count == 1 ? "1 tab" : "\(count) tabs"
+            header.count.stringValue = count == 0 ? "" : shown == count ? tabs : "\(shown) of \(tabs)"
             header.duplicates = query.isEmpty ? duplicateTabs(in: id).count : 0
             if let empty = empties[id] {
                 // Where its first card would be, as long as there's none and nothing is being dragged in.
