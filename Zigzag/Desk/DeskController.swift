@@ -259,7 +259,8 @@ final class DeskController {
     /// Counts opens and closes, so one that's been taken over doesn't finish what the next one started.
     private var transition = 0
     private var magnifyTotal: CGFloat = 0
-    private var gestureClaimed = false
+    /// The view a pinch began on, which gets it once it's clear the pinch is for the page.
+    private weak var pinchTarget: NSView?
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
     private let searchBox = ColorView()
     private let searchIcon = NSImageView()
@@ -395,6 +396,7 @@ final class DeskController {
         if !reopening, let card = currentCard { canvas.scrollToVisible(card.frame.insetBy(dx: 0, dy: -margin)) }
 
         guard !Tokens.Motion.reduceMotion else {
+            shrinkPages(to: 1)
             Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, { self.backdrop.animator().alphaValue = 1 }) {
                 if self.isVisible { controller.root.glassCovered = true }
             }
@@ -416,8 +418,32 @@ final class DeskController {
             self.cards.values.forEach { $0.refreshImage() }
             self.zoomOut(settle: true)
         }
-        capturePages(start)
+        // A pinch took the picture while it was closing: the page shrinks on from where the fingers have it.
+        if let captured = pagesCaptured {
+            pagesCaptured = nil
+            if captured.done { start(); return }
+            captured.waiting.append(start)
+        } else {
+            capturePages(start)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { start() } }
+    }
+
+    /// The pictures a closing pinch asked for ahead of the desk, and who's waiting on them.
+    private final class Capture {
+        var done = false
+        var waiting: [() -> Void] = []
+    }
+    private var pagesCaptured: Capture?
+
+    private func capturePinchedPages() {
+        let capture = Capture()
+        pagesCaptured = capture
+        capturePages {
+            capture.done = true
+            capture.waiting.forEach { $0() }
+            capture.waiting = []
+        }
     }
 
     /// Takes new pictures of the page on screen, both pages with a split, then calls `completion` once.
@@ -442,9 +468,14 @@ final class DeskController {
         let current = currentCard
         if backdrop.alphaValue < 1 { fade(backdrop, to: 1, duration: Tokens.Motion.standard) }
         if settle { settleIn(except: current) }
-        guard let current, let tab = current.tab else { return }
+        guard let current, let tab = current.tab else { shrinkPages(to: 1, animated: true); return }
         let target = current.imageClip.convert(current.imageClip.bounds, to: flightView)
-        let flight = self.flight ?? makeFlight(at: flightView.convert(controller.root.cardFrame, from: controller.root), radius: pageRadius)
+        // From the page as it is on screen: smaller already, when a pinch is closing on it.
+        let area = controller.root.cardFrame
+        let shown = area.insetBy(dx: area.width * (1 - pinchedScale) / 2, dy: area.height * (1 - pinchedScale) / 2)
+        let flight = self.flight ?? makeFlight(at: flightView.convert(shown, from: controller.root), radius: pageRadius)
+        // The picture stands in for the pages now (they're hidden under it), so they go back to full size.
+        shrinkPages(to: 1)
         // Only its picture flies; the title arrives with the other cards.
         Tokens.Motion.withoutAnimation { current.imageClip.alphaValue = 0 }
         flight.show(Self.picture(of: tab), current.partner?.snapshot, split: current.split)
@@ -572,6 +603,8 @@ final class DeskController {
         guard isVisible, let controller else { return }
         isVisible = false
         transition += 1
+        // Closed before the page's picture took over from a pinch: the pages go back to full size.
+        shrinkPages(to: 1)
         let id = transition
         // The window wakes under the desk before it goes, so the page is live where it lands.
         controller.root.glassCovered = false
@@ -1269,16 +1302,25 @@ final class DeskController {
     // MARK: Pinch
 
     /// Pinching out on a page (that isn't zoomed in) opens the desk; pinching in on a card opens it.
+    ///
+    /// The page never sees a pinch that opens the desk, not even its first steps: WebKit, once it has started
+    /// zooming, can't be talked out of it, and a page left halfway stays shrunk and shifted (further with every
+    /// pinch). So the first steps are held until the pinch shows which way it's going: closing opens the desk, and
+    /// anything else goes to the page whole, held steps first, so it zooms as if nothing had waited.
     func handleMagnify(_ event: NSEvent) -> Bool {
         guard event.type == .magnify, let controller else { return false }
+        let ends = event.phase == .ended || event.phase == .cancelled
         if event.phase == .began {
             magnifyTotal = 0
-            gestureClaimed = false
+            held = []
+            pagesCaptured = nil
+            pinch = .deciding
+            pinchTarget = controller.window?.contentView?.hitTest(event.locationInWindow)
         }
         magnifyTotal += event.magnification
         if isVisible {
-            if event.phase == .ended || event.phase == .cancelled {
-                defer { magnifyTotal = 0 }
+            if ends {
+                defer { magnifyTotal = 0; pinch = .idle }
                 if magnifyTotal > 0.12 {
                     let point = canvas.convert(event.locationInWindow, from: nil)
                     let hit = cards.first { $0.value.frame.contains(point) }?.key
@@ -1287,17 +1329,84 @@ final class DeskController {
             }
             return true
         }
-        if gestureClaimed {
-            if event.phase == .ended || event.phase == .cancelled { gestureClaimed = false }
+        switch pinch {
+        case .idle:
+            return false
+        case .desk:
+            if ends { pinch = .idle }
+            return true
+        case .page:
+            pinchTarget?.magnify(with: event)
+            if ends { pinch = .idle; pinchTarget = nil }
+            return true
+        case .deciding:
+            // Zoomed in, a pinch out zooms back out first. A PDF zooms itself, so it counts while it's bigger than fitting.
+            let pageZoomed = (controller.selectedTab?.pdfViewer?.isZoomedIn ?? false) || (controller.selectedWebView?.magnification ?? 1) > 1.01
+            held.append(event)
+            if !pageZoomed, magnifyTotal < -Self.pinchToOpen {
+                held = []
+                pinch = ends ? .idle : .desk
+                show()
+                return true
+            }
+            if !pageZoomed, magnifyTotal <= 0, !ends {
+                // Closing, not far enough yet: the page shrinks under the fingers, so the desk grows out of a move
+                // already under way. Its picture is taken now, so it's ready the moment the desk opens.
+                if magnifyTotal < 0, pagesCaptured == nil { capturePinchedPages() }
+                shrinkPages(to: Self.pinchScale(for: magnifyTotal))
+                return true
+            }
+            shrinkPages(to: 1, animated: true)
+            // Not for the desk after all: a picture taken for it would be stale by the time it opens.
+            pagesCaptured = nil
+            // Let go short of opening the desk: the page goes back, and has nothing to zoom (it can't get smaller).
+            if !pageZoomed, ends, magnifyTotal <= 0 {
+                held = []
+                pinch = .idle
+                pinchTarget = nil
+                return true
+            }
+            // Zooming in, or already zoomed: the page has the pinch, from the start.
+            pinch = ends ? .idle : .page
+            let steps = held
+            held = []
+            steps.forEach { pinchTarget?.magnify(with: $0) }
+            if ends { pinchTarget = nil }
             return true
         }
-        // Zoomed in, a pinch out zooms back out first. A PDF zooms itself, so it counts while it's bigger than fitting.
-        let pageZoomed = (controller.selectedTab?.pdfViewer?.isZoomedIn ?? false) || (controller.selectedWebView?.magnification ?? 1) > 1.01
-        guard !pageZoomed, magnifyTotal < -0.15 else { return false }
-        gestureClaimed = true
-        show()
-        return true
     }
+
+    private enum Pinch { case idle, deciding, page, desk }
+    /// How far a pinch closes before the desk opens.
+    private static let pinchToOpen: CGFloat = 0.15
+    /// The page's size under the fingers on the way there: a tenth smaller by the time the desk opens.
+    private static func pinchScale(for total: CGFloat) -> CGFloat { 1 + max(total, -pinchToOpen) / pinchToOpen * 0.1 }
+    /// How small the pinch has the pages now, 1 at rest.
+    private var pinchedScale: CGFloat = 1
+
+    /// Shrinks the pages about the middle of the page area, as a pinch closes on them; 1 puts them back.
+    private func shrinkPages(to scale: CGFloat, animated: Bool = false) {
+        guard let root = controller?.root, scale != pinchedScale || animated else { return }
+        let scale = Tokens.Motion.reduceMotion ? 1 : scale
+        pinchedScale = scale
+        let area = root.cardFrame
+        for card in [root.card, root.secondCard] {
+            guard let layer = card.layer else { continue }
+            let cx = area.midX - card.frame.minX, cy = area.midY - card.frame.minY
+            let to = scale == 1 ? CATransform3DIdentity
+                : CATransform3DTranslate(CATransform3DScale(CATransform3DMakeTranslation(cx, cy, 0), scale, scale, 1), -cx, -cy, 0)
+            let from = layer.presentation()?.transform ?? layer.transform
+            Tokens.Motion.withoutAnimation { layer.transform = to }
+            guard animated, !CATransform3DEqualToTransform(from, to) else { continue }
+            let back = Tokens.Motion.easeAnimation(keyPath: "transform", duration: Tokens.Motion.standard)
+            back.fromValue = NSValue(caTransform3D: from)
+            back.toValue = NSValue(caTransform3D: to)
+            layer.add(back, forKey: "pinch")
+        }
+    }
+    private var pinch = Pinch.idle
+    /// A pinch's first steps, held while it's still unclear whether it's for the page or the desk.
+    private var held: [NSEvent] = []
 }
 
 
