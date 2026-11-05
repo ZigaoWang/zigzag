@@ -363,6 +363,8 @@ final class DeskController {
         Tutorial.complete("overview")
         selection = []
         controller.previews.hide()
+        // A peek would sit under the cards and come back after: it's put away first.
+        controller.peek.close()
         // The page's link preview would float over the cards.
         controller.linkStatus.show(nil, in: controller.root.cardFrame)
         controller.commandBar.dismiss(restoringFocus: false)

@@ -498,6 +498,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
         updateHandoff()
         if tab !== shownTab {
+            // A peek is a look from the page you were on: going to another tab or space puts it away.
+            peek.close()
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && tab.flatMap { tabManager.partner(of: $0) } === readerTab
             if !readerStillShown { closeReader() }
