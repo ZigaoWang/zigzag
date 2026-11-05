@@ -467,13 +467,19 @@ async function forget(urls, session) {
   showEmpty();
 }
 
+// Each reload or search starts a new generation; an answer that comes back for an older one is dropped, so a slow
+// search or page never lands on top of what you asked for since.
+let generation = 0;
+
 async function loadMore() {
   if (done || loading || searching) return;
   loading = true;
+  const mine = generation;
   const last = sessions[sessions.length - 1];
   const before = last ? last.clusters[last.clusters.length - 1].items.slice(-1)[0].time : null;
   const more = await ask({ action: 'page', before });
   loading = false;
+  if (mine !== generation) { if (!searching) loadMore(); return; }
   if (searching) return;
   if (!more.length) { done = true; showEmpty(); return; }
   // Batches end where a session ends, so each one only adds.
@@ -483,7 +489,7 @@ async function loadMore() {
   requestAnimationFrame(() => { if (document.getElementById('more').getBoundingClientRect().top < innerHeight + 600) loadMore(); });
 }
 
-async function reload() { sessions = []; done = false; list.textContent = ''; await loadMore(); }
+async function reload() { generation++; sessions = []; done = false; list.textContent = ''; await loadMore(); }
 // The browser asks after History changed (a clear, or ⌘Z bringing pages back): shown again as it is now, the search
 // kept.
 window.zigzagRefresh = () => { selectAll(false); return query.value.trim() ? search() : reload(); };
@@ -494,8 +500,9 @@ async function search() {
   clearTimeout(timer); timer = null;
   searching = query.value.trim();
   if (searching) {
+    const mine = ++generation;
     const found = await ask({ action: 'search', query: searching });
-    if (query.value.trim() !== searching) return;
+    if (mine !== generation) return;
     // Clusters that hold a match open by themselves.
     found.forEach((s) => s.clusters.forEach((c) => c.open = true));
     sessions = found; done = true; render();
