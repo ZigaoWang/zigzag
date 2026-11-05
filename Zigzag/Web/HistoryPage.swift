@@ -504,13 +504,17 @@ document.addEventListener('keydown', (e) => {
 // just what it found. Esc, a click or typing lets go. In the search field with something typed, ⌘A selects that text.
 let allSelected = false;
 const selectAll = (on) => { allSelected = on; list.classList.toggle('all-selected', on); };
+// Edit › Select All comes here from the browser (it takes ⌘A before the page sees it). False: select as usual.
+window.zigzagSelectAll = () => {
+  if ((document.activeElement === query && query.value) || !list.querySelector('.row')) return false;
+  if (document.activeElement === query) query.blur();
+  selectAll(true);
+  return true;
+};
 document.addEventListener('keydown', async (e) => {
   if (e.isComposing || e.keyCode === 229) return;
   if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'a') {
-    if ((document.activeElement === query && query.value) || !list.querySelector('.row')) return;
-    e.preventDefault();
-    if (document.activeElement === query) query.blur();
-    selectAll(true);
+    if (window.zigzagSelectAll()) e.preventDefault();
     return;
   }
   if (!allSelected) return;

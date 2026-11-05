@@ -30,6 +30,20 @@ final class BrowserWebView: WKWebView {
         if window == nil { swipe.leftWindow() }
     }
 
+    /// Edit › Select All (⌘A) on the History page selects every row, as in Safari, rather than the page's text. The
+    /// menu takes ⌘A before the page sees it, so it's handed on here; with something typed in the page's search
+    /// field, that text is what's selected, as usual.
+    override func selectAll(_ sender: Any?) {
+        guard HistoryPage.isHistory(url) else { super.selectAll(sender); return }
+        evaluateJavaScript("window.zigzagSelectAll && window.zigzagSelectAll()") { [weak self] result, _ in
+            MainActor.assumeIsolated {
+                if result as? Bool != true { self?.superSelectAll(sender) }
+            }
+        }
+    }
+
+    private func superSelectAll(_ sender: Any?) { super.selectAll(sender) }
+
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if swipe.handle(event) { return }
