@@ -17,6 +17,10 @@ final class NowPlayingView: InteractiveView {
         [icon, title, playButton, muteButton].forEach { addSubview($0) }
         setAccessibilityRole(.group)
         setAccessibilityLabel("Now playing")
+        // VoiceOver goes to the playing tab as a click on the title does; the buttons speak for themselves.
+        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: "Show Tab") { [weak self] in
+            MainActor.assumeIsolated { self?.accessibilityPerformPress() ?? false }
+        }])
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -30,6 +34,7 @@ final class NowPlayingView: InteractiveView {
         guard let tab else { return }
         icon.image = tab.favicon
         title.stringValue = tab.displayTitle
+        setAccessibilityLabel("Now playing: \(tab.displayTitle)")
         playButton.symbol = isPaused ? "play" : "pause"
         playButton.toolTip = isPaused ? "Play" : "Pause"
         muteButton.symbol = tab.isMuted ? "speaker.slash" : "speaker.wave.2"
