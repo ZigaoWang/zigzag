@@ -1312,8 +1312,14 @@ final class MenuPanel: FloatingPanelView {
         didSet {
             rows.enumerated().forEach { $0.element.isHighlighted = $0.offset == highlighted }
             movePill(from: oldValue)
+            // VoiceOver follows the arrow keys through the items, as it does in a system menu.
+            if oldValue != highlighted { NSAccessibility.post(element: self, notification: .selectedChildrenChanged) }
         }
     }
+
+    /// Its items, straight under the menu for VoiceOver, without the scroll view they're drawn in between.
+    override func accessibilityChildren() -> [Any]? { rows }
+    override func accessibilitySelectedChildren() -> [Any]? { highlighted.map { [rows[$0]] } }
     /// The neutral picture for an item whose own is missing (a site with no favicon yet).
     static var placeholder: NSImage { Tokens.Symbol.image("globe", size: Tokens.TypeSize.body) }
     private var monitor: Any?
@@ -1359,6 +1365,7 @@ final class MenuPanel: FloatingPanelView {
                 }
                 rows.append(row)
                 list.addSubview(row)
+                row.setAccessibilityParent(self)
             case .header(let text):
                 list.addSubview(Label.section(text))
             case .separator:
