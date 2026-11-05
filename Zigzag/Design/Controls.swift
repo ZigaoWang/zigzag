@@ -1099,9 +1099,9 @@ final class CheckBox: InteractiveView {
         label = Label(title, font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
         box.wantsLayer = true
-        box.layer?.cornerRadius = 4
+        box.layer?.cornerRadius = Tokens.Radius.small
         box.layer?.cornerCurve = .continuous
-        box.layer?.borderWidth = 1
+        box.layer?.borderWidth = Tokens.Metric.hairline
         // One weight for symbols everywhere, but a tick this small needs bold to read.
         mark.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 9, weight: .bold))
