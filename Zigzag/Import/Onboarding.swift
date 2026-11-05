@@ -392,6 +392,8 @@ private enum Onboard {
     static let paper = Tokens.Color.dynamic(light: .white, dark: Tokens.Color.hex(0x1C1F25))
     static let ink = Tokens.Color.textPrimary
     static let accent = Brand.Theme.brand.accent
+    /// A tick or text on the accent: white on the deep light-mode accent, dark on the light dark-mode one.
+    static let onAccent = Brand.Theme.brand.onAccent
     /// Fills and outlines on the light side, used with alpha.
     static let tint = Tokens.Color.dynamic(light: Tokens.Color.hex(0x1E3A5F), dark: Tokens.Color.hex(0xDAE5F2))
     static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Tokens.Color.textPrimary.withAlphaComponent(alpha * 0.85) }
@@ -647,7 +649,7 @@ private final class BrowserRow: InteractiveView {
         box.layer?.cornerRadius = Tokens.Radius.control
         box.layer?.borderWidth = Tokens.Metric.fieldRing
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
-        tick.contentTintColor = NSColor.white
+        tick.contentTintColor = Onboard.onAccent
         box.addSubview(tick)
         icon.image = source.icon
         icon.imageScaling = .scaleProportionallyUpOrDown
@@ -1394,7 +1396,6 @@ private final class PickTile: InteractiveView {
         name.alignment = horizontal ? .left : .center
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: 18)
         check.wantsLayer = true
-        check.layer?.backgroundColor = NSColor.white.cgColor
         check.layer?.cornerRadius = 9
         check.contentTintColor = Onboard.ink
         spinner.color = Onboard.ink
@@ -1425,6 +1426,8 @@ private final class PickTile: InteractiveView {
         layer?.backgroundColor = cgColor(fill)
         layer?.borderWidth = 0
         check.contentTintColor = Onboard.accent
+        // Behind the symbol's cut-out tick, so the tick reads in either appearance.
+        check.layer?.backgroundColor = cgColor(Onboard.onAccent)
         check.isHidden = !isPicked || !spinner.isHidden
     }
 
@@ -1792,7 +1795,7 @@ private final class ExtensionRow: InteractiveView {
         box.layer?.cornerRadius = Tokens.Radius.control
         box.layer?.borderWidth = Tokens.Metric.fieldRing
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
-        tick.contentTintColor = NSColor.white
+        tick.contentTintColor = Onboard.onAccent
         box.addSubview(tick)
         status.alignment = .right
         [box, iconTile.icon, name, kind, status, statusIcon, spinner].forEach { addSubview($0) }
