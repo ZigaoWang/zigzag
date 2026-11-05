@@ -172,6 +172,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return .allow
     }
 
+    /// A page that never arrived says why, as a tab does, rather than leave the window blank.
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
+        let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
+        ErrorPage.show(error: nsError, url: failingURL, in: webView, canProceed: false)
+    }
+
     /// The page's process crashed: load it again rather than leave a blank window, unless it just did the same.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         let again = lastCrash.map { Date().timeIntervalSince($0) < 10 } ?? false

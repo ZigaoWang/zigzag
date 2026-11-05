@@ -171,13 +171,14 @@ enum ErrorPage {
         return true
     }
 
-    static func show(error: NSError, url: URL?, in webView: WKWebView) {
+    /// `canProceed` is false where a certificate can't be let through (a popup): the page explains, with no way past.
+    static func show(error: NSError, url: URL?, in webView: WKWebView, canProceed: Bool = true) {
         guard let url else { return }
         pending.add(webView)
         let (title, message) = describe(error, url: url)
         // For a certificate you know is fine (your router, a dev server), a quiet way through, with the reason first.
         var proceed = ""
-        if offersProceed(error) {
+        if canProceed, offersProceed(error) {
             if let link = CertificateExceptions.proceedLink(for: url, nonce: CertificateExceptions.nonce) {
                 proceed = """
                 <details><summary>Show details</summary><p class="why">\(escape(certificateReason(error.code)))</p>
