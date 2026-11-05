@@ -549,6 +549,8 @@ document.addEventListener('keydown', async (e) => {
     return;
   }
   if (!allSelected) return;
+  // Typing in the search field is about the search: the selection lets go rather than being cleared.
+  if (e.target === query) { selectAll(false); return; }
   if (e.key === 'Escape') { e.preventDefault(); selectAll(false); return; }
   if (e.key !== 'Backspace' && e.key !== 'Delete') return;
   e.preventDefault();
@@ -559,6 +561,7 @@ document.addEventListener('keydown', async (e) => {
 });
 document.addEventListener('mousedown', () => { if (allSelected) selectAll(false); });
 query.addEventListener('input', () => selectAll(false));
+query.addEventListener('focus', () => selectAll(false));
 
 // Clear History…: a menu as Zigzag's panels draw it, opened by click, Return or the arrow keys, walked with the arrows.
 const menu = document.getElementById('clearMenu');
