@@ -6,17 +6,27 @@ import AppKit
 /// browsing. It's written to a file you can read first, and goes nowhere until you send it.
 @MainActor
 enum ProblemReport {
-    static let file = CrashReports.folder.appendingPathComponent("Zigzag Problem Report.txt")
+    nonisolated static let file = CrashReports.folder.appendingPathComponent("Zigzag Problem Report.txt")
 
     static func show(in controller: BrowserWindowController) {
         ConfirmSheet.choose(in: controller.root.overlay, title: "Report a problem",
                             message: "Zigzag writes a short report for your email: its version, your Mac, and crash and freeze reports. Never your pages, tabs or history. Show Report lets you read it first.",
                             confirmTitle: "Email Report", alternateTitle: "Show Report") { choice in
-            guard choice != .cancel, let report = write() else { return }
-            switch choice {
-            case .confirm: email(report, in: controller)
-            case .alternate: NSWorkspace.shared.activateFileViewerSelecting([report])
-            case .cancel: break
+            guard choice != .cancel else { return }
+            Task { @MainActor in
+                // Written away from the window, so it never stops; anything slower than a moment says it's working.
+                let notice = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    if !Task.isCancelled { Toast.working("Writing report…", in: controller) }
+                }
+                let report = await write()
+                notice.cancel()
+                Toast.hide(in: controller)
+                guard let report else {
+                    Toast.show("Couldn’t write the report", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    return
+                }
+                if choice == .confirm { email(report, in: controller) } else { NSWorkspace.shared.activateFileViewerSelecting([report]) }
             }
         }
     }
@@ -41,18 +51,20 @@ enum ProblemReport {
         Toast.show("Attach the report from Finder to your email", symbol: "paperclip", duration: 6, in: controller)
     }
 
-    /// Writes the report and returns where, or nil if it couldn't be saved.
-    static func write() -> URL? {
-        try? FileManager.default.createDirectory(at: CrashReports.folder, withIntermediateDirectories: true)
-        do {
-            try Data(text.utf8).write(to: file, options: .atomic)
-            return file
-        } catch {
-            return nil
-        }
+    /// Writes the report and returns where, or nil if it couldn't be saved. What's open is read here, the rest
+    /// (the crash reports on disk, the file itself) away from the main thread.
+    static func write() async -> URL? {
+        let summary = openNow
+        let destination = file
+        return await Task.detached(priority: .userInitiated) { () -> URL? in
+            try? FileManager.default.createDirectory(at: CrashReports.folder, withIntermediateDirectories: true)
+            let text = summary + crashes
+            return (try? Data(text.utf8).write(to: destination, options: .atomic)) == nil ? nil : destination
+        }.value
     }
 
-    static var text: String {
+    /// Everything but the crash reports: versions, the Mac, what's open and the settings that matter.
+    static var openNow: String {
         var lines = ["Zigzag problem report", "Written \(Date().formatted(date: .abbreviated, time: .standard))", ""]
         lines.append(Feedback.versions.trimmingCharacters(in: .whitespacesAndNewlines))
         lines.append("Mac: \(systemValue("hw.model") ?? "unknown"), \(ProcessInfo.processInfo.physicalMemory / 1_073_741_824) GB memory, \(ProcessInfo.processInfo.activeProcessorCount) cores")
@@ -78,13 +90,17 @@ enum ProblemReport {
             lines.append("\(name) \(version), \(ExtensionStore.isEnabled(id) ? "on" : "off")")
         }
 
-        lines += ["", "Crashes and freezes, last two weeks"]
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// The crash and freeze reports kept on this Mac, read from disk.
+    nonisolated static var crashes: String {
+        var lines = ["", "Crashes and freezes, last two weeks"]
         let reports = CrashReports.recent
         if reports.isEmpty { lines.append("None reported by macOS") }
         for report in reports {
             lines.append("\(report.date.formatted(date: .abbreviated, time: .shortened)): \(report.summary)")
         }
-
         return lines.joined(separator: "\n") + "\n"
     }
 

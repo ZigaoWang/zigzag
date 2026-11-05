@@ -650,12 +650,15 @@ final class ToastView: FloatingPanelView {
     let icon = NSImageView()
     let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     let actionButton = PillButton(style: .plain)
+    /// Something under way ("Writing report…"): the ribbon turns where the icon goes.
+    let spinner = Spinner()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         icon.imageScaling = .scaleNone
         icon.contentTintColor = Tokens.Color.icon
         addSubview(icon)
+        addSubview(spinner)
         addSubview(label)
         addSubview(actionButton)
         actionButton.isHidden = true
@@ -693,6 +696,7 @@ final class ToastView: FloatingPanelView {
         var x = icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3
         if icon.image != nil {
             icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
+            spinner.frame = icon.frame
             x = icon.frame.maxX + Tokens.Space.x2
         }
         let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
@@ -738,9 +742,14 @@ enum Toast {
         show(text, symbol: symbol, action: action, duration: duration, over: controller.root.overlay, area: controller.root.cardFrame)
     }
 
+    /// Something that takes a moment: the spinner and what's happening, up until the next toast or `hide` replaces it.
+    static func working(_ text: String, in controller: BrowserWindowController) {
+        show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: controller.root.cardFrame, busy: true)
+    }
+
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, over host: NSView, area: NSRect) {
+                     duration: TimeInterval = 1.3, over host: NSView, area: NSRect, busy: Bool = false) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -753,7 +762,9 @@ enum Toast {
         }
         toast.label.stringValue = text
         Announcement.post(text, priority: action == nil ? .medium : .high)
-        toast.icon.image = symbol.map { Tokens.Symbol.image($0) }
+        // Busy: an empty picture keeps the icon's place for the spinner.
+        toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
+        busy ? toast.spinner.startAnimation(nil) : toast.spinner.stopAnimation(nil)
         toast.actionButton.isHidden = action == nil
         if let action {
             toast.actionButton.title = action.title
@@ -789,6 +800,8 @@ enum Toast {
             }
             toast.dismiss(always: true)
         }
+        // A busy toast stays until what replaces it.
+        guard duration < .greatestFiniteMagnitude else { return }
         let work = DispatchWorkItem { [weak toast] in
             MainActor.assumeIsolated {
                 state.hideWork = nil

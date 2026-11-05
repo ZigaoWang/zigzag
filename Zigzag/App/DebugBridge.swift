@@ -323,7 +323,7 @@ enum DebugBridge {
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
         case "reopenwindow": WindowManager.shared.reopenClosedWindow()
         case "whatsnew": WhatsNew.show(in: controller)
-        case "problemreport": if arg == "sheet" { ProblemReport.show(in: controller) } else { _ = ProblemReport.write() }
+        case "problemreport": if arg == "sheet" { ProblemReport.show(in: controller) } else { Task { _ = await ProblemReport.write() } }
         case "endsheet": if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet, returnCode: .cancel) }
         case "zoomin": controller.zoomIn(nil)
         case "zoomreset": controller.actualSize(nil)

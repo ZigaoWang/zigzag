@@ -6,9 +6,9 @@ import MetricKit
 /// (Help › Report a Problem). Only the last two weeks, and at most 20, are kept.
 final class CrashReports: NSObject, MXMetricManagerSubscriber {
     static let shared = CrashReports()
-    static let folder = Paths.support.appendingPathComponent("Diagnostics", isDirectory: true)
-    private static let keepFor: TimeInterval = 14 * 24 * 3600
-    private static let keepAtMost = 20
+    nonisolated static let folder = Paths.support.appendingPathComponent("Diagnostics", isDirectory: true)
+    nonisolated private static let keepFor: TimeInterval = 14 * 24 * 3600
+    nonisolated private static let keepAtMost = 20
 
     func start() {
         MXMetricManager.shared.add(self)
@@ -52,7 +52,7 @@ final class CrashReports: NSObject, MXMetricManagerSubscriber {
     }
 
     /// The reports kept now, newest first: when, and what happened.
-    static var recent: [(date: Date, summary: String, json: URL)] {
+    nonisolated static var recent: [(date: Date, summary: String, json: URL)] {
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         return files.filter { $0.pathExtension == "txt" }.compactMap { txt in
             guard let seconds = TimeInterval(txt.deletingPathExtension().lastPathComponent),
