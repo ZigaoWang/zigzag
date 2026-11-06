@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import os
 
 final class DownloadItem {
     enum State: Equatable { case downloading, paused, finished, failed, cancelled }
@@ -176,10 +177,20 @@ final class DownloadManager: NSObject {
     /// Follows a download's progress on its row: the first attempt, or the same row after a resume.
     private func attach(_ download: WKDownload, to item: DownloadItem) {
         item.download = download
+        // A fast download reports hundreds of times a second; the row, the Dock and every window hear of it four
+        // times a second, which is as often as anyone can read it.
+        let lastSent = OSAllocatedUnfairLock(initialState: Date.distantPast)
         item.progressObservation = download.progress.observe(\.fractionCompleted) { [weak self, weak item] progress, _ in
             let fraction = progress.fractionCompleted
             let completed = progress.completedUnitCount
             let total = progress.totalUnitCount
+            let due = lastSent.withLock { last -> Bool in
+                let now = Date()
+                guard fraction >= 1 || now.timeIntervalSince(last) >= 0.25 else { return false }
+                last = now
+                return true
+            }
+            guard due else { return }
             DispatchQueue.main.async {
                 guard let item else { return }
                 let now = Date()
