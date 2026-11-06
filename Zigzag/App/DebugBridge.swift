@@ -666,6 +666,17 @@ enum DebugBridge {
                 let found = all(root).filter { !$0.isHiddenOrHasHiddenAncestor }
                 if found.indices.contains(Int(arg) ?? 0) { found[Int(arg) ?? 0].openMenu() }
             }
+        case "focusview":
+            // focusview <Class>: keyboard focus on the first visible view of that class in any window (the wheel).
+            InteractiveView.debugKeyboardAccess = true
+            func views(_ v: NSView) -> [NSView] { [v] + v.subviews.flatMap(views) }
+            for window in NSApp.windows {
+                if let root = window.contentView?.superview,
+                   let found = views(root).first(where: { "\(type(of: $0))" == arg && !$0.isHiddenOrHasHiddenAncestor }) {
+                    debugLog("focusview \(arg): \(window.makeFirstResponder(found))")
+                    break
+                }
+            }
         case "keyfocus":
             // keyfocus <n>: keyboard focus on the nth drawn control in the window, as Tab with Full Keyboard Access gives it.
             InteractiveView.debugKeyboardAccess = true
