@@ -96,8 +96,14 @@ open Zigzag.xcodeproj
 ```
 
 Run the **Zigzag** scheme. Debug builds run as a separate app, "Zigzag Dev", with their own data, so they never
-touch your everyday Zigzag. To sign with your own Apple ID, set `DEVELOPMENT_TEAM` in `project.yml` and run
-`xcodegen generate` again.
+touch your everyday Zigzag.
+
+Signing is set up for my team. To build on your Mac, change two things in `project.yml` and run
+`xcodegen generate` again:
+
+- `DEVELOPMENT_TEAM`: your own team ID (Xcode › Settings › Accounts shows it).
+- The Debug `PRODUCT_BUNDLE_IDENTIFIER`: one of your own, such as `com.yourname.zigzag.dev`, since
+  `wang.zigao.zigzag.dev` is registered to my team.
 
 Run the tests:
 

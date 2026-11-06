@@ -5,7 +5,9 @@ open an issue first so we can agree on the shape of it before you spend time on 
 
 ## Build and run
 
-You need Xcode 26 or later and XcodeGen.
+You need macOS 15.4 or later, Xcode 26 or later and XcodeGen. Before the first build, set your own
+`DEVELOPMENT_TEAM` and Debug `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`, as the README's "Build from source"
+says.
 
 ```sh
 brew install xcodegen
