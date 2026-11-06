@@ -406,14 +406,17 @@ final class DownloadManager: NSObject {
 
     func remove(_ item: DownloadItem) {
         if item.state == .downloading { cancel(item) }
-        if item.state == .paused { discardPartial(item) }
+        if [.paused, .cancelled, .failed].contains(item.state) { discardPartial(item) }
         items.removeAll { $0 === item }
         changed.send(nil)
     }
 
     func clearFinished(isPrivate: Bool) {
-        // Paused downloads stay, like ones still running: Clear never throws away a half-finished file.
-        items.removeAll { ![.downloading, .paused].contains($0.state) && $0.isPrivate == isPrivate }
+        // Paused downloads stay, like ones still running: Clear never throws away a half-finished file. One that was
+        // canceled or failed is given up for good, and the part it left behind goes with it.
+        let cleared = items.filter { ![.downloading, .paused].contains($0.state) && $0.isPrivate == isPrivate }
+        for item in cleared where [.cancelled, .failed].contains(item.state) { discardPartial(item) }
+        items.removeAll { item in cleared.contains { $0 === item } }
         changed.send(nil)
     }
 
