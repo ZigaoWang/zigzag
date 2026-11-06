@@ -217,6 +217,18 @@ final class HistoryStore {
     func search(_ query: String, limit: Int = 12) -> [HistoryEntry] {
         let words = query.lowercased().split(separator: " ").map(String.init).filter { !$0.isEmpty }
         guard !words.isEmpty else { return [] }
+        // Asked again for the same text with nothing recorded since (the command bar does, when suggestions
+        // arrive): the last answer, rather than reading every visit once more.
+        let key = "\(limit)|\(words.joined(separator: " "))|\(sqlite3_total_changes(db))"
+        if let last = lastSearch, last.key == key { return last.results }
+        let results = runSearch(words, limit: limit)
+        lastSearch = (key, results)
+        return results
+    }
+
+    private var lastSearch: (key: String, results: [HistoryEntry])?
+
+    private func runSearch(_ words: [String], limit: Int) -> [HistoryEntry] {
         let clause = words.indices.map { "(url LIKE ?\($0 + 1) ESCAPE '\\' OR title LIKE ?\($0 + 1) ESCAPE '\\')" }.joined(separator: " AND ")
         let sql = "SELECT url, title, visit_count, last_visit FROM visits WHERE \(clause) ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit * 3)"
         guard let statement = prepare(sql) else { return [] }
