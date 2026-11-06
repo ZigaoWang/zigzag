@@ -51,10 +51,12 @@ targets:
     platform: macOS
     sources:
       - path: Zigzag
+        # Notes for whoever works on the design, not for the app.
+        excludes: [Design/DESIGN.md]
       # The release notes the app shows after an update: this version's section of the changelog.
       - path: CHANGELOG.md
         buildPhase: resources
-      # The licenses About Zigzag › Acknowledgements shows: the same files as the repository's, never a copy.
+      # The licenses About Zigzag › Acknowledgments shows: the same files as the repository's, never a copy.
       - path: LICENSE
         buildPhase: resources
       - path: THIRD_PARTY_NOTICES.md
