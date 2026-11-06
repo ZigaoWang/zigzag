@@ -655,11 +655,6 @@ extension Tab: WKNavigationDelegate {
             return (.cancel, preferences)
         }
 
-        // The page's ad blocking follows where it's going: allowed sites load without it.
-        if navigationAction.targetFrame?.isMainFrame ?? true, !showsExtensionPage {
-            ContentBlocker.apply(to: webView, for: url)
-        }
-
         // Going between an extension's pages and the web takes a different web view. Only an extension's page may
         // cross: a website sending you into an extension's own pages would get them a web view set up with the
         // extension's powers, so that's refused (Zigzag's own loads, from the address bar or an extension, swap in load).
@@ -696,6 +691,9 @@ extension Tab: WKNavigationDelegate {
         if isMainFrame {
             pdfFreshLoad = navigationAction.navigationType != .backForward
             pageIsGet = (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
+            // The page's ad blocking follows where it's going: allowed sites load without it. Only now, once it's
+            // going there: a link opened elsewhere leaves this page's blocking as it was.
+            if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
         }
         return (.allow, preferences)
     }
