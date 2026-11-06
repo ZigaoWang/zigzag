@@ -43,10 +43,20 @@ extension BrowserWindowController {
         sidebarUndo.registerUndo(withTarget: self) { controller in
             // Changed since (an import, another window): putting back the old copy would undo those too.
             guard controller.libraryUnchanged(since: after) else { return }
+            Self.closeTabs(inSpacesGoneFrom: before)
             Library.shared.restore(before)
             controller.registerLibraryUndo(name, restoring: after, redo: before)
         }
         sidebarUndo.setActionName(name)
+    }
+
+    /// Undoing New Space takes the space away: the tabs opened in it since close first, the way closing any tab
+    /// does, so ⇧⌘T still brings each one back.
+    static func closeTabs(inSpacesGoneFrom snapshot: Library.Snapshot) {
+        let gone = Set(Library.shared.spaces.map(\.id)).subtracting(snapshot.spaceIDs)
+        for window in WindowManager.shared.controllers {
+            for id in gone { window.tabManager.close(window.tabManager.tabs(in: id)) }
+        }
     }
 
     /// Whether the library is still as a change left it; if not, says why ⌘Z did nothing.

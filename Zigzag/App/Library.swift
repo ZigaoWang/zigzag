@@ -1170,6 +1170,7 @@ final class Library {
         fileprivate let spaces: [SpaceInfo]
         fileprivate let favorites: [Bookmark]
         fileprivate let favoriteSplits: [PinnedSplit]
+        var spaceIDs: Set<UUID> { Set(spaces.map(\.id)) }
     }
 
     var snapshot: Snapshot { Snapshot(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits) }
