@@ -63,7 +63,6 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 - No Little Arc. Links from other apps open as a tab in your window.
 - No Boosts, Easels, Notes, or AI features.
 - Some Chrome extension APIs aren't there yet: tab groups, side panel, downloads, bookmarks and history, and Google sign-in inside an extension. Bitwarden installs, but its popup doesn't show.
-- Chrome bookmarks come over without their folders.
 - The ad blocking lists update with Zigzag, not on their own.
 - macOS 15.4 or later only.
 
