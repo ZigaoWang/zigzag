@@ -17,6 +17,8 @@ nonisolated struct ImportBatch: Sendable {
     struct Bookmark: Sendable {
         let url: URL
         let title: String
+        /// The folders it was in, outermost first ("Work", "Docs"); empty at the top level.
+        var folders: [String] = []
     }
 
     var logins: [Login] = []

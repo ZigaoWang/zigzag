@@ -727,13 +727,37 @@ final class Library {
     }
 
     /// Many at the end of a space in one change (an import of thousands), saved and shown once.
-    func appendBookmarks(_ new: [(url: URL, title: String)], to spaceID: UUID) -> [Bookmark] {
+    /// With `folders`, each page's folder path (outermost first): the folders are made, nested as they were, with the
+    /// pages in them; a folder of the same name in the same place is used again.
+    func appendBookmarks(_ new: [(url: URL, title: String)], to spaceID: UUID, folders paths: [[String]] = []) -> [Bookmark] {
         guard let s = self.index(of: spaceID), !new.isEmpty else { return [] }
         let added = new.map { Bookmark(id: UUID(), url: $0.url, title: $0.title) }
         spaces[s].bookmarks += added
+        let folders = Self.filed(added.map(\.id), paths: paths, into: spaces[s].folders ?? [])
+        if !folders.isEmpty { spaces[s].folders = folders }
         tidyFolders(s)
         commit()
         return added
+    }
+
+    /// Puts pages in folders by their paths (outermost first), making the folders that aren't there yet, nested as
+    /// the paths say; a folder of the same name in the same place is used again. Deeper than four levels flattens.
+    nonisolated static func filed(_ ids: [UUID], paths: [[String]], into existing: [BookmarkFolder]) -> [BookmarkFolder] {
+        var folders = existing
+        func folder(_ path: ArraySlice<String>, parent: UUID?) -> Int? {
+            guard let name = path.first else { return nil }
+            let at = folders.firstIndex { $0.name == name && $0.parentID == parent } ?? {
+                var made = BookmarkFolder(name: name)
+                made.parentID = parent
+                folders.append(made)
+                return folders.count - 1
+            }()
+            return path.count == 1 ? at : folder(path.dropFirst(), parent: folders[at].id)
+        }
+        for (id, path) in zip(ids, paths) where !path.isEmpty {
+            if let f = folder(path.prefix(4), parent: nil) { folders[f].bookmarkIDs.append(id) }
+        }
+        return folders
     }
 
     func removeBookmark(_ id: UUID) { removeBookmarks([id]) }

@@ -358,12 +358,14 @@ enum ImportCoordinator {
         let spaceName = "From \(name)"
         let space = Library.shared.spaces.first { $0.name == spaceName } ?? Library.shared.addSpace(name: spaceName)
         var known = Set((Library.shared.spaces.first { $0.id == space.id }?.bookmarks ?? []).map { TabManager.normalize($0.url) })
-        var new: [(url: URL, title: String)] = []
+        var new: [(url: URL, title: String)] = [], paths: [[String]] = []
         for bookmark in bookmarks where known.insert(TabManager.normalize(bookmark.url)).inserted {
             new.append((bookmark.url, bookmark.title))
+            paths.append(bookmark.folders)
         }
-        // All in one change: thousands of bookmarks one at a time would redraw every window thousands of times.
-        let added = Library.shared.appendBookmarks(new, to: space.id)
+        // All in one change: thousands of bookmarks one at a time would redraw every window thousands of times. Their
+        // folders come over as folders.
+        let added = Library.shared.appendBookmarks(new, to: space.id, folders: paths)
         // Icons for the first ones now; the sidebar fetches the rest for the rows it shows.
         for bookmark in added.prefix(40) { FaviconStore.shared.prefetch(for: bookmark.url) }
         return added.count

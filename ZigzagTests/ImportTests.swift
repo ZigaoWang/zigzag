@@ -96,6 +96,19 @@ struct CSVImportTests {
         #expect(logins[0].password.matches(SecretString("he said \"hi\"")))
     }
 
+    /// Imported bookmarks keep their folders, nested as they were, and pages in the same folder share it.
+    @Test func bookmarkFoldersComeOver() {
+        let ids = (0..<4).map { _ in UUID() }
+        let folders = Library.filed(ids, paths: [["Work"], ["Work", "Docs"], [], ["Work"]], into: [])
+        #expect(folders.count == 2)
+        let work = folders.first { $0.name == "Work" }, docs = folders.first { $0.name == "Docs" }
+        #expect(work?.parentID == nil)
+        #expect(docs?.parentID == work?.id)
+        #expect(work?.bookmarkIDs == [ids[0], ids[3]])
+        #expect(docs?.bookmarkIDs == [ids[1]])
+        #expect(Library.filed([UUID()], paths: [["A", "B", "C", "D", "E", "F"]], into: []).count == 4)
+    }
+
     /// What Passwords › Export writes comes back whole, one-time codes included.
     @Test func readsZigzagsOwnExport() throws {
         let (format, logins) = try logins("name,url,username,password,note,otpauth\nGitHub,https://github.com,octo,p,,otpauth://totp/x\n")

@@ -30,17 +30,22 @@ nonisolated enum SafariImporter {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent("Bookmarks.plist")),
               let root = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { return [] }
         var result: [ImportBatch.Bookmark] = []
-        func walk(_ node: [String: Any]) {
+        // Each page with the folders it was in. Safari's own top folders (Favorites, Bookmarks Menu) aren't yours.
+        func walk(_ node: [String: Any], in path: [String], depth: Int) {
             // Reading List is a separate idea; it stays in Safari.
             if node["Title"] as? String == "com.apple.ReadingList" { return }
             if node["WebBookmarkType"] as? String == "WebBookmarkTypeLeaf", let string = node["URLString"] as? String,
                let url = URL(string: string), url.scheme == "http" || url.scheme == "https" {
                 let title = (node["URIDictionary"] as? [String: Any])?["title"] as? String
-                result.append(ImportBatch.Bookmark(url: url, title: title ?? url.host() ?? string))
+                result.append(ImportBatch.Bookmark(url: url, title: title ?? url.host() ?? string, folders: path))
             }
-            for child in node["Children"] as? [[String: Any]] ?? [] { walk(child) }
+            for child in node["Children"] as? [[String: Any]] ?? [] {
+                let isFolder = child["WebBookmarkType"] as? String == "WebBookmarkTypeList"
+                let name = (child["Title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"
+                walk(child, in: isFolder && depth >= 1 ? path + [name] : path, depth: depth + 1)
+            }
         }
-        walk(root)
+        walk(root, in: [], depth: 0)
         return result
     }
 

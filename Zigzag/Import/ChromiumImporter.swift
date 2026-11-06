@@ -279,15 +279,19 @@ nonisolated enum ChromiumImporter {
         guard let data = try? Data(contentsOf: file), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let roots = json["roots"] as? [String: Any] else { return [] }
         var result: [ImportBatch.Bookmark] = []
-        func walk(_ node: [String: Any]) {
+        // Each page with the folders it was in; the roots themselves (Bookmarks Bar, Other) aren't folders of yours.
+        func walk(_ node: [String: Any], in path: [String]) {
             if node["type"] as? String == "url", let string = node["url"] as? String, let url = URL(string: string),
                url.scheme == "http" || url.scheme == "https" {
-                result.append(ImportBatch.Bookmark(url: url, title: node["name"] as? String ?? url.host() ?? string))
+                result.append(ImportBatch.Bookmark(url: url, title: node["name"] as? String ?? url.host() ?? string, folders: path))
             }
-            for child in node["children"] as? [[String: Any]] ?? [] { walk(child) }
+            for child in node["children"] as? [[String: Any]] ?? [] {
+                let inner = child["type"] as? String == "folder" ? path + [(child["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"] : path
+                walk(child, in: inner)
+            }
         }
         // The bookmarks bar first, as it appears in the browser.
-        for name in ["bookmark_bar", "other", "synced"] { if let root = roots[name] as? [String: Any] { walk(root) } }
+        for name in ["bookmark_bar", "other", "synced"] { if let root = roots[name] as? [String: Any] { walk(root, in: []) } }
         return result
     }
 
