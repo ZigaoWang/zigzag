@@ -167,7 +167,7 @@ final class SitePanel: FloatingPanelView {
             }))
         }
         if tab.isArticle || readerOn {
-            specs.append(("doc.plaintext", "Reader", readerOn ? "Hide Reader" : "Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
+            specs.append(("doc.plaintext", "Reader", readerOn ? "Hide Reader" : "Show Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
         }
         if tab.foreignLanguage != nil || tab.isTranslated {
             specs.append(("translate", tab.isTranslated ? "Original" : "Translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
