@@ -60,6 +60,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Onboarding not finished: it comes first, instead of the window that was waiting behind it.
         let restored = WindowManager.needsOnboarding ? false : WindowManager.shared.restoreSession()
+        // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
+        MoveToApplications.offerWhenReady()
         launched = true
         if !pendingURLs.isEmpty {
             if !restored { WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false) }
