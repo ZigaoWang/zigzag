@@ -5,6 +5,32 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-11-06
+
+### New
+- Help › Report a Problem writes a short report and attaches it to an email: your Zigzag and Mac, what went wrong lately and on which sites, crash and freeze reports, and extension errors. Never the pages' addresses, your tabs or history, and nothing is sent until you send it. Show Report lets you read it first.
+- Zigzag keeps a record of what goes wrong as it happens, for that report: pages that didn't load or stopped, pop-ups blocked or opened, questions sites asked and your answers, errors pages threw, moments Zigzag froze, and whether it last quit unexpectedly. It stays on your Mac, and private windows never name their sites in it.
+- Crash and freeze reports macOS collects for Zigzag are kept on your Mac for two weeks, to go with a report.
+- Coming back from System Settings during setup checks browser access again by itself.
+
+### Fixed
+- An edited favorite opens its new address, not the old one.
+- A slow History search can't show its results over a newer one.
+- Pop-ups open whole on the display they belong on, never off screen.
+- A pop-up that fails to load says why instead of staying blank.
+- Links in a pop-up open as tabs in your window, not as more pop-ups.
+- A pop-up asking to open an app shows the question in front instead of behind it.
+- Page dialogs and sign-ins ask one at a time instead of stacking, and several asking for the same sign-in share one answer.
+- Blocking a page's dialogs ends when the page reloads, as in Safari.
+- Space dots keep a size you can click with many spaces, and scroll to keep yours in view.
+- In the tab overview, a long space name ends in "…", the count sits right beside the name, and while searching it says how many match.
+- The site panel's actions wrap into two rows in a narrow sidebar instead of cutting off their names.
+- The rename panel fits small windows and waits for a name.
+- Settings lists every site with a choice made for it, not just the first 40.
+- What's New keeps keys from the window behind it, scrolls with the arrow keys and Space, and closes with ⌘W.
+- In setup, checkmarks are readable in dark mode, and Safari's password note shows the file link it mentions.
+- Show in Finder in Downloads can be reached from the keyboard and VoiceOver, VoiceOver names what's playing, and it reads menu items as you move through them.
+
 ## [0.5.12] - 2026-11-05
 
 ### New
@@ -493,7 +519,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.12...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.13...HEAD
+[0.5.13]: https://github.com/ZigaoWang/zigzag/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/ZigaoWang/zigzag/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/ZigaoWang/zigzag/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/ZigaoWang/zigzag/compare/v0.5.9...v0.5.10
