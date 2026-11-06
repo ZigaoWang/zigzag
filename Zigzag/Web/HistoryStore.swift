@@ -42,6 +42,20 @@ final class HistoryStore {
         }
     }
 
+    /// Runs a removal on the history in every update backup too, erasing it there as here.
+    private static func scrubBackups(_ sql: String) {
+        for backup in ProfileBackup.all() {
+            let file = backup.appendingPathComponent("History.sqlite")
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            var copy: OpaquePointer?
+            guard sqlite3_open_v2(file.path, &copy, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { sqlite3_close(copy); continue }
+            sqlite3_exec(copy, "PRAGMA secure_delete=ON", nil, nil, nil)
+            sqlite3_exec(copy, sql, nil, nil, nil)
+            sqlite3_exec(copy, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil)
+            sqlite3_close(copy)
+        }
+    }
+
     /// Opens the file and makes sure it holds History's table; false when it isn't a database SQLite can use.
     private func open(_ path: String) -> Bool {
         guard sqlite3_open(path, &db) == SQLITE_OK else { return false }
@@ -147,6 +161,8 @@ final class HistoryStore {
         }
         // The log the deleted rows passed through goes too.
         exec("PRAGMA wal_checkpoint(TRUNCATE)")
+        // And the copies kept from before each update: cleared means cleared there as well.
+        Self.scrubBackups(date.map { "DELETE FROM visits WHERE last_visit >= \($0.timeIntervalSince1970)" } ?? "DELETE FROM visits")
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date),
                               pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date))
     }
@@ -161,6 +177,8 @@ final class HistoryStore {
             sqlite3_step(statement)
             sqlite3_finalize(statement)
         }
+        let quoted = urls.map { "'" + $0.absoluteString.replacingOccurrences(of: "'", with: "''") + "'" }.joined(separator: ",")
+        if !urls.isEmpty { Self.scrubBackups("DELETE FROM visits WHERE url IN (\(quoted))") }
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls), pdfPlaces: [:], icons: nil)
     }
 
