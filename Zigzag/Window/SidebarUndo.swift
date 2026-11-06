@@ -1,12 +1,15 @@
 import AppKit
+import WebKit
 
 /// ⌘Z for everything you do in the sidebar. Each action registers its own inverse, and the inverse registers the redo.
 extension BrowserWindowController {
-    /// Routes ⌘Z: text fields keep their own undo; the page keeps it when its edit is newer than the sidebar's.
+    /// Routes ⌘Z: text fields keep their own undo; the page keeps it when you worked in it after the sidebar's last
+    /// change. A web app's own undo (Figma, Docs) never shows in an undo manager, so the times alone decide.
     func handleUndoKey(redo: Bool) -> Bool {
         let responder = window?.firstResponder
         if responder is NSText { return false }
         guard redo ? sidebarUndo.canRedo : sidebarUndo.canUndo else { return false }
+        if responder is WKWebView, UndoClock.lastPageEdit > UndoClock.lastSidebarEdit { return false }
         if let page = (responder as? NSView)?.undoManager, page !== sidebarUndo, redo ? page.canRedo : page.canUndo,
            UndoClock.lastPageEdit > UndoClock.lastSidebarEdit {
             return false
@@ -237,8 +240,10 @@ extension BrowserWindowController {
 
 enum UndoClock {
     static var lastSidebarEdit = Date.distantPast
-    /// Set by typing into a page (see BrowserWindow.sendEvent).
+    /// Set by typing into a page or clicking in one (see BrowserWindow.sendEvent).
     static var lastPageEdit = Date.distantPast
+    /// The last click or key you gave a page yourself, which a page's script can't fake.
+    static var lastPageInput = Date.distantPast
     private static var token: NSObjectProtocol?
 
     static func start() {

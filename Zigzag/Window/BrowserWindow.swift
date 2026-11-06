@@ -87,9 +87,24 @@ final class BrowserWindow: NSWindow {
         return super.performKeyEquivalent(with: event)
     }
 
+    private static func isInPage(_ view: NSView) -> Bool {
+        var view: NSView? = view
+        while let current = view {
+            if current is WKWebView { return true }
+            view = current.superview
+        }
+        return false
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, !event.modifierFlags.contains(.command), firstResponder is WKWebView {
             UndoClock.lastPageEdit = Date()
+            UndoClock.lastPageInput = Date()
+        }
+        // A click in a page counts too: a web app (Figma, Docs) keeps its own undo, which a click can change.
+        if event.type == .leftMouseDown, contentView?.hitTest(event.locationInWindow).map(Self.isInPage) == true {
+            UndoClock.lastPageEdit = Date()
+            UndoClock.lastPageInput = Date()
         }
         if let eventInterceptor, eventInterceptor(event) { return }
         if routeTitlebarEvent(event) { return }
