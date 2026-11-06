@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import SQLite3
 @testable import Zigzag
 
 /// Known answers made outside Zigzag (Python's PBKDF2 and openssl), so these check Chromium's real scheme,
@@ -107,6 +108,31 @@ struct CSVImportTests {
         #expect(work?.bookmarkIDs == [ids[0], ids[3]])
         #expect(docs?.bookmarkIDs == [ids[1]])
         #expect(Library.filed([UUID()], paths: [["A", "B", "C", "D", "E", "F"]], into: []).count == 4)
+    }
+
+    /// Firefox's bookmarks come with their folders, its own roots left out.
+    @Test func firefoxBookmarksKeepTheirFolders() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("places-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: file) }
+        var db: OpaquePointer?
+        #expect(sqlite3_open(file.path, &db) == SQLITE_OK)
+        sqlite3_exec(db, """
+        CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url TEXT);
+        CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER, parent INTEGER, position INTEGER, title TEXT, guid TEXT);
+        INSERT INTO moz_bookmarks VALUES (1, 2, NULL, 0, 0, '', 'root________');
+        INSERT INTO moz_bookmarks VALUES (3, 2, NULL, 1, 0, 'toolbar', 'toolbar_____');
+        INSERT INTO moz_bookmarks VALUES (10, 2, NULL, 3, 0, 'Work', 'aaaaaaaaaaaa');
+        INSERT INTO moz_bookmarks VALUES (11, 2, NULL, 10, 0, 'Docs', 'bbbbbbbbbbbb');
+        INSERT INTO moz_places VALUES (1, 'https://a.test/'), (2, 'https://b.test/'), (3, 'https://c.test/');
+        INSERT INTO moz_bookmarks VALUES (20, 1, 1, 3, 1, 'Top', 'cccccccccccc');
+        INSERT INTO moz_bookmarks VALUES (21, 1, 2, 10, 1, 'In Work', 'dddddddddddd');
+        INSERT INTO moz_bookmarks VALUES (22, 1, 3, 11, 0, 'In Docs', 'eeeeeeeeeeee');
+        """, nil, nil, nil)
+        sqlite3_close(db)
+        let found = Dictionary(uniqueKeysWithValues: FirefoxImporter.bookmarks(at: file).map { ($0.title, $0.folders) })
+        #expect(found["Top"] == [])
+        #expect(found["In Work"] == ["Work"])
+        #expect(found["In Docs"] == ["Work", "Docs"])
     }
 
     /// What Passwords › Export writes comes back whole, one-time codes included.

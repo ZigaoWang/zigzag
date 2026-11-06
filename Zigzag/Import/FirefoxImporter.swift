@@ -199,13 +199,28 @@ nonisolated enum FirefoxImporter {
 
     // MARK: Bookmarks and history
 
-    private static func bookmarks(at file: URL) -> [ImportBatch.Bookmark] {
+    static func bookmarks(at file: URL) -> [ImportBatch.Bookmark] {
         guard FileManager.default.fileExists(atPath: file.path), let db = SQLiteReader(file) else { return [] }
+        // Folders first, by id, so each page can say which folders it's in. Firefox's own roots (the menu, the
+        // toolbar, Other Bookmarks) have guids ending in "_____" and aren't folders of yours.
+        var folders: [Int64: (name: String, parent: Int64, isRoot: Bool)] = [:]
+        db.rows("SELECT id, title, parent, guid FROM moz_bookmarks WHERE type = 2") { row in
+            folders[row.int(0)] = (row.string(1), row.int(2), row.string(3).hasSuffix("_____") || row.int(0) == row.int(2))
+        }
+        func path(_ id: Int64) -> [String] {
+            var names: [String] = [], at = id, steps = 0
+            while let folder = folders[at], !folder.isRoot, steps < 32 {
+                names.insert(folder.name.isEmpty ? "Folder" : folder.name, at: 0)
+                at = folder.parent
+                steps += 1
+            }
+            return names
+        }
         var result: [ImportBatch.Bookmark] = []
-        db.rows("SELECT p.url, b.title FROM moz_bookmarks b JOIN moz_places p ON p.id = b.fk WHERE b.type = 1 ORDER BY b.parent, b.position") { row in
+        db.rows("SELECT p.url, b.title, b.parent FROM moz_bookmarks b JOIN moz_places p ON p.id = b.fk WHERE b.type = 1 ORDER BY b.parent, b.position") { row in
             guard let url = URL(string: row.string(0)), url.scheme == "http" || url.scheme == "https" else { return }
             let title = row.string(1)
-            result.append(ImportBatch.Bookmark(url: url, title: title.isEmpty ? (url.host() ?? url.absoluteString) : title))
+            result.append(ImportBatch.Bookmark(url: url, title: title.isEmpty ? (url.host() ?? url.absoluteString) : title, folders: path(row.int(2))))
         }
         return result
     }
