@@ -897,7 +897,7 @@ extension Tab: WKNavigationDelegate {
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
         certificateWarningHost = ErrorPage.offersProceed(nsError) ? failingURL?.host()?.lowercased() : nil
         certificateWarningCertificate = certificateWarningHost == nil ? nil : CertificateExceptions.certificate(in: nsError)
-        Diagnostics.note("Page didn't load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
+        Diagnostics.note("Page didn’t load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
         ErrorPage.show(error: nsError, url: failingURL, in: webView)
     }
 

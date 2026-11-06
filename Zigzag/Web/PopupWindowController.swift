@@ -194,7 +194,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
-        Diagnostics.note("Pop-up didn't load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
+        Diagnostics.note("Pop-up didn’t load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
         ErrorPage.show(error: nsError, url: failingURL, in: webView, canProceed: false)
     }
 

@@ -36,7 +36,7 @@ enum PageDialogs {
                                                showsCancel: showsCancel, offersBlock: count >= 2, page: frame.webView)
         if case .blocked = result, let page { blocked[page] = true }
         if case .blocked = result {
-            Diagnostics.note("Page's dialogs blocked", site: frame.webView?.url?.host(), isPrivate: frame.webView?.configuration.websiteDataStore.isPersistent == false)
+            Diagnostics.note("Page’s dialogs blocked", site: frame.webView?.url?.host(), isPrivate: frame.webView?.configuration.websiteDataStore.isPersistent == false)
         }
         return result
     }
@@ -193,7 +193,7 @@ enum AuthenticationPrompt {
     @MainActor
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
                             page: WKWebView?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn't work" : "Site asked to sign in", site: challenge.protectionSpace.host,
+        Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: page?.configuration.websiteDataStore.isPersistent != true)
         let message = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
         let result = await PageDialogSheet.ask(in: window, title: "Sign in to \(challenge.protectionSpace.host)", message: message,
