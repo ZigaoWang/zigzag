@@ -300,6 +300,7 @@ final class Tab: NSObject {
             return
         }
         let webView = ensureWebView()
+        ownLoadPending = true
         Self.load(url, in: webView)
         refreshSettingsPage()
     }
@@ -316,6 +317,10 @@ final class Tab: NSObject {
 
     /// True while the web view was built for an extension's own pages (settings, dashboards).
     private var showsExtensionPage = false
+    /// A navigation the page started is on its way: its address waits until it commits (see followAddress).
+    private var addressWaitsForCommit = false
+    /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once.
+    private var ownLoadPending = false
     /// When the page last started a download without a click, and when a frame in it was last clicked into.
     private var lastScriptDownload: Date?
     private var frameClickedAt: Date?
@@ -386,13 +391,38 @@ final class Tab: NSObject {
         return FileManager.default.fileExists(atPath: saved.path) ? folder : file
     }
 
+    /// Takes the web view's address as the tab's: the page shown now, or one Zigzag itself is loading.
+    private func followAddress(of wv: WKWebView) {
+        guard let url = wv.url else { return }
+        let hostChanged = url.host() != self.url?.host()
+        if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
+        if url != self.url, self.foreignLanguage != nil || self.isTranslated {
+            self.foreignLanguage = nil
+            self.isTranslated = false
+            self.changed.send(.language)
+        }
+        let changedPage = url != self.url
+        self.url = url
+        self.navigatedSinceSave = true
+        // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
+        if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
+        // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
+        if hostChanged {
+            self.favicon = FaviconStore.shared.cachedIcon(for: url)
+            self.changed.send(.favicon)
+            if self.favicon == nil { self.refreshFavicon() }
+        }
+        self.changed.send(.url)
+        self.refreshSettingsPage()
+    }
+
     func goBack() {
         if canGoBack { webView?.goBack() } else if returnsToOpener { host?.tabWantsToReturnToOpener(self) }
     }
     func goForward() { webView?.goForward() }
     func reload() {
         guard let webView else { ensureWebView(); return }
-        if webView.url == nil, let url { webView.load(URLRequest(url: url)) } else { webView.reload() }
+        if webView.url == nil, let url { ownLoadPending = true; webView.load(URLRequest(url: url)) } else { webView.reload() }
     }
     func reloadFromOrigin() { webView?.reloadFromOrigin() }
     func stopLoading() { webView?.stopLoading() }
@@ -507,27 +537,10 @@ final class Tab: NSObject {
             },
             webView.observe(\.url, options: [.new]) { [weak self] wv, _ in
                 MainActor.assumeIsolated {
-                    guard let self, let url = wv.url else { return }
-                    let hostChanged = url.host() != self.url?.host()
-                    if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
-                    if url != self.url, self.foreignLanguage != nil || self.isTranslated {
-                        self.foreignLanguage = nil
-                        self.isTranslated = false
-                        self.changed.send(.language)
-                    }
-                    let changedPage = url != self.url
-                    self.url = url
-                    self.navigatedSinceSave = true
-                    // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too.
-                    if changedPage, !wv.isLoading { self.recordHistory(url, title: nil) }
-                    // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
-                    if hostChanged {
-                        self.favicon = FaviconStore.shared.cachedIcon(for: url)
-                        self.changed.send(.favicon)
-                        if self.favicon == nil { self.refreshFavicon() }
-                    }
-                    self.changed.send(.url)
-                    self.refreshSettingsPage()
+                    // A page sending the tab somewhere: the address stays on the page you see until the new one
+                    // arrives, so a navigation that never completes can't show another site's name over this page.
+                    guard let self, !(self.addressWaitsForCommit && wv.isLoading) else { return }
+                    self.followAddress(of: wv)
                 }
             },
             webView.observe(\.isLoading, options: [.new]) { [weak self] wv, _ in
@@ -707,6 +720,9 @@ extension Tab: WKNavigationDelegate {
             // The page's ad blocking follows where it's going: allowed sites load without it. Only now, once it's
             // going there: a link opened elsewhere leaves this page's blocking as it was.
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
+            // Back, Forward and Reload go to pages you've had; anything else the page started waits to show.
+            addressWaitsForCommit = !ownLoadPending && ![.backForward, .reload].contains(navigationAction.navigationType)
+            ownLoadPending = false
         }
         return (.allow, preferences)
     }
@@ -776,6 +792,9 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // The new page is here: its address shows.
+        addressWaitsForCommit = false
+        if webView.url != url { followAddress(of: webView) }
         // A sign-in menu belongs to the page it opened on.
         Autofill.shared.hide()
         // Its dialogs start over: blocking them was for the page you blocked, not a reload of it.
@@ -812,6 +831,7 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // Back, Forward and reload end here too, even where the address stays the same.
         navigatedSinceSave = true
+        addressWaitsForCommit = false
         if let until = landingUntil, Date() < until, let url = webView.url { pinnedLanding = url }
         checkForPDF(webView)
         refreshFavicon()
@@ -842,6 +862,9 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // It never came: the address goes back to the page still showing.
+        addressWaitsForCommit = false
+        if webView.url != url { followAddress(of: webView) }
         handle(error, in: webView)
     }
 
