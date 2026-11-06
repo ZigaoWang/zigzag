@@ -91,14 +91,34 @@ enum PageDialogs {
 /// Sites whose certificate you chose to trust anyway, from the warning page. Only until Zigzag quits, as Safari does.
 /// Kept per website data store, so a private window's choices stay in that window and go when it does.
 @MainActor enum CertificateExceptions {
-    private static let hosts = NSMapTable<WKWebsiteDataStore, NSMutableSet>.weakToStrongObjects()
-    static func allow(_ host: String, in store: WKWebsiteDataStore) {
-        let set = hosts.object(forKey: store) ?? NSMutableSet()
-        set.add(host.lowercased())
-        hosts.setObject(set, forKey: store)
+    /// Per data store, each host's trusted certificate, as Safari keeps it: the one you were warned about and
+    /// chose to trust, not whatever that host shows next. (Empty data stands for a warning that came without one.)
+    private static let trusted = NSMapTable<WKWebsiteDataStore, NSMutableDictionary>.weakToStrongObjects()
+    static func allow(_ host: String, certificate: Data?, in store: WKWebsiteDataStore) {
+        let hosts = trusted.object(forKey: store) ?? NSMutableDictionary()
+        hosts[host.lowercased()] = certificate ?? Data()
+        trusted.setObject(hosts, forKey: store)
     }
-    static func allows(_ host: String, in store: WKWebsiteDataStore) -> Bool {
-        hosts.object(forKey: store)?.contains(host.lowercased()) ?? false
+    static func allows(_ host: String, trust: SecTrust, in store: WKWebsiteDataStore) -> Bool {
+        guard let certificate = trusted.object(forKey: store)?[host.lowercased()] as? Data else { return false }
+        return certificate.isEmpty || leaf(of: trust) == certificate
+    }
+
+    /// The site's own certificate (not its issuers'), as data to compare.
+    nonisolated static func leaf(of trust: SecTrust) -> Data? {
+        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let first = chain.first else { return nil }
+        return SecCertificateCopyData(first) as Data
+    }
+
+    /// The certificate a failed load was shown, from its error.
+    nonisolated static func certificate(in error: NSError) -> Data? {
+        if let chain = error.userInfo["NSErrorPeerCertificateChainKey"] as? [SecCertificate], let first = chain.first {
+            return SecCertificateCopyData(first) as Data
+        }
+        if let value = error.userInfo[NSURLErrorFailingURLPeerTrustErrorKey], CFGetTypeID(value as CFTypeRef) == SecTrustGetTypeID() {
+            return leaf(of: value as! SecTrust)
+        }
+        return nil
     }
 
     /// The link the warning page's "Visit anyway" goes to; the tab catches it before it loads.
@@ -137,7 +157,7 @@ enum AuthenticationPrompt {
         let method = challenge.protectionSpace.authenticationMethod
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
-           await CertificateExceptions.allows(challenge.protectionSpace.host, in: store) {
+           await CertificateExceptions.allows(challenge.protectionSpace.host, trust: trust, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {

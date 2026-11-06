@@ -113,6 +113,8 @@ final class Tab: NSObject {
     private var reloadWhenShown = false
     /// The host whose certificate warning this tab last showed: the only one its "Visit anyway" link may trust.
     private var certificateWarningHost: String?
+    /// The certificate that warning was about: the one "Visit anyway" trusts.
+    private var certificateWarningCertificate: Data?
     let changed = Signal<Change>()
 
     private(set) var webView: BrowserWebView?
@@ -643,7 +645,7 @@ extension Tab: WKNavigationDelegate {
                 && webView.url?.host()?.lowercased() == certificateWarningHost
             if fromWarning, let real = CertificateExceptions.destination(of: url, warnedHost: certificateWarningHost, nonce: CertificateExceptions.nonce),
                let host = real.host() {
-                CertificateExceptions.allow(host, in: webView.configuration.websiteDataStore)
+                CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore)
                 certificateWarningHost = nil
                 DispatchQueue.main.async { [weak self] in self?.load(real) }
             }
@@ -839,6 +841,7 @@ extension Tab: WKNavigationDelegate {
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
         certificateWarningHost = ErrorPage.offersProceed(nsError) ? failingURL?.host()?.lowercased() : nil
+        certificateWarningCertificate = certificateWarningHost == nil ? nil : CertificateExceptions.certificate(in: nsError)
         Diagnostics.note("Page didn't load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
         ErrorPage.show(error: nsError, url: failingURL, in: webView)
     }
