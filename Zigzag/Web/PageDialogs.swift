@@ -243,7 +243,7 @@ enum ErrorPage {
         // Zigzag's own page, in the shared design: the surface, type and button History and Settings use, under the
         // wordmark drawn faint, as History's empty page has it.
         let html = """
-        <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+        <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
         <title>\(escape(url.host() ?? title))</title>
         <style>
         \(PageStyle.css(theme: Brand.Theme.for(webView)))
