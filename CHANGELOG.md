@@ -5,6 +5,65 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-11-06
+
+### New
+- A new About window: the version, Release Notes, Acknowledgments, the website, the source code on GitHub, who made it, and the license.
+- Acknowledgments lists every work Zigzag ships with and its license, and reads offline.
+- Opened from the disk image or a download, Zigzag offers to move itself to Applications, where it can update itself.
+- Right-click Zigzag in the Dock for a new window or a private one.
+- A page handed off from your iPhone or another Mac opens in Zigzag.
+- ⌘S saves the page, as in Safari.
+- The space editor's color wheel, sliders and direction knob work from the keyboard, with Full Keyboard Access.
+- In History, Delete removes the row you're on, and VoiceOver says so.
+
+### Fixed
+- A page can't make the address show another site while its own page stays on screen, in a tab or a pop-up.
+- The address shows a long site name's end (the part that says whose it is), a port that isn't the usual one, and the site behind a page a script made.
+- Extensions never see private windows, and never open tabs in them.
+- A website can't send a tab into an extension's own pages, or to Zigzag's Settings or History.
+- Frames and scripts can't save files to Downloads without a click.
+- Visit Anyway on a certificate warning trusts the certificate you were warned about, not any that site shows later.
+- A permission question ignores clicks on Allow for its first half second, so a click meant for the page can't land on it.
+- Mail, phone and FaceTime links open by themselves only from a real click on the page in front. A question to open an app, asked from another site's frame, names that site and isn't remembered, and an answer given on a secure page doesn't carry over to an insecure one.
+- Only the site you're on can ask for a password over its page; an image or frame from another site can't.
+- A page can ask to show notifications only right after you click.
+- Fill from My Card skips fields that are hidden, clipped, covered or far off the page.
+- Reader and the PDF viewer fetch without cookies a link from another site wouldn't carry, and Reader keeps nothing from a private page.
+- A page opened loose from Downloads can't read the rest of the folder.
+- Other apps can hand Zigzag only web links and files.
+- Clear History erases what it clears from the file, from the copies kept at updates, and from the sites noted for problem reports. Private windows leave no site names in that record.
+- A second copy of Zigzag (one opened from the disk image) hands over to the one running instead of saving over its tabs.
+- A busy page can't put off saving your tabs; they're saved within 10 seconds.
+- If preferences are reset, a profile you've used never goes back through onboarding, which used to save an empty window over your tabs.
+- A damaged history file is set aside and history starts afresh, instead of stopping quietly. A profile file that can't be read is set aside, never saved over, and a save that fails says so.
+- A link opened while onboarding is still up isn't lost at the next launch.
+- With Reduce Motion, switching spaces cross-fades instead of showing both lists at once.
+- Bookmarking a page keeps its tab's title; only a site's home page is shortened to the site's name.
+- ⌘Z goes to the page (Figma, Docs) once you've worked in it after a change in the sidebar.
+- Undoing New Space closes its tabs the usual way, so ⇧⌘T brings them back.
+- ⌘W on an empty space no longer closes the window and the tabs in its other spaces.
+- Now Playing lets go of a tab closed in the background, and a closing tab's sound stops at once.
+- A private window stays in its one space, and can't pin the page it's on in place of a pinned tab.
+- A peeked link that downloads a file closes the peek, and a peek opened as a tab while its window closes goes with it.
+- The energy warning's Close Tab closes the tab in whichever window holds it now.
+- Retrying a download picks up in the same row and file, and a canceled or failed download leaves no partial file once cleared.
+- Ad blocking changes only for a page that actually loads, not for a link opened in another tab.
+- An address with @ in its path (youtube.com/@name) opens instead of searching.
+- A password file picked after an import brings its passwords over.
+- Arc history comes over from every profile, with its latest visits.
+- Importing thousands of bookmarks no longer freezes Zigzag.
+- Exported passwords keep their one-time codes.
+- A strong password made without a username never replaces another saved login.
+- A sign-in inside another site's frame is offered for saving only once it worked.
+- Passwords work in a copy built and signed by someone else.
+- Zigzag uses less memory and energy: the sign-in menu lets go of closed pages, closed tabs let go of their pictures, download progress and the freeze watcher wake far less, Reader reads ahead only for the page in front, and the tab overview opens without decoding every picture.
+- The same History search typed twice in a row reads your history once.
+- Checking for battery power no longer risks a crash.
+- The local network and Downloads folder prompts say why Zigzag asks, and Get Info shows Zigzag's copyright.
+- A favorite's menu calls it a favorite, the whole-page screenshot has one name everywhere, the Reader tile says Show Reader, buttons that open a panel or a question end in "…", and a few descriptions in Settings and the guide read more clearly.
+- VoiceOver reads the space editor's names and color choices correctly, and the error page as English.
+
 ## [0.5.13] - 2026-11-06
 
 ### New
