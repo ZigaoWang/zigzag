@@ -226,6 +226,8 @@ final class TabManager {
     // MARK: Selecting
 
     func select(_ tab: Tab) {
+        // A tab closed since (one an old undo step or a stale button still points at) never comes back from here.
+        guard !tab.isClosed else { return }
         Autofill.shared.hide()
         // Favorites belong to every space: they open in the one you're in.
         if tab.isFavorite { tab.spaceID = currentSpaceID }

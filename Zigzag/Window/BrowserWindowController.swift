@@ -240,6 +240,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()
             desk.tabsChanged()
+            // A playing tab closed in the background: Now Playing lets it go.
+            updateNowPlaying()
         case .selection:
             showSelectedTab()
         case .space:
