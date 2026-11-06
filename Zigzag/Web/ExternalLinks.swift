@@ -13,6 +13,9 @@ enum ExternalLinks {
     private static var asking: Set<String> = []
     /// Asked and turned down this session: the page doesn't get to ask again until Zigzag restarts.
     private static var declined: Set<String> = []
+    /// Asked and put off (closed, or the tab moved on): not again from that site for a minute, so a page can't
+    /// keep putting the question back up.
+    private static var putOff: [String: Date] = [:]
 
     static func isExternal(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
@@ -21,6 +24,7 @@ enum ExternalLinks {
 
     /// Frames count too: meeting pages often open their app from a hidden frame, and the question keeps that honest.
     /// Only a page you can see asks; one in a background tab never puts a question over another site.
+    /// `isClick`: a real click or key started it (not a script's click()).
     static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView) {
         let scheme = url.scheme?.lowercased() ?? ""
         // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
@@ -39,11 +43,15 @@ enum ExternalLinks {
         }
         let host = webView.url?.host()?.lowercased() ?? ""
         let key = "\(host)|\(scheme)"
-        if isClick && everyday.contains(scheme) || !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) {
+        // Mail, phone and FaceTime open at once for a link you clicked in the page in front; from anywhere else
+        // (a hidden frame, a background tab, a script) they ask like any other app.
+        let clickedHere = isClick && isMainFrame && webView.window != nil
+        if clickedHere && everyday.contains(scheme) || !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) {
             NSWorkspace.shared.open(url)
             return
         }
-        guard let controller, webView.window != nil, !asking.contains(key), !declined.contains(key) else { return }
+        guard let controller, webView.window != nil, !asking.contains(key), !declined.contains(key),
+              putOff[key].map({ Date() > $0 }) ?? true else { return }
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
@@ -67,7 +75,7 @@ enum ExternalLinks {
             case .deny:
                 declined.insert(key)
             case .notNow:
-                break
+                putOff[key] = Date().addingTimeInterval(60)
             }
         }
     }

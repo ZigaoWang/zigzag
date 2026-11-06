@@ -688,7 +688,7 @@ extension Tab: WKNavigationDelegate {
         }
         if ExternalLinks.isExternal(url) {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
-                               isClick: navigationAction.navigationType == .linkActivated, from: webView)
+                               isClick: PopupNotice.isUserInitiated(navigationAction), from: webView)
             return (.cancel, preferences)
         }
 
