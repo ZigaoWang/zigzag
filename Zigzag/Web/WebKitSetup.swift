@@ -53,6 +53,8 @@ enum WebKitSetup {
             configuration.userContentController.add(PageFrames.shared, contentWorld: .defaultClient, name: PageFrames.messageName)
             ContentBlocker.attach(to: configuration)
             // Extension pages only: their uncaught errors go to the extensions log, so a page that stalls says why.
+            configuration.userContentController.addUserScript(PageErrors.script)
+            configuration.userContentController.add(PageErrors.shared, contentWorld: .page, name: PageErrors.messageName)
             configuration.userContentController.addUserScript(ExtensionPageErrors.script)
             configuration.userContentController.add(ExtensionPageErrors.shared, contentWorld: .page, name: ExtensionPageErrors.messageName)
         }
@@ -126,6 +128,51 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
         guard message.name == "zigzagHover", let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return }
         let text = message.body as? String ?? ""
         tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+    }
+}
+
+/// A website's uncaught errors and failed promises, and requests it makes that fail, for the diagnostics record: so
+/// "I click it and nothing happens" comes with the error the page hit. Only the message and the site, never the page's
+/// address or data (`Diagnostics.clean`), at most a few per page, and nothing from a private window.
+final class PageErrors: NSObject, WKScriptMessageHandler {
+    static let shared = PageErrors()
+    static let messageName = "zigzagPageError"
+
+    static let script = WKUserScript(source: """
+    (() => {
+      if (!/^https?:$/.test(location.protocol)) return;
+      let sent = 0;
+      const post = (kind, text) => {
+        if (++sent > 8) return;
+        try { window.webkit.messageHandlers.\(messageName).postMessage({ kind, text: String(text || '').slice(0, 300) }); } catch (e) {}
+      };
+      const where = (file, line) => { try { return ' (' + new URL(file).host + ':' + line + ')'; } catch (e) { return ''; } };
+      window.addEventListener('error', (e) => { if (e.message) post('error', e.message + where(e.filename, e.lineno)); });
+      window.addEventListener('unhandledrejection', (e) => post('rejection', (e.reason && (e.reason.message || e.reason.name)) || e.reason));
+      const failed = new Set();
+      try {
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (entry.responseStatus >= 500 || entry.responseStatus === 401 || entry.responseStatus === 403) {
+              let host = ''; try { host = new URL(entry.name).host; } catch (e) {}
+              const key = entry.responseStatus + host;
+              if (!failed.has(key)) { failed.add(key); post('http', entry.responseStatus + ' from ' + host); }
+            }
+          }
+        }).observe({ type: 'resource', buffered: true });
+      } catch (e) {}
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any], let kind = body["kind"] as? String, let text = body["text"] as? String,
+              let webView = message.webView else { return }
+        let origin = message.frameInfo.securityOrigin
+        let title = kind == "http" ? "Request failed" : kind == "rejection" ? "Page error (promise)" : "Page error"
+        // An error in a frame (a sign-in, a payment) says which frame, beside the page it's in.
+        let page = webView.url?.host()
+        let frame = message.frameInfo.isMainFrame || origin.host == page ? "" : " in a frame from \(origin.host)"
+        Diagnostics.note(title, site: page ?? origin.host, text + frame, isPrivate: !webView.configuration.websiteDataStore.isPersistent)
     }
 }
 
