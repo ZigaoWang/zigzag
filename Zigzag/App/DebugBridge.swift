@@ -320,6 +320,17 @@ enum DebugBridge {
                 case .failure(let error): debugLog("jsclient error \(error)")
                 }
             }
+        case "jump": controller.jumpToSelection(nil)
+        case "menukey":
+            // menukey <char> [cmd shift opt ctrl]: the main menu's own handling of that shortcut, logged.
+            let f = arg.split(separator: " ").map(String.init)
+            var flags: NSEvent.ModifierFlags = []
+            for m in f.dropFirst() { switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "opt": flags.insert(.option); case "ctrl": flags.insert(.control); default: break } }
+            if let ch = f.first, let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                                                windowNumber: controller.window?.windowNumber ?? 0, context: nil,
+                                                                characters: ch, charactersIgnoringModifiers: ch, isARepeat: false, keyCode: 0) {
+                debugLog("menukey \(arg): \(NSApp.mainMenu?.performKeyEquivalent(with: event) ?? false)")
+            }
         case "peekjs":
             // peekjs <script>: runs in the peeked page, as js does in the tab's.
             controller.peek.tab?.webView?.evaluateJavaScript(arg) { result, error in
@@ -391,7 +402,7 @@ enum DebugBridge {
             let named: [String: String] = ["esc": "\u{1b}", "tab": "\t", "return": "\r", "space": " ",
                                            "down": String(UnicodeScalar(NSDownArrowFunctionKey)!), "up": String(UnicodeScalar(NSUpArrowFunctionKey)!)]
             let chars = named[ch] ?? ch
-            let codes: [String: UInt16] = ["s": 1, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35,
+            let codes: [String: UInt16] = ["s": 1, "j": 38, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35,
                                           "down": 125, "up": 126, "return": 36, "space": 49]
             if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                         windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
