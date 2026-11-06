@@ -511,7 +511,7 @@ final class LookSwatch: InteractiveView {
                 fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
             }
         }
-        setAccessibilityValue(isSelected ? "selected" : nil)
+        setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
     }
 }
 
@@ -907,7 +907,7 @@ final class ColorChip: InteractiveView {
             cross.frame = badge.bounds
             badge.isHidden = onRemove == nil || !isHovered
         }
-        setAccessibilityValue(isSelected ? "selected" : nil)
+        setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
     }
 }
 
