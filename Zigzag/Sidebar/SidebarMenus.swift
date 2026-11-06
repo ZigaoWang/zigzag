@@ -273,12 +273,12 @@ enum SidebarMenus {
         }
         menu.addItem(Item("Copy Link") { controller.copyLink(favorite.url) })
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
-            menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(favorite.id) })
-            menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(favorite.id) })
-            // A private window never writes where it's been into your pins.
+            menu.addItem(Item("Back to Favorite’s Page") { manager.resetBookmarkTab(favorite.id) })
+            menu.addItem(Item("Separate from Favorite") { manager.separateBookmarkTab(favorite.id) })
+            // A private window never writes where it's been into your favorites.
             if !manager.isPrivate {
-                menu.addItem(Item("Pin This Page Instead") {
-                    controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(favorite.id, url: url) }
+                menu.addItem(Item("Make This Page the Favorite") {
+                    controller.libraryChange("Update Favorite") { Library.shared.updateBookmark(favorite.id, url: url) }
                 })
             }
         }
