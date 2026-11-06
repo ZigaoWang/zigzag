@@ -255,7 +255,11 @@ final class Tab: NSObject {
         // Sound stops the moment it closes, whatever may still hold the page for a moment.
         webView?.pauseAllMediaPlayback(completionHandler: nil)
         if let webView { tearDown(webView) }
-        if !keepingSnapshot { SnapshotStore.remove(id) }
+        if !keepingSnapshot {
+            SnapshotStore.remove(id)
+            // Undo steps can hold a closed tab for a while; its picture (megabytes, on a Retina screen) needn't.
+            snapshot = nil
+        }
     }
 
     private func tearDown(_ webView: BrowserWebView) {
