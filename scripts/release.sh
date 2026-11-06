@@ -5,12 +5,11 @@
 #   xcrun notarytool store-credentials zigzag-notary --apple-id <you> --team-id 432GL3WKY2
 #   (Sparkle's EdDSA private key lives in the login keychain; see generate_keys.)
 #
-# Usage: scripts/release.sh            build, sign, notarize, staple, appcast
+# Usage: scripts/release.sh            build, sign, notarize, staple
 #        scripts/release.sh --publish  also upload the build and appcast to zigzagbrowser.com
 #        scripts/release.sh --local    build and sign with Developer ID only, to use on this Mac
 #        scripts/release.sh --beta N   build version-beta.N and publish it to the beta feed only (Settings ›
 #                                      General › Beta updates); no DMG, website, GitHub release or Homebrew
-#        (plain run: build, sign, notarize and staple; --publish also writes the appcast and uploads both)
 # Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
