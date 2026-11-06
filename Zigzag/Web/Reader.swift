@@ -107,13 +107,17 @@ enum Reader {
             guard case .success(let value) = result, let text = value as? String, let url = URL(string: text, relativeTo: webView.url)?.absoluteURL,
                   url.scheme == "https", leadPictures[url.absoluteString] == nil else { return }
             Task {
-                guard let (data, response) = try? await URLSession.shared.data(from: url), data.count < 3_000_000,
+                guard let (data, response) = try? await pictureSession.data(from: url), data.count < 3_000_000,
                       let type = (response as? HTTPURLResponse)?.mimeType, type.hasPrefix("image/") else { return }
                 leadPictures[url.absoluteString] = "data:\(type);base64," + data.base64EncodedString()
                 if leadPictures.count > 12 { leadPictures.removeValue(forKey: leadPictures.keys.first!) }
             }
         }
     }
+
+    /// Fetches lead pictures with no cookies and nothing kept on disk, so a private page's picture leaves no trace
+    /// and none is tied to your everyday browsing.
+    private static let pictureSession = URLSession(configuration: .ephemeral)
 
     /// Lead pictures fetched ahead, by address, as data the reading page can show at once.
     private static var leadPictures: [String: String] = [:]
