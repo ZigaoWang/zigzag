@@ -178,7 +178,7 @@ License: [Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)](h
 Changes made: `scripts/update_blocklists.sh` downloads both lists, joins them, converts the filters to WebKit
 content-blocker rules, and compresses the result with LZFSE. The converted WebKit content-blocker JSON is an
 adaptation of EasyList and EasyPrivacy, and is likewise licensed under CC BY-SA 3.0, not under Zigzag's
-license. Zigzag credits the lists in Settings and in About Zigzag › Acknowledgements.
+license. Zigzag credits the lists in Settings and in About Zigzag › Acknowledgments.
 
 ### Public Suffix List
 

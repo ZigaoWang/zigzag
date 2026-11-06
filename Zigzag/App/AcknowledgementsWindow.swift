@@ -1,6 +1,6 @@
 import AppKit
 
-/// About Zigzag › Acknowledgements: Zigzag's own license and marks, then every work by others that ships in the app,
+/// About Zigzag › Acknowledgments: Zigzag's own license and marks, then every work by others that ships in the app,
 /// each with its license, then the Apache License in full. Read from the files the repository keeps (LICENSE and
 /// THIRD_PARTY_NOTICES.md), bundled as they are, so what the app says is what the source says, offline.
 final class AcknowledgementsWindowController: NSWindowController, NSWindowDelegate {
@@ -14,7 +14,7 @@ final class AcknowledgementsWindowController: NSWindowController, NSWindowDelega
         }
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: Tokens.Welcome.acknowledgementsSize),
                               styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
-        window.title = "Acknowledgements"
+        window.title = "Acknowledgments"
         // The page says its own name, large, as About does.
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -66,7 +66,7 @@ enum Acknowledgements {
     static func text() -> NSAttributedString {
         let out = NSMutableAttributedString()
         let style = NoticeStyle()
-        out.append(style.title("Acknowledgements"))
+        out.append(style.title("Acknowledgments"))
         out.append(style.paragraph("Zigzag is made by Zigao Wang and is open source under the Apache License, Version 2.0. "
                                    + "It builds on the work of others, listed below with their licenses. Thank you."))
 

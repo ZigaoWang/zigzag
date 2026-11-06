@@ -43,7 +43,7 @@ private final class AboutView: NSView {
     /// Each a name, where it goes in quiet text, and an arrow that says whether it opens here or on the web.
     private let rows: [AboutRow] = [
         AboutRow("Release Notes", open: WhatsNew.allNotes),
-        AboutRow("Acknowledgements", run: { AcknowledgementsWindowController.show() }),
+        AboutRow("Acknowledgments", run: { AcknowledgementsWindowController.show() }),
         AboutRow("Website", detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
         AboutRow("Source Code", detail: "GitHub", open: URL(string: "https://github.com/ZigaoWang/zigzag")!),
         AboutRow("Developer", detail: "zigao.wang", open: URL(string: "https://www.zigao.wang")!),
