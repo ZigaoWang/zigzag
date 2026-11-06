@@ -483,6 +483,7 @@ enum DebugBridge {
                 debugLog("pwclear removed \(samples.count)")
             }
         case "about": AboutWindowController.show()
+        case "acknowledgements": AcknowledgementsWindowController.show()
         case "exttest":
             // exttest <id> <url>: a fresh install, a page where it should work, then what happened, as one line.
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)

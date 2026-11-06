@@ -54,6 +54,11 @@ targets:
       # The release notes the app shows after an update: this version's section of the changelog.
       - path: CHANGELOG.md
         buildPhase: resources
+      # The licenses About Zigzag › Acknowledgements shows: the same files as the repository's, never a copy.
+      - path: LICENSE
+        buildPhase: resources
+      - path: THIRD_PARTY_NOTICES.md
+        buildPhase: resources
     dependencies:
       - package: Sparkle
     info:
