@@ -196,6 +196,10 @@ final class PermissionPrompt: FloatingPanelView {
     private let closeButton = IconButton(symbol: "xmark", toolTip: "Not Now")
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
     private var askingHost = ""
+    /// When it came up. Allow takes no click for the first half second, so a page can't ask just as you click
+    /// (a "click fast" game) and catch that click on Allow.
+    private var shownAt = Date.distantFuture
+    var acceptsAllow: Bool { Date().timeIntervalSince(shownAt) > 0.5 }
     private var urlToken: SignalToken?
     private var clickMonitor: Any?
     /// Don't Allow, then Allow at the far right, as macOS places them.
@@ -290,7 +294,10 @@ final class PermissionPrompt: FloatingPanelView {
             let allow = PillButton(title: allowTitle, style: .prominent)
             allow.tint = accent
             // Kept for the site (the caller keeps nothing in a private window).
-            allow.onClick = { [weak prompt] _ in prompt?.finish(.allow) }
+            allow.onClick = { [weak prompt] _ in
+                guard let prompt, prompt.acceptsAllow else { return }
+                prompt.finish(.allow)
+            }
             for button in [deny, allow] as [InteractiveView] { prompt.addSubview(button) }
             // Side by side at one width, as a Mac dialog sets its answers.
             let width = max(deny.fittingWidth, allow.fittingWidth, Tokens.Dialog.minButtonWidth)
@@ -371,6 +378,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     /// In from above the page's top edge, eased to a stop: something new arriving, seen now and then, not a key.
     private func slideIn() {
+        shownAt = Date()
         guard let layer, !Tokens.Motion.reduceMotion else { present(arrival: .fade); return }
         let drop = CABasicAnimation(keyPath: "transform")
         drop.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(0, -offstage, 0))
