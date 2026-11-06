@@ -7,6 +7,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var blockerToken: SignalToken?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // A second copy (one opened from the disk image while the installed one runs) would load the same profile
+        // and save over it: it hands over to the one already running and goes, before reading anything.
+        if !Self.isHostingTests, !SingleCopy.claim() {
+            SingleCopy.showRunningCopy()
+            exit(0)
+        }
         if !Self.isHostingTests {
             // A new version backs up the profile the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
@@ -265,5 +271,26 @@ extension AppDelegate: NSMenuItemValidation {
         if menuItem.action == #selector(makeDefaultBrowser(_:)) { menuItem.isHidden = DefaultBrowser.isDefault; return true }
         if menuItem.action == #selector(closeTab(_:)) { return NSApp.keyWindow?.styleMask.contains(.closable) ?? false }
         return true
+    }
+}
+
+/// One Zigzag per profile: a lock on a file beside the profile, held for as long as Zigzag runs. The system lets it
+/// go when the process ends, crash or not.
+enum SingleCopy {
+    private static var lock: Int32 = -1
+
+    static func claim() -> Bool {
+        try? FileManager.default.createDirectory(at: Paths.support, withIntermediateDirectories: true)
+        let file = Paths.support.appendingPathComponent("Running.lock").path
+        lock = open(file, O_RDWR | O_CREAT, 0o600)
+        guard lock >= 0 else { return true }
+        return flock(lock, LOCK_EX | LOCK_NB) == 0
+    }
+
+    /// Brings the copy already running to the front.
+    static func showRunningCopy() {
+        let me = ProcessInfo.processInfo.processIdentifier
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+        others.first { $0.processIdentifier != me }?.activate()
     }
 }
