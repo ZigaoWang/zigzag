@@ -80,6 +80,10 @@ final class EnergyWatch {
         return webView.value(forKey: "_webProcessIdentifier") as? Int32
     }
 
+    private static func window(holding tab: Tab) -> BrowserWindowController? {
+        WindowManager.shared.controllers.first { $0.tabManager.allTabs.contains { $0 === tab } }
+    }
+
     private func warn(about tab: Tab, url: URL, in controller: BrowserWindowController) {
         let site = ContentBlocker.site(of: url) ?? url.host() ?? url.absoluteString
         guard told.insert("\(tab.id)|\(site)").inserted else { return }
@@ -88,15 +92,16 @@ final class EnergyWatch {
             let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName ?? "An extension"
             Toast.show("\(name)’s page is using a lot of energy", symbol: "bolt",
                        action: ("Close Tab", { [weak controller, weak tab] in
-                           guard let controller, let tab else { return }
-                           controller.closeWithUndo(tab)
+                           guard let tab, !tab.isClosed else { return }
+                           // The window it's in now: it may have been moved to another since.
+                           (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab)
                        }), duration: 15, in: controller)
             return
         }
         Toast.show("A tab on \(site) is using a lot of energy in the background", symbol: "bolt",
                    action: ("Close Tab", { [weak controller, weak tab] in
-                       guard let controller, let tab else { return }
-                       controller.closeWithUndo(tab)
+                       guard let tab, !tab.isClosed else { return }
+                       (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab)
                    }), duration: 12, in: controller)
     }
 }
