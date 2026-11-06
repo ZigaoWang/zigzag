@@ -28,7 +28,7 @@ nonisolated enum CSVImporter {
         (.lastPass, ["url", "username", "password", "extra", "grouping"], Columns(url: "url", username: "username", password: "password", title: "name", notes: "extra", otp: "totp")),
         (.firefox, ["url", "username", "password", "httprealm", "formactionorigin"], Columns(url: "url", username: "username", password: "password")),
         (.onePassword, ["title", "url", "username", "password"], Columns(url: "url", username: "username", password: "password", title: "title", notes: "notes", otp: "otpauth")),
-        (.chrome, ["name", "url", "username", "password"], Columns(url: "url", username: "username", password: "password", title: "name", notes: "note")),
+        (.chrome, ["name", "url", "username", "password"], Columns(url: "url", username: "username", password: "password", title: "name", notes: "note", otp: "otpauth")),
     ]
 
     enum Failure: Error { case unreadable, unknownFormat, empty }

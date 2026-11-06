@@ -96,6 +96,13 @@ struct CSVImportTests {
         #expect(logins[0].password.matches(SecretString("he said \"hi\"")))
     }
 
+    /// What Passwords › Export writes comes back whole, one-time codes included.
+    @Test func readsZigzagsOwnExport() throws {
+        let (format, logins) = try logins("name,url,username,password,note,otpauth\nGitHub,https://github.com,octo,p,,otpauth://totp/x\n")
+        #expect(format == .chrome)
+        #expect(logins[0].otpAuth == "otpauth://totp/x")
+    }
+
     @Test func readsFirefoxBitwardenAndLastPass() throws {
         #expect(try logins("\"url\",\"username\",\"password\",\"httpRealm\",\"formActionOrigin\",\"guid\",\"timeCreated\",\"timeLastUsed\",\"timePasswordChanged\"\n\"https://a.test\",\"u\",\"p\",,\"https://a.test\",\"{1}\",\"1\",\"1\",\"1\"").0 == .firefox)
         #expect(try logins("folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp\n,,login,A,,,0,https://a.test,u,p,").0 == .bitwarden)

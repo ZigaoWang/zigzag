@@ -1146,13 +1146,16 @@ enum PasswordExport {
         func field(_ text: String) -> String {
             text.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) ? "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : text
         }
-        var data = Data("name,url,username,password,note\n".utf8)
+        // Chrome's columns, which every password manager reads, and the one-time-code secret as Apple's Passwords
+        // writes it, so codes come along too.
+        var data = Data("name,url,username,password,note,otpauth\n".utf8)
         var written = 0
         defer { data.resetBytes(in: 0..<data.count) }
         for credential in credentials {
             guard let password = try? await PasswordStore.shared.password(for: credential.id) else { continue }
             let line = password.withUnsafeString { secret in
-                [credential.title.isEmpty ? credential.origin.displayName : credential.title, credential.origin.description, credential.username, secret, credential.notes]
+                [credential.title.isEmpty ? credential.origin.displayName : credential.title, credential.origin.description, credential.username, secret,
+                 credential.notes, credential.otpAuth]
                     .map(field).joined(separator: ",") + "\n"
             }
             data.append(Data(line.utf8))
