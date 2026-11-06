@@ -1,5 +1,8 @@
 #if DEBUG
 import AppKit
+
+// Only for working on the design, through the debug bridge: not in the app people get.
+#if DEBUG
 import CoreImage
 
 /// Debug builds: the tactile kit (Materials.swift) put together as onboarding's first screen could be, in a window
@@ -500,4 +503,5 @@ final class SpaceDeck: NSView {
         }
     }
 }
+#endif
 #endif
