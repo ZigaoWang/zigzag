@@ -343,13 +343,24 @@ final class DownloadManager: NSObject {
         return true
     }
 
-    /// Starts a failed or cancelled download again: from where it stopped when the server allows, else from the
-    /// start. The new attempt takes the old row's place.
+    /// Starts a failed or cancelled download again: from where it stopped when the server allows, in the same row
+    /// and into the same file (WebKit doesn't ask where to save a resumed download), else from the start, the new
+    /// attempt taking the old row's place.
     @discardableResult
     func retry(_ item: DownloadItem) -> Bool {
         guard canRetry(item), let webView = webView(for: item) else { return false }
         if let data = item.resumeData {
-            webView.resumeDownload(fromResumeData: data, completionHandler: replace(item, from: webView))
+            item.resumeData = nil
+            item.failure = nil
+            item.state = .downloading
+            changed.send(item)
+            webView.resumeDownload(fromResumeData: data) { [weak self] download in
+                MainActor.assumeIsolated {
+                    download.delegate = self
+                    self?.attach(download, to: item)
+                    self?.changed.send(item)
+                }
+            }
         } else if let url = item.sourceURL {
             webView.startDownload(using: URLRequest(url: url), completionHandler: replace(item, from: webView))
         }
