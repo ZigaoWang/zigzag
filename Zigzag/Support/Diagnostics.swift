@@ -58,6 +58,15 @@ nonisolated enum Diagnostics {
         if schedule { queue.asyncAfter(deadline: .now() + 2) { save() } }
     }
 
+    /// Clearing history: what was noted since then goes too, as it names the sites you were on.
+    static func forget(since date: Date?) {
+        state.withLock { s in
+            s.events.removeAll { date == nil || $0.date >= date! }
+            s.perSite = [:]
+        }
+        queue.async { save() }
+    }
+
     /// The events kept, oldest first.
     static var events: [Event] { state.withLock { $0.events } }
 

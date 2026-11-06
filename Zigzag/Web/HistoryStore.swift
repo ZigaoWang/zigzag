@@ -161,6 +161,8 @@ final class HistoryStore {
         }
         // The log the deleted rows passed through goes too.
         exec("PRAGMA wal_checkpoint(TRUNCATE)")
+        // What went wrong lately names its sites too.
+        Diagnostics.forget(since: date)
         // And the copies kept from before each update: cleared means cleared there as well.
         Self.scrubBackups(date.map { "DELETE FROM visits WHERE last_visit >= \($0.timeIntervalSince1970)" } ?? "DELETE FROM visits")
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date),
