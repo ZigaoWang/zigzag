@@ -491,7 +491,10 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         if url.isFileURL {
             data = try? await Task.detached { try Data(contentsOf: url) }.value
         } else if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            // Only the cookies a link from another site would carry too: a "Strict" one, held back from the page's own
+            // load when another site sent you there, isn't sent behind its back now.
             let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+                .filter { $0.sameSitePolicy != .sameSiteStrict }
             let configuration = URLSessionConfiguration.ephemeral
             let storage = HTTPCookieStorage()
             cookies.forEach { storage.setCookie($0) }
