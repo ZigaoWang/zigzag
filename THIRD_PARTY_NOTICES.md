@@ -218,7 +218,7 @@ license. A build tool only.
 "Custom Progress Bar for YouTube" (version 4.0.25, extension ID `nbkomboflhdlliegkaiepilnfmophgfg`, by
 [custom-progressbar.com](https://custom-progressbar.com)). It's used only by `CRXPackageTests` to check that a
 genuinely signed store package is accepted and a tampered one refused. It belongs to its authors, is not
-covered by Zigzag's license, and is not part of the app. "YouTube" is a trademark of Google LLC.
+covered by Zigzag's license, and is not part of the app. "YouTube" is a trademark of Google LLC. It isn't in this repository: the tests that use it are skipped without it.
 
 ### firefox-profile
 
