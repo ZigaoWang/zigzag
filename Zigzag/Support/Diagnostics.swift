@@ -151,26 +151,32 @@ nonisolated enum Diagnostics {
     }
 }
 
-/// Notices Zigzag freezing as it happens, rather than a day later from macOS: the main thread ticks four times a
-/// second, and another thread watches the ticks. A gap of a second or more while Zigzag is in front is a freeze,
-/// noted with how long it lasted once it's over. Asleep, in the background or napping, gaps don't count.
+/// Notices Zigzag freezing as it happens, rather than a day later from macOS: while Zigzag is in front, the main
+/// thread ticks four times a second and another thread watches the ticks. A gap of a second or more is a freeze,
+/// noted with how long it lasted once it's over. In the background both rest, so an idle Zigzag costs nothing.
 nonisolated final class Freezes: @unchecked Sendable {
     static let shared = Freezes()
     private let beat = OSAllocatedUnfairLock(initialState: (last: Date(), counts: false))
+    /// Wakes the watcher when Zigzag comes to the front.
+    private let wake = DispatchSemaphore(value: 0)
     private var timer: Timer?
     private var started = false
+    private var tokens: [NSObjectProtocol] = []
 
     func start() {
         guard !started else { return }
         started = true
         DispatchQueue.main.async {
-            let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-                let active = MainActor.assumeIsolated { NSApp.isActive }
-                self?.beat.withLock { $0 = (Date(), active) }
-            }
-            timer.tolerance = 0.05
-            RunLoop.main.add(timer, forMode: .common)
-            self.timer = timer
+            let center = NotificationCenter.default
+            self.tokens = [
+                center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.resume() }
+                },
+                center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.rest() }
+                },
+            ]
+            if MainActor.assumeIsolated({ NSApp.isActive }) { self.resume() }
         }
         let watcher = Thread { [weak self] in self?.watch() }
         watcher.name = "Zigzag freeze watch"
@@ -178,11 +184,34 @@ nonisolated final class Freezes: @unchecked Sendable {
         watcher.start()
     }
 
+    @MainActor private func resume() {
+        guard timer == nil else { return }
+        beat.withLock { $0 = (Date(), true) }
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            self?.beat.withLock { $0 = (Date(), true) }
+        }
+        timer.tolerance = 0.05
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        wake.signal()
+    }
+
+    @MainActor private func rest() {
+        timer?.invalidate()
+        timer = nil
+        beat.withLock { $0.counts = false }
+    }
+
     private func watch() {
         var frozenSince: Date?
         while true {
-            Thread.sleep(forTimeInterval: 0.25)
             let (last, counts) = beat.withLock { $0 }
+            guard counts || frozenSince != nil else {
+                // In the background: wait to be woken, not on a clock.
+                wake.wait()
+                continue
+            }
+            Thread.sleep(forTimeInterval: 0.25)
             let gap = Date().timeIntervalSince(last)
             if gap >= 1, counts, frozenSince == nil {
                 frozenSince = last
@@ -193,6 +222,8 @@ nonisolated final class Freezes: @unchecked Sendable {
                 if length >= 1, length < 120 {
                     Diagnostics.note("Zigzag froze", String(format: "for %.1f s", length))
                 }
+            } else if !counts {
+                frozenSince = nil
             }
         }
     }
