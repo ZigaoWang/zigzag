@@ -189,9 +189,21 @@ final class TabThumbnailView: InteractiveView {
     static func isBlank(_ image: NSImage?) -> Bool {
         guard let image else { return true }
         if let known = blankness.object(forKey: image) { return known.boolValue }
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+        let blank = isBlank(cg)
+        blankness.setObject(NSNumber(value: blank), forKey: image)
+        return blank
+    }
+
+    /// Notes what a picture read from disk shows, worked out from a small thumbnail of its file, so the switcher
+    /// and the tab overview never decode the whole picture just to ask.
+    static func remember(_ image: NSImage, blank: Bool) {
+        blankness.setObject(NSNumber(value: blank), forKey: image)
+    }
+
+    nonisolated static func isBlank(_ cg: CGImage) -> Bool {
         let side = 64
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+        guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: side * side * 4) else { return false }
         context.interpolationQuality = .medium
@@ -204,9 +216,7 @@ final class TabThumbnailView: InteractiveView {
                 high[i] = max(high[i], v)
             }
         }
-        let blank = zip(low, high).allSatisfy { Int($1) - Int($0) < 8 }
-        blankness.setObject(NSNumber(value: blank), forKey: image)
-        return blank
+        return zip(low, high).allSatisfy { Int($1) - Int($0) < 8 }
     }
 
     /// Which page a click landed on: with a split, the pane under the pointer.
