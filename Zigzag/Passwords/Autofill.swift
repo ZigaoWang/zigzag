@@ -171,11 +171,22 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     #endif
 
     func hide() {
-        guard let menu else { return }
+        guard let menu else { target = nil; return }
         setSuggesting(false)
         self.menu = nil
         target = nil
         menu.dismiss(always: true)
+    }
+
+    /// A page going away (its tab closed or put to sleep, its window closed): the menu lets go of it, so nothing
+    /// keeps the page alive (and playing) after it's gone.
+    func forget(_ webView: WKWebView) {
+        if target?.webView === webView { hide() }
+    }
+
+    /// The same for every page in a window that's closing.
+    func forget(windowOf window: NSWindow?) {
+        if let window, target?.webView.window === window { hide() }
     }
 
     /// While the menu is up, the page script hands arrow keys and Escape to it; Return only once a login in it is

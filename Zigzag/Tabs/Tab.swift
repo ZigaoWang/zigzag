@@ -257,6 +257,7 @@ final class Tab: NSObject {
     }
 
     private func tearDown(_ webView: BrowserWebView) {
+        Autofill.shared.forget(webView)
         setPDFViewer(nil)
         if settingsView != nil {
             settingsView = nil

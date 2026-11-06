@@ -1292,6 +1292,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         fadeTimer?.invalidate()
+        Autofill.shared.forget(windowOf: window)
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()
         // So is a folder's icon picker, and the event monitor it holds.
