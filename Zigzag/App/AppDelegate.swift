@@ -174,6 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
     }
 
+    /// Right-click the Dock icon: a new window, or a private one, as every browser offers.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "New Window", action: #selector(newWindow(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "New Private Window", action: #selector(newPrivateWindow(_:)), keyEquivalent: "").target = self
+        return menu
+    }
+
     /// One quiet offer, on the second launch, never repeated: by then you know whether you like it here.
     private func offerDefaultBrowserOnce() {
         let defaults = UserDefaults.standard
