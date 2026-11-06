@@ -27,13 +27,32 @@ final class HistoryStore {
 
     /// The one store is `shared`; tests open their own, ":memory:", so they never see your history.
     init(path: String) {
-        guard sqlite3_open(path, &db) == SQLITE_OK else { db = nil; return }
+        guard open(path) else {
+            // A damaged file (a disk error, a half-copied restore) would leave history off for good, silently: it's
+            // set aside, named for when, and history starts afresh.
+            sqlite3_close(db)
+            db = nil
+            let stamp = Int(Date().timeIntervalSince1970)
+            for suffix in ["", "-wal", "-shm"] {
+                try? FileManager.default.moveItem(atPath: path + suffix, toPath: "\(path).damaged-\(stamp)\(suffix)")
+            }
+            Diagnostics.note("History was damaged and started afresh")
+            if !open(path) { sqlite3_close(db); db = nil }
+            return
+        }
+    }
+
+    /// Opens the file and makes sure it holds History's table; false when it isn't a database SQLite can use.
+    private func open(_ path: String) -> Bool {
+        guard sqlite3_open(path, &db) == SQLITE_OK else { return false }
+        // Another Zigzag writing (an update relaunching) waits its turn instead of losing the visit.
+        sqlite3_busy_timeout(db, 2000)
         exec("PRAGMA journal_mode=WAL")
         // With WAL this is still safe across a crash, without a full disk sync on every page visited.
         exec("PRAGMA synchronous=NORMAL")
         // What's cleared is overwritten, not just unlinked, so a cleared page can't be read back out of the file.
         exec("PRAGMA secure_delete=ON")
-        exec("""
+        let created = sqlite3_exec(db, """
         CREATE TABLE IF NOT EXISTS visits (
             url TEXT PRIMARY KEY,
             host TEXT NOT NULL,
@@ -41,11 +60,13 @@ final class HistoryStore {
             visit_count INTEGER NOT NULL DEFAULT 1,
             last_visit REAL NOT NULL
         )
-        """)
+        """, nil, nil, nil)
+        guard created == SQLITE_OK, sqlite3_exec(db, "SELECT 1 FROM visits LIMIT 1", nil, nil, nil) == SQLITE_OK else { return false }
         exec("CREATE INDEX IF NOT EXISTS visits_last ON visits(last_visit DESC)")
         exec("CREATE INDEX IF NOT EXISTS visits_host ON visits(host)")
         // A year of history is plenty to search; older single visits go, so typing stays quick as it grows.
         exec("DELETE FROM visits WHERE last_visit < strftime('%s','now') - 31536000 AND visit_count <= 1")
+        return true
     }
 
     private func exec(_ sql: String) {
