@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a><br>
   <sub>or <code>brew install --cask zigaowang/tap/zigzag</code></sub><br>
-  <sub>Free. macOS 15.4 or later. Version 0.3.1, in beta.</sub>
+  <sub>Free. macOS 15.4 or later. In beta.</sub>
 </p>
 
 <p align="center">
