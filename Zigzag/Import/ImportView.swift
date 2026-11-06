@@ -133,10 +133,11 @@ final class ImportView: NSView {
 
     // MARK: Importing
 
-    private func startImport(_ chosen: [SourceRow]) {
+    /// `data`: what to bring; by default what's ticked, read before the choices are hidden (a hidden choice counts
+    /// as not chosen).
+    private func startImport(_ chosen: [SourceRow], data: ImportCoordinator.Choice? = nil) {
         guard !chosen.isEmpty else { return }
-        // What to bring, read before the choices are hidden: a hidden choice counts as not chosen.
-        let data = chosenData
+        let data = data ?? chosenData
         stage = .importing
         title.stringValue = "Bringing it over…"
         // Only Chrome and its kin keep their passwords behind a Keychain item that macOS asks about.
@@ -272,7 +273,9 @@ final class ImportView: NSView {
             row.isChosen = true
             self.rowList.addSubview(row)
             self.rows.append(row)
-            self.startImport([row])
+            // A file you picked brings everything in it, whatever was ticked (and the ticks are hidden after an
+            // import, so reading them would bring nothing).
+            self.startImport([row], data: [.passwords, .bookmarks, .history])
             row.exportFile = url
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: handle) } else { handle(panel.runModal()) }
