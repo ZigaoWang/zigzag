@@ -167,6 +167,12 @@ enum AuthenticationPrompt {
             return (.useCredential, saved)
         }
         guard let window else { return (.cancelAuthenticationChallenge, nil) }
+        // Only the site you're on (or going to) asks for a password over its page. Something from another site
+        // inside it (an image, a frame) doesn't get to put a sign-in sheet over a page that isn't its own.
+        let pageHost = await MainActor.run { page?.url?.host()?.lowercased() }
+        if let pageHost, !pageHost.isEmpty, !Self.sameSite(pageHost, challenge.protectionSpace.host.lowercased()) {
+            return (.cancelAuthenticationChallenge, nil)
+        }
         // Several loads asking for the same sign-in at once (a page and its images): one question, one answer for all.
         let space = challenge.protectionSpace
         let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
@@ -176,6 +182,10 @@ enum AuthenticationPrompt {
         let answer = await task.value
         if signingIn[key] == task { signingIn[key] = nil }
         return answer
+    }
+
+    nonisolated private static func sameSite(_ a: String, _ b: String) -> Bool {
+        a == b || (PublicSuffix.registrableDomain(a) ?? a) == (PublicSuffix.registrableDomain(b) ?? b)
     }
 
     @MainActor private static var signingIn: [String: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>] = [:]
