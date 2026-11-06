@@ -248,6 +248,8 @@ final class PopupHeaderView: NSView {
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textSecondary
         addSubview(lock)
+        // A long host loses its start, never its end, which says whose site it is.
+        label.lineBreakMode = .byTruncatingHead
         addSubview(label)
     }
 
@@ -257,7 +259,9 @@ final class PopupHeaderView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     func show(url: URL?, secure: Bool) {
-        label.stringValue = url?.host() ?? ""
+        // With a port that isn't the usual one, so "accounts.google.com:81" never reads as Google's own.
+        let usual = url?.scheme == "https" ? 443 : url?.scheme == "http" ? 80 : nil
+        label.stringValue = (url?.host() ?? "") + (url?.port.flatMap { $0 == usual ? nil : ":\($0)" } ?? "")
         lock.image = Tokens.Symbol.image(secure ? "lock" : "exclamationmark.triangle", size: Tokens.Symbol.inline)
         lock.isHidden = url == nil
         lock.setAccessibilityLabel(secure ? "Secure connection" : "Not secure")

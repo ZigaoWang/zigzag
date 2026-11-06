@@ -68,6 +68,8 @@ final class AddressView: InteractiveView {
         lock.imageScaling = .scaleNone
         lock.contentTintColor = Tokens.Color.textTertiary
         addSubview(lock)
+        // A long host loses its start, never its end: the end is what says whose site it is.
+        label.lineBreakMode = .byTruncatingHead
         addSubview(label)
         captureButton.isHidden = true
         addSubview(captureButton)
@@ -86,6 +88,15 @@ final class AddressView: InteractiveView {
         needsLayout = true
     }
 
+    /// The site's name as the address shows it: without "www.", with a port that isn't the usual one, so
+    /// "accounts.google.com:81" never reads as Google's own.
+    private static func site(_ host: String, port: Int?, scheme: String?) -> String {
+        let name = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let usual = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
+        guard let port, port != usual else { return name }
+        return "\(name):\(port)"
+    }
+
     func show(url: URL?, isSecure: Bool) {
         if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
            let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
@@ -96,9 +107,15 @@ final class AddressView: InteractiveView {
         } else if SettingsPage.isSettings(url) {
             label.stringValue = "Settings"
         } else if let url, let host = url.host() {
-            label.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            label.stringValue = Self.site(host, port: url.port, scheme: url.scheme)
         } else if let url, url.isFileURL {
             label.stringValue = url.lastPathComponent
+        } else if let url, url.scheme == "blob", let inner = URL(string: url.path), let host = inner.host() {
+            // A page made by a site's own script: named for the site that made it.
+            label.stringValue = Self.site(host, port: inner.port, scheme: inner.scheme)
+        } else if let url, let scheme = url.scheme, scheme != "about" || url.absoluteString != "about:blank" {
+            // A page with no site (data:): said so, never left looking like an empty address bar.
+            label.stringValue = scheme == "about" ? url.absoluteString : "\(scheme): page"
         } else {
             label.stringValue = ""
         }
