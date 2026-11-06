@@ -361,13 +361,32 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     const active = document.activeElement;
     const scope = (active && active.form) || document;
     // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
+    // Your phone and address go only where you could see them land: on the page across, near where you are
+    // (a long checkout form runs on below), not clipped away inside a tiny box, and not covered by something else.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+      if (r.width < 8 || r.height < 8) return false;
+      if (r.right < 0 || r.left > innerWidth || r.bottom < -innerHeight || r.top > innerHeight * 3) return false;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const style = getComputedStyle(el);
-      return style.visibility === 'visible' && parseFloat(style.opacity) >= 0.1;
+      if (style.visibility !== 'visible' || parseFloat(style.opacity) < 0.1) return false;
+      for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
+        const o = getComputedStyle(box);
+        const overflow = o.overflow + o.overflowX + o.overflowY;
+        if (!/(hidden|clip|scroll|auto)/.test(overflow)) continue;
+        const b = box.getBoundingClientRect();
+        if (b.width < 8 || b.height < 8) return false;
+        // A scrolling box can be scrolled to what's below; one that clips can't.
+        if (!/(hidden|clip)/.test(overflow)) continue;
+        const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+        if (w < 8 || h < 8) return false;
+      }
+      if (r.top >= 0 && r.bottom <= innerHeight) {
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
+      }
+      return true;
     };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
     const passwords = inputs.filter((el) => el.type === 'password');
@@ -407,14 +426,32 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     if (location.origin !== expectedOrigin) return 0;
     const active = document.activeElement;
     const scope = (active && active.form) || document;
-    // The same test as for a login: only fields a person can see, so a page can't collect your details in hidden ones.
+    // Your phone and address go only where you could see them land: on the page across, near where you are
+    // (a long checkout form runs on below), not clipped away inside a tiny box, and not covered by something else.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+      if (r.width < 8 || r.height < 8) return false;
+      if (r.right < 0 || r.left > innerWidth || r.bottom < -innerHeight || r.top > innerHeight * 3) return false;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const style = getComputedStyle(el);
-      return style.visibility === 'visible' && parseFloat(style.opacity) >= 0.1;
+      if (style.visibility !== 'visible' || parseFloat(style.opacity) < 0.1) return false;
+      for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
+        const o = getComputedStyle(box);
+        const overflow = o.overflow + o.overflowX + o.overflowY;
+        if (!/(hidden|clip|scroll|auto)/.test(overflow)) continue;
+        const b = box.getBoundingClientRect();
+        if (b.width < 8 || b.height < 8) return false;
+        // A scrolling box can be scrolled to what's below; one that clips can't.
+        if (!/(hidden|clip)/.test(overflow)) continue;
+        const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+        if (w < 8 || h < 8) return false;
+      }
+      if (r.top >= 0 && r.bottom <= innerHeight) {
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
+      }
+      return true;
     };
     const guess = (el) => {
       const auto = (el.autocomplete || '').toLowerCase().split(/\\s+/).filter((t) => !/^(section-|shipping|billing|home|work|mobile)/.test(t)).pop();
@@ -474,13 +511,32 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     const active = document.activeElement;
     const scope = (active && active.form) || document;
     // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor.
+    // Your phone and address go only where you could see them land: on the page across, near where you are
+    // (a long checkout form runs on below), not clipped away inside a tiny box, and not covered by something else.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > innerWidth + 1000) return false;
+      if (r.width < 8 || r.height < 8) return false;
+      if (r.right < 0 || r.left > innerWidth || r.bottom < -innerHeight || r.top > innerHeight * 3) return false;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const style = getComputedStyle(el);
-      return style.visibility === 'visible' && parseFloat(style.opacity) >= 0.1;
+      if (style.visibility !== 'visible' || parseFloat(style.opacity) < 0.1) return false;
+      for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
+        const o = getComputedStyle(box);
+        const overflow = o.overflow + o.overflowX + o.overflowY;
+        if (!/(hidden|clip|scroll|auto)/.test(overflow)) continue;
+        const b = box.getBoundingClientRect();
+        if (b.width < 8 || b.height < 8) return false;
+        // A scrolling box can be scrolled to what's below; one that clips can't.
+        if (!/(hidden|clip)/.test(overflow)) continue;
+        const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+        if (w < 8 || h < 8) return false;
+      }
+      if (r.top >= 0 && r.bottom <= innerHeight) {
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
+      }
+      return true;
     };
     const inputs = [...scope.querySelectorAll('input')].filter(visible);
     const passwordField = inputs.find((el) => el.type === 'password' && !/new-password/.test(el.autocomplete || ''));
