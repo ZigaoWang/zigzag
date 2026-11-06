@@ -1434,6 +1434,8 @@ extension BrowserWindowController: TabHost {
     }
 
     func tabDidRequestClose(_ tab: Tab) {
+        // A peeked link that only fetched a file (or a page that closed itself): the card goes, not a tab.
+        if tab.isPeek, peek.tab === tab { peek.close(); return }
         tabManager.close(tab)
     }
 
