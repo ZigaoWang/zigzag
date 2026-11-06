@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 nonisolated enum Paths {
     static let support: URL = {
@@ -35,22 +36,49 @@ nonisolated enum Paths {
 
 nonisolated enum JSONStore {
     static func load<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let data = try? Data(contentsOf: url) else {
+            // There but can't be read (its permissions, a disk error): set aside too, so a fresh start can't save
+            // over it.
+            if FileManager.default.fileExists(atPath: url.path) { setAside(url) }
+            return nil
+        }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
         if let value = try? decoder.decode(type, from: data) { return value }
         // There, but unreadable (cut short, or written by a newer Zigzag): kept aside, never written over, so
         // starting fresh can't erase it and it can still be recovered.
+        setAside(url)
+        return nil
+    }
+
+    private static func setAside(_ url: URL) {
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(stamp).\(url.pathExtension)")
         try? FileManager.default.moveItem(at: url, to: aside)
-        return nil
     }
 
     static func save<T: Encodable>(_ value: T, to url: URL) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
         guard let data = try? encoder.encode(value) else { return }
-        try? data.write(to: url, options: .atomic)
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            tellOnce(error)
+        }
+    }
+
+    /// A save that failed (the disk full, a folder you can't write to) is said once a run, in the front window, so
+    /// work doesn't go unsaved without anyone knowing.
+    private static let told = OSAllocatedUnfairLock(initialState: false)
+    private static func tellOnce(_ error: Error) {
+        guard told.withLock({ old in defer { old = true }; return !old }) else { return }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+                Toast.show(SaveFailure.message("Zigzag couldn’t save your tabs and spaces", error), symbol: "exclamationmark.triangle",
+                           duration: 8, in: controller)
+            }
+        }
     }
 }
