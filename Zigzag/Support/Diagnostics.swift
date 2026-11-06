@@ -34,7 +34,9 @@ nonisolated enum Diagnostics {
     /// pass `isPrivate` from a private window and the site is left out. Repeats in a row are counted, not added.
     static func note(_ kind: String, site: String? = nil, _ detail: String? = nil, isPrivate: Bool = false) {
         let site = isPrivate ? nil : site.map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }.flatMap { $0.isEmpty ? nil : $0 }
-        let detail = detail.map(clean)
+        // A private window's own words (an error quoting a host, a certificate naming its site) never land here:
+        // only an error's code, which names nothing.
+        let detail = isPrivate ? detail.flatMap(errorCode) : detail.map(clean)
         let (added, schedule) = state.withLock { s -> (Bool, Bool) in
             let now = Date()
             if var last = s.events.last, last.kind == kind, last.site == site, last.detail == detail, now.timeIntervalSince(last.date) < 60 {
@@ -106,6 +108,11 @@ nonisolated enum Diagnostics {
     private static var version: String {
         let info = Bundle.main.infoDictionary
         return "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
+    }
+
+    /// "(NSURLErrorDomain -1202)" from the end of a described error, or nil.
+    private static func errorCode(_ text: String) -> String? {
+        text.range(of: #"\([A-Za-z]+ -?\d+\)$"#, options: .regularExpression).map { String(text[$0]) }
     }
 
     /// A page's own words, kept short, with any address in them cut to its site: an error can quote a link that

@@ -24,6 +24,17 @@ struct DiagnosticsTests {
         #expect(!Diagnostics.clean("one\ntwo").contains("\n"))
     }
 
+    /// A private window's event keeps only its error code: the text could name the site.
+    @Test func privateWindowsKeepOnlyTheCode() {
+        let kind = "Test private \(UUID().uuidString)"
+        let started = Date()
+        defer { Diagnostics.forget(since: started) }
+        Diagnostics.note(kind, site: "bank.example", "This server could be pretending to be “bank.example” (NSURLErrorDomain -1202)", isPrivate: true)
+        let event = Diagnostics.events.last { $0.kind == kind }
+        #expect(event?.site == nil)
+        #expect(event?.detail == "(NSURLErrorDomain -1202)")
+    }
+
     @Test func errorsNameTheirCode() {
         let error = NSError(domain: NSURLErrorDomain, code: -1200, userInfo: [NSLocalizedDescriptionKey: "Secure connection failed"])
         #expect(Diagnostics.describe(error) == "Secure connection failed (NSURLErrorDomain -1200)")
