@@ -320,6 +320,11 @@ enum DebugBridge {
                 case .failure(let error): debugLog("jsclient error \(error)")
                 }
             }
+        case "peekjs":
+            // peekjs <script>: runs in the peeked page, as js does in the tab's.
+            controller.peek.tab?.webView?.evaluateJavaScript(arg) { result, error in
+                debugLog("peekjs => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
+            }
         case "js":
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
