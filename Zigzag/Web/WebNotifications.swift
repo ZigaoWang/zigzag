@@ -55,7 +55,9 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
             return (permission(host: host, tab: tab), nil)
         case "request":
             let state = permission(host: host, tab: tab)
-            guard state == "default", body["gesture"] as? Bool == true, !putOff.contains("\(tab.id)|\(host)") else { return (state, nil) }
+            // Only right after a click or key: the page's own word for it isn't enough, as a script can say anything.
+            let clicked = body["gesture"] as? Bool == true && Date().timeIntervalSince(UndoClock.lastPageInput) < 5
+            guard state == "default", clicked, !putOff.contains("\(tab.id)|\(host)") else { return (state, nil) }
             let answer = await SitePermissions.requestNotifications(host: host, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
             if answer == nil { putOff.insert("\(tab.id)|\(host)") }
             // A private window asks, so the page isn't left waiting, but it still never shows one.
