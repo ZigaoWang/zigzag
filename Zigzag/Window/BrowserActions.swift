@@ -23,6 +23,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         if desk.isVisible { desk.closeFocused(); return }
         if dismissFloatingContent() { return }
         guard let tab = selectedTab else {
+            // An empty space in a window that still has tabs in other spaces: closing the window would take those
+            // too, so ⌘W stops here. With nothing open anywhere, it closes the window as on any Mac.
+            if tabManager.allTabs.contains(where: { $0.bookmarkID == nil }) { NSSound.beep(); return }
             window?.performClose(sender)
             return
         }
