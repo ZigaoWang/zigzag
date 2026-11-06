@@ -158,9 +158,12 @@ enum SidebarMenus {
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(bookmark.id) })
             menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(bookmark.id) })
-            menu.addItem(Item("Pin This Page Instead") {
-                controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(bookmark.id, url: url) }
-            })
+            // A private window never writes where it's been into your pins.
+            if !manager.isPrivate {
+                menu.addItem(Item("Pin This Page Instead") {
+                    controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(bookmark.id, url: url) }
+                })
+            }
         }
         menu.addItem(Item("Copy Link") { controller.copyLink(bookmark.url) })
         menu.addItem(Item("Add to Favorites") {
@@ -272,9 +275,12 @@ enum SidebarMenus {
         if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
             menu.addItem(Item("Back to Pinned Page") { manager.resetBookmarkTab(favorite.id) })
             menu.addItem(Item("Separate from Pinned Tab") { manager.separateBookmarkTab(favorite.id) })
-            menu.addItem(Item("Pin This Page Instead") {
-                controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(favorite.id, url: url) }
-            })
+            // A private window never writes where it's been into your pins.
+            if !manager.isPrivate {
+                menu.addItem(Item("Pin This Page Instead") {
+                    controller.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(favorite.id, url: url) }
+                })
+            }
         }
         // A split favorite: its two pages go and come as one, and can be parted into two favorites.
         if let pair = Library.shared.pinnedSplit(containing: favorite.id) {

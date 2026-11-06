@@ -1499,6 +1499,8 @@ extension BrowserWindowController: SidebarDelegate {
         if let bookmarkID = tab.bookmarkID, let here = tab.url, let pin = Library.shared.bookmark(bookmarkID),
            TabManager.normalize(here) != TabManager.normalize(pin.url) {
             tabManager.close(tab)
+            // A private window never writes where it's been into your pins, so there's nothing to offer.
+            guard !tabManager.isPrivate else { return }
             Toast.show("\(pin.title) stays pinned to its own page", symbol: "pin", action: ("Pin This Page", { [weak self] in
                 self?.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(bookmarkID, url: here) }
             }), duration: 6, in: self)
