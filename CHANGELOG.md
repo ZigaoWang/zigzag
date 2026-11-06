@@ -49,7 +49,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The energy warning's Close Tab closes the tab in whichever window holds it now.
 - Retrying a download picks up in the same row and file, and a canceled or failed download leaves no partial file once cleared.
 - Ad blocking changes only for a page that actually loads, not for a link opened in another tab.
-- An address with @ in its path (youtube.com/@name) opens instead of searching.
+- An address with @ in its path, like a YouTube channel's, opens instead of searching.
 - A password file picked after an import brings its passwords over.
 - Arc history comes over from every profile, with its latest visits.
 - Importing thousands of bookmarks no longer freezes Zigzag.
