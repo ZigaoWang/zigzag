@@ -178,7 +178,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if navigationAction.shouldPerformDownload { return .download }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
-                               isClick: PopupNotice.isUserInitiated(navigationAction), from: webView)
+                               isClick: PopupNotice.isUserInitiated(navigationAction), from: webView,
+                               asker: navigationAction.sourceFrame.securityOrigin)
             return .cancel
         }
         return .allow

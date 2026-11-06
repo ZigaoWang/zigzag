@@ -25,7 +25,9 @@ enum ExternalLinks {
     /// Frames count too: meeting pages often open their app from a hidden frame, and the question keeps that honest.
     /// Only a page you can see asks; one in a background tab never puts a question over another site.
     /// `isClick`: a real click or key started it (not a script's click()).
-    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView) {
+    /// `asker`: the frame that asked, when it's from another site than the page (an ad on a meeting page): it's named,
+    /// and it never gets the page's saved answer.
+    static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, from webView: WKWebView, asker: WKSecurityOrigin? = nil) {
         let scheme = url.scheme?.lowercased() ?? ""
         // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
         // front one, so the link never just does nothing.
@@ -41,12 +43,17 @@ enum ExternalLinks {
             }
             return
         }
-        let host = webView.url?.host()?.lowercased() ?? ""
+        let pageHost = webView.url?.host()?.lowercased() ?? ""
+        let askerHost = asker?.host.lowercased() ?? ""
+        let foreign = !askerHost.isEmpty && (PublicSuffix.registrableDomain(askerHost) ?? askerHost) != (PublicSuffix.registrableDomain(pageHost) ?? pageHost)
+        // Answers are kept for secure pages only: one given to https://zoom.us never opens Zoom for http://zoom.us.
+        let canRemember = !foreign && webView.url?.scheme?.lowercased() == "https"
+        let host = foreign ? askerHost : pageHost
         let key = "\(host)|\(scheme)"
         // Mail, phone and FaceTime open at once for a link you clicked in the page in front; from anywhere else
         // (a hidden frame, a background tab, a script) they ask like any other app.
         let clickedHere = isClick && isMainFrame && webView.window != nil
-        if clickedHere && everyday.contains(scheme) || !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) {
+        if clickedHere && everyday.contains(scheme) || canRemember && !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) {
             NSWorkspace.shared.open(url)
             return
         }
@@ -56,7 +63,7 @@ enum ExternalLinks {
         // Private windows, popups included, never remember the answer.
         let isPrivate = !webView.configuration.websiteDataStore.isPersistent
         // Nothing to keep the answer under (a private window, or a page with no host): Open is for this time only.
-        let saves = !isPrivate && !host.isEmpty
+        let saves = !isPrivate && !host.isEmpty && canRemember
         let tab = (webView as? BrowserWebView)?.owner
         asking.insert(key)
         // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
@@ -66,7 +73,7 @@ enum ExternalLinks {
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: controller,
                                                     tab: tab, title: "Open \(name)", allowTitle: "Open",
                                                     denyTitle: "Don’t Open",
-                                                    answered: { !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
+                                                    answered: { canRemember && !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
             asking.remove(key)
             switch answer {
             case .allow:
