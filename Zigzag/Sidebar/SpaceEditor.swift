@@ -715,7 +715,7 @@ final class DirectionKnob: NSView {
         layer?.addSublayer(notch)
         toolTip = "Gradient Direction"
         setAccessibilityRole(.slider)
-        setAccessibilityLabel("Gradient direction")
+        setAccessibilityLabel("Gradient Direction")
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -927,7 +927,7 @@ final class AddColorSlot: InteractiveView {
         layer?.addSublayer(plus)
         toolTip = "Add Second Color"
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Add a second color")
+        setAccessibilityLabel("Add Second Color")
     }
 
     required init?(coder: NSCoder) { fatalError() }
