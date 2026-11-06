@@ -157,12 +157,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Opening URLs from elsewhere
 
     @objc private func handleGetURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
-        guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = URL(string: string) else { return }
+        guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = URL(string: string),
+              // A link another app hands over is a web address: never one of Zigzag's own pages, an extension's, or a file.
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         open(url)
     }
 
+    /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only.
     func application(_ application: NSApplication, open urls: [URL]) {
-        urls.forEach(open)
+        urls.filter { $0.isFileURL || ["http", "https"].contains($0.scheme?.lowercased() ?? "") }.forEach(open)
     }
 
     private func open(_ url: URL) {
