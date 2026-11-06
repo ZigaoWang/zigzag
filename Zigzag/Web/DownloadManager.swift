@@ -549,6 +549,14 @@ extension DownloadManager: WKDownloadDelegate {
         var values = URLResourceValues()
         values.quarantineProperties = properties
         try? url.setResourceValues(values)
+        // Where it came from, as Safari and Chrome note it: Finder's Get Info shows it under Where From. macOS keeps
+        // no addresses in the quarantine note above, so this is where they're kept.
+        if !isPrivate {
+            let froms = [source, page].compactMap { $0?.absoluteString }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+            if !froms.isEmpty, let plist = try? PropertyListSerialization.data(fromPropertyList: froms, format: .binary, options: 0) {
+                _ = plist.withUnsafeBytes { setxattr(file.path, "com.apple.metadata:kMDItemWhereFroms", $0.baseAddress, plist.count, 0, 0) }
+            }
+        }
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
