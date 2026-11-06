@@ -42,7 +42,15 @@ if [[ "${1:-}" == "--publish" || "${1:-}" == "--beta" ]]; then PUBLISHING=true; 
 BUILD=$(awk -F'"' '/CURRENT_PROJECT_VERSION:/ {print $2; exit}' project.yml)
 if $PUBLISHING; then
   for FEED in appcast beta; do
-    LIVE=$(curl -fsSL "https://$SITE_HOST/updates/$FEED.xml" 2>/dev/null | grep -oE 'sparkle:version="?>?[0-9]+' | grep -oE '[0-9]+$' | sort -n | tail -1 || true)
+    # Only a missing feed (404) means "nothing live yet": any other failure stops here, rather than publishing a
+    # build number that may be no higher than the live one.
+    STATUS=$(curl -sS -o /tmp/zigzag-live-$FEED.xml -w '%{http_code}' "https://$SITE_HOST/updates/$FEED.xml" || echo 000)
+    if [[ "$STATUS" != 200 && "$STATUS" != 404 ]]; then
+      echo "Couldn't read the live $FEED feed (HTTP $STATUS), so the build number can't be checked. Try again."
+      exit 1
+    fi
+    LIVE=""
+    [[ "$STATUS" == 200 ]] && LIVE=$(grep -oE 'sparkle:version="?>?[0-9]+' /tmp/zigzag-live-$FEED.xml | grep -oE '[0-9]+$' | sort -n | tail -1 || true)
     if [[ -n "$LIVE" && "$BUILD" -le "$LIVE" ]]; then
       echo "CURRENT_PROJECT_VERSION is $BUILD but the $FEED feed already has build $LIVE. Raise it in project.yml, then release."
       exit 1
