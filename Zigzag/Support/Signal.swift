@@ -32,19 +32,35 @@ final class SignalToken {
     isolated deinit { cancel() }
 }
 
-/// Coalesces bursts of calls into one, after a delay.
+/// Coalesces bursts of calls into one, after a delay. With `maxWait`, a burst that never pauses (a page rewriting
+/// its address as you scroll) still runs it that long after the first call, so a save can't be put off forever.
 final class Debouncer {
     private let delay: TimeInterval
+    private let maxWait: TimeInterval?
     private var work: DispatchWorkItem?
+    private var firstCall: Date?
 
-    init(delay: TimeInterval) { self.delay = delay }
+    init(delay: TimeInterval, maxWait: TimeInterval? = nil) {
+        self.delay = delay
+        self.maxWait = maxWait
+    }
 
     func call(_ action: @escaping () -> Void) {
         work?.cancel()
-        let item = DispatchWorkItem { MainActor.assumeIsolated { action() } }
+        let now = Date()
+        let first = firstCall ?? now
+        firstCall = first
+        var wait = delay
+        if let maxWait { wait = max(0, min(delay, maxWait - now.timeIntervalSince(first))) }
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.firstCall = nil
+                action()
+            }
+        }
         work = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: item)
     }
 
-    func cancel() { work?.cancel(); work = nil }
+    func cancel() { work?.cancel(); work = nil; firstCall = nil }
 }

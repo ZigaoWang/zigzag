@@ -395,7 +395,7 @@ final class Library {
         }
     }
 
-    private let saveDebouncer = Debouncer(delay: 0.5)
+    private let saveDebouncer = Debouncer(delay: 0.5, maxWait: 5)
 
     func save() {
         saveDebouncer.call { [self] in saveNow() }

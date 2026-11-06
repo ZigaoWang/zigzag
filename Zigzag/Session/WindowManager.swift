@@ -43,7 +43,7 @@ final class WindowManager {
 
     private(set) var controllers: [BrowserWindowController] = []
     private weak var lastKey: BrowserWindowController?
-    private let saveDebouncer = Debouncer(delay: 1.5)
+    private let saveDebouncer = Debouncer(delay: 1.5, maxWait: 10)
     private var isTerminating = false
 
     var keyController: BrowserWindowController? {
