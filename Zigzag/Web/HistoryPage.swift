@@ -187,7 +187,7 @@ enum HistoryPage {
         case "yesterday": ("today and yesterday", calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)))
         default: ("all history", nil)
         }
-        ConfirmSheet.show(in: host, title: since == nil ? clearTitle : "Clear \(title)?",
+        ConfirmSheet.show(in: host, title: since == nil ? clearTitle : "Clear history from \(title)?",
                           message: since == nil ? clearMessage : "Pages you visited \(range == "hour" ? "in the last hour" : title) are forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
                           confirmTitle: "Clear History", destructive: true) { confirmed in
             if confirmed {
