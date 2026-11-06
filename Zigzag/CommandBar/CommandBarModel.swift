@@ -357,10 +357,13 @@ enum CommandRanker {
 /// Fetches search suggestions from the chosen engine. Only what you type in the command bar is sent.
 final class SuggestionFetcher {
     private var task: Task<Void, Never>?
-    /// In a private window: suggestions go through a session of their own that keeps no cookies or cache,
-    /// so the search engine can't tie them to your other browsing.
+    /// In a private window: suggestions go through a session of their own, so the search engine can't tie them to
+    /// your other browsing.
     var isPrivate = false
     private lazy var privateSession = URLSession(configuration: .ephemeral)
+    /// Everyday windows' suggestions: no cookies and no cache either, so what you type can't be tied to you by a
+    /// cookie the engine set, only your text and the address it came from.
+    private static let session = URLSession(configuration: .ephemeral)
 
     /// On by default. Off, nothing you type in the command bar leaves the Mac for suggestions.
     static var isOn: Bool {
@@ -378,7 +381,7 @@ final class SuggestionFetcher {
     func fetch(_ query: String, completion: @escaping ([String]) -> Void) {
         task?.cancel()
         guard let url = Self.url(for: query, engine: Library.shared.searchEngine, isOn: Self.isOn) else { completion([]); return }
-        let session = isPrivate ? privateSession : URLSession.shared
+        let session = isPrivate ? privateSession : Self.session
         task = Task {
             try? await Task.sleep(for: .milliseconds(90))
             guard !Task.isCancelled else { return }
