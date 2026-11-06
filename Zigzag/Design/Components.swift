@@ -50,7 +50,9 @@ class CardRow: InteractiveView {
         self.detail.stringValue = detail
         self.detail.alignment = .right
         [iconView, self.title, self.detail].forEach { addSubview($0) }
-        defer { self.symbol = symbol }
+        // Set here directly: an observer doesn't run for a property set in its own class's init.
+        self.symbol = symbol
+        iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.row) }
         setAccessibilityRole(.button)
         setAccessibilityLabel(title)
         stateDidChange(animated: false)
