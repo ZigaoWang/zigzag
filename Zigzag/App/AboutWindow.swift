@@ -45,11 +45,13 @@ private final class AboutView: NSView {
         AboutView.row("Release Notes", "doc.text", open: WhatsNew.allNotes),
         AboutView.row("Acknowledgements", "heart", run: { AcknowledgementsWindowController.show() }),
         AboutView.row("Website", "globe", detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
+        AboutView.row("Source Code", "chevron.left.forwardslash.chevron.right", detail: "GitHub", open: URL(string: "https://github.com/ZigaoWang/zigzag")!),
         AboutView.row("Made by Zigao Wang", "person", detail: "zigao.wang", open: URL(string: "https://www.zigao.wang")!),
     ]
     /// The rows on one soft card, as a group of settings sits, so they read as one list.
     private let card = ColorView(color: Tokens.Color.surfaceGroup)
-    private let legal = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    /// The copyright, and the license as a link to its text.
+    private let legal = NSTextField(labelWithAttributedString: AboutView.legalText())
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -59,9 +61,9 @@ private final class AboutView: NSView {
         let build = info?["CFBundleVersion"] as? String
         version.stringValue = "Version \(short)" + (build.map { " (\($0))" } ?? "")
         version.alignment = .center
-        legal.stringValue = "© \(Calendar.current.component(.year, from: Date())) Zigao Wang. Apache License 2.0."
-        legal.alignment = .center
-        legal.toolTip = "Zigzag’s code is open source under the Apache License 2.0; the name and logo are trademarks of Zigao Wang"
+        // Selectable, so its link can be clicked.
+        legal.isSelectable = true
+        legal.allowsEditingTextAttributes = true
         icon.imageScaling = .scaleProportionallyUpOrDown
         card.wantsLayer = true
         card.layer?.cornerRadius = Tokens.Radius.group
@@ -76,6 +78,19 @@ private final class AboutView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         needsLayout = true
+    }
+
+    /// "© 2026 Zigao Wang. Apache License 2.0.", the license a link to Zigzag's own copy of it.
+    private static func legalText() -> NSAttributedString {
+        let center = NSMutableParagraphStyle()
+        center.alignment = .center
+        let quiet: [NSAttributedString.Key: Any] = [.font: Tokens.Font.small(), .foregroundColor: Tokens.Color.textTertiary, .paragraphStyle: center]
+        let text = NSMutableAttributedString(string: "© \(Calendar.current.component(.year, from: Date())) Zigao Wang. ", attributes: quiet)
+        var link = quiet
+        link[.link] = URL(string: "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE")
+        text.append(NSAttributedString(string: "Apache License 2.0", attributes: link))
+        text.append(NSAttributedString(string: ".", attributes: quiet))
+        return text
     }
 
     private static func row(_ title: String, _ symbol: String, detail: String = "", open url: URL? = nil, run: (() -> Void)? = nil) -> CardRow {
@@ -106,6 +121,7 @@ private final class AboutView: NSView {
             row.frame = NSRect(x: pad + inset, y: y, width: width - (pad + inset) * 2, height: Tokens.Metric.rowHeight)
             y += Tokens.Metric.rowHeight
         }
-        legal.frame = NSRect(x: 0, y: bounds.height - Tokens.Space.x5 - legal.lineHeight, width: width, height: legal.lineHeight)
+        let legalHeight = ceil(legal.sizeThatFits(NSSize(width: width, height: 100)).height)
+        legal.frame = NSRect(x: 0, y: bounds.height - Tokens.Space.x5 - legalHeight, width: width, height: legalHeight)
     }
 }
