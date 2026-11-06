@@ -650,7 +650,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
         windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", control: borderlessToggle))
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
-        windowGroup.add(FormRow(title: "Large space names", detail: "The space’s name large and light above its tabs. Off, it’s a plain heading.", control: largeNamesToggle))
+        windowGroup.add(FormRow(title: "Large space names", detail: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", control: largeNamesToggle))
         windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         windowGroup.add(FormRow(title: "Reduce motion", detail: "Things appear in place instead of sliding or growing. Fades stay.", control: motionToggle))
@@ -1010,8 +1010,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         alwaysReset = always.isEmpty ? nil : reset
         alwaysGroup.add(always.isEmpty
-            ? FormRow(title: "None yet", detail: "Choose a language to always translate in a page’s site controls.", control: NSView())
-            : FormRow(title: ListFormatter.localizedString(byJoining: always), detail: "Translated as soon as they open.", control: NSView()))
+            ? FormRow(title: "None yet", detail: "To always translate a language, choose it in a page’s site controls.", control: NSView())
+            : FormRow(title: ListFormatter.localizedString(byJoining: always), detail: "Pages in these languages are translated as soon as they open.", control: NSView()))
     }
 
     // MARK: Shortcuts
@@ -1205,7 +1205,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             resetAll.isHidden = !Shortcuts.hasChanges
             // Every shortcut you set, back to how Zigzag comes: asked first, as Sites' Reset All is.
             resetAll.onClick = { [weak self] _ in
-                self?.confirm(title: "Reset all shortcuts?", message: "Every shortcut you changed goes back to how Zigzag comes.", action: "Reset All") {
+                self?.confirm(title: "Reset all shortcuts?", message: "Every shortcut you changed goes back to its default.", action: "Reset All") {
                     Shortcuts.resetAll()
                     ShortcutRow.lastTaken = nil
                     self?.reloadShortcuts()
