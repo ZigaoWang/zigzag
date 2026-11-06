@@ -65,7 +65,7 @@ enum MainMenu {
             item("Close Window", #selector(NSWindow.performClose(_:)), "w", [.command, .shift]),
             .separator(),
             item("Share…", #selector(C.sharePage(_:)), ""),
-            item("Save Page As…", #selector(C.savePageAs(_:)), ""),
+            item("Save Page As…", #selector(C.savePageAs(_:)), "s"),
             item("Export as PDF…", #selector(C.exportAsPDF(_:)), ""),
             item("Take Screenshot of Page", #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
             item("Print…", #selector(C.printPage(_:)), "p"),
