@@ -9,10 +9,11 @@ enum PowerSaving {
 
     static var isOn: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled || onBattery }
 
-    /// Whether the Mac is running on its battery right now.
+    /// Whether the Mac is running on its battery right now. (The source type is only borrowed from the info, which
+    /// is ours: a "Get", not a "Copy".)
     nonisolated static var onBattery: Bool {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let type = IOPSGetProvidingPowerSourceType(info)?.takeRetainedValue() as String? else { return false }
+              let type = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String? else { return false }
         return type == kIOPSBatteryPowerValue
     }
 
