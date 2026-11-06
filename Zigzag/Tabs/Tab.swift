@@ -369,10 +369,21 @@ final class Tab: NSObject {
             return
         }
         if url.isFileURL {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+            webView.loadFileURL(url, allowingReadAccessTo: Self.readAccess(for: url))
         } else {
             webView.load(URLRequest(url: url))
         }
+    }
+
+    /// What a local page may read: its folder, for its pictures and styles beside it. Not when it sits loose in
+    /// Downloads, which holds everything you've ever downloaded: there only the file, unless it was saved as a whole
+    /// page with its "_files" folder.
+    static func readAccess(for file: URL) -> URL {
+        let folder = file.deletingLastPathComponent()
+        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        guard folder.standardizedFileURL.path == downloads?.standardizedFileURL.path else { return folder }
+        let saved = folder.appendingPathComponent(file.deletingPathExtension().lastPathComponent + "_files")
+        return FileManager.default.fileExists(atPath: saved.path) ? folder : file
     }
 
     func goBack() {
