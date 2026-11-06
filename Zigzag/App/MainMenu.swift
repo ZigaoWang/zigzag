@@ -89,6 +89,7 @@ enum MainMenu {
                 item("Find Next", #selector(C.findNextMatch(_:)), "g"),
                 item("Find Previous", #selector(C.findPreviousMatch(_:)), "g", [.command, .shift]),
                 item("Use Selection for Find", #selector(C.useSelectionForFind(_:)), "e"),
+                item("Jump to Selection", #selector(C.jumpToSelection(_:)), "j"),
             ]),
             submenu("Spelling and Grammar", [
                 item("Show Spelling and Grammar", #selector(NSText.showGuessPanel(_:)), ":"),

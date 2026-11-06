@@ -200,6 +200,14 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// Edit › Find › Jump to Selection: the page scrolls back to what's selected on it, as in Safari.
+    @objc func jumpToSelection(_ sender: Any?) {
+        let script = "(() => { const s = getSelection(); if (!s || s.rangeCount === 0 || s.isCollapsed) return false;"
+            + " const node = s.getRangeAt(0).startContainer; const el = node.nodeType === 1 ? node : node.parentElement;"
+            + " if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); return true; })()"
+        selectedWebView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
     // MARK: View
 
     @objc func toggleBrowserSidebar(_ sender: Any?) {
@@ -468,7 +476,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
              #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(viewSource(_:)), #selector(duplicateTab(_:)),
-             #selector(useSelectionForFind(_:)):
+             #selector(useSelectionForFind(_:)), #selector(jumpToSelection(_:)):
             return tab != nil
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)):
             return tab != nil && findBar.hasQuery
