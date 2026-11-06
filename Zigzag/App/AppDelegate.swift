@@ -182,6 +182,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menu
     }
 
+    /// A page handed off from your iPhone or another Mac opens here, like a link from any app.
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity,
+                     restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return false }
+        open(url)
+        return true
+    }
+
     /// One quiet offer, on the second launch, never repeated: by then you know whether you like it here.
     private func offerDefaultBrowserOnce() {
         let defaults = UserDefaults.standard
