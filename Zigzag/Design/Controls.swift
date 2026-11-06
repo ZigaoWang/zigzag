@@ -267,7 +267,7 @@ class InteractiveView: NSView {
         return true
     }
 
-    private static var keyboardAccess: Bool {
+    static var keyboardAccess: Bool {
         #if DEBUG
         if debugKeyboardAccess { return true }
         #endif
@@ -1950,5 +1950,52 @@ enum Announcement {
         guard !text.isEmpty, NSWorkspace.shared.isVoiceOverEnabled else { return }
         NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
                              userInfo: [.announcement: text, .priority: priority.rawValue])
+    }
+}
+
+/// Keyboard focus for drawn controls that aren't buttons (the space editor's color wheel, sliders and direction
+/// knob): Tab reaches them with Full Keyboard Access on, as it does buttons, and while one has focus it's ringed in
+/// the accent, as a button is. A click never gives them focus, so the mouse works as it always has.
+final class KeyboardFocus {
+    private weak var view: NSView?
+    private var ring: CAShapeLayer?
+
+    init(_ view: NSView) { self.view = view }
+
+    var accepts: Bool {
+        guard InteractiveView.keyboardAccess else { return false }
+        if let type = NSApp.currentEvent?.type, [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(type) { return false }
+        return true
+    }
+
+    /// Shows or hides the ring, drawn along `shape` (in the view's own coordinates) just outside it.
+    func show(_ focused: Bool, around shape: CGPath) {
+        guard focused, let view, let layer = view.layer else {
+            ring?.removeFromSuperlayer()
+            ring = nil
+            return
+        }
+        layer.masksToBounds = false
+        let ring = self.ring ?? CAShapeLayer()
+        Tokens.Motion.withoutAnimation {
+            ring.path = shape
+            ring.fillColor = nil
+            ring.lineWidth = Tokens.Metric.focusRing
+            ring.strokeColor = view.cgColor(Brand.Theme.for(view).accent.withAlphaComponent(Tokens.Color.focusAlpha))
+            ring.zPosition = 10
+            if ring.superlayer == nil { layer.addSublayer(ring) }
+        }
+        self.ring = ring
+    }
+
+    /// Which arrow a key is, if any: -1 for left or down, 1 for right or up, with whether it was up or down.
+    static func arrow(_ event: NSEvent) -> (step: Double, vertical: Bool)? {
+        switch event.keyCode {
+        case 123: (-1, false)
+        case 124: (1, false)
+        case 125: (-1, true)
+        case 126: (1, true)
+        default: nil
+        }
     }
 }

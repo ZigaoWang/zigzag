@@ -247,6 +247,34 @@ final class ColorWheel: NSView {
     }
 
     /// VoiceOver: more or less color, or the next hue around.
+
+    // MARK: Keyboard
+
+    private lazy var focus = KeyboardFocus(self)
+    override var acceptsFirstResponder: Bool { focus.accepts }
+    override var canBecomeKeyView: Bool { focus.accepts && !isHiddenOrHasHiddenAncestor }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        focus.show(true, around: focusShape)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        guard super.resignFirstResponder() else { return false }
+        focus.show(false, around: focusShape)
+        return true
+    }
+
+    /// Around the disc itself, not the room the view gives it.
+    private var focusShape: CGPath { CGPath(ellipseIn: disc.frame.insetBy(dx: -(Tokens.Metric.focusGap + Tokens.Metric.focusRing / 2), dy: -(Tokens.Metric.focusGap + Tokens.Metric.focusRing / 2)), transform: nil) }
+
+    /// Left and right turn the selected knob's hue; up and down give it more color or less.
+    override func keyDown(with event: NSEvent) {
+        guard let arrow = KeyboardFocus.arrow(event) else { super.keyDown(with: event); return }
+        nudge(selected, amount: arrow.vertical ? arrow.step * 0.05 : 0, hue: arrow.vertical ? 0 : arrow.step / 36)
+    }
+
     private func nudge(_ index: Int, amount: Double, hue: Double) {
         guard index < spots.count else { return }
         var spot = spots[index]
@@ -673,6 +701,36 @@ final class LookSlider: NSView {
     override func accessibilityPerformIncrement() -> Bool { step(0.1) }
     override func accessibilityPerformDecrement() -> Bool { step(-0.1) }
 
+
+    // MARK: Keyboard
+
+    private lazy var focus = KeyboardFocus(self)
+    override var acceptsFirstResponder: Bool { focus.accepts }
+    override var canBecomeKeyView: Bool { focus.accepts && !isHiddenOrHasHiddenAncestor }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        focus.show(true, around: focusShape)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        guard super.resignFirstResponder() else { return false }
+        focus.show(false, around: focusShape)
+        return true
+    }
+
+    private var focusShape: CGPath {
+        let rect = bounds.insetBy(dx: -(Tokens.Metric.focusGap + Tokens.Metric.focusRing / 2), dy: -(Tokens.Metric.focusGap + Tokens.Metric.focusRing / 2))
+        return CGPath(roundedRect: rect, cornerWidth: rect.height / 2, cornerHeight: rect.height / 2, transform: nil)
+    }
+
+    /// Any arrow moves it a twentieth of the way.
+    override func keyDown(with event: NSEvent) {
+        guard let arrow = KeyboardFocus.arrow(event) else { super.keyDown(with: event); return }
+        _ = step(arrow.step * 0.05)
+    }
+
     private func step(_ delta: Double) -> Bool {
         value = min(max(value + delta, 0), 1)
         onChange?(value, true)
@@ -817,6 +875,33 @@ final class DirectionKnob: NSView {
     }
 
     override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
+
+    // MARK: Keyboard
+
+    private lazy var focus = KeyboardFocus(self)
+    override var acceptsFirstResponder: Bool { focus.accepts }
+    override var canBecomeKeyView: Bool { focus.accepts && !isHiddenOrHasHiddenAncestor }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        focus.show(true, around: focusShape)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        guard super.resignFirstResponder() else { return false }
+        focus.show(false, around: focusShape)
+        return true
+    }
+
+    private var focusShape: CGPath { CGPath(ellipseIn: bounds.insetBy(dx: -(Tokens.Metric.focusGap + Tokens.Metric.focusRing / 2), dy: -(Tokens.Metric.focusGap + Tokens.Metric.focusRing / 2)), transform: nil) }
+
+    /// Any arrow turns it a step of 15°.
+    override func keyDown(with event: NSEvent) {
+        guard let arrow = KeyboardFocus.arrow(event) else { super.keyDown(with: event); return }
+        angle = (angle + arrow.step * 15 + 360).truncatingRemainder(dividingBy: 360)
+        onChange?(angle, true)
+    }
 
     override func accessibilityPerformIncrement() -> Bool { angle = (angle + 45).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
     override func accessibilityPerformDecrement() -> Bool { angle = (angle + 315).truncatingRemainder(dividingBy: 360); onChange?(angle, true); return true }
