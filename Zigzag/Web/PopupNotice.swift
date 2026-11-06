@@ -78,6 +78,8 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
     static func blocked(_ url: URL?, from page: URL?, opener: Tab?, in controller: BrowserWindowController) {
         let host = page?.host()?.lowercased() ?? ""
         let isPrivate = controller.tabManager.isPrivate
+        let allowed = !host.isEmpty && !isPrivate && SitePermissions.popups(host: host)
+        Diagnostics.note(allowed ? "Pop-up opened as a tab" : "Pop-up blocked", site: host, isPrivate: isPrivate)
         if !host.isEmpty, !isPrivate, SitePermissions.popups(host: host) {
             if let url { controller.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false) }
             return

@@ -31,6 +31,7 @@ enum ExternalLinks {
             ?? popup.flatMap { p in WindowManager.shared.controllers.first { $0.window === p.parentWindow } }
             ?? WindowManager.shared.keyController
         guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
+            Diagnostics.note("No app for a link", site: webView.url?.host(), "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             if isMainFrame, webView.window != nil, let controller {
                 Toast.show("No app on this Mac opens “\(scheme):” links", symbol: "questionmark.app", duration: 3, in: controller)
             }

@@ -821,6 +821,7 @@ extension Tab: WKNavigationDelegate {
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
         certificateWarningHost = ErrorPage.offersProceed(nsError) ? failingURL?.host()?.lowercased() : nil
+        Diagnostics.note("Page didn't load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
         ErrorPage.show(error: nsError, url: failingURL, in: webView)
     }
 
@@ -829,6 +830,7 @@ extension Tab: WKNavigationDelegate {
         guard webView.window != nil else { reloadWhenShown = true; return }
         let now = Date()
         crashes = crashes.filter { now.timeIntervalSince($0) < 60 } + [now]
+        Diagnostics.note("Page stopped", site: (url ?? webView.url)?.host(), crashes.count >= 2 ? "twice in a minute" : "reloaded", isPrivate: isPrivate)
         // Twice in a minute: say so, rather than crash and reload forever.
         if crashes.count >= 2 {
             ErrorPage.show(error: NSError(domain: ErrorPage.crashDomain, code: 1), url: url ?? webView.url, in: webView)

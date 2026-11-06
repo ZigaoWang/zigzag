@@ -250,6 +250,8 @@ final class PermissionPrompt: FloatingPanelView {
         }
         queue[key] = task
         let answer = await task.value
+        Diagnostics.note("Asked: \(title ?? "Use \(what)")", site: host, answer == .allow ? "allowed" : answer == .deny ? "not allowed" : "put off",
+                         isPrivate: controller.tabManager.isPrivate)
         if queue[key] == task { queue[key] = nil }
         return answer
     }

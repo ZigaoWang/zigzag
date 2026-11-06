@@ -25,6 +25,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
         let controller = PopupWindowController(configuration: configuration, features: features, parent: parent)
         Self.open.insert(controller)
+        // Sign-ins and payments run through these: which site opened one is often the clue.
+        let opener = WindowManager.shared.controllers.first { $0.window === parent }?.tabManager.selectedTab?.url?.host()
+        Diagnostics.note("Pop-up opened", site: opener, isPrivate: controller.isPrivate)
         controller.showWindow(nil)
         if #available(macOS 15.4, *), !controller.isPrivate { ExtensionHost.shared.popupOpened(controller) }
         return controller.webView
@@ -138,6 +141,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webViewDidClose(_ webView: WKWebView) {
+        Diagnostics.note("Pop-up closed itself", site: webView.url?.host(), isPrivate: isPrivate)
         window?.close()
     }
 
@@ -189,12 +193,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
+        Diagnostics.note("Pop-up didn't load", site: failingURL?.host(), Diagnostics.describe(nsError), isPrivate: isPrivate)
         ErrorPage.show(error: nsError, url: failingURL, in: webView, canProceed: false)
     }
 
     /// The page's process crashed: load it again rather than leave a blank window, unless it just did the same.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         let again = lastCrash.map { Date().timeIntervalSince($0) < 10 } ?? false
+        Diagnostics.note("Pop-up page stopped", site: webView.url?.host(), isPrivate: isPrivate)
         lastCrash = Date()
         guard !again else { return }
         if webView.url != nil { webView.reload() }

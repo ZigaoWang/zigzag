@@ -540,6 +540,7 @@ extension DownloadManager: WKDownloadDelegate {
         if item.state != .cancelled {
             item.state = .failed
             item.failure = Self.reason(for: error)
+            Diagnostics.note("Download failed", site: item.sourceURL?.host(), Diagnostics.describe(error as NSError), isPrivate: item.isPrivate)
         }
         changed.send(item)
     }
