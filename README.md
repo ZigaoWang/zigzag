@@ -79,7 +79,7 @@ Updates install by themselves. What changed in each version is in the
 
 ## Feedback
 
-- **Bugs and ideas:** [open an issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), or Help › Send Feedback… in the app.
+- **Bugs and ideas:** [open an issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), or Help › Send Feedback… in the app. For a bug, Help › Report a Problem… writes a report you can read before you send it.
 - **Email:** a@zigao.wang
 - **Security problems:** see [SECURITY.md](SECURITY.md). Please don't post them in public issues.
 
