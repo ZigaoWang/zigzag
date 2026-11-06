@@ -54,12 +54,16 @@ page = f"""<!doctype html>
 <title>Zigzag Release Notes</title>
 <meta name="description" content="What's new in each version of Zigzag, the lightweight browser for Mac.">
 <link rel="canonical" href="https://zigzagbrowser.com/release-notes/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Zigzag">
 <meta property="og:title" content="Zigzag Release Notes">
 <meta property="og:description" content="What's new in each version of Zigzag, the lightweight browser for Mac.">
 <meta property="og:image" content="https://zigzagbrowser.com/assets/og.png">
 <meta property="og:url" content="https://zigzagbrowser.com/release-notes/">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://zigzagbrowser.com/assets/og.png">
 <link rel="icon" type="image/png" href="/assets/favicon-64.png">
+<link rel="apple-touch-icon" href="/assets/icon-256.png">
 <link rel="stylesheet" href="/assets/site.css?v=1793300000">
 </head>
 <body>
