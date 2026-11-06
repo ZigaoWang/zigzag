@@ -160,7 +160,7 @@ final class SitePanel: FloatingPanelView {
             self.close()
         }))
         if PageScreenshot.canTake(tab), !readerOn {
-            specs.append(("camera.viewfinder", "Capture", "Screenshot of the Whole Page", false, { [weak self] in
+            specs.append(("camera.viewfinder", "Capture", "Take Screenshot of Whole Page", false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 PageScreenshot.take(self.tab, in: controller)

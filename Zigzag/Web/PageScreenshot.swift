@@ -41,7 +41,7 @@ enum PageScreenshot {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setData(data, forType: .png)
             let name = fileName(for: tab)
-            let note = onScreenOnly ? "Copied what’s on screen: this page scrolls inside itself" : "Screenshot of the whole page copied"
+            let note = onScreenOnly ? "Copied what’s on screen: this page scrolls inside itself" : "Screenshot copied"
             Toast.show(note, symbol: "camera.viewfinder", action: ("Save", { [weak controller] in
                 guard let controller else { return }
                 save(data, name: name, in: controller)
