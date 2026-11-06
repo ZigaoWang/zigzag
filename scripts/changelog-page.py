@@ -53,11 +53,11 @@ page = f"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zigzag Release Notes</title>
 <meta name="description" content="What's new in each version of Zigzag, the lightweight browser for Mac.">
-<link rel="canonical" href="https://zigzagbrowser.com/release-notes">
+<link rel="canonical" href="https://zigzagbrowser.com/release-notes/">
 <meta property="og:title" content="Zigzag Release Notes">
 <meta property="og:description" content="What's new in each version of Zigzag, the lightweight browser for Mac.">
 <meta property="og:image" content="https://zigzagbrowser.com/assets/og.png">
-<meta property="og:url" content="https://zigzagbrowser.com/release-notes">
+<meta property="og:url" content="https://zigzagbrowser.com/release-notes/">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="/assets/favicon-64.png">
 <link rel="stylesheet" href="/assets/site.css?v=1793300000">
@@ -85,7 +85,7 @@ old.write_text('<!doctype html><meta charset="utf-8"><title>Zigzag Release Notes
 # The sitemap, dated by the newest release: every page changes with a release.
 newest = versions[0]["date"] if versions else datetime.date.today().isoformat()
 urls = "".join(f"  <url><loc>https://zigzagbrowser.com{path}</loc><lastmod>{newest}</lastmod></url>\n"
-               for path in ["/", "/download", "/release-notes"])
+               for path in ["/", "/download/", "/release-notes/"])
 (root / "site" / "sitemap.xml").write_text(
     '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + "</urlset>\n",
     encoding="utf-8")
