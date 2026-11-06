@@ -83,6 +83,7 @@ targets:
         NSCameraUsageDescription: Websites you visit can ask to use your camera.
         NSContactsUsageDescription: Zigzag fills your name, email, phone and address into forms from your own card in Contacts.
         NSMicrophoneUsageDescription: Websites you visit can ask to use your microphone.
+        NSLocalNetworkUsageDescription: Websites you visit can ask to connect to devices on your local network.
         NSLocationUsageDescription: Websites you visit can ask for your location.
         NSLocationWhenInUseUsageDescription: Websites you visit can ask for your location.
         NSAppTransportSecurity:
