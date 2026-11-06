@@ -87,7 +87,11 @@ actor PasswordStore {
     /// Whether this copy shows a test vault rather than the person's passwords.
     nonisolated static var isTestVault: Bool { testVaultLabel != nil }
 
-    static let accessGroup = "432GL3WKY2.app.zigzag.passwords"
+    /// The entitlement's group, as the build signed it (the team's prefix comes first); Zigzag's own as a fallback.
+    static let accessGroup: String = {
+        let group = Bundle.main.object(forInfoDictionaryKey: "ZigzagKeychainGroup") as? String ?? ""
+        return group.hasSuffix(".app.zigzag.passwords") ? group : "432GL3WKY2.app.zigzag.passwords"
+    }()
     /// "Never save for this site" choices, kept with the passwords so they sync too.
     private static let neverService = "app.zigzag.never-save"
 

@@ -72,6 +72,8 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         SUFeedURL: https://zigzagbrowser.com/updates/appcast.xml
         SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
+        # The passwords' Keychain group, with the signing team's prefix, so a build signed by anyone finds it.
+        ZigzagKeychainGroup: $(AppIdentifierPrefix)app.zigzag.passwords
         SUEnableAutomaticChecks: true
         SUAutomaticallyUpdate: true
         SUScheduledCheckInterval: 86400

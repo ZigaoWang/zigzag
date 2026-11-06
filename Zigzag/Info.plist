@@ -117,5 +117,7 @@
 	<string>$(SPARKLE_PUBLIC_KEY)</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
+	<key>ZigzagKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)app.zigzag.passwords</string>
 </dict>
 </plist>
