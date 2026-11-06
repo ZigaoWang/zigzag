@@ -31,6 +31,8 @@ final class HistoryStore {
         exec("PRAGMA journal_mode=WAL")
         // With WAL this is still safe across a crash, without a full disk sync on every page visited.
         exec("PRAGMA synchronous=NORMAL")
+        // What's cleared is overwritten, not just unlinked, so a cleared page can't be read back out of the file.
+        exec("PRAGMA secure_delete=ON")
         exec("""
         CREATE TABLE IF NOT EXISTS visits (
             url TEXT PRIMARY KEY,
@@ -122,6 +124,8 @@ final class HistoryStore {
         } else if date == nil {
             exec("DELETE FROM visits")
         }
+        // The log the deleted rows passed through goes too.
+        exec("PRAGMA wal_checkpoint(TRUNCATE)")
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date),
                               pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date))
     }
