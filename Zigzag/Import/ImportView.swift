@@ -518,7 +518,13 @@ private final class SourceRow: InteractiveView {
         switch fix {
         case .retry: title = "Try Again"
         case .fullDiskAccess: title = "Open System Settings"
-        case .exportFromApplePasswords: title = "Show Me How"
+        // Named for the app it opens to export from, so it says what happens.
+        case .exportFromApplePasswords:
+            switch source.kind {
+            case .safari: title = "Open Safari"
+            case .firefox(let browser): title = "Open \(browser.name)"
+            default: title = "Open Passwords"
+            }
         case .primaryPassword: title = "Unlock"
         case .none: return
         }
