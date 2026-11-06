@@ -29,15 +29,19 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         let password: SecretString
         let isChange: Bool
         weak var tab: Tab?
+        /// Sent from a frame of another site (an embedded sign-in): the page the tab was on then. The tab's own page
+        /// says nothing about how the frame's sign-in went, so only the tab moving on counts as it having worked.
+        let framedOn: URL?
         var urlToken: SignalToken?
         var checks: [DispatchWorkItem] = []
 
-        init(origin: Origin, username: String, password: SecretString, isChange: Bool, tab: Tab) {
+        init(origin: Origin, username: String, password: SecretString, isChange: Bool, tab: Tab, framedOn: URL?) {
             self.origin = origin
             self.username = username
             self.password = password
             self.isChange = isChange
             self.tab = tab
+            self.framedOn = framedOn
         }
     }
 
@@ -110,7 +114,9 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         }
         pendingUsernames[key] = nil
         guard Self.offersToSave else { return }
-        hold(HeldLogin(origin: origin, username: username, password: password, isChange: kind == "change", tab: tab), key: key)
+        let framed = !message.frameInfo.isMainFrame && tab.url?.host()?.lowercased() != origin.host
+        hold(HeldLogin(origin: origin, username: username, password: password, isChange: kind == "change", tab: tab,
+                       framedOn: framed ? tab.url : nil), key: key)
     }
 
     /// Keeps a sent login until the site answers. The answer is usually a new page, which reports itself; a site that
@@ -159,7 +165,18 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
 
     private func judge(_ key: ObjectIdentifier, page: PageAfterLogin) {
         guard let login = held[key] else { return }
-        switch Self.verdict(loginHost: login.origin.host, page: page) {
+        if let framedOn = login.framedOn {
+            // Still on the page that held the frame: wait, and if the tab never moves on, nothing is offered.
+            guard let now = login.tab?.url, now != framedOn else { return }
+            judge(key, verdict: .offer)
+            return
+        }
+        judge(key, verdict: Self.verdict(loginHost: login.origin.host, page: page))
+    }
+
+    private func judge(_ key: ObjectIdentifier, verdict: Verdict) {
+        guard let login = held[key] else { return }
+        switch verdict {
         case .wait:
             return
         case .drop:
