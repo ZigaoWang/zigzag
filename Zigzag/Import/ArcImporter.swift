@@ -1,6 +1,5 @@
 import AppKit
 import os
-import SQLite3
 
 /// One-click import from Arc: spaces (with names and colors), pinned tabs and Favorites as bookmarks, and history.
 /// Reads Arc's local files only; nothing leaves the Mac.
@@ -224,32 +223,34 @@ enum ArcImporter {
 
     // MARK: History
 
-    /// Reads Arc's Chromium history, off the main thread: the file can be hundreds of megabytes. It's copied
-    /// first because Arc keeps it locked while running.
+    /// Reads Arc's Chromium history, off the main thread: the file can be hundreds of megabytes. Every profile's, as
+    /// Arc's spaces can live in any of them ("Default", "Profile 1"…); the newest visit of a page wins.
     nonisolated static func readHistory() throws -> [(URL, String, Int, Date)] {
-        let source = arcSupport.appendingPathComponent("User Data/Default/History")
-        guard FileManager.default.fileExists(atPath: source.path) else { return [] }
-        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-arc-history-\(UUID().uuidString).sqlite")
-        defer { try? FileManager.default.removeItem(at: copy) }
-        try FileManager.default.copyItem(at: source, to: copy)
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(copy.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_close(db) }
-        var statement: OpaquePointer?
-        let sql = "SELECT url, title, visit_count, last_visit_time FROM urls WHERE hidden = 0 ORDER BY last_visit_time DESC LIMIT 50000"
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(statement) }
+        let userData = arcSupport.appendingPathComponent("User Data", isDirectory: true)
+        let profiles = ((try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? [])
+            .filter { $0 == "Default" || $0.hasPrefix("Profile ") }.sorted()
+        var newest: [URL: (URL, String, Int, Date)] = [:]
+        for profile in profiles {
+            let source = userData.appendingPathComponent(profile).appendingPathComponent("History")
+            guard FileManager.default.fileExists(atPath: source.path) else { continue }
+            for entry in readHistory(at: source) where newest[entry.0].map({ $0.3 < entry.3 }) ?? true {
+                newest[entry.0] = entry
+            }
+        }
+        return newest.values.sorted { $0.3 > $1.3 }
+    }
+
+    /// One profile's history, through a private copy with its write-ahead log (Arc keeps the file locked while
+    /// running, and the latest visits may be only in the log).
+    nonisolated private static func readHistory(at source: URL) -> [(URL, String, Int, Date)] {
+        guard let reader = SQLiteReader(source) else { return [] }
         var entries: [(URL, String, Int, Date)] = []
         // Chromium time: microseconds since 1601-01-01.
         let epochOffset: Double = 11_644_473_600
-        while sqlite3_step(statement) == SQLITE_ROW {
-            guard let cURL = sqlite3_column_text(statement, 0), let url = URL(string: String(cString: cURL)),
-                  HistoryStore.shouldRecord(url) else { continue }
-            let title = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
-            let count = Int(sqlite3_column_int(statement, 2))
-            let micros = Double(sqlite3_column_int64(statement, 3))
-            let date = Date(timeIntervalSince1970: micros / 1_000_000 - epochOffset)
-            entries.append((url, title, count, date))
+        reader.rows("SELECT url, title, visit_count, last_visit_time FROM urls WHERE hidden = 0 ORDER BY last_visit_time DESC LIMIT 50000") { row in
+            guard let url = URL(string: row.string(0)), HistoryStore.shouldRecord(url) else { return }
+            let date = Date(timeIntervalSince1970: Double(row.int(3)) / 1_000_000 - epochOffset)
+            entries.append((url, row.string(1), Int(row.int(2)), date))
         }
         return entries
     }
