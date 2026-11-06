@@ -62,9 +62,15 @@ final class TabArchive {
         prune()
     }
 
-    func add(_ entry: ArchivedTab) {
-        entries.removeAll { $0.url == entry.url }
-        entries.insert(entry, at: 0)
+    func add(_ entry: ArchivedTab) { add(contentsOf: [entry]) }
+
+    /// Several at once (a morning's worth of tabs going quiet), written once.
+    func add(contentsOf new: [ArchivedTab]) {
+        guard !new.isEmpty else { return }
+        for entry in new {
+            entries.removeAll { $0.url == entry.url }
+            entries.insert(entry, at: 0)
+        }
         prune()
         save()
     }

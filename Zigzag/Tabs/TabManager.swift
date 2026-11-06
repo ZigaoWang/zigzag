@@ -1132,9 +1132,11 @@ final class TabManager {
                 && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
         }
         guard !stale.isEmpty else { return }
+        var archived: [ArchivedTab] = []
+        defer { TabArchive.shared.add(contentsOf: archived) }
         for tab in stale {
             guard let url = tab.url, var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { continue }
-            TabArchive.shared.add(ArchivedTab(url: url, title: tab.displayTitle, spaceID: tab.spaceID, archivedAt: now))
+            archived.append(ArchivedTab(url: url, title: tab.displayTitle, spaceID: tab.spaceID, archivedAt: now))
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
             recentTabIDs.removeAll { $0 == tab.id }
