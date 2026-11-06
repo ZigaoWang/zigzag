@@ -63,7 +63,7 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
 
     /// WebKit's own record of whether a click or a key started it (not public API, but long-standing); without
     /// it, whether the last thing you did was a click or a key a moment ago.
-    private static func isUserInitiated(_ action: WKNavigationAction) -> Bool {
+    static func isUserInitiated(_ action: WKNavigationAction) -> Bool {
         let selector = NSSelectorFromString("_isUserInitiated")
         if action.responds(to: selector), let initiated = action.value(forKey: "_isUserInitiated") as? Bool { return initiated }
         guard let event = NSApp.currentEvent, ProcessInfo.processInfo.systemUptime - event.timestamp < 1 else { return false }

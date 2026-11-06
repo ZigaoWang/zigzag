@@ -314,6 +314,9 @@ final class Tab: NSObject {
 
     /// True while the web view was built for an extension's own pages (settings, dashboards).
     private var showsExtensionPage = false
+    /// When the page last started a download without a click, and when a frame in it was last clicked into.
+    private var lastScriptDownload: Date?
+    private var frameClickedAt: Date?
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
@@ -613,7 +616,21 @@ final class Tab: NSObject {
 
 extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
-        if navigationAction.shouldPerformDownload { return (.download, preferences) }
+        let userInitiated = PopupNotice.isUserInitiated(navigationAction)
+        if navigationAction.shouldPerformDownload {
+            // A download link you click saves. One a script starts on its own saves too (an export that's ready),
+            // but not a stream of them: another within half a minute is refused.
+            if !userInitiated {
+                if let last = lastScriptDownload, Date().timeIntervalSince(last) < 30 {
+                    Diagnostics.note("Download refused", site: url?.host(), "A page started another download without a click", isPrivate: isPrivate)
+                    return (.cancel, preferences)
+                }
+                lastScriptDownload = Date()
+            }
+            return (.download, preferences)
+        }
+        // A click inside a frame lets that frame hand over a file a moment later (a download page's hidden frame).
+        if navigationAction.targetFrame?.isMainFrame == false, userInitiated { frameClickedAt = Date() }
 
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
 
@@ -710,14 +727,15 @@ extension Tab: WKNavigationDelegate {
         // service worker, as YouTube's first load does), and a page saved as "youtube.com.html" is never right.
         let isWebPage = mime.isEmpty || ["text/html", "application/xhtml+xml", "text/plain", "application/json", "text/xml", "application/xml"].contains(mime)
         let isAttachment = disposition.hasPrefix("attachment") && (!isWebPage || disposition.contains("filename"))
+        // Files in frames aren't saved behind the person's back: only the page itself, or a frame just clicked.
+        let frameMaySave = navigationResponse.isForMainFrame || frameClickedAt.map { Date().timeIntervalSince($0) < 10 } == true
         let policy: WKNavigationResponsePolicy
         if isAttachment {
-            policy = .download
+            policy = frameMaySave ? .download : .cancel
         } else if isWebPage || navigationResponse.canShowMIMEType {
             policy = .allow
         } else {
-            // Files in frames aren't saved behind the person's back; only the page itself can start a download.
-            policy = navigationResponse.isForMainFrame ? .download : .cancel
+            policy = frameMaySave ? .download : .cancel
         }
         #if DEBUG
         if policy == .download {
