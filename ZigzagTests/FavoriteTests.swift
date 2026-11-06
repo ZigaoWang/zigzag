@@ -47,3 +47,17 @@ struct FavoriteTests {
         #expect(order == [ids[0], ids[1], new, ids[2]])
     }
 }
+
+/// What a bookmark is called when you pin a page.
+struct BookmarkTitleTests {
+    @Test func homePageTakesTheSiteName() {
+        #expect(TabManager.bookmarkTitle("Inbox (3) - Gmail", url: URL(string: "https://gmail.com/")!) == "Gmail")
+        #expect(TabManager.bookmarkTitle("YouTube", url: URL(string: "https://www.youtube.com")!) == "YouTube")
+    }
+
+    @Test func otherPagesKeepTheirTitle() {
+        let title = "ZigaoWang/zigzag: A browser - GitHub"
+        #expect(TabManager.bookmarkTitle(title, url: URL(string: "https://github.com/ZigaoWang/zigzag")!) == title)
+        #expect(TabManager.bookmarkTitle("Results - Google Search", url: URL(string: "https://google.com/?q=x")!) == "Results - Google Search")
+    }
+}

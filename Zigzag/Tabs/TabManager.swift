@@ -641,8 +641,12 @@ final class TabManager {
         tab.load(bookmark.url)
     }
 
-    /// Page titles make long bookmark names ("GitHub · Change is constant"). Keep the site's name when it leads.
+    /// A site's home page is named for the site ("Inbox (3) - Gmail" is kept as "Gmail"): the page title there says
+    /// little. Any other page keeps the title its tab showed, which says which page it is ("ZigaoWang/zigzag: A browser
+    /// - GitHub" stays, never just "GitHub").
     static func bookmarkTitle(_ title: String, url: URL) -> String {
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard path.isEmpty, url.query == nil else { return title }
         let separators = [" · ", " | ", " - ", " — ", " – ", ": "]
         let host = HistoryStore.normalizedHost(url).split(separator: ".").first.map(String.init)?.lowercased() ?? ""
         for separator in separators {
