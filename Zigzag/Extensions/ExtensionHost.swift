@@ -178,11 +178,11 @@ final class ExtensionHost: NSObject {
     }
 
     private func announceExistingWindows(to context: WKWebExtensionContext) {
-        for window in WindowManager.shared.controllers {
+        for window in openWindows {
             controller.didOpenWindow(window)
             for tab in window.tabManager.allTabs { controller.didOpenTab(tab) }
         }
-        if let key = WindowManager.shared.keyController { controller.didFocusWindow(key) }
+        if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { controller.didFocusWindow(key) }
     }
 
     // MARK: Toolbar actions
@@ -341,7 +341,11 @@ final class ExtensionHost: NSObject {
         default: break
         }
     }
-    func windowOpened(_ window: BrowserWindowController) { controller.didOpenWindow(window) }
+    // Private windows are never told to extensions: not opened, focused or closed, and never listed.
+    func windowOpened(_ window: BrowserWindowController) {
+        guard !window.tabManager.isPrivate else { return }
+        controller.didOpenWindow(window)
+    }
 
     // Sign-in popups: a window with one tab, opened, changed, focused and closed like any other.
     func popupOpened(_ popup: PopupWindowController) {
@@ -358,8 +362,17 @@ final class ExtensionHost: NSObject {
         controller.didCloseTab(popup.tab, windowIsClosing: true)
         controller.didCloseWindow(popup)
     }
-    func windowClosed(_ window: BrowserWindowController) { controller.didCloseWindow(window) }
-    func windowFocused(_ window: BrowserWindowController?) { controller.didFocusWindow(window) }
+    func windowClosed(_ window: BrowserWindowController) {
+        guard !window.tabManager.isPrivate else { return }
+        controller.didCloseWindow(window)
+    }
+    /// A private window in front reads to extensions as no window focused.
+    func windowFocused(_ window: BrowserWindowController?) {
+        controller.didFocusWindow(window?.tabManager.isPrivate == true ? nil : window)
+    }
+
+    /// The windows extensions may see: every one but the private ones.
+    private var openWindows: [BrowserWindowController] { WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate } }
 
     /// Keyboard shortcuts declared by extensions (1Password's fill shortcut).
     func performCommand(for event: NSEvent) -> Bool {
@@ -375,18 +388,21 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
         // The focused window first, as extensions expect; sign-in popups count too.
         let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter { !$0.isPrivate }
-        let windows: [any WKWebExtensionWindow] = WindowManager.shared.controllers
+        let windows: [any WKWebExtensionWindow] = openWindows
         let key = PopupWindowController.key
         return key.map { [$0] + windows + popups.filter { $0 !== key } } ?? windows + popups
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        PopupWindowController.key ?? WindowManager.shared.keyController
+        if let popup = PopupWindowController.key { return popup }
+        return WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
-        let window = (configuration.window as? BrowserWindowController) ?? WindowManager.shared.keyController
+        // Never into a private window: what an extension opens belongs to everyday browsing.
+        let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
+        let window = (configuration.window as? BrowserWindowController) ?? key ?? openWindows.last
             ?? WindowManager.shared.restoreIfNoWindows() ?? WindowManager.shared.newWindow(showCommandBar: false)
         let tab = window.tabManager.newTab(url: configuration.url, select: configuration.shouldBeActive)
         completionHandler(tab, nil)
@@ -581,8 +597,9 @@ extension Tab: WKWebExtensionTab {
 
 @available(macOS 15.4, *)
 extension BrowserWindowController: WKWebExtensionWindow {
-    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { tabManager.navigableTabs }
-    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tabManager.selectedTab }
+    // A private window is never listed, but should one be reached anyway, its tabs stay unseen.
+    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { tabManager.isPrivate ? [] : tabManager.navigableTabs }
+    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tabManager.isPrivate ? nil : tabManager.selectedTab }
     func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .normal }
     func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState {
         guard let window else { return .normal }
