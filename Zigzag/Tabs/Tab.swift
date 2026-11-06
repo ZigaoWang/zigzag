@@ -863,7 +863,9 @@ extension Tab: WKNavigationDelegate {
         }
         Task { [weak self] in
             let article = await Reader.isArticle(webView)
-            if article { Reader.prepare(webView); ReaderView.prewarm() }
+            // Read ahead only for the page you're looking at: ten links opened in the background shouldn't each be
+            // parsed and have their pictures fetched. Reader still opens on any page; it just reads it then.
+            if article, webView.window != nil { Reader.prepare(webView); ReaderView.prewarm() }
             guard let self, self.webView === webView, article != self.isArticle else { return }
             self.isArticle = article
             self.changed.send(.reader)
