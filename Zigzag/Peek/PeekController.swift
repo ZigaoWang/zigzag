@@ -291,6 +291,8 @@ final class PeekController {
         }, completion: {
             if !self.isVisible { self.panel.removeFromSuperview() }
             self.panel.alphaValue = 1
+            // The window closed while it grew: the page goes with it, rather than living on with no window.
+            guard WindowManager.shared.controllers.contains(where: { $0 === controller }) else { tab.close(); return }
             controller.tabManager.insert(tab)
         })
     }
