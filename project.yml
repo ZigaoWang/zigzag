@@ -70,6 +70,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: © 2026 Zigao Wang
         SUFeedURL: https://zigzagbrowser.com/updates/appcast.xml
         SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
         # The passwords' Keychain group, with the signing team's prefix, so a build signed by anyone finds it.

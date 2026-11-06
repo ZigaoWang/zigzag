@@ -95,6 +95,8 @@
 	<string>Zigzag saves the files you download here.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Zigao Wang</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Websites you visit can ask to connect to devices on your local network.</string>
 	<key>NSLocationUsageDescription</key>
