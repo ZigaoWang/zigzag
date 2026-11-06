@@ -38,7 +38,7 @@ final class ImportView: NSView {
     private let rowList = FlippedView()
     private let choiceLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private var choiceButtons: [(ImportCoordinator.Choice, ChoicePill)] = []
-    private let chooseFile = TextButton(title: "Choose a File", font: Tokens.Font.body(.medium))
+    private let chooseFile = TextButton(title: "Choose File…", font: Tokens.Font.body(.medium))
     private let primary = PrimaryButton(title: "Import")
     private let secondary = TextButton(title: "Not Now", font: Tokens.Font.body(.medium))
     private let emptyNote = NSTextField(wrappingLabelWithString: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.")

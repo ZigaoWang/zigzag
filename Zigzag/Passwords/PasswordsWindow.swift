@@ -89,7 +89,7 @@ final class PasswordsView: NSView {
     private let header = PageHeader()
     private let paneTitle = PageTitleView("All Passwords")
     private let search = FilledField.search("Search sites and usernames")
-    private let importButton = PillButton(title: "Import", symbol: "square.and.arrow.down", style: .plain)
+    private let importButton = PillButton(title: "Import…", symbol: "square.and.arrow.down", style: .plain)
     private let exportButton = PillButton(title: "Export", symbol: "square.and.arrow.up", style: .plain)
     private let listScroll = NSScrollView()
     private let list = FlippedView()
@@ -220,7 +220,7 @@ final class PasswordsView: NSView {
     private var isLoadingVault = false
     /// The keychain wouldn't give up the list: say so, rather than look like there are no passwords at all.
     private var readFailed = false
-    private let importPasswords = PillButton(title: "Import Passwords", style: .prominent)
+    private let importPasswords = PillButton(title: "Import Passwords…", style: .prominent)
     private let tryAgain = PillButton(title: "Try Again", style: .prominent)
 
     private func setLocked(_ isLocked: Bool) {

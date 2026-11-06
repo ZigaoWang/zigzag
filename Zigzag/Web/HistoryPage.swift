@@ -334,13 +334,13 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
   %TITLE%
   %SEARCH%
   <div class="clear">
-    <button class="button" id="clearButton" aria-haspopup="menu" aria-expanded="false" aria-controls="clearMenu">Clear History…</button>
+    <button class="button" id="clearButton" aria-haspopup="menu" aria-expanded="false" aria-controls="clearMenu">Clear History</button>
     <div class="menu" id="clearMenu" role="menu" aria-label="Clear History">
-      <button role="menuitem" data-range="hour">The Last Hour</button>
-      <button role="menuitem" data-range="today">Today</button>
-      <button role="menuitem" data-range="yesterday">Today and Yesterday</button>
+      <button role="menuitem" data-range="hour">The Last Hour…</button>
+      <button role="menuitem" data-range="today">Today…</button>
+      <button role="menuitem" data-range="yesterday">Today and Yesterday…</button>
       <hr role="separator">
-      <button role="menuitem" class="destructive" data-range="all">All History</button>
+      <button role="menuitem" class="destructive" data-range="all">All History…</button>
     </div>
   </div>
 </div></header>

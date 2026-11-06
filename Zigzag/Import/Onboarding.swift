@@ -910,7 +910,7 @@ private final class BringPicker: StepContent {
     private let hint = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.7))
     private let bringLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
     private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
-    private let fileLink = Onboard.quiet("Import a password file")
+    private let fileLink = Onboard.quiet("Import a password file…")
     private var isImporting = false
     /// Many browsers or profiles: the list scrolls inside its box instead of running into the buttons.
     private let scroll = NSScrollView()

@@ -33,7 +33,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", toolTip: "Zoom In")
     private let twoPagesButton = IconButton(symbol: "book", toolTip: "Two Pages")
     private let darkButton = IconButton(symbol: "moon", toolTip: "Dark Pages")
-    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: "Save PDF")
+    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: "Save PDF…")
     private var showsSidebar = false
     private var saveWork: DispatchWorkItem?
 

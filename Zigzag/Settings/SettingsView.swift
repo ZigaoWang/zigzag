@@ -545,7 +545,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var languages: [(id: String, name: String)] = []
     private let addSpaceButton = PillButton(title: "New Space")
     private let getExtensionsButton = PillButton(title: "Get Extensions")
-    private let loadUnpackedButton = PillButton(title: "Load Unpacked")
+    private let loadUnpackedButton = PillButton(title: "Load Unpacked…")
     private var spaceRows: [SpaceSettingsRow] = []
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
@@ -641,7 +641,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
         blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
-        let importButton = PillButton(title: "Import")
+        let importButton = PillButton(title: "Import…")
         importButton.onClick = { _ in ImportWindowController.show() }
         importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
 
@@ -1201,7 +1201,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section("Installed", extensionsGroup, accessory: buttons)
             section(nil, developerGroup)
         case .shortcuts:
-            let resetAll = PillButton(title: "Reset All")
+            let resetAll = PillButton(title: "Reset All…")
             resetAll.isHidden = !Shortcuts.hasChanges
             // Every shortcut you set, back to how Zigzag comes: asked first, as Sites' Reset All is.
             resetAll.onClick = { [weak self] _ in
@@ -1407,7 +1407,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let media = SitePermissions.sites.count, zoom = ZoomLevels.count
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
         let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set")].compactMap { $0 }
-        let reset = PillButton(title: "Reset All")
+        let reset = PillButton(title: "Reset All…")
         sitesReset = parts.isEmpty ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
