@@ -34,7 +34,7 @@ history and passwords come over. The pile of open tabs stays behind, so you star
 
 **It can't be switched off.** Zigzag doesn't depend on a server of mine. The only thing I host is the update
 feed, and if that went away, Zigzag would keep working. The engine's security updates come from Apple, with
-macOS. Search suggestions are on by default and come from your search engine; you can turn them off in Settings.
+macOS. [Privacy](#privacy) lists everything Zigzag connects to on its own.
 
 ## What it does
 
@@ -66,6 +66,27 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 - Chrome bookmarks come over without their folders.
 - The ad blocking lists update with Zigzag, not on their own.
 - macOS 15.4 or later only.
+
+## Privacy
+
+No account, no analytics, no telemetry. Nothing about how you browse is sent to me. These are the only
+connections Zigzag makes on its own, apart from the pages you open:
+
+- **Updates.** Once a day, Zigzag reads the update feed at zigzagbrowser.com. The request says Zigzag's version
+  and nothing else; no system profile is sent. A new version downloads from there too.
+- **Search suggestions.** As you type in the address bar, the text goes to your search engine for suggestions,
+  without cookies. Google, DuckDuckGo, Brave, Bing, Kagi and Ecosia offer them; with any other engine, nothing is
+  sent. Turn them off in Settings › General.
+- **Site icons.** Icons come from each site itself, also for pinned tabs, favorites and imported bookmarks you
+  haven't opened yet.
+- **Extensions.** Installing one downloads it from the Chrome Web Store. At launch, at most once a day, Zigzag
+  asks the store whether your extensions have updates, which sends their IDs and versions to Google.
+- **Setup.** The welcome screens show a few site icons from Google's icon service and load Wikipedia's front page
+  as a preview.
+
+Translation runs on your Mac, with Apple's on-device Translation. Fraudulent website warnings are WebKit's own,
+the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
+Help › Report a Problem writes a report you can read first, and nothing is sent unless you send it.
 
 ## Install
 
