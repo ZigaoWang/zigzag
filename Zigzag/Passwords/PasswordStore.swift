@@ -157,11 +157,12 @@ actor PasswordStore {
 
     // MARK: Writing
 
-    /// Saves a login, or updates the password of the one already saved for this origin and username.
+    /// Saves a login, or updates the password of the one already saved for this origin and username. With
+    /// `replacingExisting` false it's always a new login.
     @discardableResult
     func save(origin: Origin, username: String, password: SecretString, title: String? = nil, notes: String = "", otpAuth: String = "",
-              created: Date = Date()) throws -> Credential {
-        if var existing = try credentials(for: origin).first(where: { $0.username == username }) {
+              created: Date = Date(), replacingExisting: Bool = true) throws -> Credential {
+        if replacingExisting, var existing = try credentials(for: origin).first(where: { $0.username == username }) {
             existing.modified = Date()
             if let title { existing.title = title }
             if !notes.isEmpty { existing.notes = notes }

@@ -228,7 +228,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let password = candidates[index]
             let username = result?["username"] as? String
             do {
-                try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password)
+                // With no username on the form, nothing says which login this is: it's kept as a new one, never over
+                // another saved without a name (an account made earlier), whose password would be lost.
+                let named = !(username ?? "").isEmpty
+                try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password, replacingExisting: named)
                 if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key", duration: 2, in: controller) }
             } catch {
                 if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
