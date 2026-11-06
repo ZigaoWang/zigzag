@@ -219,14 +219,14 @@ final class Tab: NSObject {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
             // from an extension that's gone gets explained rather than restored.
             pendingInteractionState = nil
-            Self.load(url, in: webView)
+            loadOwn(url, in: webView)
         } else if let state = pendingInteractionState {
             webView.interactionState = state as NSData
             pendingInteractionState = nil
             // Interaction state restores history but may not start a load on its own.
-            if webView.url == nil, let url { Self.load(url, in: webView) }
+            if webView.url == nil, let url { loadOwn(url, in: webView) }
         } else if let url, !fromWebKit {
-            Self.load(url, in: webView)
+            loadOwn(url, in: webView)
         }
         // A new web view starts with sound and playing; carry over what you'd set on the old one.
         if isMuted { setMuted(true) }
@@ -300,8 +300,7 @@ final class Tab: NSObject {
             return
         }
         let webView = ensureWebView()
-        ownLoadPending = true
-        Self.load(url, in: webView)
+        loadOwn(url, in: webView)
         refreshSettingsPage()
     }
 
@@ -343,6 +342,12 @@ final class Tab: NSObject {
         let webView = ensureWebView()
         self.url = url
         changed.send(.url)
+        loadOwn(url, in: webView)
+    }
+
+    /// Loads a page in this tab's web view as Zigzag's own doing (not the page's), so its address shows at once.
+    private func loadOwn(_ url: URL, in webView: WKWebView) {
+        ownLoadPending = true
         Self.load(url, in: webView)
     }
 
@@ -422,7 +427,7 @@ final class Tab: NSObject {
     func goForward() { webView?.goForward() }
     func reload() {
         guard let webView else { ensureWebView(); return }
-        if webView.url == nil, let url { ownLoadPending = true; webView.load(URLRequest(url: url)) } else { webView.reload() }
+        if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
     }
     func reloadFromOrigin() { webView?.reloadFromOrigin() }
     func stopLoading() { webView?.stopLoading() }
@@ -675,6 +680,12 @@ extension Tab: WKNavigationDelegate {
             }
             return (.cancel, preferences)
         }
+        // Zigzag's own pages (Settings, History) open from Zigzag or from one another, never because a website
+        // sent the tab there: a page could time it so your next click lands on a switch.
+        if url.scheme?.lowercased() == HistoryPage.scheme, !ownLoadPending, navigationAction.navigationType != .backForward,
+           navigationAction.sourceFrame.securityOrigin.protocol != HistoryPage.scheme {
+            return (.cancel, preferences)
+        }
         if ExternalLinks.isExternal(url) {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
                                isClick: navigationAction.navigationType == .linkActivated, from: webView)
@@ -892,14 +903,14 @@ extension Tab: WKNavigationDelegate {
             return
         }
         // Crashed before anything loaded: load its address, since there's nothing to reload.
-        if webView.url == nil, let url { Self.load(url, in: webView) } else { webView.reload() }
+        if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
     }
 
     /// Shown again after its page stopped while out of sight.
     func reloadIfItStopped() {
         guard reloadWhenShown, let webView else { return }
         reloadWhenShown = false
-        if webView.url == nil, let url { Self.load(url, in: webView) } else { webView.reload() }
+        if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
