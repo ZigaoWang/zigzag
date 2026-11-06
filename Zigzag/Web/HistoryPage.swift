@@ -376,17 +376,29 @@ const icon = (url) => {
   img.onerror = () => img.replaceWith(el('span', 'dot'));
   return img;
 };
+// The × is for the pointer. It sits inside its row (a link, or a heading that opens), and a control inside another
+// can't be reached with VoiceOver or Tab, so it's left out for them: the row itself takes Delete instead.
 const removeButton = (label, action) => {
-  const b = el('button', 'remove'); b.title = label; b.setAttribute('aria-label', label);
+  const b = el('button', 'remove'); b.title = label; b.tabIndex = -1; b.setAttribute('aria-hidden', 'true');
   b.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>';
   b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); action(); };
   return b;
+};
+
+// Delete or Backspace on a focused row removes it, as its × does; VoiceOver says so.
+const removableByKey = (row, action) => {
+  row.setAttribute('aria-keyshortcuts', 'Delete');
+  row.addEventListener('keydown', (e) => {
+    if ((e.key !== 'Delete' && e.key !== 'Backspace') || allSelected || e.metaKey || e.altKey || e.ctrlKey) return;
+    e.preventDefault(); e.stopPropagation(); action();
+  });
 };
 
 function page(item, session) {
   const a = el('a', 'row'); a.href = item.url; a.title = item.url;
   a.append(icon(item.url), el('span', 'title', item.title), el('span', 'where', where(item.url)), el('time', null, timeOf(item.time)),
            removeButton('Remove from History', () => forget([item.url], session)));
+  removableByKey(a, () => forget([item.url], session));
   return a;
 }
 
@@ -401,6 +413,7 @@ function clusterElement(cluster, session) {
   head.append(chevron, icon(cluster.items[0].url), el('span', 'title', cluster.host), el('span', 'where', count + ' pages'),
               el('time', null, span(cluster.items)),
               removeButton('Remove ' + count + ' Pages from History', () => forget(cluster.items.map((i) => i.url), session)));
+  removableByKey(head, () => forget(cluster.items.map((i) => i.url), session));
   head.onclick = () => {
     // Opened or closed from the keyboard, the new heading keeps the focus, so the arrows carry on from it.
     const focused = document.activeElement === head;
