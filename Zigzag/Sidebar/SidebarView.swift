@@ -783,8 +783,10 @@ final class SidebarView: NSView {
         handOff = (incoming, work)
 
         if Tokens.Motion.reduceMotion {
-            // Nothing slides: the new list fades in over the old where it stands.
+            // Nothing slides: the two lists cross-fade where they stand, the old going as the new comes, so their
+            // rows never show on top of each other.
             Self.fadeIn(incoming.scroll, duration: Tokens.Motion.standard)
+            Self.fadeOut(scrollView, duration: Tokens.Motion.standard * 0.6)
             DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.standard + 0.02, execute: work)
             return
         }
