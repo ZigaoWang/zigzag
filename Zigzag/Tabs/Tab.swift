@@ -643,10 +643,12 @@ extension Tab: WKNavigationDelegate {
             ContentBlocker.apply(to: webView, for: url)
         }
 
-        // Going between an extension's pages and the web takes a different web view.
+        // Going between an extension's pages and the web takes a different web view. Only an extension's page may
+        // cross: a website sending you into an extension's own pages would get them a web view set up with the
+        // extension's powers, so that's refused (Zigzag's own loads, from the address bar or an extension, swap in load).
         if navigationAction.targetFrame?.isMainFrame ?? true, Self.isExtensionPage(url) != showsExtensionPage,
            ["http", "https", "webkit-extension"].contains(url.scheme?.lowercased() ?? "") {
-            DispatchQueue.main.async { [weak self] in self?.load(url) }
+            if showsExtensionPage { DispatchQueue.main.async { [weak self] in self?.load(url) } }
             return (.cancel, preferences)
         }
 
