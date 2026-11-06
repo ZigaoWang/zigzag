@@ -1,16 +1,16 @@
 import AppKit
 
 /// Help › Report a Problem: a plain text report to go with an email, so a bug arrives with what's needed to find it.
-/// It holds which Zigzag, macOS and Mac, how much is open, a few settings, the extensions, and crash and freeze
-/// reports (`CrashReports`). Never a page, a tab's address, history or anything else from your
-/// browsing. It's written to a file you can read first, and goes nowhere until you send it.
+/// It holds which Zigzag, macOS and Mac, how much is open, a few settings, the extensions, what went wrong lately and
+/// on which sites (`Diagnostics`), and crash and freeze reports (`CrashReports`). Never a page's address, a tab, history
+/// or anything you typed. It's written to a file you can read first, and goes nowhere until you send it.
 @MainActor
 enum ProblemReport {
     nonisolated static let file = CrashReports.folder.appendingPathComponent("Zigzag Problem Report.txt")
 
     static func show(in controller: BrowserWindowController) {
         ConfirmSheet.choose(in: controller.root.overlay, title: "Report a problem",
-                            message: "Zigzag writes a short report for your email: its version, your Mac, and crash and freeze reports. Never your pages, tabs or history. Show Report lets you read it first.",
+                            message: "Zigzag writes a short report for your email: its version, your Mac, what went wrong lately and on which sites, and crash and freeze reports. Never the pages’ addresses, your tabs or history. Show Report lets you read it first.",
                             confirmTitle: "Email Report", alternateTitle: "Show Report") { choice in
             guard choice != .cancel else { return }
             Task { @MainActor in
@@ -58,7 +58,7 @@ enum ProblemReport {
         let destination = file
         return await Task.detached(priority: .userInitiated) { () -> URL? in
             try? FileManager.default.createDirectory(at: CrashReports.folder, withIntermediateDirectories: true)
-            let text = summary + crashes
+            let text = summary + recent + crashes + extensionLog
             return (try? Data(text.utf8).write(to: destination, options: .atomic)) == nil ? nil : destination
         }.value
     }
@@ -91,6 +91,26 @@ enum ProblemReport {
         }
 
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// What went wrong lately, newest last: the heart of the report.
+    nonisolated static var recent: String {
+        let lines = Diagnostics.lines()
+        return (["", "What happened recently"] + (lines.isEmpty ? ["Nothing went wrong that Zigzag noticed"] : lines))
+            .joined(separator: "\n") + "\n"
+    }
+
+    /// The latest errors in the extensions log, when there are any: an extension that stalls usually says why there.
+    nonisolated static var extensionLog: String {
+        let name = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true ? "Zigzag Dev" : "Zigzag"
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/\(name)/extensions.log")
+        guard let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty else { return "" }
+        // Its errors only: the comings and goings of a password manager's connection are noise here.
+        let problems = text.split(separator: "\n").map(String.init).filter { line in
+            ["error", "rejection", "failed", "couldn", "crash", "http 4", "http 5", "invalid"].contains { line.localizedCaseInsensitiveContains($0) }
+        }
+        guard !problems.isEmpty else { return "" }
+        return (["", "Extension errors, latest"] + problems.suffix(20).map(Diagnostics.clean)).joined(separator: "\n") + "\n"
     }
 
     /// The crash and freeze reports kept on this Mac, read from disk.
