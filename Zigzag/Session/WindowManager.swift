@@ -62,9 +62,23 @@ final class WindowManager {
     /// Onboarding hasn't been finished or closed yet. Until it is, every launch starts with it, even if a hidden
     /// browser window was saved behind it.
     static var needsOnboarding: Bool {
-        !Library.shared.importedFromArc && !UserDefaults.standard.bool(forKey: "ImportOfferDismissed")
-            && !UserDefaults.standard.bool(forKey: "ArcOfferDismissed")
+        guard !Library.shared.importedFromArc, !UserDefaults.standard.bool(forKey: "ImportOfferDismissed"),
+              !UserDefaults.standard.bool(forKey: "ArcOfferDismissed") else { return false }
+        // Preferences reset (a cleaner app, a migration that moved the profile but not them) while the profile is
+        // full: that's someone who has used Zigzag, and welcoming them would save an empty window over their tabs.
+        if hasBeenUsed {
+            UserDefaults.standard.set(true, forKey: "ImportOfferDismissed")
+            return false
+        }
+        return true
     }
+
+    /// Tabs saved, or pins and favorites made: read once, from what's on disk.
+    private static let hasBeenUsed: Bool = {
+        let tabs = JSONStore.load(SessionState.self, from: Paths.session)?.windows
+            .contains { window in window.spaces.contains { !$0.tabs.isEmpty } || !window.bookmarkTabs.isEmpty } ?? false
+        return tabs || !Library.shared.allBookmarkIDs.isEmpty
+    }()
 
     @discardableResult
     func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false) -> BrowserWindowController {
