@@ -9,7 +9,7 @@ enum ProblemReport {
     nonisolated static let file = CrashReports.folder.appendingPathComponent("Zigzag Problem Report.txt")
 
     static func show(in controller: BrowserWindowController) {
-        ConfirmSheet.choose(in: controller.root.overlay, title: "Report a problem",
+        ConfirmSheet.choose(in: controller.root.overlay, title: "Report a Problem",
                             message: "Zigzag writes a short report for your email: its version, your Mac, what went wrong lately and on which sites, and crash and freeze reports. Never the pages’ addresses, your tabs or history. Show Report lets you read it first.",
                             confirmTitle: "Email Report", alternateTitle: "Show Report") { choice in
             guard choice != .cancel else { return }
