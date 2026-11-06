@@ -6,6 +6,13 @@ final class FaviconStore {
     static let shared = FaviconStore()
 
     private var memory: [String: NSImage] = [:]
+
+    /// Icons in memory, at most a few hundred: a long session's worth of sites would otherwise all stay. Past that
+    /// the cache starts over, and icons come back from disk as they're shown.
+    private func keep(_ image: NSImage, for key: String) {
+        if memory.count >= 400, memory[key] == nil { memory.removeAll(keepingCapacity: true) }
+        memory[key] = image
+    }
     /// Sites with no icon file yet, so asking again (every sidebar refresh) doesn't read the disk each time.
     private var missing: Set<String> = []
     private var inFlight: Set<String> = []
@@ -65,7 +72,7 @@ final class FaviconStore {
         if let image = memory[key] { return image }
         guard !missing.contains(key) else { return nil }
         if let image = NSImage(contentsOf: file(for: key)) {
-            memory[key] = image
+            keep(image, for: key)
             return image
         }
         missing.insert(key)
@@ -265,7 +272,7 @@ final class FaviconStore {
 
     private func store(_ image: NSImage, key: String) {
         let normalized = Self.normalize(image)
-        memory[key] = normalized
+        keep(normalized, for: key)
         missing.remove(key)
         if let tiff = normalized.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
