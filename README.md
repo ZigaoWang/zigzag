@@ -24,7 +24,7 @@
 
 ## Coming from Arc
 
-**Your Arc comes with you.** File › Import, pick Arc, and your spaces, pinned tabs, pinned folders, Favorites,
+**Your Arc comes with you.** File › Import from Another Browser…, pick Arc, and your spaces, pinned tabs, pinned folders, Favorites,
 history and passwords come over. The pile of open tabs stays behind, so you start clean.
 
 **1Password works.** Install it from the Chrome Web Store inside Zigzag, like you would in Arc. It talks to the
