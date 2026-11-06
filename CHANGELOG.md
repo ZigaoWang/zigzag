@@ -39,7 +39,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Site Data in Settings › Privacy lists every site that keeps cookies, saved data or a cache on this Mac, with Remove for each one.
 - Reduce motion in Settings › General: things appear in place instead of sliding or growing, for Zigzag alone.
 - The getting-started guide shows each step being done right in your window: a cursor drags a tab into Split View, Shift-clicks a link and clicks +, and two fingertips swipe between spaces. Rings and demos keep going until you do the step. They replace the videos.
-- A new step in the guide: see all your tabs with ⌘⇧\ or a pinch.
+- A new step in the guide: see all your tabs with ⇧⌘\ or a pinch.
 - The guide can be closed for good with its ×. Help › Getting Started brings it back.
 - Open pinned pages show a fine edge, as favorites do, so you can tell which are loaded.
 
