@@ -726,6 +726,16 @@ final class Library {
         return bookmark
     }
 
+    /// Many at the end of a space in one change (an import of thousands), saved and shown once.
+    func appendBookmarks(_ new: [(url: URL, title: String)], to spaceID: UUID) -> [Bookmark] {
+        guard let s = self.index(of: spaceID), !new.isEmpty else { return [] }
+        let added = new.map { Bookmark(id: UUID(), url: $0.url, title: $0.title) }
+        spaces[s].bookmarks += added
+        tidyFolders(s)
+        commit()
+        return added
+    }
+
     func removeBookmark(_ id: UUID) { removeBookmarks([id]) }
 
     /// Several at once, in one change (both pages of a pinned split).
