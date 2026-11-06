@@ -373,7 +373,8 @@ final class TabManager {
     // MARK: Spaces
 
     func switchToSpace(_ id: UUID) {
-        guard id != currentSpaceID, Library.shared.space(id) != nil else { return }
+        // A private window keeps to one space: a swipe or ⌃1 there would leave its tabs out of sight.
+        guard !isPrivate, id != currentSpaceID, Library.shared.space(id) != nil else { return }
         // Making a space switches to it on its own; going somewhere after that is the guide's last step.
         if !isPrivate, Tutorial.done.contains("space") { Tutorial.complete("switch") }
         selectedTab?.captureSnapshot()
@@ -418,7 +419,7 @@ final class TabManager {
 
     /// Shows another space's list without leaving the page you're on (used while dragging a tab).
     func showSpaceKeepingPage(_ id: UUID) {
-        guard id != currentSpaceID, Library.shared.space(id) != nil else { return }
+        guard !isPrivate, id != currentSpaceID, Library.shared.space(id) != nil else { return }
         currentSpaceID = id
         changed.send(.space)
     }
