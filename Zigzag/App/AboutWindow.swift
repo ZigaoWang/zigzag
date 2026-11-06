@@ -33,17 +33,23 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) { Self.shared = nil }
 }
 
-/// The icon, the wordmark and the version with its build; the release notes and the acknowledgements as buttons, and
-/// the website; then the legal lines: the copyright, Zigzag's license and its marks.
+/// The icon, the wordmark and the version with its build, then the places to go as one quiet list (release notes,
+/// acknowledgements, the website and who made it), and the copyright and license in a line at the foot.
 private final class AboutView: NSView {
     static let height = Tokens.Welcome.aboutSize.height
     private let icon = NSImageView(image: NSApp.applicationIconImage)
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let notes = PillButton(title: "Release Notes")
-    private let thanks = PillButton(title: "Acknowledgements")
-    private let website = NSTextField(labelWithAttributedString: AboutView.link("zigzagbrowser.com", "https://zigzagbrowser.com"))
-    private let legal = NSTextField(labelWithAttributedString: AboutView.legalText())
+    /// Each a row as lists have them everywhere in Zigzag: a symbol, its name, and where it goes in quiet text.
+    private let rows: [CardRow] = [
+        AboutView.row("Release Notes", "doc.text", open: WhatsNew.allNotes),
+        AboutView.row("Acknowledgements", "heart", run: { AcknowledgementsWindowController.show() }),
+        AboutView.row("Website", "globe", detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
+        AboutView.row("Made by Zigao Wang", "person", detail: "zigao.wang", open: URL(string: "https://www.zigao.wang")!),
+    ]
+    /// The rows on one soft card, as a group of settings sits, so they read as one list.
+    private let card = ColorView(color: Tokens.Color.surfaceGroup)
+    private let legal = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -53,21 +59,33 @@ private final class AboutView: NSView {
         let build = info?["CFBundleVersion"] as? String
         version.stringValue = "Version \(short)" + (build.map { " (\($0))" } ?? "")
         version.alignment = .center
-        version.isSelectable = true
-        notes.onClick = { _ in NSWorkspace.shared.open(WhatsNew.allNotes) }
-        thanks.onClick = { _ in AcknowledgementsWindowController.show() }
-        // Selectable, so the links can be clicked.
-        for field in [website, legal] {
-            field.isSelectable = true
-            field.allowsEditingTextAttributes = true
-            field.maximumNumberOfLines = 0
-        }
+        legal.stringValue = "© \(Calendar.current.component(.year, from: Date())) Zigao Wang. Apache License 2.0."
+        legal.alignment = .center
+        legal.toolTip = "Zigzag’s code is open source under the Apache License 2.0; the name and logo are trademarks of Zigao Wang"
         icon.imageScaling = .scaleProportionallyUpOrDown
-        [icon, wordmark, version, notes, thanks, website, legal].forEach { addSubview($0) }
+        card.wantsLayer = true
+        card.layer?.cornerRadius = Tokens.Radius.group
+        card.layer?.cornerCurve = .continuous
+        card.layer?.borderWidth = Tokens.Metric.hairline
+        ([icon, wordmark, version, legal, card] + rows).forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
+    }
+
+    private static func row(_ title: String, _ symbol: String, detail: String = "", open url: URL? = nil, run: (() -> Void)? = nil) -> CardRow {
+        let row = CardRow(title: title, symbol: symbol, detail: detail, font: Tokens.Font.body())
+        row.onClick = { _ in
+            if let url { NSWorkspace.shared.open(url) }
+            run?()
+        }
+        return row
+    }
 
     override func layout() {
         super.layout()
@@ -78,40 +96,16 @@ private final class AboutView: NSView {
         let markWidth = ceil(markHeight * WordmarkView.aspect)
         wordmark.frame = NSRect(x: round((width - markWidth) / 2), y: icon.frame.maxY + Tokens.Space.x4, width: markWidth, height: markHeight)
         version.frame = NSRect(x: 0, y: wordmark.frame.maxY + Tokens.Space.x2, width: width, height: version.lineHeight)
-        // The two buttons side by side, each as wide as its words, centered together.
-        let h = Tokens.Page.controlHeight
-        let total = notes.fittingWidth + Tokens.Space.x2 + thanks.fittingWidth
-        notes.frame = NSRect(x: round((width - total) / 2), y: version.frame.maxY + Tokens.Space.x5, width: notes.fittingWidth, height: h)
-        thanks.frame = NSRect(x: notes.frame.maxX + Tokens.Space.x2, y: notes.frame.minY, width: thanks.fittingWidth, height: h)
-        let siteHeight = ceil(website.sizeThatFits(NSSize(width: width, height: 100)).height)
-        website.frame = NSRect(x: 0, y: notes.frame.maxY + Tokens.Space.x3, width: width, height: siteHeight)
-        let inner = width - Tokens.Space.x4 * 2
-        let legalHeight = ceil(legal.sizeThatFits(NSSize(width: inner, height: 200)).height)
-        legal.frame = NSRect(x: Tokens.Space.x4, y: bounds.height - Tokens.Space.x6 - legalHeight, width: inner, height: legalHeight)
-    }
-
-    private static var centered: NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.alignment = .center
-        style.paragraphSpacing = 2
-        return style
-    }
-
-    private static func link(_ title: String, _ url: String) -> NSAttributedString {
-        NSAttributedString(string: title, attributes: [.font: Tokens.Font.small(), .link: URL(string: url) as Any, .paragraphStyle: centered])
-    }
-
-    /// "© 2026 Zigao Wang", that Zigzag is under the Apache License (a link to the acknowledgements, which hold it in
-    /// full), and that the name and logo are marks, which the license doesn't cover.
-    private static func legalText() -> NSAttributedString {
-        let quiet: [NSAttributedString.Key: Any] = [.font: Tokens.Font.small(), .foregroundColor: Tokens.Color.textTertiary,
-                                                    .paragraphStyle: centered]
-        let year = Calendar.current.component(.year, from: Date())
-        let text = NSMutableAttributedString(string: "© \(year) Zigao Wang\nLicensed under the ", attributes: quiet)
-        var license = quiet
-        license[.link] = URL(string: "https://www.apache.org/licenses/LICENSE-2.0")
-        text.append(NSAttributedString(string: "Apache License 2.0", attributes: license))
-        text.append(NSAttributedString(string: "\nZigzag is a trademark of Zigao Wang", attributes: quiet))
-        return text
+        // The list, inset as a panel's rows are, its text lined up under nothing but itself.
+        let pad = Tokens.Space.x5, inset = Tokens.Space.x1
+        let top = version.frame.maxY + Tokens.Space.x6
+        card.frame = NSRect(x: pad, y: top, width: width - pad * 2, height: CGFloat(rows.count) * Tokens.Metric.rowHeight + inset * 2)
+        card.layer?.borderColor = cgColor(Tokens.Color.surfaceGroupEdge)
+        var y = top + inset
+        for row in rows {
+            row.frame = NSRect(x: pad + inset, y: y, width: width - (pad + inset) * 2, height: Tokens.Metric.rowHeight)
+            y += Tokens.Metric.rowHeight
+        }
+        legal.frame = NSRect(x: 0, y: bounds.height - Tokens.Space.x5 - legal.lineHeight, width: width, height: legal.lineHeight)
     }
 }

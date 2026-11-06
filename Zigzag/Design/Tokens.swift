@@ -338,7 +338,7 @@ enum Tokens {
         /// A brand moment's card (onboarding's import card).
         static let cardRadius: CGFloat = 22
         /// The About window: its width and height, the app icon and the wordmark under it.
-        static let aboutSize = NSSize(width: 320, height: 380)
+        static let aboutSize = NSSize(width: 320, height: 420)
         static let aboutIcon: CGFloat = 96
         /// About › Acknowledgements: wide enough for a license's lines as written.
         static let acknowledgementsSize = NSSize(width: 640, height: 600)
