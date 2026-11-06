@@ -13,6 +13,7 @@ struct AddressTests {
         #expect(CommandRanker.url(from: "localhost:3000")?.absoluteString == "http://localhost:3000")
         #expect(CommandRanker.url(from: "192.168.1.1/admin")?.absoluteString == "http://192.168.1.1/admin")
         #expect(CommandRanker.url(from: "printer.local")?.absoluteString == "http://printer.local")
+        #expect(CommandRanker.url(from: "youtube.com/@mkbhd")?.absoluteString == "https://youtube.com/@mkbhd")
     }
 
     @Test func searches() {

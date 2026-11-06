@@ -51,11 +51,12 @@ enum CommandRanker {
         if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:") {
             return URL(string: trimmed)
         }
-        // An email address is something to search for, not a place to go.
-        if lower.contains("@") { return nil }
         // The host is everything before the first of / ? #; the port comes off too.
         let hostEnd = lower.firstIndex { "/?#".contains($0) } ?? lower.endIndex
         let hostPart = String(lower[..<hostEnd])
+        // An email address is something to search for, not a place to go. An @ further on is part of the page
+        // ("youtube.com/@name").
+        if hostPart.contains("@") { return nil }
         let host = hostPart.split(separator: ":", omittingEmptySubsequences: false).first.map(String.init) ?? hostPart
         if host == "localhost" || host.range(of: #"^\d{1,3}(\.\d{1,3}){3}$"#, options: .regularExpression) != nil {
             return URL(string: "http://" + trimmed)
