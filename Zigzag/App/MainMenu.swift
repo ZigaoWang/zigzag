@@ -196,6 +196,8 @@ enum MainMenu {
             item("What’s New in Zigzag", #selector(C.showWhatsNew(_:)), ""),
             item("Send Feedback…", #selector(C.sendFeedback(_:)), ""),
             item("Report a Problem…", #selector(C.reportProblem(_:)), ""),
+            .separator(),
+            item("Zigzag on GitHub", #selector(AppDelegate.showSourceCode(_:)), ""),
         ])
         main.addItem(help)
         NSApp.helpMenu = help.submenu

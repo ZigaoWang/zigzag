@@ -234,6 +234,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func sendFeedback(_ sender: Any?) { frontBrowserWindow().map(Feedback.show) }
     @objc func reportProblem(_ sender: Any?) { frontBrowserWindow().map(ProblemReport.show) }
+    /// Help › Zigzag on GitHub: the source, issues and releases, opened in a tab here.
+    @objc func showSourceCode(_ sender: Any?) {
+        if let url = URL(string: "https://github.com/ZigaoWang/zigzag") { WindowManager.shared.openExternal(url) }
+    }
 
     /// ⌘W in a window without tabs (Passwords, Import) closes that window, as on any Mac.
     @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
