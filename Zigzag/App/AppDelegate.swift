@@ -41,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         EnergyWatch.shared.start()
         // Crash and freeze reports from macOS, kept here for Help › Report a Problem.
         CrashReports.shared.start()
+        // What goes wrong from now on, kept for the same report, and whether the last run ended badly.
+        Diagnostics.start()
         // New lists or settings reach open pages on their next load.
         blockerToken = ContentBlocker.changed.observe {
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
@@ -146,6 +148,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Password managers' helpers end with Zigzag, so none are left running.
         if #available(macOS 15.4, *) { NativeMessagingHost.terminateAll() }
+        // Quit properly: the next launch knows this wasn't a crash.
+        Diagnostics.stop()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
