@@ -178,7 +178,23 @@ License: [Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)](h
 Changes made: `scripts/update_blocklists.sh` downloads both lists, joins them, converts the filters to WebKit
 content-blocker rules, and compresses the result with LZFSE. The converted WebKit content-blocker JSON is an
 adaptation of EasyList and EasyPrivacy, and is likewise licensed under CC BY-SA 3.0, not under Zigzag's
-license. Zigzag credits the lists in Settings and in About Zigzag.
+license. Zigzag credits the lists in Settings and in About Zigzag › Acknowledgements.
+
+### Public Suffix List
+
+Telling one site from another (which part of an address is the site, as in `bbc.co.uk`).
+`Zigzag/Resources/public_suffix_list.txt` is the [Public Suffix List](https://publicsuffix.org) by Mozilla and its
+contributors, with comments removed; the source form is at
+[publicsuffix.org/list/public_suffix_list.dat](https://publicsuffix.org/list/public_suffix_list.dat).
+
+License: [Mozilla Public License, Version 2.0](https://mozilla.org/MPL/2.0/).
+
+### Top-level domains
+
+Telling an address from a search in the address bar. `Zigzag/Resources/tlds.txt` is the list of top-level domains
+published by the [Internet Assigned Numbers Authority](https://www.iana.org/domains/root/db)
+([data.iana.org/TLD/tlds-alpha-by-domain.txt](https://data.iana.org/TLD/tlds-alpha-by-domain.txt)), lowercased.
+IANA publishes it freely, without restrictions on its use.
 
 ## Used to build, not shipped
 
