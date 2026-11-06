@@ -91,6 +91,8 @@
 	<string>Websites you visit can ask to use your camera.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Zigzag fills your name, email, phone and address into forms from your own card in Contacts.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Zigzag saves the files you download here.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
