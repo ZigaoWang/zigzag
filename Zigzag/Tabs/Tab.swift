@@ -252,6 +252,8 @@ final class Tab: NSObject {
     func close(keepingSnapshot: Bool = false) {
         isClosed = true
         for tab in openedHere.allObjects where !tab.canGoBack { tab.changed.send(.navigation) }
+        // Sound stops the moment it closes, whatever may still hold the page for a moment.
+        webView?.pauseAllMediaPlayback(completionHandler: nil)
         if let webView { tearDown(webView) }
         if !keepingSnapshot { SnapshotStore.remove(id) }
     }
