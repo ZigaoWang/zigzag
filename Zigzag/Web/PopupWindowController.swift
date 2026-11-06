@@ -81,8 +81,20 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         webView.isInspectable = true
 
         observations = [
-            webView.observe(\.url) { [weak self] wv, _ in MainActor.assumeIsolated { self?.updateHeader(); self?.tellExtensions(.URL) } },
-            webView.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.tellExtensions(.loading) } },
+            // A change of address while nothing loads is the page's own (a sign-in moving on with pushState); one
+            // still loading waits for the page to arrive (didCommit), so the header never names a site not shown.
+            webView.observe(\.url) { [weak self] wv, _ in
+                MainActor.assumeIsolated {
+                    if !wv.isLoading { self?.shownURL = wv.url; self?.updateHeader() }
+                    self?.tellExtensions(.URL)
+                }
+            },
+            webView.observe(\.isLoading) { [weak self] wv, _ in
+                MainActor.assumeIsolated {
+                    if !wv.isLoading { self?.shownURL = wv.url; self?.updateHeader() }
+                    self?.tellExtensions(.loading)
+                }
+            },
             webView.observe(\.hasOnlySecureContent) { [weak self] _, _ in MainActor.assumeIsolated { self?.updateHeader() } },
             webView.observe(\.title) { [weak self] wv, _ in MainActor.assumeIsolated { self?.window?.title = wv.title ?? ""; self?.tellExtensions(.title) } },
         ]
@@ -119,8 +131,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if #available(macOS 15.4, *), !isPrivate { ExtensionHost.shared.popupFocused(self) }
     }
 
+    /// The address of the page on screen: never one only on its way, which a page could start and never finish.
+    private var shownURL: URL?
+
     private func updateHeader() {
-        header.show(url: webView.url, secure: webView.hasOnlySecureContent)
+        header.show(url: shownURL, secure: webView.hasOnlySecureContent)
     }
 
     /// Shows an extension's popup over this window, from the right end of its header, so it isn't hidden behind it.
@@ -187,10 +202,15 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         PageDialogs.pageLoaded(webView)
+        shownURL = webView.url
+        updateHeader()
     }
 
     /// A page that never arrived says why, as a tab does, rather than leave the window blank.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // It never came: the header stays on the page still showing.
+        shownURL = webView.url
+        updateHeader()
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
         let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
