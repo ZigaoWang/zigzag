@@ -1,8 +1,8 @@
 import AppKit
 
 /// About Zigzag: a small window as every Mac app has it (icon, name, version and copyright), with the drawn wordmark
-/// for the name, as Settings has it, and who made it and where to read more below. Check for Updates sits right
-/// under About in the Zigzag menu.
+/// for the name, as Settings has it, the release notes and the acknowledgements a click away, and the legal lines at
+/// the foot. Check for Updates sits right under About in the Zigzag menu.
 final class AboutWindowController: NSWindowController, NSWindowDelegate {
     private static var shared: AboutWindowController?
 
@@ -33,29 +33,37 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) { Self.shared = nil }
 }
 
-/// The icon, the wordmark, the version (its build in the tooltip), then the credits and the copyright.
+/// The icon, the wordmark and the version with its build; the release notes and the acknowledgements as buttons, and
+/// the website; then the legal lines: the copyright, Zigzag's license and its marks.
 private final class AboutView: NSView {
     static let height = Tokens.Welcome.aboutSize.height
     private let icon = NSImageView(image: NSApp.applicationIconImage)
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let credits = NSTextField(labelWithAttributedString: AboutView.creditsText())
-    private let copyright = Label("", font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    private let notes = PillButton(title: "Release Notes")
+    private let thanks = PillButton(title: "Acknowledgements")
+    private let website = NSTextField(labelWithAttributedString: AboutView.link("zigzagbrowser.com", "https://zigzagbrowser.com"))
+    private let legal = NSTextField(labelWithAttributedString: AboutView.legalText())
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         let info = Bundle.main.infoDictionary
-        // The same words Settings and What's New use; the build is there for anyone who asks.
-        version.stringValue = "Version \(info?["CFBundleShortVersionString"] as? String ?? "")"
-        if let build = info?["CFBundleVersion"] as? String { version.toolTip = "Build \(build)" }
-        copyright.stringValue = "© \(Calendar.current.component(.year, from: Date())) Zigao Wang"
-        [version, copyright].forEach { $0.alignment = .center }
-        // Selectable, so its links can be clicked.
-        credits.isSelectable = true
-        credits.allowsEditingTextAttributes = true
-        credits.maximumNumberOfLines = 0
+        // As a Mac app's About says it: the version, with the build in brackets for anyone reporting a problem.
+        let short = info?["CFBundleShortVersionString"] as? String ?? ""
+        let build = info?["CFBundleVersion"] as? String
+        version.stringValue = "Version \(short)" + (build.map { " (\($0))" } ?? "")
+        version.alignment = .center
+        version.isSelectable = true
+        notes.onClick = { _ in NSWorkspace.shared.open(WhatsNew.allNotes) }
+        thanks.onClick = { _ in AcknowledgementsWindowController.show() }
+        // Selectable, so the links can be clicked.
+        for field in [website, legal] {
+            field.isSelectable = true
+            field.allowsEditingTextAttributes = true
+            field.maximumNumberOfLines = 0
+        }
         icon.imageScaling = .scaleProportionallyUpOrDown
-        [icon, wordmark, version, credits, copyright].forEach { addSubview($0) }
+        [icon, wordmark, version, notes, thanks, website, legal].forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -70,34 +78,40 @@ private final class AboutView: NSView {
         let markWidth = ceil(markHeight * WordmarkView.aspect)
         wordmark.frame = NSRect(x: round((width - markWidth) / 2), y: icon.frame.maxY + Tokens.Space.x4, width: markWidth, height: markHeight)
         version.frame = NSRect(x: 0, y: wordmark.frame.maxY + Tokens.Space.x2, width: width, height: version.lineHeight)
-        let inner = width - Tokens.Space.x6 * 2
-        let creditsHeight = ceil(credits.sizeThatFits(NSSize(width: inner, height: 200)).height)
-        credits.frame = NSRect(x: Tokens.Space.x6, y: version.frame.maxY + Tokens.Space.x5, width: inner, height: creditsHeight)
-        copyright.frame = NSRect(x: 0, y: bounds.height - Tokens.Space.x6 - copyright.lineHeight, width: width, height: copyright.lineHeight)
+        // The two buttons side by side, each as wide as its words, centered together.
+        let h = Tokens.Page.controlHeight
+        let total = notes.fittingWidth + Tokens.Space.x2 + thanks.fittingWidth
+        notes.frame = NSRect(x: round((width - total) / 2), y: version.frame.maxY + Tokens.Space.x5, width: notes.fittingWidth, height: h)
+        thanks.frame = NSRect(x: notes.frame.maxX + Tokens.Space.x2, y: notes.frame.minY, width: thanks.fittingWidth, height: h)
+        let siteHeight = ceil(website.sizeThatFits(NSSize(width: width, height: 100)).height)
+        website.frame = NSRect(x: 0, y: notes.frame.maxY + Tokens.Space.x3, width: width, height: siteHeight)
+        let inner = width - Tokens.Space.x4 * 2
+        let legalHeight = ceil(legal.sizeThatFits(NSSize(width: inner, height: 200)).height)
+        legal.frame = NSRect(x: Tokens.Space.x4, y: bounds.height - Tokens.Space.x6 - legalHeight, width: inner, height: legalHeight)
     }
 
-    /// Centered lines: the maker, the links, then the ad blocking lists' credit.
-    private static func creditsText() -> NSAttributedString {
-        let center = NSMutableParagraphStyle()
-        center.alignment = .center
-        center.paragraphSpacing = 6
-        let body: [NSAttributedString.Key: Any] = [.font: Tokens.Font.small(), .foregroundColor: Tokens.Color.textSecondary,
-                                                   .paragraphStyle: center]
-        func link(_ title: String, _ url: String) -> NSAttributedString {
-            var attributes = body
-            attributes[.link] = URL(string: url)
-            return NSAttributedString(string: title, attributes: attributes)
-        }
-        let text = NSMutableAttributedString()
-        text.append(NSAttributedString(string: "Made by ", attributes: body))
-        text.append(link("Zigao Wang", "https://zigao.wang"))
-        text.append(NSAttributedString(string: "\n", attributes: body))
-        text.append(link("Website", "https://zigzagbrowser.com"))
-        text.append(NSAttributedString(string: "\u{2003}", attributes: body))
-        text.append(link("Release Notes", "https://zigzagbrowser.com/release-notes"))
-        text.append(NSAttributedString(string: "\u{2003}", attributes: body))
-        text.append(link("License", "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE"))
-        text.append(NSAttributedString(string: "\nAd blocking lists by EasyList, CC BY-SA 3.0", attributes: body))
+    private static var centered: NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        style.paragraphSpacing = 2
+        return style
+    }
+
+    private static func link(_ title: String, _ url: String) -> NSAttributedString {
+        NSAttributedString(string: title, attributes: [.font: Tokens.Font.small(), .link: URL(string: url) as Any, .paragraphStyle: centered])
+    }
+
+    /// "© 2026 Zigao Wang", that Zigzag is under the Apache License (a link to the acknowledgements, which hold it in
+    /// full), and that the name and logo are marks, which the license doesn't cover.
+    private static func legalText() -> NSAttributedString {
+        let quiet: [NSAttributedString.Key: Any] = [.font: Tokens.Font.small(), .foregroundColor: Tokens.Color.textTertiary,
+                                                    .paragraphStyle: centered]
+        let year = Calendar.current.component(.year, from: Date())
+        let text = NSMutableAttributedString(string: "© \(year) Zigao Wang\nLicensed under the ", attributes: quiet)
+        var license = quiet
+        license[.link] = URL(string: "https://www.apache.org/licenses/LICENSE-2.0")
+        text.append(NSAttributedString(string: "Apache License 2.0", attributes: license))
+        text.append(NSAttributedString(string: "\nZigzag is a trademark of Zigao Wang", attributes: quiet))
         return text
     }
 }
