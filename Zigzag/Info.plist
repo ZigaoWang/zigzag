@@ -93,6 +93,8 @@
 	<string>Zigzag fills your name, email, phone and address into forms from your own card in Contacts.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Websites you visit can ask to connect to devices on your local network.</string>
 	<key>NSLocationUsageDescription</key>
 	<string>Websites you visit can ask for your location.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
