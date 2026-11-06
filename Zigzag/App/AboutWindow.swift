@@ -33,21 +33,23 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) { Self.shared = nil }
 }
 
-/// The icon, the wordmark and the version with its build, then the places to go as one quiet list (release notes,
-/// acknowledgements, the website and who made it), and the copyright and license in a line at the foot.
+/// The icon, the wordmark and the version with its build, then the places to go as one grouped list (release notes,
+/// acknowledgements, the website, the source and who made it), and the copyright and license in a line at the foot.
 private final class AboutView: NSView {
     static let height = Tokens.Welcome.aboutSize.height
     private let icon = NSImageView(image: NSApp.applicationIconImage)
     private let wordmark = WordmarkView()
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    /// Each a row as lists have them everywhere in Zigzag: a symbol, its name, and where it goes in quiet text.
-    private let rows: [CardRow] = [
-        AboutView.row("Release Notes", "doc.text", open: WhatsNew.allNotes),
-        AboutView.row("Acknowledgements", "heart", run: { AcknowledgementsWindowController.show() }),
-        AboutView.row("Website", "globe", detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
-        AboutView.row("Source Code", "chevron.left.forwardslash.chevron.right", detail: "GitHub", open: URL(string: "https://github.com/ZigaoWang/zigzag")!),
-        AboutView.row("Made by Zigao Wang", "person", detail: "zigao.wang", open: URL(string: "https://www.zigao.wang")!),
+    /// Each a name, where it goes in quiet text, and an arrow that says whether it opens here or on the web.
+    private let rows: [AboutRow] = [
+        AboutRow("Release Notes", open: WhatsNew.allNotes),
+        AboutRow("Acknowledgements", run: { AcknowledgementsWindowController.show() }),
+        AboutRow("Website", detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
+        AboutRow("Source Code", detail: "GitHub", open: URL(string: "https://github.com/ZigaoWang/zigzag")!),
+        AboutRow("Developer", detail: "zigao.wang", open: URL(string: "https://www.zigao.wang")!),
     ]
+    /// Hairlines between the rows, inset from the card's edges as a grouped list has them.
+    private let lines: [ColorView] = (0..<4).map { _ in ColorView(color: Tokens.Color.separator) }
     /// The rows on one soft card, as a group of settings sits, so they read as one list.
     private let card = ColorView(color: Tokens.Color.surfaceGroup)
     /// The copyright, and the license as a link to its text.
@@ -69,7 +71,7 @@ private final class AboutView: NSView {
         card.layer?.cornerRadius = Tokens.Radius.group
         card.layer?.cornerCurve = .continuous
         card.layer?.borderWidth = Tokens.Metric.hairline
-        ([icon, wordmark, version, legal, card] + rows).forEach { addSubview($0) }
+        ([icon, wordmark, version, legal, card] + lines + rows).forEach { addSubview($0) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -93,15 +95,6 @@ private final class AboutView: NSView {
         return text
     }
 
-    private static func row(_ title: String, _ symbol: String, detail: String = "", open url: URL? = nil, run: (() -> Void)? = nil) -> CardRow {
-        let row = CardRow(title: title, symbol: symbol, detail: detail, font: Tokens.Font.body())
-        row.onClick = { _ in
-            if let url { NSWorkspace.shared.open(url) }
-            run?()
-        }
-        return row
-    }
-
     override func layout() {
         super.layout()
         let width = bounds.width
@@ -111,17 +104,50 @@ private final class AboutView: NSView {
         let markWidth = ceil(markHeight * WordmarkView.aspect)
         wordmark.frame = NSRect(x: round((width - markWidth) / 2), y: icon.frame.maxY + Tokens.Space.x4, width: markWidth, height: markHeight)
         version.frame = NSRect(x: 0, y: wordmark.frame.maxY + Tokens.Space.x2, width: width, height: version.lineHeight)
-        // The list, inset as a panel's rows are, its text lined up under nothing but itself.
-        let pad = Tokens.Space.x5, inset = Tokens.Space.x1
+        // The list, inset as a panel's rows are, a hairline between each two, the lines lined up with the text.
+        let pad = Tokens.Space.x5, inset = Tokens.Space.x1, rowHeight = Tokens.Metric.rowHeight + Tokens.Space.x1
         let top = version.frame.maxY + Tokens.Space.x6
-        card.frame = NSRect(x: pad, y: top, width: width - pad * 2, height: CGFloat(rows.count) * Tokens.Metric.rowHeight + inset * 2)
+        card.frame = NSRect(x: pad, y: top, width: width - pad * 2, height: CGFloat(rows.count) * rowHeight + inset * 2)
         card.layer?.borderColor = cgColor(Tokens.Color.surfaceGroupEdge)
         var y = top + inset
-        for row in rows {
-            row.frame = NSRect(x: pad + inset, y: y, width: width - (pad + inset) * 2, height: Tokens.Metric.rowHeight)
-            y += Tokens.Metric.rowHeight
+        for (i, row) in rows.enumerated() {
+            row.frame = NSRect(x: pad + inset, y: y, width: width - (pad + inset) * 2, height: rowHeight)
+            y += rowHeight
+            if i < lines.count {
+                let lineX = row.frame.minX + CardRow.inset
+                lines[i].frame = NSRect(x: lineX, y: y - Tokens.Metric.hairline / 2, width: row.frame.maxX - CardRow.inset - lineX,
+                                        height: Tokens.Metric.hairline)
+            }
         }
         let legalHeight = ceil(legal.sizeThatFits(NSSize(width: width, height: 100)).height)
         legal.frame = NSRect(x: 0, y: bounds.height - Tokens.Space.x5 - legalHeight, width: width, height: legalHeight)
+    }
+}
+
+/// A row of About's list: its name, where it goes in quiet text, and at the end an arrow: up and out for a page on
+/// the web, a chevron for a window of Zigzag's own.
+private final class AboutRow: CardRow {
+    private let arrow = NSImageView()
+
+    init(_ title: String, detail: String = "", open url: URL? = nil, run: (() -> Void)? = nil) {
+        super.init(title: title, detail: detail, font: Tokens.Font.body())
+        arrow.image = Tokens.Symbol.image(url == nil ? "chevron.right" : "arrow.up.right", size: Tokens.TypeSize.small)
+        arrow.imageScaling = .scaleNone
+        arrow.contentTintColor = Tokens.Color.textTertiary
+        addSubview(arrow)
+        onClick = { _ in
+            if let url { NSWorkspace.shared.open(url) }
+            run?()
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Space.x4
+        arrow.frame = NSRect(x: bounds.width - Self.inset - side, y: (bounds.height - side) / 2, width: side, height: side)
+        // The detail moves in from the end to sit before the arrow.
+        detail.frame.origin.x -= side + Tokens.Space.x2
     }
 }
