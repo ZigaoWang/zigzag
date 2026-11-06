@@ -151,6 +151,9 @@ final class WindowManager {
     /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window. Never a private one: a link
     /// from elsewhere doesn't get to choose that.
     func openExternal(_ url: URL) {
+        // A link opened before onboarding was finished: you're browsing now, so the next launch restores this window
+        // instead of starting over with the welcome (and then saving over what you opened).
+        if Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
         let key = keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
         if let controller = key ?? controllers.last(where: { !$0.tabManager.isPrivate }) ?? restoreIfNoWindows() {
             controller.open(url, disposition: .foregroundTab)
