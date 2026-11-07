@@ -282,19 +282,12 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .feat .stage.peek img { width: 150%; }
 .feat figcaption { margin: 16px 4px 0; font-size: 15px; line-height: 1.55; color: var(--soft); }
 .feat figcaption b { display: block; margin-bottom: 2px; font-size: 17px; font-weight: 600; color: var(--ink); }
-/* Size, on a navy card. */
-.weight.navy { padding: 56px 48px 48px; border-radius: 28px; background: #1F2D40; color: #F1F4F9; }
-.navy .lede, .navy .note { color: rgba(241, 244, 249, .66); }
-.navy .bars li { color: rgba(241, 244, 249, .72); }
-.navy .bars .track { background: rgba(241, 244, 249, .12); }
-.navy .bars .fill { background: rgba(241, 244, 249, .35); }
-.navy .bars .us { color: #fff; } .navy .bars .us .fill { background: #8EC0F5; }
 .duo, .story { padding-top: 40px; gap: 56px; }
 .duo h2, .story h2 { font-size: 26px; }
 .pitch.sky-card { padding: 72px 24px; margin-bottom: 72px; }
 @media (max-width: 760px) {
   .trio { grid-template-columns: 1fr; margin-bottom: 72px; } .feat .stage.comp { height: 260px; }
-  .feature, .duo, .story { margin-bottom: 72px; } .weight.navy { padding: 40px 20px; }
+  .feature, .duo, .story { margin-bottom: 72px; }
 }
 
 /* The bar across the top of the sky: the name, where to go, and Download. */
@@ -329,3 +322,20 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
   .nav-links, .nav-gh { display: none; } .hero-text { padding-top: 88px; }
   .intro { grid-template-columns: 1fr; gap: 8px; } .end { grid-template-columns: 1fr 1fr; } .foot-brand { grid-column: 1 / -1; }
 }
+
+/* Size: a plain chart on the page, like a benchmark, Zigzag's bar the one in color. */
+.weight { max-width: 880px; margin: 0 auto 104px; }
+.weight h2 { margin: 0; font-size: clamp(28px, 3vw, 36px); font-weight: 600; letter-spacing: -0.012em; }
+.weight .lede { max-width: 620px; margin: 12px 0 0; font-size: 17px; line-height: 1.6; color: var(--soft); }
+.weight .bars { max-width: none; margin: 36px 0 0; }
+.weight .bars li { grid-template-columns: 120px 1fr 84px; gap: 20px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.weight .bars li:first-child { border-top: 0; }
+.weight .bars .n { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.weight .bars .n img { width: 24px; height: 24px; }
+.weight .bars .track { height: 12px; border-radius: 4px; background: transparent; }
+.weight .bars .fill { border-radius: 4px; background: #D5DCE6; }
+.weight .bars .us .fill { background: #2F6FD0; }
+.weight .bars .us, .weight .bars .us .mb { font-weight: 600; color: var(--ink); }
+.weight .note { max-width: none; margin: 16px 0 0; text-align: left; }
+.foot-home { display: inline-block; text-decoration: none; } .foot-home .wm { height: 18px; display: block; }
+@media (max-width: 760px) { .weight .bars li { grid-template-columns: 92px 1fr 72px; gap: 10px; font-size: 14px; } }
