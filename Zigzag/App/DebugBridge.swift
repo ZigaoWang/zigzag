@@ -306,6 +306,11 @@ enum DebugBridge {
                 webView.configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
                 webView.reload()
             }
+        case "webstate":
+            // webstate: where the tab in front's page is, as WebKit sees it (for a page that never answers scripts).
+            if let view = controller.selectedWebView {
+                debugLog("webstate url=\(view.url?.absoluteString ?? "-") loading=\(view.isLoading) progress=\(view.estimatedProgress) title=\(view.title ?? "-")")
+            }
         case "popupjs":
             if #available(macOS 15.4, *), let webView = ExtensionHost.shared.lastAction?.popupWebView {
                 webView.evaluateJavaScript(arg) { result, error in
