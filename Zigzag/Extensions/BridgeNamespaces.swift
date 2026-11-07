@@ -148,6 +148,44 @@ final class BridgeNotifications: BridgeNamespace {
     }
 }
 
+// MARK: - system.display
+
+/// `chrome.system.display`: your screens' sizes and places, as Chrome reports them (from the top left of the main
+/// screen, in points). Extensions read it to place a window of their own (Sound Booster does, as it starts).
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeDisplay: BridgeNamespace {
+    static let name = "system.display"
+    static let permission = "system.display"
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "getInfo":
+            let screens = NSScreen.screens
+            let top = screens.first?.frame.maxY ?? 0
+            let rect = { (frame: NSRect) -> [String: Any] in
+                ["left": Int(frame.minX), "top": Int(top - frame.maxY), "width": Int(frame.width), "height": Int(frame.height)]
+            }
+            return screens.enumerated().map { index, screen -> [String: Any] in
+                let number = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? UInt32(index)
+                let dpi = 72 * screen.backingScaleFactor
+                return [
+                    "id": String(number), "name": screen.localizedName, "mirroringSourceId": "", "mirroringDestinationIds": [String](),
+                    "isPrimary": index == 0, "isInternal": CGDisplayIsBuiltin(number) != 0, "isEnabled": true, "isUnified": false,
+                    "dpiX": dpi, "dpiY": dpi, "rotation": 0, "hasTouchSupport": false, "hasAccelerometerSupport": false,
+                    "availableDisplayZoomFactors": [1], "displayZoomFactor": 1, "modes": [[String: Any]](),
+                    "bounds": rect(screen.frame), "workArea": rect(screen.visibleFrame),
+                    "overscan": ["left": 0, "top": 0, "right": 0, "bottom": 0],
+                ]
+            }
+        case "getDisplayLayout":
+            return [[String: Any]]()
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+}
+
 // MARK: - idle
 
 /// `chrome.idle`: active, idle (no input for the interval) or locked, from macOS. Watched only while an extension

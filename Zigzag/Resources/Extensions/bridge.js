@@ -331,6 +331,19 @@
     onStatusChanged: event('tabCapture.onStatusChanged'),
   });
 
+  // system.display sits under chrome.system, beside any other system namespace WebKit has.
+  if (asked.has('system.display')) {
+    for (const target of new Set([globalThis.chrome, globalThis.browser])) {
+      if (!target || (target.system && target.system.display)) continue;
+      const system = Object.assign({}, target.system, { display: {
+        getInfo: (...args) => method('system.display', 'getInfo')(...args.filter((a) => typeof a === 'function')),
+        getDisplayLayout: method('system.display', 'getDisplayLayout'),
+        onDisplayChanged: event('system.display.onDisplayChanged'),
+      } });
+      try { Object.defineProperty(target, 'system', { value: system, configurable: true, enumerable: true, writable: true }); } catch (e) {}
+    }
+  }
+
   install('power', {
     requestKeepAwake: (level) => { send('power', 'requestKeepAwake', [level]).catch(() => {}); },
     releaseKeepAwake: () => { send('power', 'releaseKeepAwake', []).catch(() => {}); },
