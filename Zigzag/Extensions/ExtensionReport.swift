@@ -21,7 +21,9 @@ struct ExtensionReport {
     init(extension ext: WKWebExtension, manifest: [String: Any], id: String) {
         let requested = Self.strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
-        abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id)
+        // Not a permission, but worth saying up front: it changes what ⌘T does.
+        let replacesNewTab = (manifest["chrome_url_overrides"] as? [String: Any])?["newtab"] != nil
+        abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id, replacesNewTab: replacesNewTab)
 
         var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
         let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
@@ -48,7 +50,7 @@ struct ExtensionReport {
 
     // MARK: Plain words
 
-    private static func abilities(permissions: Set<String>, patterns: [String], id: String) -> [Line] {
+    private static func abilities(permissions: Set<String>, patterns: [String], id: String, replacesNewTab: Bool = false) -> [Line] {
         var lines: [Line] = []
         let hosts = patterns.compactMap(host(of:))
         if patterns.contains(where: { $0 == "<all_urls>" || $0.hasPrefix("*://*/") || $0.hasPrefix("http://*/") || $0.hasPrefix("https://*/") }) {
@@ -73,6 +75,9 @@ struct ExtensionReport {
         }
         if permissions.contains("notifications") {
             lines.append(Line(symbol: "bell", text: "Show notifications"))
+        }
+        if replacesNewTab {
+            lines.append(Line(symbol: "plus.square", text: "Show its own page when you open a new tab"))
         }
         if permissions.contains("declarativeNetRequest") || permissions.contains("declarativeNetRequestWithHostAccess") {
             lines.append(Line(symbol: "hand.raised", text: "Block content on pages"))
@@ -139,6 +144,5 @@ struct ExtensionReport {
     /// Manifest features with no WebKit equivalent.
     private static let manifestLimits: [(String, String)] = [
         ("omnibox", "Address bar keyword"),
-        ("chrome_url_overrides", "Replacing the new tab page"),
     ]
 }

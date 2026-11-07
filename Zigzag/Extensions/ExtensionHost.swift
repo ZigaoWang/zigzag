@@ -71,6 +71,18 @@ final class ExtensionHost: NSObject {
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
     /// Stops an extension: its buttons, scripts and background page go away.
+    /// The page an extension puts in place of a new tab (`chrome_url_overrides.newtab`), as in Chrome: the most
+    /// recently loaded one that asks, while it's on. Nil keeps Zigzag's own command bar.
+    func newTabOverride() -> URL? {
+        for context in contexts.reversed() {
+            guard let overrides = ExtensionStore.manifest(for: context.uniqueIdentifier)?["chrome_url_overrides"] as? [String: Any],
+                  let path = overrides["newtab"] as? String,
+                  let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { continue }
+            return url
+        }
+        return nil
+    }
+
     /// The extension's name, for saying who's asking (a keep-awake, a notification).
     func displayName(for id: String) -> String {
         context(for: id)?.webExtension.displayName ?? installed[id]?.displayName ?? "an extension"
