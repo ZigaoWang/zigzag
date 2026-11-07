@@ -24,7 +24,7 @@ struct ExtensionReport {
         abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id)
 
         var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
-        let covered = ExtensionProfile.profile(for: id)?.coveredPermissions ?? []
+        let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
         for permission in requested.subtracting(recognized).subtracting(covered).sorted() {
             if let name = Self.limitNames[permission], !limits.contains(name) { limits.append(name) }
         }
@@ -60,8 +60,19 @@ struct ExtensionReport {
         if permissions.contains("nativeMessaging") {
             lines.append(Line(symbol: "macwindow", text: "Talk to \(appName(for: id)) on your Mac"))
         }
-        if permissions.contains("tabs") || permissions.contains("webNavigation") || permissions.contains("history") {
+        if permissions.contains("history") {
+            lines.append(Line(symbol: "clock", text: "Read and change your browsing history"))
+        } else if permissions.contains("tabs") || permissions.contains("webNavigation") {
             lines.append(Line(symbol: "clock", text: "See the sites you visit"))
+        }
+        if permissions.contains("bookmarks") {
+            lines.append(Line(symbol: "pin", text: "Read and change your pinned pages, folders and favorites"))
+        }
+        if permissions.contains("downloads") {
+            lines.append(Line(symbol: "arrow.down.circle", text: permissions.contains("downloads.open") ? "Download files and open them" : "Download files and manage your downloads"))
+        }
+        if permissions.contains("notifications") {
+            lines.append(Line(symbol: "bell", text: "Show notifications"))
         }
         if permissions.contains("declarativeNetRequest") || permissions.contains("declarativeNetRequestWithHostAccess") {
             lines.append(Line(symbol: "hand.raised", text: "Block content on pages"))
