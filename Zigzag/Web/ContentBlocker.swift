@@ -109,6 +109,29 @@ enum ContentBlocker {
     /// The list a page should be blocked with right now, if any.
     static var activeList: WKContentRuleList? { ruleList ?? fallbackList }
 
+    // MARK: YouTube
+
+    /// YouTube serves its video ads from its own servers, where no blocklist reaches: a script in its pages takes
+    /// them out instead (Resources/YouTubeAds.js), asking first whether ad blocking is on for the page.
+    private static let youTubeScript: WKUserScript = {
+        let source = Bundle.main.url(forResource: "YouTubeAds", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+    }()
+
+    static func attachYouTube(to configuration: WKWebViewConfiguration) {
+        configuration.userContentController.addUserScript(youTubeScript)
+        configuration.userContentController.addScriptMessageHandler(YouTubeAnswer.shared, contentWorld: .page, name: "zigzagAds")
+    }
+
+    /// Answers whether ads are blocked on the page asking (the tab's own site decides, as for the blocklist).
+    private final class YouTubeAnswer: NSObject, WKScriptMessageHandlerWithReply {
+        static let shared = YouTubeAnswer()
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
+            let page = message.webView?.url ?? message.frameInfo.request.url
+            return (ContentBlocker.isEnabled && !ContentBlocker.isAllowed(on: page), nil)
+        }
+    }
+
     static func attach(to configuration: WKWebViewConfiguration) {
         guard isEnabled, let list = activeList else { return }
         configuration.userContentController.add(list)
