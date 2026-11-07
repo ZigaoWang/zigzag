@@ -76,6 +76,16 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .clip figcaption b { display: block; margin-bottom: 4px; color: var(--ink); font-size: 24px; font-weight: 600; letter-spacing: -0.012em; }
 
 .pitch { padding: 40px 0 140px; text-align: center; }
+/* The close: the same sky as the top, once more, on a card around the last Download. */
+.pitch.sky-card { --navy: #1F2D40; margin: 0 0 96px; padding: 96px 24px; border-radius: 28px; color: var(--navy); color-scheme: light;
+  background: #93C2F1 url(/assets/sky-card.jpg?v=1) center / cover no-repeat; }
+.sky-card h2 { font-size: clamp(32px, 4vw, 48px); }
+.sky-card p:not(.fine) { color: rgba(31, 45, 64, .72); }
+.sky-card .button { background: var(--navy); color: #fff; }
+.sky-card .gh.big { color: var(--navy); border-color: rgba(31, 45, 64, .25); }
+.sky-card .gh.big:hover { background: rgba(255, 255, 255, .35); }
+.sky-card .fine { color: rgba(31, 45, 64, .62); }
+@media (max-width: 600px) { .pitch.sky-card { padding: 64px 20px; border-radius: 20px; margin-bottom: 64px; } }
 .pitch h2 { margin: 0; }
 .pitch p:not(.fine) { margin: 10px auto 0; max-width: 560px; font-size: 17px; color: var(--soft); text-wrap: pretty; }
 .end { padding: 24px 0 64px; text-align: center; border-top: 1px solid var(--line); }
