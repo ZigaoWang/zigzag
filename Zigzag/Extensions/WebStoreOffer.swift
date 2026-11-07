@@ -54,7 +54,8 @@ final class WebStoreOffer: FloatingPanelView {
         tabToken = controller.tabManager.selectedTab?.changed.observe { [weak self] change in
             guard let self, change == .title || change == .loading else { return }
             self.refreshName()
-            if change == .loading, self.controller?.tabManager.selectedTab?.isLoading == false { self.loadIcon() }
+            // A new title is a new listing too (the store changes listings without loading a page).
+            if self.controller?.tabManager.selectedTab?.isLoading == false { self.loadIcon() }
         }
         close.onClick = { _ in Self.hide() }
         onLayout = { [weak self] in self?.layoutContent() }
@@ -126,10 +127,18 @@ final class WebStoreOffer: FloatingPanelView {
     private func loadIcon() {
         // Only from this extension's own page, so a previous page's icon never shows.
         guard let tab = controller?.tabManager.selectedTab, ExtensionStore.webStoreID(from: tab.url) == id, !tab.isLoading else { return }
-        let script = "(document.querySelector('meta[property=\"og:image\"]')||{}).content || ''"
+        // The listing's own logo, named for the listing on screen. The store moves between listings without loading
+        // a page, so the page's preview image (og:image) can still be the first listing's: never trusted on its own.
+        let script = """
+            (() => {
+              const name = document.title.split(' - Chrome Web Store')[0];
+              const logo = [...document.images].find((i) => i.alt === 'Item logo image for ' + name);
+              return logo ? logo.src : '';
+            })()
+            """
         tab.webView?.evaluateJavaScript(script) { [weak self] result, _ in
             MainActor.assumeIsolated {
-                guard let string = result as? String, let url = URL(string: string) else { return }
+                guard let string = result as? String, let url = URL(string: string), url.scheme == "https" else { return }
                 Task { @MainActor [weak self] in
                     guard let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data), image.isValid,
                           let self else { return }
