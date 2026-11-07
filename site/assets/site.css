@@ -300,7 +300,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .nav-links a, .nav-gh { color: rgba(31, 45, 64, .78); text-decoration: none; } .nav-links a:hover, .nav-gh:hover { color: #1F2D40; }
 .nav-end { display: flex; align-items: center; gap: 20px; font-size: 14px; }
 .hero .button.small { background: #1F2D40; color: #fff; }
-.hero { --text: 400px; } .hero-text { padding-top: 104px; }
+.hero { --text: 350px; } .hero-text { padding-top: 104px; }
 .pill { display: inline-block; padding: 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, .55); border: 1px solid rgba(255, 255, 255, .8);
   font-size: 13px; font-weight: 500; color: #1F2D40; text-decoration: none; }
 .tag { margin-top: 18px; font-size: clamp(36px, 5vw, 60px); }
@@ -339,3 +339,11 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .weight .note { max-width: none; margin: 16px 0 0; text-align: left; }
 .foot-home { display: inline-block; text-decoration: none; } .foot-home .wm { height: 18px; display: block; }
 @media (max-width: 760px) { .weight .bars li { grid-template-columns: 92px 1fr 72px; gap: 10px; font-size: 14px; } }
+
+/* The hero, pared back: a headline, one line, one button, and a quiet link. */
+.hero-text { padding-top: 120px; }
+.hero .tag, .hero h1.tag { margin: 0; font-size: clamp(40px, 5.4vw, 68px); letter-spacing: -0.025em; line-height: 1.02; }
+.hero .sub { margin-top: 18px; font-size: clamp(17px, 1.5vw, 19px); color: rgba(31, 45, 64, .7); }
+.hero .actions { gap: 24px; margin-top: 32px; }
+.text-link { font-size: 15px; font-weight: 500; color: #1F2D40; text-decoration: none; }
+.text-link::after { content: " →"; } .text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
