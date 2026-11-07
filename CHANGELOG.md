@@ -5,6 +5,28 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-11-07
+
+### New
+- Chrome extensions can use much more, answered by Zigzag itself and only with the permissions they asked for:
+  - History: search, add and remove, and hear about each visit. Private windows never show.
+  - Bookmarks: your pinned pages, folders and favorites, read and changed as bookmarks.
+  - Downloads: start, follow, pause, resume, show and open files. A name an extension gives stays inside Downloads.
+  - Notifications, shown by macOS under the extension's name.
+  - Side panels, docked beside the page like a second pane, opened from the extension's button.
+  - Offscreen pages, for an extension's clipboard, audio and parsing work.
+  - Signing in through the web, in a small window of its own.
+  - The sound of the tab you're on, for Shazam and recorders, right after you click the extension. A note says it's listening.
+  - Its own new tab page, in place of the command bar on ⌘T.
+  - Top sites, idle state, reading aloud and keeping the Mac awake.
+- An extension's install sheet says what these let it do, instead of listing them as missing.
+
+### Fixed
+- Download PDF saves to Downloads like any file, flies into the Downloads button, and opens the saved copy on the page you were reading. On a PDF already on your Mac, the button saves a copy.
+- The Add to Zigzag bar shows the listing's own icon, also after moving from one listing to another.
+- Stand-ins for extension features WebKit lacks now attach where WebKit names a feature without providing it.
+- An unpacked extension in a linked folder or on another disk gets Zigzag's compatibility layer.
+
 ## [0.5.16] - 2026-11-07
 
 ### Fixed
@@ -597,7 +619,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.16...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.17...HEAD
+[0.5.17]: https://github.com/ZigaoWang/zigzag/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/ZigaoWang/zigzag/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/ZigaoWang/zigzag/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/ZigaoWang/zigzag/compare/v0.5.13...v0.5.14
