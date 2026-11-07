@@ -1,25 +1,11 @@
 <p align="center">
-  <img src="Zigzag/Resources/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="96" alt="Zigzag app icon">
-</p>
-
-<p align="center">
-  <img src="docs/brand/wordmark-light.svg#gh-light-mode-only" width="260" alt="Zigzag">
-  <img src="docs/brand/wordmark-dark.svg#gh-dark-mode-only" width="260" alt="Zigzag">
-</p>
-
-<p align="center">
-  <b>Feels great. Weighs nothing.</b><br>
-  The lightweight browser for Mac.
+  <a href="https://zigzagbrowser.com"><img src="docs/brand/social-preview.png" width="960" alt="Zigzag: Feels great. Weighs nothing. The lightweight browser for Mac, free and open source. A Zigzag window in split view, Fonts In Use beside Grilli Type, with the sidebar of spaces and pinned tabs."></a>
 </p>
 
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a><br>
   <sub>or <code>brew install --cask zigaowang/tap/zigzag</code></sub><br>
   <sub>Free. macOS 15.4 or later. In beta.</sub>
-</p>
-
-<p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Switching between three spaces in Zigzag, each with its own color and tabs">
 </p>
 
 ## Coming from Arc
@@ -35,6 +21,25 @@ history and passwords come over. The pile of open tabs stays behind, so you star
 **It can't be switched off.** Zigzag doesn't depend on a server of mine. The only thing I host is the update
 feed, and if that went away, Zigzag would keep working. The engine's security updates come from Apple, with
 macOS. [Privacy](#privacy) lists everything Zigzag connects to on its own.
+
+## See it
+
+<p align="center">
+  <img src="docs/spaces.gif" width="960" alt="Switching between three spaces in Zigzag, each with its own color and tabs">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="site/assets/clips/peek.jpg" alt="Peek: a linked Wikipedia article open over the one you're reading"><br><b>Peek.</b> Shift-click a link to glance at it without losing your place.</td>
+    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split view: Python's itertools docs beside a Python console"><br><b>Split view.</b> Drag a tab onto the page to open it beside.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/all-tabs.jpg" alt="Every tab across three spaces shown as cards"><br><b>Every tab at once.</b> ⇧⌘\ shows every space. Type to filter.</td>
+    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="An essay in Reader, in warm sepia"><br><b>Reader.</b> One click turns a long essay into calm, clear type.</td>
+  </tr>
+</table>
+
+<p align="center"><sub>More, in motion, at <a href="https://zigzagbrowser.com">zigzagbrowser.com</a>.</sub></p>
 
 ## What it does
 
