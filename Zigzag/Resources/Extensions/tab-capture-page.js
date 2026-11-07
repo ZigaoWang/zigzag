@@ -22,7 +22,7 @@ const parts = [], muted = [];
 for (const [context, list] of byContext) {
   if (context.state !== 'running') continue;
   const mix = context.createGain();
-  const processor = context.createScriptProcessor(4096, 2, 1);
+  const processor = context.createScriptProcessor(512, 2, 1);
   mix.connect(processor);
   processor.connect(context.destination);
   for (const node of list) {
@@ -39,7 +39,7 @@ for (const [context, list] of byContext) {
     const bytes = new Uint8Array(samples.buffer);
     let binary = '';
     for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: context.sampleRate, pcm: btoa(binary) });
+    window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: context.sampleRate, pcm: btoa(binary), at: Date.now() });
   };
   parts.push({ mix, processor });
 }

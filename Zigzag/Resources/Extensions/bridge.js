@@ -246,14 +246,21 @@
   });
 
   // tabCapture: Zigzag sends the tab's samples; here they play into a MediaStream the extension uses as Chrome's.
-  const captureStream = (id, sourceRate) => {
+  // Kept as close behind the tab as it can be (a few hundredths of a second), since the tab itself goes quiet and an
+  // extension like a volume booster plays this in its place, under the tab's picture.
+  const captureStream = (id) => {
     const context = new AudioContext();
     const destination = context.createMediaStreamDestination();
-    const player = context.createScriptProcessor(4096, 0, 1);
+    const player = context.createScriptProcessor(512, 0, 1);
     const queue = [];
-    let queued = 0;
+    let queued = 0, primed = false;
+    // A small cushion before playing (and again after running dry), so uneven arrival doesn't crackle; never more
+    // than a tenth of a second behind, so it can't drift away from the picture.
+    const cushion = Math.round(context.sampleRate * 0.025), most = Math.round(context.sampleRate * 0.1);
     player.onaudioprocess = (event) => {
       const out = event.outputBuffer.getChannelData(0);
+      if (!primed && queued < cushion) { out.fill(0); return; }
+      primed = true;
       let i = 0;
       while (i < out.length && queue.length) {
         const chunk = queue[0];
@@ -262,11 +269,13 @@
         chunk.offset += take; i += take; queued -= take;
         if (chunk.offset >= chunk.length) queue.shift();
       }
-      out.fill(0, i);
+      if (i < out.length) { out.fill(0, i); primed = false; }
     };
     player.connect(destination);
-    const receive = (tap, rate, pcm) => {
+    const receive = (tap, rate, pcm, at) => {
       if (tap !== id) return;
+      // Sound that took too long to arrive would only put it further behind.
+      if (at && Date.now() - at > 250) return;
       const binary = atob(pcm);
       const samples = new Int16Array(binary.length / 2);
       for (let i = 0; i < samples.length; i++) samples[i] = binary.charCodeAt(2 * i) | (binary.charCodeAt(2 * i + 1) << 8);
@@ -278,8 +287,10 @@
       chunk.offset = 0;
       queue.push(chunk);
       queued += length;
-      // Never more than a second behind: a stalled player drops the oldest sound rather than drifting.
-      while (queued > context.sampleRate && queue.length > 1) queued -= queue.shift().length;
+      while (queued - (queue[0].length - queue[0].offset) >= most && queue.length > 1) {
+        const dropped = queue.shift();
+        queued -= dropped.length - dropped.offset;
+      }
     };
     on('tabCapture.chunk', receive);
     const stream = destination.stream;

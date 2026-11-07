@@ -28,7 +28,7 @@ if (ctx.state !== 'running') {
 }
 const muted = new Set();
 const mix = ctx.createGain();
-const processor = ctx.createScriptProcessor(4096, 2, 1);
+const processor = ctx.createScriptProcessor(512, 2, 1);
 mix.connect(processor);
 // A processor only runs while connected onward; it writes nothing, so this adds no sound.
 processor.connect(ctx.destination);
@@ -73,7 +73,7 @@ processor.onaudioprocess = (event) => {
   const bytes = new Uint8Array(samples.buffer);
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: ctx.sampleRate, pcm: btoa(binary) });
+  window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: ctx.sampleRate, pcm: btoa(binary), at: Date.now() });
 };
 state.taps.set(tap, { processor, mix, observer, onPlay, muted });
 return muted.size;

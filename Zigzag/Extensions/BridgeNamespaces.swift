@@ -712,7 +712,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             }
             let id = UUID().uuidString
             // The page's own Web Audio first: when it plays through that (YouTube does), its elements can't be tapped.
-            let routed = try? await webView.callAsyncJavaScript(Self.pageScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: .page) as? Int
+            var routed: Int?
+            do { routed = try await webView.callAsyncJavaScript(Self.pageScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: .page) as? Int }
+            catch { ExtensionLog.write("tab capture page half: \(error)") }
             if let routed, routed > 0 {
                 taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: .page, script: Self.pageScript)
             } else {
@@ -751,13 +753,14 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let id = body["tap"] as? String, let pcm = body["pcm"] as? String,
               let rate = body["rate"] as? Double else { return }
+        let at = body["at"] as? Double ?? 0
         let world = message.world
         MainActor.assumeIsolated {
             // Only from the half that's listening, in the tab it's listening to.
             guard let tap = taps[id], tap.webView === message.webView, tap.world == world else { return }
             // The extension stopped listening (its popup closed): the tap goes too, and the tab's sound comes back.
             guard ExtensionBridge.shared.isListened("tabCapture.chunk") else { stop(id); return }
-            ExtensionBridge.shared.emit("tabCapture.chunk", [id, rate, pcm], to: tap.extensionID)
+            ExtensionBridge.shared.emit("tabCapture.chunk", [id, rate, pcm, at], to: tap.extensionID)
         }
     }
 
