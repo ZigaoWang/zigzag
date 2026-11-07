@@ -22,15 +22,31 @@
   if (!reachable.length) return;
   const runtime = window.browser && window.browser.runtime;
   if (!runtime || typeof runtime.sendMessage !== 'function') return;
-  // These sites decide from the browser's name whether to hand things to the extension (claude.ai finishing Claude's
-  // sign-in does): here, where an extension asked to be reached, the page reads Chrome, as the extension was built for.
-  // What's sent to the server is unchanged.
-  const asChrome = navigator.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/140.0.0.0 Safari/537.36');
-  const proto = Object.getPrototypeOf(navigator);
-  const brands = Object.freeze([{ brand: 'Chromium', version: '140' }, { brand: 'Google Chrome', version: '140' }, { brand: 'Not=A?Brand', version: '24' }]);
-  const userAgentData = { brands, mobile: false, platform: 'macOS', getHighEntropyValues: async () => ({ brands, mobile: false, platform: 'macOS', fullVersionList: brands }), toJSON: () => ({ brands, mobile: false, platform: 'macOS' }) };
-  for (const [key, value] of [['userAgent', asChrome], ['appVersion', asChrome.replace(/^Mozilla\//, '')], ['vendor', 'Google Inc.'], ['userAgentData', userAgentData]]) {
-    try { Object.defineProperty(proto, key, { get: () => value, configurable: true, enumerable: true }); } catch (e) {}
+  // Inside one of these extensions' own pages (Claude's side panel shows claude.ai in a frame), the site checks it's
+  // framed by the extension as Chrome names it: chrome-extension://<id>. WebKit's name for the same page is
+  // webkit-extension://<id>; the site reads Chrome's, and what it sends back to that page goes to WebKit's.
+  const toChrome = (origin) => {
+    const match = /^webkit-extension:\/\/([a-p]{32})$/.exec(origin || '');
+    return match && reachable.includes(match[1]) ? 'chrome-extension://' + match[1] : origin;
+  };
+  const toWebKit = (origin) => (typeof origin === 'string' ? origin.replace(/^chrome-extension:\/\/([a-p]{32})$/, 'webkit-extension://$1') : origin);
+  const ancestors = location.ancestorOrigins;
+  if (window.parent !== window && ancestors && ancestors.length && toChrome(ancestors[0]) !== ancestors[0]) {
+    const named = Object.freeze(Object.assign([...ancestors].map(toChrome), { contains: (o) => [...ancestors].map(toChrome).includes(o), item: (i) => toChrome(ancestors[i]) }));
+    try { Object.defineProperty(Location.prototype, 'ancestorOrigins', { get: () => named, configurable: true }); } catch (e) {}
+    const parent = window.parent;
+    const standIn = new Proxy({}, {
+      get(_, name) {
+        if (name === 'postMessage') {
+          return (message, target, transfer) => (target && typeof target === 'object'
+            ? parent.postMessage(message, Object.assign({}, target, { targetOrigin: toWebKit(target.targetOrigin) }))
+            : parent.postMessage(message, toWebKit(target), transfer));
+        }
+        const value = parent[name];
+        return typeof value === 'function' ? value.bind(parent) : value;
+      },
+    });
+    try { Object.defineProperty(window, 'parent', { get: () => standIn, configurable: true }); } catch (e) {}
   }
   if (window.chrome) return;
   // Chrome's sendMessage(extensionId?, message, options?, callback?): WebKit's takes no options, and refuses the call

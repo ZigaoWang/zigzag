@@ -349,6 +349,8 @@ final class ExtensionHost: NSObject {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self, self.popupShownAt == nil else { return }
+            // Its side panel opening (Claude's, from its own click handler) is it doing something.
+            if WindowManager.shared.controllers.contains(where: { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }) { return }
             let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
             guard tabsNow == tabsBefore, let options = context.optionsPageURL,
                   let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
