@@ -224,6 +224,68 @@
     onClosed: event('sidePanel.onClosed'),
   });
 
+  // tabCapture: Zigzag sends the tab's samples; here they play into a MediaStream the extension uses as Chrome's.
+  const captureStream = (id, sourceRate) => {
+    const context = new AudioContext();
+    const destination = context.createMediaStreamDestination();
+    const player = context.createScriptProcessor(4096, 0, 1);
+    const queue = [];
+    let queued = 0;
+    player.onaudioprocess = (event) => {
+      const out = event.outputBuffer.getChannelData(0);
+      let i = 0;
+      while (i < out.length && queue.length) {
+        const chunk = queue[0];
+        const take = Math.min(out.length - i, chunk.length - chunk.offset);
+        out.set(chunk.subarray(chunk.offset, chunk.offset + take), i);
+        chunk.offset += take; i += take; queued -= take;
+        if (chunk.offset >= chunk.length) queue.shift();
+      }
+      out.fill(0, i);
+    };
+    player.connect(destination);
+    const receive = (tap, rate, pcm) => {
+      if (tap !== id) return;
+      const binary = atob(pcm);
+      const samples = new Int16Array(binary.length / 2);
+      for (let i = 0; i < samples.length; i++) samples[i] = binary.charCodeAt(2 * i) | (binary.charCodeAt(2 * i + 1) << 8);
+      // Resampled to this context's rate when the two differ.
+      const ratio = rate / context.sampleRate;
+      const length = Math.floor(samples.length / ratio);
+      const chunk = new Float32Array(length);
+      for (let i = 0; i < length; i++) chunk[i] = samples[Math.min(samples.length - 1, Math.floor(i * ratio))] / 0x8000;
+      chunk.offset = 0;
+      queue.push(chunk);
+      queued += length;
+      // Never more than a second behind: a stalled player drops the oldest sound rather than drifting.
+      while (queued > context.sampleRate && queue.length > 1) queued -= queue.shift().length;
+    };
+    on('tabCapture.chunk', receive);
+    const stream = destination.stream;
+    for (const track of stream.getAudioTracks()) {
+      const stop = track.stop.bind(track);
+      track.stop = () => {
+        stop();
+        const set = listeners.get('tabCapture.chunk');
+        if (set) set.delete(receive);
+        player.disconnect();
+        context.close().catch(() => {});
+        send('tabCapture', 'stop', [id]).catch(() => {});
+      };
+    }
+    return stream;
+  };
+  install('tabCapture', {
+    capture: (options, callback) => {
+      const result = send('tabCapture', 'capture', [options || {}]).then((tap) => captureStream(tap.id));
+      if (typeof callback !== 'function') return result;
+      result.then((stream) => callback(stream), (error) => { console.warn('chrome.tabCapture.capture:', error.message); callback(null); });
+    },
+    getCapturedTabs: method('tabCapture', 'getCapturedTabs'),
+    getMediaStreamId: method('tabCapture', 'getMediaStreamId'),
+    onStatusChanged: event('tabCapture.onStatusChanged'),
+  });
+
   install('power', {
     requestKeepAwake: (level) => { send('power', 'requestKeepAwake', [level]).catch(() => {}); },
     releaseKeepAwake: () => { send('power', 'releaseKeepAwake', []).catch(() => {}); },

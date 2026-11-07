@@ -71,6 +71,10 @@ final class ExtensionHost: NSObject {
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
     /// Stops an extension: its buttons, scripts and background page go away.
+    /// When each extension's button was last clicked: some APIs act only in answer to that (tab capture).
+    private var actionClicks: [String: Date] = [:]
+    func lastActionClick(_ id: String) -> Date { actionClicks[id] ?? .distantPast }
+
     /// The page an extension puts in place of a new tab (`chrome_url_overrides.newtab`), as in Chrome: the most
     /// recently loaded one that asks, while it's on. Nil keeps Zigzag's own command bar.
     func newTabOverride() -> URL? {
@@ -289,6 +293,7 @@ final class ExtensionHost: NSObject {
         let context = item.context
         let hasPopup = context.action(for: tab)?.presentsPopup ?? false
         ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(hasPopup)")
+        actionClicks[item.id] = Date()
         // Its side panel, when that's what its button opens.
         let controller = WindowManager.shared.controllers.first { $0.window === anchor.window } ?? WindowManager.shared.keyController
         if ExtensionBridge.shared.sidePanel.handleClick(item.id, hasPopup: hasPopup, in: controller) { return }
