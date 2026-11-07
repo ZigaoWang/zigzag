@@ -25,6 +25,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Download PDF saves to Downloads like any file and flies into the Downloads button. The tab stays on the page you were reading, and the saved file opens there later. On a PDF already on your Mac, the button saves a copy.
 - Claude signs in: claude.ai can reach the extension, and its background no longer stops on Chrome features WebKit lacks.
 - Sites an extension lets message it can, with Chrome's names, and the extension learns which site sent each message.
+- An extension asking for a tab's sound (Sound Booster) gets the tab, never your microphone, even on the rare page WebKit sets up late.
 - An extension's popup closes when you open site controls, a menu, Downloads or the space editor.
 - An extension's own small window opens at the size it asks for, with its name on top, not as a whole browser window, and without its popup left over it.
 - The Add to Zigzag bar shows the listing's own icon, also after moving from one listing to another.
