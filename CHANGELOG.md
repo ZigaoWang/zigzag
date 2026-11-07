@@ -5,6 +5,18 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-11-07
+
+### New
+- Bookmarks imported from Chrome, Safari and Firefox keep their folders, nested as they were.
+- ⌘J (Find › Jump to Selection) scrolls back to what you'd selected, as in Safari.
+- Help › Zigzag on GitHub opens the source code.
+
+### Fixed
+- Web apps get their own shortcuts first: ⌘S commits in GitHub's editor, ⌘F searches a document, ⌘D duplicates in a design tool. When a page doesn't use one, Zigzag does what the menu says, so ⌘S still saves the page.
+- Search suggestions are fetched without cookies, in every window.
+- Downloads note the page they came from, so Get Info shows it under Where From.
+
 ## [0.5.14] - 2026-11-06
 
 ### New
@@ -578,7 +590,9 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.13...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.15...HEAD
+[0.5.15]: https://github.com/ZigaoWang/zigzag/compare/v0.5.14...v0.5.15
+[0.5.14]: https://github.com/ZigaoWang/zigzag/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/ZigaoWang/zigzag/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/ZigaoWang/zigzag/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/ZigaoWang/zigzag/compare/v0.5.10...v0.5.11
