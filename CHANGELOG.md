@@ -5,6 +5,13 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-11-07
+
+### Fixed
+- Extension popups and pages that don't choose a font use the system font, as in Chrome, instead of a serif.
+- The Add to Zigzag bar on the Chrome Web Store shows the extension's icon on a rounded tile.
+- An empty space's wordmark is lightly engraved into the space's color, and shows on black.
+
 ## [0.5.15] - 2026-11-07
 
 ### New
@@ -590,7 +597,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.15...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.5.16...HEAD
+[0.5.16]: https://github.com/ZigaoWang/zigzag/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/ZigaoWang/zigzag/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/ZigaoWang/zigzag/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/ZigaoWang/zigzag/compare/v0.5.12...v0.5.13
