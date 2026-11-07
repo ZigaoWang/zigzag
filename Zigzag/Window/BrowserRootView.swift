@@ -925,40 +925,54 @@ final class SplitDropHint: NSView {
 }
 
 
-/// What a space with no tabs shows on its color: the wordmark, faint, like a mark pressed into it. Nothing to
-/// click or dismiss; ⌘T and the sidebar's New Tab are where a tab comes from.
+/// What a space with no tabs shows on its color: the wordmark lightly engraved into it. The letters' floor is a
+/// shade darker, their upper wall casts a soft shadow inside them, and their lower rim catches a thin line of light,
+/// so it reads as pressed in on any color, black and white included. Nothing to click or dismiss; ⌘T and the
+/// sidebar's New Tab are where a tab comes from.
 final class EmptySpaceMark: NSView {
     static let size = NSSize(width: 28 * WordmarkView.aspect, height: 28)
-    private let wordmark = WordmarkView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        addSubview(wordmark)
         setAccessibilityElement(false)
-        refresh()
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        refresh()
-    }
-
-    /// Drawn solid and faded as one piece: the letters' strokes overlap, and a see-through color would darken where
-    /// they cross.
-    private func refresh() {
-        wordmark.color = Tokens.Color.textPrimary
-        // On the mark itself: this view's own opacity is what fades it in and out with the page.
-        wordmark.wantsLayer = true
-        wordmark.layer?.allowsGroupOpacity = true
-        wordmark.alphaValue = 0.07
-    }
-
+    override var isFlipped: Bool { false }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
+    override func layout() { super.layout(); needsDisplay = true }
 
-    override func layout() {
-        super.layout()
-        wordmark.frame = bounds
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        // A dark space has little to shade, so light carries the cut; a light one has little to light, so shade does.
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let ink = WordmarkView.outline(in: bounds.insetBy(dx: 2, dy: 2))
+        let below = CGMutablePath(); below.addPath(ink, transform: CGAffineTransform(translationX: 0, y: -1))
+
+        // The rim of light under each letter: the outline nudged down, less the letters themselves.
+        context.saveGState()
+        context.addPath(below.subtracting(ink))
+        context.setFillColor(NSColor.white.withAlphaComponent(dark ? 0.2 : 0.75).cgColor)
+        context.fillPath()
+        context.restoreGState()
+
+        // The floor: a shade darker than a light surface; on a dark one, darker can't show, so it takes a breath of light.
+        context.saveGState()
+        context.addPath(ink)
+        context.setFillColor((dark ? NSColor.white.withAlphaComponent(0.07) : NSColor.black.withAlphaComponent(0.025)).cgColor)
+        context.fillPath()
+        context.restoreGState()
+
+        // The upper wall's shadow, inside the letters: everything but the letters casts it, clipped to them.
+        context.saveGState()
+        context.addPath(ink); context.clip()
+        let surround = CGMutablePath(); surround.addRect(bounds.insetBy(dx: -20, dy: -20)); surround.addPath(ink)
+        context.setShadow(offset: CGSize(width: 0, height: -1.2), blur: 1.4,
+                          color: NSColor.black.withAlphaComponent(dark ? 0.6 : 0.13).cgColor)
+        context.addPath(surround)
+        context.setFillColor(NSColor.black.cgColor)
+        context.fillPath(using: .evenOdd)
+        context.restoreGState()
     }
 }
