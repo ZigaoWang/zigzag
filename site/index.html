@@ -22,23 +22,31 @@
 <meta name="twitter:image" content="https://zigzagbrowser.com/assets/og.png">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Zigzag", "applicationCategory": "BrowserApplication", "operatingSystem": "macOS 15.4 or later", "description": "Zigzag is a fast, free web browser for Mac with spaces, a sidebar, split view and peek. Coming from Arc? Bring your spaces and pinned tabs over in one click.", "url": "https://zigzagbrowser.com/", "downloadUrl": "https://zigzagbrowser.com/download/", "image": "https://zigzagbrowser.com/assets/icon-512.png", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "author": {"@type": "Person", "name": "Zigao Wang", "url": "https://zigao.wang"}, "license": "https://www.apache.org/licenses/LICENSE-2.0", "sameAs": ["https://github.com/ZigaoWang/zigzag"]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is Zigzag just an Arc copy?", "acceptedAnswer": {"@type": "Answer", "text": "Arc showed a lot of people that a browser could feel good, and Zigzag is openly inspired by that. But it’s built from scratch, on Safari’s engine instead of Chrome’s, with its own design, and things Arc never had: tabs that tidy themselves, built in ad blocking, and a password manager that imports from any browser. Zigzag isn’t affiliated with The Browser Company."}}, {"@type": "Question", "name": "Will Zigzag shut down like Arc?", "acceptedAnswer": {"@type": "Answer", "text": "It can’t be switched off. There’s no account, and the only server is the update feed. If it went away, Zigzag would keep working on your Mac. Security updates for the engine come straight from Apple with macOS."}}, {"@type": "Question", "name": "Do I need an account?", "acceptedAnswer": {"@type": "Answer", "text": "No. Download it and go."}}, {"@type": "Question", "name": "Is Zigzag finished?", "acceptedAnswer": {"@type": "Answer", "text": "Not yet. It’s in beta, which means it works well for everyday browsing, but some things are still being polished. Updates install automatically, so it keeps getting better on its own."}}, {"@type": "Question", "name": "Is it free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes."}}, {"@type": "Question", "name": "Can I bring my stuff from Arc?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, in one click: spaces, pinned tabs, Favorites, history, and passwords. Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox, and Zen work too."}}, {"@type": "Question", "name": "Does it work with Chrome extensions?", "acceptedAnswer": {"@type": "Answer", "text": "Most popular ones, installed straight from the Chrome Web Store. Some can’t work outside Chrome, and Zigzag tells you upfront instead of breaking silently."}}, {"@type": "Question", "name": "Why Safari’s engine?", "acceptedAnswer": {"@type": "Answer", "text": "It’s fast, light on memory and battery, and Apple keeps it secure."}}, {"@type": "Question", "name": "Is my data private?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. There’s no account, no analytics and no telemetry, and nothing about how you browse is sent to me. Zigzag checks zigzagbrowser.com once a day for updates, sending only its version. Passwords live in your Mac’s Keychain and sync only through your own iCloud. Everything Zigzag connects to on its own is listed in the README on GitHub."}}, {"@type": "Question", "name": "Is Zigzag open source?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The code is under the Apache License 2.0, on GitHub. Read it, build it, fork it. The Zigzag name and icon aren’t part of the license, so a fork needs its own."}}, {"@type": "Question", "name": "Which Macs does it run on?", "acceptedAnswer": {"@type": "Answer", "text": "macOS 15.4 or later."}}]}</script>
-<link rel="stylesheet" href="/assets/site.css?v=1796000000">
+<link rel="stylesheet" href="/assets/site.css?v=1796300000">
 </head>
 <body>
 <header class="hero">
+  <nav class="nav">
+    <a class="nav-home" href="/" aria-label="Zigzag home"><img src="/assets/icon-64.png" width="30" height="30" alt=""><span class="wm" role="img" aria-label="Zigzag"></span></a>
+    <span class="nav-links"><a href="#features">Features</a><a href="#why">Why Zigzag</a><a href="#questions">Questions</a><a href="/release-notes">Release Notes</a></span>
+    <span class="nav-end"><a class="nav-gh" href="https://github.com/ZigaoWang/zigzag">GitHub</a><a class="button small" href="/download">Download</a></span>
+  </nav>
   <div class="hero-text">
-    <h1 class="lockup"><img class="lockup-icon" src="/assets/icon-256.png" width="68" height="68" alt=""><svg class="mark" viewBox="0 0 372 73" role="img" aria-label="Zigzag"><g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path pathLength="1" style="--i:0" d="M6.50,6.50 L56.50,6.50 L11.12,36.50 L51.88,36.50 L6.50,66.50 L56.50,66.50"/><path pathLength="1" style="--i:1" d="M77.50,66.50 L77.50,6.50"/><path pathLength="1" style="--i:2" d="M145.62,13.38 L142.35,11.03 L138.79,9.13 L135.00,7.73 L131.07,6.85 L127.05,6.50 L123.02,6.70 L119.05,7.44 L115.22,8.70 L111.59,10.47 L108.23,12.70 L105.20,15.37 L102.56,18.42 L100.35,21.79 L98.61,25.44 L97.38,29.28 L96.68,33.25 L96.51,37.28 L96.89,41.30 L97.80,45.23 L99.23,49.00 L101.15,52.55 L103.54,55.80 L106.33,58.71 L109.50,61.22 L112.97,63.27 L116.68,64.85 L120.57,65.91 L124.57,66.44 L128.61,66.43 L132.60,65.87 L136.49,64.79 L140.20,63.19 L143.65,61.11 L146.80,58.59 L149.58,55.66 L151.94,52.39 L153.85,48.84 L155.25,45.05 L156.14,41.12 L156.49,37.10 L156.50,36.50 L135.50,36.50"/><path pathLength="1" style="--i:3" d="M170.50,6.50 L220.50,6.50 L175.12,36.50 L215.88,36.50 L170.50,66.50 L220.50,66.50"/><path pathLength="1" style="--i:4" d="M237.50,66.50 L263.50,6.50 L289.50,66.50"/><path pathLength="1" style="--i:5" d="M249.50,46.50 L277.50,46.50"/><path pathLength="1" style="--i:6" d="M352.62,13.38 L349.35,11.03 L345.79,9.13 L342.00,7.73 L338.07,6.85 L334.05,6.50 L330.02,6.70 L326.05,7.44 L322.22,8.70 L318.59,10.47 L315.23,12.70 L312.20,15.37 L309.56,18.42 L307.35,21.79 L305.61,25.44 L304.38,29.28 L303.68,33.25 L303.51,37.28 L303.89,41.30 L304.80,45.23 L306.23,49.00 L308.15,52.55 L310.54,55.80 L313.33,58.71 L316.50,61.22 L319.97,63.27 L323.68,64.85 L327.57,65.91 L331.57,66.44 L335.61,66.43 L339.60,65.87 L343.49,64.79 L347.20,63.19 L350.65,61.11 L353.80,58.59 L356.58,55.66 L358.94,52.39 L360.85,48.84 L362.25,45.05 L363.14,41.12 L363.49,37.10 L363.50,36.50 L342.50,36.50"/></g></svg><span class="beta">Beta</span></h1>
-    <p class="tag">Feels great. Weighs nothing.</p>
-    <p class="sub">The lightweight browser for Mac. Free and open source.</p>
+    <a class="pill" href="https://github.com/ZigaoWang/zigzag">Free and open source, in beta</a>
+    <h1 class="tag">Feels great. Weighs nothing.</h1>
+    <p class="sub">The lightweight browser for Mac.</p>
     <div class="actions"><a class="button" href="/download">Download for Mac</a><a class="gh big" href="https://github.com/ZigaoWang/zigzag" aria-label="Zigzag on GitHub" title="Zigzag on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
     <p class="fine">macOS 15.4 or later.</p>
   </div>
 </header>
 <main>
-  <section class="intro">
-      <p><strong>Zigzag is a native Mac browser with a sidebar, spaces, and the calm Arc made you love.</strong> It’s written in Swift on Safari’s engine, so it’s small, fast, and kept secure by Apple.</p>
-      <p>There’s no account and nothing to sign up for. Download it and go.</p>
-    </section>
+  <section class="intro" id="features">
+    <p class="label">Introducing Zigzag</p>
+    <div>
+      <p>When Arc said it would shut down on December 22, a lot of people were about to lose the browser they loved. Zigzag is for them, and for anyone who likes their tabs down the side.</p>
+      <p><strong>Zigzag is a native Mac browser with a sidebar and spaces.</strong> It’s written in Swift on Safari’s engine, so it’s small, fast, and kept secure by Apple. There’s no account, and nothing to sign up for.</p>
+    </div>
+  </section>
 
   <section class="feature">
     <h2>Spaces, each in its own color.</h2>
@@ -95,14 +103,14 @@
     </div>
   </section>
 
-  <section class="story">
+  <section class="story" id="why">
     <div class="letter">
       <h2>Why <span class="wm" role="img" aria-label="Zigzag"></span></h2>
       <p>In October 2026, The Browser Company announced Arc would shut down on December 22. Arc accounts stop working that day, and with them, a lot of people’s favorite browser.</p><p>I was one of them. So was my friend, who isn’t a browser person at all and usually calls everything trash. This time he said: “I trust you. You can make one. Make it good.”</p><p>So I did. Zigzag keeps what made Arc feel good: the sidebar, spaces, a page that feels like it’s floating, and a browser that gets out of your way. It’s built from scratch on Safari’s engine, so it’s light on your Mac and secure, with updates straight from Apple.</p><p>And it can’t happen again. There’s no account, and the only server is the update feed, so nobody can switch Zigzag off. The code is open source under the Apache License 2.0. If I ever stop working on it, anyone can pick it up and keep going.</p><p>Zigzag is free, made by one person, and built for everyone who loved Arc and doesn’t want to start over.</p>
       <p class="sign">Zigao</p>
       <div class="beta-box"><b>It’s a beta.</b> It’s ready to use every day, but you’ll probably find rough edges. That’s where you come in. Found a bug, a site that breaks, or something that just feels off? Tell me. Every message gets read, and a lot of what’s in Zigzag today came from people saying “this bugs me.” <span class="links">Email <a href="mailto:a@zigao.wang">a@zigao.wang</a>, or <a href="https://github.com/ZigaoWang/zigzag/issues">report it on GitHub</a>.</span></div>
     </div>
-    <div class="faq">
+    <div class="faq" id="questions">
       <h2>Questions</h2>
     <details><summary>Is Zigzag just an Arc copy?</summary><p>Arc showed a lot of people that a browser could feel good, and Zigzag is openly inspired by that. But it’s built from scratch, on Safari’s engine instead of Chrome’s, with its own design, and things Arc never had: tabs that tidy themselves, built in ad blocking, and a password manager that imports from any browser. Zigzag isn’t affiliated with The Browser Company.</p></details>
     <details><summary>Will Zigzag shut down like Arc?</summary><p>It can’t be switched off. There’s no account, and the only server is the update feed. If it went away, Zigzag would keep working on your Mac. Security updates for the engine come straight from Apple with macOS.</p></details>
@@ -125,13 +133,10 @@
     <p class="fine">Free. Requires macOS 15.4 or later.</p>
   </section>
   <footer class="end">
-    <nav class="foot-links">
-      <a href="/release-notes">Release Notes</a>
-      <a href="https://github.com/ZigaoWang/zigzag">GitHub</a>
-      <a href="https://github.com/ZigaoWang/zigzag/issues">Report a bug</a>
-      <a href="https://github.com/ZigaoWang/zigzag/blob/main/LICENSE">License</a>
-      <a href="mailto:a@zigao.wang">a@zigao.wang</a>
-    </nav>
+    <div class="foot-brand"><a class="nav-home" href="/" aria-label="Zigzag home"><img src="/assets/icon-64.png" width="26" height="26" alt=""><span class="wm" role="img" aria-label="Zigzag"></span></a><p>The lightweight browser for Mac.</p></div>
+    <div><p class="foot-h">Zigzag</p><a href="/download">Download</a><a href="/release-notes">Release Notes</a><a href="#questions">Questions</a></div>
+    <div><p class="foot-h">Source</p><a href="https://github.com/ZigaoWang/zigzag">GitHub</a><a href="https://github.com/ZigaoWang/zigzag/blob/main/LICENSE">License</a><a href="https://github.com/ZigaoWang/zigzag#privacy">Privacy</a></div>
+    <div><p class="foot-h">Contact</p><a href="https://github.com/ZigaoWang/zigzag/issues">Report a bug</a><a href="mailto:a@zigao.wang">a@zigao.wang</a></div>
     <p class="fine">© 2026 Zigao Wang</p>
   </footer>
 </main>

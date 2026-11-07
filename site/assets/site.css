@@ -296,3 +296,36 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
   .trio { grid-template-columns: 1fr; margin-bottom: 72px; } .feat .stage.comp { height: 260px; }
   .feature, .duo, .story { margin-bottom: 72px; } .weight.navy { padding: 40px 20px; }
 }
+
+/* The bar across the top of the sky: the name, where to go, and Download. */
+.nav { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+  max-width: 1160px; margin: 0 auto; padding: 18px 24px; text-align: left; }
+.nav-home { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.nav-home img { width: 30px; height: 30px; margin: -3px -2px -3px -3px; }
+.nav-home .wm { height: 15px; }
+.nav-links { display: flex; gap: 28px; font-size: 14px; }
+.nav-links a, .nav-gh { color: rgba(31, 45, 64, .78); text-decoration: none; } .nav-links a:hover, .nav-gh:hover { color: #1F2D40; }
+.nav-end { display: flex; align-items: center; gap: 20px; font-size: 14px; }
+.hero .button.small { background: #1F2D40; color: #fff; }
+.hero { --text: 400px; } .hero-text { padding-top: 104px; }
+.pill { display: inline-block; padding: 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, .55); border: 1px solid rgba(255, 255, 255, .8);
+  font-size: 13px; font-weight: 500; color: #1F2D40; text-decoration: none; }
+.tag { margin-top: 18px; font-size: clamp(36px, 5vw, 60px); }
+.tag, h1.tag { font-weight: 600; letter-spacing: -0.015em; line-height: 1.06; }
+/* Introducing: a small label, and two paragraphs to read, left aligned. */
+.intro { display: grid; grid-template-columns: 220px 1fr; gap: 32px; max-width: 920px; margin: 0 auto 104px; text-align: left; }
+.intro .label { margin: 5px 0 0; font-size: 14px; font-weight: 500; color: #2F6FD0; }
+.intro p:not(.label) { margin: 0 0 16px; font-size: 18px; line-height: 1.6; color: var(--soft); }
+.intro p strong { color: var(--ink); font-weight: 600; }
+.intro p:last-child { color: var(--ink); }
+/* Footer: columns of links under a line. */
+.end { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px; padding: 40px 0 56px; text-align: left; border-top: 1px solid var(--line); }
+.end > div a { display: block; margin: 0 0 8px; font-size: 14px; color: var(--soft); text-decoration: none; } .end > div a:hover { color: var(--ink); }
+.foot-h { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.foot-brand p { margin: 10px 0 0; font-size: 14px; color: var(--soft); }
+.foot-brand .nav-home { margin: 0; }
+.end .fine { grid-column: 1 / -1; margin: 16px 0 0; }
+@media (max-width: 760px) {
+  .nav-links, .nav-gh { display: none; } .hero-text { padding-top: 88px; }
+  .intro { grid-template-columns: 1fr; gap: 8px; } .end { grid-template-columns: 1fr 1fr; } .foot-brand { grid-column: 1 / -1; }
+}
