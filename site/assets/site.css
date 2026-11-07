@@ -1,12 +1,11 @@
 /* One quiet page: the wordmark, a line, the button, then the app itself. */
 :root { --bg: #F5F8FC; --ink: #1F2D40; --soft: #5E6B7D; --line: rgba(31,45,64,.11); color-scheme: light; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0D1117; --ink: #E9EEF4; --soft: #8D98A7; --line: rgba(233,238,244,.12); color-scheme: dark; } }
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink);
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
-main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 
 .top { padding: 120px 0 96px; text-align: center; }
 .mark { display: block; width: min(380px, 76vw); height: auto; margin: 0 auto; color: var(--ink); overflow: visible; }
@@ -194,10 +193,9 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .points h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
 .points p { margin: 0; font-size: 16px; line-height: 1.6; color: var(--soft); }
 .points a { color: inherit; text-underline-offset: 3px; }
-/* Privacy, on navy: the one dark panel on the page. */
-.private { margin: 0 0 150px; padding: 80px 56px; border-radius: 28px; background: #1F2D40; color: #F1F4F9; }
-.private .points { margin-top: 48px; } .private .points > div { border-color: rgba(241, 244, 249, .14); }
-.private .points p { color: rgba(241, 244, 249, .7); }
+/* Privacy, on a pale panel of the sky's own blue. */
+.private { margin: 0 0 150px; padding: 80px 56px; border-radius: 28px; background: #E6EFFA; }
+.private .points { margin-top: 48px; }
 @media (max-width: 760px) {
   .intro { grid-template-columns: 1fr; gap: 12px; margin-bottom: 96px; } .intro p { font-size: 18px; }
   .feature, .private { margin-bottom: 96px; }
@@ -205,5 +203,19 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
   .private { padding: 48px 24px; border-radius: 20px; }
   .bars li { grid-template-columns: 64px 1fr 70px; gap: 10px; font-size: 14px; }
 }
-@media (prefers-color-scheme: dark) { .card { background: rgba(255, 255, 255, .03); } .label { color: #7FB0F5; } .bars .us .fill { background: #5B9BF0; }
-  .bars .fill { background: rgba(241, 244, 249, .3); } .private { background: #18233A; } }
+
+/* A stage: a piece of our sky with a real part of Zigzag set on it. */
+.stage { padding: clamp(24px, 5vw, 64px); border-radius: 28px; background: #93C2F1 url(/assets/sky-card.jpg?v=1) center / cover no-repeat; }
+.stage.dusk { background-color: #B9A6D8; background-image: url(/assets/sky-card-dusk.jpg?v=1); }
+.stage video { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 30px 60px -28px rgba(31, 45, 64, .5); }
+/* A whole window, captured with its own corners and shadow. */
+.stage img { display: block; width: 104%; max-width: none; height: auto; margin: -2% -2%; }
+.stage video { aspect-ratio: 1600 / 1025; background: transparent center / cover no-repeat; }
+.feature .stage { margin-top: 48px; }
+.row { display: grid; grid-template-columns: 4fr 8fr; gap: 56px; align-items: center; margin: 0 0 140px; }
+.row .stage { padding: clamp(16px, 3vw, 36px); }
+.row.flip .row-text { order: 2; }
+.row.flip { grid-template-columns: 8fr 4fr; }
+.row-text h2 { margin: 0 0 14px; font-size: clamp(28px, 3vw, 38px); font-weight: 600; letter-spacing: -0.012em; line-height: 1.12; }
+.row-text p { margin: 0; font-size: 18px; line-height: 1.6; color: var(--soft); text-wrap: pretty; }
+@media (max-width: 760px) { .row { grid-template-columns: 1fr; gap: 28px; margin-bottom: 96px; } .row.flip .row-text { order: 0; } .stage { border-radius: 20px; } }
