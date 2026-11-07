@@ -120,8 +120,6 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 /* The bar on every page but the home page: the wordmark, and the way to get Zigzag. */
 .bar { max-width: 1040px; margin: 0 auto; padding: 24px 24px; display: flex; align-items: center; justify-content: space-between; min-height: 84px; }
 .bar .wm { height: 18px; color: var(--ink); display: block; }
-.bar-home { display: inline-flex; align-items: center; gap: 10px; }
-.bar-home img { width: 34px; height: 34px; margin: 0 -4px 0 -3px; }
 .button.small { height: 36px; padding: 0 16px; margin: 0; font-size: 14px; }
 /* The project on GitHub: a quiet mark in the top corner of the home page, beside Download on the others. */
 .gh { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 999px; color: var(--soft); transition: color .15s, background-color .15s; }
@@ -293,9 +291,6 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 /* The bar across the top of the sky: the name, where to go, and Download. */
 .nav { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between;
   max-width: 1160px; margin: 0 auto; padding: 18px 24px; text-align: left; }
-.nav-home { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-.nav-home img { width: 30px; height: 30px; margin: -3px -2px -3px -3px; }
-.nav-home .wm { height: 15px; }
 .nav-links { display: flex; gap: 28px; font-size: 14px; }
 .nav-links a, .nav-gh { color: rgba(31, 45, 64, .78); text-decoration: none; } .nav-links a:hover, .nav-gh:hover { color: #1F2D40; }
 .nav-end { display: flex; align-items: center; gap: 20px; font-size: 14px; }
@@ -313,7 +308,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .intro p:last-child { color: var(--ink); }
 /* Footer: columns of links under a line. */
 .end { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px; padding: 40px 0 56px; text-align: left; border-top: 1px solid var(--line); }
-.end > div a { display: block; margin: 0 0 8px; font-size: 14px; color: var(--soft); text-decoration: none; } .end > div a:hover { color: var(--ink); }
+.end > div:not(.foot-brand) a { display: block; margin: 0 0 8px; font-size: 14px; color: var(--soft); text-decoration: none; } .end > div a:hover { color: var(--ink); }
 .foot-h { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .foot-brand p { margin: 10px 0 0; font-size: 14px; color: var(--soft); }
 .foot-brand .nav-home { margin: 0; }
@@ -372,10 +367,23 @@ main { max-width: 1080px; }
 .weight .bars li { grid-template-columns: 104px 1fr 72px; gap: 14px; padding: 7px 0; font-size: 14px; border-top: 0; }
 .weight .bars .n img { width: 20px; height: 20px; }
 .weight .bars .track { height: 8px; }
-.foot-home { display: inline-flex; align-items: center; gap: 8px; } .foot-home img { width: 30px; height: 30px; margin: -3px -2px -3px -3px; }
-.foot-home .wm { height: 16px; }
 @media (max-width: 760px) {
   .hero { height: calc(var(--text) + 62vw); background-size: 260% auto; background-position: 32% bottom; }
   .hero::before { bottom: calc(116.7vw - 160px); }
   .weight { grid-template-columns: 1fr; gap: 24px; }
 }
+
+/* The hero as a card of sky with a margin around it, its window cut off by the card's rounded bottom. */
+.hero { margin: 12px 12px 0; border-radius: 24px; }
+.nav { padding-left: 28px; padding-right: 28px; }
+/* Introducing: one statement, the second half quieter. */
+.intro { display: block; max-width: 840px; margin: 0 auto 96px; text-align: left; }
+.intro .label { margin: 0 0 14px; font-size: 14px; font-weight: 500; color: #2F6FD0; }
+.intro .statement { margin: 0; font-size: clamp(22px, 2.4vw, 28px); line-height: 1.4; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); }
+.intro .statement span { color: #8A95A5; }
+@media (max-width: 760px) { .hero { margin: 8px 8px 0; border-radius: 18px; } }
+
+/* The lockup, the same everywhere: the icon's square (its file has a 6/64 margin) a clear 9px from the wordmark, centered on it. */
+.bar-home, .nav-home, .foot-home { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.bar-home img, .nav-home img, .foot-home img { width: 30px; height: 30px; margin: 0 0 0 -3px; }
+.bar-home .wm, .nav-home .wm, .foot-home .wm { display: block; height: 15px; }
