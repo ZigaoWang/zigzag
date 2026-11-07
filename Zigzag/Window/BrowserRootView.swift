@@ -295,6 +295,15 @@ final class BrowserRootView: ColorView {
     private let resizeHandle = ResizeHandle()
     /// Floating surfaces (command bar, previews, peek) live here, above everything.
     let overlay = PassthroughView()
+    /// An extension's side panel, docked right of the page while open.
+    let sidePanel = ExtensionSidePanelView()
+    var showsSidePanel = false {
+        didSet {
+            guard oldValue != showsSidePanel else { return }
+            sidePanel.isHidden = !showsSidePanel
+            needsLayout = true
+        }
+    }
 
     var sidebarVisible = true
     var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
@@ -316,6 +325,8 @@ final class BrowserRootView: ColorView {
         sidebarContainer = SidebarContainer(sidebar: sidebar)
         super.init(color: SpaceColor.sky.background)
         addSubview(card)
+        sidePanel.isHidden = true
+        addSubview(sidePanel)
         emptyHint.alphaValue = 0
         addSubview(emptyHint)
         secondCard.isHidden = true
@@ -425,6 +436,25 @@ final class BrowserRootView: ColorView {
     static let borderlessChanged = Notification.Name("BorderlessPageChanged")
 
     var cardFrame: NSRect {
+        let whole = pageAreaFrame
+        guard showsSidePanel else { return whole }
+        // The side panel takes the right, a gap away; the page keeps at least a pane's worth.
+        let width = min(ExtensionSidePanelView.width, max(0, whole.width - Self.minimumPaneWidth - Tokens.Metric.cardInset))
+        return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - Tokens.Metric.cardInset, height: whole.height)
+    }
+
+    /// Where the side panel sits, beside the page.
+    var sidePanelFrame: NSRect {
+        let whole = pageAreaFrame, page = cardFrame
+        let inset = Tokens.Metric.cardInset
+        // Against the window's edge it keeps a margin, as a card does, even when the page goes borderless.
+        let top = isEdgeToEdge || Self.isBorderless ? inset : whole.minY
+        return NSRect(x: page.maxX + inset, y: top, width: max(0, whole.maxX - page.maxX - inset * (whole.maxX >= bounds.maxX ? 2 : 1)),
+                      height: max(0, bounds.height - top - inset))
+    }
+
+    /// The page area as a whole, before a side panel takes its share.
+    private var pageAreaFrame: NSRect {
         let inset = Tokens.Metric.cardInset
         if isEdgeToEdge { return bounds }
         if sidebarVisible {
@@ -492,6 +522,7 @@ final class BrowserRootView: ColorView {
             splitHandle.isHidden = true
         }
         splitDropHint.frame = cardFrame
+        if showsSidePanel { sidePanel.frame = sidePanelFrame }
     }
 
     var sidebarFrame: NSRect {

@@ -17,12 +17,14 @@ final class ExtensionBridge {
     static let host = "zigzag.bridge"
 
     private let namespaces: [String: any BridgeNamespace]
+    /// Side panels, which the toolbar's click handling asks first (ExtensionHost.performAction).
+    let sidePanel = BridgeSidePanel()
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
     private init() {
         let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(),
-                                          BridgeSpeech(), BridgePower(), BridgeOffscreen(), BridgeIdentity()]
+                                          BridgeSpeech(), BridgePower(), BridgeOffscreen(), BridgeIdentity(), sidePanel]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 
@@ -133,7 +135,7 @@ struct BridgeError: Error {
 /// The script side of the bridge (Resources/Extensions/bridge.js), run before an extension's own code.
 enum ExtensionBridgeScript {
     /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
-    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity"]
+    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel"]
 
     static let source: String = {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),

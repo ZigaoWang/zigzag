@@ -277,6 +277,9 @@ final class ExtensionHost: NSObject {
         let context = item.context
         let hasPopup = context.action(for: tab)?.presentsPopup ?? false
         ExtensionLog.write("click \(context.webExtension.displayName ?? "?") popup=\(hasPopup)")
+        // Its side panel, when that's what its button opens.
+        let controller = WindowManager.shared.controllers.first { $0.window === anchor.window } ?? WindowManager.shared.keyController
+        if ExtensionBridge.shared.sidePanel.handleClick(item.id, hasPopup: hasPopup, in: controller) { return }
         context.performAction(for: tab)
         guard !hasPopup else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in

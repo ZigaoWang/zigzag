@@ -213,6 +213,17 @@
     onSignInChanged: event('identity.onSignInChanged'),
   });
 
+  install('sidePanel', {
+    setOptions: method('sidePanel', 'setOptions'),
+    getOptions: method('sidePanel', 'getOptions'),
+    setPanelBehavior: method('sidePanel', 'setPanelBehavior'),
+    getPanelBehavior: method('sidePanel', 'getPanelBehavior'),
+    open: method('sidePanel', 'open'),
+    close: method('sidePanel', 'close'),
+    onOpened: event('sidePanel.onOpened'),
+    onClosed: event('sidePanel.onClosed'),
+  });
+
   install('power', {
     requestKeepAwake: (level) => { send('power', 'requestKeepAwake', [level]).catch(() => {}); },
     releaseKeepAwake: () => { send('power', 'releaseKeepAwake', []).catch(() => {}); },

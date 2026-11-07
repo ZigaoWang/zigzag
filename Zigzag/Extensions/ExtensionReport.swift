@@ -138,7 +138,6 @@ struct ExtensionReport {
 
     /// Manifest features with no WebKit equivalent.
     private static let manifestLimits: [(String, String)] = [
-        ("side_panel", "Side panel"),
         ("omnibox", "Address bar keyword"),
         ("chrome_url_overrides", "Replacing the new tab page"),
     ]

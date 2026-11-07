@@ -467,3 +467,110 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
         for flow in flows.values where flow.extensionID == extensionID { end(flow.webView, .failure(BridgeError("The extension was turned off."))) }
     }
 }
+
+// MARK: - sidePanel
+
+/// `chrome.sidePanel`: the extension's page docked on the window's right (ExtensionSidePanelView), opened by its
+/// toolbar button when it asks for that, or by `open()` after a click. Options apply to every tab; Zigzag doesn't keep
+/// a panel per tab.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeSidePanel: BridgeNamespace {
+    static let name = "sidePanel"
+    static let permission = "sidePanel"
+    private var paths: [String: String] = [:]
+    private var disabled: Set<String> = []
+    private var opensOnClick: Set<String> = []
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "setOptions":
+            let options = args.object(0)
+            if let path = options.string("path") { paths[extensionID] = path }
+            if let enabled = options["enabled"] as? Bool {
+                if enabled { disabled.remove(extensionID) } else { disabled.insert(extensionID); close(extensionID) }
+            }
+            return nil
+        case "getOptions":
+            var options: [String: Any] = ["enabled": !disabled.contains(extensionID)]
+            if let path = path(for: extensionID) { options["path"] = path }
+            return options
+        case "setPanelBehavior":
+            if let click = args.object(0)["openPanelOnActionClick"] as? Bool {
+                if click { opensOnClick.insert(extensionID) } else { opensOnClick.remove(extensionID) }
+            }
+            return nil
+        case "getPanelBehavior":
+            return ["openPanelOnActionClick": opensOnClick.contains(extensionID)]
+        case "open":
+            // Chrome lets a panel open only in answer to something you did; a click on the extension leads here.
+            guard Date().timeIntervalSince(UndoClock.lastPageInput) < 5 || Date().timeIntervalSince(lastClick) < 5 else {
+                throw BridgeError("`sidePanel.open()` may only be called in response to a user gesture.")
+            }
+            guard open(extensionID, in: WindowManager.shared.keyController) else { throw BridgeError("No active side panel for the extension") }
+            return nil
+        case "close":
+            close(extensionID)
+            return nil
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    private var lastClick = Date.distantPast
+
+    /// The page to show: what the extension set, else its manifest's.
+    private func path(for extensionID: String) -> String? {
+        if let set = paths[extensionID] { return set }
+        return (ExtensionStore.manifest(for: extensionID)?["side_panel"] as? [String: Any])?["default_path"] as? String
+    }
+
+    /// A click on the extension's button: opens or closes its panel when that's what the click is for (it asked, or
+    /// it has a panel and no popup). False leaves the click to WebKit.
+    func handleClick(_ extensionID: String, hasPopup: Bool, in controller: BrowserWindowController?) -> Bool {
+        lastClick = Date()
+        guard !disabled.contains(extensionID), path(for: extensionID) != nil,
+              opensOnClick.contains(extensionID) || !hasPopup else { return false }
+        if let controller, controller.root.showsSidePanel, controller.root.sidePanel.extensionID == extensionID {
+            hide(in: controller)
+        } else {
+            _ = open(extensionID, in: controller)
+        }
+        return true
+    }
+
+    @discardableResult
+    func open(_ extensionID: String, in controller: BrowserWindowController?) -> Bool {
+        guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID),
+              let context = ExtensionHost.shared.context(for: extensionID), let configuration = context.webViewConfiguration,
+              let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
+        let root = controller.root
+        if root.showsSidePanel, root.sidePanel.extensionID == extensionID, root.sidePanel.webView?.url?.path == url.path { return true }
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.load(URLRequest(url: url))
+        let image = context.webExtension.icon(for: NSSize(width: 32, height: 32))
+        root.sidePanel.show(webView, extensionID: extensionID, name: context.webExtension.displayName ?? "Extension", image: image)
+        root.sidePanel.onClose = { [weak self, weak controller] in if let controller { self?.hide(in: controller) } }
+        Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true) {
+            root.showsSidePanel = true
+            root.layoutSubtreeIfNeeded()
+        }
+        return true
+    }
+
+    private func hide(in controller: BrowserWindowController) {
+        controller.root.showsSidePanel = false
+        controller.root.sidePanel.clear()
+    }
+
+    private func close(_ extensionID: String) {
+        for controller in WindowManager.shared.controllers where controller.root.sidePanel.extensionID == extensionID { hide(in: controller) }
+    }
+
+    func release(_ extensionID: String) {
+        close(extensionID)
+        paths[extensionID] = nil
+        opensOnClick.remove(extensionID)
+        disabled.remove(extensionID)
+    }
+}
