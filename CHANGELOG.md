@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.5.17] - 2026-11-07
 
 ### New
+- Built-in ad blocking reaches YouTube: ads are taken out of videos before they play (and skipped if one slips through), and YouTube's ad spaces are hidden. Allowing ads on YouTube turns it off.
 - Chrome extensions can use much more, answered by Zigzag itself and only with the permissions they asked for:
   - History: search, add and remove, and hear about each visit. Private windows never show.
   - Bookmarks: your pinned pages, folders and favorites, read and changed as bookmarks.
@@ -16,21 +17,24 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
   - Side panels, docked beside the page like a second pane, opened from the extension's button.
   - Offscreen pages, for an extension's clipboard, audio and parsing work.
   - Signing in through the web, in a small window of its own.
-  - The sound of the tab you're on, for Shazam, volume boosters and recorders, while the extension's popup is open or right after you click it. The tab goes quiet while captured, as in Chrome, and what the extension plays back runs only a few hundredths of a second behind the picture. Streamed video (YouTube and most video sites) keeps WebKit from handing over a tab's sound, so there Zigzag lets the extension hear the sound it plays instead, after asking once; listening extensions like Shazam work, volume boosters can't boost it. A note says it's listening.
+  - The sound of the tab you're on, for Shazam, volume boosters and recorders, while the extension's popup is open or right after you click it. As in Chrome the tab goes quiet while captured and the extension plays it back, a few hundredths of a second behind the picture. On streamed video (YouTube and most video sites) Zigzag hears the sound it plays itself, after asking you once, and plays what the extension makes of it, so Shazam names songs and boosters boost there too. A note says it's listening.
   - Its own new tab page, in place of the command bar on ⌘T.
   - Top sites, idle state, your screens' sizes, reading aloud and keeping the Mac awake.
 - An extension's install sheet says what these let it do, instead of listing them as missing.
-- Every other Chrome extension API is there too, filled in from Chrome's own definitions: what Zigzag can't do yet says so to the extension, instead of stopping it as it starts.
+- Every other Chrome extension API is there too, filled in from Chrome's own definitions: what Zigzag can't do yet says so to the extension, instead of stopping it as it starts. Of the most used extensions, ad blockers, password managers, Grammarly, Dark Reader, translators, Shazam and volume boosters work.
+- Not yet: Claude can sign in and chat, but not act on pages, which needs Chrome's debugging protocol; Honey, LastPass and Tampermonkey still miss pieces.
 
 ### Fixed
+- A white box no longer shows over a full-screen video while an extension keeps a hidden page of its own.
 - Download PDF saves to Downloads like any file and flies into the Downloads button. The tab stays on the page you were reading, and the saved file opens there later. On a PDF already on your Mac, the button saves a copy.
-- Claude signs in: claude.ai can reach the extension, and its background no longer stops on Chrome features WebKit lacks.
+- Claude signs in: claude.ai reaches the extension (a message to an extension that isn't installed fails at once, as in Chrome, so it moves on to the one you have), claude.ai shows inside Claude's side panel, and its background no longer stops on Chrome features WebKit lacks.
 - Sites an extension lets message it can, with Chrome's names, and the extension learns which site sent each message.
 - An extension asking for a tab's sound (Sound Booster) gets the tab, never your microphone, even on the rare page WebKit sets up late.
-- An extension's popup closes when you open site controls, a menu, Downloads or the space editor.
+- An extension's popup closes when you open site controls, a menu, Downloads or the space editor, opens on every click, and a click on its button while it's open closes it.
+- Shazam keeps listening through its own redraws, and its requests reach shazam.com: extensions' requests now tell servers what Zigzag really is, while their code still reads Chrome.
 - Extensions that ask which of their pages are open get the answer, so Boost My Bass and others start their sound page.
 - A tab is captured once at a time, as in Chrome, so moving a booster's slider no longer brings the tab's own sound back on top.
-- Ad blockers keep blocking when WebKit doesn't know one kind of request they watch, and Grammarly no longer stops on a cookie change.
+- Ad blockers keep blocking when WebKit doesn't know one kind of request or one rule they use, and Grammarly, Privacy Badger and OneTab no longer stop on settings or a cookie change.
 - An extension that fails to start says why in the extensions log.
 - An extension's own small window opens at the size it asks for, with its name on top, not as a whole browser window, and without its popup left over it.
 - The Add to Zigzag bar shows the listing's own icon, also after moving from one listing to another.
