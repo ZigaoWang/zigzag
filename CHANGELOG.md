@@ -8,7 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.5.17] - 2026-11-07
 
 ### New
-- Built-in ad blocking reaches YouTube: ads are taken out of videos before they play (and skipped if one slips through), and YouTube's ad spaces are hidden. Allowing ads on YouTube turns it off.
+- Built-in ad blocking reaches YouTube, the way established blockers do: ads are taken out of what YouTube sends before the page reads it, one that slips through plays unseen and unheard and is skipped, and YouTube's ad spaces and its note blaming a blocker are hidden. Allowing ads on YouTube turns it off.
 - Chrome extensions can use much more, answered by Zigzag itself and only with the permissions they asked for:
   - History: search, add and remove, and hear about each visit. Private windows never show.
   - Bookmarks: your pinned pages, folders and favorites, read and changed as bookmarks.
@@ -22,10 +22,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
   - Top sites, idle state, your screens' sizes, reading aloud and keeping the Mac awake.
 - An extension's install sheet says what these let it do, instead of listing them as missing.
 - Every other Chrome extension API is there too, filled in from Chrome's own definitions: what Zigzag can't do yet says so to the extension, instead of stopping it as it starts. Of the most used extensions, ad blockers, password managers, Grammarly, Dark Reader, translators, Shazam and volume boosters work.
-- Not yet: Claude can sign in and chat, but not act on pages, which needs Chrome's debugging protocol; Honey, LastPass and Tampermonkey still miss pieces.
+- Not yet: Claude can sign in and chat, but not act on pages, which needs Chrome's debugging protocol; Honey, LastPass and Tampermonkey still miss pieces, and AdBlock and Adblock Plus run without one of their features.
 
 ### Fixed
 - A white box no longer shows over a full-screen video while an extension keeps a hidden page of its own.
+- The guided tour's note stays over the tab overview, saying what to do there.
 - Download PDF saves to Downloads like any file and flies into the Downloads button. The tab stays on the page you were reading, and the saved file opens there later. On a PDF already on your Mac, the button saves a copy.
 - Claude signs in: claude.ai reaches the extension (a message to an extension that isn't installed fails at once, as in Chrome, so it moves on to the one you have), claude.ai shows inside Claude's side panel, and its background no longer stops on Chrome features WebKit lacks.
 - Sites an extension lets message it can, with Chrome's names, and the extension learns which site sent each message.
