@@ -20,10 +20,19 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     private var parentObserver: Any?
     /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
     private(set) weak var parentWindow: NSWindow?
+    /// The strip at the top with the traffic lights and whose page it is.
+    private static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
-        let controller = PopupWindowController(configuration: configuration, features: features, parent: parent)
+        let size = NSSize(width: features.width.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.width,
+                          height: features.height.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.height)
+        // A page's screenX and screenY count from the top left of the main display.
+        var origin: NSPoint?
+        if let x = features.x, let y = features.y, let top = NSScreen.screens.first?.frame.maxY {
+            origin = NSPoint(x: CGFloat(x.doubleValue), y: top - CGFloat(y.doubleValue) - size.height)
+        }
+        let controller = PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent)
         Self.open.insert(controller)
         // Sign-ins and payments run through these: which site opened one is often the clue.
         let opener = WindowManager.shared.controllers.first { $0.window === parent }?.tabManager.selectedTab?.url?.host()
@@ -33,12 +42,25 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller.webView
     }
 
-    private init(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) {
+    /// An extension's own small window (`chrome.windows.create({ type: "popup" })`): a volume control, a recorder.
+    /// `frame` is where it asked for, in screen coordinates; any part it left out (NaN) is up to Zigzag.
+    @available(macOS 15.4, *)
+    static func openForExtension(url: URL, configuration: WKWebViewConfiguration, frame: CGRect, parent: NSWindow?) -> PopupWindowController {
+        // Chrome's size is the whole window's, its title bar included.
+        let size = NSSize(width: frame.width.isFinite && frame.width > 0 ? frame.width : Tokens.Metric.popupDefaultSize.width,
+                          height: frame.height.isFinite && frame.height > 0 ? frame.height - headerHeight : Tokens.Metric.popupDefaultSize.height)
+        let origin = frame.origin.x.isFinite && frame.origin.y.isFinite ? frame.origin : nil
+        let controller = PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent)
+        Self.open.insert(controller)
+        controller.webView.load(URLRequest(url: url))
+        controller.showWindow(nil)
+        ExtensionHost.shared.popupOpened(controller)
+        return controller
+    }
+
+    private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?) {
         webView = WKWebView(frame: .zero, configuration: configuration)
-        let width = features.width.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.width
-        let height = features.height.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.height
-        let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
-        let placed = Self.frame(for: NSSize(width: max(320, width), height: max(240, height) + headerHeight), features: features, parent: parent)
+        let placed = Self.frame(for: NSSize(width: max(320, pageSize.width), height: max(240, pageSize.height) + Self.headerHeight), origin: origin, parent: parent)
         let size = placed.size
         let origin = placed.origin
 
@@ -72,9 +94,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.contentView = content
         content.addSubview(header)
         content.addSubview(webView)
-        header.frame = NSRect(x: 0, y: 0, width: size.width, height: headerHeight)
+        header.frame = NSRect(x: 0, y: 0, width: size.width, height: Self.headerHeight)
         header.autoresizingMask = [.width]
-        webView.frame = NSRect(x: 0, y: headerHeight, width: size.width, height: size.height - headerHeight)
+        webView.frame = NSRect(x: 0, y: Self.headerHeight, width: size.width, height: size.height - Self.headerHeight)
         webView.autoresizingMask = [.width, .height]
         webView.uiDelegate = self
         webView.navigationDelegate = self
@@ -104,11 +126,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     required init?(coder: NSCoder) { fatalError() }
 
     /// Where the page asked for it, else centered on the window that opened it; always whole on one screen, made
-    /// smaller if it's bigger than the screen. A page's screenX and screenY count from the top left of the main display.
-    private static func frame(for size: NSSize, features: WKWindowFeatures, parent: NSWindow?) -> NSRect {
+    /// smaller if it's bigger than the screen.
+    private static func frame(for size: NSSize, origin: NSPoint?, parent: NSWindow?) -> NSRect {
         var frame = NSRect(origin: .zero, size: size)
-        if let x = features.x, let y = features.y, let top = NSScreen.screens.first?.frame.maxY {
-            frame.origin = NSPoint(x: CGFloat(x.doubleValue), y: top - CGFloat(y.doubleValue) - size.height)
+        if let origin {
+            frame.origin = origin
         } else if let around = parent?.frame ?? NSScreen.main?.visibleFrame {
             frame.origin = NSPoint(x: around.midX - size.width / 2, y: around.midY - size.height / 2)
         }
@@ -280,6 +302,16 @@ final class PopupHeaderView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     func show(url: URL?, secure: Bool) {
+        // An extension's own page: whose it is, not an address no one could read.
+        if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
+           let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
+            label.stringValue = context.webExtension.displayName ?? ""
+            lock.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
+            lock.isHidden = false
+            lock.setAccessibilityLabel("Extension")
+            needsLayout = true
+            return
+        }
         // With a port that isn't the usual one, so "accounts.google.com:81" never reads as Google's own.
         let usual = url?.scheme == "https" ? 443 : url?.scheme == "http" ? 80 : nil
         label.stringValue = (url?.host() ?? "") + (url?.port.flatMap { $0 == usual ? nil : ":\($0)" } ?? "")

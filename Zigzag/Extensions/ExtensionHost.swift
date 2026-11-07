@@ -461,6 +461,16 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void) {
+        // A small window of the extension's own page (a volume control), as Chrome opens it, not a whole browser window.
+        if configuration.windowType == .popup, configuration.tabURLs.count <= 1, !configuration.shouldBePrivate {
+            let url = configuration.tabURLs.first ?? extensionContext.baseURL
+            let pageConfiguration = url.host() == extensionContext.baseURL.host() ? extensionContext.webViewConfiguration : nil
+            let popup = PopupWindowController.openForExtension(url: url, configuration: pageConfiguration ?? WebKitSetup.makeConfiguration(),
+                                                               frame: configuration.frame, parent: WindowManager.shared.keyController?.window)
+            if configuration.shouldBeFocused == false { WindowManager.shared.keyController?.window?.makeKeyAndOrderFront(nil) }
+            completionHandler(popup, nil)
+            return
+        }
         // The saved session comes back first, or the new window's first save would replace it.
         WindowManager.shared.restoreIfNoWindows()
         let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, showCommandBar: false)
