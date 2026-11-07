@@ -164,3 +164,46 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .rel li { margin: 0 0 10px; line-height: 1.6; text-wrap: pretty; }
 .rel li::marker { color: var(--soft); }
 @media (max-width: 640px) { .log { padding-top: 40px; } .log h1 { font-size: 30px; } .rel { grid-template-columns: 1fr; gap: 16px; } .rel header { position: static; } }
+
+/* The home page's story, section by section. */
+.intro { display: grid; grid-template-columns: 200px 1fr; gap: 32px; max-width: 880px; margin: 0 auto 140px; }
+.label { margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #2F6FD0; }
+.intro p { margin: 0 0 16px; font-size: 20px; line-height: 1.55; color: var(--soft); text-wrap: pretty; }
+.intro strong { color: var(--ink); font-weight: 600; }
+.feature { margin: 0 0 150px; }
+.feature > h2, .private > h2 { margin: 0; text-align: center; font-size: clamp(30px, 3.6vw, 44px); font-weight: 600; letter-spacing: -0.012em; line-height: 1.1; }
+.feature > .lede { max-width: 560px; margin: 14px auto 0; text-align: center; font-size: 18px; color: var(--soft); text-wrap: pretty; }
+.feature .clip { margin: 48px 0 0; }
+.cards { display: grid; gap: 20px; margin-top: 48px; }
+.cards.three { grid-template-columns: repeat(3, 1fr); }
+.cards.two { grid-template-columns: repeat(2, 1fr); margin-top: 20px; }
+.card { margin: 0; padding: 14px 14px 22px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255, 255, 255, .55); }
+.card video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 10px; background: transparent center / cover no-repeat; }
+.card figcaption { margin: 18px 6px 0; font-size: 15px; line-height: 1.5; color: var(--soft); }
+.card figcaption b { display: block; margin-bottom: 2px; font-size: 17px; font-weight: 600; color: var(--ink); }
+/* Size, as a chart: Zigzag's bar is the one in color. */
+.bars { list-style: none; max-width: 720px; margin: 48px auto 0; padding: 0; }
+.bars li { display: grid; grid-template-columns: 90px 1fr 80px; align-items: center; gap: 16px; padding: 9px 0; font-size: 15px; color: var(--soft); }
+.bars .track { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bars .fill { display: block; height: 100%; width: var(--w); border-radius: 999px; background: rgba(31, 45, 64, .28); }
+.bars .us { color: var(--ink); font-weight: 600; } .bars .us .fill { background: #2F6FD0; }
+.bars .mb { text-align: right; font-variant-numeric: tabular-nums; }
+.note { max-width: 720px; margin: 20px auto 0; font-size: 13px; color: var(--soft); text-align: center; }
+.points { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px 56px; max-width: 880px; margin: 56px auto 0; }
+.points > div { padding-top: 20px; border-top: 1px solid var(--line); }
+.points h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+.points p { margin: 0; font-size: 16px; line-height: 1.6; color: var(--soft); }
+.points a { color: inherit; text-underline-offset: 3px; }
+/* Privacy, on navy: the one dark panel on the page. */
+.private { margin: 0 0 150px; padding: 80px 56px; border-radius: 28px; background: #1F2D40; color: #F1F4F9; }
+.private .points { margin-top: 48px; } .private .points > div { border-color: rgba(241, 244, 249, .14); }
+.private .points p { color: rgba(241, 244, 249, .7); }
+@media (max-width: 760px) {
+  .intro { grid-template-columns: 1fr; gap: 12px; margin-bottom: 96px; } .intro p { font-size: 18px; }
+  .feature, .private { margin-bottom: 96px; }
+  .cards.three, .cards.two, .points { grid-template-columns: 1fr; }
+  .private { padding: 48px 24px; border-radius: 20px; }
+  .bars li { grid-template-columns: 64px 1fr 70px; gap: 10px; font-size: 14px; }
+}
+@media (prefers-color-scheme: dark) { .card { background: rgba(255, 255, 255, .03); } .label { color: #7FB0F5; } .bars .us .fill { background: #5B9BF0; }
+  .bars .fill { background: rgba(241, 244, 249, .3); } .private { background: #18233A; } }
