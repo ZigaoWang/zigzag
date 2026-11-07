@@ -184,6 +184,14 @@
     onEvent: event('tts.onEvent'),
   });
 
+  install('offscreen', {
+    createDocument: method('offscreen', 'createDocument'),
+    closeDocument: method('offscreen', 'closeDocument'),
+    hasDocument: method('offscreen', 'hasDocument'),
+    Reason: Object.fromEntries(['TESTING', 'AUDIO_PLAYBACK', 'IFRAME_SCRIPTING', 'DOM_SCRAPING', 'BLOBS', 'DOM_PARSER', 'USER_MEDIA',
+      'DISPLAY_MEDIA', 'WEB_RTC', 'CLIPBOARD', 'LOCAL_STORAGE', 'WORKERS', 'BATTERY_STATUS', 'MATCH_MEDIA', 'GEOLOCATION'].map((r) => [r, r])),
+  });
+
   install('power', {
     requestKeepAwake: (level) => { send('power', 'requestKeepAwake', [level]).catch(() => {}); },
     releaseKeepAwake: () => { send('power', 'releaseKeepAwake', []).catch(() => {}); },

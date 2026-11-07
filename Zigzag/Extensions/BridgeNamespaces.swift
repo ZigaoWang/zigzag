@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 import AVFoundation
 import IOKit.pwr_mgt
 import UserNotifications
@@ -310,5 +311,46 @@ final class BridgePower: BridgeNamespace {
 
     func release(_ extensionID: String) {
         if let id = assertions.removeValue(forKey: extensionID) { IOPMAssertionRelease(id) }
+    }
+}
+
+// MARK: - offscreen
+
+/// `chrome.offscreen`: one hidden page of the extension's own, as Chrome gives, for work a background can't do
+/// itself (playing audio, parsing a page, the clipboard). It's a real extension page, so it has the extension's APIs
+/// and talks to the background with `runtime.sendMessage`. Never shown, and gone when the extension is.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeOffscreen: BridgeNamespace {
+    static let name = "offscreen"
+    static let permission = "offscreen"
+    private var pages: [String: WKWebView] = [:]
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "createDocument":
+            guard pages[extensionID] == nil else { throw BridgeError("Only a single offscreen document may be created.") }
+            guard let context = ExtensionHost.shared.context(for: extensionID), let configuration = context.webViewConfiguration,
+                  let path = args.object(0).string("url"), let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL,
+                  url.scheme == context.baseURL.scheme, url.host() == context.baseURL.host() else {
+                throw BridgeError("The offscreen document must be one of the extension's own pages")
+            }
+            let page = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+            pages[extensionID] = page
+            page.load(URLRequest(url: url))
+            return nil
+        case "closeDocument":
+            guard let page = pages.removeValue(forKey: extensionID) else { throw BridgeError("No current offscreen document.") }
+            page.stopLoading()
+            return nil
+        case "hasDocument":
+            return pages[extensionID] != nil
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    func release(_ extensionID: String) {
+        pages.removeValue(forKey: extensionID)?.stopLoading()
     }
 }
