@@ -263,3 +263,24 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
   .duo, .story { margin-bottom: 96px; gap: 40px; } 
   .stage.comp { height: 360px; padding: 32px 20px 0; }
 }
+
+/* Bands: the page alternates calm fields of color, edge to edge, so it never reads as one long white column. */
+.band { position: relative; padding: 120px 0; margin-bottom: 0; }
+.band::before { content: ""; position: absolute; inset: 0 calc(50% - 50vw); z-index: -1; }
+.band.blue::before { background: linear-gradient(#EAF2FC, #DCEAFA); }
+.band.white::before { background: #fff; }
+.band.white { padding: 140px 0 10px; }
+.band.navy::before { background: #1F2D40; }
+.band.navy { color: #F1F4F9; }
+.band.navy .lede, .band.navy .note { color: rgba(241, 244, 249, .66); }
+.band.navy .bars li { color: rgba(241, 244, 249, .7); }
+.band.navy .bars .track { background: rgba(241, 244, 249, .12); }
+.band.navy .bars .fill { background: rgba(241, 244, 249, .35); }
+.band.navy .bars .us { color: #fff; } .band.navy .bars .us .fill { background: #8EC0F5; }
+.band + section, .band + .band { margin-top: 0; }
+.band.blue + .band, .band.white + .feature { padding-top: 0; }
+.feature.band, .band .row:last-child { margin-bottom: 0; }
+.band.white + .feature { margin-top: 140px; }
+.band.navy { margin: 150px 0; }
+main { overflow-x: clip; }
+@media (max-width: 760px) { .band { padding: 72px 0; } .band.white { padding: 80px 0 1px; } .band.navy { margin: 96px 0; } .band.white + .feature { margin-top: 96px; } }
