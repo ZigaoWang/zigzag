@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://zigzagbrowser.com/assets/og.png">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Zigzag", "applicationCategory": "BrowserApplication", "operatingSystem": "macOS 15.4 or later", "description": "Zigzag is a fast, free web browser for Mac with spaces, a sidebar, split view and peek. Coming from Arc? Bring your spaces and pinned tabs over in one click.", "url": "https://zigzagbrowser.com/", "downloadUrl": "https://zigzagbrowser.com/download/", "image": "https://zigzagbrowser.com/assets/icon-512.png", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "author": {"@type": "Person", "name": "Zigao Wang", "url": "https://zigao.wang"}, "license": "https://www.apache.org/licenses/LICENSE-2.0", "sameAs": ["https://github.com/ZigaoWang/zigzag"]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is Zigzag just an Arc copy?", "acceptedAnswer": {"@type": "Answer", "text": "Arc showed a lot of people that a browser could feel good, and Zigzag is openly inspired by that. But it’s built from scratch, on Safari’s engine instead of Chrome’s, with its own design, and things Arc never had: tabs that tidy themselves, built in ad blocking, and a password manager that imports from any browser. Zigzag isn’t affiliated with The Browser Company."}}, {"@type": "Question", "name": "Will Zigzag shut down like Arc?", "acceptedAnswer": {"@type": "Answer", "text": "It can’t be switched off. There’s no account, and the only server is the update feed. If it went away, Zigzag would keep working on your Mac. Security updates for the engine come straight from Apple with macOS."}}, {"@type": "Question", "name": "Is Zigzag finished?", "acceptedAnswer": {"@type": "Answer", "text": "Not yet. It’s in beta, which means it works well for everyday browsing, but some things are still being polished. Updates install automatically, so it keeps getting better on its own."}}, {"@type": "Question", "name": "Does it work with Chrome extensions?", "acceptedAnswer": {"@type": "Answer", "text": "Most popular ones, installed straight from the Chrome Web Store. Some can’t work outside Chrome, and Zigzag tells you upfront instead of breaking silently."}}, {"@type": "Question", "name": "Why Safari’s engine?", "acceptedAnswer": {"@type": "Answer", "text": "It’s already on your Mac, so Zigzag doesn’t have to ship one, and Apple fixes its security issues in macOS updates."}}, {"@type": "Question", "name": "Which Macs does it run on?", "acceptedAnswer": {"@type": "Answer", "text": "macOS 15.4 or later."}}]}</script>
-<link rel="stylesheet" href="/assets/site.css?v=1797500000">
+<link rel="stylesheet" href="/assets/site.css?v=1797800000">
 </head>
 <body>
 <header class="hero">
@@ -40,7 +40,7 @@
 <main>
   <section class="intro" id="features">
     <p class="label">Introducing Zigzag</p>
-    <p class="statement">Your tabs in a sidebar, grouped into spaces. <span>A native Mac browser, free and open source, that Arc users can move into in a minute.</span></p>
+    <p class="statement"><span class="w">Your</span> <span class="w">tabs</span> <span class="w">in</span> <span class="w">a</span> <span class="w">sidebar,</span> <span class="w">grouped</span> <span class="w">into</span> <span class="w">spaces.</span> <span class="w">A</span> <span class="w">native</span> <span class="w">Mac</span> <span class="w">browser,</span> <span class="w">free</span> <span class="w">and</span> <span class="w">open</span> <span class="w">source,</span> <span class="w">that</span> <span class="w">Arc</span> <span class="w">users</span> <span class="w">can</span> <span class="w">move</span> <span class="w">into</span> <span class="w">in</span> <span class="w">a</span> <span class="w">minute.</span></p>
   </section>
 
   <section class="feature">
@@ -63,7 +63,8 @@
         <button role="tab" aria-selected="false" data-k="desk"><b>Every tab at once</b><span>All your spaces in one view.</span></button>
         <button role="tab" aria-selected="false" data-k="reader"><b>Reader</b><span>Long reads, without the clutter.</span></button>
       </div>
-      <div class="stage"><video data-k="split" src="/assets/clips/split.mp4?v=1795600000" poster="/assets/clips/split.jpg?v=1795600000" muted playsinline preload="none" aria-label="Dragging the Fonts In Use tab onto Grilli Type’s page, where it opens beside it."></video><video data-k="desk" hidden src="/assets/clips/desk.mp4?v=1795600000" poster="/assets/clips/desk.jpg?v=1796200000" muted playsinline preload="none" aria-label="Every tab across Personal, Work and Studio shown as cards, filtered by typing brock, and Josef Müller-Brockmann’s page opened in Studio."></video><video data-k="reader" hidden src="/assets/clips/reader.mp4?v=1795600000" poster="/assets/clips/reader.jpg?v=1795600000" muted playsinline preload="none" aria-label="An essay on Veronese’s dogs from The Public Domain Review opened in Reader, and scrolled past its paintings."></video></div>
+      <div class="screen"><video data-k="split" src="/assets/clips/split.mp4?v=1795600000" poster="/assets/clips/split.jpg?v=1795600000" muted playsinline preload="none" aria-label="Dragging the Fonts In Use tab onto Grilli Type’s page, where it opens beside it."></video><video data-k="desk" hidden src="/assets/clips/desk.mp4?v=1795600000" poster="/assets/clips/desk.jpg?v=1796200000" muted playsinline preload="none" aria-label="Every tab across Personal, Work and Studio shown as cards, filtered by typing brock, and Josef Müller-Brockmann’s page opened in Studio."></video><video data-k="reader" hidden src="/assets/clips/reader.mp4?v=1795600000" poster="/assets/clips/reader.jpg?v=1795600000" muted playsinline preload="none" aria-label="An essay on Veronese’s dogs from The Public Domain Review opened in Reader, and scrolled past its paintings."></video></div>
+      <p class="player-cap" aria-live="polite">Two pages side by side.</p>
     </div>
     <ul class="specs">
       <li><b>Ad blocking</b> Built in, on by default</li>
@@ -159,11 +160,28 @@
     var tabs = p.querySelectorAll("[role=tab]"), vids = p.querySelectorAll("video[data-k]"), order = ["split", "desk", "reader"];
     vids.forEach(function (v) { if (v.poster) v.style.backgroundImage = "url(" + v.poster + ")"; });
     function show(k, play) {
-      tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.k === k); });
+      tabs.forEach(function (t) { var on = t.dataset.k === k; t.setAttribute("aria-selected", on); if (on) p.querySelector(".player-cap").textContent = t.querySelector("span").textContent; });
       vids.forEach(function (v) { var on = v.dataset.k === k; v.hidden = !on; if (on) { v.currentTime = 0; if (play) { v.preload = "auto"; var r = v.play(); if (r) r.catch(function(){}); } } else v.pause(); });
     }
     tabs.forEach(function (t) { t.addEventListener("click", function () { show(t.dataset.k, true); }); });
     vids.forEach(function (v) { v.addEventListener("ended", function () { show(order[(order.indexOf(v.dataset.k) + 1) % 3], true); }); });
+  })();
+</script>
+<script>
+  (function () {
+    var ws = document.querySelectorAll(".statement .w"); if (!ws.length) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { ws.forEach(function (w) { w.classList.add("on"); }); return; }
+    var p = ws[0].parentNode, ticking = false;
+    function update() {
+      ticking = false;
+      var r = p.getBoundingClientRect(), vh = innerHeight;
+      // From when the statement's top reaches 85% down the screen until its bottom reaches 45%.
+      var t = (vh * .85 - r.top) / (vh * .85 - vh * .45 + r.height);
+      var n = Math.round(Math.max(0, Math.min(1, t)) * ws.length);
+      ws.forEach(function (w, i) { w.classList.toggle("on", i < n); });
+    }
+    addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    addEventListener("resize", update); update();
   })();
 </script>
 </body>

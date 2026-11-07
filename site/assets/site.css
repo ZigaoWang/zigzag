@@ -430,3 +430,36 @@ main { max-width: 1080px; }
 .hero { height: min(max(calc(100svh - 12px), calc(var(--text) + 24vw)), calc(var(--text) + 24vw + 160px)); }
 @media (max-width: 760px) { .player-tabs { grid-template-columns: 1fr; gap: 0; } .specs { grid-template-columns: 1fr 1fr; } .hero { height: calc(var(--text) + 62vw); } }
 .intro p.statement { margin: 0; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+
+/* Hero, full screen: the picture grows until its window starts just under the words, so there's no empty band of sky.
+   The window takes the bottom 53.5% of the picture, which is 44.9% as tall as it's wide. */
+@media (min-width: 761px) {
+  .hero { --text: 380px; --ih: max(44.9vw, calc((100svh - 12px - var(--text)) / .535)); height: calc(100svh - 12px); min-height: calc(var(--text) + 24vw);
+    background-size: auto var(--ih); background-position: center bottom; }
+  .hero::before { bottom: calc(var(--ih) - 160px); }
+}
+/* The statement lights up word by word as it scrolls into view. */
+.intro p.statement .w { color: #B9C2CE; transition: color .35s ease; }
+.intro p.statement .w.on { color: var(--ink); }
+
+/* Wider: the page uses the room a laptop screen has. */
+main, .nav { max-width: 1240px; }
+/* The player: the clip itself (already Zigzag over our sky), edge to edge in a rounded frame, no card around it.
+   The tabs sit centered above it as one segmented control. */
+.player-tabs { display: flex; justify-content: center; gap: 4px; width: fit-content; margin: 0 auto 24px; padding: 4px;
+  border-radius: 999px; background: rgba(31, 45, 64, .06); }
+.player-tabs button { padding: 8px 18px; border: 0; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--soft); }
+.player-tabs button b { display: inline; font-size: inherit; font-weight: inherit; }
+.player-tabs button span { display: none; }
+.player-tabs [aria-selected=true] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(31, 45, 64, .14); }
+.player .screen { position: relative; border-radius: 22px; overflow: hidden; box-shadow: 0 30px 60px -36px rgba(31, 45, 64, .5); }
+.player .screen video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; background: transparent center / cover no-repeat; }
+.player .screen video[hidden] { display: none; }
+.player-cap { margin: 18px 0 0; text-align: center; font-size: 16px; color: var(--soft); }
+.specs { margin-top: 40px; border-top: 1px solid var(--line); }
+.specs li { padding-top: 18px; }
+@media (max-width: 760px) { .player-tabs { flex-wrap: wrap; border-radius: 18px; } }
+@media (min-width: 761px) {
+  /* The picture grows at most to 70% of the width, so a very tall window never blows it up. */
+  .hero { --ih: clamp(44.9vw, calc((100svh - 12px - var(--text)) / .535), 70vw); height: calc(var(--text) + var(--ih) * .535); min-height: 0; }
+}
