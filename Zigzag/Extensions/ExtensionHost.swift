@@ -27,6 +27,18 @@ final class ExtensionHost: NSObject {
         configuration.webViewConfiguration.userContentController.addUserScript(
             WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionProfile.compatibility)\n}",
                          injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        // Chrome gives extension pages its system font (and a smaller base size) unless they set their own; many
+        // popups rely on it and would otherwise fall to WebKit's default serif. Zero specificity, first in the
+        // document, so any style of the extension's own wins.
+        let fonts = """
+            if (location.protocol === 'webkit-extension:') {
+              const style = document.createElement('style');
+              style.textContent = ':where(body) { font-family: system-ui, sans-serif; font-size: 75%; }';
+              document.documentElement.prepend(style);
+            }
+            """
+        configuration.webViewConfiguration.userContentController.addUserScript(
+            WKUserScript(source: fonts, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         for (id, source) in ExtensionProfile.pagePreludes {
             let guarded = "if (location.host === '\(id)') {\n\(source)\n}"
             configuration.webViewConfiguration.userContentController.addUserScript(
