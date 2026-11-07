@@ -755,10 +755,12 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             catch { ExtensionLog.write("tab capture page half: \(error)") }
             if let routed, routed > 0 {
                 taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: .page, script: Self.pageScript)
+                ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): the page's own audio, \(routed) source(s)")
             } else {
                 let elements = try await webView.callAsyncJavaScript(Self.elementScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: Self.world) as? Int
                 guard let elements, elements >= 0 else { throw BridgeError("Play something in the tab first, then try again") }
                 taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript)
+                ExtensionLog.write("tab capture for \(host.displayName(for: extensionID)): \(elements) media element(s)")
             }
             Toast.show("\(host.displayName(for: extensionID)) is listening to this tab", symbol: "waveform", duration: 3, in: controller)
             return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]

@@ -47,10 +47,11 @@ final class ExtensionBridge {
             do {
                 let value = try await namespace.call(fn, args: args, extensionID: id)
                 reply(["value": Self.plain(value) ?? NSNull()], nil)
-            } catch let error as BridgeError {
-                reply(["error": error.message], nil)
             } catch {
-                reply(["error": error.localizedDescription], nil)
+                let text = (error as? BridgeError)?.message ?? error.localizedDescription
+                // In the extensions log, so "it didn't work" can be traced to the call that said no.
+                ExtensionLog.write("\(context.webExtension.displayName ?? id) \(ns).\(fn) failed: \(text)")
+                reply(["error": text], nil)
             }
         }
     }

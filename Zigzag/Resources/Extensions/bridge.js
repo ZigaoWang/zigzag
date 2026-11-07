@@ -99,9 +99,24 @@
     const wrapped = new WeakMap();
     external.addListener = (listener) => {
       if (typeof listener !== 'function') return add(listener);
+      // Each message and when it's answered go to the extensions log (its type and the site, nothing it carries), so a
+      // sign-in that never finishes shows where it stopped.
+      const note = (text) => { try { api.runtime.sendNativeMessage('zigzag.diagnostics', { where: 'external', kind: 'message', text }); } catch (e) {} };
       const withOrigin = (message, sender, sendResponse) => {
         if (sender && !sender.origin && sender.url) { try { sender = Object.assign({}, sender, { origin: new URL(sender.url).origin }); } catch (e) {} }
-        return listener(message, sender, sendResponse);
+        const kind = message && typeof message === 'object' && typeof message.type === 'string' ? message.type : typeof message;
+        const started = Date.now();
+        let answered = false;
+        note(`${kind} from ${sender && sender.origin}`);
+        const late = setTimeout(() => { if (!answered) note(`${kind}: no answer after 15 s`); }, 15000);
+        const respond = (value) => {
+          answered = true;
+          clearTimeout(late);
+          const ok = value && typeof value === 'object' && 'success' in value ? ` success=${value.success}${typeof value.error === 'string' ? ` (${value.error.slice(0, 120)})` : ''}` : '';
+          note(`${kind} answered in ${Date.now() - started} ms${ok}`);
+          return sendResponse(value);
+        };
+        return listener(message, sender, respond);
       };
       wrapped.set(listener, withOrigin);
       return add(withOrigin);
