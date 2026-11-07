@@ -589,8 +589,11 @@ enum ExtensionProfile {
     /// clear "not available" where it must act. Extensions that check first still take their own path.
     static let compatibility = """
     (() => {
+      // As the bridge does: an extension page may get its `chrome` a moment after this runs.
+      const start = () => {
       const api = globalThis.chrome || globalThis.browser;
-      if (!api || !api.runtime || globalThis.__zigzagCompat) return;
+      if (globalThis.__zigzagCompat) return true;
+      if (!api || !api.runtime) return false;
       globalThis.__zigzagCompat = true;
       const held = (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []);
       const noop = () => {};
@@ -667,8 +670,14 @@ enum ExtensionProfile {
       add('privacy', { services: {}, network: {}, websites: {} });
       add('power', { requestKeepAwake: noop, releaseKeepAwake: noop });
       add('search', { query: no('Searching from extensions') });
+      return true;
+      };
+      if (!start()) {
+        let tries = 0;
+        const again = () => { if (!start() && ++tries < 100) setTimeout(again, 20); };
+        setTimeout(again, 0);
+      }
     })();
-
     """
 
     /// Every page prelude, by extension ID.

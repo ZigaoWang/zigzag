@@ -4,8 +4,39 @@
 // when the extension asked for its permission in its manifest, and only when WebKit doesn't already provide it. Calls
 // travel as native messages to "zigzag.bridge"; events come back over a port opened once something listens.
 (() => {
+  // Chrome's way to ask for a tab's (or the screen's) sound is getUserMedia with a `chromeMediaSource`. WebKit doesn't
+  // know that field and would hear a plain request for the microphone, so such a request is never passed on: Zigzag
+  // answers it with the tab, or refuses. Set up before anything else, so it holds even before the bridge can start.
+  let tabStream = null;
+  // On MediaDevices itself, so it holds however late the page's `navigator.mediaDevices` appears.
+  const guard = () => {
+    const proto = typeof MediaDevices !== 'undefined' && MediaDevices.prototype;
+    if (!proto || typeof proto.getUserMedia !== 'function') return false;
+    if (proto.getUserMedia.__zigzagGuard) return true;
+    const getUserMedia = proto.getUserMedia;
+    const source = (part) => (part && typeof part === 'object' ? (part.mandatory || {}).chromeMediaSource || part.chromeMediaSource : undefined);
+    const refuse = (text, name) => Promise.reject(new DOMException(text, name));
+    const guarded = function (constraints) {
+      const audio = source(constraints && constraints.audio), video = source(constraints && constraints.video);
+      if (audio === undefined && video === undefined) return getUserMedia.call(this, constraints);
+      if (video !== undefined || audio !== 'tab') return refuse("Zigzag can capture a tab's sound, not its picture or your screen", 'NotSupportedError');
+      if (!tabStream) start();
+      if (!tabStream) return refuse('Tab capture is not available here', 'NotAllowedError');
+      const part = constraints.audio;
+      return tabStream((part.mandatory || {}).chromeMediaSourceId || part.chromeMediaSourceId);
+    };
+    Object.defineProperty(guarded, '__zigzagGuard', { value: true });
+    Object.defineProperty(proto, 'getUserMedia', { value: guarded, configurable: true, writable: true });
+    return true;
+  };
+  const inPage = typeof window !== 'undefined';
+  const guarding = !inPage || guard();
+
+  // WebKit sometimes hands an extension page its `chrome` a moment after this runs: until then, it tries again.
+  const start = () => {
   const api = globalThis.chrome || globalThis.browser;
-  if (!api || !api.runtime || typeof api.runtime.sendNativeMessage !== 'function' || globalThis.__zigzagBridge) return;
+  if (globalThis.__zigzagBridge) return true;
+  if (!api || !api.runtime || typeof api.runtime.sendNativeMessage !== 'function') return false;
   globalThis.__zigzagBridge = true;
   const HOST = 'zigzag.bridge';
 
@@ -307,19 +338,9 @@
     }
     return stream;
   };
-  // Chrome's second way in: getMediaStreamId names a tab, and the extension's page asks getUserMedia for it.
-  const media = typeof navigator !== 'undefined' && navigator.mediaDevices;
-  if (media && typeof media.getUserMedia === 'function') {
-    const getUserMedia = media.getUserMedia.bind(media);
-    const fromTab = (part) => part && typeof part === 'object' && ((part.mandatory || {}).chromeMediaSource || part.chromeMediaSource) === 'tab';
-    media.getUserMedia = (constraints) => {
-      if (!constraints || !(fromTab(constraints.audio) || fromTab(constraints.video))) return getUserMedia(constraints);
-      if (fromTab(constraints.video)) return Promise.reject(new DOMException("Zigzag can capture a tab's sound, not its picture", 'NotSupportedError'));
-      const streamId = (constraints.audio.mandatory || {}).chromeMediaSourceId || constraints.audio.chromeMediaSourceId;
-      return send('tabCapture', 'capture', [{ audio: true, streamId }]).then((tap) => captureStream(tap.id),
-        (error) => { throw new DOMException(error.message, 'NotAllowedError'); });
-    };
-  }
+  // Chrome's second way in: getMediaStreamId names a tab, and the extension's page asks getUserMedia for it (above).
+  tabStream = (streamId) => send('tabCapture', 'capture', [{ audio: true, streamId }])
+    .then((tap) => captureStream(tap.id), (error) => { throw new DOMException(error.message, 'NotAllowedError'); });
   install('tabCapture', {
     capture: (options, callback) => {
       const result = send('tabCapture', 'capture', [options || {}]).then((tap) => captureStream(tap.id));
@@ -349,4 +370,11 @@
     releaseKeepAwake: () => { send('power', 'releaseKeepAwake', []).catch(() => {}); },
     Level: { SYSTEM: 'system', DISPLAY: 'display' },
   });
+  return true;
+  };
+  if (!start() || !guarding) {
+    let tries = 0;
+    const again = () => { const ready = start() & (!inPage || guard()); if (!ready && ++tries < 100) setTimeout(again, 20); };
+    setTimeout(again, 0);
+  }
 })();
