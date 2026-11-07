@@ -265,6 +265,8 @@ final class ExtensionHost: NSObject {
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
     weak var lastAction: WKWebExtension.Action?
+    /// Extensions whose popup opened a window of their own before the popup was even shown (Sound Booster).
+    private var popupReplacedByWindow: [String: Date] = [:]
 
     func performAction(_ item: ActionItem, tab: Tab?, anchor: NSView) {
         var anchor = anchor
@@ -467,7 +469,15 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             let pageConfiguration = url.host() == extensionContext.baseURL.host() ? extensionContext.webViewConfiguration : nil
             let popup = PopupWindowController.openForExtension(url: url, configuration: pageConfiguration ?? WebKitSetup.makeConfiguration(),
                                                                frame: configuration.frame, parent: WindowManager.shared.keyController?.window)
-            if configuration.shouldBeFocused == false { WindowManager.shared.keyController?.window?.makeKeyAndOrderFront(nil) }
+            // In Chrome the popup that asked closes as the window takes focus; the window is where it continues.
+            // Its popup page often opens the window before Zigzag has shown the popup at all: then it isn't shown.
+            if configuration.shouldBeFocused == false {
+                WindowManager.shared.keyController?.window?.makeKeyAndOrderFront(nil)
+            } else if lastAction?.webExtensionContext === extensionContext, lastAction?.popupPopover?.isShown == true {
+                closeActionPopup()
+            } else if Date().timeIntervalSince(lastActionClick(extensionContext.uniqueIdentifier)) < 3 {
+                popupReplacedByWindow[extensionContext.uniqueIdentifier] = Date()
+            }
             completionHandler(popup, nil)
             return
         }
@@ -532,6 +542,11 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         popupShownAt = Date()
         ExtensionLog.write("popup \(context.webExtension.displayName ?? "?") has=\(action.popupPopover != nil)")
         guard let popover = action.popupPopover else { completionHandler(nil); return }
+        if let replaced = popupReplacedByWindow.removeValue(forKey: context.uniqueIdentifier), Date().timeIntervalSince(replaced) < 3 {
+            action.closePopup()
+            completionHandler(nil)
+            return
+        }
         // Asked for from a sign-in popup (1Password's "Unlock" in a field there, or its shortcut): it opens over that
         // popup. From the window behind, it would be out of sight and close at the first click back in the popup.
         if let popup = (action.associatedTab as? PopupTab)?.popup ?? PopupWindowController.key, popup.window?.isVisible == true {

@@ -772,10 +772,13 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         }
     }
 
-    /// The tab in front, for an extension you've just used: its popup is open, or you clicked it a moment ago.
+    /// The tab in front, for an extension you're using: its popup or its own window is open, or you clicked it a
+    /// moment ago.
     private func frontTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
         let host = ExtensionHost.shared
-        guard host.isPopupShown(for: extensionID) || Date().timeIntervalSince(host.lastActionClick(extensionID)) < 120 else {
+        let base = host.context(for: extensionID)?.baseURL.host()
+        let ownWindow = base != nil && PopupWindowController.all.contains { $0.window?.isVisible == true && $0.webView.url?.host() == base }
+        guard ownWindow || host.isPopupShown(for: extensionID) || Date().timeIntervalSince(host.lastActionClick(extensionID)) < 120 else {
             throw BridgeError("Extension has not been invoked for the current page (see activeTab permission).")
         }
         guard let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate,
