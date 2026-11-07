@@ -337,7 +337,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .weight .bars .us .fill { background: #2F6FD0; }
 .weight .bars .us, .weight .bars .us .mb { font-weight: 600; color: var(--ink); }
 .weight .note { max-width: none; margin: 16px 0 0; text-align: left; }
-.foot-home { display: inline-block; text-decoration: none; } .foot-home .wm { height: 18px; display: block; }
+.foot-home { text-decoration: none; }
 @media (max-width: 760px) { .weight .bars li { grid-template-columns: 92px 1fr 72px; gap: 10px; font-size: 14px; } }
 
 /* The hero, pared back: a headline, one line, one button, and a quiet link. */
@@ -347,3 +347,35 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .hero .actions { gap: 24px; margin-top: 32px; }
 .text-link { font-size: 15px; font-weight: 500; color: #1F2D40; text-decoration: none; }
 .text-link::after { content: " →"; } .text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* Scale: everything a size smaller, so the page reads at a glance. */
+main { max-width: 1080px; }
+.hero { height: min(calc(var(--text) + 24vw), 1000px);
+  background: #93C2F1 image-set(url(/assets/hero-1600.jpg?v=2) 1x, url(/assets/hero.jpg?v=2) 2x) center bottom / 100% auto no-repeat; }
+.hero::before { bottom: calc(44.9vw - 160px); }
+.hero .tag, .hero h1.tag { font-size: clamp(38px, 4.4vw, 58px); }
+.nav { max-width: 1080px; }
+.feature > h2, .weight h2, .private > h2 { font-size: clamp(26px, 2.6vw, 32px); }
+.feature > .lede, .weight .lede, .intro p:not(.label) { font-size: 16px; }
+.feature, .duo, .story, .trio, .weight { margin-bottom: 88px; }
+.feat figcaption { font-size: 14px; } .feat figcaption b { font-size: 15px; }
+.feat .stage.comp { height: 260px; }
+.tile figcaption, .tile.list p { font-size: 14px; }
+.duo h2, .story h2 { font-size: 22px; } .duo p { font-size: 15px; } .letter p { font-size: 15px; }
+.story .faq summary { font-size: 15px; }
+.pitch.sky-card { padding: 56px 24px; } .sky-card h2 { font-size: clamp(26px, 3vw, 36px); }
+/* Size, beside its explanation: compact rows, like a benchmark table. */
+.weight { display: grid; grid-template-columns: 4fr 7fr; gap: 56px; align-items: center; max-width: none; }
+.weight .lede { margin-top: 10px; }
+.weight .note { margin-top: 14px; font-size: 12px; }
+.weight .bars { margin: 0; }
+.weight .bars li { grid-template-columns: 104px 1fr 72px; gap: 14px; padding: 7px 0; font-size: 14px; border-top: 0; }
+.weight .bars .n img { width: 20px; height: 20px; }
+.weight .bars .track { height: 8px; }
+.foot-home { display: inline-flex; align-items: center; gap: 8px; } .foot-home img { width: 30px; height: 30px; margin: -3px -2px -3px -3px; }
+.foot-home .wm { height: 16px; }
+@media (max-width: 760px) {
+  .hero { height: calc(var(--text) + 62vw); background-size: 260% auto; background-position: 32% bottom; }
+  .hero::before { bottom: calc(116.7vw - 160px); }
+  .weight { grid-template-columns: 1fr; gap: 24px; }
+}
