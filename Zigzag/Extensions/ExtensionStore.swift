@@ -569,7 +569,8 @@ enum ExtensionProfile {
       let manifest = {};
       try { manifest = api.runtime.getManifest() || {}; } catch (e) {}
       const asked = new Set([...(manifest.permissions || []), ...(manifest.optional_permissions || [])]);
-      const add = (name, value) => { if (asked.has(name) && !(name in api)) { try { api[name] = value; held.push(value); } catch (e) {} } };
+      // WebKit names some of these with nothing behind them, so `in` isn't enough and plain assignment fails quietly.
+      const add = (name, value) => { if (asked.has(name) && api[name] == null) { try { Object.defineProperty(api, name, { value, configurable: true, enumerable: true, writable: true }); held.push(value); } catch (e) {} } };
       const fill = (name, values) => { const target = api[name]; if (!target) return; held.push(target); for (const [k, v] of Object.entries(values)) { if (!(k in target)) { try { target[k] = v; } catch (e) {} } } };
       // Missing calls on namespaces WebKit does have: often called unconditionally.
       fill('action', { setBadgeTextColor: done(), getBadgeTextColor: done([0, 0, 0, 255]), getUserSettings: done({ isOnToolbar: true }) });
