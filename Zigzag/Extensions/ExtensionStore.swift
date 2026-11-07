@@ -332,6 +332,19 @@ enum ExtensionStore {
     /// The current version's manifest.
     static func manifest(for id: String) -> [String: Any]? { packageDirectory(for: id).flatMap(manifest(in:)) }
 
+    /// What the extension asked for in its own manifest (the package's, not the loaded copy's, which adds native
+    /// messaging for Zigzag's bridge). Read once per version.
+    static func declaredPermissions(_ id: String) -> (required: Set<String>, optional: Set<String>) {
+        let version = state(id)?.version ?? ""
+        if let cached = declaredCache[id], cached.version == version { return (cached.required, cached.optional) }
+        let manifest = manifest(for: id) ?? [:]
+        let required = Set(manifest["permissions"] as? [String] ?? []), optional = Set(manifest["optional_permissions"] as? [String] ?? [])
+        declaredCache[id] = (version, required, optional)
+        return (required, optional)
+    }
+
+    private static var declaredCache: [String: (version: String, required: Set<String>, optional: Set<String>)] = [:]
+
     nonisolated private static func manifest(in folder: URL) -> [String: Any]? {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")) else { return nil }
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -529,7 +542,8 @@ enum ExtensionProfile {
     /// Every extension gets the compatibility layer first; some get their own fixes on top.
     static func profile(for id: String) -> Profile? {
         var profile = profiles[id] ?? Profile()
-        profile.backgroundPrelude = compatibility + (profile.backgroundPrelude ?? "")
+        // The bridge first (real answers from Zigzag), then stand-ins for what's still missing.
+        profile.backgroundPrelude = ExtensionBridgeScript.source + "\n" + compatibility + (profile.backgroundPrelude ?? "")
         #if DEBUG
         profile.backgroundPrelude = errorRecorder + (profile.backgroundPrelude ?? "")
         #endif
@@ -888,6 +902,8 @@ extension ExtensionStore {
 
     private static func linkTree(from source: URL, to target: URL) -> Bool {
         let fm = FileManager.default
+        // The enumerator answers with links resolved (/tmp is /private/tmp): so must the root, for paths to line up.
+        let source = source.resolvingSymlinksInPath()
         guard (try? fm.createDirectory(at: target, withIntermediateDirectories: true)) != nil,
               let enumerator = fm.enumerator(at: source, includingPropertiesForKeys: [.isDirectoryKey]) else { return false }
         for case let item as URL in enumerator {
@@ -905,8 +921,6 @@ extension ExtensionStore {
         return true
     }
 
-        // The enumerator answers with links resolved (/tmp is /private/tmp): so must the root, for paths to line up.
-        let source = source.resolvingSymlinksInPath()
     private static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
         guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -919,6 +933,11 @@ extension ExtensionStore {
             : "importScripts('zigzag-prelude.js', '\(path)');\n"
         background["service_worker"] = "zigzag-entry.js"
         manifest["background"] = background
+        // The loaded copy may message Zigzag's own bridge (ExtensionBridge), which stands in for Chrome APIs WebKit
+        // lacks. Real native hosts stay out of reach unless the extension asked for them itself (ExtensionHost).
+        var permissions = manifest["permissions"] as? [String] ?? []
+        if !permissions.contains("nativeMessaging") { permissions.append("nativeMessaging") }
+        manifest["permissions"] = permissions
         guard let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) else { return false }
         do {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))

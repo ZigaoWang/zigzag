@@ -127,6 +127,33 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         }
     }
 
+    // MARK: Extensions
+
+    /// An extension's notification (`chrome.notifications`), titled with its name. Unlike a site's, it shows even
+    /// with Zigzag in front: the extension isn't a tab you're looking at.
+    func showForExtension(key: String, extensionID: String, title: String, message: String, context: String?, silent: Bool) async -> Bool {
+        guard !AppDelegate.isHostingTests, await authorize() else { return false }
+        let content = UNMutableNotificationContent()
+        content.title = String(title.prefix(200))
+        content.subtitle = ExtensionHost.shared.displayName(for: extensionID)
+        content.body = String(([message] + [context].compactMap { $0 }).joined(separator: "\n").prefix(1000))
+        content.threadIdentifier = "extension:\(extensionID)"
+        content.categoryIdentifier = Self.category
+        content.sound = silent ? nil : .default
+        do {
+            try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: key, content: content, trigger: nil))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func clearForExtension(keys: [String]) {
+        let center = UNUserNotificationCenter.current()
+        center.removeDeliveredNotifications(withIdentifiers: keys)
+        center.removePendingNotificationRequests(withIdentifiers: keys)
+    }
+
     /// Asks macOS once, the first time a site you've allowed has something to show.
     private func authorize() async -> Bool {
         if let authorized { return authorized }
@@ -209,6 +236,11 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
 
     /// A click brings its tab forward, wherever it is, then tells the page. Swiping it away just tells the page.
     private func answered(key: String, dismissed: Bool) {
+        // An extension's: it decides what a click does.
+        if key.hasPrefix(BridgeNotifications.prefix) {
+            if #available(macOS 15.4, *) { BridgeNotifications.answered(key: key, dismissed: dismissed) }
+            return
+        }
         let entry = entries[key]
         entries[key] = nil
         if !dismissed {

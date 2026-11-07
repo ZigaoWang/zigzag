@@ -112,7 +112,13 @@ final class HistoryStore {
         sqlite3_bind_int(statement, 4, Int32(count))
         sqlite3_bind_double(statement, 5, date.timeIntervalSince1970)
         sqlite3_step(statement)
+        onVisit?(url)
     }
+
+    /// Told of each page recorded, for extensions listening to `history.onVisited` (ExtensionBridge).
+    var onVisit: ((URL) -> Void)?
+    /// Told of pages taken out (nil: all of them), for `history.onVisitRemoved`.
+    var onRemove: (([URL]?) -> Void)?
 
     func updateTitle(_ title: String, for url: URL) {
         guard Self.shouldRecord(url), let statement = prepare("UPDATE visits SET title = ?1 WHERE url = ?2") else { return }
@@ -165,6 +171,7 @@ final class HistoryStore {
         Diagnostics.forget(since: date)
         // And the copies kept from before each update: cleared means cleared there as well.
         Self.scrubBackups(date.map { "DELETE FROM visits WHERE last_visit >= \($0.timeIntervalSince1970)" } ?? "DELETE FROM visits")
+        onRemove?(date == nil ? nil : visits.map(\.url))
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date),
                               pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date))
     }
@@ -181,6 +188,7 @@ final class HistoryStore {
         }
         let quoted = urls.map { "'" + $0.absoluteString.replacingOccurrences(of: "'", with: "''") + "'" }.joined(separator: ",")
         if !urls.isEmpty { Self.scrubBackups("DELETE FROM visits WHERE url IN (\(quoted))") }
+        if !visits.isEmpty { onRemove?(visits.map(\.url)) }
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls), pdfPlaces: [:], icons: nil)
     }
 
@@ -279,6 +287,56 @@ final class HistoryStore {
                             sqlite3_column_double(statement, 4)))
         }
         return results
+    }
+
+    /// Pages for an extension's `history.search`: the text in the address or title (every word, or anything when
+    /// empty), last visited in the range, newest first, each with its row's number as a stable ID.
+    func items(matching text: String, from start: Date?, to end: Date?, limit: Int) -> [(id: Int64, entry: HistoryEntry)] {
+        let words = text.lowercased().split(separator: " ").map(String.init).filter { !$0.isEmpty }
+        var clauses = ["last_visit >= ?1", "last_visit <= ?2"]
+        clauses += words.indices.map { "(url LIKE ?\($0 + 3) ESCAPE '\\' OR title LIKE ?\($0 + 3) ESCAPE '\\')" }
+        let sql = "SELECT rowid, url, title, visit_count, last_visit FROM visits WHERE \(clauses.joined(separator: " AND ")) ORDER BY last_visit DESC LIMIT \(max(1, min(limit, 10_000)))"
+        guard let statement = prepare(sql) else { return [] }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, (start ?? .distantPast).timeIntervalSince1970)
+        sqlite3_bind_double(statement, 2, (end ?? .distantFuture).timeIntervalSince1970)
+        for (i, word) in words.enumerated() {
+            let escaped = word.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
+            sqlite3_bind_text(statement, Int32(i + 3), "%\(escaped)%", -1, transient)
+        }
+        var results: [(Int64, HistoryEntry)] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let cURL = sqlite3_column_text(statement, 1), let url = URL(string: String(cString: cURL)) else { continue }
+            let title = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
+            results.append((sqlite3_column_int64(statement, 0), HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 3)),
+                                                                               lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)))))
+        }
+        return results
+    }
+
+    /// One page by its address, with its ID, for `history.getVisits` and `onVisited`.
+    func item(for url: URL) -> (id: Int64, entry: HistoryEntry)? {
+        guard let statement = prepare("SELECT rowid, url, title, visit_count, last_visit FROM visits WHERE url = ?1") else { return nil }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, url.absoluteString, -1, transient)
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        let title = sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? ""
+        return (sqlite3_column_int64(statement, 0), HistoryEntry(url: url, title: title, visitCount: Int(sqlite3_column_int(statement, 3)),
+                                                                lastVisit: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4))))
+    }
+
+    /// The pages visited most, weighed by how recent, for `topSites.get`.
+    func mostVisited(limit: Int) -> [HistoryEntry] {
+        guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit)") else { return [] }
+        defer { sqlite3_finalize(statement) }
+        return collect(statement)
+    }
+
+    /// Takes out what was last visited between two times, for `history.deleteRange`.
+    func remove(from start: Date, to end: Date) -> HistoryRemoval {
+        let bind: (OpaquePointer) -> Void = { sqlite3_bind_double($0, 1, start.timeIntervalSince1970); sqlite3_bind_double($0, 2, end.timeIntervalSince1970) }
+        let visits = select("last_visit >= ?1 AND last_visit <= ?2", bind: bind)
+        return visits.isEmpty ? HistoryRemoval(visits: [], archive: [], pdfPlaces: [:], icons: nil) : remove(visits.map(\.url))
     }
 
     func recent(limit: Int = 8) -> [HistoryEntry] {

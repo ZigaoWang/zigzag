@@ -25,7 +25,7 @@ final class ExtensionHost: NSObject {
         // its own extension's pages, before their scripts.
         // The compatibility layer on every extension page too (popups, options), before their own scripts.
         configuration.webViewConfiguration.userContentController.addUserScript(
-            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionProfile.compatibility)\n}",
+            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionProfile.compatibility)\n}",
                          injectionTime: .atDocumentStart, forMainFrameOnly: false))
         // Chrome gives extension pages its system font (and a smaller base size) unless they set their own; many
         // popups rely on it and would otherwise fall to WebKit's default serif. Zero specificity, first in the
@@ -71,12 +71,18 @@ final class ExtensionHost: NSObject {
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
     /// Stops an extension: its buttons, scripts and background page go away.
+    /// The extension's name, for saying who's asking (a keep-awake, a notification).
+    func displayName(for id: String) -> String {
+        context(for: id)?.webExtension.displayName ?? installed[id]?.displayName ?? "an extension"
+    }
+
     func unload(_ id: String) {
         guard let context = context(for: id) else { return }
         try? controller.unload(context)
         contexts.removeAll { $0 === context }
         // Its companion-app helpers end with it, whether or not WebKit closed their ports.
         NativeMessagingHost.terminateAll(for: id)
+        ExtensionBridge.shared.release(id)
         Passkeys.refresh()
         changed.send()
     }
@@ -136,6 +142,8 @@ final class ExtensionHost: NSObject {
         let permissions = state?.grantedPermissions.map { Set($0.map(WKWebExtension.Permission.init(rawValue:))) } ?? ext.requestedPermissions
         let patterns = state?.grantedMatchPatterns.map { Set($0.compactMap { try? WKWebExtension.MatchPattern(string: $0) }) } ?? ext.allRequestedMatchPatterns
         for permission in permissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
+        // For Zigzag's own bridge; ExtensionHost keeps real native hosts to extensions that asked for them.
+        context.setPermissionStatus(.grantedExplicitly, for: .nativeMessaging)
         for pattern in patterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         if state?.grantedPermissions == nil { saveGrants(of: context) }
         applySiteAccess(to: context)
@@ -517,7 +525,14 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             replyHandler(nil, nil)
             return
         }
-        guard let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext) else {
+        if applicationIdentifier == ExtensionBridge.host {
+            ExtensionBridge.shared.handle(message, from: extensionContext, reply: replyHandler)
+            return
+        }
+        // A companion app only for an extension that asked for native messaging itself; the loaded copy's grant is
+        // for Zigzag's bridge alone.
+        guard ExtensionBridge.allows("nativeMessaging", for: extensionContext),
+              let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext) else {
             companionAppMissing(for: extensionContext)
             replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
@@ -536,7 +551,13 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             completionHandler(nil)
             return
         }
-        guard let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext) else {
+        if port.applicationIdentifier == ExtensionBridge.host {
+            ExtensionBridge.shared.connect(port, for: extensionContext)
+            completionHandler(nil)
+            return
+        }
+        guard ExtensionBridge.allows("nativeMessaging", for: extensionContext),
+              let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext) else {
             companionAppMissing(for: extensionContext)
             completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
             return
