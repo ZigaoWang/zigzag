@@ -5,7 +5,7 @@
 // into 16-bit samples and handed to Zigzag, and stops playing directly, as a captured tab goes quiet in Chrome (the
 // extension plays it if it wants to). Stopping puts the sound back. Elements whose sound comes from another site
 // without permission are left alone: Web Audio would silence them. Encrypted (DRM) media gives only silence.
-// Answers how many elements it tapped, or -1 when the page can't play sound yet.
+// Answers how many elements it tapped and whether what plays is streamed, or null when the page can't play sound yet.
 const state = (window.__zigzagTap = window.__zigzagTap || { ctx: null, sources: new WeakMap(), taps: new Map() });
 if (stop) {
   const current = state.taps.get(tap);
@@ -24,7 +24,7 @@ const ctx = state.ctx;
 // context takes a moment to start; one the page hasn't earned (no sound yet) never does.
 if (ctx.state !== 'running') {
   try { await Promise.race([ctx.resume(), new Promise((done) => setTimeout(done, 800))]); } catch (e) {}
-  if (ctx.state !== 'running') return -1;
+  if (ctx.state !== 'running') return null;
 }
 const muted = new Set();
 const mix = ctx.createGain();
@@ -78,4 +78,6 @@ processor.onaudioprocess = (event) => {
   window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: ctx.sampleRate, pcm: btoa(binary), at: Date.now(), level });
 };
 state.taps.set(tap, { processor, mix, observer, onPlay, muted });
-return muted.size;
+// Streamed media (Media Source, a blob: address) reaches Web Audio as silence: Zigzag hears it another way.
+const streamed = [...document.querySelectorAll('video, audio')].some((element) => !element.paused && (element.currentSrc || '').startsWith('blob:'));
+return { tapped: muted.size, streamed };

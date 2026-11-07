@@ -21,12 +21,14 @@ final class ExtensionBridge {
     let sidePanel = BridgeSidePanel()
     /// Offscreen pages, which runtime.getContexts reports.
     let offscreen = BridgeOffscreen()
+    /// Tab capture, whose captures end with the popup that made them.
+    let tabCapture = BridgeTabCapture()
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
     private init() {
         let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(),
-                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, BridgeTabCapture()]
+                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 

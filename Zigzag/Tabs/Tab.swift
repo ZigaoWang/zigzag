@@ -448,12 +448,7 @@ final class Tab: NSObject {
 
     func setMuted(_ muted: Bool) {
         guard let webView else { return }
-        let selector = NSSelectorFromString("_setPageMuted:")
-        if webView.responds(to: selector) {
-            typealias SetMuted = @convention(c) (AnyObject, Selector, UInt) -> Void
-            let imp = unsafeBitCast(webView.method(for: selector), to: SetMuted.self)
-            imp(webView, selector, muted ? 1 : 0)
-        } else {
+        if !webView.setPageAudioMuted(muted) {
             webView.evaluateJavaScript("document.querySelectorAll('audio,video').forEach(m => m.muted = \(muted))")
         }
         isMuted = muted
@@ -1110,5 +1105,18 @@ extension Tab {
     private func settingsAddressFollows(_ pane: SettingsPane) {
         let path = pane == .general ? "/" : "/" + pane.path
         webView?.evaluateJavaScript("history.replaceState(null, '', '\(path)')")
+    }
+}
+
+extension WKWebView {
+    /// Mutes everything the page plays, Web Audio included, as WebKit's own tab muting does. False where WebKit
+    /// doesn't offer it.
+    @discardableResult
+    func setPageAudioMuted(_ muted: Bool) -> Bool {
+        let selector = NSSelectorFromString("_setPageMuted:")
+        guard responds(to: selector) else { return false }
+        typealias SetMuted = @convention(c) (AnyObject, Selector, UInt) -> Void
+        unsafeBitCast(method(for: selector), to: SetMuted.self)(self, selector, muted ? 1 : 0)
+        return true
     }
 }

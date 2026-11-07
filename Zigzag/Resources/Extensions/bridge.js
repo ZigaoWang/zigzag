@@ -350,6 +350,37 @@
     for (const element of capture.elements) element.muted = true;
   };
 
+  // Chrome hands a capture over only after the messages the page had already sent were delivered, the page's own
+  // included. Extensions rely on that order: Shazam's popup sends itself "stopRecording" each time it redraws, and
+  // in Chrome that arrives before its recording exists. Zigzag's capture can come back sooner, so it waits for
+  // them (briefly at most): a message sent before the capture never stops it.
+  const sentEarlier = [];
+  if (typeof window !== 'undefined' && api.runtime.onMessage && typeof api.runtime.sendMessage === 'function') {
+    const sendMessage = api.runtime.sendMessage.bind(api.runtime);
+    const key = (message) => { try { return JSON.stringify(message); } catch (e) { return ''; } };
+    try {
+      api.runtime.sendMessage = (...args) => {
+        const message = typeof args[0] === 'string' && args.length > 1 && typeof args[1] !== 'function' ? args[1] : args[0];
+        sentEarlier.push({ key: key(message), at: Date.now() });
+        if (sentEarlier.length > 50) sentEarlier.shift();
+        return sendMessage(...args);
+      };
+    } catch (e) {}
+    api.runtime.onMessage.addListener((message) => {
+      const index = sentEarlier.findIndex((sent) => sent.key === key(message));
+      if (index >= 0) sentEarlier.splice(index, 1);
+    });
+  }
+  const afterEarlierMessages = async () => {
+    // Delivery can wait on WebKit waking the extension's background: up to a couple of seconds, the first time.
+    const until = Date.now() + 2500;
+    while (sentEarlier.some((sent) => Date.now() - sent.at < 2500) && Date.now() < until) {
+      await new Promise((done) => setTimeout(done, 15));
+    }
+    // The extension's own listeners for the last of them run in the same turn: one more, and they've run.
+    await new Promise((done) => setTimeout(done, 0));
+  };
+
   // tabCapture: Zigzag sends the tab's samples; here they play into a MediaStream the extension uses as Chrome's.
   // Kept as close behind the tab as it can be (a few hundredths of a second), since the tab itself goes quiet and an
   // extension like a volume booster plays this in its place, under the tab's picture.
@@ -399,15 +430,26 @@
         queued -= dropped.length - dropped.offset;
       }
     };
-    on('tabCapture.chunk', receive);
+    // Collected from Zigzag about fifty times a second while the stream lives.
+    let live = true;
+    const collect = async () => {
+      if (!live) return;
+      try {
+        const chunks = await send('tabCapture', 'read', [id]);
+        // Nothing at all (not even an empty list): the capture has ended.
+        if (chunks == null) { live = false; return; }
+        for (const chunk of chunks) receive(id, ...chunk);
+      } catch (e) {}
+      setTimeout(collect, 20);
+    };
+    collect();
     const stream = destination.stream;
     captures.set(stream, capture);
     for (const track of stream.getAudioTracks()) {
       const stop = track.stop.bind(track);
       track.stop = () => {
         stop();
-        const set = listeners.get('tabCapture.chunk');
-        if (set) set.delete(receive);
+        live = false;
         player.disconnect();
         context.close().catch(() => {});
         send('tabCapture', 'stop', [id]).catch(() => {});
@@ -416,11 +458,12 @@
     return stream;
   };
   // Chrome's second way in: getMediaStreamId names a tab, and the extension's page asks getUserMedia for it (above).
-  tabStream = (streamId) => send('tabCapture', 'capture', [{ audio: true, streamId }])
-    .then((tap) => captureStream(tap.id), (error) => { throw new DOMException(error.message, 'NotAllowedError'); });
+  tabStream = (streamId) => send('tabCapture', 'capture', [{ audio: true, streamId, page: location.pathname }])
+    .then(async (tap) => { const stream = captureStream(tap.id); await afterEarlierMessages(); return stream; },
+      (error) => { throw new DOMException(error.message, 'NotAllowedError'); });
   install('tabCapture', {
     capture: (options, callback) => {
-      const result = send('tabCapture', 'capture', [options || {}]).then((tap) => captureStream(tap.id));
+      const result = send('tabCapture', 'capture', [{ ...(options || {}), page: location.pathname }]).then(async (tap) => { const stream = captureStream(tap.id); await afterEarlierMessages(); return stream; });
       if (typeof callback !== 'function') return result;
       result.then((stream) => callback(stream), (error) => { console.warn('chrome.tabCapture.capture:', error.message); callback(null); });
     },
