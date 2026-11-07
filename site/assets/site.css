@@ -400,3 +400,33 @@ main { max-width: 1080px; }
 .specs b { font-size: 15px; font-weight: 600; }
 .specs p { margin: 4px 0 0; font-size: 14px; line-height: 1.55; color: var(--soft); }
 @media (max-width: 760px) { .clips3, .specs { grid-template-columns: 1fr; } }
+
+/* The hero fills the first screen; the window always clears the words. */
+.hero { height: max(calc(100svh - 12px), calc(var(--text) + 24vw)); max-height: none; }
+@media (max-width: 760px) { .hero { height: calc(var(--text) + 62vw); } }
+/* Introducing: one big statement, its second half quieter. */
+.intro { max-width: 980px; margin: 120px auto 120px; }
+.intro .label { margin-bottom: 20px; }
+.intro .statement { font-size: clamp(30px, 3.6vw, 46px); line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; }
+.intro .statement span { color: #9AA5B4; }
+@media (max-width: 760px) { .intro { margin: 72px auto; } }
+
+/* The essentials: one player, its three clips picked by tabs, playing in turn. */
+.player { margin-top: 32px; }
+.player-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.player-tabs button { padding: 14px 18px 15px; border: 0; border-top: 2px solid var(--line); background: none; text-align: left; font: inherit; color: var(--soft); cursor: pointer; }
+.player-tabs button b { display: block; font-size: 15px; font-weight: 600; color: inherit; }
+.player-tabs button span { font-size: 14px; }
+.player-tabs [aria-selected=true] { border-top-color: #1F2D40; color: var(--ink); }
+.player-tabs [aria-selected=true] span { color: var(--soft); }
+.player .stage { padding: clamp(20px, 3.5vw, 40px); }
+.player .stage video[hidden] { display: none; }
+/* Everything else, one compact row. */
+.specs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; margin: 28px 0 0; padding: 0; list-style: none; }
+.specs li { padding: 14px 16px 0 0; font-size: 13px; line-height: 1.45; color: var(--soft); }
+.specs li b { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.specs > div { display: none; }
+/* The hero fills the screen, but never with much more than it needs. */
+.hero { height: min(max(calc(100svh - 12px), calc(var(--text) + 24vw)), calc(var(--text) + 24vw + 160px)); }
+@media (max-width: 760px) { .player-tabs { grid-template-columns: 1fr; gap: 0; } .specs { grid-template-columns: 1fr 1fr; } .hero { height: calc(var(--text) + 62vw); } }
+.intro p.statement { margin: 0; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
