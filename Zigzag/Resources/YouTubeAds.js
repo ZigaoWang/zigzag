@@ -32,9 +32,16 @@
     const response = await nativeFetch.apply(this, arguments);
     const url = typeof input === 'string' ? input : input && input.url;
     if (!blocking || !isData(url)) return response;
+    // Anything unexpected and the page gets YouTube's response as it came.
     try {
-      const text = rewrite(await response.clone().text());
-      return new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
+      const original = await response.clone().text();
+      const text = rewrite(original);
+      if (text === original) return response;
+      const edited = new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
+      for (const name of ['url', 'redirected', 'type']) {
+        try { Object.defineProperty(edited, name, { value: response[name] }); } catch (e) {}
+      }
+      return edited;
     } catch (e) {
       return response;
     }
