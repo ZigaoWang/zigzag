@@ -890,18 +890,22 @@ extension ExtensionStore {
         guard (try? fm.createDirectory(at: target, withIntermediateDirectories: true)) != nil,
               let enumerator = fm.enumerator(at: source, includingPropertiesForKeys: [.isDirectoryKey]) else { return false }
         for case let item as URL in enumerator {
-            let relative = String(item.path.dropFirst(source.path.count + 1))
+            let relative = String(item.resolvingSymlinksInPath().path.dropFirst(source.path.count + 1))
             guard relative != "manifest.json" else { continue }
             let destination = target.appendingPathComponent(relative)
             if (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                 try? fm.createDirectory(at: destination, withIntermediateDirectories: true)
-            } else if (try? fm.linkItem(at: item, to: destination)) == nil {
+            } else if (try? fm.linkItem(at: item, to: destination)) == nil,
+                      // Another volume (an unpacked extension on an external disk) can't hard link: a copy then.
+                      (try? fm.copyItem(at: item, to: destination)) == nil {
                 return false
             }
         }
         return true
     }
 
+        // The enumerator answers with links resolved (/tmp is /private/tmp): so must the root, for paths to line up.
+        let source = source.resolvingSymlinksInPath()
     private static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
         guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
