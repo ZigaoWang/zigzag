@@ -291,6 +291,65 @@
     onClosed: event('sidePanel.onClosed'),
   });
 
+  // A capture that switches to Zigzag's own sound (streamed video, whose sound Web Audio can't reach) leaves the tab
+  // playing, so whatever the extension sends from it to the speakers would be heard twice, and come back around into
+  // the capture as an echo. From then on such paths go through a silent node: the extension's processing still runs
+  // (a recorder's ScriptProcessor needs a path to the speakers to run at all), but nothing more is heard.
+  const captures = new WeakMap();   // MediaStream -> { live, edges, elements }
+  const reaching = new WeakMap();   // AudioNode fed by a captured stream -> its capture
+  const silent = new WeakMap();     // AudioContext -> a gain of 0 into its speakers
+  let connectQuietly = null;
+  if (typeof AudioNode !== 'undefined' && typeof AudioContext !== 'undefined') {
+    const connect = AudioNode.prototype.connect;
+    const silence = (context) => {
+      let node = silent.get(context);
+      if (!node) { node = context.createGain(); node.gain.value = 0; connect.call(node, context.destination); silent.set(context, node); }
+      return node;
+    };
+    connectQuietly = (node, destination) => connect.call(node, silence(destination.context));
+    const createSource = AudioContext.prototype.createMediaStreamSource;
+    AudioContext.prototype.createMediaStreamSource = function (stream) {
+      const node = createSource.call(this, stream);
+      const capture = captures.get(stream);
+      if (capture) reaching.set(node, capture);
+      return node;
+    };
+    AudioNode.prototype.connect = function (destination, ...rest) {
+      const capture = reaching.get(this);
+      if (capture && destination instanceof AudioNode) {
+        if (destination instanceof AudioDestinationNode) {
+          if (capture.live) { connectQuietly(this, destination); return destination; }
+          capture.edges.push([new WeakRef(this), destination]);
+        } else {
+          reaching.set(destination, capture);
+        }
+      }
+      return connect.call(this, destination, ...rest);
+    };
+    const srcObject = typeof HTMLMediaElement !== 'undefined' && Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject');
+    if (srcObject && srcObject.set) {
+      Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+        configurable: true, enumerable: srcObject.enumerable, get: srcObject.get,
+        set(value) {
+          const capture = value && captures.get(value);
+          if (capture) { capture.elements.add(this); if (capture.live) this.muted = true; }
+          srcObject.set.call(this, value);
+        },
+      });
+    }
+  }
+  const quiet = (capture) => {
+    capture.live = true;
+    for (const [ref, destination] of capture.edges) {
+      const node = ref.deref();
+      if (!node) continue;
+      try { node.disconnect(destination); } catch (e) {}
+      try { connectQuietly && connectQuietly(node, destination); } catch (e) {}
+    }
+    capture.edges = [];
+    for (const element of capture.elements) element.muted = true;
+  };
+
   // tabCapture: Zigzag sends the tab's samples; here they play into a MediaStream the extension uses as Chrome's.
   // Kept as close behind the tab as it can be (a few hundredths of a second), since the tab itself goes quiet and an
   // extension like a volume booster plays this in its place, under the tab's picture.
@@ -318,8 +377,10 @@
       if (i < out.length) { out.fill(0, i); primed = false; }
     };
     player.connect(destination);
-    const receive = (tap, rate, pcm, at) => {
+    const capture = { live: false, edges: [], elements: new Set() };
+    const receive = (tap, rate, pcm, at, live) => {
       if (tap !== id) return;
+      if (live && !capture.live) quiet(capture);
       // Sound that took too long to arrive would only put it further behind.
       if (at && Date.now() - at > 250) return;
       const binary = atob(pcm);
@@ -340,6 +401,7 @@
     };
     on('tabCapture.chunk', receive);
     const stream = destination.stream;
+    captures.set(stream, capture);
     for (const track of stream.getAudioTracks()) {
       const stop = track.stop.bind(track);
       track.stop = () => {

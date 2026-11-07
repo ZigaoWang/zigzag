@@ -32,14 +32,16 @@ for (const [context, list] of byContext) {
     const input = event.inputBuffer;
     const left = input.getChannelData(0), right = input.numberOfChannels > 1 ? input.getChannelData(1) : left;
     const samples = new Int16Array(left.length);
+    let level = 0;
     for (let i = 0; i < left.length; i++) {
       const s = Math.max(-1, Math.min(1, (left[i] + right[i]) / 2));
+      level = Math.max(level, Math.abs(s));
       samples[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     const bytes = new Uint8Array(samples.buffer);
     let binary = '';
     for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: context.sampleRate, pcm: btoa(binary), at: Date.now() });
+    window.webkit.messageHandlers.zigzagTap.postMessage({ tap, rate: context.sampleRate, pcm: btoa(binary), at: Date.now(), level });
   };
   parts.push({ mix, processor });
 }
