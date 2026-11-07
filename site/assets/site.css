@@ -113,8 +113,9 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .foot-links a, .end .fine a { color: var(--soft); } .foot-links a:hover, .end .fine a:hover { color: var(--ink); }
 .end .fine a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 /* The wordmark in place of the typed name, sized to the heading's cap height. */
-.wm { display: inline-block; height: .74em; aspect-ratio: 372 / 73; background: currentColor; vertical-align: -.02em;
-  -webkit-mask: url(/assets/wordmark.svg) left center / contain no-repeat; mask: url(/assets/wordmark.svg) left center / contain no-repeat; }
+/* The wordmark in text, drawn as a picture in the site's navy (a mask drops out of some screenshots as a black box). */
+.wm { display: inline-block; height: .74em; aspect-ratio: 372 / 73; vertical-align: -.02em;
+  background: url(/assets/wordmark-ink.svg?v=1) left center / contain no-repeat; }
 
 /* The bar on every page but the home page: the wordmark, and the way to get Zigzag. */
 .bar { max-width: 1040px; margin: 0 auto; padding: 24px 24px; display: flex; align-items: center; justify-content: space-between; min-height: 84px; }
@@ -282,5 +283,5 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .feature.band, .band .row:last-child { margin-bottom: 0; }
 .band.white + .feature { margin-top: 140px; }
 .band.navy { margin: 150px 0; }
-main { overflow-x: clip; }
+body { overflow-x: clip; }
 @media (max-width: 760px) { .band { padding: 72px 0; } .band.white { padding: 80px 0 1px; } .band.navy { margin: 96px 0; } .band.white + .feature { margin-top: 96px; } }
