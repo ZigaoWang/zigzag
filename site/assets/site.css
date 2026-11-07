@@ -159,7 +159,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .rel h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
 .rel h3:not(:first-child) { margin-top: 28px; }
 .rel ul { margin: 0; padding-left: 18px; }
-.rel li { margin: 0 0 10px; line-height: 1.6; text-wrap: pretty; }
+.rel > * { min-width: 0; }
+.rel li { margin: 0 0 10px; line-height: 1.6; text-wrap: pretty; overflow-wrap: anywhere; }
 .rel li::marker { color: var(--soft); }
 @media (max-width: 640px) { .log { padding-top: 40px; } .log h1 { font-size: 30px; } .rel { grid-template-columns: 1fr; gap: 16px; } .rel header { position: static; } }
 
@@ -491,8 +492,15 @@ main, .nav { max-width: 1240px; }
 .bento .vis video { display: block; width: 100%; height: 100%; aspect-ratio: 1600 / 1025; object-fit: cover; background: transparent center / cover no-repeat; }
 .bento .vis.sky { background: #93C2F1 url(/assets/sky-card.jpg?v=1) center / cover no-repeat; }
 .bento .offers { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 0 7%; }
-.bento .offers img { display: block; width: 112%; max-width: none; height: auto; margin-left: -6%; }
+.bento .offers img { display: block; width: 112%; max-width: none; height: auto; margin-left: -6%; filter: drop-shadow(0 6px 14px rgba(30, 50, 90, .14)); }
 .bento .offers img + img { margin-left: 4%; }
 .bento figcaption { margin: 14px 10px 6px; font-size: 14px; line-height: 1.5; color: var(--soft); }
 .bento figcaption b { display: block; margin-bottom: 1px; font-size: 15px; font-weight: 600; color: var(--ink); }
-@media (max-width: 760px) { .bento .w4, .bento .w3, .bento .w2 { grid-column: auto; } .bento .offers { padding: 32px 7%; } }
+@media (max-width: 760px) { .bento .w4, .bento .w3, .bento .w2 { grid-column: auto; } .bento .offers { padding: 32px 5%; } .bento .offers img, .bento .offers img + img { width: 100%; margin-left: 0; } }
+/* Phones, and large text in phone browsers (WeChat's included): the top grows with its words instead of a set height,
+   so the picture always starts below the buttons. */
+@media (max-width: 760px) {
+  .hero { height: auto; min-height: 0; padding-bottom: calc(62vw + 20px); }
+  .hero .actions { flex-wrap: wrap; justify-content: center; row-gap: 14px; }
+  .hero .actions > * { white-space: nowrap; }
+}
