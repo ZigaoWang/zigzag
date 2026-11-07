@@ -10,7 +10,7 @@
 
 <p align="center">
   Your tabs in a sidebar, grouped into spaces. A native Mac app in Swift on WebKit,<br>
-  17 MB installed, with no account and nothing it phones home for.
+  17 MB installed, with no account and no telemetry.
 </p>
 
 ## Coming from Arc
