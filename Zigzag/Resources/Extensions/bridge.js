@@ -296,6 +296,19 @@
     }
     return stream;
   };
+  // Chrome's second way in: getMediaStreamId names a tab, and the extension's page asks getUserMedia for it.
+  const media = typeof navigator !== 'undefined' && navigator.mediaDevices;
+  if (media && typeof media.getUserMedia === 'function') {
+    const getUserMedia = media.getUserMedia.bind(media);
+    const fromTab = (part) => part && typeof part === 'object' && ((part.mandatory || {}).chromeMediaSource || part.chromeMediaSource) === 'tab';
+    media.getUserMedia = (constraints) => {
+      if (!constraints || !(fromTab(constraints.audio) || fromTab(constraints.video))) return getUserMedia(constraints);
+      if (fromTab(constraints.video)) return Promise.reject(new DOMException("Zigzag can capture a tab's sound, not its picture", 'NotSupportedError'));
+      const streamId = (constraints.audio.mandatory || {}).chromeMediaSourceId || constraints.audio.chromeMediaSourceId;
+      return send('tabCapture', 'capture', [{ audio: true, streamId }]).then((tap) => captureStream(tap.id),
+        (error) => { throw new DOMException(error.message, 'NotAllowedError'); });
+    };
+  }
   install('tabCapture', {
     capture: (options, callback) => {
       const result = send('tabCapture', 'capture', [options || {}]).then((tap) => captureStream(tap.id));

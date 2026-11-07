@@ -325,6 +325,34 @@ final class BridgeOffscreen: BridgeNamespace {
     static let name = "offscreen"
     static let permission = "offscreen"
     private var pages: [String: WKWebView] = [:]
+    /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
+    private var host: NSWindow?
+
+    private func place(_ page: WKWebView) {
+        if host == nil {
+            let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.ignoresMouseEvents = true
+            window.isExcludedFromWindowsMenu = true
+            window.collectionBehavior = [.transient, .ignoresCycle]
+            window.orderBack(nil)
+            host = window
+        }
+        // Behind every other window, it would count as covered up, and hidden all the same.
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if page.responds(to: occlusion) {
+            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+            unsafeBitCast(page.method(for: occlusion), to: SetBool.self)(page, occlusion, false)
+        }
+        host?.contentView?.addSubview(page)
+    }
+
+    private func remove(_ extensionID: String) {
+        guard let page = pages.removeValue(forKey: extensionID) else { return }
+        page.stopLoading()
+        page.removeFromSuperview()
+        if pages.isEmpty { host?.close(); host = nil }
+    }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -337,11 +365,17 @@ final class BridgeOffscreen: BridgeNamespace {
             }
             let page = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
             pages[extensionID] = page
+            place(page)
+            // As in Chrome, done once the page has loaded and its scripts listen: extensions message it right away.
+            let loaded = PageLoad()
+            page.navigationDelegate = loaded
             page.load(URLRequest(url: url))
+            await loaded.wait(seconds: 10)
+            page.navigationDelegate = nil
             return nil
         case "closeDocument":
-            guard let page = pages.removeValue(forKey: extensionID) else { throw BridgeError("No current offscreen document.") }
-            page.stopLoading()
+            guard pages[extensionID] != nil else { throw BridgeError("No current offscreen document.") }
+            remove(extensionID)
             return nil
         case "hasDocument":
             return pages[extensionID] != nil
@@ -351,8 +385,36 @@ final class BridgeOffscreen: BridgeNamespace {
     }
 
     func release(_ extensionID: String) {
-        pages.removeValue(forKey: extensionID)?.stopLoading()
+        remove(extensionID)
     }
+}
+
+/// Waits for a hidden page to finish loading (or fail, or take too long).
+@MainActor
+private final class PageLoad: NSObject, WKNavigationDelegate {
+    private var waiting: CheckedContinuation<Void, Never>?
+    private var finished = false
+
+    func wait(seconds: Double) async {
+        guard !finished else { return }
+        await withCheckedContinuation { continuation in
+            waiting = continuation
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(seconds))
+                self?.finish()
+            }
+        }
+    }
+
+    private func finish() {
+        finished = true
+        waiting?.resume()
+        waiting = nil
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish() }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish() }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish() }
 }
 
 // MARK: - identity
@@ -584,6 +646,8 @@ final class BridgeSidePanel: BridgeNamespace {
 /// Zigzag's own (tab-capture.js). As in Chrome the tab goes quiet while captured, and the extension plays it back if
 /// it wants. Only the tab in front, never a private window's, and only while the extension's popup is open or soon
 /// after you click it; a note says it's listening, and it stops when the extension stops listening or goes away.
+/// `getMediaStreamId` is the same, in two steps (Sound Booster): it names the tab in front, and the extension's
+/// page then asks `getUserMedia` for that tab, within a few seconds, once.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler {
@@ -608,20 +672,39 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         let script: String
     }
     private var taps: [String: Tap] = [:]
+    /// Tabs named by getMediaStreamId, waiting for the extension to ask for their sound.
+    private struct Pending {
+        let extensionID: String
+        weak var tab: Tab?
+        let expires: Date
+    }
+    private var pending: [String: Pending] = [:]
     /// Web views given the message handler (in both worlds), so it's added once each.
     private var handled = Set<ObjectIdentifier>()
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
+        case "getMediaStreamId":
+            let (tab, _) = try frontTab(for: extensionID)
+            pending = pending.filter { $0.value.expires > Date() }
+            let id = UUID().uuidString
+            pending[id] = Pending(extensionID: extensionID, tab: tab, expires: Date().addingTimeInterval(10))
+            return id
         case "capture":
             let options = args.object(0)
             guard options["audio"] as? Bool == true else { throw BridgeError("Zigzag can capture a tab's sound, not its picture") }
             let host = ExtensionHost.shared
-            guard host.isPopupShown(for: extensionID) || Date().timeIntervalSince(host.lastActionClick(extensionID)) < 120 else {
-                throw BridgeError("Extension has not been invoked for the current page (see activeTab permission).")
+            let tab: Tab, controller: BrowserWindowController
+            if let streamID = options.string("streamId") {
+                // A tab getMediaStreamId named: good once, for a few seconds, for the extension it was given to.
+                guard let named = pending.removeValue(forKey: streamID), named.extensionID == extensionID, named.expires > Date(),
+                      let namedTab = named.tab, let owner = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === namedTab } }),
+                      !owner.tabManager.isPrivate else { throw BridgeError("Invalid stream ID") }
+                (tab, controller) = (namedTab, owner)
+            } else {
+                (tab, controller) = try frontTab(for: extensionID)
             }
-            guard let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate,
-                  let tab = controller.tabManager.selectedTab, let webView = tab.webView else { throw BridgeError("Cannot capture a tab here") }
+            guard let webView = tab.webView else { throw BridgeError("Cannot capture a tab here") }
             for (id, tap) in taps where tap.extensionID == extensionID { stop(id) }
             if handled.insert(ObjectIdentifier(webView)).inserted {
                 webView.configuration.userContentController.add(self, contentWorld: Self.world, name: "zigzagTap")
@@ -649,6 +732,17 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         }
     }
 
+    /// The tab in front, for an extension you've just used: its popup is open, or you clicked it a moment ago.
+    private func frontTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
+        let host = ExtensionHost.shared
+        guard host.isPopupShown(for: extensionID) || Date().timeIntervalSince(host.lastActionClick(extensionID)) < 120 else {
+            throw BridgeError("Extension has not been invoked for the current page (see activeTab permission).")
+        }
+        guard let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate,
+              let tab = controller.tabManager.selectedTab, tab.webView != nil else { throw BridgeError("Cannot capture a tab here") }
+        return (tab, controller)
+    }
+
     private func stop(_ id: String) {
         guard let tap = taps.removeValue(forKey: id) else { return }
         tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
@@ -669,5 +763,6 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     func release(_ extensionID: String) {
         for (id, tap) in taps where tap.extensionID == extensionID { stop(id) }
+        pending = pending.filter { $0.value.extensionID != extensionID }
     }
 }
