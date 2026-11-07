@@ -173,3 +173,11 @@ it, commercially or not.
 The name "Zigzag", the app icon and the logo are not covered by the license: they're trademarks, all rights
 reserved. A fork needs its own name and icon. See [TRADEMARKS.md](TRADEMARKS.md) and [NOTICE](NOTICE).
 Third-party work Zigzag uses is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Acknowledgments
+
+Thanks to the [LINUX DO](https://linux.do) community for trying Zigzag early and sharing their feedback.
+
+<p align="center">
+  <a href="https://linux.do"><img src="https://shorturl.at/ggSqS" alt="LINUX DO" /></a>
+</p>
