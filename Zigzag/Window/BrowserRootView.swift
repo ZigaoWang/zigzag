@@ -440,17 +440,16 @@ final class BrowserRootView: ColorView {
         guard showsSidePanel else { return whole }
         // The side panel takes the right, a gap away; the page keeps at least a pane's worth.
         let width = min(ExtensionSidePanelView.width, max(0, whole.width - Self.minimumPaneWidth - Tokens.Metric.cardInset))
-        return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - Tokens.Metric.cardInset, height: whole.height)
+        let gap = isEdgeToEdge ? 1 : Tokens.Metric.cardInset
+        return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - gap, height: whole.height)
     }
 
-    /// Where the side panel sits, beside the page.
+    /// Where the side panel sits: beside the page, a gap away, over the same height, reaching as far right as the page
+    /// would have. It reads as a second pane, like a split's.
     var sidePanelFrame: NSRect {
         let whole = pageAreaFrame, page = cardFrame
-        let inset = Tokens.Metric.cardInset
-        // Against the window's edge it keeps a margin, as a card does, even when the page goes borderless.
-        let top = isEdgeToEdge || Self.isBorderless ? inset : whole.minY
-        return NSRect(x: page.maxX + inset, y: top, width: max(0, whole.maxX - page.maxX - inset * (whole.maxX >= bounds.maxX ? 2 : 1)),
-                      height: max(0, bounds.height - top - inset))
+        let gap = isEdgeToEdge ? 1 : Tokens.Metric.cardInset
+        return NSRect(x: page.maxX + gap, y: whole.minY, width: max(0, whole.maxX - page.maxX - gap), height: whole.height)
     }
 
     /// The page area as a whole, before a side panel takes its share.
@@ -522,7 +521,14 @@ final class BrowserRootView: ColorView {
             splitHandle.isHidden = true
         }
         splitDropHint.frame = cardFrame
-        if showsSidePanel { sidePanel.frame = sidePanelFrame }
+        if showsSidePanel {
+            let frame = sidePanelFrame
+            sidePanel.frame = frame
+            // Shaped like a page pane: the same corners, square where they're the window's own.
+            let attached = sidebarVisible && Self.isBorderless
+            sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius : Tokens.Radius.card,
+                               squareRight: windowCorners(of: frame, attached: attached))
+        }
     }
 
     var sidebarFrame: NSRect {

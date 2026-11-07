@@ -50,6 +50,19 @@ final class ExtensionSidePanelView: NSView {
         needsLayout = true
     }
 
+    /// The corner radius, with the right corners squared where the window rounds them itself.
+    func setShape(radius: CGFloat, squareRight: (top: Bool, bottom: Bool)) {
+        Tokens.Motion.withoutAnimation {
+            layer?.cornerRadius = radius
+            // In this flipped view, "min Y" is the top.
+            var corners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+            if !squareRight.top { corners.insert(.layerMaxXMinYCorner) }
+            if !squareRight.bottom { corners.insert(.layerMaxXMaxYCorner) }
+            layer?.maskedCorners = corners
+            layer?.borderWidth = radius == 0 ? 0 : 1
+        }
+    }
+
     func clear() {
         webView?.removeFromSuperview()
         webView = nil
