@@ -387,3 +387,16 @@ main { max-width: 1080px; }
 .bar-home, .nav-home, .foot-home { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .bar-home img, .nav-home img, .foot-home img { width: 30px; height: 30px; margin: 0 0 0 -3px; }
 .bar-home .wm, .nav-home .wm, .foot-home .wm { display: block; height: 15px; }
+
+/* The essentials: three clips side by side with no frames around them, then the rest as a quiet grid of facts. */
+.clips3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 36px; }
+.clips3 figure { margin: 0; }
+.clips3 video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 14px; background: transparent center / cover no-repeat;
+  box-shadow: 0 1px 0 rgba(31, 45, 64, .04), 0 12px 32px -18px rgba(31, 45, 64, .35); }
+.clips3 figcaption { margin: 14px 2px 0; font-size: 14px; line-height: 1.55; color: var(--soft); }
+.clips3 figcaption b { display: block; margin-bottom: 2px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 32px; margin-top: 56px; }
+.specs > div { padding-top: 16px; border-top: 1px solid var(--line); }
+.specs b { font-size: 15px; font-weight: 600; }
+.specs p { margin: 4px 0 0; font-size: 14px; line-height: 1.55; color: var(--soft); }
+@media (max-width: 760px) { .clips3, .specs { grid-template-columns: 1fr; } }
