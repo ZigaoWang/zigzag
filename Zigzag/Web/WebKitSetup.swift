@@ -58,6 +58,11 @@ enum WebKitSetup {
             configuration.userContentController.addUserScript(ExtensionPageErrors.script)
             configuration.userContentController.add(ExtensionPageErrors.shared, contentWorld: .page, name: ExtensionPageErrors.messageName)
         }
+        // Sites an extension lets message it get Chrome's name for that messaging.
+        if #available(macOS 15.4, *) {
+            let patterns = ExtensionStore.externallyConnectablePatterns()
+            if !patterns.isEmpty { configuration.userContentController.addUserScript(PageScripts.chromeRuntime(matching: patterns)) }
+        }
         // With an extension that can capture tabs (Shazam), pages note where their Web Audio plays, so it can hear them.
         if #available(macOS 15.4, *), ExtensionStore.someEnabledExtensionDeclares("tabCapture"),
            !configuration.userContentController.userScripts.contains(BridgeTabCapture.routesScript) {
@@ -96,6 +101,18 @@ enum PageScripts {
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
         [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient)]
     }
+
+    /// Chrome's name for the messaging WebKit gives sites an extension lists (Resources/Extensions/chrome-runtime.js).
+    static func chromeRuntime(matching patterns: [String]) -> WKUserScript {
+        let json = (try? JSONSerialization.data(withJSONObject: patterns)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return WKUserScript(source: chromeRuntimeSource.replacingOccurrences(of: "__PATTERNS__", with: json),
+                            injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+    }
+
+    private static let chromeRuntimeSource: String = {
+        guard let url = Bundle.main.url(forResource: "chrome-runtime", withExtension: "js") else { return "" }
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }()
 
     /// Tells the browser which link the pointer is over, for the link preview in the corner.
     static let linkHover = """

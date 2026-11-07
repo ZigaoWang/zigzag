@@ -60,6 +60,27 @@
     hasListeners() { const set = listeners.get(name); return !!set && set.size > 0; },
   });
 
+  // Messages from websites: Chrome says which site sent each (sender.origin) and extensions check it before answering
+  // (Claude answers only claude.ai). WebKit gives the address; the origin comes from it.
+  const external = api.runtime.onMessageExternal;
+  if (external && typeof external.addListener === 'function') {
+    const add = external.addListener.bind(external);
+    const wrapped = new WeakMap();
+    external.addListener = (listener) => {
+      if (typeof listener !== 'function') return add(listener);
+      const withOrigin = (message, sender, sendResponse) => {
+        if (sender && !sender.origin && sender.url) { try { sender = Object.assign({}, sender, { origin: new URL(sender.url).origin }); } catch (e) {} }
+        return listener(message, sender, sendResponse);
+      };
+      wrapped.set(listener, withOrigin);
+      return add(withOrigin);
+    };
+    const remove = external.removeListener && external.removeListener.bind(external);
+    if (remove) external.removeListener = (listener) => remove(wrapped.get(listener) || listener);
+    const has = external.hasListener && external.hasListener.bind(external);
+    if (has) external.hasListener = (listener) => has(wrapped.get(listener) || listener);
+  }
+
   // Puts a namespace on chrome (and browser), unless WebKit has a working one of its own.
   const install = (name, value) => {
     if (!asked.has(name)) return;

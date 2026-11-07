@@ -141,6 +141,7 @@
 		B9BAF8A4CC1907F52C65274B /* Readability-LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DB536661E9E732536910C2 /* Readability-LICENSE.md */; };
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
+		C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */ = {isa = PBXBuildFile; fileRef = B030A4C0601F5AE1232B9288 /* chrome-runtime.js */; };
 		C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */; };
 		C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765C1F36BCEE463F8B5316BE /* Paths.swift */; };
 		C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */; };
@@ -311,6 +312,7 @@
 		AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionHost.swift; sourceTree = "<group>"; };
 		AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBridge.swift; sourceTree = "<group>"; };
 		AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressTests.swift; sourceTree = "<group>"; };
+		B030A4C0601F5AE1232B9288 /* chrome-runtime.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "chrome-runtime.js"; sourceTree = "<group>"; };
 		B0560887D19F137BADD3B098 /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
 		BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmSheet.swift; sourceTree = "<group>"; };
@@ -418,6 +420,7 @@
 			children = (
 				CD2C91E2BA65EF3F426B22F9 /* audio-routes.js */,
 				71C449E3F3ECA4A28D2BCAA7 /* bridge.js */,
+				B030A4C0601F5AE1232B9288 /* chrome-runtime.js */,
 				05160D4ABF2A17C7C0D3E968 /* tab-capture-page.js */,
 				ECFB222D7082B8C1D2724708 /* tab-capture.js */,
 			);
@@ -893,6 +896,7 @@
 				242E316E28B214F1B75E2B6F /* blocklist.info.json in Resources */,
 				2BAC5D63A9B904BE86762FE6 /* blocklist.json.lzfse in Resources */,
 				CCE61B476DAB6D934A4808C5 /* bridge.js in Resources */,
+				C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */,
 				4D9511C5D1A46A84D045245D /* public_suffix_list.txt in Resources */,
 				29A47D6EFC370DBFCADBCE02 /* tab-capture-page.js in Resources */,
 				5407D3683D005B57D0D03AD8 /* tab-capture.js in Resources */,

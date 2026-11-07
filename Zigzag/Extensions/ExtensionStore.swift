@@ -352,6 +352,14 @@ enum ExtensionStore {
         }
     }
 
+    /// The sites enabled extensions let message them (`externally_connectable.matches`), never every site.
+    static func externallyConnectablePatterns() -> [String] {
+        let all = installedIDs.filter(isEnabled).flatMap { id -> [String] in
+            ((manifest(for: id)?["externally_connectable"] as? [String: Any])?["matches"] as? [String]) ?? []
+        }
+        return Array(Set(all.filter { $0 != "<all_urls>" && !$0.hasPrefix("*://*/") && !$0.hasPrefix("https://*/") && !$0.hasPrefix("http://*/") })).sorted()
+    }
+
     private static var declaredCache: [String: (version: String, required: Set<String>, optional: Set<String>)] = [:]
 
     nonisolated private static func manifest(in folder: URL) -> [String: Any]? {
@@ -597,14 +605,51 @@ enum ExtensionProfile {
       const fill = (name, values) => { const target = api[name]; if (!target) return; held.push(target); for (const [k, v] of Object.entries(values)) { if (!(k in target)) { try { target[k] = v; } catch (e) {} } } };
       // Missing calls on namespaces WebKit does have: often called unconditionally.
       fill('action', { setBadgeTextColor: done(), getBadgeTextColor: done([0, 0, 0, 255]), getUserSettings: done({ isOnToolbar: true }) });
-      fill('tabs', { group: no('Tab groups'), ungroup: done(), discard: done(), highlight: done() });
+      fill('tabs', { group: no('Tab groups'), ungroup: done(), discard: done(), highlight: done(), TAB_ID_NONE: -1 });
+      fill('windows', { WINDOW_ID_NONE: -1, WINDOW_ID_CURRENT: -2 });
       // Not getContexts: extensions check for it and fall back to getViews, and an always-empty answer ("no popup
       // open") sends some (Bitwarden) into a loop asking again.
-      fill('runtime', { onSuspend: event(), onSuspendCanceled: event() });
+      const names = (list, form = (n) => n.toLowerCase()) => Object.freeze(Object.fromEntries(list.map((n) => [n, form(n)])));
+      fill('runtime', { onSuspend: event(), onSuspendCanceled: event(), onUpdateAvailable: event(), onRestartRequired: event(),
+        OnInstalledReason: names(['INSTALL', 'UPDATE', 'CHROME_UPDATE', 'SHARED_MODULE_UPDATE']),
+        ContextType: names(['TAB', 'POPUP', 'BACKGROUND', 'OFFSCREEN_DOCUMENT', 'SIDE_PANEL', 'DEVELOPER_TOOLS'], (n) => n) });
+      // Chrome's names for the values declarativeNetRequest rules use; WebKit takes the values, not always the names.
+      const camel = (n) => n.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      fill('declarativeNetRequest', {
+        HeaderOperation: names(['APPEND', 'SET', 'REMOVE']),
+        RuleActionType: names(['BLOCK', 'REDIRECT', 'ALLOW', 'UPGRADE_SCHEME', 'MODIFY_HEADERS', 'ALLOW_ALL_REQUESTS'], camel),
+        ResourceType: names(['MAIN_FRAME', 'SUB_FRAME', 'STYLESHEET', 'SCRIPT', 'IMAGE', 'FONT', 'OBJECT', 'XMLHTTPREQUEST', 'PING', 'CSP_REPORT', 'MEDIA', 'WEBSOCKET', 'WEBTRANSPORT', 'WEBBUNDLE', 'OTHER']),
+      });
       fill('i18n', { detectLanguage: done({ isReliable: false, languages: [] }) });
       fill('storage', { managed: { get: done({}), getBytesInUse: done(0), onChanged: event() } });
+      // WebKit refuses a whole set of rules when one names a header it doesn't know (Claude sets its own on its API
+      // calls). As close to Chrome as it gets: the unknown header is left out and the rest of the rules still apply.
+      const dnr = api.declarativeNetRequest;
+      if (dnr) for (const fn of ['updateSessionRules', 'updateDynamicRules']) {
+        const native = dnr[fn] && dnr[fn].bind(dnr);
+        if (!native) continue;
+        const without = (options, header) => Object.assign({}, options, { addRules: (options.addRules || []).map((rule) => {
+          const action = rule.action || {};
+          const keep = (list) => list && list.filter((h) => String(h.header).toLowerCase() !== header);
+          return Object.assign({}, rule, { action: Object.assign({}, action, { requestHeaders: keep(action.requestHeaders), responseHeaders: keep(action.responseHeaders) }) });
+        }).filter((rule) => (rule.action || {}).type !== 'modifyHeaders' || (rule.action.requestHeaders || []).length + (rule.action.responseHeaders || []).length > 0) });
+        try { dnr[fn] = (options, callback) => {
+          const attempt = async (current, tries) => {
+            try { return await native(current); } catch (e) {
+              const text = String(e && e.message), start = text.indexOf('The header `'), end = text.indexOf('` is not recognized');
+              if (start < 0 || end < start || tries > 20) throw e;
+              return attempt(without(current, text.slice(start + 12, end).toLowerCase()), tries + 1);
+            }
+          };
+          const result = attempt(options || {}, 0);
+          if (typeof callback !== 'function') return result;
+          result.then(() => callback(), () => callback());
+        }; } catch (e) {}
+      }
       // Whole namespaces, only where asked for.
-      add('tabGroups', { TAB_GROUP_ID_NONE: -1, query: done([]), get: no('Tab groups'), update: no('Tab groups'), move: no('Tab groups'), onCreated: event(), onUpdated: event(), onRemoved: event(), onMoved: event() });
+      // Its constants are read as the extension starts (Claude does), so they must be there, or it stops loading.
+      const colors = Object.freeze(Object.fromEntries(['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'].map((c) => [c.toUpperCase(), c])));
+      add('tabGroups', { TAB_GROUP_ID_NONE: -1, Color: colors, query: done([]), get: no('Tab groups'), update: no('Tab groups'), move: no('Tab groups'), onCreated: event(), onUpdated: event(), onRemoved: event(), onMoved: event() });
       add('sidePanel', { setPanelBehavior: done(), setOptions: done(), getOptions: done({ enabled: false }), getPanelBehavior: done({ openPanelOnActionClick: false }), open: no('The side panel') });
       add('offscreen', { createDocument: no('Offscreen documents'), closeDocument: done(), hasDocument: done(false), Reason: {} });
       add('idle', { queryState: done('active'), setDetectionInterval: noop, getAutoLockDelay: done(0), onStateChanged: event() });
@@ -614,6 +659,7 @@ enum ExtensionProfile {
       add('bookmarks', { getTree: done([{ id: '0', title: '', children: [] }]), get: done([]), getChildren: done([]), getRecent: done([]), search: done([]), create: no('Bookmarks from extensions'), update: no('Bookmarks from extensions'), remove: no('Bookmarks from extensions'), onCreated: event(), onRemoved: event(), onChanged: event(), onMoved: event() });
       add('sessions', { getRecentlyClosed: done([]), getDevices: done([]), restore: no('Restoring sessions'), MAX_SESSION_RESULTS: 25, onChanged: event() });
       add('topSites', { get: done([]) });
+      add('debugger', { attach: no('Debugging pages'), detach: done(), sendCommand: no('Debugging pages'), getTargets: done([]), onEvent: event(), onDetach: event() });
       add('management', { getSelf: done({ id: api.runtime.id, name: manifest.name, version: manifest.version, enabled: true, installType: 'normal', type: 'extension' }), getAll: done([]), get: no('Other extensions'), setEnabled: no('Turning other extensions off'), onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event() });
       add('identity', { getRedirectURL: (path) => 'https://' + api.runtime.id + '.chromiumapp.org/' + (path || ''), launchWebAuthFlow: no('Signing in through the browser'), getAuthToken: no('Signing in through the browser'), getProfileUserInfo: done({ email: '', id: '' }), onSignInChanged: event() });
       add('tts', { speak: done(), stop: noop, getVoices: done([]), isSpeaking: done(false), onEvent: event() });
