@@ -340,6 +340,13 @@ enum DebugBridge {
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "popupjs":
+            // Runs a script in the extension popup that's showing, to drive a real extension as you would.
+            if #available(macOS 15.4, *) {
+                ExtensionHost.shared.lastAction?.popupWebView?.evaluateJavaScript(arg) { result, error in
+                    debugLog("popupjs => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
+                }
+            }
         case "slowmo":
             // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
             let factor = max(1, Float(arg) ?? 1)
