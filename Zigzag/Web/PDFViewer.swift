@@ -421,11 +421,9 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     }
 
     /// Downloaded like any file: into Downloads (or where you choose, with that setting), with the usual flight into
-    /// the Downloads button. The tab then shows the saved copy, on the page you were reading, so it reads offline and
-    /// Back still leads to the web one. A PDF that's already a file on your Mac has nothing to download: Save As asks
-    /// where a copy goes.
-    var onDownloaded: ((URL) -> Void)?
-
+    /// the Downloads button, which opens to show it. The tab stays on the web copy you were reading; opening the file
+    /// from Downloads opens it on the same page. A PDF that's already a file on your Mac has nothing to download: Save
+    /// As asks where a copy goes.
     func save() {
         guard let data, let window else { return }
         let name = url.lastPathComponent.lowercased().hasSuffix(".pdf") ? url.lastPathComponent : "Document.pdf"
@@ -450,9 +448,8 @@ final class PDFViewerView: NSView, PDFViewDelegate {
             do {
                 guard let item = try await DownloadManager.shared.save(data, named: name, from: self.url, isPrivate: self.isPrivate, window: window),
                       let file = item.destination else { return }
-                // The saved copy opens on the same page.
+                // The saved copy, opened later, opens on the same page.
                 if !self.isPrivate { Self.setPlace(page, for: file) }
-                self.onDownloaded?(file)
             } catch {
                 if let controller { Toast.show(SaveFailure.message("Couldn’t download the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
             }
