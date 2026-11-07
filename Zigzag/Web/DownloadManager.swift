@@ -489,6 +489,31 @@ extension DownloadManager: WKDownloadDelegate {
         return destination
     }
 
+    /// A file Zigzag already has in hand (the PDF viewer's), saved as any download is: into Downloads, or where you
+    /// choose with that setting on; marked as downloaded; listed; and flown into the Downloads button. Nil when you
+    /// cancel the save sheet.
+    @discardableResult
+    func save(_ data: Data, named name: String, from source: URL?, isPrivate: Bool, window: NSWindow?) async throws -> DownloadItem? {
+        var destination = Self.uniqueDestination(for: name)
+        if Self.asksWhereToSave {
+            guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else { return nil }
+            destination = chosen
+        }
+        try data.write(to: destination, options: .atomic)
+        Self.markDownloaded(destination, from: source, page: source, isPrivate: isPrivate)
+        let item = DownloadItem(filename: destination.lastPathComponent, sourceURL: source, isPrivate: isPrivate)
+        item.destination = destination
+        item.state = .finished
+        item.fractionCompleted = 1
+        item.totalBytes = Int64(data.count)
+        item.completedBytes = item.totalBytes
+        items.insert(item, at: 0)
+        started.send((item, window))
+        changed.send(item)
+        DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
+        return item
+    }
+
     /// The standard save sheet, on the window the download came from.
     private func askWhere(name: String, in window: NSWindow?) async -> URL? {
         let panel = NSSavePanel()

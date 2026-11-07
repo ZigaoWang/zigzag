@@ -33,7 +33,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", toolTip: "Zoom In")
     private let twoPagesButton = IconButton(symbol: "book", toolTip: "Two Pages")
     private let darkButton = IconButton(symbol: "moon", toolTip: "Dark Pages")
-    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: "Save PDF…")
+    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: "Download PDF")
     private var showsSidebar = false
     private var saveWork: DispatchWorkItem?
 
@@ -114,6 +114,11 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         twoPagesButton.onClick = { [weak self] _ in self?.toggleTwoPages() }
         darkButton.onClick = { [weak self] _ in self?.toggleDarkPages() }
         saveButton.onClick = { [weak self] _ in self?.save() }
+        // A PDF already on your Mac has nothing to download; the button saves a copy elsewhere.
+        if url.isFileURL {
+            saveButton.toolTip = "Save a Copy…"
+            saveButton.symbol = "square.and.arrow.down"
+        }
         pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
         pageButton.onDone = { [weak self] in guard let self else { return }; self.window?.makeFirstResponder(self.pdfView) }
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: pdfView)
@@ -415,21 +420,49 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         pdfView.scaleFactor = 1
     }
 
+    /// Downloaded like any file: into Downloads (or where you choose, with that setting), with the usual flight into
+    /// the Downloads button. The tab then shows the saved copy, on the page you were reading, so it reads offline and
+    /// Back still leads to the web one. A PDF that's already a file on your Mac has nothing to download: Save As asks
+    /// where a copy goes.
+    var onDownloaded: ((URL) -> Void)?
+
     func save() {
         guard let data, let window else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = url.lastPathComponent.lowercased().hasSuffix(".pdf") ? url.lastPathComponent : "Document.pdf"
-        panel.beginSheetModal(for: window) { response in
-            guard response == .OK, let target = panel.url else { return }
-            MainActor.assumeIsolated {
-                // A save that didn't happen says so, rather than leave you looking for a file that isn't there.
-                do { try data.write(to: target) } catch {
-                    guard let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return }
-                    Toast.show(SaveFailure.message("Couldn’t save the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller)
+        let name = url.lastPathComponent.lowercased().hasSuffix(".pdf") ? url.lastPathComponent : "Document.pdf"
+        let controller = WindowManager.shared.controllers.first { $0.window === window }
+        if url.isFileURL {
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.pdf]
+            panel.nameFieldStringValue = name
+            panel.beginSheetModal(for: window) { response in
+                guard response == .OK, let target = panel.url else { return }
+                MainActor.assumeIsolated {
+                    do { try data.write(to: target) } catch {
+                        if let controller { Toast.show(SaveFailure.message("Couldn’t save the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                    }
                 }
             }
+            return
         }
+        let page = pdfView.currentPage.flatMap { pdfView.document?.index(for: $0) } ?? 0
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                guard let item = try await DownloadManager.shared.save(data, named: name, from: self.url, isPrivate: self.isPrivate, window: window),
+                      let file = item.destination else { return }
+                // The saved copy opens on the same page.
+                if !self.isPrivate { Self.setPlace(page, for: file) }
+                self.onDownloaded?(file)
+            } catch {
+                if let controller { Toast.show(SaveFailure.message("Couldn’t download the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+            }
+        }
+    }
+
+    private static func setPlace(_ index: Int, for url: URL) {
+        var all = UserDefaults.standard.dictionary(forKey: placesKey) ?? [:]
+        all[key(for: url)] = [index, Date().timeIntervalSince1970]
+        UserDefaults.standard.set(all, forKey: placesKey)
     }
 
     /// Printed from the file itself: paper is never dark.
