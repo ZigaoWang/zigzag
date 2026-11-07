@@ -58,6 +58,11 @@ enum WebKitSetup {
             configuration.userContentController.addUserScript(ExtensionPageErrors.script)
             configuration.userContentController.add(ExtensionPageErrors.shared, contentWorld: .page, name: ExtensionPageErrors.messageName)
         }
+        // With an extension that can capture tabs (Shazam), pages note where their Web Audio plays, so it can hear them.
+        if #available(macOS 15.4, *), ExtensionStore.someEnabledExtensionDeclares("tabCapture"),
+           !configuration.userContentController.userScripts.contains(BridgeTabCapture.routesScript) {
+            configuration.userContentController.addUserScript(BridgeTabCapture.routesScript)
+        }
     }
 
     /// WebKit's tracking prevention keeps cookies from any site embedded in another, as Safari does by default. That

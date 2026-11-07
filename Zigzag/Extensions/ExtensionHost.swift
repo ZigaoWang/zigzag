@@ -71,6 +71,12 @@ final class ExtensionHost: NSObject {
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
     /// Stops an extension: its buttons, scripts and background page go away.
+    /// Whether an extension's popup is showing now (some APIs act while it's open, as in Chrome).
+    func isPopupShown(for id: String) -> Bool {
+        guard let action = lastAction, action.webExtensionContext?.uniqueIdentifier == id else { return false }
+        return action.popupPopover?.isShown == true
+    }
+
     /// Closes the extension popup showing, when another of Zigzag's panels opens in its place.
     func closeActionPopup() {
         if lastAction?.popupPopover?.isShown == true { lastAction?.closePopup() }

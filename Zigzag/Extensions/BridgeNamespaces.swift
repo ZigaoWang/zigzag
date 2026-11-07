@@ -577,28 +577,38 @@ final class BridgeSidePanel: BridgeNamespace {
 
 // MARK: - tabCapture
 
-/// `chrome.tabCapture.capture({ audio: true })`: the sound of the tab you're on, for an extension you just clicked
-/// (Shazam, a recorder). Zigzag taps the page's own media in a script world of its own (Resources/Extensions/
-/// tab-capture.js) and streams the samples to the extension, which plays them into a normal MediaStream. The page
-/// keeps playing as before. Only the tab in front, never a private window's, and only soon after you click the
-/// extension; a note says it's listening, and it stops when the extension stops or goes away.
+/// `chrome.tabCapture.capture({ audio: true })`: the sound of the tab you're on, for an extension you've clicked
+/// (Shazam, a recorder). Zigzag taps the page's sound and streams the samples to the extension, which plays them into
+/// a normal MediaStream. Two halves: the page's own Web Audio when it uses it (Resources/Extensions/
+/// tab-capture-page.js, over the routes audio-routes.js noted), else its media elements, from a script world of
+/// Zigzag's own (tab-capture.js). As in Chrome the tab goes quiet while captured, and the extension plays it back if
+/// it wants. Only the tab in front, never a private window's, and only while the extension's popup is open or soon
+/// after you click it; a note says it's listening, and it stops when the extension stops listening or goes away.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler {
     static let name = "tabCapture"
     static let permission = "tabCapture"
     private static let world = WKContentWorld.world(name: "zigzag-tab-capture")
-    private static let script: String = {
-        guard let url = Bundle.main.url(forResource: "tab-capture", withExtension: "js") else { return "" }
+    private static func resource(_ name: String) -> String {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return "" }
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-    }()
+    }
+    private static let elementScript = resource("tab-capture")
+    private static let pageScript = resource("tab-capture-page")
+    /// For pages, at their start, while an extension that can capture tabs is installed (WebKitSetup).
+    static let routesScript = WKUserScript(source: resource("audio-routes"), injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page)
+
     private struct Tap {
         let extensionID: String
         weak var webView: WKWebView?
         let tabID: UUID
+        /// Which half is listening: the page's Web Audio, or its media elements.
+        let world: WKContentWorld
+        let script: String
     }
     private var taps: [String: Tap] = [:]
-    /// Web views given the message handler, so it's added once each.
+    /// Web views given the message handler (in both worlds), so it's added once each.
     private var handled = Set<ObjectIdentifier>()
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
@@ -606,7 +616,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         case "capture":
             let options = args.object(0)
             guard options["audio"] as? Bool == true else { throw BridgeError("Zigzag can capture a tab's sound, not its picture") }
-            guard Date().timeIntervalSince(ExtensionHost.shared.lastActionClick(extensionID)) < 120 else {
+            let host = ExtensionHost.shared
+            guard host.isPopupShown(for: extensionID) || Date().timeIntervalSince(host.lastActionClick(extensionID)) < 120 else {
                 throw BridgeError("Extension has not been invoked for the current page (see activeTab permission).")
             }
             guard let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate,
@@ -614,15 +625,19 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             for (id, tap) in taps where tap.extensionID == extensionID { stop(id) }
             if handled.insert(ObjectIdentifier(webView)).inserted {
                 webView.configuration.userContentController.add(self, contentWorld: Self.world, name: "zigzagTap")
+                webView.configuration.userContentController.add(self, contentWorld: .page, name: "zigzagTap")
             }
             let id = UUID().uuidString
-            taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id)
-            let status = try await webView.callAsyncJavaScript(Self.script, arguments: ["tap": id, "stop": false], in: nil, contentWorld: Self.world) as? String
-            guard status == "running" else {
-                taps[id] = nil
-                throw BridgeError("Play something in the tab first, then try again")
+            // The page's own Web Audio first: when it plays through that (YouTube does), its elements can't be tapped.
+            let routed = try? await webView.callAsyncJavaScript(Self.pageScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: .page) as? Int
+            if let routed, routed > 0 {
+                taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: .page, script: Self.pageScript)
+            } else {
+                let elements = try await webView.callAsyncJavaScript(Self.elementScript, arguments: ["tap": id, "stop": false], in: nil, contentWorld: Self.world) as? Int
+                guard let elements, elements >= 0 else { throw BridgeError("Play something in the tab first, then try again") }
+                taps[id] = Tap(extensionID: extensionID, webView: webView, tabID: tab.id, world: Self.world, script: Self.elementScript)
             }
-            Toast.show("\(ExtensionHost.shared.displayName(for: extensionID)) is listening to this tab", symbol: "waveform", duration: 3, in: controller)
+            Toast.show("\(host.displayName(for: extensionID)) is listening to this tab", symbol: "waveform", duration: 3, in: controller)
             return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]
         case "stop":
             if let id = args.string(0), taps[id]?.extensionID == extensionID { stop(id) }
@@ -636,15 +651,17 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     private func stop(_ id: String) {
         guard let tap = taps.removeValue(forKey: id) else { return }
-        tap.webView?.callAsyncJavaScript(Self.script, arguments: ["tap": id, "stop": true], in: nil, in: Self.world, completionHandler: nil)
+        tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
     }
 
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let id = body["tap"] as? String, let pcm = body["pcm"] as? String,
               let rate = body["rate"] as? Double else { return }
+        let world = message.world
         MainActor.assumeIsolated {
-            guard let tap = taps[id], tap.webView === message.webView else { return }
-            // The extension stopped listening (its popup closed): the tap goes too.
+            // Only from the half that's listening, in the tab it's listening to.
+            guard let tap = taps[id], tap.webView === message.webView, tap.world == world else { return }
+            // The extension stopped listening (its popup closed): the tap goes too, and the tab's sound comes back.
             guard ExtensionBridge.shared.isListened("tabCapture.chunk") else { stop(id); return }
             ExtensionBridge.shared.emit("tabCapture.chunk", [id, rate, pcm], to: tap.extensionID)
         }

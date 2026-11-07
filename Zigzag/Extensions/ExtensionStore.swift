@@ -343,6 +343,15 @@ enum ExtensionStore {
         return (required, optional)
     }
 
+    /// Whether an extension that's on asked for a permission, required or optional.
+    static func someEnabledExtensionDeclares(_ permission: String) -> Bool {
+        installedIDs.contains { id in
+            guard isEnabled(id) else { return false }
+            let declared = declaredPermissions(id)
+            return declared.required.contains(permission) || declared.optional.contains(permission)
+        }
+    }
+
     private static var declaredCache: [String: (version: String, required: Set<String>, optional: Set<String>)] = [:]
 
     nonisolated private static func manifest(in folder: URL) -> [String: Any]? {
