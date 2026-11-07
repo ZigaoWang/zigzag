@@ -6,8 +6,8 @@ import WebKit
 /// process (where every page's audio is played). Used by tab capture when a page's own sound can't be reached:
 /// WebKit gives Web Audio only silence for streamed (MSE) and protected video, which is most video sites.
 ///
-/// It hears all of Zigzag's web audio, not one tab, and leaves it playing as it was. macOS asks once whether Zigzag
-/// may record the sound it plays. Samples come mixed to mono, as Float, on a queue of its own.
+/// It hears all of Zigzag's web audio, not one tab. macOS asks once whether Zigzag may record the sound it plays.
+/// Samples come mixed to mono, as Float, on a queue of its own.
 @available(macOS 14.4, *)
 nonisolated final class SystemAudioTap: @unchecked Sendable {
     enum Failure: Error, CustomStringConvertible {
@@ -34,13 +34,14 @@ nonisolated final class SystemAudioTap: @unchecked Sendable {
         return unsafeBitCast(webView.method(for: selector), to: Getter.self)(webView, selector)
     }
 
-    /// Starts hearing `pid`'s sound; `samples` gets each buffer (mono Float, its sample rate).
-    func start(pid: pid_t, samples: @escaping @Sendable (UnsafeBufferPointer<Float>, Double) -> Void) throws {
+    /// Starts hearing `pid`'s sound; `samples` gets each buffer (mono Float, its sample rate). `muting` silences that
+    /// process on the speakers meanwhile, as Chrome silences a captured tab (the tap still hears it).
+    func start(pid: pid_t, muting: Bool, samples: @escaping @Sendable (UnsafeBufferPointer<Float>, Double) -> Void) throws {
         let process = try Self.audioObject(for: pid)
         let description = CATapDescription(stereoMixdownOfProcesses: [process])
         description.name = "Zigzag tab capture"
         description.isPrivate = true
-        description.muteBehavior = .unmuted
+        description.muteBehavior = muting ? .mutedWhenTapped : .unmuted
         var status = AudioHardwareCreateProcessTap(description, &tapID)
         guard status == noErr else { throw Failure.status("Creating the tap", status) }
 

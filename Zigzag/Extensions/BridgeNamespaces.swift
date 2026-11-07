@@ -405,7 +405,6 @@ final class BridgeOffscreen: BridgeNamespace {
     private var pages: [String: WKWebView] = [:]
     /// The extension's offscreen page's address, if it has one open (for runtime.getContexts).
     func pageURL(for extensionID: String) -> URL? { pages[extensionID]?.url }
-    func pageView(for extensionID: String) -> WKWebView? { pages[extensionID] }
     /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
     private var host: NSWindow?
 
@@ -767,6 +766,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         var page = ""
         /// Which opening of the extension's popup was showing when it began.
         var opening = 0
+        /// What the extension has played for Zigzag to play itself, and how loud, for the extensions log.
+        var played = 0
+        var playedPeak: Float = 0
     }
     /// Each extension's popup openings, counted, so closing one ends only what that one started.
     private var openings: [String: Int] = [:]
@@ -854,6 +856,22 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             tap.hasRead = true
             taps[id] = tap
             return chunks
+        case "play":
+            // What the extension plays while hearing Zigzag's own sound (whose web audio is muted meanwhile, as a
+            // captured tab is in Chrome): played from Zigzag itself, so it's heard and never captured again.
+            guard let id = args.string(0), let source = args.string(1), let tap = taps[id], tap.extensionID == extensionID, tap.system != nil,
+                  let rate = args.number(2), let pcm = args.string(3), let data = Data(base64Encoded: pcm) else { return nil }
+            let samples = data.withUnsafeBytes { raw in raw.bindMemory(to: Int16.self).map { Float($0) / 32768 } }
+            NativeAudioOut.shared.feed(id + "|" + source, samples: samples, rate: rate)
+            if var tap = taps[id] {
+                tap.played += 1
+                tap.playedPeak = max(tap.playedPeak, samples.map(abs).max() ?? 0)
+                taps[id] = tap
+                if tap.played == 100 {
+                    ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: extensionID)): Zigzag plays its sound itself, peak \(String(format: "%.4f", tap.playedPeak))")
+                }
+            }
+            return nil
         case "stop":
             if let id = args.string(0), taps[id]?.extensionID == extensionID { stop(id) }
             return nil
@@ -915,9 +933,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: tap.extensionID)) ended after \(Int(Date().timeIntervalSince(tap.started))) s: \(reason)")
         if #available(macOS 14.4, *) { (tap.system as? SystemAudioTap)?.stop() }
         (tap.system as? DispatchSourceTimer)?.cancel()
-        if tap.system != nil, !taps.values.contains(where: { $0.extensionID == tap.extensionID && $0.system != nil }) {
-            muteExtensionPages(tap.extensionID, false)
-        }
+        NativeAudioOut.shared.end(sourcesStartingWith: id)
         tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
     }
 
@@ -931,9 +947,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     // MARK: Zigzag's own sound
 
     /// The page's sound gave only silence while the tab plays (streamed or protected video): the capture carries on
-    /// with the sound Zigzag plays instead, once you've let the extension hear it. The page's tap ends, so the tab
-    /// sounds as it did; what the extension plays from this stream stays off the speakers (bridge.js), or you'd hear
-    /// the tab twice and it would echo.
+    /// with the sound Zigzag plays instead, once you've let the extension hear it. As in Chrome the tab goes quiet
+    /// meanwhile (Zigzag's web audio is muted at the source), and what the extension plays (Shazam passing it on, a
+    /// booster's louder copy) is played by Zigzag itself (NativeAudioOut): heard, and never captured again.
     private func switchToSystemAudio(_ id: String) {
         guard #available(macOS 14.4, *), var tap = taps[id], !tap.switching, let webView = tap.webView,
               let (tab, controller) = tab(tap.tabID) else { return }
@@ -959,31 +975,18 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 if UserDefaults.standard.bool(forKey: "DebugFakeSystemAudio") {
                     // Silence at the real pace, without macOS's capture, to test everything around it.
                     taps[id]?.system = ChunkMaker.fakeSilence(into: chunks) as AnyObject
-                    muteExtensionPages(tap.extensionID, true)
                     ExtensionLog.write("tab capture for \(name): fake Zigzag sound (debug)")
                     return
                 }
                 #endif
-                try system.start(pid: pid) { samples, rate in chunks.add(samples, rate: rate) }
+                try system.start(pid: pid, muting: true) { samples, rate in chunks.add(samples, rate: rate) }
             } catch {
                 ExtensionLog.write("tab capture for \(name): hearing Zigzag's sound failed: \(error)")
                 return
             }
             taps[id]?.system = system
-            muteExtensionPages(tap.extensionID, true)
             ExtensionLog.write("tab capture for \(name): streamed video, so Zigzag's own sound")
         }
-    }
-
-    /// Hearing Zigzag's own sound, the tab keeps playing: anything the extension's pages play would be heard twice
-    /// and come back around as an echo. So they're muted, as a muted tab is, while it listens (it still hears).
-    /// Whether one of the extension's captures is hearing Zigzag's own sound (its pages stay muted meanwhile).
-    func hearsZigzag(_ extensionID: String) -> Bool {
-        taps.values.contains { $0.extensionID == extensionID && $0.system != nil }
-    }
-
-    private func muteExtensionPages(_ extensionID: String, _ muted: Bool) {
-        for view in ExtensionHost.shared.pageViews(for: extensionID) { view.setPageAudioMuted(muted) }
     }
 
     private func emitSystemChunk(_ id: String, rate: Double, pcm: String) {

@@ -38,23 +38,30 @@
       removeRules(ids, callback) { const cb = typeof ids === 'function' ? ids : callback; if (typeof cb === 'function') setTimeout(() => cb(), 0); },
     });
     // WebKit names some features with nothing behind them: `in` isn't enough, and plain assignment can fail quietly.
-    const put = (target, key, value) => {
+    // (Where WebKit won't let the member be set, webkit-differences.js stands in for the object holding it.)
+    const setMember = globalThis.__zigzagSetMember;
+    let root = api;   // the object (chrome or browser) being filled now
+    const put = (target, key, value, path) => {
       if (target[key] != null) return target[key];
-      try { Object.defineProperty(target, key, { value, configurable: true, enumerable: true, writable: true }); } catch (e) { return null; }
-      return target[key];
+      try { Object.defineProperty(target, key, { value, configurable: true, enumerable: true, writable: true }); } catch (e) {}
+      if (target[key] == null && setMember && path) setMember(path, key, value);
+      if (!path) return target[key];
+      const holder = path.reduce((object, part) => object && object[part], root);
+      return (holder && holder[key]) ?? target[key];
     };
-    const fill = (target, spec, name) => {
-      for (const fn of spec.functions || []) if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`));
-      for (const ev of spec.events || []) put(target, ev, event());
-      for (const [key, value] of Object.entries(spec.constants || {})) if (target[key] === undefined) put(target, key, value);
-      for (const [key, values] of Object.entries(spec.enums || {})) if (target[key] === undefined) put(target, key, Object.freeze({ ...values }));
+    // `path` is where `target` sits under chrome, for the stand-in that's needed where WebKit refuses a member.
+    const fill = (target, spec, name, path) => {
+      for (const fn of spec.functions || []) if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`), path);
+      for (const ev of spec.events || []) put(target, ev, event(), path);
+      for (const [key, value] of Object.entries(spec.constants || {})) if (target[key] === undefined) put(target, key, value, path);
+      for (const [key, values] of Object.entries(spec.enums || {})) if (target[key] === undefined) put(target, key, Object.freeze({ ...values }), path);
       for (const [key, inner] of Object.entries(spec.objects || {})) {
-        const object = put(target, key, {});
+        const object = put(target, key, {}, path);
         if (!object || typeof object !== 'object') continue;
         if (inner.properties) for (const [prop, members] of Object.entries(inner.properties)) {
-          const child = put(object, prop, {});
-          if (child && typeof child === 'object') fill(child, members, `${name}.${key}.${prop}`);
-        } else fill(object, inner, `${name}.${key}`);
+          const child = put(object, prop, {}, path && [...path, key]);
+          if (child && typeof child === 'object') fill(child, members, `${name}.${key}.${prop}`, path && [...path, key, prop]);
+        } else fill(object, inner, `${name}.${key}`, path && [...path, key]);
       }
     };
     const available = (spec) => {
@@ -74,12 +81,14 @@
         // on even in Chrome, so extensions check for it and take another way: present, it would send them down this one.
         if (path.startsWith('devtools.') || path === 'userScripts' || !available(spec)) continue;
         let namespace = target;
-        for (const part of path.split('.')) {
-          namespace = namespace && put(namespace, part, {});
-        }
-        if (namespace && typeof namespace === 'object') fill(namespace, spec, `chrome.${path}`);
+        const parts = path.split('.');
+        root = target;
+        parts.forEach((part, index) => { namespace = namespace && put(namespace, part, {}, parts.slice(0, index)); });
+        if (namespace && typeof namespace === 'object') fill(namespace, spec, `chrome.${path}`, parts);
       }
     }
+    // Answers for what's now there but Zigzag can't do (webkit-differences.js).
+    if (typeof globalThis.__zigzagAfterSurface === 'function') { try { globalThis.__zigzagAfterSurface(); } catch (e) {} }
     return true;
   };
   if (!start()) {

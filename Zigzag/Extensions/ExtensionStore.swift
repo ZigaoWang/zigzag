@@ -643,8 +643,14 @@ enum ExtensionProfile {
           const attempt = async (current, tries) => {
             try { return await native(current); } catch (e) {
               const text = String(e && e.message), start = text.indexOf('The header `'), end = text.indexOf('` is not recognized');
-              if (start < 0 || end < start || tries > 20) throw e;
-              return attempt(without(current, text.slice(start + 12, end).toLowerCase()), tries + 1);
+              if (tries > 50) throw e;
+              if (start >= 0 && end > start) return attempt(without(current, text.slice(start + 12, end).toLowerCase()), tries + 1);
+              // Any other rule WebKit can't take is left out by itself, as Chrome would refuse only that one; the
+              // extension's other rules still apply (DuckDuckGo's, an ad blocker's).
+              const at = text.indexOf('rule at index ');
+              const index = at >= 0 ? parseInt(text.slice(at + 14), 10) : NaN;
+              if (Number.isNaN(index) || !(current.addRules || [])[index]) throw e;
+              return attempt(Object.assign({}, current, { addRules: current.addRules.filter((_, i) => i !== index) }), tries + 1);
             }
           };
           const result = attempt(options || {}, 0);

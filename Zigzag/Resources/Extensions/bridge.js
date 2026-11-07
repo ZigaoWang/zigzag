@@ -303,64 +303,70 @@
     onClosed: event('sidePanel.onClosed'),
   });
 
-  // A capture that switches to Zigzag's own sound (streamed video, whose sound Web Audio can't reach) leaves the tab
-  // playing, so whatever the extension sends from it to the speakers would be heard twice, and come back around into
-  // the capture as an echo. From then on such paths go through a silent node: the extension's processing still runs
-  // (a recorder's ScriptProcessor needs a path to the speakers to run at all), but nothing more is heard.
-  const captures = new WeakMap();   // MediaStream -> { live, edges, elements }
-  const reaching = new WeakMap();   // AudioNode fed by a captured stream -> its capture
-  const silent = new WeakMap();     // AudioContext -> a gain of 0 into its speakers
-  let connectQuietly = null;
-  if (typeof AudioNode !== 'undefined' && typeof AudioContext !== 'undefined') {
+  // A capture that hears Zigzag's own sound (streamed video, whose sound Web Audio can't reach) has Zigzag's web audio
+  // muted at the source, as Chrome mutes a captured tab. What the extension then plays (Shazam passing the sound on, a
+  // booster's louder copy) goes to Zigzag, which plays it itself (NativeAudioOut.swift): heard, and never captured
+  // again. So each audio context in the page plays through a router: straight to the speakers normally, to Zigzag
+  // while such a capture is on. However the extension builds its sound, all of it passes there.
+  const hearing = new Set();   // captures hearing Zigzag's own sound
+  const routes = [];           // one per audio context: { context, router, speakers, relay, source }
+  const relayOn = (route) => {
+    if (route.relay) return;
+    const { context } = route;
+    const relay = context.createScriptProcessor(1024, 1, 1);
+    relay.onaudioprocess = (event) => {
+      event.outputBuffer.getChannelData(0).fill(0);
+      const id = hearing.values().next().value;
+      if (!id) return;
+      const input = event.inputBuffer.getChannelData(0);
+      const samples = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) { const v = Math.max(-1, Math.min(1, input[i])); samples[i] = v < 0 ? v * 0x8000 : v * 0x7fff; }
+      const bytes = new Uint8Array(samples.buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      send('tabCapture', 'play', [id, route.source, context.sampleRate, btoa(binary)]).catch(() => {});
+    };
+    try { route.router.disconnect(); } catch (e) {}
+    route.connect.call(route.router, relay);
+    // A processor runs only while it leads somewhere; it writes silence.
+    route.connect.call(relay, route.speakers);
+    route.relay = relay;
+  };
+  const relayOff = (route) => {
+    if (!route.relay) return;
+    try { route.router.disconnect(); route.relay.disconnect(); } catch (e) {}
+    route.relay.onaudioprocess = null;
+    route.relay = null;
+    route.connect.call(route.router, route.speakers);
+  };
+  const startHearing = (id) => { hearing.add(id); routes.forEach(relayOn); };
+  const stopHearing = (id) => { hearing.delete(id); if (!hearing.size) routes.forEach(relayOff); };
+  if (typeof BaseAudioContext !== 'undefined' && typeof AudioContext !== 'undefined' && asked.has('tabCapture')) {
+    const destination = Object.getOwnPropertyDescriptor(BaseAudioContext.prototype, 'destination');
     const connect = AudioNode.prototype.connect;
-    const silence = (context) => {
-      let node = silent.get(context);
-      if (!node) { node = context.createGain(); node.gain.value = 0; connect.call(node, context.destination); silent.set(context, node); }
-      return node;
-    };
-    connectQuietly = (node, destination) => connect.call(node, silence(destination.context));
-    const createSource = AudioContext.prototype.createMediaStreamSource;
-    AudioContext.prototype.createMediaStreamSource = function (stream) {
-      const node = createSource.call(this, stream);
-      const capture = captures.get(stream);
-      if (capture) reaching.set(node, capture);
-      return node;
-    };
-    AudioNode.prototype.connect = function (destination, ...rest) {
-      const capture = reaching.get(this);
-      if (capture && destination instanceof AudioNode) {
-        if (destination instanceof AudioDestinationNode) {
-          if (capture.live) { connectQuietly(this, destination); return destination; }
-          capture.edges.push([new WeakRef(this), destination]);
-        } else {
-          reaching.set(destination, capture);
-        }
-      }
-      return connect.call(this, destination, ...rest);
-    };
-    const srcObject = typeof HTMLMediaElement !== 'undefined' && Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject');
-    if (srcObject && srcObject.set) {
-      Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
-        configurable: true, enumerable: srcObject.enumerable, get: srcObject.get,
-        set(value) {
-          const capture = value && captures.get(value);
-          if (capture) { capture.elements.add(this); if (capture.live) this.muted = true; }
-          srcObject.set.call(this, value);
+    const routeOf = new WeakMap();
+    if (destination && destination.get) {
+      Object.defineProperty(BaseAudioContext.prototype, 'destination', {
+        configurable: true, enumerable: destination.enumerable,
+        get() {
+          const speakers = destination.get.call(this);
+          // Rendering offline plays nothing.
+          if (!(this instanceof AudioContext)) return speakers;
+          let route = routeOf.get(this);
+          if (!route) {
+            const router = this.createGain();
+            try { Object.defineProperty(router, 'maxChannelCount', { value: speakers.maxChannelCount }); } catch (e) {}
+            route = { context: this, router, speakers, relay: null, connect, source: 'c' + routes.length };
+            connect.call(router, speakers);
+            routeOf.set(this, route);
+            routes.push(route);
+            if (hearing.size) relayOn(route);
+          }
+          return route.router;
         },
       });
     }
   }
-  const quiet = (capture) => {
-    capture.live = true;
-    for (const [ref, destination] of capture.edges) {
-      const node = ref.deref();
-      if (!node) continue;
-      try { node.disconnect(destination); } catch (e) {}
-      try { connectQuietly && connectQuietly(node, destination); } catch (e) {}
-    }
-    capture.edges = [];
-    for (const element of capture.elements) element.muted = true;
-  };
 
   // Chrome hands a capture over only after the messages the page had already sent were delivered, the page's own
   // included. Extensions rely on that order: Shazam's popup sends itself "stopRecording" each time it redraws, and
@@ -420,10 +426,10 @@
       if (i < out.length) { out.fill(0, i); primed = false; }
     };
     player.connect(destination);
-    const capture = { live: false, edges: [], elements: new Set() };
+    let heard = false;
     const receive = (tap, rate, pcm, at, live) => {
       if (tap !== id) return;
-      if (live && !capture.live) quiet(capture);
+      if (live && !heard) { heard = true; startHearing(id); }
       // Sound that took too long to arrive would only put it further behind.
       if (at && Date.now() - at > 250) return;
       const binary = atob(pcm);
@@ -443,25 +449,25 @@
       }
     };
     // Collected from Zigzag about fifty times a second while the stream lives.
-    let live = true;
+    let collecting = true;
+    const ended = () => { collecting = false; if (heard) { heard = false; stopHearing(id); } };
     const collect = async () => {
-      if (!live) return;
+      if (!collecting) return;
       try {
         const chunks = await send('tabCapture', 'read', [id]);
         // Nothing at all (not even an empty list): the capture has ended.
-        if (chunks == null) { live = false; return; }
+        if (chunks == null) { ended(); return; }
         for (const chunk of chunks) receive(id, ...chunk);
       } catch (e) {}
       setTimeout(collect, 20);
     };
     collect();
     const stream = destination.stream;
-    captures.set(stream, capture);
     for (const track of stream.getAudioTracks()) {
       const stop = track.stop.bind(track);
       track.stop = () => {
         stop();
-        live = false;
+        ended();
         player.disconnect();
         context.close().catch(() => {});
         send('tabCapture', 'stop', [id]).catch(() => {});
