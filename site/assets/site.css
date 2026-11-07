@@ -34,6 +34,37 @@ main { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 .button:hover { opacity: .82; }
 .fine { margin: 12px 0 0; font-size: 13px; color: var(--soft); }
 
+/* The top: our own sky, and Zigzag in it as glass, captured from the app. The words sit in the clear sky above it. */
+.hero { --navy: #1F2D40; --text: 420px; position: relative; display: flex; justify-content: center;
+  /* Room for the words, then the window: it starts 37% down the picture, which is 53.8% as tall as it's wide. */
+  height: min(calc(var(--text) + 33.9vw), 1120px); overflow: hidden;
+  background: #93C2F1 image-set(url(/assets/hero-1600.jpg?v=1) 1x, url(/assets/hero.jpg?v=1) 2x) center bottom / 100% auto no-repeat;
+  color: var(--navy); text-align: center; color-scheme: light; }
+.hero-text { position: relative; padding: 72px 24px 0; }
+/* Where the picture starts, its sky fades into the plain one above, so there's no edge. */
+.hero::before { content: ""; position: absolute; left: 0; right: 0; bottom: calc(53.8vw - 160px); height: 160px; pointer-events: none;
+  background: linear-gradient(#93C2F1, rgba(147, 194, 241, 0)); }
+.lockup { display: inline-flex; align-items: center; gap: 14px; position: relative; margin: 0; font-size: inherit; }
+/* The icon file has its own margin and shadow around the rounded square, so it's drawn as is. */
+.lockup-icon { width: 68px; height: 68px; margin-right: -6px; }
+.hero .mark { width: 168px; margin: 0; color: var(--navy); }
+.hero .beta { color: var(--navy); border-color: rgba(31, 45, 64, .25); top: 50%; transform: translateY(-50%); }
+.tag { margin: 26px 0 0; font-size: clamp(34px, 4.6vw, 56px); line-height: 1.08; font-weight: 600; letter-spacing: -0.012em; }
+.sub { margin: 14px 0 0; font-size: clamp(17px, 1.5vw, 20px); color: rgba(31, 45, 64, .72); }
+.hero .actions { margin-top: 28px; }
+.hero .button { background: var(--navy); color: #fff; }
+.hero .gh.big { color: var(--navy); border-color: rgba(31, 45, 64, .25); }
+.hero .gh.big:hover { background: rgba(255, 255, 255, .35); }
+.hero .fine { color: rgba(31, 45, 64, .62); }
+.hero + main { padding-top: 120px; }
+@media (max-width: 600px) {
+  /* On a phone the window shows larger, from the sidebar to the first posters. */
+  .hero { height: calc(470px + 61vw); background-size: 180% auto; background-position: 9% bottom; }
+  .hero::before { bottom: calc(96.8vw - 160px); } .hero-text { padding-top: 56px; }
+  .lockup-icon { width: 54px; height: 54px; } .hero .mark { width: 132px; }
+  .hero .beta { position: static; transform: none; } .hero + main { padding-top: 72px; }
+}
+
 .clip { margin: 0 0 120px; }
 .clip video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025;
   /* The window's own corner (31 of 2560 × 1640 px), a hair larger, so the background never peeks out. */
