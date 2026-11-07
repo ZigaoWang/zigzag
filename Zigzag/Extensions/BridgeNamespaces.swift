@@ -354,3 +354,116 @@ final class BridgeOffscreen: BridgeNamespace {
         pages.removeValue(forKey: extensionID)?.stopLoading()
     }
 }
+
+// MARK: - identity
+
+/// `chrome.identity.launchWebAuthFlow`: an extension's "Sign in with…" in a small window of its own, with your
+/// usual cookies, as Chrome does it. When the sign-in sends the window to the extension's redirect address
+/// (`https://<id>.chromiumapp.org/…`), the window closes and the extension gets that address, with its code or
+/// token. Never with `interactive: false` unless no click is needed. `getAuthToken` (Chrome's own Google account
+/// sign-in) has no Zigzag equivalent and says so.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSWindowDelegate {
+    static let name = "identity"
+    static let permission = "identity"
+    private struct Flow {
+        let extensionID: String
+        let window: NSWindow?
+        let webView: WKWebView
+        let finish: (Result<URL, BridgeError>) -> Void
+    }
+    private var flows: [ObjectIdentifier: Flow] = [:]
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "launchWebAuthFlow":
+            let details = args.object(0)
+            guard let text = details.string("url"), let url = URL(string: text), Self.isAllowedStart(url) else { throw BridgeError("Authorization page could not be loaded.") }
+            let result = await withCheckedContinuation { done in start(url, interactive: details["interactive"] as? Bool == true, extensionID: extensionID) { done.resume(returning: $0) } }
+            return try result.get().absoluteString
+        case "getRedirectURL":
+            return "https://\(extensionID).chromiumapp.org/" + (args.string(0) ?? "")
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    /// Sign-in pages are secure pages. Testing builds also take a local server, to try a flow without a real provider.
+    static func isAllowedStart(_ url: URL) -> Bool {
+        if url.scheme?.lowercased() == "https" { return true }
+        #if DEBUG
+        return url.scheme == "http" && ["localhost", "127.0.0.1"].contains(url.host() ?? "")
+        #else
+        return false
+        #endif
+    }
+
+    private func start(_ url: URL, interactive: Bool, extensionID: String, finish: @escaping (Result<URL, BridgeError>) -> Void) {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 640), configuration: WebKitSetup.makeConfiguration())
+        webView.navigationDelegate = self
+        var window: NSWindow?
+        if interactive {
+            let made = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            made.title = "Sign In for \(ExtensionHost.shared.displayName(for: extensionID))"
+            made.subtitle = url.host() ?? ""
+            made.contentView = webView
+            made.isReleasedWhenClosed = false
+            made.delegate = self
+            if let parent = WindowManager.shared.keyController?.window {
+                made.setFrameOrigin(NSPoint(x: parent.frame.midX - 240, y: parent.frame.midY - 320))
+            } else {
+                made.center()
+            }
+            made.makeKeyAndOrderFront(nil)
+            window = made
+        }
+        flows[ObjectIdentifier(webView)] = Flow(extensionID: extensionID, window: window, webView: webView, finish: finish)
+        webView.load(URLRequest(url: url))
+        // Without a window, the flow has a few seconds to reach the redirect on its own.
+        if !interactive {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self, weak webView] in
+                guard let self, let webView else { return }
+                self.end(webView, .failure(BridgeError("User interaction required.")))
+            }
+        }
+    }
+
+    private func end(_ webView: WKWebView, _ result: Result<URL, BridgeError>) {
+        guard let flow = flows.removeValue(forKey: ObjectIdentifier(webView)) else { return }
+        webView.stopLoading()
+        flow.window?.delegate = nil
+        flow.window?.close()
+        flow.finish(result)
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
+        guard let flow = flows[ObjectIdentifier(webView)], let url = action.request.url else { return .allow }
+        // The extension's own redirect address, exactly: never stops on another site that happens to look like it.
+        if url.scheme == "https", url.host()?.lowercased() == "\(flow.extensionID).chromiumapp.org" {
+            end(webView, .success(url))
+            return .cancel
+        }
+        return .allow
+    }
+
+    /// A server's redirect to the address, too, in case it arrives without its own navigation decision.
+    func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+        guard let flow = flows[ObjectIdentifier(webView)], let url = webView.url, url.scheme == "https",
+              url.host()?.lowercased() == "\(flow.extensionID).chromiumapp.org" else { return }
+        end(webView, .success(url))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if (error as NSError).code != NSURLErrorCancelled { end(webView, .failure(BridgeError("Authorization page could not be loaded."))) }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, let flow = flows.values.first(where: { $0.window === window }) else { return }
+        end(flow.webView, .failure(BridgeError("The user did not approve access.")))
+    }
+
+    func release(_ extensionID: String) {
+        for flow in flows.values where flow.extensionID == extensionID { end(flow.webView, .failure(BridgeError("The extension was turned off."))) }
+    }
+}

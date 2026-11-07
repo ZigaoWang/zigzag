@@ -192,6 +192,27 @@
       'DISPLAY_MEDIA', 'WEB_RTC', 'CLIPBOARD', 'LOCAL_STORAGE', 'WORKERS', 'BATTERY_STATUS', 'MATCH_MEDIA', 'GEOLOCATION'].map((r) => [r, r])),
   });
 
+  install('identity', {
+    launchWebAuthFlow: method('identity', 'launchWebAuthFlow'),
+    getRedirectURL: (path) => `https://${api.runtime.id}.chromiumapp.org/${path || ''}`,
+    getAuthToken: (...args) => {
+      const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+      const error = new Error("Chrome's own account sign-in isn't available in Zigzag; use launchWebAuthFlow");
+      if (callback) { setTimeout(() => callback(undefined), 0); return; }
+      return Promise.reject(error);
+    },
+    removeCachedAuthToken: method('identity', 'getRedirectURL', { after: () => undefined }),
+    clearAllCachedAuthTokens: () => Promise.resolve(),
+    getProfileUserInfo: (...args) => {
+      const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+      const info = { email: '', id: '' };
+      if (callback) { setTimeout(() => callback(info), 0); return; }
+      return Promise.resolve(info);
+    },
+    getAccounts: () => Promise.resolve([]),
+    onSignInChanged: event('identity.onSignInChanged'),
+  });
+
   install('power', {
     requestKeepAwake: (level) => { send('power', 'requestKeepAwake', [level]).catch(() => {}); },
     releaseKeepAwake: () => { send('power', 'releaseKeepAwake', []).catch(() => {}); },
