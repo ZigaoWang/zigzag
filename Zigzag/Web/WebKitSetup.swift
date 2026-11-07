@@ -103,7 +103,7 @@ enum PageScripts {
     }
 
     /// Chrome's name for the messaging WebKit gives sites an extension lists (Resources/Extensions/chrome-runtime.js).
-    static func chromeRuntime(matching patterns: [String]) -> WKUserScript {
+    static func chromeRuntime(matching patterns: [String: [String]]) -> WKUserScript {
         let json = (try? JSONSerialization.data(withJSONObject: patterns)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         return WKUserScript(source: chromeRuntimeSource.replacingOccurrences(of: "__PATTERNS__", with: json),
                             injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)

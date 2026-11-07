@@ -352,12 +352,15 @@ enum ExtensionStore {
         }
     }
 
-    /// The sites enabled extensions let message them (`externally_connectable.matches`), never every site.
-    static func externallyConnectablePatterns() -> [String] {
-        let all = installedIDs.filter(isEnabled).flatMap { id -> [String] in
-            ((manifest(for: id)?["externally_connectable"] as? [String: Any])?["matches"] as? [String]) ?? []
+    /// The sites each enabled extension lets message it (`externally_connectable.matches`), never every site.
+    static func externallyConnectablePatterns() -> [String: [String]] {
+        var byExtension: [String: [String]] = [:]
+        for id in installedIDs where isEnabled(id) {
+            let matches = ((manifest(for: id)?["externally_connectable"] as? [String: Any])?["matches"] as? [String]) ?? []
+            let narrow = matches.filter { $0 != "<all_urls>" && !$0.hasPrefix("*://*/") && !$0.hasPrefix("https://*/") && !$0.hasPrefix("http://*/") }
+            if !narrow.isEmpty { byExtension[id] = narrow.sorted() }
         }
-        return Array(Set(all.filter { $0 != "<all_urls>" && !$0.hasPrefix("*://*/") && !$0.hasPrefix("https://*/") && !$0.hasPrefix("http://*/") })).sorted()
+        return byExtension
     }
 
     private static var declaredCache: [String: (version: String, required: Set<String>, optional: Set<String>)] = [:]
