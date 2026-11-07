@@ -226,8 +226,6 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .stage.comp img { width: 100%; max-width: 640px; margin: 0; }
 .stage.comp.tall { height: 580px; }
 .stage.comp.tall img { width: 290px; max-width: 80%; }
-.reveal.pending { opacity: 0; transform: translateY(28px) scale(.98); }
-.reveal.pending.in { opacity: 1; transform: none; transition: opacity .9s ease, transform 1.1s cubic-bezier(.2, .7, .15, 1); }
 
 /* Everything else: a grid of clips and facts, not one more column of the same. */
 .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 48px; }
@@ -265,23 +263,36 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
   .stage.comp { height: 360px; padding: 32px 20px 0; }
 }
 
-/* Bands: the page alternates calm fields of color, edge to edge, so it never reads as one long white column. */
-.band { position: relative; padding: 120px 0; margin-bottom: 0; }
-.band::before { content: ""; position: absolute; inset: 0 calc(50% - 50vw); z-index: -1; }
-.band.blue::before { background: linear-gradient(#EAF2FC, #DCEAFA); }
-.band.white::before { background: #fff; }
-.band.white { padding: 140px 0 10px; }
-.band.navy::before { background: #1F2D40; }
-.band.navy { color: #F1F4F9; }
-.band.navy .lede, .band.navy .note { color: rgba(241, 244, 249, .66); }
-.band.navy .bars li { color: rgba(241, 244, 249, .7); }
-.band.navy .bars .track { background: rgba(241, 244, 249, .12); }
-.band.navy .bars .fill { background: rgba(241, 244, 249, .35); }
-.band.navy .bars .us { color: #fff; } .band.navy .bars .us .fill { background: #8EC0F5; }
-.band + section, .band + .band { margin-top: 0; }
-.band.blue + .band, .band.white + .feature { padding-top: 0; }
-.feature.band, .band .row:last-child { margin-bottom: 0; }
-.band.white + .feature { margin-top: 140px; }
-.band.navy { margin: 150px 0; }
-body { overflow-x: clip; }
-@media (max-width: 760px) { .band { padding: 72px 0; } .band.white { padding: 80px 0 1px; } .band.navy { margin: 96px 0; } .band.white + .feature { margin-top: 96px; } }
+
+/* Compact: one rhythm for every section, nothing taller than it needs to be. */
+.hero + main { padding-top: 72px; }
+.intro { margin-bottom: 88px; } .intro p { font-size: 19px; }
+.feature, .duo, .story { margin-bottom: 104px; }
+.feature > h2, .private > h2 { font-size: clamp(28px, 3vw, 36px); }
+.feature > .lede { font-size: 17px; }
+.feature .stage, .bento, .bars { margin-top: 36px; }
+.feature > .stage { padding: clamp(20px, 3.5vw, 40px); }
+/* Three features, each a sky card with a real part of Zigzag in it, and two lines under it. */
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 0 0 104px; }
+.feat { margin: 0; }
+.feat .stage.comp { height: 300px; padding: 32px 24px 0; border-radius: 22px; align-items: flex-start; }
+.feat .stage.comp img { width: 100%; max-width: none; }
+.feat .stage.comp.dusk img { width: 62%; }
+.feat .stage.peek { padding: 28px 0 0 28px; justify-content: flex-start; }
+.feat .stage.peek img { width: 150%; }
+.feat figcaption { margin: 16px 4px 0; font-size: 15px; line-height: 1.55; color: var(--soft); }
+.feat figcaption b { display: block; margin-bottom: 2px; font-size: 17px; font-weight: 600; color: var(--ink); }
+/* Size, on a navy card. */
+.weight.navy { padding: 56px 48px 48px; border-radius: 28px; background: #1F2D40; color: #F1F4F9; }
+.navy .lede, .navy .note { color: rgba(241, 244, 249, .66); }
+.navy .bars li { color: rgba(241, 244, 249, .72); }
+.navy .bars .track { background: rgba(241, 244, 249, .12); }
+.navy .bars .fill { background: rgba(241, 244, 249, .35); }
+.navy .bars .us { color: #fff; } .navy .bars .us .fill { background: #8EC0F5; }
+.duo, .story { padding-top: 40px; gap: 56px; }
+.duo h2, .story h2 { font-size: 26px; }
+.pitch.sky-card { padding: 72px 24px; margin-bottom: 72px; }
+@media (max-width: 760px) {
+  .trio { grid-template-columns: 1fr; margin-bottom: 72px; } .feat .stage.comp { height: 260px; }
+  .feature, .duo, .story { margin-bottom: 72px; } .weight.navy { padding: 40px 20px; }
+}
