@@ -8,6 +8,11 @@
   <sub>Free. macOS 15.4 or later. In beta.</sub>
 </p>
 
+<p align="center">
+  Your tabs in a sidebar, grouped into spaces. A native Mac app in Swift on WebKit,<br>
+  17 MB installed, with no account and nothing it phones home for.
+</p>
+
 ## Coming from Arc
 
 **Your Arc comes with you.** File › Import from Another Browser…, pick Arc, and your spaces, pinned tabs, pinned folders, Favorites,
@@ -16,11 +21,9 @@ history and passwords come over. The pile of open tabs stays behind, so you star
 **1Password works.** Install it from the Chrome Web Store inside Zigzag, like you would in Arc. It talks to the
 1Password app. The first time, add Zigzag in 1Password › Settings › Browser.
 
-**No account.** There's nothing to sign up for or sign in to. Download it and go.
-
-**It can't be switched off.** Zigzag doesn't depend on a server of mine. The only thing I host is the update
-feed, and if that went away, Zigzag would keep working. The engine's security updates come from Apple, with
-macOS. [Privacy](#privacy) lists everything Zigzag connects to on its own.
+**It can't be switched off.** There's no account, and Zigzag doesn't depend on a server of mine. The only thing I
+host is the update feed, and if that went away, Zigzag would keep working. [Privacy](#privacy) lists everything
+Zigzag connects to on its own.
 
 ## See it
 
@@ -30,12 +33,12 @@ macOS. [Privacy](#privacy) lists everything Zigzag connects to on its own.
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/peek.jpg" alt="Peek: a linked Wikipedia article open over the one you're reading"><br><b>Peek.</b> Shift-click a link to glance at it without losing your place.</td>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split view: Python's itertools docs beside a Python console"><br><b>Split view.</b> Drag a tab onto the page to open it beside.</td>
+    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split view: Fonts In Use beside Grilli Type"><br><b>Split View.</b> Drag a tab onto the page to open it beside.</td>
+    <td width="50%"><img src="docs/all-tabs.jpg" alt="Every tab across three spaces shown as cards"><br><b>Every tab at once.</b> ⇧⌘\ shows every space. Type to filter.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="Every tab across three spaces shown as cards"><br><b>Every tab at once.</b> ⇧⌘\ shows every space. Type to filter.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="An essay in Reader, in warm sepia"><br><b>Reader.</b> One click turns a long essay into calm, clear type.</td>
+    <td width="50%"><img src="site/assets/win-peek.webp" alt="A Wikipedia article on typography peeked over the page"><br><b>Peek.</b> Shift-click a link to glance at it without losing your place.</td>
+    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="An essay from The Public Domain Review in Reader"><br><b>Reader.</b> Long reads, without the clutter.</td>
   </tr>
 </table>
 
@@ -53,8 +56,8 @@ macOS. [Privacy](#privacy) lists everything Zigzag connects to on its own.
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
 | **Clear** | Closes tabs you haven't looked at in a while first, and keeps today's. |
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
-| **Ad blocking** | Built in and on, with EasyList and EasyPrivacy. |
-| **Extensions** | From the Chrome Web Store. Most popular ones work; see below for what doesn't. |
+| **Ad blocking** | Built in and on: about 123,000 EasyList and EasyPrivacy rules, compiled into WebKit content rule lists. |
+| **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Dark Reader and most popular ones work; see below for what doesn't. |
 | **Import** | Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox and Zen. |
 | **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), translation, picture in picture, private windows, Web Inspector. |
 
@@ -70,6 +73,27 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 - Some Chrome extension APIs aren't there yet: tab groups, side panel, downloads, bookmarks and history, and Google sign-in inside an extension. Bitwarden installs, but its popup doesn't show.
 - The ad blocking lists update with Zigzag, not on their own.
 - macOS 15.4 or later only.
+
+## How it's built
+
+Zigzag is about 53,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
+engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
+with macOS updates rather than from me.
+
+| Part | How |
+|---|---|
+| **Pages** | One `WKWebView` per tab. Tabs you haven't used in a while can be suspended: the web view is released and the tab keeps its snapshot and state, then reloads when you come back. Private windows use a non-persistent data store. |
+| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. APIs WebKit doesn't have yet get stubs, so most extensions load instead of failing. Native messaging connects 1Password's helper. |
+| **Ad blocking** | EasyList and EasyPrivacy converted ahead of time with SafariConverterLib into content rule lists (`WKContentRuleListStore`), compiled once and cached. |
+| **Passwords** | Saved as Keychain items, so iCloud Keychain syncs them and Touch ID unlocks them. Passkeys go through Apple's browser passkey entitlement. Autofill is a small content script that only fills fields you can see. |
+| **Import** | Reads each browser's own files: Arc's `StorableSidebar.json`, Chromium's bookmarks and SQLite history, Safari's `Bookmarks.plist`, Firefox's `places.sqlite`. Chromium passwords are decrypted with the key from that browser's Keychain item, after macOS asks you. |
+| **Your data** | Spaces, pins and favorites in `Library.json`, open tabs in `Session.json`, history in SQLite, all under `~/Library/Application Support/Zigzag`. Writes are debounced and atomic, and a file that can't be read is set aside, never overwritten. |
+| **Reader** | Mozilla's Readability, run in the page, shown in Zigzag's own typography. |
+| **Updates** | Sparkle 2, with EdDSA-signed updates from zigzagbrowser.com. Releases are signed with Developer ID and notarized. |
+
+The source is organized by feature: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`,
+`CommandBar`, `Desk` (every tab at once), `Peek`, `Window` and `Design` (Zigzag's own drawn controls and design
+tokens). About 190 tests cover importing, passwords, address handling, history and the security fixes.
 
 ## Privacy
 
