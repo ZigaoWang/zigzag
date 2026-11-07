@@ -5,7 +5,7 @@
 // - What YouTube sends about each video is edited before the page reads it: its ad slots (adPlacements, adSlots,
 //   playerAds) and its warnings about blockers (enforcementMessageViewModel) are renamed so nothing finds them. This
 //   is done to the text of its responses (fetch and XHR to /youtubei/), and to the data built into the page.
-// - The spaces ads take in the page are hidden.
+// - The spaces ads take in the page are hidden, and so is YouTube's note blaming a blocker for slow loading.
 // - Should an ad start anyway (YouTube changes often), it's hidden and muted and plays through at 16× (jumping to its
 //   end can stall YouTube's ad player), its Skip pressed as soon as there is one; then the video's own sound and
 //   speed come back as they were.
@@ -100,12 +100,27 @@
   style();
   document.addEventListener('DOMContentLoaded', style);
 
+  // YouTube's note blaming a blocker for slow loading ("Experiencing interruptions? Find out why"): it's about this,
+  // so it's left out. Matched by what it says and where it leads, so YouTube's other notes still show.
+  const blockerNote = /interruptions|ad ?blockers?/i;
+  const quietNotes = () => {
+    for (const note of document.querySelectorAll('tp-yt-paper-toast, yt-notification-action-renderer, ytd-popup-container > *')) {
+      if (note.dataset.zigzagQuiet) continue;
+      const leadsToHelp = !!note.querySelector('a[href*="support.google.com"]');
+      if (blockerNote.test(note.textContent || '') || (leadsToHelp && /why/i.test(note.textContent || ''))) {
+        note.dataset.zigzagQuiet = '1';
+        note.style.setProperty('display', 'none', 'important');
+      }
+    }
+  };
+
   // MARK: If one plays anyway
 
   let before = null;
   const check = () => {
     queued = false;
     if (!blocking) return;
+    quietNotes();
     const player = document.querySelector('.html5-video-player');
     const video = player && player.querySelector('video');
     if (!player || !video) return;
