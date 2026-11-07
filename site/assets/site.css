@@ -463,3 +463,19 @@ main, .nav { max-width: 1240px; }
   /* The picture grows at most to 70% of the width, so a very tall window never blows it up. */
   .hero { --ih: clamp(44.9vw, calc((100svh - 12px - var(--text)) / .535), 70vw); height: calc(var(--text) + var(--ih) * .535); min-height: 0; }
 }
+
+/* The bento, back: white tiles with a hairline, clips and the Web Store on sky, the rest as a short list. */
+.bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 36px; }
+.tile { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 22px; background: #fff; display: flex; flex-direction: column; }
+.tile.wide { grid-column: span 4; } .tile.list { grid-column: span 2; } .tile.half { grid-column: span 3; }
+.tile video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 12px; background: transparent center / cover no-repeat; }
+.tile-sky { border-radius: 12px; overflow: hidden; padding: 4% 5% 0; background: #93C2F1 url(/assets/sky-card.jpg?v=1) center / cover no-repeat;
+  aspect-ratio: 1600 / 1025; display: flex; align-items: flex-end; }
+.tile-sky img { display: block; width: 104%; max-width: none; margin: 0 -2% -3%; height: auto; }
+.tile figcaption { margin: 16px 8px 6px; font-size: 14px; line-height: 1.5; color: var(--soft); }
+.tile b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+.tile.list { justify-content: center; padding: 18px 24px; }
+.tile.list p { margin: 0; padding: 13px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.45; color: var(--soft); }
+.tile.list p:first-child { border-top: 0; }
+.tile.list b { display: block; margin-bottom: 2px; }
+@media (max-width: 760px) { .bento { grid-template-columns: 1fr; } .tile.wide, .tile.list, .tile.half { grid-column: auto; } }
