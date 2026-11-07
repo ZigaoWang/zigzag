@@ -204,14 +204,15 @@ final class GuidedTour: NSView {
         let bar = controller.commandBar.isVisible, peek = controller.peek.isVisible
         let editing = SpaceEditorPanel.current != nil
         let spaceStep = editingNewSpace || confirming?.id == "space"
-        let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep)
+        // The tab overview is the overview step's own screen: the guide stays, to say what to do there.
+        let overviewStep = controller.desk.isVisible && (Tutorial.current?.id == "overview" || confirming?.id == "overview")
+        let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep) || overviewStep
         let aside = !relevant && (controller.hasFloatingPanel || peek)
         // During the Peek step the card sits above the peek, so "Close it" is right there; otherwise it stays beneath
         // everything that floats.
         if let overlay = superview {
             // Over the tab overview too, while it's the step: "every tab, at a glance" is said over it.
-            let overview = controller.desk.isVisible && (Tutorial.current?.id == "overview" || confirming?.id == "overview")
-            let onTop = (peek && Tutorial.current?.id == "peek") || overview
+            let onTop = (peek && Tutorial.current?.id == "peek") || overviewStep
             if onTop, overlay.subviews.last !== self { overlay.addSubview(self) }
             if !onTop, overlay.subviews.first !== self { overlay.addSubview(self, positioned: .below, relativeTo: nil) }
         }
