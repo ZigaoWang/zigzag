@@ -165,9 +165,9 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 @media (max-width: 640px) { .log { padding-top: 40px; } .log h1 { font-size: 30px; } .rel { grid-template-columns: 1fr; gap: 16px; } .rel header { position: static; } }
 
 /* The home page's story, section by section. */
-.intro { display: grid; grid-template-columns: 200px 1fr; gap: 32px; max-width: 880px; margin: 0 auto 140px; }
+.intro { max-width: 760px; margin: 0 auto 140px; text-align: center; }
 .label { margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #2F6FD0; }
-.intro p { margin: 0 0 16px; font-size: 20px; line-height: 1.55; color: var(--soft); text-wrap: pretty; }
+.intro p { margin: 0 0 16px; font-size: 22px; line-height: 1.55; color: var(--soft); text-wrap: pretty; }
 .intro strong { color: var(--ink); font-weight: 600; }
 .feature { margin: 0 0 150px; }
 .feature > h2, .private > h2 { margin: 0; text-align: center; font-size: clamp(30px, 3.6vw, 44px); font-weight: 600; letter-spacing: -0.012em; line-height: 1.1; }
@@ -219,3 +219,47 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .row-text h2 { margin: 0 0 14px; font-size: clamp(28px, 3vw, 38px); font-weight: 600; letter-spacing: -0.012em; line-height: 1.12; }
 .row-text p { margin: 0; font-size: 18px; line-height: 1.6; color: var(--soft); text-wrap: pretty; }
 @media (max-width: 760px) { .row { grid-template-columns: 1fr; gap: 28px; margin-bottom: 96px; } .row.flip .row-text { order: 0; } .stage { border-radius: 20px; } }
+
+/* A component on its own, cut out of the app with its real shadow, rising into place as it comes into view. */
+.stage.comp { display: flex; align-items: flex-start; justify-content: center; height: 500px; overflow: hidden; padding: 56px 40px 0; }
+.stage.comp img { width: 100%; max-width: 640px; margin: 0; }
+.stage.comp.tall { height: 580px; }
+.stage.comp.tall img { width: 290px; max-width: 80%; }
+.reveal.pending { opacity: 0; transform: translateY(28px) scale(.98); }
+.reveal.pending.in { opacity: 1; transform: none; transition: opacity .9s ease, transform 1.1s cubic-bezier(.2, .7, .15, 1); }
+
+/* Everything else: a grid of clips and facts, not one more column of the same. */
+.bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 48px; }
+.tile { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 22px; background: #fff; display: flex; flex-direction: column; }
+.tile.wide { grid-column: span 4; } .tile.list { grid-column: span 2; } .tile.half { grid-column: span 3; }
+.tile video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1025; border-radius: 12px; background: transparent center / cover no-repeat; }
+.tile figcaption { margin: 16px 8px 6px; font-size: 15px; line-height: 1.5; color: var(--soft); }
+.tile b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+.tile.list { justify-content: center; padding: 20px 26px; }
+.tile.list p { margin: 0; padding: 14px 0; border-top: 1px solid var(--line); font-size: 15px; line-height: 1.5; color: var(--soft); }
+.tile.list p:first-child { border-top: 0; }
+.tile.list b { display: block; margin-bottom: 2px; }
+
+/* Arc and privacy, side by side, as plain writing. */
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; margin: 0 0 150px; padding-top: 48px; border-top: 1px solid var(--line); }
+.duo h2, .story h2 { margin: 0 0 16px; font-size: 30px; font-weight: 600; letter-spacing: -0.012em; line-height: 1.15; }
+.duo p { margin: 0 0 14px; font-size: 17px; line-height: 1.65; color: var(--soft); }
+.duo a { color: var(--ink); text-underline-offset: 3px; }
+
+/* The letter and the questions, side by side. */
+.story { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; margin: 0 0 150px; align-items: start; }
+.letter p { margin: 14px 0 0; font-size: 16px; line-height: 1.65; color: var(--soft); }
+.letter p:first-of-type { color: var(--ink); }
+.story h2 .wm { height: .74em; }
+.letter .sign { color: var(--ink); font-weight: 600; }
+.beta-box { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 15px; line-height: 1.6; color: var(--soft); }
+.beta-box b { color: var(--ink); } .beta-box a { color: var(--ink); }
+.story .faq { max-width: none; margin: 0; }
+.story { padding-top: 48px; border-top: 1px solid var(--line); }
+.story .faq details:first-of-type { border-top: 0; }
+.story .faq summary { font-size: 16px; }
+@media (max-width: 760px) {
+  .bento, .duo, .story { grid-template-columns: 1fr; } .tile.wide, .tile.list, .tile.half { grid-column: auto; }
+  .duo, .story { margin-bottom: 96px; gap: 40px; } 
+  .stage.comp { height: 360px; padding: 32px 20px 0; }
+}

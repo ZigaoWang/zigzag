@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://zigzagbrowser.com/assets/og.png">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Zigzag", "applicationCategory": "BrowserApplication", "operatingSystem": "macOS 15.4 or later", "description": "Zigzag is a fast, free web browser for Mac with spaces, a sidebar, split view and peek. Coming from Arc? Bring your spaces and pinned tabs over in one click.", "url": "https://zigzagbrowser.com/", "downloadUrl": "https://zigzagbrowser.com/download/", "image": "https://zigzagbrowser.com/assets/icon-512.png", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "author": {"@type": "Person", "name": "Zigao Wang", "url": "https://zigao.wang"}, "license": "https://www.apache.org/licenses/LICENSE-2.0", "sameAs": ["https://github.com/ZigaoWang/zigzag"]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is Zigzag just an Arc copy?", "acceptedAnswer": {"@type": "Answer", "text": "Arc showed a lot of people that a browser could feel good, and Zigzag is openly inspired by that. But it’s built from scratch, on Safari’s engine instead of Chrome’s, with its own design, and things Arc never had: tabs that tidy themselves, built in ad blocking, and a password manager that imports from any browser. Zigzag isn’t affiliated with The Browser Company."}}, {"@type": "Question", "name": "Will Zigzag shut down like Arc?", "acceptedAnswer": {"@type": "Answer", "text": "It can’t be switched off. There’s no account, and the only server is the update feed. If it went away, Zigzag would keep working on your Mac. Security updates for the engine come straight from Apple with macOS."}}, {"@type": "Question", "name": "Do I need an account?", "acceptedAnswer": {"@type": "Answer", "text": "No. Download it and go."}}, {"@type": "Question", "name": "Is Zigzag finished?", "acceptedAnswer": {"@type": "Answer", "text": "Not yet. It’s in beta, which means it works well for everyday browsing, but some things are still being polished. Updates install automatically, so it keeps getting better on its own."}}, {"@type": "Question", "name": "Is it free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes."}}, {"@type": "Question", "name": "Can I bring my stuff from Arc?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, in one click: spaces, pinned tabs, Favorites, history, and passwords. Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox, and Zen work too."}}, {"@type": "Question", "name": "Does it work with Chrome extensions?", "acceptedAnswer": {"@type": "Answer", "text": "Most popular ones, installed straight from the Chrome Web Store. Some can’t work outside Chrome, and Zigzag tells you upfront instead of breaking silently."}}, {"@type": "Question", "name": "Why Safari’s engine?", "acceptedAnswer": {"@type": "Answer", "text": "It’s fast, light on memory and battery, and Apple keeps it secure."}}, {"@type": "Question", "name": "Is my data private?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. There’s no account, no analytics and no telemetry, and nothing about how you browse is sent to me. Zigzag checks zigzagbrowser.com once a day for updates, sending only its version. Passwords live in your Mac’s Keychain and sync only through your own iCloud. Everything Zigzag connects to on its own is listed in the README on GitHub."}}, {"@type": "Question", "name": "Is Zigzag open source?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The code is under the Apache License 2.0, on GitHub. Read it, build it, fork it. The Zigzag name and icon aren’t part of the license, so a fork needs its own."}}, {"@type": "Question", "name": "Which Macs does it run on?", "acceptedAnswer": {"@type": "Answer", "text": "macOS 15.4 or later."}}]}</script>
-<link rel="stylesheet" href="/assets/site.css?v=1795300000">
+<link rel="stylesheet" href="/assets/site.css?v=1795700000">
 </head>
 <body>
 <header class="hero">
@@ -36,12 +36,9 @@
 </header>
 <main>
   <section class="intro">
-    <p class="label">What it is</p>
-    <div>
       <p><strong>Zigzag is a native Mac browser with a sidebar, spaces, and the calm Arc made you love.</strong> It’s written in Swift on Safari’s engine, so it’s small, fast, and kept secure by Apple.</p>
       <p>There’s no account and nothing to sign up for. Download it and go.</p>
-    </div>
-  </section>
+    </section>
 
   <section class="feature">
     <h2>Spaces, each in its own color.</h2>
@@ -51,25 +48,32 @@
 
   <section class="row">
     <div class="row-text"><h2>⌘T finds anything.</h2><p>Open tabs, history and sites, in one list as you type. Type a site’s name, press Tab, and you’re searching it.</p></div>
-    <div class="stage"><img src="/assets/win-command-bar.webp?v=1" srcset="/assets/win-command-bar-1x.webp?v=1 1x, /assets/win-command-bar.webp?v=1 2x" width="2304" height="1544" loading="lazy" alt="Zigzag with the command bar open, searching git: the Zigzag repository, GitHub Docs and GitHub, with Search GitHub on Tab."></div>
+    <div class="stage comp"><img class="reveal" src="/assets/comp-command-bar.webp?v=1" srcset="/assets/comp-command-bar-1x.webp?v=1 1x, /assets/comp-command-bar.webp?v=1 2x" width="648" height="392" loading="lazy" alt="Zigzag’s command bar, searching git: the Zigzag repository, GitHub Docs and GitHub, with Search GitHub on Tab."></div>
   </section>
 
   <section class="row flip">
-    <div class="row-text"><h2>Make each space yours.</h2><p>A color or a gradient, how much of your desktop shows through the sidebar, and a little grain. It feels like your own room.</p></div>
-    <div class="stage dusk"><img src="/assets/win-space-editor.webp?v=1" srcset="/assets/win-space-editor-1x.webp?v=1 1x, /assets/win-space-editor.webp?v=1 2x" width="2304" height="1544" loading="lazy" alt="Zigzag with the space editor open beside the sidebar: color swatches, a gradient wheel, shade, see-through, clear or frosted glass, and grain."></div>
+    <div class="row-text"><h2>Make each space yours.</h2><p>A color or a gradient, a shade, how much of your desktop shows through, and a little grain. Every space can feel like its own room.</p></div>
+    <div class="stage comp dusk tall"><img class="reveal" src="/assets/comp-space-editor.webp?v=1" srcset="/assets/comp-space-editor-1x.webp?v=1 1x, /assets/comp-space-editor.webp?v=1 2x" width="309" height="648" loading="lazy" alt="Zigzag’s space editor: color swatches, a color wheel, shade, gradient, see-through and grain."></div>
   </section>
 
   <section class="row">
     <div class="row-text"><h2>Peek, then carry on.</h2><p>Shift-click a link to read it over the page you’re on. Close it, and you’re right where you were.</p></div>
-    <div class="stage"><img src="/assets/win-peek.webp?v=1" srcset="/assets/win-peek-1x.webp?v=1 1x, /assets/win-peek.webp?v=1 2x" width="2304" height="1544" loading="lazy" alt="Zigzag with a Wikipedia article on typography peeked over Grilli Type’s site."></div>
+    <div class="stage"><img class="reveal" src="/assets/win-peek.webp?v=2" srcset="/assets/win-peek-1x.webp?v=2 1x, /assets/win-peek.webp?v=2 2x" width="1152" height="772" loading="lazy" alt="Zigzag with a Wikipedia article on typography peeked over Grilli Type’s site."></div>
   </section>
 
   <section class="feature">
-    <h2>And the rest, done right.</h2>
-    <div class="cards three">
-      <figure class="card"><video src="/assets/clips/split.mp4?v=1794000000" poster="/assets/clips/split.jpg?v=1794000000" muted loop playsinline preload="none" aria-label="In a dark space, the Pyodide console tab is dragged onto Python’s itertools docs and opens beside them, where a line of code runs."></video><figcaption><b>Split View</b> Drag a tab onto the page to open it beside.</figcaption></figure>
-      <figure class="card"><video src="/assets/clips/reader.mp4?v=1794000000" poster="/assets/clips/reader.jpg?v=1794000000" muted loop playsinline preload="none" aria-label="An essay from The Public Domain Review opened in Reader, in warm sepia, and scrolled into the text."></video><figcaption><b>Reader</b> One click turns a long essay into calm, clear type.</figcaption></figure>
-      <figure class="card"><video src="/assets/clips/desk.mp4?v=1794100000" poster="/assets/clips/desk.jpg?v=1794100000" muted loop playsinline preload="none" aria-label="Every tab across Work, Personal and Side Project shown as cards, filtered by typing lisb, and a Lisbon travel guide opened."></video><figcaption><b>Every tab at once</b> ⇧⌘\ shows every space. Type to filter.</figcaption></figure>
+    <h2>Everything else, built in.</h2>
+    <div class="bento">
+      <figure class="tile wide"><video src="/assets/clips/split.mp4?v=1795600000" poster="/assets/clips/split.jpg?v=1795600000" muted loop playsinline preload="none" aria-label="Dragging the Fonts In Use tab onto Grilli Type’s page, where it opens beside it."></video><figcaption><b>Split View</b> Drag a tab onto the page to open it beside.</figcaption></figure>
+      <div class="tile list">
+        <p><b>Ad blocking</b> EasyList and EasyPrivacy, on from the start.</p>
+        <p><b>Chrome extensions</b> From the Chrome Web Store. 1Password works.</p>
+        <p><b>Passwords and passkeys</b> In your Keychain, with Touch ID, synced by iCloud.</p>
+        <p><b>Translation</b> Whole pages, with Apple’s on-device Translation.</p>
+        <p><b>And</b> PDFs, full-page screenshots, picture in picture and private windows.</p>
+      </div>
+      <figure class="tile half"><video src="/assets/clips/desk.mp4?v=1795600000" poster="/assets/clips/desk.jpg?v=1795600000" muted loop playsinline preload="none" aria-label="Every tab across Personal, Work and Studio shown as cards, filtered by typing brock, and Josef Müller-Brockmann’s page opened in Studio."></video><figcaption><b>Every tab at once</b> ⇧⌘\ shows every space. Type to filter.</figcaption></figure>
+      <figure class="tile half"><video src="/assets/clips/reader.mp4?v=1795600000" poster="/assets/clips/reader.jpg?v=1795600000" muted loop playsinline preload="none" aria-label="An essay on Veronese’s dogs from The Public Domain Review opened in Reader, and scrolled past its paintings."></video><figcaption><b>Reader</b> One click turns a long essay into calm, clear type.</figcaption></figure>
     </div>
   </section>
 
@@ -87,42 +91,28 @@
     <p class="note">Size of each app in Applications, measured on one Mac in November 2026.</p>
   </section>
 
-  <section class="feature arc">
-    <h2>Coming from Arc?</h2>
-    <div class="points">
-      <div><h3>Your Arc comes with you.</h3><p>Pick Arc in File › Import from Another Browser. Spaces, pinned tabs, folders, Favorites, history and passwords come over. The pile of open tabs stays behind, so you start clean.</p></div>
-      <div><h3>1Password works.</h3><p>Install it from the Chrome Web Store inside Zigzag, like you did in Arc. Most popular extensions work the same way.</p></div>
-      <div><h3>It can’t be switched off.</h3><p>No account, and the only server is the update feed. If it went away, Zigzag would keep working on your Mac.</p></div>
-      <div><h3>The things you used every day.</h3><p>Favorites, pinned folders, a command bar on ⌘T, tabs that tidy themselves, and peek, built in.</p></div>
+  <section class="duo">
+    <div>
+      <h2>Coming from Arc?</h2>
+      <p>Pick Arc in File › Import from Another Browser, and your spaces, pinned tabs, folders, Favorites, history and passwords come over in about a minute. The pile of open tabs stays behind, so you start clean.</p>
+      <p>1Password and most of your extensions install from the Chrome Web Store, the way they did in Arc.</p>
+    </div>
+    <div>
+      <h2>Nothing to collect.</h2>
+      <p>No account, no analytics, no telemetry. Zigzag checks for updates once a day and sends only its version. It doesn’t depend on a server of mine, so it can’t be switched off.</p>
+      <p>The code is on <a href="https://github.com/ZigaoWang/zigzag">GitHub</a>, and the README <a href="https://github.com/ZigaoWang/zigzag#privacy">lists every connection</a> Zigzag makes on its own.</p>
     </div>
   </section>
 
-  <section class="private">
-    <h2>Private, because there’s nothing to collect.</h2>
-    <div class="points">
-      <div><h3>No account, no analytics.</h3><p>Nothing about how you browse is sent to me. Zigzag checks for updates once a day, sending only its version.</p></div>
-      <div><h3>Passwords in your Keychain.</h3><p>Synced by your own iCloud, with Touch ID and passkeys. Import them from any browser.</p></div>
-      <div><h3>Ads blocked, built in.</h3><p>EasyList and EasyPrivacy are on from the start, with nothing to install.</p></div>
-      <div><h3>The code is public.</h3><p>Apache 2.0, on <a href="https://github.com/ZigaoWang/zigzag">GitHub</a>. Every connection Zigzag makes on its own is <a href="https://github.com/ZigaoWang/zigzag#privacy">listed in the README</a>.</p></div>
+  <section class="story">
+    <div class="letter">
+      <h2>Why <span class="wm" role="img" aria-label="Zigzag"></span></h2>
+      <p>In October 2026, The Browser Company announced Arc would shut down on December 22. Arc accounts stop working that day, and with them, a lot of people’s favorite browser.</p><p>I was one of them. So was my friend, who isn’t a browser person at all and usually calls everything trash. This time he said: “I trust you. You can make one. Make it good.”</p><p>So I did. Zigzag keeps what made Arc feel good: the sidebar, spaces, a page that feels like it’s floating, and a browser that gets out of your way. It’s built from scratch on Safari’s engine, so it’s light on your Mac and secure, with updates straight from Apple.</p><p>And it can’t happen again. There’s no account, and the only server is the update feed, so nobody can switch Zigzag off. The code is open source under the Apache License 2.0. If I ever stop working on it, anyone can pick it up and keep going.</p><p>Zigzag is free, made by one person, and built for everyone who loved Arc and doesn’t want to start over.</p>
+      <p class="sign">Zigao</p>
+      <div class="beta-box"><b>It’s a beta.</b> It’s ready to use every day, but you’ll probably find rough edges. That’s where you come in. Found a bug, a site that breaks, or something that just feels off? Tell me. Every message gets read, and a lot of what’s in Zigzag today came from people saying “this bugs me.” <span class="links">Email <a href="mailto:a@zigao.wang">a@zigao.wang</a>, or <a href="https://github.com/ZigaoWang/zigzag/issues">report it on GitHub</a>.</span></div>
     </div>
-  </section>
-
-  <section class="why">
-    <h2>Why <span class="wm" role="img" aria-label="Zigzag"></span></h2>
-    <p>In October 2026, The Browser Company announced Arc would shut down on December 22. Arc accounts stop working that day, and with them, a lot of people’s favorite browser.</p>
-    <p>I was one of them. So was my friend, who isn’t a browser person at all and usually calls everything trash. This time he said: “I trust you. You can make one. Make it good.”</p>
-    <p>So I did. Zigzag keeps what made Arc feel good: the sidebar, spaces, a page that feels like it’s floating, and a browser that gets out of your way. It’s built from scratch on Safari’s engine, so it’s light on your Mac and secure, with updates straight from Apple.</p>
-    <p>And it can’t happen again. There’s no account, and the only server is the update feed, so nobody can switch Zigzag off. The code is open source under the Apache License 2.0. If I ever stop working on it, anyone can pick it up and keep going.</p>
-    <p>Zigzag is free, made by one person, and built for everyone who loved Arc and doesn’t want to start over.</p>
-    <p class="sign">Zigao</p>
-  </section>
-  <section class="beta-note">
-    <h2><span class="wm" role="img" aria-label="Zigzag"></span> is in beta</h2>
-    <p>It’s ready to use every day, but you’ll probably find rough edges. That’s where you come in. Found a bug, a site that breaks, or something that just feels off? Tell me. Every message gets read, and a lot of what’s in Zigzag today came from people saying “this bugs me.”</p>
-    <p class="links">Email <a href="mailto:a@zigao.wang">a@zigao.wang</a>, or <a href="https://github.com/ZigaoWang/zigzag/issues">report it on GitHub</a>.</p>
-  </section>
-  <section class="faq">
-    <h2>Questions</h2>
+    <div class="faq">
+      <h2>Questions</h2>
     <details><summary>Is Zigzag just an Arc copy?</summary><p>Arc showed a lot of people that a browser could feel good, and Zigzag is openly inspired by that. But it’s built from scratch, on Safari’s engine instead of Chrome’s, with its own design, and things Arc never had: tabs that tidy themselves, built in ad blocking, and a password manager that imports from any browser. Zigzag isn’t affiliated with The Browser Company.</p></details>
     <details><summary>Will Zigzag shut down like Arc?</summary><p>It can’t be switched off. There’s no account, and the only server is the update feed. If it went away, Zigzag would keep working on your Mac. Security updates for the engine come straight from Apple with macOS.</p></details>
     <details><summary>Do I need an account?</summary><p>No. Download it and go.</p></details>
@@ -134,7 +124,9 @@
     <details><summary>Is my data private?</summary><p>Yes. There’s no account, no analytics and no telemetry, and nothing about how you browse is sent to me. Zigzag checks zigzagbrowser.com once a day for updates, sending only its version. Passwords live in your Mac’s Keychain and sync only through your own iCloud. <a href="https://github.com/ZigaoWang/zigzag#privacy">Everything Zigzag connects to</a> is listed on GitHub.</p></details>
     <details><summary>Is Zigzag open source?</summary><p>Yes. The code is under the <a href="https://github.com/ZigaoWang/zigzag/blob/main/LICENSE">Apache License 2.0</a>, on <a href="https://github.com/ZigaoWang/zigzag">GitHub</a>. Read it, build it, fork it. The Zigzag name and icon aren’t part of the license, so a fork needs its own.</p></details>
     <details><summary>Which Macs does it run on?</summary><p>macOS 15.4 or later.</p></details>
+  </div>
   </section>
+
   <section class="pitch sky-card">
     <h2>Try <span class="wm" role="img" aria-label="Zigzag"></span></h2>
     <p>It takes a minute to bring everything over from your old browser.</p>
@@ -157,7 +149,7 @@
   // browser drops while it starts or scrolls shows the picture, never a gap. They load and start a screen ahead and
   // pause only once fully off screen, so you never see one restart.
   (function () {
-    var clips = document.querySelectorAll(".clip video, .card video, .stage video");
+    var clips = document.querySelectorAll(".stage video, .tile video");
     clips.forEach(function (v) { if (v.poster) v.style.backgroundImage = "url(" + v.poster + ")"; });
     if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
     var io = new IntersectionObserver(function (es) {
@@ -168,6 +160,9 @@
       });
     }, { rootMargin: "50% 0px" });
     clips.forEach(function (v) { io.observe(v); });
+    var rev = document.querySelectorAll(".reveal");
+    var ro = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); ro.unobserve(e.target); } }); }, { rootMargin: "0px 0px -12% 0px" });
+    rev.forEach(function (el) { el.classList.add("pending"); ro.observe(el); });
   })();
 </script>
 </body>
