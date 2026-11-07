@@ -135,6 +135,13 @@ final class WebStoreOffer: FloatingPanelView {
                           let self else { return }
                     self.icon.image = image
                     self.icon.contentTintColor = nil
+                    // Store icons come square, often on white: set on a rounded tile with a hairline, like an app icon,
+                    // so a square one never reads as a pasted box.
+                    self.icon.wantsLayer = true
+                    self.icon.layer?.cornerCurve = .continuous
+                    self.icon.layer?.masksToBounds = true
+                    self.icon.layer?.borderWidth = 1 / (self.window?.backingScaleFactor ?? 2)
+                    self.needsLayout = true
                 }
             }
         }
@@ -149,6 +156,8 @@ final class WebStoreOffer: FloatingPanelView {
         let h = bounds.height, pad = Tokens.Space.x4, gap = Tokens.Space.x2
         let iconSide = Tokens.Space.x8 + Tokens.Space.x1
         icon.frame = NSRect(x: pad, y: (h - iconSide) / 2, width: iconSide, height: iconSide)
+        icon.layer?.cornerRadius = iconSide * 0.26
+        icon.layer?.borderColor = Tokens.Color.textPrimary.withAlphaComponent(0.1).cgColor
         let cb = close.frame.width
         close.frame.origin = NSPoint(x: bounds.width - pad + Tokens.Space.x1 - cb, y: (h - cb) / 2)
         let aw = add.fittingWidth, bh = Tokens.Page.controlHeight
