@@ -83,9 +83,21 @@ final class BrowserWindow: NSWindow {
                 return false
             }
         }
+        // A page's own shortcuts come first, as in Safari: ⌘S commits in GitHub's editor, ⌘F searches a document,
+        // ⌘D duplicates in a design tool. When the page lets the key pass, WebKit sends it again and the menu takes it.
+        if let key = event.charactersIgnoringModifiers?.lowercased(), Self.pageFirst.contains(where: { $0.key == key && $0.mods == mods }),
+           let view = firstResponder as? NSView, Self.isInPage(view) {
+            return super.performKeyEquivalent(with: event)
+        }
         if let menu = NSApp.mainMenu, menu.performKeyEquivalent(with: event) { return true }
         return super.performKeyEquivalent(with: event)
     }
+
+    /// Shortcuts a web app may use for its document. Tabs, windows and getting around (⌘T, ⌘W, ⌘L, ⌘R…) always stay Zigzag's.
+    private static let pageFirst: [(key: String, mods: NSEvent.ModifierFlags)] = [
+        ("s", .command), ("p", .command), ("f", .command), ("g", .command), ("g", [.command, .shift]),
+        ("e", .command), ("j", .command), ("d", .command),
+    ]
 
     private static func isInPage(_ view: NSView) -> Bool {
         var view: NSView? = view
