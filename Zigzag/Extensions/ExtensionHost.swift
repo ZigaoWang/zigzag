@@ -17,10 +17,10 @@ final class ExtensionHost: NSObject {
 
     private override init() {
         let configuration = WKWebExtensionController.Configuration(identifier: UUID(uuidString: "6F1E2D6A-5B0C-4C1B-9E1A-2A7B5D3C9E10")!)
-        // Extensions here are Chrome Web Store builds, and several choose their code path from the user agent:
-        // told "Safari", they take a Safari branch that expects Safari's own plumbing and stops. Their own pages
-        // and backgrounds say what they were built for; web pages are unaffected.
-        configuration.webViewConfiguration.applicationNameForUserAgent = "Chrome/140.0.0.0 Safari/537.36"
+        // What extensions' requests tell servers is what Zigzag is, as its network traffic shows: a server that checks
+        // (shazam.com's) turns away one that claims Chrome but doesn't look it. Their own code still reads Chrome
+        // (bridge.js), since several choose their code path from navigator.userAgent.
+        configuration.webViewConfiguration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         // Profiles' page preludes reach every extension page through the shared configuration; each runs only on
         // its own extension's pages, before their scripts.
         // The compatibility layer on every extension page too (popups, options), before their own scripts.

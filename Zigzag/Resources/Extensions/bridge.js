@@ -4,6 +4,18 @@
 // when the extension asked for its permission in its manifest, and only when WebKit doesn't already provide it. Calls
 // travel as native messages to "zigzag.bridge"; events come back over a port opened once something listens.
 (() => {
+  // Extensions here are Chrome Web Store builds, and several choose their code path from navigator.userAgent: told
+  // "Safari", they take a Safari branch that expects Safari's own plumbing and stops. So their code reads Chrome, while
+  // what they send to servers stays Zigzag's own, as servers that compare it with the connection expect.
+  const nav = typeof navigator !== 'undefined' ? navigator : null;
+  if (nav && !/Chrome\//.test(nav.userAgent)) {
+    const asChrome = nav.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/140.0.0.0 Safari/537.36');
+    const proto = Object.getPrototypeOf(nav);
+    for (const [key, value] of [['userAgent', asChrome], ['appVersion', asChrome.replace(/^Mozilla\//, '')]]) {
+      try { Object.defineProperty(proto, key, { get: () => value, configurable: true, enumerable: true }); } catch (e) {}
+    }
+  }
+
   // Chrome's way to ask for a tab's (or the screen's) sound is getUserMedia with a `chromeMediaSource`. WebKit doesn't
   // know that field and would hear a plain request for the microphone, so such a request is never passed on: Zigzag
   // answers it with the tab, or refuses. Set up before anything else, so it holds even before the bridge can start.
