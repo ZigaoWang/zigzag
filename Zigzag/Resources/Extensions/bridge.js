@@ -107,6 +107,29 @@
     MAX_SUSTAINED_WRITE_OPERATIONS_PER_MINUTE: 1000000,
   });
 
+  install('downloads', {
+    download: method('downloads', 'download'),
+    search: method('downloads', 'search'),
+    pause: method('downloads', 'pause'),
+    resume: method('downloads', 'resume'),
+    cancel: method('downloads', 'cancel'),
+    erase: method('downloads', 'erase'),
+    removeFile: method('downloads', 'removeFile'),
+    open: (id) => { send('downloads', 'open', [id]).catch((e) => console.warn('chrome.downloads.open:', e.message)); },
+    show: (id) => { send('downloads', 'show', [id]).catch(() => {}); },
+    showDefaultFolder: () => { send('downloads', 'showDefaultFolder', []).catch(() => {}); },
+    getFileIcon: method('downloads', 'getFileIcon'),
+    setUiOptions: method('downloads', 'setUiOptions'),
+    setShelfEnabled: () => {},
+    acceptDanger: method('downloads', 'acceptDanger'),
+    onCreated: event('downloads.onCreated'),
+    onChanged: event('downloads.onChanged'),
+    onErased: event('downloads.onErased'),
+    // Zigzag names files itself; an extension can't step in before it does.
+    onDeterminingFilename: event('downloads.onDeterminingFilename'),
+    State: { IN_PROGRESS: 'in_progress', INTERRUPTED: 'interrupted', COMPLETE: 'complete' },
+  });
+
   install('notifications', {
     // create(id?, options): the ID comes back, made up when none was given.
     create: method('notifications', 'create'),

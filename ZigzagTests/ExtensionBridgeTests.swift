@@ -50,3 +50,14 @@ struct ExtensionBridgeTests {
         #expect(JSONSerialization.isValidJSONObject(plain))
     }
 }
+
+extension ExtensionBridgeTests {
+    /// A name an extension gives a download stays a plain file name inside Downloads.
+    @Test func downloadNamesCantClimbOut() {
+        #expect(BridgeDownloads.safeName("../../evil/report.pdf") == "report.pdf")
+        #expect(BridgeDownloads.safeName("/etc/passwd") == "passwd")
+        #expect(BridgeDownloads.safeName("..\\..\\x.txt") == "x.txt")
+        #expect(BridgeDownloads.safeName(".hidden") == "hidden")
+        #expect(BridgeDownloads.safeName("a:b.txt") == "a-b.txt")
+    }
+}
