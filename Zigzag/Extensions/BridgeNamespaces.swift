@@ -148,6 +148,46 @@ final class BridgeNotifications: BridgeNamespace {
     }
 }
 
+// MARK: - runtime.getContexts
+
+/// `chrome.runtime.getContexts`: which of its pages an extension has open, as Chrome answers. Its background, its
+/// offscreen page, its popup while showing, its side panel while open. Extensions ask before making an offscreen page
+/// (Boost My Bass) or to see whether their popup is open. Every extension may ask about its own pages.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeContexts: BridgeNamespace {
+    static let name = "contexts"
+    static let permission = ""
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        guard fn == "getContexts" else { throw BridgeError.unsupported(Self.name, fn) }
+        let host = ExtensionHost.shared
+        guard let context = host.context(for: extensionID) else { return [Any]() }
+        var found: [[String: Any]] = []
+        let add = { (type: String, url: URL?) in
+            let address = url?.absoluteString ?? ""
+            let origin = url.flatMap { url in url.scheme.map { "\($0)://\(url.host() ?? "")" } } ?? ""
+            found.append(["contextType": type, "contextId": "\(type.lowercased())-\(found.count)", "tabId": -1, "windowId": -1,
+                          "documentId": "\(type.lowercased())-\(extensionID)", "frameId": type == "BACKGROUND" ? -1 : 0,
+                          "documentUrl": address, "documentOrigin": origin, "incognito": false])
+        }
+        let background = (context.webExtension.manifest["background"] as? [String: Any])?["service_worker"] as? String
+        add("BACKGROUND", background.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL })
+        if let url = ExtensionBridge.shared.offscreen.pageURL(for: extensionID) { add("OFFSCREEN_DOCUMENT", url) }
+        if host.isPopupShown(for: extensionID) { add("POPUP", host.lastAction?.popupWebView?.url) }
+        for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && controller.root.sidePanel.extensionID == extensionID {
+            add("SIDE_PANEL", controller.root.sidePanel.webView?.url)
+        }
+        // Chrome's filter: each field given narrows the answer.
+        let filter = args.object(0)
+        if let types = filter["contextTypes"] as? [String] { found = found.filter { types.contains($0["contextType"] as? String ?? "") } }
+        if let urls = filter["documentUrls"] as? [String] { found = found.filter { urls.contains($0["documentUrl"] as? String ?? "") } }
+        if let origins = filter["documentOrigins"] as? [String] { found = found.filter { origins.contains($0["documentOrigin"] as? String ?? "") } }
+        if filter["incognito"] as? Bool == true { found = [] }
+        return found
+    }
+}
+
 // MARK: - system.display
 
 /// `chrome.system.display`: your screens' sizes and places, as Chrome reports them (from the top left of the main
@@ -363,6 +403,8 @@ final class BridgeOffscreen: BridgeNamespace {
     static let name = "offscreen"
     static let permission = "offscreen"
     private var pages: [String: WKWebView] = [:]
+    /// The extension's offscreen page's address, if it has one open (for runtime.getContexts).
+    func pageURL(for extensionID: String) -> URL? { pages[extensionID]?.url }
     /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
     private var host: NSWindow?
 
@@ -410,6 +452,7 @@ final class BridgeOffscreen: BridgeNamespace {
             page.load(URLRequest(url: url))
             await loaded.wait(seconds: 10)
             page.navigationDelegate = nil
+            ExtensionLog.write("offscreen page for \(ExtensionHost.shared.displayName(for: extensionID)) opened: \(url.lastPathComponent)")
             return nil
         case "closeDocument":
             guard pages[extensionID] != nil else { throw BridgeError("No current offscreen document.") }
@@ -708,6 +751,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         /// Which half is listening: the page's Web Audio, or its media elements.
         let world: WKContentWorld
         let script: String
+        /// Its extension needs a moment to start listening after a capture begins.
+        var started = Date()
     }
     private var taps: [String: Tap] = [:]
     /// Tabs named by getMediaStreamId, waiting for the extension to ask for their sound.
@@ -717,6 +762,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         let expires: Date
     }
     private var pending: [String: Pending] = [:]
+    /// Tabs whose capture is being set up.
+    private var starting = Set<UUID>()
     /// Web views given the message handler (in both worlds), so it's added once each.
     private var handled = Set<ObjectIdentifier>()
 
@@ -724,6 +771,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         switch fn {
         case "getMediaStreamId":
             let (tab, _) = try frontTab(for: extensionID)
+            try ensureNotCaptured(tab)
             pending = pending.filter { $0.value.expires > Date() }
             let id = UUID().uuidString
             pending[id] = Pending(extensionID: extensionID, tab: tab, expires: Date().addingTimeInterval(10))
@@ -743,7 +791,10 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 (tab, controller) = try frontTab(for: extensionID)
             }
             guard let webView = tab.webView else { throw BridgeError("Cannot capture a tab here") }
-            for (id, tap) in taps where tap.extensionID == extensionID { stop(id) }
+            try ensureNotCaptured(tab)
+            // Counted as captured from here: a second request while this one starts is refused, not run alongside.
+            starting.insert(tab.id)
+            defer { starting.remove(tab.id) }
             if handled.insert(ObjectIdentifier(webView)).inserted {
                 webView.configuration.userContentController.add(self, contentWorld: Self.world, name: "zigzagTap")
                 webView.configuration.userContentController.add(self, contentWorld: .page, name: "zigzagTap")
@@ -788,6 +839,21 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         return (tab, controller)
     }
 
+    /// As in Chrome, a tab is captured once at a time: a second capture is refused until the first stops (extensions
+    /// expect this, and check before asking again). A capture whose page has gone, or whose extension stopped
+    /// listening, no longer counts.
+    private func ensureNotCaptured(_ tab: Tab) throws {
+        if starting.contains(tab.id) { throw BridgeError("Cannot capture a tab with an active stream.") }
+        for (id, tap) in taps where tap.tabID == tab.id {
+            let listening = Date().timeIntervalSince(tap.started) < 10 || ExtensionBridge.shared.isListened("tabCapture.chunk", by: tap.extensionID)
+            if tap.webView == nil || tap.webView !== tab.webView || !listening {
+                stop(id)
+            } else {
+                throw BridgeError("Cannot capture a tab with an active stream.")
+            }
+        }
+    }
+
     private func stop(_ id: String) {
         guard let tap = taps.removeValue(forKey: id) else { return }
         tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
@@ -802,7 +868,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             // Only from the half that's listening, in the tab it's listening to.
             guard let tap = taps[id], tap.webView === message.webView, tap.world == world else { return }
             // The extension stopped listening (its popup closed): the tap goes too, and the tab's sound comes back.
-            guard ExtensionBridge.shared.isListened("tabCapture.chunk") else { stop(id); return }
+            guard ExtensionBridge.shared.isListened("tabCapture.chunk", by: tap.extensionID) else { stop(id); return }
             ExtensionBridge.shared.emit("tabCapture.chunk", [id, rate, pcm, at], to: tap.extensionID)
         }
     }

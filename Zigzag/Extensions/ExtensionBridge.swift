@@ -19,12 +19,14 @@ final class ExtensionBridge {
     private let namespaces: [String: any BridgeNamespace]
     /// Side panels, which the toolbar's click handling asks first (ExtensionHost.performAction).
     let sidePanel = BridgeSidePanel()
+    /// Offscreen pages, which runtime.getContexts reports.
+    let offscreen = BridgeOffscreen()
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
     private init() {
-        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(),
-                                          BridgeSpeech(), BridgePower(), BridgeOffscreen(), BridgeIdentity(), sidePanel, BridgeTabCapture()]
+        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(),
+                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, BridgeTabCapture()]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 
@@ -59,6 +61,8 @@ final class ExtensionBridge {
     /// Whether the extension asked for a permission in its own manifest (required, or optional and since granted).
     /// The loaded copy's manifest also asks for native messaging, so the package's own is what counts.
     static func allows(_ permission: String, for context: WKWebExtensionContext) -> Bool {
+        // Namespaces about the extension's own pages need no permission.
+        if permission.isEmpty { return true }
         let declared = ExtensionStore.declaredPermissions(context.uniqueIdentifier)
         if declared.required.contains(permission) { return true }
         return declared.optional.contains(permission) && context.hasPermission(WKWebExtension.Permission(rawValue: permission))
@@ -91,7 +95,9 @@ final class ExtensionBridge {
     }
 
     /// Whether any extension listens to an event, so a namespace only watches (idle, say) while someone cares.
-    func isListened(_ event: String) -> Bool { ports.values.contains { $0.events.contains(event) } }
+    func isListened(_ event: String, by extensionID: String? = nil) -> Bool {
+        ports.values.contains { $0.events.contains(event) && (extensionID == nil || $0.id == extensionID) }
+    }
 
     /// Tells every extension listening to `event` (all of them, or only `extensionID`).
     func emit(_ event: String, _ args: [Any], to extensionID: String? = nil) {

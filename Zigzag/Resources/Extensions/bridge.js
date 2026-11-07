@@ -367,6 +367,11 @@
     onStatusChanged: event('tabCapture.onStatusChanged'),
   });
 
+  // runtime.getContexts: Zigzag knows which of the extension's pages are open (its offscreen page, popup, side panel).
+  if (typeof api.runtime.getContexts !== 'function') {
+    try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
+  }
+
   // system.display sits under chrome.system, beside any other system namespace WebKit has.
   if (asked.has('system.display')) {
     for (const target of new Set([globalThis.chrome, globalThis.browser])) {

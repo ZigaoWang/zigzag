@@ -610,7 +610,7 @@ enum ExtensionProfile {
       fill('action', { setBadgeTextColor: done(), getBadgeTextColor: done([0, 0, 0, 255]), getUserSettings: done({ isOnToolbar: true }) });
       fill('tabs', { group: no('Tab groups'), ungroup: done(), discard: done(), highlight: done(), TAB_ID_NONE: -1 });
       fill('windows', { WINDOW_ID_NONE: -1, WINDOW_ID_CURRENT: -2 });
-      // Not getContexts: extensions check for it and fall back to getViews, and an always-empty answer ("no popup
+      // getContexts is the bridge's, with the real answer: an always-empty one ("no popup
       // open") sends some (Bitwarden) into a loop asking again.
       const names = (list, form = (n) => n.toLowerCase()) => Object.freeze(Object.fromEntries(list.map((n) => [n, form(n)])));
       fill('runtime', { onSuspend: event(), onSuspendCanceled: event(), onUpdateAvailable: event(), onRestartRequired: event(),

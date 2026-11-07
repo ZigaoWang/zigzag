@@ -328,7 +328,7 @@ final class BridgeBookmarks: BridgeNamespace {
         let after = snapshot()
         lastSeen = after
         let bridge = ExtensionBridge.shared
-        guard ["bookmarks.onCreated", "bookmarks.onRemoved", "bookmarks.onChanged", "bookmarks.onMoved"].contains(where: bridge.isListened) else { return }
+        guard ["bookmarks.onCreated", "bookmarks.onRemoved", "bookmarks.onChanged", "bookmarks.onMoved"].contains(where: { bridge.isListened($0) }) else { return }
         for id in after.keys where before[id] == nil {
             bridge.emit("bookmarks.onCreated", [id, node(id, depth: 0)])
         }
