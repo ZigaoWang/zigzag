@@ -117,6 +117,7 @@
 		A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91506D36CD561CBD7E11897D /* ContentBlocker.swift */; };
 		A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111BB58676C39406F3B81A0E /* FavoriteTests.swift */; };
 		A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */; };
+		A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */; };
 		A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */; };
 		A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31A2391B831DAAD2A652FCA /* Onboarding.swift */; };
 		A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */; };
@@ -200,6 +201,7 @@
 		0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageScreenshot.swift; sourceTree = "<group>"; };
 		0C67092285DC153FB7BBDFCE /* Materials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Materials.swift; sourceTree = "<group>"; };
 		0C6B64529E363AA584C30979 /* PasswordHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealth.swift; sourceTree = "<group>"; };
+		0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeBookmarks.swift; sourceTree = "<group>"; };
 		0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportBatch.swift; sourceTree = "<group>"; };
 		106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserActions.swift; sourceTree = "<group>"; };
 		111BB58676C39406F3B81A0E /* FavoriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTests.swift; sourceTree = "<group>"; };
@@ -497,6 +499,7 @@
 		85A5F772A833404217E58966 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
+				0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */,
 				F5C531844DCB5F002266118C /* BridgeNamespaces.swift */,
 				9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */,
 				AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */,
@@ -893,6 +896,7 @@
 				A51ADDC4218AC8285461C618 /* Atmosphere.swift in Sources */,
 				087468A86D6129B66892F5D9 /* Autofill.swift in Sources */,
 				2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */,
+				A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */,
 				F2B2D57349048BBF7D703BD1 /* BridgeNamespaces.swift in Sources */,
 				7C8E072F95543D8F9533BB85 /* BrowserActions.swift in Sources */,
 				8E3C385DDEE5EEBB729EF55B /* BrowserRootView.swift in Sources */,

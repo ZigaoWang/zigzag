@@ -84,6 +84,29 @@
 
   install('topSites', { get: method('topSites', 'get') });
 
+  install('bookmarks', {
+    getTree: method('bookmarks', 'getTree'),
+    getSubTree: method('bookmarks', 'getSubTree'),
+    get: method('bookmarks', 'get'),
+    getChildren: method('bookmarks', 'getChildren'),
+    getRecent: method('bookmarks', 'getRecent'),
+    search: method('bookmarks', 'search'),
+    create: method('bookmarks', 'create'),
+    update: method('bookmarks', 'update'),
+    move: method('bookmarks', 'move'),
+    remove: method('bookmarks', 'remove'),
+    removeTree: method('bookmarks', 'removeTree'),
+    onCreated: event('bookmarks.onCreated'),
+    onRemoved: event('bookmarks.onRemoved'),
+    onChanged: event('bookmarks.onChanged'),
+    onMoved: event('bookmarks.onMoved'),
+    onChildrenReordered: event('bookmarks.onChildrenReordered'),
+    onImportBegan: event('bookmarks.onImportBegan'),
+    onImportEnded: event('bookmarks.onImportEnded'),
+    MAX_WRITE_OPERATIONS_PER_HOUR: 1000000,
+    MAX_SUSTAINED_WRITE_OPERATIONS_PER_MINUTE: 1000000,
+  });
+
   install('notifications', {
     // create(id?, options): the ID comes back, made up when none was given.
     create: method('notifications', 'create'),

@@ -21,7 +21,8 @@ final class ExtensionBridge {
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
     private init() {
-        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeNotifications(), BridgeIdle(), BridgeSpeech(), BridgePower()]
+        let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeNotifications(), BridgeIdle(),
+                                          BridgeSpeech(), BridgePower()]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 
@@ -58,6 +59,11 @@ final class ExtensionBridge {
         let declared = ExtensionStore.declaredPermissions(context.uniqueIdentifier)
         if declared.required.contains(permission) { return true }
         return declared.optional.contains(permission) && context.hasPermission(WKWebExtension.Permission(rawValue: permission))
+    }
+
+    /// The same, by the extension's ID, for namespaces that check a further permission ("downloads.open").
+    static func allows(_ permission: String, for extensionID: String) -> Bool {
+        ExtensionHost.shared.context(for: extensionID).map { allows(permission, for: $0) } ?? false
     }
 
     // MARK: Events
@@ -126,6 +132,9 @@ struct BridgeError: Error {
 
 /// The script side of the bridge (Resources/Extensions/bridge.js), run before an extension's own code.
 enum ExtensionBridgeScript {
+    /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
+    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "notifications", "idle", "tts", "power"]
+
     static let source: String = {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
