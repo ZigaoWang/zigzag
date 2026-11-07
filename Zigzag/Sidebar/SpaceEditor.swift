@@ -1446,6 +1446,7 @@ final class SpaceLookEditor: NSView {
 /// Edits one space: its name, and how it looks with `SpaceLookEditor`. Everything shows in the window as you drag,
 /// and saves when you let go.
 final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
+    override var replacesExtensionPopup: Bool { true }
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
     /// The name in the app's voice, as the sidebar shows it.

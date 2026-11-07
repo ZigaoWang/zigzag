@@ -241,6 +241,7 @@ enum DownloadsPanel {
 }
 
 final class DownloadsPanelView: FloatingPanelView {
+    override var replacesExtensionPopup: Bool { true }
     private weak var controller: BrowserWindowController?
     private var rows: [DownloadRowView] = []
     /// Opened by a download landing: just that one (and any others still coming), not the whole list.

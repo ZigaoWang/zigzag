@@ -1273,6 +1273,7 @@ final class DropdownButton: InteractiveView {
 /// Keys: Up and Down move, Return or Space chooses, Esc closes, and typing a name jumps to it. Right-click menus stay
 /// the system's.
 final class MenuPanel: FloatingPanelView {
+    override var replacesExtensionPopup: Bool { true }
     enum Entry {
         case item(Item)
         /// A quiet heading over the items after it ("Save Downloads To").

@@ -71,6 +71,11 @@ final class ExtensionHost: NSObject {
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
 
     /// Stops an extension: its buttons, scripts and background page go away.
+    /// Closes the extension popup showing, when another of Zigzag's panels opens in its place.
+    func closeActionPopup() {
+        if lastAction?.popupPopover?.isShown == true { lastAction?.closePopup() }
+    }
+
     /// When each extension's button was last clicked: some APIs act only in answer to that (tab capture).
     private var actionClicks: [String: Date] = [:]
     func lastActionClick(_ id: String) -> Date { actionClicks[id] ?? .distantPast }

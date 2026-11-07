@@ -508,7 +508,12 @@ class FloatingPanelView: NSView {
     /// Above the window's top edge: where a top-edge panel comes from and goes back to.
     private var offstage: CGFloat { frame.maxY + 12 }
 
+    /// A panel you open in Zigzag (site controls, a menu, Downloads) takes the place of an extension's popup, which
+    /// would otherwise stay open beside it. Notes and toasts leave it be.
+    var replacesExtensionPopup: Bool { false }
+
     func present(always: Bool = false, arrival: Arrival = .pop) {
+        if replacesExtensionPopup, #available(macOS 15.4, *) { ExtensionHost.shared.closeActionPopup() }
         layoutSubtreeIfNeeded()
         recede(true)
         // Shown again while it was leaving: everything the exit left behind goes, so it never stays shrunk or

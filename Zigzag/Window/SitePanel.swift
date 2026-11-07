@@ -5,6 +5,7 @@ import WebKit
 /// extensions in the same grid, and this site's own settings. Rarer things (copying the link, clearing the site's
 /// cache or cookies) wait in the ⋯ menu. Changes apply at once and say so.
 final class SitePanel: FloatingPanelView {
+    override var replacesExtensionPopup: Bool { true }
     private static weak var current: SitePanel?
     static var isOpen: Bool { current?.superview != nil }
     static func isOpen(in window: NSWindow?) -> Bool { isOpen && current?.window === window }
