@@ -559,10 +559,13 @@ enum ExtensionProfile {
     /// Every extension gets the compatibility layer first; some get their own fixes on top.
     static func profile(for id: String) -> Profile? {
         var profile = profiles[id] ?? Profile()
-        // The bridge first (real answers from Zigzag), then stand-ins for what's still missing.
-        profile.backgroundPrelude = ExtensionBridgeScript.source + "\n" + compatibility + (profile.backgroundPrelude ?? "")
+        // Errors reported first (a background that stops as it starts says why), then the bridge (real answers from
+        // Zigzag), then stand-ins for what's still missing.
+        profile.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + (profile.backgroundPrelude ?? "")
         #if DEBUG
-        profile.backgroundPrelude = errorRecorder + (profile.backgroundPrelude ?? "")
+        // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
+        let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
+        profile.backgroundPrelude = errorRecorder + (profile.backgroundPrelude ?? "") + started
         #endif
         return profile
     }
@@ -684,7 +687,7 @@ enum ExtensionProfile {
     static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
 
     private static let profiles: [String: Profile] = [
-        ExtensionStore.onePasswordID: Profile(backgroundPrelude: webSocketShim + diagnostics + onePasswordPrelude, pagePrelude: diagnostics,
+        ExtensionStore.onePasswordID: Profile(backgroundPrelude: webSocketShim + onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         // Its popup app loops in WebKit and never draws (found in the 2026-10-25 test pass).
         "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],

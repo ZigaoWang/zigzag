@@ -25,7 +25,7 @@ final class ExtensionHost: NSObject {
         // its own extension's pages, before their scripts.
         // The compatibility layer on every extension page too (popups, options), before their own scripts.
         configuration.webViewConfiguration.userContentController.addUserScript(
-            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionProfile.compatibility)\n}",
+            WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionProfile.compatibility)\n\(ExtensionBridgeScript.afterCompatibility)\n}",
                          injectionTime: .atDocumentStart, forMainFrameOnly: false))
         // Chrome gives extension pages its system font (and a smaller base size) unless they set their own; many
         // popups rely on it and would otherwise fall to WebKit's default serif. Zero specificity, first in the

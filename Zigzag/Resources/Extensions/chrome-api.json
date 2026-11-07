@@ -1,0 +1,2474 @@
+{
+ "accessibilityFeatures": {
+  "flags": [
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "objects": {
+   "animationPolicy": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "autoclick": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "caretHighlight": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "cursorColor": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "cursorHighlight": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "dictation": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "dockedMagnifier": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "focusHighlight": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "highContrast": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "largeCursor": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "screenMagnifier": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "selectToSpeak": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "spokenFeedback": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "stickyKeys": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "switchAccess": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   },
+   "virtualKeyboard": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   }
+  },
+  "permissions": [
+   "accessibilityFeatures.modify",
+   "accessibilityFeatures.read"
+  ]
+ },
+ "action": {
+  "events": [
+   "onClicked",
+   "onUserSettingsChanged"
+  ],
+  "functions": [
+   "setTitle",
+   "getTitle",
+   "setIcon",
+   "setPopup",
+   "getPopup",
+   "setBadgeText",
+   "getBadgeText",
+   "setBadgeBackgroundColor",
+   "getBadgeBackgroundColor",
+   "setBadgeTextColor",
+   "getBadgeTextColor",
+   "enable",
+   "disable",
+   "isEnabled",
+   "getUserSettings",
+   "openPopup"
+  ]
+ },
+ "alarms": {
+  "events": [
+   "onAlarm"
+  ],
+  "functions": [
+   "create",
+   "get",
+   "getAll",
+   "clear",
+   "clearAll"
+  ],
+  "permissions": [
+   "alarms"
+  ]
+ },
+ "audio": {
+  "events": [
+   "onLevelChanged",
+   "onMuteChanged",
+   "onDeviceListChanged"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "getDevices",
+   "setActiveDevices",
+   "setProperties",
+   "getMute",
+   "setMute"
+  ],
+  "permissions": [
+   "audio"
+  ]
+ },
+ "bookmarks": {
+  "constants": {
+   "MAX_SUSTAINED_WRITE_OPERATIONS_PER_MINUTE": 1000000,
+   "MAX_WRITE_OPERATIONS_PER_HOUR": 1000000,
+   "ROOT_NODE_ID": "0"
+  },
+  "enums": {
+   "FolderType": {
+    "BOOKMARKS_BAR": "bookmarks-bar",
+    "MANAGED": "managed",
+    "MOBILE": "mobile",
+    "OTHER": "other"
+   }
+  },
+  "events": [
+   "onCreated",
+   "onRemoved",
+   "onChanged",
+   "onMoved",
+   "onChildrenReordered",
+   "onImportBegan",
+   "onImportEnded"
+  ],
+  "functions": [
+   "get",
+   "getChildren",
+   "getRecent",
+   "getTree",
+   "getSubTree",
+   "search",
+   "create",
+   "move",
+   "update",
+   "remove",
+   "removeTree"
+  ],
+  "permissions": [
+   "bookmarks"
+  ]
+ },
+ "browsingData": {
+  "functions": [
+   "settings",
+   "remove",
+   "removeAppcache",
+   "removeCache",
+   "removeCacheStorage",
+   "removeCookies",
+   "removeDownloads",
+   "removeFileSystems",
+   "removeFormData",
+   "removeHistory",
+   "removeIndexedDB",
+   "removeLocalStorage",
+   "removePluginData",
+   "removePasswords",
+   "removeServiceWorkers",
+   "removeWebSQL"
+  ],
+  "permissions": [
+   "browsingData"
+  ]
+ },
+ "certificateProvider": {
+  "enums": {
+   "Algorithm": {
+    "RSASSA_PKCS1_V1_5_MD5_SHA1": "RSASSA_PKCS1_v1_5_MD5_SHA1",
+    "RSASSA_PKCS1_V1_5_SHA1": "RSASSA_PKCS1_v1_5_SHA1",
+    "RSASSA_PKCS1_V1_5_SHA256": "RSASSA_PKCS1_v1_5_SHA256",
+    "RSASSA_PKCS1_V1_5_SHA384": "RSASSA_PKCS1_v1_5_SHA384",
+    "RSASSA_PKCS1_V1_5_SHA512": "RSASSA_PKCS1_v1_5_SHA512",
+    "RSASSA_PSS_SHA256": "RSASSA_PSS_SHA256",
+    "RSASSA_PSS_SHA384": "RSASSA_PSS_SHA384",
+    "RSASSA_PSS_SHA512": "RSASSA_PSS_SHA512"
+   },
+   "Error": {
+    "GENERAL_ERROR": "GENERAL_ERROR"
+   },
+   "Hash": {
+    "MD5_SHA1": "MD5_SHA1",
+    "SHA1": "SHA1",
+    "SHA256": "SHA256",
+    "SHA384": "SHA384",
+    "SHA512": "SHA512"
+   },
+   "PinRequestErrorType": {
+    "INVALID_PIN": "INVALID_PIN",
+    "INVALID_PUK": "INVALID_PUK",
+    "MAX_ATTEMPTS_EXCEEDED": "MAX_ATTEMPTS_EXCEEDED",
+    "UNKNOWN_ERROR": "UNKNOWN_ERROR"
+   },
+   "PinRequestType": {
+    "PIN": "PIN",
+    "PUK": "PUK"
+   }
+  },
+  "events": [
+   "onCertificatesUpdateRequested",
+   "onSignatureRequested"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "requestPin",
+   "stopPinRequest",
+   "setCertificates",
+   "reportSignature"
+  ],
+  "permissions": [
+   "certificateProvider"
+  ]
+ },
+ "commands": {
+  "events": [
+   "onCommand"
+  ],
+  "functions": [
+   "getAll"
+  ]
+ },
+ "contentSettings": {
+  "objects": {
+   "autoVerify": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "automaticDownloads": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "camera": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "clipboard": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "cookies": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "fullscreen": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "images": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "javascript": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "location": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "microphone": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "mouselock": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "notifications": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "plugins": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "popups": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   },
+   "unsandboxedPlugins": {
+    "events": [],
+    "functions": [
+     "clear",
+     "get",
+     "set",
+     "getResourceIdentifiers"
+    ]
+   }
+  },
+  "permissions": [
+   "contentSettings"
+  ]
+ },
+ "contextMenus": {
+  "constants": {
+   "ACTION_MENU_TOP_LEVEL_LIMIT": 6
+  },
+  "enums": {
+   "ContextType": {
+    "ACTION": "action",
+    "TAB": "tab"
+   }
+  },
+  "events": [
+   "onClicked"
+  ],
+  "functions": [
+   "create",
+   "update",
+   "remove",
+   "removeAll"
+  ],
+  "permissions": [
+   "contextMenus"
+  ]
+ },
+ "cookies": {
+  "events": [
+   "onChanged"
+  ],
+  "functions": [
+   "get",
+   "getAll",
+   "set",
+   "remove",
+   "getAllCookieStores",
+   "getPartitionKey"
+  ],
+  "permissions": [
+   "cookies"
+  ]
+ },
+ "debugger": {
+  "events": [
+   "onEvent",
+   "onDetach"
+  ],
+  "functions": [
+   "attach",
+   "detach",
+   "sendCommand",
+   "getTargets"
+  ],
+  "permissions": [
+   "debugger"
+  ]
+ },
+ "declarativeContent": {
+  "events": [
+   "onPageChanged"
+  ],
+  "permissions": [
+   "declarativeContent"
+  ]
+ },
+ "declarativeNetRequest": {
+  "constants": {
+   "DYNAMIC_RULESET_ID": "_dynamic",
+   "GETMATCHEDRULES_QUOTA_INTERVAL": 10,
+   "GUARANTEED_MINIMUM_STATIC_RULES": 30000,
+   "MAX_GETMATCHEDRULES_CALLS_PER_INTERVAL": 20,
+   "MAX_NUMBER_OF_DYNAMIC_RULES": 30000,
+   "MAX_NUMBER_OF_ENABLED_STATIC_RULESETS": 50,
+   "MAX_NUMBER_OF_REGEX_RULES": 1000,
+   "MAX_NUMBER_OF_SESSION_RULES": 5000,
+   "MAX_NUMBER_OF_STATIC_RULESETS": 100,
+   "MAX_NUMBER_OF_UNSAFE_DYNAMIC_RULES": 5000,
+   "MAX_NUMBER_OF_UNSAFE_SESSION_RULES": 5000,
+   "SESSION_RULESET_ID": "_session"
+  },
+  "enums": {
+   "DomainType": {
+    "FIRST_PARTY": "firstParty",
+    "THIRD_PARTY": "thirdParty"
+   },
+   "HeaderOperation": {
+    "APPEND": "append",
+    "REMOVE": "remove",
+    "SET": "set"
+   },
+   "RuleActionType": {
+    "ALLOW": "allow",
+    "ALLOW_ALL_REQUESTS": "allowAllRequests",
+    "BLOCK": "block",
+    "MODIFY_HEADERS": "modifyHeaders",
+    "REDIRECT": "redirect",
+    "UPGRADE_SCHEME": "upgradeScheme"
+   },
+   "UnsupportedRegexReason": {
+    "MEMORY_LIMIT_EXCEEDED": "memoryLimitExceeded",
+    "SYNTAX_ERROR": "syntaxError"
+   }
+  },
+  "events": [
+   "onRuleMatchedDebug"
+  ],
+  "functions": [
+   "updateDynamicRules",
+   "getDynamicRules",
+   "updateSessionRules",
+   "getSessionRules",
+   "updateEnabledRulesets",
+   "getEnabledRulesets",
+   "updateStaticRules",
+   "getDisabledRuleIds",
+   "getMatchedRules",
+   "setExtensionActionOptions",
+   "isRegexSupported",
+   "getAvailableStaticRuleCount",
+   "testMatchOutcome"
+  ],
+  "permissions": [
+   "declarativeNetRequest",
+   "declarativeNetRequestWithHostAccess"
+  ]
+ },
+ "desktopCapture": {
+  "functions": [
+   "chooseDesktopMedia",
+   "cancelChooseDesktopMedia"
+  ],
+  "permissions": [
+   "desktopCapture"
+  ]
+ },
+ "devtools.inspectedWindow": {
+  "events": [
+   "onResourceAdded",
+   "onResourceContentCommitted"
+  ],
+  "functions": [
+   "_eval",
+   "reload",
+   "getResources"
+  ]
+ },
+ "devtools.network": {
+  "events": [
+   "onRequestFinished",
+   "onNavigated"
+  ],
+  "functions": [
+   "getHAR"
+  ]
+ },
+ "devtools.panels": {
+  "enums": {
+   "Theme": {
+    "DARK": "dark",
+    "DEFAULT": "default"
+   }
+  },
+  "functions": [
+   "create",
+   "setOpenResourceHandler",
+   "openResource",
+   "setThemeChangeHandler"
+  ],
+  "objects": {
+   "elements": {
+    "events": [
+     "onSelectionChanged"
+    ],
+    "functions": [
+     "createSidebarPane"
+    ]
+   },
+   "sources": {
+    "events": [
+     "onSelectionChanged"
+    ],
+    "functions": [
+     "createSidebarPane"
+    ]
+   }
+  }
+ },
+ "devtools.performance": {
+  "events": [
+   "onProfilingStarted",
+   "onProfilingStopped"
+  ]
+ },
+ "devtools.recorder": {
+  "functions": [
+   "registerRecorderExtensionPlugin",
+   "createView"
+  ]
+ },
+ "dns": {
+  "flags": [
+   "chrome-channel=dev"
+  ],
+  "functions": [
+   "resolve"
+  ],
+  "permissions": [
+   "dns"
+  ]
+ },
+ "documentScan": {
+  "enums": {
+   "Configurability": {
+    "HARDWARE_CONFIGURABLE": "HARDWARE_CONFIGURABLE",
+    "NOT_CONFIGURABLE": "NOT_CONFIGURABLE",
+    "SOFTWARE_CONFIGURABLE": "SOFTWARE_CONFIGURABLE"
+   },
+   "ConstraintType": {
+    "FIXED_LIST": "FIXED_LIST",
+    "FIXED_RANGE": "FIXED_RANGE",
+    "INT_LIST": "INT_LIST",
+    "INT_RANGE": "INT_RANGE",
+    "STRING_LIST": "STRING_LIST"
+   },
+   "OperationResult": {
+    "ACCESS_DENIED": "ACCESS_DENIED",
+    "ADF_EMPTY": "ADF_EMPTY",
+    "ADF_JAMMED": "ADF_JAMMED",
+    "CANCELLED": "CANCELLED",
+    "COVER_OPEN": "COVER_OPEN",
+    "DEVICE_BUSY": "DEVICE_BUSY",
+    "EOF": "EOF",
+    "INTERNAL_ERROR": "INTERNAL_ERROR",
+    "INVALID": "INVALID",
+    "IO_ERROR": "IO_ERROR",
+    "MISSING": "MISSING",
+    "NO_MEMORY": "NO_MEMORY",
+    "SUCCESS": "SUCCESS",
+    "UNKNOWN": "UNKNOWN",
+    "UNREACHABLE": "UNREACHABLE",
+    "UNSUPPORTED": "UNSUPPORTED",
+    "WRONG_TYPE": "WRONG_TYPE"
+   },
+   "OptionType": {
+    "BOOL": "BOOL",
+    "BUTTON": "BUTTON",
+    "FIXED": "FIXED",
+    "GROUP": "GROUP",
+    "INT": "INT",
+    "STRING": "STRING",
+    "UNKNOWN": "UNKNOWN"
+   },
+   "OptionUnit": {
+    "BIT": "BIT",
+    "DPI": "DPI",
+    "MICROSECOND": "MICROSECOND",
+    "MM": "MM",
+    "PERCENT": "PERCENT",
+    "PIXEL": "PIXEL",
+    "UNITLESS": "UNITLESS"
+   }
+  },
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "scan",
+   "getScannerList",
+   "openScanner",
+   "getOptionGroups",
+   "closeScanner",
+   "setOptions",
+   "startScan",
+   "cancelScan",
+   "readScanData"
+  ],
+  "permissions": [
+   "documentScan"
+  ]
+ },
+ "dom": {
+  "functions": [
+   "openOrClosedShadowRoot"
+  ]
+ },
+ "downloads": {
+  "enums": {
+   "DangerType": {
+    "ACCEPTED": "accepted",
+    "ALLOWLISTED_BY_POLICY": "allowlistedByPolicy",
+    "CONTENT": "content",
+    "FILE": "file",
+    "FORCE_SAVE_TO_GDRIVE": "forceSaveToGdrive",
+    "FORCE_SAVE_TO_ONEDRIVE": "forceSaveToOnedrive",
+    "HOST": "host",
+    "SAFE": "safe",
+    "UNCOMMON": "uncommon",
+    "UNWANTED": "unwanted",
+    "URL": "url"
+   }
+  },
+  "events": [
+   "onCreated",
+   "onErased",
+   "onChanged",
+   "onDeterminingFilename"
+  ],
+  "functions": [
+   "download",
+   "search",
+   "pause",
+   "resume",
+   "cancel",
+   "getFileIcon",
+   "open",
+   "show",
+   "showDefaultFolder",
+   "erase",
+   "removeFile",
+   "acceptDanger",
+   "setShelfEnabled",
+   "setUiOptions"
+  ],
+  "permissions": [
+   "downloads"
+  ]
+ },
+ "enterprise.deviceAttributes": {
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "getDirectoryDeviceId",
+   "getDeviceSerialNumber",
+   "getDeviceAssetId",
+   "getDeviceAnnotatedLocation",
+   "getDeviceHostname"
+  ],
+  "permissions": [
+   "enterprise.deviceAttributes"
+  ]
+ },
+ "enterprise.hardwarePlatform": {
+  "flags": [
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "getHardwarePlatformInfo"
+  ],
+  "permissions": [
+   "enterprise.hardwarePlatform"
+  ]
+ },
+ "enterprise.kioskInput": {
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "setCurrentInputMethod"
+  ],
+  "permissions": [
+   "enterprise.kioskInput"
+  ]
+ },
+ "enterprise.login": {
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "exitCurrentManagedGuestSession"
+  ],
+  "permissions": [
+   "enterprise.login"
+  ]
+ },
+ "enterprise.networkingAttributes": {
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "getNetworkDetails"
+  ],
+  "permissions": [
+   "enterprise.networkingAttributes"
+  ]
+ },
+ "enterprise.platformKeys": {
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "getTokens",
+   "getCertificates",
+   "importCertificate",
+   "removeCertificate",
+   "challengeKey",
+   "challengeMachineKey",
+   "challengeUserKey"
+  ],
+  "permissions": [
+   "enterprise.platformKeys"
+  ]
+ },
+ "extension": {
+  "functions": [
+   "getViews",
+   "getBackgroundPage",
+   "isAllowedIncognitoAccess",
+   "isAllowedFileSchemeAccess",
+   "setUpdateUrlData"
+  ]
+ },
+ "extensionTypes": {
+  "enums": {
+   "RunAt": {
+    "DOCUMENT_END": "document_end",
+    "DOCUMENT_IDLE": "document_idle",
+    "DOCUMENT_START": "document_start"
+   }
+  }
+ },
+ "fileBrowserHandler": {
+  "events": [
+   "onExecute"
+  ],
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-disallow-service-workers="
+  ],
+  "permissions": [
+   "fileBrowserHandler"
+  ]
+ },
+ "fileSystemProvider": {
+  "events": [
+   "onUnmountRequested",
+   "onGetMetadataRequested",
+   "onGetActionsRequested",
+   "onReadDirectoryRequested",
+   "onOpenFileRequested",
+   "onCloseFileRequested",
+   "onReadFileRequested",
+   "onCreateDirectoryRequested",
+   "onDeleteEntryRequested",
+   "onCreateFileRequested",
+   "onCopyEntryRequested",
+   "onMoveEntryRequested",
+   "onTruncateRequested",
+   "onWriteFileRequested",
+   "onAbortRequested",
+   "onConfigureRequested",
+   "onMountRequested",
+   "onAddWatcherRequested",
+   "onRemoveWatcherRequested",
+   "onExecuteActionRequested"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "mount",
+   "unmount",
+   "getAll",
+   "get",
+   "notify"
+  ],
+  "permissions": [
+   "fileSystemProvider"
+  ]
+ },
+ "fontSettings": {
+  "events": [
+   "onFontChanged",
+   "onDefaultFontSizeChanged",
+   "onDefaultFixedFontSizeChanged",
+   "onMinimumFontSizeChanged"
+  ],
+  "functions": [
+   "clearFont",
+   "getFont",
+   "setFont",
+   "getFontList",
+   "clearDefaultFontSize",
+   "getDefaultFontSize",
+   "setDefaultFontSize",
+   "clearDefaultFixedFontSize",
+   "getDefaultFixedFontSize",
+   "setDefaultFixedFontSize",
+   "clearMinimumFontSize",
+   "getMinimumFontSize",
+   "setMinimumFontSize"
+  ],
+  "permissions": [
+   "fontSettings"
+  ]
+ },
+ "gcm": {
+  "constants": {
+   "MAX_MESSAGE_SIZE": 4096
+  },
+  "events": [
+   "onMessage",
+   "onMessagesDeleted",
+   "onSendError"
+  ],
+  "functions": [
+   "register",
+   "unregister",
+   "send"
+  ],
+  "permissions": [
+   "gcm"
+  ]
+ },
+ "history": {
+  "enums": {
+   "TransitionType": {
+    "AUTO_BOOKMARK": "auto_bookmark",
+    "AUTO_SUBFRAME": "auto_subframe",
+    "AUTO_TOPLEVEL": "auto_toplevel",
+    "FORM_SUBMIT": "form_submit",
+    "GENERATED": "generated",
+    "KEYWORD": "keyword",
+    "KEYWORD_GENERATED": "keyword_generated",
+    "LINK": "link",
+    "MANUAL_SUBFRAME": "manual_subframe",
+    "RELOAD": "reload",
+    "TYPED": "typed"
+   }
+  },
+  "events": [
+   "onVisited",
+   "onVisitRemoved"
+  ],
+  "functions": [
+   "search",
+   "getVisits",
+   "addUrl",
+   "deleteUrl",
+   "deleteRange",
+   "deleteAll"
+  ],
+  "permissions": [
+   "history"
+  ]
+ },
+ "i18n": {
+  "functions": [
+   "getAcceptLanguages",
+   "getMessage",
+   "getUILanguage",
+   "detectLanguage"
+  ]
+ },
+ "identity": {
+  "enums": {
+   "AccountStatus": {
+    "ANY": "ANY",
+    "SYNC": "SYNC"
+   }
+  },
+  "events": [
+   "onSignInChanged"
+  ],
+  "functions": [
+   "getAccounts",
+   "getAuthToken",
+   "getProfileUserInfo",
+   "removeCachedAuthToken",
+   "clearAllCachedAuthTokens",
+   "launchWebAuthFlow",
+   "getRedirectURL"
+  ],
+  "permissions": [
+   "identity"
+  ]
+ },
+ "idle": {
+  "events": [
+   "onStateChanged"
+  ],
+  "functions": [
+   "queryState",
+   "setDetectionInterval",
+   "getAutoLockDelay"
+  ],
+  "permissions": [
+   "idle"
+  ]
+ },
+ "input.ime": {
+  "events": [
+   "onActivate",
+   "onDeactivated",
+   "onFocus",
+   "onBlur",
+   "onInputContextUpdate",
+   "onKeyEvent",
+   "onCandidateClicked",
+   "onMenuItemActivated",
+   "onSurroundingTextChanged",
+   "onReset",
+   "onAssistiveWindowButtonClicked"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "setComposition",
+   "clearComposition",
+   "commitText",
+   "sendKeyEvents",
+   "hideInputView",
+   "setCandidateWindowProperties",
+   "setCandidates",
+   "setCursorPosition",
+   "setAssistiveWindowProperties",
+   "setAssistiveWindowButtonHighlighted",
+   "setMenuItems",
+   "updateMenuItems",
+   "deleteSurroundingText",
+   "keyEventHandled"
+  ],
+  "permissions": [
+   "input"
+  ]
+ },
+ "instanceID": {
+  "events": [
+   "onTokenRefresh"
+  ],
+  "functions": [
+   "getID",
+   "getCreationTime",
+   "getToken",
+   "deleteToken",
+   "deleteID"
+  ],
+  "permissions": [
+   "gcm"
+  ]
+ },
+ "loginState": {
+  "enums": {
+   "ProfileType": {
+    "LOCK_PROFILE": "LOCK_PROFILE",
+    "SIGNIN_PROFILE": "SIGNIN_PROFILE",
+    "USER_PROFILE": "USER_PROFILE"
+   },
+   "SessionState": {
+    "IN_LOCK_SCREEN": "IN_LOCK_SCREEN",
+    "IN_LOGIN_SCREEN": "IN_LOGIN_SCREEN",
+    "IN_OOBE_SCREEN": "IN_OOBE_SCREEN",
+    "IN_RMA_SCREEN": "IN_RMA_SCREEN",
+    "IN_SESSION": "IN_SESSION",
+    "UNKNOWN": "UNKNOWN"
+   }
+  },
+  "events": [
+   "onSessionStateChanged"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "getProfileType",
+   "getSessionState"
+  ],
+  "permissions": [
+   "loginState"
+  ]
+ },
+ "management": {
+  "events": [
+   "onInstalled",
+   "onUninstalled",
+   "onEnabled",
+   "onDisabled"
+  ],
+  "functions": [
+   "getAll",
+   "get",
+   "getSelf",
+   "getPermissionWarningsById",
+   "getPermissionWarningsByManifest",
+   "setEnabled",
+   "uninstall",
+   "uninstallSelf",
+   "launchApp",
+   "createAppShortcut",
+   "setLaunchType",
+   "generateAppForLink",
+   "installReplacementWebApp"
+  ],
+  "permissions": [
+   "management"
+  ]
+ },
+ "mimeHandler": {
+  "flags": [
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "functions": [
+   "getStreamInfo",
+   "abortAndFallbackToNativeHandler",
+   "setMimeHandlerOptions",
+   "getMimeHandlerOptions"
+  ]
+ },
+ "notifications": {
+  "enums": {
+   "PermissionLevel": {
+    "DENIED": "denied",
+    "GRANTED": "granted"
+   },
+   "TemplateType": {
+    "BASIC": "basic",
+    "IMAGE": "image",
+    "LIST": "list",
+    "PROGRESS": "progress"
+   }
+  },
+  "events": [
+   "onClosed",
+   "onClicked",
+   "onButtonClicked",
+   "onPermissionLevelChanged",
+   "onShowSettings"
+  ],
+  "functions": [
+   "create",
+   "update",
+   "clear",
+   "getAll",
+   "getPermissionLevel"
+  ],
+  "permissions": [
+   "notifications"
+  ]
+ },
+ "offscreen": {
+  "enums": {
+   "Reason": {
+    "AUDIO_PLAYBACK": "AUDIO_PLAYBACK",
+    "BATTERY_STATUS": "BATTERY_STATUS",
+    "BLOBS": "BLOBS",
+    "CLIPBOARD": "CLIPBOARD",
+    "DISPLAY_MEDIA": "DISPLAY_MEDIA",
+    "DOM_PARSER": "DOM_PARSER",
+    "DOM_SCRAPING": "DOM_SCRAPING",
+    "GEOLOCATION": "GEOLOCATION",
+    "IFRAME_SCRIPTING": "IFRAME_SCRIPTING",
+    "LOCAL_STORAGE": "LOCAL_STORAGE",
+    "MATCH_MEDIA": "MATCH_MEDIA",
+    "TESTING": "TESTING",
+    "USER_MEDIA": "USER_MEDIA",
+    "WEB_RTC": "WEB_RTC",
+    "WORKERS": "WORKERS"
+   }
+  },
+  "functions": [
+   "createDocument",
+   "closeDocument",
+   "hasDocument"
+  ],
+  "permissions": [
+   "offscreen"
+  ]
+ },
+ "omnibox": {
+  "events": [
+   "onInputStarted",
+   "onInputChanged",
+   "onInputEntered",
+   "onInputCancelled",
+   "onDeleteSuggestion"
+  ],
+  "functions": [
+   "setDefaultSuggestion"
+  ]
+ },
+ "pageCapture": {
+  "functions": [
+   "saveAsMHTML"
+  ],
+  "permissions": [
+   "pageCapture"
+  ]
+ },
+ "permissions": {
+  "events": [
+   "onAdded",
+   "onRemoved"
+  ],
+  "functions": [
+   "getAll",
+   "contains",
+   "request",
+   "remove",
+   "addHostAccessRequest",
+   "removeHostAccessRequest"
+  ]
+ },
+ "platformKeys": {
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "selectClientCertificates",
+   "getKeyPair",
+   "getKeyPairBySpki",
+   "subtleCrypto",
+   "verifyTLSServerCertificate"
+  ],
+  "permissions": [
+   "platformKeys"
+  ]
+ },
+ "power": {
+  "enums": {
+   "Level": {
+    "DISPLAY": "display",
+    "SYSTEM": "system"
+   }
+  },
+  "functions": [
+   "requestKeepAwake",
+   "releaseKeepAwake",
+   "reportActivity"
+  ],
+  "permissions": [
+   "power"
+  ]
+ },
+ "printerProvider": {
+  "enums": {
+   "PrintError": {
+    "FAILED": "FAILED",
+    "INVALID_DATA": "INVALID_DATA",
+    "INVALID_TICKET": "INVALID_TICKET",
+    "OK": "OK"
+   }
+  },
+  "events": [
+   "onGetPrintersRequested",
+   "onGetUsbPrinterInfoRequested",
+   "onGetCapabilityRequested",
+   "onPrintRequested"
+  ],
+  "flags": [
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "permissions": [
+   "printerProvider"
+  ]
+ },
+ "printing": {
+  "constants": {
+   "MAX_GET_PRINTER_INFO_CALLS_PER_MINUTE": 20,
+   "MAX_SUBMIT_JOB_CALLS_PER_MINUTE": 40
+  },
+  "enums": {
+   "JobStatus": {
+    "CANCELED": "CANCELED",
+    "FAILED": "FAILED",
+    "IN_PROGRESS": "IN_PROGRESS",
+    "PENDING": "PENDING",
+    "PRINTED": "PRINTED"
+   },
+   "PrinterSource": {
+    "POLICY": "POLICY",
+    "USER": "USER"
+   },
+   "PrinterStatus": {
+    "AVAILABLE": "AVAILABLE",
+    "DOOR_OPEN": "DOOR_OPEN",
+    "EXPIRED_CERTIFICATE": "EXPIRED_CERTIFICATE",
+    "GENERIC_ISSUE": "GENERIC_ISSUE",
+    "OUTPUT_FULL": "OUTPUT_FULL",
+    "OUT_OF_INK": "OUT_OF_INK",
+    "OUT_OF_PAPER": "OUT_OF_PAPER",
+    "PAPER_JAM": "PAPER_JAM",
+    "STOPPED": "STOPPED",
+    "TRAY_MISSING": "TRAY_MISSING",
+    "UNREACHABLE": "UNREACHABLE"
+   },
+   "SubmitJobStatus": {
+    "OK": "OK",
+    "USER_REJECTED": "USER_REJECTED"
+   }
+  },
+  "events": [
+   "onJobStatusChanged"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "submitJob",
+   "cancelJob",
+   "getPrinters",
+   "getPrinterInfo",
+   "getJobStatus"
+  ],
+  "permissions": [
+   "printing"
+  ]
+ },
+ "printingMetrics": {
+  "enums": {
+   "ColorMode": {
+    "BLACK_AND_WHITE": "BLACK_AND_WHITE",
+    "COLOR": "COLOR"
+   },
+   "DuplexMode": {
+    "ONE_SIDED": "ONE_SIDED",
+    "TWO_SIDED_LONG_EDGE": "TWO_SIDED_LONG_EDGE",
+    "TWO_SIDED_SHORT_EDGE": "TWO_SIDED_SHORT_EDGE"
+   },
+   "PrintJobSource": {
+    "ANDROID_APP": "ANDROID_APP",
+    "EXTENSION": "EXTENSION",
+    "ISOLATED_WEB_APP": "ISOLATED_WEB_APP",
+    "PRINT_PREVIEW": "PRINT_PREVIEW"
+   },
+   "PrintJobStatus": {
+    "CANCELED": "CANCELED",
+    "FAILED": "FAILED",
+    "PRINTED": "PRINTED"
+   },
+   "PrinterSource": {
+    "POLICY": "POLICY",
+    "USER": "USER"
+   }
+  },
+  "events": [
+   "onPrintJobFinished"
+  ],
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "getPrintJobs"
+  ],
+  "permissions": [
+   "printingMetrics"
+  ]
+ },
+ "privacy": {
+  "objects": {
+   "network": {
+    "properties": {
+     "networkPredictionEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "webRTCIPHandlingPolicy": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     }
+    }
+   },
+   "services": {
+    "properties": {
+     "alternateErrorPagesEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "autofillAddressEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "autofillCreditCardEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "autofillEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "passwordSavingEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "safeBrowsingEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "safeBrowsingExtendedReportingEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "searchSuggestEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "spellingServiceEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "translationServiceEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     }
+    }
+   },
+   "websites": {
+    "properties": {
+     "adMeasurementEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "doNotTrackEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "fledgeEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "hyperlinkAuditingEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "protectedContentEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "referrersEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "thirdPartyCookiesAllowed": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     },
+     "topicsEnabled": {
+      "events": [
+       "onChange"
+      ],
+      "functions": [
+       "get",
+       "set",
+       "clear"
+      ]
+     }
+    }
+   }
+  },
+  "permissions": [
+   "privacy"
+  ]
+ },
+ "processes": {
+  "enums": {
+   "ProcessType": {
+    "SERVICE_WORKER": "service_worker",
+    "WORKER": "worker"
+   }
+  },
+  "events": [
+   "onUpdated",
+   "onUpdatedWithMemory",
+   "onCreated",
+   "onUnresponsive",
+   "onExited"
+  ],
+  "flags": [
+   "chrome-channel=dev"
+  ],
+  "functions": [
+   "getProcessIdForTab",
+   "terminate",
+   "getProcessInfo"
+  ],
+  "permissions": [
+   "processes"
+  ]
+ },
+ "proxy": {
+  "events": [
+   "onProxyError"
+  ],
+  "objects": {
+   "settings": {
+    "events": [
+     "onChange"
+    ],
+    "functions": [
+     "get",
+     "set",
+     "clear"
+    ]
+   }
+  },
+  "permissions": [
+   "proxy"
+  ]
+ },
+ "publicSuffix": {
+  "functions": [
+   "isKnownSuffix",
+   "getKnownSuffix",
+   "getDomain"
+  ],
+  "permissions": [
+   "publicSuffix"
+  ]
+ },
+ "readingList": {
+  "events": [
+   "onEntryAdded",
+   "onEntryRemoved",
+   "onEntryUpdated"
+  ],
+  "functions": [
+   "addEntry",
+   "removeEntry",
+   "updateEntry",
+   "query"
+  ],
+  "permissions": [
+   "readingList"
+  ]
+ },
+ "runtime": {
+  "enums": {
+   "ContextType": {
+    "BACKGROUND": "BACKGROUND",
+    "DEVELOPER_TOOLS": "DEVELOPER_TOOLS",
+    "OFFSCREEN_DOCUMENT": "OFFSCREEN_DOCUMENT",
+    "POPUP": "POPUP",
+    "SIDE_PANEL": "SIDE_PANEL",
+    "TAB": "TAB"
+   },
+   "OnInstalledReason": {
+    "CHROME_UPDATE": "chrome_update",
+    "INSTALL": "install",
+    "SHARED_MODULE_UPDATE": "shared_module_update",
+    "UPDATE": "update"
+   },
+   "OnLoadedReason": {
+    "BROWSER_UPDATE": "browser_update",
+    "ENABLE": "enable",
+    "INSTALL": "install",
+    "RELOAD": "reload",
+    "STARTUP": "startup",
+    "UPDATE": "update"
+   },
+   "OnRestartRequiredReason": {
+    "APP_UPDATE": "app_update",
+    "OS_UPDATE": "os_update",
+    "PERIODIC": "periodic"
+   },
+   "PlatformArch": {
+    "ARM": "arm",
+    "ARM64": "arm64",
+    "MIPS": "mips",
+    "MIPS64": "mips64",
+    "RISCV64": "riscv64",
+    "X86_32": "x86-32",
+    "X86_64": "x86-64"
+   },
+   "PlatformNaclArch": {
+    "ARM": "arm",
+    "MIPS": "mips",
+    "MIPS64": "mips64",
+    "X86_32": "x86-32",
+    "X86_64": "x86-64"
+   },
+   "PlatformOs": {
+    "ANDROID": "android",
+    "CROS": "cros",
+    "LINUX": "linux",
+    "MAC": "mac",
+    "OPENBSD": "openbsd",
+    "WIN": "win"
+   },
+   "RequestUpdateCheckStatus": {
+    "NO_UPDATE": "no_update",
+    "THROTTLED": "throttled",
+    "UPDATE_AVAILABLE": "update_available"
+   }
+  },
+  "events": [
+   "onStartup",
+   "onInstalled",
+   "onEnabled",
+   "onExtensionLoaded",
+   "onSuspend",
+   "onSuspendCanceled",
+   "onUpdateAvailable",
+   "onBrowserUpdateAvailable",
+   "onConnect",
+   "onConnectExternal",
+   "onUserScriptConnect",
+   "onConnectNative",
+   "onMessage",
+   "onMessageExternal",
+   "onUserScriptMessage",
+   "onRestartRequired"
+  ],
+  "functions": [
+   "getBackgroundPage",
+   "openOptionsPage",
+   "getManifest",
+   "getVersion",
+   "getURL",
+   "setUninstallURL",
+   "reload",
+   "requestUpdateCheck",
+   "restart",
+   "restartAfterDelay",
+   "connect",
+   "connectNative",
+   "sendMessage",
+   "sendNativeMessage",
+   "getPlatformInfo",
+   "getPackageDirectoryEntry",
+   "getContexts"
+  ]
+ },
+ "scripting": {
+  "enums": {
+   "ExecutionWorld": {
+    "ISOLATED": "ISOLATED",
+    "MAIN": "MAIN"
+   }
+  },
+  "functions": [
+   "executeScript",
+   "insertCSS",
+   "removeCSS",
+   "registerContentScripts",
+   "getRegisteredContentScripts",
+   "unregisterContentScripts",
+   "updateContentScripts"
+  ],
+  "permissions": [
+   "scripting"
+  ]
+ },
+ "search": {
+  "enums": {
+   "Disposition": {
+    "CURRENT_TAB": "CURRENT_TAB",
+    "NEW_TAB": "NEW_TAB",
+    "NEW_WINDOW": "NEW_WINDOW"
+   }
+  },
+  "functions": [
+   "query"
+  ],
+  "permissions": [
+   "search"
+  ]
+ },
+ "sessions": {
+  "constants": {
+   "MAX_SESSION_RESULTS": 25
+  },
+  "events": [
+   "onChanged"
+  ],
+  "functions": [
+   "getRecentlyClosed",
+   "getDevices",
+   "restore"
+  ],
+  "permissions": [
+   "sessions"
+  ]
+ },
+ "sidePanel": {
+  "events": [
+   "onOpened",
+   "onClosed"
+  ],
+  "flags": [
+   "chrome-platform=chromeos desktop_android linux mac win"
+  ],
+  "functions": [
+   "setOptions",
+   "getOptions",
+   "setPanelBehavior",
+   "getPanelBehavior",
+   "open",
+   "getLayout",
+   "close"
+  ],
+  "permissions": [
+   "sidePanel"
+  ]
+ },
+ "sockets.tcp": {
+  "events": [
+   "onReceive",
+   "onReceiveError"
+  ],
+  "flags": [
+   "chrome-channel=dev",
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "functions": [
+   "create",
+   "update",
+   "setPaused",
+   "setKeepAlive",
+   "setNoDelay",
+   "connect",
+   "disconnect",
+   "secure",
+   "send",
+   "close",
+   "getInfo",
+   "getSockets"
+  ]
+ },
+ "sockets.tcpServer": {
+  "events": [
+   "onAccept",
+   "onAcceptError"
+  ],
+  "flags": [
+   "chrome-channel=dev",
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "functions": [
+   "create",
+   "update",
+   "setPaused",
+   "listen",
+   "disconnect",
+   "close",
+   "getInfo",
+   "getSockets"
+  ]
+ },
+ "sockets.udp": {
+  "events": [
+   "onReceive",
+   "onReceiveError"
+  ],
+  "flags": [
+   "chrome-channel=dev",
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "functions": [
+   "create",
+   "update",
+   "setPaused",
+   "bind",
+   "send",
+   "close",
+   "getInfo",
+   "getSockets",
+   "joinGroup",
+   "leaveGroup",
+   "setMulticastTimeToLive",
+   "setMulticastLoopbackMode",
+   "getJoinedGroups",
+   "setBroadcast"
+  ]
+ },
+ "storage": {
+  "enums": {
+   "AccessLevel": {
+    "TRUSTED_AND_UNTRUSTED_CONTEXTS": "TRUSTED_AND_UNTRUSTED_CONTEXTS",
+    "TRUSTED_CONTEXTS": "TRUSTED_CONTEXTS"
+   }
+  },
+  "events": [
+   "onChanged"
+  ],
+  "objects": {
+   "managed": {
+    "events": [
+     "onChanged"
+    ],
+    "functions": [
+     "get",
+     "getKeys",
+     "getBytesInUse",
+     "set",
+     "remove",
+     "clear",
+     "setAccessLevel"
+    ]
+   }
+  },
+  "permissions": [
+   "storage"
+  ]
+ },
+ "system.cpu": {
+  "functions": [
+   "getInfo"
+  ],
+  "permissions": [
+   "system.cpu"
+  ]
+ },
+ "system.display": {
+  "enums": {
+   "MirrorMode": {
+    "MIXED": "mixed",
+    "NORMAL": "normal",
+    "OFF": "off"
+   }
+  },
+  "events": [
+   "onDisplayChanged"
+  ],
+  "functions": [
+   "getInfo",
+   "getDisplayLayout",
+   "setDisplayProperties",
+   "setDisplayLayout",
+   "enableUnifiedDesktop",
+   "overscanCalibrationStart",
+   "overscanCalibrationAdjust",
+   "overscanCalibrationReset",
+   "overscanCalibrationComplete",
+   "showNativeTouchCalibration",
+   "startCustomTouchCalibration",
+   "completeCustomTouchCalibration",
+   "clearTouchCalibration",
+   "setMirrorMode"
+  ],
+  "permissions": [
+   "system.display"
+  ]
+ },
+ "system.memory": {
+  "functions": [
+   "getInfo"
+  ],
+  "permissions": [
+   "system.memory"
+  ]
+ },
+ "system.network": {
+  "flags": [
+   "chrome-channel=dev"
+  ],
+  "functions": [
+   "getNetworkInterfaces"
+  ],
+  "permissions": [
+   "system.network"
+  ]
+ },
+ "system.storage": {
+  "enums": {
+   "EjectDeviceResultCode": {
+    "FAILURE": "failure",
+    "IN_USE": "in_use",
+    "NO_SUCH_DEVICE": "no_such_device",
+    "SUCCESS": "success"
+   },
+   "StorageUnitType": {
+    "FIXED": "fixed",
+    "REMOVABLE": "removable",
+    "UNKNOWN": "unknown"
+   }
+  },
+  "events": [
+   "onAttached",
+   "onDetached"
+  ],
+  "flags": [
+   "chrome-platform=chromeos linux mac win"
+  ],
+  "functions": [
+   "getInfo",
+   "ejectDevice",
+   "getAvailableCapacity"
+  ],
+  "permissions": [
+   "system.storage"
+  ]
+ },
+ "systemLog": {
+  "flags": [
+   "chrome-platform=chromeos",
+   "chrome-install-location=policy"
+  ],
+  "functions": [
+   "add"
+  ],
+  "permissions": [
+   "systemLog"
+  ]
+ },
+ "tabCapture": {
+  "events": [
+   "onStatusChanged"
+  ],
+  "functions": [
+   "capture",
+   "getCapturedTabs",
+   "getMediaStreamId"
+  ],
+  "permissions": [
+   "tabCapture"
+  ]
+ },
+ "tabGroups": {
+  "constants": {
+   "TAB_GROUP_ID_NONE": -1
+  },
+  "events": [
+   "onCreated",
+   "onUpdated",
+   "onMoved",
+   "onRemoved"
+  ],
+  "functions": [
+   "get",
+   "query",
+   "update",
+   "move"
+  ],
+  "permissions": [
+   "tabGroups"
+  ]
+ },
+ "tabs": {
+  "constants": {
+   "MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND": 2,
+   "SPLIT_VIEW_ID_NONE": -1,
+   "TAB_ID_NONE": -1,
+   "TAB_INDEX_NONE": -1
+  },
+  "enums": {
+   "MutedInfoReason": {
+    "CAPTURE": "capture",
+    "EXTENSION": "extension",
+    "USER": "user"
+   },
+   "ZoomSettingsMode": {
+    "AUTOMATIC": "automatic",
+    "DISABLED": "disabled",
+    "MANUAL": "manual"
+   },
+   "ZoomSettingsScope": {
+    "PER_ORIGIN": "per-origin",
+    "PER_TAB": "per-tab"
+   }
+  },
+  "events": [
+   "onCreated",
+   "onUpdated",
+   "onMoved",
+   "onActivated",
+   "onHighlighted",
+   "onDetached",
+   "onAttached",
+   "onRemoved",
+   "onReplaced",
+   "onZoomChange"
+  ],
+  "functions": [
+   "get",
+   "getCurrent",
+   "connect",
+   "sendMessage",
+   "create",
+   "createSplit",
+   "duplicate",
+   "query",
+   "highlight",
+   "update",
+   "move",
+   "reload",
+   "remove",
+   "group",
+   "ungroup",
+   "unsplit",
+   "detectLanguage",
+   "captureVisibleTab",
+   "setZoom",
+   "getZoom",
+   "setZoomSettings",
+   "getZoomSettings",
+   "discard",
+   "goForward",
+   "goBack"
+  ]
+ },
+ "topSites": {
+  "functions": [
+   "get"
+  ],
+  "permissions": [
+   "topSites"
+  ]
+ },
+ "tts": {
+  "events": [
+   "onVoicesChanged"
+  ],
+  "functions": [
+   "speak",
+   "stop",
+   "pause",
+   "resume",
+   "isSpeaking",
+   "getVoices"
+  ],
+  "permissions": [
+   "tts"
+  ]
+ },
+ "ttsEngine": {
+  "events": [
+   "onSpeak",
+   "onSpeakWithAudioStream",
+   "onStop",
+   "onPause",
+   "onResume",
+   "onInstallLanguageRequest",
+   "onUninstallLanguageRequest",
+   "onLanguageStatusRequest"
+  ],
+  "functions": [
+   "updateVoices",
+   "updateLanguage"
+  ],
+  "permissions": [
+   "ttsEngine"
+  ]
+ },
+ "userScripts": {
+  "enums": {
+   "ExecutionWorld": {
+    "MAIN": "MAIN",
+    "USER_SCRIPT": "USER_SCRIPT"
+   }
+  },
+  "functions": [
+   "register",
+   "getScripts",
+   "unregister",
+   "update",
+   "execute",
+   "configureWorld",
+   "getWorldConfigurations",
+   "resetWorldConfiguration"
+  ],
+  "permissions": [
+   "userScripts"
+  ]
+ },
+ "vpnProvider": {
+  "enums": {
+   "PlatformMessage": {
+    "CONNECTED": "connected",
+    "DISCONNECTED": "disconnected",
+    "ERROR": "error",
+    "LINK_CHANGED": "linkChanged",
+    "LINK_DOWN": "linkDown",
+    "LINK_UP": "linkUp",
+    "RESUME": "resume",
+    "SUSPEND": "suspend"
+   },
+   "UIEvent": {
+    "SHOW_ADD_DIALOG": "showAddDialog",
+    "SHOW_CONFIGURE_DIALOG": "showConfigureDialog"
+   },
+   "VpnConnectionState": {
+    "CONNECTED": "connected",
+    "FAILURE": "failure"
+   }
+  },
+  "events": [
+   "onPlatformMessage",
+   "onPacketReceived",
+   "onConfigRemoved",
+   "onConfigCreated",
+   "onUIEvent"
+  ],
+  "flags": [
+   "chrome-platform=chromeos"
+  ],
+  "functions": [
+   "createConfig",
+   "destroyConfig",
+   "setParameters",
+   "sendPacket",
+   "notifyConnectionStateChanged"
+  ],
+  "permissions": [
+   "vpnProvider"
+  ]
+ },
+ "webAuthenticationProxy": {
+  "events": [
+   "onRemoteSessionStateChange",
+   "onCreateRequest",
+   "onGetRequest",
+   "onIsUvpaaRequest",
+   "onRequestCanceled"
+  ],
+  "flags": [
+   "chrome-platform=linux mac win"
+  ],
+  "functions": [
+   "completeCreateRequest",
+   "completeGetRequest",
+   "completeIsUvpaaRequest",
+   "attach",
+   "detach"
+  ],
+  "permissions": [
+   "webAuthenticationProxy"
+  ]
+ },
+ "webNavigation": {
+  "events": [
+   "onBeforeNavigate",
+   "onCommitted",
+   "onDOMContentLoaded",
+   "onCompleted",
+   "onErrorOccurred",
+   "onCreatedNavigationTarget",
+   "onReferenceFragmentUpdated",
+   "onTabReplaced",
+   "onHistoryStateUpdated"
+  ],
+  "functions": [
+   "getFrame",
+   "getAllFrames"
+  ],
+  "permissions": [
+   "webNavigation"
+  ]
+ },
+ "webRequest": {
+  "constants": {
+   "MAX_HANDLER_BEHAVIOR_CHANGED_CALLS_PER_10_MINUTES": 20
+  },
+  "enums": {
+   "OnAuthRequiredOptions": {
+    "ASYNC_BLOCKING": "asyncBlocking",
+    "BLOCKING": "blocking",
+    "EXTRA_HEADERS": "extraHeaders",
+    "RESPONSE_HEADERS": "responseHeaders"
+   },
+   "OnBeforeRedirectOptions": {
+    "EXTRA_HEADERS": "extraHeaders",
+    "RESPONSE_HEADERS": "responseHeaders"
+   },
+   "OnBeforeRequestOptions": {
+    "BLOCKING": "blocking",
+    "EXTRA_HEADERS": "extraHeaders",
+    "REQUEST_BODY": "requestBody"
+   },
+   "OnBeforeSendHeadersOptions": {
+    "BLOCKING": "blocking",
+    "EXTRA_HEADERS": "extraHeaders",
+    "REQUEST_HEADERS": "requestHeaders"
+   },
+   "OnCompletedOptions": {
+    "EXTRA_HEADERS": "extraHeaders",
+    "RESPONSE_HEADERS": "responseHeaders"
+   },
+   "OnErrorOccurredOptions": {
+    "EXTRA_HEADERS": "extraHeaders"
+   },
+   "OnHeadersReceivedOptions": {
+    "BLOCKING": "blocking",
+    "EXTRA_HEADERS": "extraHeaders",
+    "RESPONSE_HEADERS": "responseHeaders",
+    "SECURITY_INFO": "securityInfo",
+    "SECURITY_INFO_RAW_DER": "securityInfoRawDer"
+   },
+   "OnResponseStartedOptions": {
+    "EXTRA_HEADERS": "extraHeaders",
+    "RESPONSE_HEADERS": "responseHeaders"
+   },
+   "OnSendHeadersOptions": {
+    "EXTRA_HEADERS": "extraHeaders",
+    "REQUEST_HEADERS": "requestHeaders"
+   },
+   "ResourceType": {
+    "CSP_REPORT": "csp_report",
+    "FONT": "font",
+    "IMAGE": "image",
+    "MAIN_FRAME": "main_frame",
+    "MEDIA": "media",
+    "OBJECT": "object",
+    "OTHER": "other",
+    "PING": "ping",
+    "SCRIPT": "script",
+    "STYLESHEET": "stylesheet",
+    "SUB_FRAME": "sub_frame",
+    "WEBBUNDLE": "webbundle",
+    "WEBSOCKET": "websocket",
+    "XMLHTTPREQUEST": "xmlhttprequest"
+   }
+  },
+  "events": [
+   "onBeforeRequest",
+   "onBeforeSendHeaders",
+   "onSendHeaders",
+   "onHeadersReceived",
+   "onAuthRequired",
+   "onResponseStarted",
+   "onBeforeRedirect",
+   "onCompleted",
+   "onErrorOccurred",
+   "onActionIgnored"
+  ],
+  "functions": [
+   "handlerBehaviorChanged"
+  ],
+  "permissions": [
+   "webRequest"
+  ]
+ },
+ "windows": {
+  "constants": {
+   "WINDOW_ID_CURRENT": -2,
+   "WINDOW_ID_NONE": -1
+  },
+  "enums": {
+   "CreateType": {
+    "NORMAL": "normal",
+    "PANEL": "panel",
+    "POPUP": "popup"
+   },
+   "WindowState": {
+    "FULLSCREEN": "fullscreen",
+    "MAXIMIZED": "maximized",
+    "MINIMIZED": "minimized",
+    "NORMAL": "normal"
+   },
+   "WindowType": {
+    "APP": "app",
+    "DEVTOOLS": "devtools",
+    "NORMAL": "normal",
+    "PANEL": "panel",
+    "POPUP": "popup"
+   }
+  },
+  "events": [
+   "onCreated",
+   "onRemoved",
+   "onFocusChanged",
+   "onBoundsChanged"
+  ],
+  "functions": [
+   "get",
+   "getCurrent",
+   "getLastFocused",
+   "getAll",
+   "create",
+   "update",
+   "remove"
+  ]
+ }
+}

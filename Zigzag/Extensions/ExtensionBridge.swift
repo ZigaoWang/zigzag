@@ -149,6 +149,23 @@ enum ExtensionBridgeScript {
               let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
         return text
     }()
+
+    /// Where WebKit answers differently from Chrome, made to answer as Chrome does (webkit-differences.js).
+    static let differences: String = {
+        Bundle.main.url(forResource: "webkit-differences", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+    }()
+
+    /// Everything Zigzag puts before an extension's own code, after the bridge and the compatibility layer.
+    static var afterCompatibility: String { differences + "\n" + surface }
+
+    /// The rest of Chrome's API, from Chrome's own definitions (api-surface.js over chrome-api.json): runs after the
+    /// bridge and the compatibility layer, and fills only what's still missing.
+    static let surface: String = {
+        guard let script = Bundle.main.url(forResource: "api-surface", withExtension: "js").flatMap({ try? String(contentsOf: $0, encoding: .utf8) }),
+              let data = Bundle.main.url(forResource: "chrome-api", withExtension: "json").flatMap({ try? String(contentsOf: $0, encoding: .utf8) })
+        else { return "" }
+        return script.replacingOccurrences(of: "__SURFACE__", with: data)
+    }()
 }
 
 /// One Chrome namespace the bridge answers.
