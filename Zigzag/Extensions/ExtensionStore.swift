@@ -501,7 +501,7 @@ enum ExtensionStore {
     }
 }
 
-/// Per-extension adjustments the host applies, never by editing the package (see EXTENSIONS.md).
+/// Per-extension adjustments the host applies, never by editing the package.
 enum ExtensionProfile {
     struct Profile {
         /// `browser.*` paths hidden from the extension, so it takes its own fallback instead of calling into nothing.
