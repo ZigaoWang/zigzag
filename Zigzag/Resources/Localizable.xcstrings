@@ -3419,6 +3419,41 @@
         }
       }
     },
+    "Close %lld tabs you haven’t been using" : {
+      "comment" : "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close the tab you haven’t been using"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close %lld tabs you haven’t been using"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "关闭 %lld 个你最近没在用的标签页"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Close Folder" : {
       "comment" : "Item in a folder's context menu in the sidebar.",
       "localizations" : {

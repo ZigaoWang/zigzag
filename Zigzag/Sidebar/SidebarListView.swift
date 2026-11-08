@@ -514,7 +514,7 @@ final class SidebarListView: NSView {
     /// With the pointer on Clear, the rows it would close sink back; off it, they come back up.
     private func previewClear(_ on: Bool) {
         guard let manager else { return }
-        let closing = on ? manager.tabsToClear(in: shownSpaceID ?? manager.currentSpaceID) : []
+        let closing = on ? manager.tabsToClear(in: shownSpaceID ?? manager.currentSpaceID).tabs : []
         for view in rows.values {
             guard let row = view as? TabRowView, !row.isBookmark else { continue }
             row.isAboutToClear = closing.contains { $0 === row.tab || (row.partner != nil && $0 === row.partner) }
@@ -708,12 +708,15 @@ final class SidebarListView: NSView {
         case .separator:
             // For the space this list shows: the neighbor sliding in during a swipe has its own tabs.
             let space = shownSpaceID ?? manager.currentSpaceID
-            let closing = manager.tabsToClear(in: space)
+            let (closing, kind) = manager.tabsToClear(in: space)
             // Clear is there whenever it has something to close, and its tooltip says what.
             (view as? SeparatorRowView)?.hasTabs = !closing.isEmpty
             (view as? SeparatorRowView)?.refreshInk()
-            let current = manager.selectedTab(in: space)
-            (view as? SeparatorRowView)?.clearButton.step = closing.contains { $0 === current } ? .last(closing.count) : .others(closing.count)
+            (view as? SeparatorRowView)?.clearButton.step = switch kind {
+            case .unused: .unused(closing.count)
+            case .others: .others(closing.count)
+            case .last: .last(closing.count)
+            }
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }

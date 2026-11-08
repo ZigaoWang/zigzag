@@ -421,21 +421,51 @@ final class TabManager {
         changed.send(.selection)
     }
 
-    /// What Clear closes in a space: every tab but the one you're on (and the page beside it in a split), however
-    /// new; once those are all that's left, them too, leaving the space empty. Never a tab playing sound or in a call.
-    func tabsToClear(in spaceID: UUID) -> [Tab] {
+    /// What Clear closes in a space and why. `unused`: the tabs you've drifted away from, keeping the ones you're
+    /// working with now; once there are none, `others`: every tab but the one you're on (and the page beside it in a
+    /// split); once those are all that's left, `last`: them too, leaving the space empty. Never a tab playing sound
+    /// or in a call.
+    enum ClearKind { case unused, others, last }
+
+    func tabsToClear(in spaceID: UUID, now: Date = Date()) -> (tabs: [Tab], kind: ClearKind) {
         let tabs = self.tabs(in: spaceID)
         let current = selectedTab(in: spaceID)
         let partner = current.flatMap { self.partner(of: $0) }
         let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse }.map(\.id))
-        let ids = Self.clearing(tabs.map(\.id), current: current?.id, partner: partner?.id, busy: busy)
-        return tabs.filter { ids.contains($0.id) }
+        let ages = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) })
+        let (ids, kind) = Self.clearing(tabs.map(\.id), current: current?.id, partner: partner?.id, busy: busy, ages: ages)
+        return (tabs.filter { ids.contains($0.id) }, kind)
     }
 
     /// Clear's choice, by id. While other tabs are left, even only busy ones, yours stay.
-    nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partner: UUID?, busy: Set<UUID>) -> Set<UUID> {
+    nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partner: UUID?, busy: Set<UUID>,
+                                     ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
         let others = tabs.filter { $0 != current && $0 != partner }
-        return Set((others.isEmpty ? tabs : others).filter { !busy.contains($0) })
+        guard !others.isEmpty else { return (Set(tabs.filter { !busy.contains($0) }), .last) }
+        let closable = others.filter { !busy.contains($0) }
+        let newestFirst = closable.sorted { ages[$0, default: 0] < ages[$1, default: 0] }
+        let kept = keptByActivity(newestFirst.map { ages[$0, default: 0] })
+        let unused = Set(newestFirst.dropFirst(kept))
+        return unused.isEmpty ? (Set(closable), .others) : (unused, .unused)
+    }
+
+    /// How many tabs to keep as the ones you're working with now, given how long ago each was last looked at (or
+    /// opened, for one never looked at), newest first. People work in bursts: the tabs of what you're doing now were
+    /// all seen within a short while of each other, and the rest much longer ago. That break shows as the biggest
+    /// jump in age from one tab to the next, measured as a ratio, so 2 minutes against 10 counts as much as 1 hour
+    /// against 5. Ages under a couple of minutes count as equal, so switching back and forth is never a break. The
+    /// break is looked for among the newest dozen, since no one works with more at once; a jump of less than 3 times
+    /// is just steady browsing, with no break, and then the newest five stay.
+    nonisolated static func keptByActivity(_ ages: [TimeInterval]) -> Int {
+        let floor: TimeInterval = 2 * 60, clearJump = 3.0, mostAtOnce = 12, keptWithoutBreak = 5
+        let a = ages.map { max($0, floor) }
+        var best = (ratio: clearJump, kept: -1)
+        for i in 0..<min(mostAtOnce, max(a.count - 1, 0)) {
+            let ratio = a[i + 1] / a[i]
+            // The bigger jump wins; between equal ones, the later, keeping more.
+            if ratio >= best.ratio { best = (ratio, i + 1) }
+        }
+        return best.kept >= 0 ? best.kept : min(keptWithoutBreak, a.count)
     }
 
     /// Ends a drag that opened another space and was dropped there: it becomes the space you're in, its colors and

@@ -940,11 +940,14 @@ final class ClearTabsButton: InteractiveView {
         stateDidChange(animated: false)
     }
 
-    /// What a click does now, and its tooltip says so: every tab but the one you're on, then that one too.
-    enum Step: Equatable { case others(Int), last(Int) }
+    /// What a click does now, and its tooltip says so: the tabs you haven't been using, then every tab but the one
+    /// you're on, then that one too.
+    enum Step: Equatable { case unused(Int), others(Int), last(Int) }
     var step: Step = .others(0) {
         didSet {
             switch step {
+            case .unused(let n):
+                toolTip = String(localized: "Close \(n) tabs you haven’t been using", comment: "Tooltip of the sidebar's Clear button: closes the tabs you haven't looked at in a while, keeping the ones you're working with now.")
             case .others(let n):
                 toolTip = String(localized: "Close the other \(n) tabs", comment: "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.")
             case .last(let n):

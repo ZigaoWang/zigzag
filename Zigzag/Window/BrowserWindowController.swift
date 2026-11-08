@@ -1655,8 +1655,8 @@ extension BrowserWindowController: SidebarDelegate {
     func listNewTab() { commandBar.show(mode: .newTab) }
 
     func listClearTabs() {
-        // Every tab but yours, however new (TabManager.tabsToClear).
-        let closing = tabManager.tabsToClear(in: tabManager.currentSpaceID)
+        // The tabs you've drifted away from, else every tab but yours (TabManager.tabsToClear).
+        let closing = tabManager.tabsToClear(in: tabManager.currentSpaceID).tabs
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing, leavingSpaceEmpty: true)
         showClosedToast(closing.count)

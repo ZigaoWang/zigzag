@@ -53,29 +53,95 @@ struct PickAllTests {
     }
 }
 
-/// Clear closes every tab but yours, however new, and never one playing sound or in a call.
+/// Clear closes the tabs you've drifted away from, keeping the ones you're working with now; with none, every tab
+/// but yours. Never one playing sound or in a call.
 struct ClearTabsTests {
-    let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+    let a = UUID(), b = UUID(), c = UUID(), d = UUID(), e = UUID()
+    let minute: TimeInterval = 60
 
-    @Test func everyTabButYours() {
-        #expect(TabManager.clearing([a, b, c], current: b, partner: nil, busy: []) == [a, c])
+    func ages(_ minutes: [UUID: Double]) -> [UUID: TimeInterval] { minutes.mapValues { $0 * minute } }
+
+    @Test func closesWhatYouDriftedAwayFrom() {
+        let result = TabManager.clearing([a, b, c, d], current: a, partner: nil, busy: [], ages: ages([a: 0, b: 1, c: 3, d: 300]))
+        #expect(result.ids == [d])
+        #expect(result.kind == .unused)
+    }
+
+    @Test func allRecentClosesEveryTabButYours() {
+        let result = TabManager.clearing([a, b, c], current: b, partner: nil, busy: [], ages: ages([a: 1, b: 0, c: 2]))
+        #expect(result.ids == [a, c])
+        #expect(result.kind == .others)
     }
 
     @Test func keepsYourSplitTogether() {
-        #expect(TabManager.clearing([a, b, c, d], current: b, partner: c, busy: []) == [a, d])
+        let result = TabManager.clearing([a, b, c, d], current: b, partner: c, busy: [], ages: ages([a: 1, b: 0, c: 500, d: 2]))
+        #expect(result.ids == [a, d])
     }
 
     @Test func onAPinnedPageItsEveryTab() {
-        #expect(TabManager.clearing([a, b], current: d, partner: nil, busy: []) == [a, b])
+        #expect(TabManager.clearing([a, b], current: e, partner: nil, busy: [], ages: ages([a: 1, b: 2])).ids == [a, b])
     }
 
     @Test func leavesWhatsPlaying() {
-        #expect(TabManager.clearing([a, b, c], current: a, partner: nil, busy: [c]) == [b])
+        let result = TabManager.clearing([a, b, c, d], current: a, partner: nil, busy: [d], ages: ages([a: 0, b: 1, c: 400, d: 500]))
+        #expect(result.ids == [c])
     }
 
     @Test func yoursOnlyOnceTheyAreAllThatsLeft() {
-        #expect(TabManager.clearing([a, b], current: a, partner: b, busy: []) == [a, b])
+        let result = TabManager.clearing([a, b], current: a, partner: b, busy: [], ages: [:])
+        #expect(result.ids == [a, b])
+        #expect(result.kind == .last)
         // A tab still playing beside yours keeps yours open: Clear has nothing to do.
-        #expect(TabManager.clearing([a, b], current: a, partner: nil, busy: [b]).isEmpty)
+        #expect(TabManager.clearing([a, b], current: a, partner: nil, busy: [b], ages: [:]).ids.isEmpty)
+    }
+}
+
+/// The tabs you're working with now: the newest ones, up to the first clear break in how long ago they were seen.
+struct KeptByActivityTests {
+    func kept(minutes: [Double]) -> Int { TabManager.keptByActivity(minutes.map { $0 * 60 }) }
+
+    @Test func aBurstOfTenAmongFiftySevenOlder() {
+        let burst: [Double] = [0.5, 1, 2, 3, 5, 7, 10, 12, 15, 20]
+        let older = (0..<57).map { 60 + Double($0) * 3 }
+        #expect(kept(minutes: burst + older) == 10)
+    }
+
+    @Test func steadyBrowsingKeepsTheNewestFive() {
+        #expect(kept(minutes: (1...30).map { Double($0) * 4 }) == 5)
+        #expect(kept(minutes: (1...30).map { Double($0) }) == 5)
+    }
+
+    @Test func everythingWithinTwoMinutesHasNoBreak() {
+        #expect(kept(minutes: (0..<20).map { Double($0) * 0.1 }) == 5)
+    }
+
+    @Test func twoTabs() {
+        #expect(kept(minutes: [1, 120]) == 1)
+        // Both recent: both stay, and Clear closes every tab but yours instead.
+        #expect(kept(minutes: [1, 3]) == 2)
+    }
+
+    @Test func oneVeryOldTabAmongRecentOnes() {
+        #expect(kept(minutes: [1, 2, 3, 4, 3 * 24 * 60]) == 4)
+    }
+
+    @Test func tabsOpenedInTheBackgroundCountFromWhenTheyOpened() {
+        // Eight looked at in the last few minutes; twenty opened behind them 45 minutes ago and never looked at.
+        #expect(kept(minutes: [0.2, 0.5, 1, 2, 3, 4, 5, 6] + Array(repeating: 45, count: 20)) == 8)
+        // Ten just opened in the background are new, and stay.
+        #expect(kept(minutes: Array(repeating: 0.5, count: 10) + [60, 90, 120]) == 10)
+    }
+
+    @Test func theBiggerBreakWinsOverAnEarlyOne() {
+        // Seen seconds ago, then a few around ten minutes, then the rest hours ago: the hours are the break.
+        #expect(kept(minutes: [0.5, 8, 9, 10, 240, 300]) == 4)
+    }
+
+    @Test func noMoreThanADozenAtOnce() {
+        #expect(kept(minutes: (1...20).map { Double($0) } + [600, 700]) == 5)
+    }
+
+    @Test func none() {
+        #expect(kept(minutes: []) == 0)
     }
 }
