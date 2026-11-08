@@ -5,6 +5,20 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.18] - 2026-11-08
+
+### New
+- Tampermonkey works. Clicking Install on a script (Greasy Fork and other script sites) opens its install page, and your scripts run with their saved settings, cross-site requests and menu commands. Its popup lists the scripts on the page, and its dashboard shows each script's sites. Scripts also run on sites that allow no inline scripts, like GitHub, with no setting to change.
+- Script managers have Chrome's user script API, so Violentmonkey starts and registers your scripts too.
+- An extension's install sheet says when it can run scripts you add.
+- Not yet: after you browse to another site in the same tab, Tampermonkey's popup can still list scripts from the page before (they don't run there), and Violentmonkey's install links don't open its install page.
+
+### Fixed
+- Extensions that keep a live connection to their server in the background no longer freeze, and their popups open when you click them.
+- Turning an extension off and on again no longer tells it it was just installed, so Tampermonkey keeps your scripts switched on.
+- Messages between an extension's own pages and its background arrive whole.
+- Extensions that ask whether they have a permission Zigzag answers for itself get an answer, instead of stopping as they start.
+
 ## [0.5.17] - 2026-11-07
 
 ### New
