@@ -14,11 +14,15 @@ nonisolated enum SafariImporter {
     static func read(_ choice: ChromiumImporter.Choice) -> ImportBatch {
         var batch = ImportBatch()
         if choice.contains(.passwords) {
-            batch.problems.append(ImportProblem(message: "Safari’s passwords are kept by the Passwords app. Export them there (File › Export All Passwords), then choose the file here.", fix: .exportFromApplePasswords))
+            batch.problems.append(ImportProblem(message: String(localized: "Safari’s passwords are kept by the Passwords app. Export them there (File › Export All Passwords), then choose the file here.",
+                                                                comment: "Note in the Import window. File › Export All Passwords is the Passwords app's own menu wording."),
+                                                fix: .exportFromApplePasswords))
         }
         guard choice.contains(.bookmarks) || choice.contains(.history) else { return batch }
         guard hasAccess else {
-            batch.problems.append(ImportProblem(message: "To bring over Safari’s bookmarks and history, export them from Safari (File › Export Browsing Data to File) and choose that file here. Nothing else needs your permission.", fix: .exportFromApplePasswords))
+            batch.problems.append(ImportProblem(message: String(localized: "To bring over Safari’s bookmarks and history, export them from Safari (File › Export Browsing Data to File) and choose that file here. Nothing else needs your permission.",
+                                                                comment: "Note in the Import window. File › Export Browsing Data to File is Safari's own menu wording."),
+                                                fix: .exportFromApplePasswords))
             return batch
         }
         if choice.contains(.bookmarks) { batch.bookmarks = bookmarks() }
@@ -41,7 +45,7 @@ nonisolated enum SafariImporter {
             }
             for child in node["Children"] as? [[String: Any]] ?? [] {
                 let isFolder = child["WebBookmarkType"] as? String == "WebBookmarkTypeList"
-                let name = (child["Title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"
+                let name = (child["Title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Folder", comment: "Name of an imported folder that had none.")
                 walk(child, in: isFolder && depth >= 1 ? path + [name] : path, depth: depth + 1)
             }
         }
@@ -74,7 +78,9 @@ nonisolated enum SafariImporter {
         let unzip = Process()
         unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         unzip.arguments = ["-x", "-k", zip.path, folder.path]
-        let unreadable = ImportProblem(message: "\(zip.lastPathComponent) isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes.", fix: .none)
+        let unreadable = ImportProblem(message: String(localized: "\(zip.lastPathComponent) isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes.",
+                                                              comment: "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording."),
+                                       fix: .none)
         guard (try? unzip.run()) != nil else { batch.problems.append(unreadable); return batch }
         unzip.waitUntilExit()
         guard unzip.terminationStatus == 0 else { batch.problems.append(unreadable); return batch }

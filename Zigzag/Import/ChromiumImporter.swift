@@ -104,7 +104,9 @@ nonisolated enum ChromiumImporter {
         }
         if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) })
             || (profiles.isEmpty && FileManager.default.fileExists(atPath: rootURL(of: browser).path)) {
-            batch.problems.append(ImportProblem(message: "macOS keeps \(browser.name)’s data private until you allow it. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on \(browser.name), then try again.", fix: .fullDiskAccess))
+            batch.problems.append(ImportProblem(message: String(localized: "macOS keeps \(browser.name)’s data private until you allow it. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on \(browser.name), then try again.",
+                                                                comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; System Settings › Privacy & Security › Files & Folders is macOS's own wording."),
+                                                fix: .fullDiskAccess))
             return batch
         }
         let cookieFiles = choice.contains(.cookies)
@@ -125,16 +127,25 @@ nonisolated enum ChromiumImporter {
             // Never a quiet zero: passwords that are there but wouldn't open are said, with a way to try again.
             if unreadable > 0 {
                 let message = batch.logins.isEmpty
-                    ? "Zigzag couldn’t open \(browser.name)’s passwords. Quit \(browser.name), then try again."
-                    : "\(unreadable) \(unreadable == 1 ? "password" : "passwords") from \(browser.name) couldn’t be opened. Quit \(browser.name), then try again."
+                    ? String(localized: "Zigzag couldn’t open \(browser.name)’s passwords. Quit \(browser.name), then try again.",
+                             comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome.")
+                    : String(localized: "\(unreadable) passwords from \(browser.name) couldn’t be opened. Quit \(browser.name), then try again.",
+                             comment: "Problem in the Import window: how many passwords couldn't be opened, then a browser's name, like Chrome.")
                 batch.problems.append(ImportProblem(message: message, fix: .retry, retries: Choice.passwords.rawValue))
             }
         case .failure(.denied)?:
             // Everything else still comes over; only what needs the key waits for Try Again.
             let both = wantsPasswords && !cookieFiles.isEmpty
-            let what = both ? "passwords and sign-ins" : wantsPasswords ? "passwords" : "sign-ins"
             let scope: Choice = both ? [.passwords, .cookies] : wantsPasswords ? .passwords : .cookies
-            batch.problems.append(ImportProblem(message: "\(browser.name)’s \(what) stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.", fix: .retry, retries: scope.rawValue))
+            let message = both
+                ? String(localized: "\(browser.name)’s passwords and sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.",
+                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.")
+                : wantsPasswords
+                ? String(localized: "\(browser.name)’s passwords stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.",
+                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.")
+                : String(localized: "\(browser.name)’s sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.",
+                         comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.")
+            batch.problems.append(ImportProblem(message: message, fix: .retry, retries: scope.rawValue))
         default:
             break  // No key saved there: no passwords to say anything about.
         }
@@ -325,7 +336,8 @@ nonisolated enum ChromiumImporter {
                 result.append(ImportBatch.Bookmark(url: url, title: node["name"] as? String ?? url.host() ?? string, folders: path))
             }
             for child in node["children"] as? [[String: Any]] ?? [] {
-                let inner = child["type"] as? String == "folder" ? path + [(child["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder"] : path
+                let unnamed = String(localized: "Folder", comment: "Name of an imported folder that had none.")
+                let inner = child["type"] as? String == "folder" ? path + [(child["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? unnamed] : path
                 walk(child, in: inner)
             }
         }

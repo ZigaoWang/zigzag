@@ -62,7 +62,9 @@ nonisolated enum CSVImporter {
             batch.logins.append(login)
         }
         if skipped > 0 {
-            batch.problems.append(ImportProblem(message: "\(skipped) entr\(skipped == 1 ? "y" : "ies") had no website or no password, so \(skipped == 1 ? "it was" : "they were") left out.", fix: .none))
+            batch.problems.append(ImportProblem(message: String(localized: "\(skipped) entries had no website or no password, so they were left out.",
+                                                                    comment: "Problem in the Import window after reading a passwords file: how many entries were left out."),
+                                                fix: .none))
         }
         return batch.logins.isEmpty && skipped == 0 ? .failure(.empty) : .success((format, batch))
     }

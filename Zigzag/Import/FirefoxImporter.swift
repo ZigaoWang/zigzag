@@ -90,12 +90,17 @@ nonisolated enum FirefoxImporter {
             switch key(in: profile, primaryPassword: primaryPassword) {
             case .failure(.primaryPassword):
                 if !batch.problems.contains(where: { $0.fix == .primaryPassword }) {
-                    let message = primaryPassword.isEmpty ? "\(browser.name) has a primary password. Type it to bring its passwords over."
-                        : "That isn’t \(browser.name)’s primary password. Check it and try again."
+                    let message = primaryPassword.isEmpty
+                        ? String(localized: "\(browser.name) has a primary password. Type it to bring its passwords over.",
+                                 comment: "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term.")
+                        : String(localized: "That isn’t \(browser.name)’s primary password. Check it and try again.",
+                                 comment: "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term.")
                     batch.problems.append(ImportProblem(message: message, fix: .primaryPassword))
                 }
             case .failure(.unreadable):
-                batch.problems.append(ImportProblem(message: "\(browser.name)’s passwords are in a format Zigzag can’t read. Export them from \(browser.name)’s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
+                batch.problems.append(ImportProblem(message: String(localized: "\(browser.name)’s passwords are in a format Zigzag can’t read. Export them from \(browser.name)’s Passwords page as a CSV file, then choose it here.",
+                                                                    comment: "Problem in the Import window. The placeholder is a browser's name, like Firefox."),
+                                                    fix: .exportFromApplePasswords))
             case .success(let key):
                 for login in logins {
                     guard let host = login["hostname"] as? String, let url = URL(string: host),
@@ -115,7 +120,9 @@ nonisolated enum FirefoxImporter {
             var count: Int64 = 0
             reader.rows("SELECT (SELECT count(*) FROM loginsL WHERE is_deleted = 0) + (SELECT count(*) FROM loginsM WHERE is_deleted = 0)") { count = $0.int(0) }
             if count > 0 {
-                batch.problems.append(ImportProblem(message: "\(browser.name) keeps its \(count) passwords in a newer format Zigzag can’t read yet. Export them from \(browser.name)’s Passwords page as a CSV file, then choose it here.", fix: .exportFromApplePasswords))
+                batch.problems.append(ImportProblem(message: String(localized: "\(browser.name) keeps its \(count) passwords in a newer format Zigzag can’t read yet. Export them from \(browser.name)’s Passwords page as a CSV file, then choose it here.",
+                                                                    comment: "Problem in the Import window. The placeholders are a browser's name, like Firefox, and how many passwords it has."),
+                                                    fix: .exportFromApplePasswords))
             }
         }
     }
@@ -215,7 +222,7 @@ nonisolated enum FirefoxImporter {
         func path(_ id: Int64) -> [String] {
             var names: [String] = [], at = id, steps = 0
             while let folder = folders[at], !folder.isRoot, steps < 32 {
-                names.insert(folder.name.isEmpty ? "Folder" : folder.name, at: 0)
+                names.insert(folder.name.isEmpty ? String(localized: "Folder", comment: "Name of an imported folder that had none.") : folder.name, at: 0)
                 at = folder.parent
                 steps += 1
             }

@@ -69,8 +69,10 @@ nonisolated enum SignInImporter {
     static func note(unreadable: Int, broughtAny: Bool, from browser: String) -> String? {
         guard unreadable > 0 else { return nil }
         return broughtAny
-            ? "A few of your sign-ins from \(browser) couldn’t come over, so some sites may ask you to sign in again."
-            : "Your sign-ins from \(browser) couldn’t come over, so sites will ask you to sign in again."
+            ? String(localized: "A few of your sign-ins from \(browser) couldn’t come over, so some sites may ask you to sign in again.",
+                     comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.")
+            : String(localized: "Your sign-ins from \(browser) couldn’t come over, so sites will ask you to sign in again.",
+                     comment: "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.")
     }
 
     /// Whether a browser keeps any sign-ins, for the line under its name; nothing is decrypted or read out.

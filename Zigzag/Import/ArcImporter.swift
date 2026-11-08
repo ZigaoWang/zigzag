@@ -14,16 +14,29 @@ enum ArcImporter {
 
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Zigzag", category: "import")
 
+    /// What of Arc's couldn't be read.
+    private enum Part: String { case history, sidebar = "spaces and pinned tabs" }
+
     /// Turns a file error into something to show: macOS refusing access gets the fix that opens its setting.
-    private static func problem(reading what: String, _ error: Error, retries: Int = 8) -> ImportProblem {
+    private static func problem(reading part: Part, _ error: Error, retries: Int = 8) -> ImportProblem {
         let ns = error as NSError
-        log.error("Arc import: couldn't read \(what, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
+        log.error("Arc import: couldn't read \(part.rawValue, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
         let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
             || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
         if denied {
-            return ImportProblem(message: "macOS didn’t let Zigzag read Arc’s \(what). In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.", fix: .fullDiskAccess)
+            let message = switch part {
+            case .history: String(localized: "macOS didn’t let Zigzag read Arc’s history. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.",
+                                  comment: "Problem in the Import window. Arc is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.")
+            case .sidebar: String(localized: "macOS didn’t let Zigzag read Arc’s spaces and pinned tabs. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.",
+                                  comment: "Problem in the Import window. Arc is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.")
+            }
+            return ImportProblem(message: message, fix: .fullDiskAccess)
         }
-        return ImportProblem(message: "Zigzag couldn’t read Arc’s \(what). Try again.", fix: .retry, retries: retries)
+        let message = switch part {
+        case .history: String(localized: "Zigzag couldn’t read Arc’s history. Try again.", comment: "Problem in the Import window. Arc is a browser's name.")
+        case .sidebar: String(localized: "Zigzag couldn’t read Arc’s spaces and pinned tabs. Try again.", comment: "Problem in the Import window. Arc is a browser's name.")
+        }
+        return ImportProblem(message: message, fix: .retry, retries: retries)
     }
 
     nonisolated static var arcSupport: URL {
@@ -47,7 +60,7 @@ enum ArcImporter {
     }
 
     /// Trying again reads history only (`Choice.history`), never the sidebar a second time.
-    static func historyProblem(_ error: Error) -> ImportProblem { problem(reading: "history", error, retries: 4) }
+    static func historyProblem(_ error: Error) -> ImportProblem { problem(reading: .history, error, retries: 4) }
 
     /// Spaces, pinned tabs and Favorites.
     @discardableResult
@@ -57,7 +70,7 @@ enum ArcImporter {
         do {
             (spaces, favorites) = try readSidebar()
         } catch {
-            result.problems.append(problem(reading: "spaces and pinned tabs", error))
+            result.problems.append(problem(reading: .sidebar, error))
             (spaces, favorites) = ([], [])
         }
         var newSpaces = spaces
@@ -142,7 +155,7 @@ enum ArcImporter {
 
         var spaces: [SpaceInfo] = []
         for case let space as [String: Any] in main["spaces"] as? [Any] ?? [] {
-            let name = (space["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Space \(spaces.count + 1)"
+            let name = (space["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Space \(spaces.count + 1)", comment: "Name of an imported space that had none in Arc: Space 1, Space 2…")
             let containerIDs = space["containerIDs"] as? [Any] ?? []
             var pinnedID: String?
             for (i, value) in containerIDs.enumerated() where (value as? String) == "pinned" && i + 1 < containerIDs.count {
@@ -154,7 +167,8 @@ enum ArcImporter {
                 var folders: [BookmarkFolder] = []
                 func addFolder(_ id: String, parent: UUID?, depth: Int) {
                     guard depth < 8, let node = items[id] else { return }
-                    var folder = BookmarkFolder(name: (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Folder")
+                    var folder = BookmarkFolder(name: (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                                                ?? String(localized: "Folder", comment: "Name of an imported folder that had none."))
                     folder.parentID = parent
                     let at = folders.count
                     folders.append(folder)
