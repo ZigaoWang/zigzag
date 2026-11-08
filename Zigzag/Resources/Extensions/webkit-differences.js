@@ -92,6 +92,15 @@
       if (has) setMember(['cookies', 'onChanged'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
+    // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
+    if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {
+      setMember(['webRequest'], 'handlerBehaviorChanged', (callback) => {
+        if (typeof callback === 'function') { setTimeout(() => callback(), 0); return undefined; }
+        return Promise.resolve();
+      });
+    }
+
     // runtime.requestUpdateCheck: Zigzag updates extensions itself; as in Chrome when none is waiting, "no update".
     if (typeof api.runtime.requestUpdateCheck !== 'function') {
       setMember(['runtime'], 'requestUpdateCheck', (callback) => {
