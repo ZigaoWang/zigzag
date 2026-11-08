@@ -128,6 +128,7 @@ enum DebugBridge {
                 controller.tabManager.currentTabs[Int(n[0])].lastActivated = Date().addingTimeInterval(-n[1] * 3600)
                 controller.sidebar.list.refreshRows()
             }
+        case "edgedrag": controller.root.debugEdgeDrag(arg)
         case "sidebarwidth":
             // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
             if let n = Double(arg) {

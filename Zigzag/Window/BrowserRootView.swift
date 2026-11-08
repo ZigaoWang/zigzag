@@ -925,6 +925,17 @@ final class BrowserRootView: ColorView {
 
     /// True while the sidebar is in its floating, slid-in state.
     var isSidebarFloatingVisible: Bool { !sidebarVisible && sidebarRevealed }
+
+    #if DEBUG
+    /// Testing builds: a drag on the sidebar's edge, step by step ("begin", an x, "end"), as the handle reports it.
+    func debugEdgeDrag(_ step: String) {
+        switch step {
+        case "begin": resizeHandle.onBegin?()
+        case "end": resizeHandle.onEnd?()
+        default: if let x = Double(step) { resizeHandle.onDrag?(CGFloat(x)) }
+        }
+    }
+    #endif
 }
 
 /// A full-size layer for floating UI that lets clicks fall through where it has nothing.
