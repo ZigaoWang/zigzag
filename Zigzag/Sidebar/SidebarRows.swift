@@ -783,8 +783,11 @@ final class SpaceHeaderView: InteractiveView {
 final class SeparatorRowView: NSView {
     private let label = Label("Tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
-    /// The label in the space's quiet ink.
-    func refreshInk() { label.textColor = Brand.Theme.for(self).quietInk }
+    /// The label and Clear in the space's quiet ink.
+    func refreshInk() {
+        label.textColor = Brand.Theme.for(self).quietInk
+        clearButton.stateDidChange(animated: false)
+    }
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
     /// Shown under the pointer, or while Tab has brought keyboard focus to it.
@@ -898,8 +901,8 @@ final class InsertionLineView: NSView {
     }
 }
 
-/// Clear, on the line above the tabs: small, quiet text with a downward arrow (it clears what's below), the same
-/// grey as the line until the pointer is on it.
+/// Clear, on the line above the tabs: small, quiet text with a downward arrow (it clears what's below), in the same
+/// quiet ink as "Tabs" until the pointer is on it, then in the rows' ink.
 final class ClearTabsButton: InteractiveView {
     /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
     private let arrow = NSImageView()
@@ -958,7 +961,8 @@ final class ClearTabsButton: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let active = isHovered || isPressed
-        label.textColor = active ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
+        let theme = Brand.Theme.for(self)
+        label.textColor = active ? theme.rowInk : theme.quietInk
         arrow.contentTintColor = label.textColor
         let fill: NSColor? = isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
