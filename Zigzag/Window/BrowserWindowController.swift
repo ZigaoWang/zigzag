@@ -1268,14 +1268,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// back the window you had, not one the size of the screen.
     private(set) var windowedFrame: NSRect?
 
-    func windowWillEnterFullScreen(_ notification: Notification) { windowedFrame = window?.frame }
+    /// In full screen the traffic lights come down with the menu bar, in AppKit's title bar. Transparent, as Zigzag's
+    /// is everywhere else, it left them floating over the page; there it gets the system's bar behind them, as in Safari.
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        windowedFrame = window?.frame
+        browserWindow.titlebarAppearsTransparent = false
+    }
 
     func windowDidEnterFullScreen(_ notification: Notification) {
+        browserWindow.titlebarAppearsTransparent = false
         layoutTrafficLights()
         root.needsLayout = true
     }
 
+    func windowWillExitFullScreen(_ notification: Notification) { browserWindow.titlebarAppearsTransparent = true }
+
     func windowDidExitFullScreen(_ notification: Notification) {
+        browserWindow.titlebarAppearsTransparent = true
         windowedFrame = nil
         layoutTrafficLights()
         root.needsLayout = true
