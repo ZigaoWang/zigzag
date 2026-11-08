@@ -436,7 +436,7 @@ final class SitePanel: FloatingPanelView {
             y += siteLabel.lineHeight + Tokens.Space.x2
             let h = group.height
             place(group, NSRect(x: pad, y: y, width: inner, height: h))
-            y += h
+            y += h - group.bottomSlack
         } else {
             y -= Tokens.Space.x5
         }
@@ -540,6 +540,9 @@ final class PanelGroup: NSView {
     private let fill = ColorView(color: Tokens.Color.fieldFill)
 
     var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
+    /// The room left under the last row's words inside its row: the panel's bottom margin counts from the words,
+    /// as its top does, so this much less is added there.
+    var bottomSlack: CGFloat { rows.last.map { (PanelRow.height - $0.contentHeight) / 2 } ?? 0 }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -572,6 +575,8 @@ final class PanelRow: NSView {
     private let title: Label
     private let control: NSView
     private let value: Label?
+    /// The words' height: the title, and the line under it when there is one.
+    var contentHeight: CGFloat { title.lineHeight + (value?.lineHeight ?? 0) }
 
     private init(_ title: String, control: NSView, value: String? = nil) {
         self.title = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
