@@ -207,11 +207,13 @@ enum CommandRanker {
     }
 
     /// Whether every word you typed starts a word of the command's own name ("imp" for Import, "pin t" for Pin Tab),
-    /// rather than only one of its hidden keywords.
+    /// rather than only one of its hidden keywords. One or two characters found inside a page command's name (其他
+    /// in 关闭其他标签页) don't count: it's listed after the search, so Return never closes tabs on a near miss.
     static func isNamed(_ action: Action, by words: [String]) -> Bool {
         let titleWords = action.title.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        let inside = words.joined().count >= 3 || actions.contains { $0.id == action.id }
         return !words.isEmpty && words.allSatisfy { word in
-            titleWords.contains { $0.hasPrefix(word) } || (namesFindCommands && action.title.localizedCaseInsensitiveContains(word))
+            titleWords.contains { $0.hasPrefix(word) } || (namesFindCommands && inside && action.title.localizedCaseInsensitiveContains(word))
         }
     }
 
@@ -220,11 +222,30 @@ enum CommandRanker {
     static func commands(for query: String, context: Context) -> [Action] {
         let words = query.lowercased().split(separator: " ").map(String.init)
         guard !words.isEmpty else { return [] }
-        let candidates = (query.count >= 3 ? contextActions(context) : []) + actions
+        let pageCommands = contextActions(context)
+        let candidates = (isEnough(query, for: (pageCommands + actions).map(\.title)) ? pageCommands : []) + actions
         return candidates.filter { action in
             words.allSatisfy { word in
                 action.keywords.contains { $0.hasPrefix(word) } || (namesFindCommands && action.title.localizedCaseInsensitiveContains(word))
             }
+        }
+    }
+
+    /// Whether what you typed is enough for the commands about this page and window. Three letters in Latin; in
+    /// Chinese or Japanese a character or two already make a word, so two are enough, and one is when it starts
+    /// just one command's name (固 for 固定标签页).
+    static func isEnough(_ query: String, for names: [String]) -> Bool {
+        if query.count >= 3 { return true }
+        let typed = query.lowercased().filter { !$0.isWhitespace }
+        guard !typed.isEmpty, typed.allSatisfy(isCJK) else { return false }
+        if typed.count == 2 { return true }
+        return typed.count == 1 && names.filter { $0.lowercased().hasPrefix(typed) }.count == 1
+    }
+
+    /// A Chinese character, kana or Hangul: one of these says about as much as a Latin word.
+    private static func isCJK(_ c: Character) -> Bool {
+        c.unicodeScalars.allSatisfy { s in
+            s.properties.isIdeographic || (0x3040...0x30FF).contains(s.value) || (0xAC00...0xD7AF).contains(s.value)
         }
     }
 
