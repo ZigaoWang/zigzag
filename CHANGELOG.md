@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Ad blocking covers Chinese sites too: EasyList China joins EasyList and EasyPrivacy, so the banner walls on sites like ITDOG are gone. The lists are fresh as of November 8.
+
 ## [0.6.0] - 2026-11-08
 
 ### New
