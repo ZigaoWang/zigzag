@@ -440,7 +440,7 @@ final class SitePanel: FloatingPanelView {
             y += Tokens.Space.x5
         }
         if !extensionTiles.isEmpty {
-            place(extensionsLabel, NSRect(x: pad, y: y, width: inner, height: extensionsLabel.lineHeight))
+            place(extensionsLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: extensionsLabel.lineHeight))
             y += extensionsLabel.lineHeight + Tokens.Space.x2
             grid(extensionTiles, columns: columns)
             y += Tokens.Space.x5
@@ -448,7 +448,7 @@ final class SitePanel: FloatingPanelView {
 
         // This site's own settings.
         if !rows.isEmpty {
-            place(siteLabel, NSRect(x: pad, y: y, width: inner, height: siteLabel.lineHeight))
+            place(siteLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: siteLabel.lineHeight))
             y += siteLabel.lineHeight + Tokens.Space.x2
             let h = group.height
             place(group, NSRect(x: pad, y: y, width: inner, height: h))
