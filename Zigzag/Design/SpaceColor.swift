@@ -16,16 +16,16 @@ enum SpaceColor: String, Codable, CaseIterable {
 
     var name: String {
         switch self {
-        case .snow: "White"
-        case .graphite: "Graphite"
-        case .ink: "Black"
-        case .sky: "Sky"
-        case .sage: "Sage"
-        case .sand: "Sand"
-        case .rose: "Rose"
-        case .lavender: "Lavender"
-        case .mint: "Mint"
-        case .peach: "Peach"
+        case .snow: String(localized: "White", comment: "Name of a curated space color, in the space editor.")
+        case .graphite: String(localized: "Graphite", comment: "Name of a curated space color, in the space editor.")
+        case .ink: String(localized: "Black", comment: "Name of a curated space color, in the space editor.")
+        case .sky: String(localized: "Sky", comment: "Name of a curated space color, in the space editor.")
+        case .sage: String(localized: "Sage", comment: "Name of a curated space color, in the space editor.")
+        case .sand: String(localized: "Sand", comment: "Name of a curated space color, in the space editor.")
+        case .rose: String(localized: "Rose", comment: "Name of a curated space color, in the space editor.")
+        case .lavender: String(localized: "Lavender", comment: "Name of a curated space color, in the space editor.")
+        case .mint: String(localized: "Mint", comment: "Name of a curated space color, in the space editor.")
+        case .peach: String(localized: "Peach", comment: "Name of a curated space color, in the space editor.")
         }
     }
 

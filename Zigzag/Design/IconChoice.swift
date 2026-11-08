@@ -64,7 +64,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     var onPick: ((String?) -> Void)?
 
     private var cells: [IconButton] = []
-    private let emojiField = FilledField(placeholder: "Or type an emoji")
+    private let emojiField = FilledField(placeholder: String(localized: "Or type an emoji", comment: "Placeholder of the field under the icon choices, for a space's or a folder's icon."))
 
     static let columns = 8
     static let cell: CGFloat = 30
@@ -81,7 +81,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         self.noneSymbol = noneSymbol
         self.selected = selected
         super.init(frame: .zero)
-        let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: "No Icon")
+        let none = IconButton(symbol: noneSymbol, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: String(localized: "No Icon", comment: "Tooltip of the choice that takes a space's or a folder's icon away."))
         none.onClick = { [weak self] _ in self?.pick(nil) }
         cells = [none] + IconChoice.symbols.map { name in
             let button = IconButton(symbol: name, size: Self.cell, symbolSize: Tokens.Symbol.row, toolTip: nil)

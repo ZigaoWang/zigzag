@@ -421,9 +421,9 @@ final class IconButton: InteractiveView {
         didSet { setAccessibilityLabel(toolTip.map(Self.withoutShortcut)) }
     }
 
-    /// "Back (⌘[)" → "Back".
+    /// "Back (⌘[)" → "Back". Full-width parentheses too, as a translation may set them ("返回（⌘[）").
     static func withoutShortcut(_ tip: String) -> String {
-        tip.replacingOccurrences(of: #"\s*\([⌃⌥⇧⌘][^()]*\)\s*$"#, with: "", options: .regularExpression)
+        tip.replacingOccurrences(of: #"\s*[(（][⌃⌥⇧⌘][^()（）]*[)）]\s*$"#, with: "", options: .regularExpression)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1745,7 +1745,7 @@ final class MenuPanel: FloatingPanelView {
             isEnabled = item.isEnabled
             setAccessibilityRole(.menuItem)
             setAccessibilityLabel(item.title)
-            setAccessibilityValue(item.isChecked ? "selected" : nil)
+            setAccessibilityValue(item.isChecked ? String(localized: "selected", comment: "What VoiceOver says after a checked item in one of Zigzag's menus.") : nil)
             stateDidChange(animated: false)
         }
 

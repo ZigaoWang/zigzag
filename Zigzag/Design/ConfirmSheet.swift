@@ -14,7 +14,7 @@ final class ConfirmSheet: NSView {
     private let body: NSTextField
     private let buttons = DialogButtons()
     private let confirm: PillButton
-    private let cancel = PillButton(title: "Cancel", style: .plain)
+    private let cancel = PillButton(title: String(localized: "Cancel", comment: "Button in a sheet that asks before doing something."), style: .plain)
     private let alternate: PillButton?
     private var monitor: Any?
     private let isDestructive: Bool
@@ -148,15 +148,18 @@ final class ConfirmSheet: NSView {
     /// Removing an extension deletes its data too, and can't be undone, so it asks first, from Settings and from the
     /// extension's own menu alike.
     static func removeExtension(id: String, name: String?, in host: NSView) {
-        show(in: host, title: "Remove \(name ?? "this extension")?", message: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.",
-             confirmTitle: "Remove", destructive: true) { confirmed in
+        let title = name.map { name in String(localized: "Remove \(name)?", comment: "Title of the sheet that asks before removing an extension. The placeholder is the extension's name.") }
+            ?? String(localized: "Remove this extension?", comment: "Title of the sheet that asks before removing an extension without a name.")
+        show(in: host, title: title,
+             message: String(localized: "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store.", comment: "Message of the sheet that asks before removing an extension."),
+             confirmTitle: String(localized: "Remove", comment: "Button of the sheet that asks before removing an extension."), destructive: true) { confirmed in
             if confirmed { ExtensionStore.uninstall(id) }
         }
     }
 
     /// Something that didn't work, said plainly, with one button to acknowledge it.
     static func notice(in host: NSView, title: String, message: String) {
-        show(in: host, title: title, message: message, confirmTitle: "OK") { _ in }
+        show(in: host, title: title, message: message, confirmTitle: String(localized: "OK", comment: "Button of a sheet that says something didn't work.")) { _ in }
         (host.subviews.last as? ConfirmSheet)?.cancel.isHidden = true
     }
 
