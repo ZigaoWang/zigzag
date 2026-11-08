@@ -1567,6 +1567,12 @@ extension BrowserWindowController: SidebarDelegate {
 
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { sidebarUndo }
 
+    /// Settings › General: after closing a pinned tab that went to another page, offer to pin that page instead.
+    static var offersToPinWanderedPage: Bool {
+        get { UserDefaults.standard.object(forKey: "OffersToPinWanderedPage") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "OffersToPinWanderedPage") }
+    }
+
     /// Closes a tab; ⌘Z brings it back with its history, ⇧⌘Z closes it again.
     func closeWithUndo(_ tab: Tab) {
         let wasBookmark = tab.bookmarkID != nil
@@ -1576,8 +1582,9 @@ extension BrowserWindowController: SidebarDelegate {
         if let bookmarkID = tab.bookmarkID, let here = tab.url, let pin = Library.shared.bookmark(bookmarkID),
            TabManager.normalize(here) != TabManager.normalize(pin.url) {
             tabManager.close(tab)
-            // A private window never writes where it's been into your pins, so there's nothing to offer.
-            guard !tabManager.isPrivate else { return }
+            // A private window never writes where it's been into your pins, so there's nothing to offer. Nor when you
+            // turned the offer off: on a site like DeepSeek every new chat is a new address.
+            guard !tabManager.isPrivate, Self.offersToPinWanderedPage else { return }
             Toast.show(String(localized: "\(pin.title) stays pinned to its own page", comment: "Toast after closing a pinned tab that had wandered to another page. The title is the pinned tab's."), symbol: "pin",
                        action: (String(localized: "Pin This Page", comment: "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead."), { [weak self] in
                 self?.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in the Edit menu as Undo Update Pinned Page.")) { Library.shared.updateBookmark(bookmarkID, url: here) }

@@ -544,6 +544,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
+    private let pinOfferToggle = Toggle()
     private let languagePicker = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
@@ -709,6 +710,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         windowGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › General: how many favorites' tiles sit side by side in the sidebar."),
                                 detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › General."),
                                 control: favoritesPerRow))
+        pinOfferToggle.onChange = { on in BrowserWindowController.offersToPinWanderedPage = on }
+        windowGroup.add(FormRow(title: String(localized: "Offer to pin the page you moved to", comment: "A setting in Settings › General."),
+                                detail: String(localized: "After you close a pinned tab that went to another page, like a new chat.", comment: "Explanation under “Offer to pin the page you moved to” in Settings › General."),
+                                control: pinOfferToggle))
         windowGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                                 detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                                 control: quitToggle))
@@ -1429,6 +1434,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.isOn = BrowserRootView.isBorderless
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
+        pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0

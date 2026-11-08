@@ -1889,6 +1889,17 @@
         }
       }
     },
+    "After you close a pinned tab that went to another page, like a new chat." : {
+      "comment" : "Explanation under “Offer to pin the page you moved to” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭一个已跳转到其他页面（比如新对话）的固定标签页后。"
+          }
+        }
+      }
+    },
     "After you sign in. Kept in your Keychain, synced with iCloud." : {
       "comment" : "Explanation under “Offer to save passwords” in Settings › Passwords.",
       "localizations" : {
@@ -7181,6 +7192,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 管理密码时此项关闭。打开即可同时使用两者。"
+          }
+        }
+      }
+    },
+    "Offer to pin the page you moved to" : {
+      "comment" : "A setting in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示固定跳转后的页面"
           }
         }
       }
