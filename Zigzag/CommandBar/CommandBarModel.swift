@@ -27,11 +27,12 @@ struct CommandResult: Equatable {
 
     var actionLabel: String {
         switch kind {
-        case .open, .history: "Open"
-        case .search, .suggestion, .searchOn: "Search"
-        case .switchTo: "Switch to Tab"
-        case .bookmark: isFavorite ? "Open Favorite" : "Open Pinned Tab"
-        case .action: "Run"
+        case .open, .history: String(localized: "Open", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the page.")
+        case .search, .suggestion, .searchOn: String(localized: "Search", comment: "Action label at the right of the selected command bar result, saying what Return does: searches for it.")
+        case .switchTo: String(localized: "Switch to Tab", comment: "Action label at the right of the selected command bar result, saying what Return does: goes to the open tab.")
+        case .bookmark: isFavorite ? String(localized: "Open Favorite", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the favorite.")
+                                    : String(localized: "Open Pinned Tab", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the pinned tab.")
+        case .action: String(localized: "Run", comment: "Action label at the right of the selected command bar result, saying what Return does: runs the command.")
         case .note: ""
         }
     }
@@ -120,13 +121,20 @@ enum CommandRanker {
     }
 
     static let actions: [Action] = [
-        Action(id: "clear-cache", title: "Clear Cache…", keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
-        Action(id: "clear-cookies", title: "Clear Cookies…", keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
-        Action(id: "settings", title: "Settings", keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
-        Action(id: "passwords", title: "Passwords", keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key"),
-        Action(id: "import", title: "Import from Another Browser…", keywords: ["import", "bring", "move", "switch", "passwords", "bookmarks", "arc", "chrome", "safari", "firefox"], symbol: "square.and.arrow.down"),
-        Action(id: "feedback", title: "Send Feedback…", keywords: ["feedback", "send", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
-        Action(id: "report", title: "Report a Problem…", keywords: ["report", "bug", "issue", "problem", "crash", "freeze", "broken", "help"], symbol: "exclamationmark.bubble"),
+        Action(id: "clear-cache", title: String(localized: "Clear Cache…", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
+        Action(id: "clear-cookies", title: String(localized: "Clear Cookies…", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
+        Action(id: "settings", title: String(localized: "Settings", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
+        Action(id: "passwords", title: String(localized: "Passwords", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key"),
+        Action(id: "import", title: String(localized: "Import from Another Browser…", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["import", "bring", "move", "switch", "passwords", "bookmarks", "arc", "chrome", "safari", "firefox"], symbol: "square.and.arrow.down"),
+        Action(id: "feedback", title: String(localized: "Send Feedback…", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["feedback", "send", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
+        Action(id: "report", title: String(localized: "Report a Problem…", comment: "A command in the command bar, named as in the menu bar."),
+               keywords: ["report", "bug", "issue", "problem", "crash", "freeze", "broken", "help"], symbol: "exclamationmark.bubble"),
     ]
 
     /// What the bar needs to know about the window to offer only the commands that would do something.
@@ -154,34 +162,45 @@ enum CommandRanker {
         var list: [Action] = []
         if c.hasPage, !c.isPrivate, !c.isFavorite {
             list.append(c.isPinned
-                ? Action(id: "unpin", title: "Unpin Tab", keywords: ["unpin", "pin", "tab", "remove"], symbol: "pin.slash")
-                : Action(id: "pin", title: "Pin Tab", keywords: ["pin", "tab", "keep", "bookmark"], symbol: "pin"))
+                ? Action(id: "unpin", title: String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar."),
+                         keywords: ["unpin", "pin", "tab", "remove"], symbol: "pin.slash")
+                : Action(id: "pin", title: String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar."),
+                         keywords: ["pin", "tab", "keep", "bookmark"], symbol: "pin"))
         }
         if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
-            list.append(Action(id: "favorite", title: "Add to Favorites", keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
+            list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
         }
         if c.inSplit {
-            list.append(Action(id: "separate", title: "Separate Tabs", keywords: ["separate", "tabs", "split", "unsplit", "view", "close"], symbol: "rectangle.split.2x1.slash"))
+            list.append(Action(id: "separate", title: String(localized: "Separate Tabs", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["separate", "tabs", "split", "unsplit", "view", "close"], symbol: "rectangle.split.2x1.slash"))
         } else if c.canSplitWithRecent {
-            list.append(Action(id: "split", title: "Open in Split View", keywords: ["open", "split", "view", "side", "two"], symbol: "rectangle.split.2x1"))
+            list.append(Action(id: "split", title: String(localized: "Open in Split View", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["open", "split", "view", "side", "two"], symbol: "rectangle.split.2x1"))
         }
         if c.hasOtherTabs {
-            list.append(Action(id: "close-others", title: "Close Other Tabs", keywords: ["close", "other", "tabs", "clean", "tidy"], symbol: "xmark.circle"))
+            list.append(Action(id: "close-others", title: String(localized: "Close Other Tabs", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["close", "other", "tabs", "clean", "tidy"], symbol: "xmark.circle"))
         }
         if c.hasTabsBelow {
-            list.append(Action(id: "close-below", title: "Close Tabs Below", keywords: ["close", "tabs", "below", "under"], symbol: "xmark.circle"))
+            list.append(Action(id: "close-below", title: String(localized: "Close Tabs Below", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["close", "tabs", "below", "under"], symbol: "xmark.circle"))
         }
         if c.canReopen {
-            list.append(Action(id: "reopen", title: "Reopen Closed Tab", keywords: ["reopen", "closed", "tab", "undo", "restore", "back"], symbol: "arrow.uturn.backward"))
+            list.append(Action(id: "reopen", title: String(localized: "Reopen Closed Tab", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["reopen", "closed", "tab", "undo", "restore", "back"], symbol: "arrow.uturn.backward"))
         }
         // Spaces are kept for good; a private window keeps nothing and has one space.
         guard !c.isPrivate else { return list }
-        list.append(Action(id: "new-space", title: "New Space", keywords: ["new", "space", "create", "add"], symbol: "plus.square"))
+        list.append(Action(id: "new-space", title: String(localized: "New Space", comment: "A command in the command bar, named as in the menu bar."),
+                           keywords: ["new", "space", "create", "add"], symbol: "plus.square"))
         for space in c.spaces where space.id != c.currentSpaceID {
             let name = space.name.lowercased().split(separator: " ").map(String.init)
-            list.append(Action(id: "space:\(space.id.uuidString)", title: "Switch to \(space.name)", keywords: ["switch", "go", "space"] + name, symbol: "square.on.square"))
+            list.append(Action(id: "space:\(space.id.uuidString)", title: String(localized: "Switch to \(space.name)", comment: "A command in the command bar: goes to another space. The name is the space's."),
+                               keywords: ["switch", "go", "space"] + name, symbol: "square.on.square"))
             if c.canMove {
-                list.append(Action(id: "move:\(space.id.uuidString)", title: "Move to \(space.name)", keywords: ["move", "tab", "space", "send"] + name, symbol: "arrow.right.square"))
+                list.append(Action(id: "move:\(space.id.uuidString)", title: String(localized: "Move to \(space.name)", comment: "A command in the command bar: moves the tab to another space. The name is the space's."),
+                                   keywords: ["move", "tab", "space", "send"] + name, symbol: "arrow.right.square"))
             }
         }
         return list
@@ -191,7 +210,9 @@ enum CommandRanker {
     /// rather than only one of its hidden keywords.
     static func isNamed(_ action: Action, by words: [String]) -> Bool {
         let titleWords = action.title.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
-        return !words.isEmpty && words.allSatisfy { word in titleWords.contains { $0.hasPrefix(word) } }
+        return !words.isEmpty && words.allSatisfy { word in
+            titleWords.contains { $0.hasPrefix(word) } || (namesFindCommands && action.title.localizedCaseInsensitiveContains(word))
+        }
     }
 
     /// The commands every word you typed starts a keyword of. The ones about this page and window (Pin Tab, Close
@@ -200,8 +221,17 @@ enum CommandRanker {
         let words = query.lowercased().split(separator: " ").map(String.init)
         guard !words.isEmpty else { return [] }
         let candidates = (query.count >= 3 ? contextActions(context) : []) + actions
-        return candidates.filter { action in words.allSatisfy { word in action.keywords.contains { $0.hasPrefix(word) } } }
+        return candidates.filter { action in
+            words.allSatisfy { word in
+                action.keywords.contains { $0.hasPrefix(word) } || (namesFindCommands && action.title.localizedCaseInsensitiveContains(word))
+            }
+        }
     }
+
+    /// The keywords are English. With Zigzag in another language, what you type in it finds a command by its own
+    /// name too (Chinese has no spaces to start words at, so anywhere in the name counts). In English, only the
+    /// keywords do, as they always have.
+    private static let namesFindCommands = !(Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("en")
 
     static func context(for manager: TabManager) -> Context {
         var c = Context()
@@ -253,7 +283,8 @@ enum CommandRanker {
                 }
                 // No history yet: say what this is for rather than showing nothing.
                 if results.isEmpty {
-                    add(CommandResult(kind: .note, title: "No history yet", detail: "Pages you visit show up here",
+                    add(CommandResult(kind: .note, title: String(localized: "No history yet", comment: "The command bar searching history, when there is none yet."),
+                                      detail: String(localized: "Pages you visit show up here", comment: "Under No history yet, in the command bar searching history."),
                                       symbol: "clock"), key: "empty-history")
                 }
                 return results
@@ -279,7 +310,7 @@ enum CommandRanker {
             for action in list {
                 // Split View says which page it puts beside this one.
                 let partner = action.id == "split" ? manager.selectedTab.flatMap { splitPartner(for: $0, in: manager) } : nil
-                add(CommandResult(kind: .action(action.id), title: action.title, detail: partner.map { "with \($0.displayTitle)" } ?? "",
+                add(CommandResult(kind: .action(action.id), title: action.title, detail: partner.map { String(localized: "with \($0.displayTitle)", comment: "Under the command bar's Open in Split View command: the page it opens beside this one. The title is that page's.") } ?? "",
                                   symbol: action.symbol), key: "action:\(action.id)")
             }
         }
@@ -324,7 +355,8 @@ enum CommandRanker {
                 guard !seen.contains(key) else { continue }
                 let space = Library.shared.space(entry.spaceID)?.name
                 add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
-                                  detail: space.map { "Archived from \($0)" } ?? "Archived",
+                                  detail: space.map { String(localized: "Archived from \($0)", comment: "Under a command bar result for a tab that tidied itself away. The name is the space it was in.") }
+                                      ?? String(localized: "Archived", comment: "Under a command bar result for a tab that tidied itself away."),
                                   icon: FaviconStore.shared.cachedIcon(for: entry.url), symbol: "archivebox"), key: key)
             }
         }
@@ -341,7 +373,8 @@ enum CommandRanker {
 
         // Searching history and nothing matches: never a blank bar. Say so, with the web search one Return away.
         if historyOnly, results.isEmpty {
-            add(CommandResult(kind: .search(query), title: "Search the web for “\(query)”", detail: "Nothing in your history matches",
+            add(CommandResult(kind: .search(query), title: String(localized: "Search the web for “\(query)”", comment: "Command bar result when nothing in history matches. The query is what was typed."),
+                              detail: String(localized: "Nothing in your history matches", comment: "Under the command bar's search-the-web result, when nothing in history matches."),
                               symbol: "magnifyingglass"), key: "search:\(query)")
         }
 

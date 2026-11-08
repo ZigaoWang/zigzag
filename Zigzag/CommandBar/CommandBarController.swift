@@ -49,7 +49,8 @@ final class CommandRowView: InteractiveView {
             symbolView.image = Tokens.Symbol.image(result.symbol ?? "globe", size: Tokens.Symbol.row)
         }
         setAccessibilityRole(result.isActionable ? .button : .staticText)
-        setAccessibilityLabel(result.detail.isEmpty ? result.title : "\(result.title), \(result.detail)")
+        setAccessibilityLabel(result.detail.isEmpty ? result.title
+                              : String(localized: "\(result.title), \(result.detail)", comment: "VoiceOver name of a command bar result: its title, then what's under it."))
         needsLayout = true
     }
 
@@ -109,7 +110,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private let panel = FloatingPanelView()
     /// The bar itself, for pointing at it (the Getting started guide).
     var panelView: NSView { panel }
-    private let field = PlainTextField(font: Tokens.Font.title(.regular), placeholder: "Search or enter address")
+    private let field = PlainTextField(font: Tokens.Font.title(.regular), placeholder: String(localized: "Search or enter address", comment: "Placeholder of the command bar's field."))
     private let fieldIcon = NSImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
     private var rows: [CommandRowView] = []
@@ -159,7 +160,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             guard let self, let text = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !text.isEmpty, !text.contains("\n") else { return [] }
             let url = CommandRanker.url(from: text)
-            return [SidebarMenus.Item(url != nil ? "Paste and Go" : "Paste and Search") { [weak self] in
+            let title = url != nil ? String(localized: "Paste and Go", comment: "Item in the command bar field's right-click menu: opens the copied address.")
+                                : String(localized: "Paste and Search", comment: "Item in the command bar field's right-click menu: searches for the copied text.")
+            return [SidebarMenus.Item(title) { [weak self] in
                 // Straight to the page or the search, never a suggestion listed for what was typed before.
                 self?.activate(CommandResult(kind: url.map { .open($0) } ?? .search(text), title: "", detail: ""), modifiers: [])
             }]
@@ -248,7 +251,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // Light type, the space name's voice: the sidebar's size over the address, large and airy for a new tab.
         let font = Tokens.Font.voice(isAnchored ? Tokens.Font.sidebarRow().pointSize : 22)
         field.font = font
-        field.placeholderAttributedString = NSAttributedString(string: mode == .history ? "Search history" : "Search or enter address",
+        let placeholder = mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field.")
+        field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
         if mode == .editCurrent, let url = controller.tabManager.selectedTab?.url {
             field.stringValue = url.absoluteString
@@ -449,7 +453,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let q = typed.trimmingCharacters(in: .whitespaces)
             let queries = (q.isEmpty ? [] : [q]) + suggestions.filter { $0.lowercased() != q.lowercased() }.prefix(5)
             results = queries.compactMap { query in
-                scope.url(for: query).map { CommandResult(kind: .searchOn($0), title: query, detail: "Search \(scope.name)",
+                scope.url(for: query).map { CommandResult(kind: .searchOn($0), title: query, detail: String(localized: "Search \(scope.name)", comment: "Under each result while the command bar searches one site. The name is the site's, like YouTube."),
                                                          icon: FaviconStore.shared.cachedIcon(for: scope.home), symbol: "magnifyingglass") }
             }
             // Nothing typed yet: the site itself and where you've been on it, so the bar doesn't empty out at Tab.
@@ -550,7 +554,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private func refreshHint() {
         hinted = scope == nil && mode != .history ? SiteSearch.match(typed) : nil
-        hint.stringValue = hinted.map { "Search \($0.name)" } ?? ""
+        hint.stringValue = hinted.map { String(localized: "Search \($0.name)", comment: "In the command bar, when what's typed names a site: Tab searches it. The name is the site's, like YouTube.") } ?? ""
         hint.isHidden = hinted == nil
         hintKey.isHidden = hinted == nil
         panel.needsLayout = true
@@ -585,7 +589,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (typedBeforeScope as NSString).length, length: 0)
         }
         let font = field.font ?? Tokens.Font.title(.regular)
-        field.placeholderAttributedString = NSAttributedString(string: site.map { "Search \($0.name)" } ?? (mode == .history ? "Search history" : "Search or enter address"),
+        let placeholder = site.map { String(localized: "Search \($0.name)", comment: "Placeholder of the command bar's field while it searches one site. The name is the site's, like YouTube.") }
+            ?? (mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field."))
+        field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
         if let site { FaviconStore.shared.prefetch(for: site.home) }
         refreshHint()
