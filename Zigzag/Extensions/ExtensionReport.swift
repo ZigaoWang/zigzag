@@ -54,43 +54,47 @@ struct ExtensionReport {
         var lines: [Line] = []
         let hosts = patterns.compactMap(host(of:))
         if patterns.contains(where: { $0 == "<all_urls>" || $0.hasPrefix("*://*/") || $0.hasPrefix("http://*/") || $0.hasPrefix("https://*/") }) {
-            lines.append(Line(symbol: "globe", text: "Read and change what you see on every website"))
+            lines.append(Line(symbol: "globe", text: String(localized: "Read and change what you see on every website", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         } else if let first = hosts.first {
             let others = Set(hosts).count - 1
-            lines.append(Line(symbol: "globe", text: others > 0 ? "Read and change what you see on \(first) and \(others) other site\(others == 1 ? "" : "s")" : "Read and change what you see on \(first)"))
+            lines.append(Line(symbol: "globe", text: others > 0
+                ? String(localized: "Read and change what you see on \(first) and \(others) other sites",
+                         comment: "One thing an extension can do, in its install sheet and in Settings. The first placeholder is a site, like youtube.com; the second counts the other sites.")
+                : String(localized: "Read and change what you see on \(first)",
+                         comment: "One thing an extension can do, in its install sheet and in Settings. The placeholder is a site, like youtube.com.")))
         }
         if permissions.contains("nativeMessaging") {
-            lines.append(Line(symbol: "macwindow", text: "Talk to \(appName(for: id)) on your Mac"))
+            lines.append(Line(symbol: "macwindow", text: appLine(for: id)))
         }
         if permissions.contains("history") {
-            lines.append(Line(symbol: "clock", text: "Read and change your browsing history"))
+            lines.append(Line(symbol: "clock", text: String(localized: "Read and change your browsing history", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         } else if permissions.contains("tabs") || permissions.contains("webNavigation") {
-            lines.append(Line(symbol: "clock", text: "See the sites you visit"))
+            lines.append(Line(symbol: "clock", text: String(localized: "See the sites you visit", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if permissions.contains("bookmarks") {
-            lines.append(Line(symbol: "pin", text: "Read and change your pinned pages, folders and favorites"))
+            lines.append(Line(symbol: "pin", text: String(localized: "Read and change your pinned pages, folders and favorites", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if permissions.contains("downloads") {
-            lines.append(Line(symbol: "arrow.down.circle", text: permissions.contains("downloads.open") ? "Download files and open them" : "Download files and manage your downloads"))
+            lines.append(Line(symbol: "arrow.down.circle", text: permissions.contains("downloads.open") ? String(localized: "Download files and open them", comment: "One thing an extension can do, listed in its install sheet and in Settings.") : String(localized: "Download files and manage your downloads", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if permissions.contains("notifications") {
-            lines.append(Line(symbol: "bell", text: "Show notifications"))
+            lines.append(Line(symbol: "bell", text: String(localized: "Show notifications", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if replacesNewTab {
-            lines.append(Line(symbol: "plus.square", text: "Show its own page when you open a new tab"))
+            lines.append(Line(symbol: "plus.square", text: String(localized: "Show its own page when you open a new tab", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if permissions.contains("declarativeNetRequest") || permissions.contains("declarativeNetRequestWithHostAccess") {
-            lines.append(Line(symbol: "hand.raised", text: "Block content on pages"))
+            lines.append(Line(symbol: "hand.raised", text: String(localized: "Block content on pages", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         // Installing it is the go-ahead Chrome asks for separately ("Allow user scripts"), so the sheet says so.
         if permissions.contains("userScripts") {
-            lines.append(Line(symbol: "curlybraces", text: "Run scripts you add on the sites it can access"))
+            lines.append(Line(symbol: "curlybraces", text: String(localized: "Run scripts you add on the sites it can access", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if permissions.contains("cookies") {
-            lines.append(Line(symbol: "lock", text: "Read and change cookies on the sites it can access"))
+            lines.append(Line(symbol: "lock", text: String(localized: "Read and change cookies on the sites it can access", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         if permissions.contains("management") {
-            lines.append(Line(symbol: "puzzlepiece.extension", text: "See your other extensions"))
+            lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "See your other extensions", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
         return lines
     }
@@ -104,48 +108,49 @@ struct ExtensionReport {
         return String(host)
     }
 
-    private static func appName(for id: String) -> String {
+    /// "Talk to the 1Password app on your Mac": a whole line for each app, so each reads right in any language.
+    private static func appLine(for id: String) -> String {
         switch id {
-        case ExtensionStore.onePasswordID: "the 1Password app"
-        case "nngceckbapebfimnlniiiahkandclblb": "the Bitwarden app"
-        default: "an app"
+        case ExtensionStore.onePasswordID: String(localized: "Talk to the 1Password app on your Mac", comment: "One thing an extension can do, in its install sheet and in Settings: exchange messages with an app installed on the Mac.")
+        case "nngceckbapebfimnlniiiahkandclblb": String(localized: "Talk to the Bitwarden app on your Mac", comment: "One thing an extension can do, in its install sheet and in Settings: exchange messages with an app installed on the Mac.")
+        default: String(localized: "Talk to an app on your Mac", comment: "One thing an extension can do, in its install sheet and in Settings: exchange messages with an app installed on the Mac.")
         }
     }
 
     /// Permissions WebKit doesn't support, by the feature a person would notice is missing.
     private static let limitNames: [String: String] = [
-        "sidePanel": "Side panel",
-        "identity": "Signing in with your account",
-        "identity.email": "Signing in with your account",
-        "notifications": "Notifications",
-        "downloads": "Downloads",
-        "downloads.open": "Downloads",
-        "idle": "Knowing when you’re away",
-        "offscreen": "Background audio and clipboard",
-        "webRequestBlocking": "Blocking requests the old way",
-        "webRequestAuthProvider": "Filling in sign-in dialogs",
-        "history": "Your browsing history",
-        "bookmarks": "Your bookmarks",
-        "topSites": "Your top sites",
-        "tabGroups": "Tab groups",
-        "fontSettings": "Font settings",
-        "tts": "Reading aloud",
-        "ttsEngine": "Reading aloud",
-        "geolocation": "Your location",
-        "clipboardRead": "Reading what you copy",
-        "management": "Managing other extensions",
-        "privacy": "Privacy settings",
-        "proxy": "Proxy settings",
-        "debugger": "Debugging pages",
-        "pageCapture": "Saving pages",
-        "desktopCapture": "Recording your screen",
-        "tabCapture": "Recording tabs",
-        "system.display": "Display information",
-        "power": "Keeping your Mac awake",
+        "sidePanel": String(localized: "Side panel", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "identity": String(localized: "Signing in with your account", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "identity.email": String(localized: "Signing in with your account", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "notifications": String(localized: "Notifications", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "downloads": String(localized: "Downloads", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "downloads.open": String(localized: "Downloads", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "idle": String(localized: "Knowing when you’re away", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "offscreen": String(localized: "Background audio and clipboard", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "webRequestBlocking": String(localized: "Blocking requests the old way", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "webRequestAuthProvider": String(localized: "Filling in sign-in dialogs", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "history": String(localized: "Your browsing history", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "bookmarks": String(localized: "Your bookmarks", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "topSites": String(localized: "Your top sites", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "tabGroups": String(localized: "Tab groups", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "fontSettings": String(localized: "Font settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "tts": String(localized: "Reading aloud", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "ttsEngine": String(localized: "Reading aloud", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "geolocation": String(localized: "Your location", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "clipboardRead": String(localized: "Reading what you copy", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "management": String(localized: "Managing other extensions", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "privacy": String(localized: "Privacy settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "proxy": String(localized: "Proxy settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "debugger": String(localized: "Debugging pages", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "pageCapture": String(localized: "Saving pages", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "desktopCapture": String(localized: "Recording your screen", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "tabCapture": String(localized: "Recording tabs", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "system.display": String(localized: "Display information", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+        "power": String(localized: "Keeping your Mac awake", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
     ]
 
     /// Manifest features with no WebKit equivalent.
     private static let manifestLimits: [(String, String)] = [
-        ("omnibox", "Address bar keyword"),
+        ("omnibox", String(localized: "Address bar keyword", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag.")),
     ]
 }
