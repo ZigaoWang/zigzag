@@ -28,8 +28,13 @@
     // WebKit keeps chrome and browser apart; an extension may use either (webextension-polyfill takes browser).
     const roots = [...new Set([globalThis.chrome, globalThis.browser])].filter(Boolean);
     const setMember = (path, key, value) => roots.map((root) => setMemberIn(root, path, key, value)).some(Boolean);
+    // WebKit keeps its API objects only while something else does, and makes new ones, without what was set on them,
+    // when asked again after they're gone, so a fix could miss the extension's later calls (Bitwarden's background, on
+    // some starts). Each object a member is set on, and the ones leading to it, are kept here.
+    const kept = new Set();
     const setMemberIn = (root, path, key, value) => {
-      const parent = path.reduce((object, part) => object && object[part], root);
+      const parent = path.reduce((object, part) => { kept.add(object); return object && object[part]; }, root);
+      kept.add(parent);
       if (!parent || (typeof parent !== 'object' && typeof parent !== 'function')) return false;
       const added = extras.get(parent);
       if (added) { added[key] = value; return true; }
