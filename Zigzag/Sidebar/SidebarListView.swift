@@ -761,8 +761,11 @@ final class SidebarListView: NSView {
 
     // MARK: Picking several
 
-    /// ⌘-click adds or takes away one row, ⇧-click picks everything from the last picked (or the tab you're on) to
-    /// here. A plain click lets go of them all. Returns true when the click was a pick, not an open.
+    /// The row the last ⌘-click picked, where a ⇧-click's run starts, as in Finder.
+    private var markAnchor: SidebarItem?
+
+    /// ⌘-click adds or takes away one row, ⇧-click picks everything from the last ⌘-clicked row (or the tab you're
+    /// on) to here. A plain click lets go of them all. Returns true when the click was a pick, not an open.
     private func mark(_ item: SidebarItem, with event: NSEvent?) -> Bool {
         let flags = event?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
         guard flags.contains(.command) || flags.contains(.shift) else {
@@ -772,13 +775,15 @@ final class SidebarListView: NSView {
         let pickable = items.filter(\.isPickable)
         // Starting a pick includes where you are, the way Finder keeps what's already selected.
         if marked.isEmpty, let current = currentItem, current != item { marked = [current] }
-        if flags.contains(.shift), let anchor = marked.last ?? currentItem,
-           let a = pickable.firstIndex(of: anchor), let b = pickable.firstIndex(of: item) {
+        let anchor = markAnchor.flatMap { marked.contains($0) ? $0 : nil } ?? marked.last ?? currentItem
+        if flags.contains(.shift), let anchor, let a = pickable.firstIndex(of: anchor), let b = pickable.firstIndex(of: item) {
             for picked in pickable[min(a, b)...max(a, b)] where !marked.contains(picked) { marked.append(picked) }
+            markAnchor = anchor
         } else if let i = marked.firstIndex(of: item) {
             marked.remove(at: i)
         } else {
             marked.append(item)
+            markAnchor = item
         }
         marked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
         if marked.count < 2 { marked = [] }
