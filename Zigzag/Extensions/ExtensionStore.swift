@@ -706,7 +706,7 @@ enum ExtensionProfile {
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         // Tampermonkey.
-        "dhdgffkkebhmkfjojejmpbldmpobfkfo": Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch]),
+        "dhdgffkkebhmkfjojejmpbldmpobfkfo": Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch]),
     ]
 
     /// Tampermonkey's background lets itself add listeners only in the first moment of starting, until the first
@@ -721,6 +721,13 @@ enum ExtensionProfile {
     /// request went unanswered and the popup stayed blank.
     private static let tampermonkeyPagesPatch = Patch(file: "background.js", find: #"INTERNAL_PAGE_PROTOCOLS:["chrome-extension:"]"#,
                                                       replace: #"INTERNAL_PAGE_PROTOCOLS:["webkit-extension:"]"#)
+
+    /// Opening a script's .user.js address should open Tampermonkey's install page. Its usual way is a
+    /// declarativeNetRequest redirect whose patterns WebKit can't read (`(?:…|…)`), and WebKit drops such rules
+    /// without a word, so nothing happened. Its older way, watching the tab's address, works here; it now takes
+    /// that way in its "Auto" setting too.
+    private static let tampermonkeyInstallPatch = Patch(file: "background.js", find: #""legacy"==wn.values.scriptUrlDetection||"#,
+                                                        replace: #""legacy"==wn.values.scriptUrlDetection||"auto"==wn.values.scriptUrlDetection||"#)
 
     /// Return YouTube Dislike writes its count into a copy of YouTube's label, class names and all. YouTube's
     /// own like and dislike code find their labels by class, so both write into the copy, in turns ("0", the
