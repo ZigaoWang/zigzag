@@ -4,7 +4,8 @@ The words Zigzag uses most, and what they become in Simplified Chinese (zh-Hans)
 (`Zigzag/Resources/Localizable.xcstrings`) starts from this table, so one English word is one Chinese word everywhere.
 
 Where macOS or Safari already has a word for the same thing, Zigzag uses Apple's, so it reads like the rest of the Mac:
-边栏, not 侧边栏; 共享, not 分享; 重新载入, not 刷新. Rows marked **Decide** have a real choice to make first.
+边栏, not 侧边栏; 共享, not 分享; 重新载入, not 刷新. Every term here is decided; the last column keeps the words
+considered and not used, so a translator doesn't bring them back.
 
 Brand and product names stay as they are in every sentence: Zigzag, Arc, Chrome, Safari, Firefox, Brave, Edge,
 macOS, iCloud, Google. A space goes between Chinese and a Latin word or a number ("从 Chrome 导入", "3 个标签页"),
@@ -12,23 +13,23 @@ as Apple writes it.
 
 ## Places and things
 
-| English | 简体中文 | Alternatives | Why |
+| English | 简体中文 | Not used | Why |
 |---|---|---|---|
-| Space | 空间 | 工作区 | Arc's Chinese users say 空间, and macOS calls Mission Control's Spaces 空间. **Decide**: 空间 could be confused with Mission Control's; 工作区 is clearer but colder and not what Arc users know. |
+| Space | 空间 | 工作区 | Arc's Chinese users say 空间, and macOS calls Mission Control's Spaces 空间. 工作区 was clearer next to Mission Control but colder, and not what Arc users know. |
 | Tab | 标签页 | | Safari and Chrome. |
 | New Tab | 新建标签页 | | Safari's button and menu item. |
 | Pinned (the section) | 已固定 | 固定标签页 | Safari's Pin Tab is 固定标签页; as a heading 已固定 is shorter. |
 | Pin Tab | 固定标签页 | | Safari's menu item. |
 | Back to Pinned Page | 回到固定的页面 | 返回固定页面 | Plain and short; 回到 reads warmer than 返回. |
-| Favorites | 个人收藏 | 收藏, 常用 | Safari's Favorites are 个人收藏. **Decide**: 个人收藏 is Apple's, but in Zigzag Favorites are the row of icons on top; 收藏 is shorter in tight places. |
+| Favorites | 收藏 | 个人收藏, 常用 | Zigzag's Favorites are the row of icons on top, and 收藏 fits it and tight places. Safari's 个人收藏 is longer and names a different thing; 常用 sounds like most visited. |
 | Bookmarks | 书签 | | Safari, Chrome. |
 | Folder | 文件夹 | | macOS. |
 | Sidebar | 边栏 | 侧边栏 | macOS and Safari say 边栏 (显示边栏). |
 | Window | 窗口 | | macOS. |
 | Private window | 无痕浏览窗口 | 隐私浏览窗口, 无痕窗口 | Safari's New Private Window is 新建无痕浏览窗口. |
 | Split View | 分屏浏览 | 分栏 | macOS calls its Split View 分屏浏览. |
-| Peek | 速览 | 预览, keep "Peek" | **Decide**: no Apple word; Quick Look is 快速查看, so 速览 is close without clashing. 预览 clashes with the Preview app. |
-| Command Bar | 命令栏 | 指令栏 | **Decide**: Arc's community says 命令栏; 指令栏 also seen. |
+| Peek | 速览 | 预览, keep "Peek" | No Apple word; Quick Look is 快速查看, so 速览 is close without clashing. 预览 clashes with the Preview app; English would read as untranslated. |
+| Command Bar | 命令栏 | 指令栏 | Arc's Chinese users say 命令栏; 指令栏 is seen less. |
 | Site controls (the site panel) | 网站设置 | 网站控制 | Safari's per-site settings are 网站设置; "控制" sounds technical. |
 | Address (field) | 地址栏 | 智能搜索栏 | Safari calls it 智能搜索栏, but Zigzag's field is plainer; 地址栏 is what people say. |
 | Downloads | 下载 | 下载项 | Safari's list is 下载项; as a title and button, 下载 is enough. |
@@ -37,7 +38,7 @@ as Apple writes it.
 | Extensions | 扩展 | 扩展程序 | Safari says 扩展; Chrome says 扩展程序. Zigzag runs Chrome extensions, but on a Mac 扩展 reads native. |
 | Passwords | 密码 | | macOS Passwords app. |
 | Passkeys | 通行密钥 | | Apple's term. |
-| Sign-ins (staying signed in, imported) | 登录状态 | 登录信息 | **Decide**: Zigzag means "you stay signed in to your sites"; 登录状态 says that, 登录信息 sounds like saved passwords. |
+| Sign-ins (staying signed in, imported) | 登录状态 | 登录信息 | Zigzag means "you stay signed in to your sites"; 登录状态 says that, 登录信息 sounds like saved passwords. |
 | Reader | 阅读器 | | Safari's 显示阅读器 / 隐藏阅读器. |
 | Capture (screenshot of the page) | 截图 | 截取, 屏幕快照 | macOS's Screenshot app is 截屏; for a page, 截图 is what people say. |
 | Archive (old tabs put away) | 归档 | 存档 | Arc's Chinese users say 归档. |
@@ -46,7 +47,7 @@ as Apple writes it.
 
 ## Actions
 
-| English | 简体中文 | Alternatives | Why |
+| English | 简体中文 | Not used | Why |
 |---|---|---|---|
 | Clear (history, cache, cookies) | 清除 | 清空 | Safari: 清除历史记录. |
 | Close Tab | 关闭标签页 | | Safari. |
