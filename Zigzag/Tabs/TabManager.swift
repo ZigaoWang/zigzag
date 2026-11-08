@@ -153,10 +153,20 @@ final class TabManager {
                 while index < list.count, list[index].opener === opener { index += 1 }
                 return index
             }
-            if space == currentSpaceID, let here = selectedTab, let at = list.firstIndex(where: { $0 === here }) { return at + 1 }
+            if space == currentSpaceID, let here = selectedTab, let at = list.firstIndex(where: { $0 === here }) {
+                // Several opened in a row beside the same tab (an extension opening a few pages) keep their order:
+                // each goes after the last one placed there, not in front of it.
+                if let beside = placedBeside, beside.anchor === here, let last = beside.last,
+                   let after = list.firstIndex(where: { $0 === last }), after > at { return after + 1 }
+                return at + 1
+            }
             return 0
         }
     }
+
+    /// The last tab put beside the current one with nothing that opened it, so the next lands after it.
+    private var placedBeside: PlacedBeside?
+    private struct PlacedBeside { weak var anchor: Tab?; weak var last: Tab? }
 
     @discardableResult
     func newTab(url: URL?, spaceID: UUID? = nil, select: Bool = true, configuration: WKWebViewConfiguration? = nil,
@@ -168,6 +178,7 @@ final class TabManager {
         tab.opener = opener
         // Placed once, as Settings says; the list never reorders itself after that.
         tabsBySpace[space, default: []].insert(tab, at: newTabIndex(in: space, opener: opener))
+        if opener == nil, !select, Self.newTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
         // the page it came from waits in the list. A pinned split keeps its pages; the new tab shows on its own.
