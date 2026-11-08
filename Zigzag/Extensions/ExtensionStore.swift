@@ -563,8 +563,9 @@ enum ExtensionProfile {
     static func profile(for id: String) -> Profile? {
         var profile = profiles[id] ?? Profile()
         // Errors reported first (a background that stops as it starts says why), then the bridge (real answers from
-        // Zigzag), then stand-ins for what's still missing.
-        profile.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + (profile.backgroundPrelude ?? "")
+        // Zigzag), then stand-ins for what's still missing. Every background gets the WebSocket stand-in: one opened
+        // the WebKit way freezes the extension's pages along with it (MyBib's popup never came up).
+        profile.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n" + (profile.backgroundPrelude ?? "")
         #if DEBUG
         // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
         let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
@@ -696,7 +697,7 @@ enum ExtensionProfile {
     static var pagePreludes: [(id: String, source: String)] { profiles.compactMap { id, profile in profile.pagePrelude.map { (id, $0) } } }
 
     private static let profiles: [String: Profile] = [
-        ExtensionStore.onePasswordID: Profile(backgroundPrelude: webSocketShim + onePasswordPrelude, pagePrelude: diagnostics,
+        ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         // Its popup app loops in WebKit and never draws (found in the 2026-10-25 test pass).
         "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
@@ -763,9 +764,11 @@ enum ExtensionProfile {
     """)
 
     /// WebKit's extension service workers freeze on `new WebSocket(…)`. This stands in for it, with the same
-    /// events and methods, and Zigzag opens the real connection over a native port (WebSocketBridge).
+    /// events and methods, and Zigzag opens the real connection over a native port (WebSocketBridge). A background
+    /// page (not a worker) opens its own as usual.
     private static let webSocketShim = """
     (() => {
+      if (typeof window !== 'undefined') return;
       const api = globalThis.browser || globalThis.chrome;
       if (!api || !api.runtime || typeof api.runtime.connectNative !== 'function') return;
       const toBase64 = (buffer) => { const bytes = new Uint8Array(buffer); let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); };
