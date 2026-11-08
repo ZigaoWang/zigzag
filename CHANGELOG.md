@@ -22,7 +22,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - Bitwarden's autofill menu shows in login fields.
 - 1Password's sign-in banner closes once you've signed in, on single-page and two-step logins too.
-- Violentmonkey's buttons open its editor and dashboard, so new scripts can be made and saved, and its toolbar icon updates.
+- Violentmonkey's buttons open its editor and dashboard, so new scripts can be made and saved, and its toolbar icon updates. Script links like Greasyfork's Install open its install page; with Tampermonkey on too, Tampermonkey takes them.
 - Imported bookmarks keep up to eight levels of folders, and an open folder's arrow points down at every depth.
 - Favorites' rows come out whole: four sit in one row, never three and one left alone below.
 - The Site Controls button in the address field is as big as the toolbar's and easy to hit, and a long site name in the site panel ends with an ellipsis instead of being cut off.
