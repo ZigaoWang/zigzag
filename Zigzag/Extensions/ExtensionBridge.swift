@@ -23,12 +23,14 @@ final class ExtensionBridge {
     let offscreen = BridgeOffscreen()
     /// Tab capture, whose captures end with the popup that made them.
     let tabCapture = BridgeTabCapture()
+    /// Proxy settings, put back at launch before any page loads.
+    let proxy = BridgeProxy()
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
     private init() {
         let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(), BridgeRuntime(),
-                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture, BridgeUserScripts()]
+                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture, BridgeUserScripts(), proxy]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 
@@ -144,7 +146,7 @@ struct BridgeError: Error {
 /// The script side of the bridge (Resources/Extensions/bridge.js), run before an extension's own code.
 enum ExtensionBridgeScript {
     /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
-    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts"]
+    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts", "proxy"]
 
     static let source: String = {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),

@@ -303,6 +303,54 @@
     onClosed: event('sidePanel.onClosed'),
   });
 
+  // proxy.settings is one of Chrome's ChromeSettings. Zigzag follows fixed servers (BridgeProxy.swift); a setting it
+  // can't follow, a PAC script, is refused and changes nothing.
+  install('proxy', {
+    settings: {
+      get: method('proxy', 'settings.get'),
+      set: method('proxy', 'settings.set'),
+      clear: method('proxy', 'settings.clear'),
+      onChange: event('proxy.settings.onChange'),
+    },
+    // WebKit doesn't say when a proxy fails, so this never fires.
+    onProxyError: event('proxy.onProxyError'),
+  });
+
+  // Proxy sign-in: Chrome asks webRequest.onAuthRequired listeners when a proxy wants a password (FoxyProxy answers
+  // from the sign-ins you gave it). WebKit never asks, so Zigzag asks them itself, with Chrome's details, as soon as
+  // the extension sets a proxy, and gives the proxy their answer. A listener answers as in Chrome, returning
+  // { authCredentials } or calling back with it (asyncBlocking), or with a promise of it, as in Firefox.
+  if (asked.has('proxy') && asked.has('webRequest')) {
+    const signIn = new Map();   // listener -> whether it answers through a callback
+    const ask = async (details) => {
+      for (const [listener, callsBack] of [...signIn]) {
+        let answer;
+        try {
+          answer = await new Promise((resolve) => {
+            const returned = listener(Object.assign({}, details), callsBack ? resolve : undefined);
+            if (!callsBack) Promise.resolve(returned).then(resolve, () => resolve(undefined));
+            setTimeout(() => resolve(undefined), 10000);
+          });
+        } catch (e) {}
+        const credentials = answer && answer.authCredentials;
+        if (credentials && typeof credentials.username === 'string') {
+          send('proxy', 'authAnswer', [details.requestId, { username: credentials.username, password: String(credentials.password || '') }]).catch(() => {});
+          return;
+        }
+      }
+    };
+    // WebKit has its own onAuthRequired and won't let it be replaced here: webkit-differences.js, which can stand in
+    // for it, tells this about each listener as it's added.
+    Object.defineProperty(globalThis, '__zigzagProxySignIn', { value: {
+      add(listener, extraInfoSpec) {
+        if (typeof listener !== 'function') return;
+        signIn.set(listener, Array.isArray(extraInfoSpec) && extraInfoSpec.includes('asyncBlocking'));
+        on('proxy.onAuthRequired', ask);
+      },
+      remove(listener) { signIn.delete(listener); },
+    }, configurable: true });
+  }
+
   // A capture that hears Zigzag's own sound (streamed video, whose sound Web Audio can't reach) has Zigzag's web audio
   // muted at the source, as Chrome mutes a captured tab. What the extension then plays (Shazam passing the sound on, a
   // booster's louder copy) goes to Zigzag, which plays it itself (NativeAudioOut.swift): heard, and never captured

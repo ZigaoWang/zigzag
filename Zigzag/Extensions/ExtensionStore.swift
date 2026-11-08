@@ -160,6 +160,8 @@ enum ExtensionStore {
         guard #available(macOS 15.4, *) else { return }
         // An extension engine whose extension went while Zigzag was closed: the one you had before.
         ExtensionSearchProvider.reconcile()
+        // An extension's proxy applies from the first page on, not from when its background has started again.
+        ExtensionBridge.shared.proxy.restore()
         Task {
             await migrateLegacyInstalls()
             await ExtensionHost.shared.loadInstalled()

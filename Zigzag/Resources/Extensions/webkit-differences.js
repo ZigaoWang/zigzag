@@ -562,6 +562,22 @@
       if (has) setMember(['runtime', 'onConnect'], 'hasListener', (listener) => has(shown.get(listener) || listener));
     }
 
+    // webRequest.onAuthRequired, for a proxy extension: its listeners also answer for the proxy it sets, as the bridge
+    // asks them (bridge.js). WebKit's own still hears what it can.
+    const signIn = globalThis.__zigzagProxySignIn;
+    const authRequired = api.webRequest && api.webRequest.onAuthRequired;
+    if (signIn && authRequired && typeof authRequired.addListener === 'function') {
+      const add = authRequired.addListener.bind(authRequired);
+      const remove = authRequired.removeListener && authRequired.removeListener.bind(authRequired);
+      try {
+        setMember(['webRequest', 'onAuthRequired'], 'addListener', (listener, filter, extraInfoSpec, ...rest) => {
+          signIn.add(listener, extraInfoSpec);
+          try { return add(listener, filter, extraInfoSpec, ...rest); } catch (e) {}
+        });
+        setMember(['webRequest', 'onAuthRequired'], 'removeListener', (listener) => { signIn.remove(listener); if (remove) return remove(listener); });
+      } catch (e) {}
+    }
+
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
     // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
     if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {
