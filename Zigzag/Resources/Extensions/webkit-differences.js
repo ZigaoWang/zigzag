@@ -18,8 +18,9 @@
   // worker's clients): in Chrome the worker controls its extension's pages and they reach it, in WebKit nothing the
   // pages post arrives, and the worker's clients don't include them. Violentmonkey's popup and dashboard ask its
   // background for everything that way, so its buttons did nothing and its dashboard stayed blank. Here it travels
-  // over a runtime port instead: the page connects when it first posts (or when the worker looks for its clients),
-  // and each end sees the other's messages as message events, as in Chrome.
+  // over a runtime port instead: the page connects when it first posts to its worker (or when a worker that relies on
+  // this looks for its clients), and each end sees the other's messages as message events, as in Chrome. Pages and
+  // workers that never use it are left exactly as WebKit has them.
   const WORKER_PORT = '__zigzagWorkerClient';
   const TAB_PORT = '__zigzagTabPage';
   const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
@@ -30,9 +31,11 @@
   const workerPage = (() => {
     if (isWorker || typeof location === 'undefined' || location.protocol !== 'webkit-extension:') return null;
     const container = globalThis.navigator && navigator.serviceWorker;
-    if (!container || typeof ServiceWorker === 'undefined' || typeof ServiceWorkerContainer === 'undefined') return null;
+    if (!container || typeof ServiceWorker === 'undefined') return null;
     const own = location.origin + '/';
     let port = null;
+    // The worker the page posted to, as its messages' source.
+    let worker = null;
     const connect = () => {
       if (port) return port;
       const api = globalThis.chrome || globalThis.browser;
@@ -40,7 +43,7 @@
       port.onMessage.addListener((message) => {
         if (!message || message.kind !== 'message') return;
         const event = new MessageEvent('message', { data: message.data, origin: location.origin });
-        Object.defineProperty(event, 'source', { value: container.controller });
+        Object.defineProperty(event, 'source', { value: container.controller || worker });
         container.dispatchEvent(event);
       });
       // The worker was unloaded: the next message wakes it, over a new port.
@@ -48,23 +51,16 @@
       return port;
     };
     const send = (message) => connect().postMessage({ kind: 'message', data: portable(message) });
-    const scriptURL = () => {
-      try { return new URL((globalThis.chrome || globalThis.browser).runtime.getManifest().background.service_worker, own).href; } catch (e) { return own; }
-    };
-    const standIn = Object.create(ServiceWorker.prototype, {
-      scriptURL: { get: scriptURL }, state: { value: 'activated' },
-      onstatechange: { value: null, writable: true }, onerror: { value: null, writable: true },
-      postMessage: { value: (message) => send(message) },
-      addEventListener: { value: () => {} }, removeEventListener: { value: () => {} }, dispatchEvent: { value: () => true },
-    });
+    // controller stays WebKit's (none): Violentmonkey then posts to navigator.serviceWorker.ready's active worker,
+    // which WebKit does give, and only those posts, to the extension's own worker, go over the port.
     try {
-      const controller = Object.getOwnPropertyDescriptor(ServiceWorkerContainer.prototype, 'controller').get;
-      Object.defineProperty(container, 'controller', { configurable: true, get: () => controller.call(container) || standIn });
       const post = ServiceWorker.prototype.postMessage;
       ServiceWorker.prototype.postMessage = function (message, ...rest) {
         let url = '';
         try { url = String(this.scriptURL); } catch (e) {}
-        return url.startsWith(own) ? send(message) : post.call(this, message, ...rest);
+        if (!url.startsWith(own)) return post.call(this, message, ...rest);
+        worker = this;
+        return send(message);
       };
     } catch (e) { return null; }
     return { connect };
@@ -390,28 +386,15 @@
       const has = onConnect.hasListener && onConnect.hasListener.bind(onConnect);
       if (isWorker) {
         const pages = new Map();
-        add((port) => {
-          if (!port || port.name !== WORKER_PORT) return;
-          const url = (port.sender && port.sender.url) || '';
-          const client = {
-            id: `zigzag-${Date.now()}-${Math.random().toString(36).slice(2)}`, type: 'window', frameType: 'top-level', url,
-            postMessage: (message) => { try { port.postMessage({ kind: 'message', data: portable(message) }); } catch (e) {} },
-          };
-          pages.set(port, client);
-          if (keepOpen) keepOpen(port);
-          port.onMessage.addListener((message) => {
-            if (!message || message.kind !== 'message') return;
-            const event = new MessageEvent('message', { data: message.data });
-            Object.defineProperty(event, 'source', { value: client });
-            Object.defineProperty(event, 'waitUntil', { value: (promise) => { Promise.resolve(promise).catch(() => {}); } });
-            globalThis.dispatchEvent(event);
-          });
-          port.onDisconnect.addListener(() => pages.delete(port));
-        });
         // The worker's clients include the pages, as in Chrome (Violentmonkey finds its offscreen page so). Pages not
-        // yet connected are asked to, and given a moment.
+        // yet connected are asked to, and given a moment. Only once the extension relies on this, when a page has
+        // posted to the worker or the worker has made an offscreen page: other workers keep WebKit's clients as they
+        // are, with no wait.
         const workerClients = globalThis.clients;
-        if (workerClients && typeof workerClients.matchAll === 'function') {
+        let relied = false;
+        const rely = () => {
+          if (relied || !workerClients || typeof workerClients.matchAll !== 'function') return;
+          relied = true;
           const matchAll = workerClients.matchAll.bind(workerClients);
           const get = typeof workerClients.get === 'function' ? workerClients.get.bind(workerClients) : null;
           const gather = async () => {
@@ -433,6 +416,32 @@
               } });
             }
           } catch (e) {}
+        };
+        add((port) => {
+          if (!port || port.name !== WORKER_PORT) return;
+          rely();
+          const url = (port.sender && port.sender.url) || '';
+          const client = {
+            id: `zigzag-${Date.now()}-${Math.random().toString(36).slice(2)}`, type: 'window', frameType: 'top-level', url,
+            postMessage: (message) => { try { port.postMessage({ kind: 'message', data: portable(message) }); } catch (e) {} },
+          };
+          pages.set(port, client);
+          if (keepOpen) keepOpen(port);
+          port.onMessage.addListener((message) => {
+            if (!message || message.kind !== 'message') return;
+            const event = new MessageEvent('message', { data: message.data });
+            Object.defineProperty(event, 'source', { value: client });
+            Object.defineProperty(event, 'waitUntil', { value: (promise) => { Promise.resolve(promise).catch(() => {}); } });
+            globalThis.dispatchEvent(event);
+          });
+          port.onDisconnect.addListener(() => pages.delete(port));
+        });
+        // Violentmonkey makes its offscreen page and looks for it among its clients straight away, before the page
+        // has posted anything; it may be an offscreen page left from the worker's last run.
+        const offscreen = api.offscreen;
+        if (offscreen && typeof offscreen.createDocument === 'function') {
+          const create = offscreen.createDocument.bind(offscreen);
+          setMember(['offscreen'], 'createDocument', (...args) => { rely(); return create(...args); });
         }
       }
       // The extension's pages inside tabs (above), at the background's end.
