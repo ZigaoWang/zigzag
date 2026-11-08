@@ -14,6 +14,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A background tab that keeps working hard goes to sleep on its own and wakes where it was when you open it. Zigzag says so once per site, with Show Tab. Settings can turn it off.
 - Settings can turn off the offer to pin the page a pinned tab moved to, for sites like DeepSeek where every new chat is a new address.
 - Drop a pinned page on another pinned page to open them in split view, as tabs and favorites already do.
+- Mini window: ⌃⌘N opens a small window for one quick page, and Open in Zigzag moves it into your browser window as a tab without reloading. Settings › General can open links from other apps in one, as Arc's Little Arc did.
+- ⌥⌘S lists your spaces to pick one with the arrow keys, a number or a click. ([#11](https://github.com/ZigaoWang/zigzag/issues/11))
+- Proxy extensions like FoxyProxy can send your browsing through a proxy server, with passwords and sites to skip. Proxy scripts (PAC) don't work yet, and the install sheet says so.
+- Extensions that bring a search engine, like ChatGPT search, add it to Settings, and Zigzag asks before searching with it.
+- The developer tools open on Chrome's keys: ⌥⌘I or F12 shows and hides the Web Inspector, ⌥⌘J opens the console and ⌥⌘C picks an element. Inspect Element is always last in a page's menu.
 
 ### Faster
 - History search keeps up with your typing, however long your history.
@@ -30,6 +35,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Undo after Clear brings back every tab it closed, in place, with a split view coming back as a split.
 - Several tabs opened in the background beside yours keep the order they were opened in.
 - Extensions that check their access to a local address with a port, as 1Password does, no longer fail there.
+- Control-Tab switches tabs while a page has the focus, which it almost always does; before, it often did nothing. ([#11](https://github.com/ZigaoWang/zigzag/issues/11))
+- Rabby and other wallets built like MetaMask start again after Zigzag relaunches, instead of saying their background isn't responding. ([#12](https://github.com/ZigaoWang/zigzag/issues/12))
+- When your network or proxy changes, sites connect afresh instead of reusing a remembered HTTP/3 route that could go around a VPN or proxy.
 
 ## [0.6.2] - 2026-11-08
 
