@@ -24,6 +24,8 @@ nonisolated struct ImportBatch: Sendable {
     var logins: [Login] = []
     var bookmarks: [Bookmark] = []
     var history: [(URL, String, Int, Date)] = []
+    /// The sites you're signed in to there; held only until they're set into Zigzag's website data.
+    var cookies: [SignInImporter.Cookie] = []
     /// Something that couldn't come over, and how to fix it.
     var problems: [ImportProblem] = []
 }

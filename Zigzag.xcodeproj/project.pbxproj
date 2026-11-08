@@ -179,6 +179,7 @@
 		E38366D663CE427B640F71A5 /* PeekController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB43BE39C48B06C807284C2 /* PeekController.swift */; };
 		E42A5504EE597C075414B18A /* WebStoreOffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 820132CF9AAE60C1C4104C7B /* WebStoreOffer.swift */; };
 		E77131ED815A795FB7D6F9B8 /* Tutorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D9F429D6C84167482CCFC1 /* Tutorial.swift */; };
+		E7E71F580428AFC67EE93EA2 /* SignInImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146D98C93CFFD5EA35B991D8 /* SignInImporter.swift */; };
 		E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
 		ED98E29840EB4D47CE0DB5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B6B0BECF34D62E3B175E0A /* SettingsView.swift */; };
@@ -189,6 +190,7 @@
 		F642AD8EB346945EEB6E2E67 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4363A8C97194CFB82618511C /* main.swift */; };
 		F68205100699AE990735AFB7 /* ImportBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */; };
 		F972A38781338935BAF22135 /* WebsiteData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */; };
+		FA190095693F186FC9FC635C /* SignInImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD95FCA35585195612C38204 /* SignInImportTests.swift */; };
 		FAC7B9D0E2590199CED38D23 /* SwipeNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B92A13A0C322891D0B40426 /* SwipeNavigation.swift */; };
 		FAF549DD3B7D4C4893E5DA34 /* NativeAudioOut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */; };
 		FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */; };
@@ -223,6 +225,7 @@
 		106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserActions.swift; sourceTree = "<group>"; };
 		111BB58676C39406F3B81A0E /* FavoriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTests.swift; sourceTree = "<group>"; };
 		118460E2A057D11B6C1946F1 /* ExtensionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStore.swift; sourceTree = "<group>"; };
+		146D98C93CFFD5EA35B991D8 /* SignInImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInImporter.swift; sourceTree = "<group>"; };
 		14B44E3C60BDACED82D8B858 /* DiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTests.swift; sourceTree = "<group>"; };
 		14F71A00B5EA5EDD64C993B3 /* SaveFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveFailureTests.swift; sourceTree = "<group>"; };
 		15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarListView.swift; sourceTree = "<group>"; };
@@ -364,6 +367,7 @@
 		D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconStore.swift; sourceTree = "<group>"; };
 		DAC9B2535F5F2C950BA4096B /* DownloadPlace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPlace.swift; sourceTree = "<group>"; };
 		DB9026CE3C5C707675A9BEEC /* ProblemReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemReport.swift; sourceTree = "<group>"; };
+		DD95FCA35585195612C38204 /* SignInImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInImportTests.swift; sourceTree = "<group>"; };
 		DE66F1100EDA4A2A65A5DA39 /* CarriedCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedCopy.swift; sourceTree = "<group>"; };
 		DEB39442D06F521CAE1203D0 /* Autofill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Autofill.swift; sourceTree = "<group>"; };
 		DF9088949B9C029636E9E355 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
@@ -650,6 +654,7 @@
 				D31A2391B831DAAD2A652FCA /* Onboarding.swift */,
 				E97F4271F918C8D77FB14081 /* PageShots.swift */,
 				F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */,
+				146D98C93CFFD5EA35B991D8 /* SignInImporter.swift */,
 				F12B055E9A9D600A2CAA8EAA /* WelcomeWindow.swift */,
 			);
 			path = Import;
@@ -748,6 +753,7 @@
 				7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */,
 				FB5152360ED2798576497043 /* SettingsPageTests.swift */,
 				014C509EA75D15344BB68028 /* ShipFixesTests.swift */,
+				DD95FCA35585195612C38204 /* SignInImportTests.swift */,
 				B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */,
 				E18895E549507CE748D20047 /* TabDropIndexTests.swift */,
 				88D86346DE78193D507DCECC /* TabStateCacheTests.swift */,
@@ -1045,6 +1051,7 @@
 				D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */,
 				37872776DAE6F6D005D98E10 /* SidebarUndo.swift in Sources */,
 				9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */,
+				E7E71F580428AFC67EE93EA2 /* SignInImporter.swift in Sources */,
 				6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */,
 				57456DF0F211F4F978E29567 /* SitePanel.swift in Sources */,
 				6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */,
@@ -1103,6 +1110,7 @@
 				91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */,
 				4A65CC145A4105C2BA63B742 /* SettingsPageTests.swift in Sources */,
 				80ADEAD45C5C339358B88DFB /* ShipFixesTests.swift in Sources */,
+				FA190095693F186FC9FC635C /* SignInImportTests.swift in Sources */,
 				40D4C0EB780B16A242E6E1E6 /* SplitDropTests.swift in Sources */,
 				686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */,
 				72796F999AA54249F5465613 /* TabStateCacheTests.swift in Sources */,

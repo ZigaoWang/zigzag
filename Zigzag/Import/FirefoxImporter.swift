@@ -48,10 +48,19 @@ nonisolated enum FirefoxImporter {
 
     static func read(_ browser: Browser, _ choice: ChromiumImporter.Choice, primaryPassword: String = "") -> ImportBatch {
         var batch = ImportBatch()
+        var unreadableCookies = 0
         for profile in profiles(of: browser) {
             if choice.contains(.passwords) { readLogins(browser, profile, primaryPassword, into: &batch) }
             if choice.contains(.bookmarks) { batch.bookmarks += bookmarks(at: profile.appendingPathComponent("places.sqlite")) }
             if choice.contains(.history) { batch.history += history(at: profile.appendingPathComponent("places.sqlite")) }
+            if choice.contains(.cookies) {
+                let read = SignInImporter.firefox(at: profile.appendingPathComponent("cookies.sqlite"))
+                batch.cookies += read.cookies
+                unreadableCookies += read.unreadable
+            }
+        }
+        if let problem = SignInImporter.problem(unreadable: unreadableCookies, broughtAny: !batch.cookies.isEmpty, from: browser.name) {
+            batch.problems.append(problem)
         }
         return batch
     }

@@ -90,40 +90,64 @@ nonisolated enum ChromiumImporter {
         static let passwords = Choice(rawValue: 1)
         static let bookmarks = Choice(rawValue: 2)
         static let history = Choice(rawValue: 4)
+        /// The sites you're signed in to. The same bit as `ImportCoordinator.Choice.signIns`, so a problem's
+        /// retry scope reads the same in both.
+        static let cookies = Choice(rawValue: 16)
     }
 
     static func read(_ browser: Browser, _ choice: Choice) -> ImportBatch {
         var batch = ImportBatch()
         let profiles = profiles(of: browser)
         // macOS protects some browsers' data (Chrome, Edge, Brave) from other apps, with no prompt; say so.
-        let files = profiles.flatMap { profile in ["Login Data", "Bookmarks", "History"].map { profile.appendingPathComponent($0) } }
+        let files = profiles.flatMap { profile in
+            ["Login Data", "Bookmarks", "History"].map { profile.appendingPathComponent($0) } + [SignInImporter.chromiumFile(in: profile)]
+        }
         if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) })
             || (profiles.isEmpty && FileManager.default.fileExists(atPath: rootURL(of: browser).path)) {
             batch.problems.append(ImportProblem(message: "macOS keeps \(browser.name)’s data private until you allow it. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on \(browser.name), then try again.", fix: .fullDiskAccess))
             return batch
         }
-        if choice.contains(.passwords) {
-            switch safeStorageKey(browser) {
-            case .success(let key):
-                var unreadable = 0
-                for profile in profiles {
-                    for file in ["Login Data", "Login Data For Account"] {
-                        let read = logins(at: profile.appendingPathComponent(file), key: key)
-                        batch.logins += read.logins
-                        unreadable += read.unreadable
-                    }
+        let cookieFiles = choice.contains(.cookies)
+            ? profiles.map(SignInImporter.chromiumFile(in:)).filter { FileManager.default.fileExists(atPath: $0.path) } : []
+        let wantsPasswords = choice.contains(.passwords)
+        // Passwords and sign-ins open with the same key: asked for once, so macOS asks once, not twice.
+        let key: Result<Data, KeyError>? = wantsPasswords || !cookieFiles.isEmpty ? safeStorageKey(browser) : nil
+        switch key {
+        case .success(let key)? where wantsPasswords:
+            var unreadable = 0
+            for profile in profiles {
+                for file in ["Login Data", "Login Data For Account"] {
+                    let read = logins(at: profile.appendingPathComponent(file), key: key)
+                    batch.logins += read.logins
+                    unreadable += read.unreadable
                 }
-                // Never a quiet zero: passwords that are there but wouldn't open are said, with a way to try again.
-                if unreadable > 0 {
-                    let message = batch.logins.isEmpty
-                        ? "Zigzag couldn’t open \(browser.name)’s passwords. Quit \(browser.name), then try again."
-                        : "\(unreadable) \(unreadable == 1 ? "password" : "passwords") from \(browser.name) couldn’t be opened. Quit \(browser.name), then try again."
-                    batch.problems.append(ImportProblem(message: message, fix: .retry, retries: 1))
-                }
-            case .failure(.denied):
-                batch.problems.append(ImportProblem(message: "\(browser.name)’s passwords stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.", fix: .retry, retries: 1))
-            case .failure(.missing):
-                break  // No passwords saved there: nothing to say.
+            }
+            // Never a quiet zero: passwords that are there but wouldn't open are said, with a way to try again.
+            if unreadable > 0 {
+                let message = batch.logins.isEmpty
+                    ? "Zigzag couldn’t open \(browser.name)’s passwords. Quit \(browser.name), then try again."
+                    : "\(unreadable) \(unreadable == 1 ? "password" : "passwords") from \(browser.name) couldn’t be opened. Quit \(browser.name), then try again."
+                batch.problems.append(ImportProblem(message: message, fix: .retry, retries: Choice.passwords.rawValue))
+            }
+        case .failure(.denied)?:
+            // Everything else still comes over; only what needs the key waits for Try Again.
+            let both = wantsPasswords && !cookieFiles.isEmpty
+            let what = both ? "passwords and sign-ins" : wantsPasswords ? "passwords" : "sign-ins"
+            let scope: Choice = both ? [.passwords, .cookies] : wantsPasswords ? .passwords : .cookies
+            batch.problems.append(ImportProblem(message: "\(browser.name)’s \(what) stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow.", fix: .retry, retries: scope.rawValue))
+        default:
+            break  // No key saved there: no passwords to say anything about.
+        }
+        // Without a key ever saved, whatever the browser kept unencrypted still comes; denied, nothing would open.
+        if !cookieFiles.isEmpty, key != .failure(.denied) {
+            var unreadable = 0
+            for file in cookieFiles {
+                let read = SignInImporter.chromium(at: file, key: try? key?.get())
+                batch.cookies += read.cookies
+                unreadable += read.unreadable
+            }
+            if let problem = SignInImporter.problem(unreadable: unreadable, broughtAny: !batch.cookies.isEmpty, from: browser.name) {
+                batch.problems.append(problem)
             }
         }
         if choice.contains(.bookmarks) {
@@ -214,8 +238,18 @@ nonisolated enum ChromiumImporter {
         return key
     }
 
-    /// A `v10` value: AES-128-CBC with an IV of sixteen spaces, PKCS#7 padding.
+    /// A `v10` password, which a real one is text.
     static func decrypt(_ value: Data, key: Data) -> SecretString? {
+        guard var plain = decryptBytes(value, key: key) else { return nil }
+        defer { plain.resetBytes(in: 0..<plain.count) }
+        // The wrong key can still end in valid padding, giving bytes that aren't a password; a real one is text.
+        guard isText(plain) else { return nil }
+        return SecretString(data: plain)
+    }
+
+    /// A `v10` value: AES-128-CBC with an IV of sixteen spaces, PKCS#7 padding. Passwords and cookies share it.
+    /// The caller clears the bytes when done.
+    static func decryptBytes(_ value: Data, key: Data) -> Data? {
         guard value.count > 3, value.prefix(3) == Data("v10".utf8) else { return nil }
         let ciphertext = value.dropFirst(3)
         let iv = Data(repeating: 0x20, count: kCCBlockSizeAES128)
@@ -235,10 +269,8 @@ nonisolated enum ChromiumImporter {
         }
         defer { output.resetBytes(in: 0..<output.count) }
         guard status == kCCSuccess else { return nil }
-        // The wrong key can still end in valid padding, giving bytes that aren't a password; a real one is text.
-        let plain = output.prefix(moved)
-        guard isText(plain) else { return nil }
-        return SecretString(data: plain)
+        // A copy of its own, so clearing `output` above doesn't clear what's handed back.
+        return Data(output.prefix(moved))
     }
 
     /// Valid UTF-8 with no control characters, checked byte by byte so the password never becomes a String.
