@@ -21,6 +21,7 @@
   // over a runtime port instead: the page connects when it first posts (or when the worker looks for its clients),
   // and each end sees the other's messages as message events, as in Chrome.
   const WORKER_PORT = '__zigzagWorkerClient';
+  const TAB_PORT = '__zigzagTabPage';
   const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
   // What can travel over a port: Chrome would carry an Error across, so its name and message go along.
   const portable = (value) => {
@@ -226,6 +227,9 @@
     };
     const unwrapNul = (value) => (value && typeof value === 'object' && typeof value[NUL_KEY] === 'string' ? JSON.parse(value[NUL_KEY]) : value);
     const onMessage = api.runtime.onMessage;
+    // The extension's own runtime.onMessage listeners on this page, for messages sent to its tab (below).
+    const heard = new Set();
+    let tabPage = null;
     if (ownPages && onMessage && typeof onMessage.addListener === 'function') {
       const add = onMessage.addListener.bind(onMessage);
       const remove = onMessage.removeListener && onMessage.removeListener.bind(onMessage);
@@ -240,9 +244,17 @@
           return result && typeof result.then === 'function' ? result.then(withNul) : result;
         };
         answering.set(listener, wrapped);
+        heard.add(listener);
+        if (tabPage) tabPage.listening();
         return add(wrapped);
       });
-      if (remove) setMember(['runtime', 'onMessage'], 'removeListener', (listener) => remove(answering.get(listener) || listener));
+      if (remove) {
+        setMember(['runtime', 'onMessage'], 'removeListener', (listener) => {
+          heard.delete(listener);
+          if (tabPage) tabPage.listening();
+          return remove(answering.get(listener) || listener);
+        });
+      }
       if (has) setMember(['runtime', 'onMessage'], 'hasListener', (listener) => has(answering.get(listener) || listener));
     }
     if (ownPages && typeof api.runtime.sendMessage === 'function') {
@@ -253,6 +265,56 @@
         const sent = sendMessage(...args);
         return sent && typeof sent.then === 'function' ? sent.then(unwrapNul) : sent;
       });
+    }
+
+    // tabs.sendMessage: Chrome delivers it to the extension's own pages inside that tab too (a frame of its own page
+    // on a site), WebKit only to its content scripts. 1Password's sign-in banner on a site is such a frame, told to
+    // close that way once you've signed in, so it stayed on the page. Each such page that listens for messages
+    // keeps a port to its background, which hands it what's sent to its tab and carries its answer back.
+    const background = isWorker || (() => { try { return !!api.extension && api.extension.getBackgroundPage() === globalThis; } catch (e) { return false; } })();
+    if (!background && ownPages && typeof api.runtime.connect === 'function') {
+      let port = null;
+      let quickDrops = 0;
+      let inTab = true;
+      const connect = () => {
+        if (port || !heard.size || !inTab) return;
+        let opened = Date.now();
+        try { port = api.runtime.connect({ name: TAB_PORT }); } catch (e) { port = null; return; }
+        port.onMessage.addListener((message) => {
+          // Not in a tab (a popup): nothing is sent its way.
+          if (message && message.kind === 'no-tab') inTab = false;
+          if (!message || message.kind !== 'tab-message') return;
+          const own = port;
+          let answered = false;
+          const sendResponse = (value) => {
+            if (answered) return;
+            answered = true;
+            try { own.postMessage({ kind: 'tab-answer', id: message.id, value: portable(value) }); } catch (e) {}
+          };
+          let waits = false;
+          for (const listener of [...heard]) {
+            let result;
+            try { result = listener(message.message, message.sender, sendResponse); } catch (e) { continue; }
+            if (result === true) waits = true;
+            else if (result && typeof result.then === 'function') { waits = true; result.then(sendResponse, () => {}); }
+          }
+          if (!waits && !answered) { answered = true; try { own.postMessage({ kind: 'tab-answer', id: message.id, none: true }); } catch (e) {} }
+        });
+        port.onDisconnect.addListener(() => {
+          port = null;
+          // The background restarted: connect again, unless it keeps refusing.
+          quickDrops = Date.now() - opened < 1000 ? quickDrops + 1 : 0;
+          if (quickDrops < 3) setTimeout(connect, 500);
+        });
+        port.postMessage({ kind: 'listening', value: true });
+      };
+      tabPage = {
+        listening: () => {
+          if (!port) { setTimeout(connect, 0); return; }
+          try { port.postMessage({ kind: 'listening', value: heard.size > 0 }); } catch (e) {}
+        },
+      };
+      if (heard.size) tabPage.listening();
     }
 
     // runtime.onInstalled: WebKit says "install" each time an extension is turned back on, where Chrome says nothing.
@@ -373,10 +435,73 @@
           } catch (e) {}
         }
       }
+      // The extension's pages inside tabs (above), at the background's end.
+      if (background && api.tabs && typeof api.tabs.sendMessage === 'function') {
+        const tabPages = new Map();
+        let asked = 0;
+        add((port) => {
+          if (!port || port.name !== TAB_PORT) return;
+          const sender = port.sender || {};
+          if (!sender.tab || typeof sender.tab.id !== 'number') {
+            try { port.postMessage({ kind: 'no-tab' }); port.disconnect(); } catch (e) {}
+            return;
+          }
+          const page = { port, tabId: sender.tab.id, frameId: sender.frameId, documentId: sender.documentId, listening: false, waiting: new Map() };
+          tabPages.set(port, page);
+          if (keepOpen) keepOpen(port);
+          port.onMessage.addListener((message) => {
+            if (!message) return;
+            if (message.kind === 'listening') page.listening = !!message.value;
+            if (message.kind === 'tab-answer' && page.waiting.has(message.id)) {
+              const resolve = page.waiting.get(message.id);
+              page.waiting.delete(message.id);
+              resolve(message.none ? { none: true } : { value: message.value });
+            }
+          });
+          port.onDisconnect.addListener(() => {
+            tabPages.delete(port);
+            for (const resolve of page.waiting.values()) resolve({ none: true });
+            page.waiting.clear();
+          });
+        });
+        const from = { id: api.runtime.id, url: (() => { try { return location.href; } catch (e) { return undefined; } })() };
+        const ask = (page, message) => new Promise((resolve) => {
+          const id = ++asked;
+          page.waiting.set(id, resolve);
+          try { page.port.postMessage({ kind: 'tab-message', id, message: portable(message), sender: from }); } catch (e) { page.waiting.delete(id); resolve({ none: true }); }
+        });
+        const sendToTab = api.tabs.sendMessage.bind(api.tabs);
+        setMember(['tabs'], 'sendMessage', (tabId, message, ...rest) => {
+          const options = rest[0] && typeof rest[0] === 'object' ? rest[0] : null;
+          const pages = [...tabPages.values()].filter((page) => page.listening && page.tabId === tabId
+            && (!options || options.frameId == null || page.frameId === options.frameId)
+            && (!options || options.documentId == null || page.documentId === options.documentId));
+          // No page of its own there: exactly as WebKit sends it.
+          if (!pages.length) return sendToTab(tabId, message, ...rest);
+          const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
+          // Aimed at one frame or document, and it's one of the pages: content scripts don't run there.
+          const scripts = options && (options.frameId != null || options.documentId != null) ? null
+            : Promise.resolve().then(() => sendToTab(tabId, message, ...rest));
+          // As in Chrome, the first answer wins; with none, the message still arrived, so no error.
+          const answer = new Promise((resolve) => {
+            let left = pages.length + (scripts ? 1 : 0);
+            let done = false;
+            const settle = (answered, value) => {
+              if (done) return;
+              if (answered || --left === 0) { done = true; resolve(answered ? value : undefined); }
+            };
+            if (scripts) scripts.then((value) => settle(value !== undefined, value), () => settle(false));
+            for (const page of pages) ask(page, message).then((reply) => settle(!reply.none, reply.value));
+          });
+          if (!callback) return answer;
+          answer.then((value) => callback(value));
+          return undefined;
+        });
+      }
       const shown = new WeakMap();
       setMember(['runtime', 'onConnect'], 'addListener', (listener) => {
         if (typeof listener !== 'function') return extensionAdd(listener);
-        const wrapped = (port, ...rest) => { if (!port || port.name !== WORKER_PORT) return listener(port, ...rest); };
+        const wrapped = (port, ...rest) => { if (!port || (port.name !== WORKER_PORT && port.name !== TAB_PORT)) return listener(port, ...rest); };
         shown.set(listener, wrapped);
         return extensionAdd(wrapped);
       });

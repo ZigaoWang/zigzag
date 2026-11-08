@@ -58,6 +58,11 @@ enum WebKitSetup {
             configuration.userContentController.add(PageErrors.shared, contentWorld: .page, name: PageErrors.messageName)
             configuration.userContentController.addUserScript(ExtensionPageErrors.script)
             configuration.userContentController.add(ExtensionPageErrors.shared, contentWorld: .page, name: ExtensionPageErrors.messageName)
+            // An extension's own page in a frame on a site (1Password's sign-in banner, Bitwarden's autofill menu)
+            // answers as Chrome's would, as its pages elsewhere do.
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.differences)\n}",
+                injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
