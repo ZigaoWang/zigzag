@@ -118,10 +118,15 @@ enum ArcImporter {
     }
 
     static func parseSidebar(_ data: Data) throws -> (spaces: [SpaceInfo], favorites: [Bookmark]) {
-        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let sidebar = root["sidebar"] as? [String: Any],
-              let containers = sidebar["containers"] as? [[String: Any]],
-              let main = containers.first(where: { $0["spaces"] != nil }) else { throw FormatError() }
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw FormatError() }
+        let main = ((root["sidebar"] as? [String: Any])?["containers"] as? [[String: Any]])?.first(where: { $0["spaces"] != nil })
+        // Arc with sync keeps the sidebar it shows in sidebarSyncState, and the classic copy above can be stale or
+        // empty: a space then came over with no name and nothing in it. An older version synced through
+        // firebaseSyncState. Read every copy there is, the synced ones winning.
+        let sync = root["sidebarSyncState"] as? [String: Any]
+        let firebase = (root["firebaseSyncState"] as? [String: Any])?["syncData"] as? [String: Any]
+        guard main != nil || sync != nil || firebase != nil else { throw FormatError() }
+        let syncContainer = (sync?["container"] as? [String: Any]).flatMap { ($0["value"] as? [String: Any]) ?? $0 }
 
         // Arc stores lists as [key, value, key, value…] or as plain arrays, and newer versions (and Arc Sync) wrap each
         // value as {"value": …}; collect the dictionaries either way.
@@ -130,9 +135,24 @@ enum ArcImporter {
             if dict["id"] == nil, let inner = dict["value"] as? [String: Any] { return inner }
             return dict
         }
-        let itemList = (main["items"] as? [Any] ?? []).compactMap(unwrapped)
         var items: [String: [String: Any]] = [:]
-        for item in itemList { if let id = item["id"] as? String { items[id] = item } }
+        for source in [main?["items"], firebase?["items"], sync?["items"]] {
+            for item in (source as? [Any] ?? []).compactMap(unwrapped) { if let id = item["id"] as? String { items[id] = item } }
+        }
+        // Spaces by id, the synced copy winning; in the order Arc shows them, which also leaves out spaces it no
+        // longer shows.
+        var spaceByID: [String: [String: Any]] = [:]
+        var classicOrder: [String] = []
+        for (index, source) in [main?["spaces"], firebase?["spaceModels"], sync?["spaceModels"]].enumerated() {
+            for space in (source as? [Any] ?? []).compactMap(unwrapped) where space["containerIDs"] != nil || space["title"] != nil {
+                guard let id = space["id"] as? String else { continue }
+                if index == 0 { classicOrder.append(id) }
+                spaceByID[id] = space
+            }
+        }
+        let shownOrder = (syncContainer?["orderedSpaceIDs"] as? [Any] ?? []).compactMap { $0 as? String }.filter { spaceByID[$0] != nil }
+        let spaceList = (shownOrder.isEmpty ? (classicOrder.isEmpty ? Array(spaceByID.keys).sorted() : classicOrder) : shownOrder)
+            .compactMap { spaceByID[$0] }
         /// A container's kind as Arc writes it: the word ("pinned"), or, in newer files, an object keyed by it
         /// ({"pinned": {…}}).
         func kind(_ any: Any) -> String? {
@@ -166,7 +186,7 @@ enum ArcImporter {
         }
 
         var spaces: [SpaceInfo] = []
-        for space in (main["spaces"] as? [Any] ?? []).compactMap(unwrapped) where space["containerIDs"] != nil || space["title"] != nil {
+        for space in spaceList {
             let name = (space["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Space \(spaces.count + 1)", comment: "Name of an imported space that had none in Arc: Space 1, Space 2…")
             let containerIDs = space["containerIDs"] as? [Any] ?? []
             var pinnedID: String?
@@ -221,10 +241,12 @@ enum ArcImporter {
         }
 
         var favorites: [Bookmark] = []
-        if let top = main["topAppsContainerIDs"] as? [Any] {
+        var topIDs: [String] = []
+        for top in [syncContainer?["topAppsContainerIDs"], main?["topAppsContainerIDs"]] {
             // IDs, between the markers that say whose they are; only IDs name an item.
-            for case let id as String in top where items[id] != nil { favorites += bookmarks(under: id) }
+            for case let id as String in top as? [Any] ?? [] where items[id] != nil && !topIDs.contains(id) { topIDs.append(id) }
         }
+        for id in topIDs { favorites += bookmarks(under: id) }
         return (spaces, favorites)
     }
 

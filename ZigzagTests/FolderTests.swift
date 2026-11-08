@@ -158,6 +158,38 @@ struct ArcFolderTests {
         #expect(favorites.map(\.url.lastPathComponent) == ["fav"])
     }
 
+    /// Arc with sync keeps what it shows in sidebarSyncState; the classic copy may be stale. The synced spaces, pins
+    /// and favorites come over, in Arc's order, without spaces it no longer shows.
+    @Test func syncedSidebarWins() throws {
+        func tab(_ id: String, _ url: String) -> [String: Any] {
+            ["value": ["id": id, "title": id, "data": ["tab": ["savedURL": url]], "childrenIds": [String]()]]
+        }
+        let synced: [Any] = [
+            "pinned", ["value": ["id": "pinned", "childrenIds": ["folder"], "data": ["itemContainer": [:]]]],
+            "folder", ["value": ["id": "folder", "title": "Imported From Chrome", "data": ["list": [:]], "childrenIds": ["t1"]]],
+            "t1", tab("t1", "https://example.com/1"),
+            "top", ["value": ["id": "top", "childrenIds": ["f1"], "data": ["itemContainer": [:]]]],
+            "f1", tab("f1", "https://example.com/fav"),
+        ]
+        func space(_ id: String, _ title: String) -> [String: Any] {
+            ["value": ["id": id, "title": title, "containerIDs": ["unpinned", "u", "pinned", "pinned"]]]
+        }
+        let root: [String: Any] = [
+            // The classic copy: the space is there, its pins aren't.
+            "sidebar": ["containers": [["global": [:]], ["spaces": ["s1", ["id": "s1", "containerIDs": ["pinned", "gone"]]], "items": [Any](), "topAppsContainerIDs": [Any]()]]],
+            "sidebarSyncState": [
+                "container": ["value": ["orderedSpaceIDs": ["s1"], "topAppsContainerIDs": [["default": true], "top"]]],
+                "spaceModels": ["s1", space("s1", "Home"), "old", space("old", "Archived")],
+                "items": synced,
+            ],
+        ]
+        let (spaces, favorites) = try ArcImporter.parseSidebar(JSONSerialization.data(withJSONObject: root))
+        #expect(spaces.map(\.name) == ["Home"])
+        #expect(spaces.first?.bookmarks.map(\.url.lastPathComponent) == ["1"])
+        #expect((spaces.first?.folders ?? []).map(\.name) == ["Imported From Chrome"])
+        #expect(favorites.map(\.url.lastPathComponent) == ["fav"])
+    }
+
     @Test func movedFolderLandsBetweenGroups() {
         let b = (0..<6).map { _ in UUID() }
         let folders = [BookmarkFolder(name: "F", bookmarkIDs: [b[1], b[2], b[3]])]
