@@ -238,6 +238,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if WindowManager.shared.controllers.contains(where: { !$0.tabManager.isPrivate }) { WindowManager.shared.newWindow() } else { WindowManager.shared.reopen() }
     }
     @objc func newPrivateWindow(_ sender: Any?) { WindowManager.shared.newWindow(isPrivate: true) }
+    /// A mini window with its address field ready: for a quick look that needn't become a tab.
+    @objc func newMiniWindow(_ sender: Any?) { MiniWindowController.open(url: nil) }
 
     // With Passwords or Import in front, or no window open, these reach here rather than a browser window: that
     // window comes forward (or the closed one comes back) and does it, instead of the menu item being greyed out.
