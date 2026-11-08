@@ -652,6 +652,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
                                  control: defaultControl))
+        // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
+        if Self.hasLanguages {
+            let languageButton = PillButton(title: String(localized: "Change in System Settings…",
+                                                          comment: "Button in Settings › General that opens Language & Region in System Settings."))
+            languageButton.onClick = { _ in Self.openLanguageSettings() }
+            generalGroup.add(FormRow(title: String(localized: "Language", comment: "A setting in Settings › General."),
+                                     detail: String(localized: "Zigzag follows your Mac’s language. You can choose a different one for Zigzag here.",
+                                                    comment: "Explanation under “Language” in Settings › General."),
+                                     control: languageButton))
+        }
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
@@ -1473,6 +1483,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     // MARK: Actions
+
+    /// Whether the app has more than English to choose from.
+    private static var hasLanguages: Bool { Bundle.main.localizations.filter { $0 != "Base" }.count > 1 }
+
+    /// Language & Region in System Settings, where Applications gives each app its own language; System Settings
+    /// itself if that pane can't be opened.
+    private static func openLanguageSettings() {
+        let pane = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!
+        if !NSWorkspace.shared.open(pane) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:")!) }
+    }
 
     private func makeDefault() {
         DefaultBrowser.make()
