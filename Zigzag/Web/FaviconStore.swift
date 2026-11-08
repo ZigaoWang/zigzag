@@ -93,37 +93,75 @@ final class FaviconStore {
         !hasIcon || pageURL.pathComponents.filter { $0 != "/" }.count <= 1
     }
 
-    /// Loads an icon for a URL we have never visited (bookmarks, imports, history).
+    /// Sites whose icon couldn't be found: when to look again, and how long the wait was. A site that's down, blocks
+    /// requests or has no icon is asked again after a minute, then twice as long each time up to a day, never at
+    /// every sidebar refresh.
+    private var failures: [String: (next: Date, wait: TimeInterval)] = [:]
+
+    /// The wait before asking a site again after it gave no icon, from the wait before it.
+    nonisolated static func retryWait(after previous: TimeInterval?) -> TimeInterval {
+        min(max((previous ?? 30) * 2, 60), 24 * 3600)
+    }
+
+    /// Loads an icon for a URL we have never visited (bookmarks, imports, history): the site's usual addresses
+    /// first, then the icons its page lists, then the ones its front page lists. One fetch per site at a time.
     func prefetch(for url: URL) {
         guard let key = key(for: url), memory[key] == nil, !inFlight.contains(key),
-              !FileManager.default.fileExists(atPath: file(for: key).path),
-              // A Google app's icon isn't at the host's root; it arrives with its page instead.
-              !key.contains("/") else { return }
+              !FileManager.default.fileExists(atPath: file(for: key).path) else { return }
+        if let failure = failures[key], failure.next > Date() { return }
         inFlight.insert(key)
+        let done: (Bool) -> Void = { [weak self] found in
+            guard let self else { return }
+            self.inFlight.remove(key)
+            if found {
+                self.failures[key] = nil
+            } else {
+                let wait = Self.retryWait(after: self.failures[key]?.wait)
+                self.failures[key] = (Date().addingTimeInterval(wait), wait)
+            }
+        }
+        // A Google app's icon isn't at the host's root, only on its own page.
+        guard !key.contains("/") else { fetchListed(on: [url], key: key, done: done); return }
+        // The page itself, then the site's front page, when the address is deeper: an app's address often only
+        // leads to its sign-in, but its front page lists the icons.
+        var pages = [url]
+        if let home = URL(string: "/", relativeTo: url)?.absoluteURL, home.path() != url.path() { pages.append(home) }
         let (icons, touch) = Self.rank(links: [], pageURL: url)
         fetchFirst(icons, touch: touch, key: key) { [weak self] image in
+            guard image == nil else { done(true); return }
+            // Nothing at the usual addresses (Brave Search keeps its icons on a CDN): the icons the pages list.
+            self?.fetchListed(on: pages, key: key, done: done)
+        }
+    }
+
+    /// The first of `pages` that lists icons, and the best of them that loads.
+    private func fetchListed(on pages: [URL], key: String, done: @escaping (Bool) -> Void) {
+        guard let page = pages.first else { done(false); return }
+        let rest = Array(pages.dropFirst())
+        declaredIcons(of: page) { [weak self] links in
             guard let self else { return }
-            guard image == nil else { self.inFlight.remove(key); return }
-            // Nothing at the usual addresses (Brave Search keeps its icons on a CDN): the icons the home page lists.
-            self.declaredIcons(of: url) { [weak self] links in
-                guard let self else { return }
-                guard !links.isEmpty else { self.inFlight.remove(key); return }
-                let (icons, touch) = Self.rank(links: links, pageURL: url)
-                self.fetchFirst(icons, touch: touch, key: key) { [weak self] _ in self?.inFlight.remove(key) }
+            guard !links.isEmpty else { self.fetchListed(on: rest, key: key, done: done); return }
+            let (icons, touch) = Self.rank(links: links, pageURL: page)
+            self.fetchFirst(icons, touch: touch, key: key) { [weak self] image in
+                if image == nil { self?.fetchListed(on: rest, key: key, done: done) } else { done(true) }
             }
         }
     }
 
-    /// The icon links a page's head declares, read from its HTML without loading it in a web view.
+    /// The icon links a page's head declares, read from its HTML without loading it in a web view. Asked as the
+    /// browser (some sites turn other clients away). A page that sends you elsewhere (to a sign-in on another
+    /// host) lists that host's icons, not its own: none then.
     private func declaredIcons(of url: URL, completion: @escaping @MainActor ([[String: String]]) -> Void) {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("text/html", forHTTPHeaderField: "Accept")
-        URLSession.shared.dataTask(with: request) { data, _, _ in
-            let html = data.flatMap { String(data: $0.prefix(200_000), encoding: .utf8) } ?? ""
+        session.dataTask(with: request) { data, response, _ in
+            let landed = response?.url ?? url
+            let sameHost = landed.host()?.lowercased() == url.host()?.lowercased()
+            let html = sameHost ? data.flatMap { String(data: $0.prefix(200_000), encoding: .utf8) } ?? "" : ""
             // Made absolute, as a page's own script reports them.
             let links = Self.iconLinks(in: html).map { link -> [String: String] in
                 var link = link
-                link["href"] = link["href"].flatMap { URL(string: $0, relativeTo: url)?.absoluteString }
+                link["href"] = link["href"].flatMap { URL(string: $0, relativeTo: landed)?.absoluteString }
                 return link
             }
             Task { @MainActor in completion(links) }
@@ -133,14 +171,16 @@ final class FaviconStore {
     /// `<link rel="…icon…" href="…" sizes="…">` tags, as the page's own icon script reports them.
     nonisolated static func iconLinks(in html: String) -> [[String: String]] {
         guard let tag = try? NSRegularExpression(pattern: "<link\\b[^>]*>", options: .caseInsensitive),
-              let attribute = try? NSRegularExpression(pattern: "([a-zA-Z-]+)\\s*=\\s*[\"']([^\"']*)[\"']") else { return [] }
+              // Quoted or not: minified pages often leave the quotes off.
+              let attribute = try? NSRegularExpression(pattern: "([a-zA-Z-]+)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))") else { return [] }
         let range = NSRange(html.startIndex..., in: html)
         return tag.matches(in: html, range: range).compactMap { match in
             guard let r = Range(match.range, in: html) else { return nil }
             let text = String(html[r])
             var fields: [String: String] = [:]
             for a in attribute.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-                guard let k = Range(a.range(at: 1), in: text), let v = Range(a.range(at: 2), in: text) else { continue }
+                guard let k = Range(a.range(at: 1), in: text),
+                      let v = (2...4).lazy.compactMap({ Range(a.range(at: $0), in: text) }).first else { continue }
                 fields[text[k].lowercased()] = String(text[v])
             }
             guard let rel = fields["rel"]?.lowercased(), rel.contains("icon"), fields["href"] != nil else { return nil }
@@ -274,6 +314,7 @@ final class FaviconStore {
         let normalized = Self.normalize(image)
         keep(normalized, for: key)
         missing.remove(key)
+        failures[key] = nil
         if let tiff = normalized.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
             try? png.write(to: file(for: key), options: .atomic)

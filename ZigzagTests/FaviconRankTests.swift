@@ -33,3 +33,18 @@ struct FaviconRankTests {
         #expect(!declared.icons.map(\.path).contains("/favicon.ico"))
     }
 }
+
+/// Icons a page lists, however its HTML is written, and how long a site with none is left alone.
+struct FaviconFetchTests {
+    @Test func linksWithoutQuotesAreRead() {
+        let links = FaviconStore.iconLinks(in: #"<link rel=icon href=//www.google.com/i.ico><link href='/a.png' rel="shortcut icon">"#)
+        #expect(links.map { $0["href"] } == ["//www.google.com/i.ico", "/a.png"])
+    }
+
+    @Test func retriesWaitLongerUpToADay() {
+        let first = FaviconStore.retryWait(after: nil)
+        #expect(first == 60)
+        #expect(FaviconStore.retryWait(after: first) == 120)
+        #expect(FaviconStore.retryWait(after: 20 * 3600) == 24 * 3600)
+    }
+}
