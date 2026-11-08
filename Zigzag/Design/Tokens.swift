@@ -962,6 +962,8 @@ enum Tokens {
         static let cardShadow = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
         static let hover = Color.dynamic(light: white(0.38), dark: white(0.05))
+        /// New Tab under the pointer: a lighter wash than a tab's, so the one quiet row stays quiet.
+        static let quietHover = Color.dynamic(light: white(0.22), dark: white(0.03))
         /// Pressed: a step darker than hover, as a thing pushed in is (`showSink`).
         static let pressed = Color.dynamic(light: white(0.28), dark: white(0.035))
         /// The address and the favorites: a soft field of the space's color, no line around it.

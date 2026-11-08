@@ -514,8 +514,11 @@ final class NewTabRowView: SidebarRowView {
 
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
-        title.textColor = Brand.Theme.for(self).quietInk
+        // Quieter than the tabs under it, coming up when you point at it, with a lighter wash than theirs.
+        let ink = Brand.Theme.for(self).quietInk
+        title.textColor = isHovered || isPressed ? ink : ink.withAlphaComponent(ink.alphaComponent * 0.75)
         plus.contentTintColor = title.textColor
+        if isHovered, !isPressed, !isSelected, !isMarked { layer?.backgroundColor = cgColor(Tokens.Chrome.quietHover) }
     }
 
     override func viewDidMoveToWindow() {
