@@ -958,7 +958,9 @@ enum Tokens {
         /// At night the card's top edge catches the light: one pixel inside its upper rim (`setCardRim`). By day the
         /// card is nearly white already and a lit edge can't read at 1x, so there is none.
         static let rim = Color.dynamic(light: .clear, dark: white(0.14))
-        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.08))
+        /// Only just there by night too: the lit rim and the shadow part the card, a bright line all round would
+        /// outline it.
+        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.035))
         static let cardShadow = Color.dynamic(light: Color.hex(0x1E2A44, alpha: 0.10), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
         static let hover = Color.dynamic(light: white(0.38), dark: white(0.05))
