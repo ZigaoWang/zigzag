@@ -26,6 +26,12 @@
             "state" : "new",
             "value" : "%1$@ (%2$@)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@（%2$@）"
+          }
         }
       }
     },
@@ -41,7 +47,15 @@
       }
     },
     "%@ afternoon" : {
-      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”."
+      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@下午"
+          }
+        }
+      }
     },
     "%@ afternoon, %@" : {
       "comment" : "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”.",
@@ -50,6 +64,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ afternoon, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ %1$@下午"
           }
         }
       }
@@ -72,10 +92,26 @@
       }
     },
     "%@ can’t prove it is who it says it is, so Zigzag didn’t open it." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 无法证明自己的身份，所以 Zigzag 没有打开它。"
+          }
+        }
+      }
     },
     "%@ evening" : {
-      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”."
+      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@晚上"
+          }
+        }
+      }
     },
     "%@ evening, %@" : {
       "comment" : "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”.",
@@ -84,6 +120,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ evening, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ %1$@晚上"
           }
         }
       }
@@ -128,7 +170,15 @@
       }
     },
     "%@ is on a port kept for other things, like email, so browsers don’t open it." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 使用的端口留作电子邮件等其他用途，所以浏览器不会打开它。"
+          }
+        }
+      }
     },
     "%@ isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes." : {
       "comment" : "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording.",
@@ -170,10 +220,26 @@
       }
     },
     "%@ keeps sending you around" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 一直在来回跳转"
+          }
+        }
+      }
     },
     "%@ late night" : {
-      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”. Between midnight and 5 AM."
+      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”. Between midnight and 5 AM.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@凌晨"
+          }
+        }
+      }
     },
     "%@ late night, %@" : {
       "comment" : "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”. Between midnight and 5 AM.",
@@ -183,11 +249,25 @@
             "state" : "new",
             "value" : "%1$@ late night, %2$@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ %1$@凌晨"
+          }
         }
       }
     },
     "%@ morning" : {
-      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”."
+      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@上午"
+          }
+        }
+      }
     },
     "%@ morning, %@" : {
       "comment" : "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”.",
@@ -197,11 +277,25 @@
             "state" : "new",
             "value" : "%1$@ morning, %2$@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ %1$@上午"
+          }
         }
       }
     },
     "%@ muted" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it's muted."
+      "comment" : "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it's muted.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，已静音"
+          }
+        }
+      }
     },
     "%@ needs its app" : {
       "comment" : "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
@@ -215,7 +309,15 @@
       }
     },
     "%@ night" : {
-      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”."
+      "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@夜里"
+          }
+        }
+      }
     },
     "%@ night, %@" : {
       "comment" : "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”.",
@@ -224,6 +326,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ night, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ %1$@夜里"
           }
         }
       }
@@ -236,17 +344,47 @@
             "state" : "new",
             "value" : "%1$@ of %2$@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@"
+          }
         }
       }
     },
     "%@ playing audio" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it plays sound."
+      "comment" : "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it plays sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，正在播放音频"
+          }
+        }
+      }
     },
     "%@ says" : {
-      "comment" : "Title of a page's JavaScript alert, confirm or prompt sheet. The placeholder is the site's host name, or “This page”."
+      "comment" : "Title of a page's JavaScript alert, confirm or prompt sheet. The placeholder is the site's host name, or “This page”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 提示"
+          }
+        }
+      }
     },
     "%@ sent a broken page" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 发来的页面已损坏"
+          }
+        }
+      }
     },
     "%@ side panel" : {
       "comment" : "What VoiceOver calls an extension's side panel. The placeholder is the extension's name.",
@@ -278,14 +416,36 @@
             "state" : "new",
             "value" : "%1$@ to %2$@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 至 %2$@"
+          }
         }
       }
     },
     "%@ took too long" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 响应时间过长"
+          }
+        }
+      }
     },
     "%@ wants a certificate" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 要求提供证书"
+          }
+        }
+      }
     },
     "%@ wants more access" : {
       "comment" : "Title of the sheet shown when an extension's update asks for more access. The name is the extension's.",
@@ -350,6 +510,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@, by %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，作者：%2$@"
           }
         }
       }
@@ -441,6 +607,12 @@
             "state" : "new",
             "value" : "%1$@: %2$@?"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@？"
+          }
         }
       }
     },
@@ -489,7 +661,15 @@
       }
     },
     "%@?" : {
-      "comment" : "A site's permission question: the request, then a question mark, like “Use your camera?”."
+      "comment" : "A site's permission question: the request, then a question mark, like “Use your camera?”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@？"
+          }
+        }
+      }
     },
     "%@’s page is using a lot of energy" : {
       "comment" : "Toast when an extension's own page uses a lot of energy. The name is the extension's.",
@@ -618,6 +798,18 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "还有 %lld 个下载正在进行。退出后它们会暂停，下次打开 Zigzag 时可以在“下载”中继续。"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -711,6 +903,18 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个匹配项"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -730,6 +934,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld minutes left"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "还剩 %lld 分钟"
                 }
               }
             }
@@ -797,6 +1013,12 @@
             "state" : "new",
             "value" : "%1$lld of %2$lld"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld"
+          }
         }
       }
     },
@@ -851,6 +1073,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个页面"
                 }
               }
             }
@@ -1030,7 +1264,15 @@
       }
     },
     "%lld percent dark" : {
-      "comment" : "VoiceOver, the Shade slider's value, like “40 percent dark”."
+      "comment" : "VoiceOver, the Shade slider's value, like “40 percent dark”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% 暗度"
+          }
+        }
+      }
     },
     "%lld pinned tabs" : {
       "comment" : "Under a space's name in Settings › Spaces.",
@@ -1083,6 +1325,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld seconds left"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "还剩 %lld 秒"
                 }
               }
             }
@@ -1306,7 +1560,15 @@
       }
     },
     "Acknowledgments" : {
-      "comment" : "Row in the About window: the licenses of the works Zigzag uses.\nTitle of the window with the licenses of the works Zigzag uses."
+      "comment" : "Row in the About window: the licenses of the works Zigzag uses.\nTitle of the window with the licenses of the works Zigzag uses.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "致谢"
+          }
+        }
+      }
     },
     "Actual Size" : {
       "comment" : "View menu item.",
@@ -1584,7 +1846,15 @@
       }
     },
     "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%." : {
-      "comment" : "Message of the sheet that forgets the choices made for single sites."
+      "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放也会恢复为 100%。"
+          }
+        }
+      }
     },
     "After 12 Hours" : {
       "comment" : "A choice in Settings for when tabs you haven't used are archived.",
@@ -1631,7 +1901,15 @@
       }
     },
     "All History…" : {
-      "comment" : "Item in the Clear History menu on the History page."
+      "comment" : "Item in the Clear History menu on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部历史记录…"
+          }
+        }
+      }
     },
     "All Passwords" : {
       "comment" : "A kind of password in the Passwords window's column, and the list's title: every saved password.",
@@ -1645,7 +1923,15 @@
       }
     },
     "All Release Notes" : {
-      "comment" : "Button in the What’s New sheet: opens every version's notes on the website."
+      "comment" : "Button in the What’s New sheet: opens every version's notes on the website.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有发行说明"
+          }
+        }
+      }
     },
     "All in Zigzag" : {
       "comment" : "Welcome window’s import step, once everything came over.",
@@ -1879,10 +2165,26 @@
       }
     },
     "Auto" : {
-      "comment" : "Color choice in Reader: follows the Mac's light or dark look."
+      "comment" : "Color choice in Reader: follows the Mac's light or dark look.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        }
+      }
     },
     "Auto: follows your Mac" : {
-      "comment" : "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is."
+      "comment" : "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动：跟随你的 Mac"
+          }
+        }
+      }
     },
     "Back" : {
       "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the sidebar's back button.\nView menu item.",
@@ -1984,7 +2286,15 @@
       }
     },
     "Block Dialogs" : {
-      "comment" : "Button in a page's JavaScript dialog sheet, once it has shown a second dialog."
+      "comment" : "Button in a page's JavaScript dialog sheet, once it has shown a second dialog.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阻止对话框"
+          }
+        }
+      }
     },
     "Block ads and trackers" : {
       "comment" : "A setting in Settings › Privacy.\nSwitch in the site panel, in the welcome window’s picture of Zigzag.",
@@ -2341,19 +2651,59 @@
       }
     },
     "Canceled" : {
-      "comment" : "Under a download's name in the downloads panel: the download was stopped."
+      "comment" : "Under a download's name in the downloads panel: the download was stopped.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消"
+          }
+        }
+      }
     },
     "Can’t connect securely to %@" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安全连接到 %@"
+          }
+        }
+      }
     },
     "Can’t connect to %@" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接到 %@"
+          }
+        }
+      }
     },
     "Can’t find %@" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
+      "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到 %@"
+          }
+        }
+      }
     },
     "Can’t open this page" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开此页面"
+          }
+        }
+      }
     },
     "Can’t undo: spaces or pinned tabs have changed since then" : {
       "comment" : "Toast when ⌘Z can't take back a change because the sidebar changed since.",
@@ -2499,10 +2849,26 @@
       }
     },
     "Check the address for typos." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查地址是否有误。"
+          }
+        }
+      }
     },
     "Check your internet connection, then try again." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查你的互联网连接，然后再试一次。"
+          }
+        }
+      }
     },
     "Checks your writing" : {
       "comment" : "Under Grammarly in the welcome window’s list of extensions.",
@@ -2527,7 +2893,15 @@
       }
     },
     "Choose" : {
-      "comment" : "Button of the panel that picks the downloads folder."
+      "comment" : "Button of the panel that picks the downloads folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取"
+          }
+        }
+      }
     },
     "Choose File…" : {
       "comment" : "Button in the Import window: choose a passwords export or Safari export file.",
@@ -2596,7 +2970,15 @@
       }
     },
     "Choose where downloads are saved." : {
-      "comment" : "Message of the panel that picks the downloads folder."
+      "comment" : "Message of the panel that picks the downloads folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取下载内容的存储位置。"
+          }
+        }
+      }
     },
     "Clay" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale warm brown.",
@@ -2621,7 +3003,15 @@
       }
     },
     "Clear Cache" : {
-      "comment" : "Button of the sheet that clears the cache.\nButton that clears the cache, in the sheet that asks first."
+      "comment" : "Button of the sheet that clears the cache.\nButton that clears the cache, in the sheet that asks first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除缓存"
+          }
+        }
+      }
     },
     "Clear Cache for This Site…" : {
       "comment" : "Item in the … menu of the site panel.",
@@ -2646,7 +3036,15 @@
       }
     },
     "Clear Cookies" : {
-      "comment" : "Button of the sheet that clears cookies.\nButton that clears cookies, in the sheet that asks first."
+      "comment" : "Button of the sheet that clears cookies.\nButton that clears cookies, in the sheet that asks first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 Cookie"
+          }
+        }
+      }
     },
     "Clear Cookies for This Site…" : {
       "comment" : "Item in the … menu of the site panel.",
@@ -2671,7 +3069,15 @@
       }
     },
     "Clear Finished Downloads" : {
-      "comment" : "Item in the downloads panel's … menu."
+      "comment" : "Item in the downloads panel's … menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除已完成的下载"
+          }
+        }
+      }
     },
     "Clear History" : {
       "comment" : "Button of the sheet that clears history.\nButton that clears History, and the name of that change in the Edit menu, as in “Undo Clear History”.\nButton that clears all history, in the sheet that asks first.\nUndo action name, shown in the Edit menu as Undo Clear History.\nWhat Edit › Undo undoes after history is cleared.",
@@ -2718,25 +3124,81 @@
       }
     },
     "Clear cookies for %@?" : {
-      "comment" : "Title of the sheet that asks before clearing one site's cookies. The site is a domain, like example.com."
+      "comment" : "Title of the sheet that asks before clearing one site's cookies. The site is a domain, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除 %@ 的 Cookie 吗？"
+          }
+        }
+      }
     },
     "Clear cookies for every site?" : {
-      "comment" : "Title of the sheet that asks before clearing every site's cookies.\nTitle of the sheet that clears cookies."
+      "comment" : "Title of the sheet that asks before clearing every site's cookies.\nTitle of the sheet that clears cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除所有网站的 Cookie 吗？"
+          }
+        }
+      }
     },
     "Clear history from the last hour?" : {
-      "comment" : "Title of the sheet that asks before clearing part of History."
+      "comment" : "Title of the sheet that asks before clearing part of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除过去一小时的历史记录吗？"
+          }
+        }
+      }
     },
     "Clear history from today and yesterday?" : {
-      "comment" : "Title of the sheet that asks before clearing part of History."
+      "comment" : "Title of the sheet that asks before clearing part of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除今天和昨天的历史记录吗？"
+          }
+        }
+      }
     },
     "Clear history from today?" : {
-      "comment" : "Title of the sheet that asks before clearing part of History."
+      "comment" : "Title of the sheet that asks before clearing part of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除今天的历史记录吗？"
+          }
+        }
+      }
     },
     "Clear the cache for %@?" : {
-      "comment" : "Title of the sheet that asks before clearing one site's cache. The site is a domain, like example.com."
+      "comment" : "Title of the sheet that asks before clearing one site's cache. The site is a domain, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除 %@ 的缓存吗？"
+          }
+        }
+      }
     },
     "Clear the cache for every site?" : {
-      "comment" : "Title of the sheet that asks before clearing every site's cache.\nTitle of the sheet that clears the cache."
+      "comment" : "Title of the sheet that asks before clearing every site's cache.\nTitle of the sheet that clears the cache.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除所有网站的缓存吗？"
+          }
+        }
+      }
     },
     "Cleared" : {
       "comment" : "Shown on a Clear button in Settings › Privacy for a moment after it clears.",
@@ -2779,11 +3241,25 @@
             "state" : "new",
             "value" : "Click Allow to let Zigzag read %1$@’s bookmarks and passwords. Nothing in %2$@ changes."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按“允许”，让 Zigzag 读取 %1$@ 的书签和密码。%2$@ 中的内容不会有任何改动。"
+          }
         }
       }
     },
     "Click Allow to let Zigzag read Safari’s bookmarks and history. Nothing in Safari changes." : {
-      "comment" : "Message of the folder panel that lets Zigzag read Safari’s data."
+      "comment" : "Message of the folder panel that lets Zigzag read Safari’s data.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按“允许”，让 Zigzag 读取 Safari 的书签和历史记录。Safari 中的内容不会有任何改动。"
+          }
+        }
+      }
     },
     "Click a shortcut to change it. To find one, type its name or keys in Find a setting." : {
       "comment" : "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder.",
@@ -3161,7 +3637,15 @@
       }
     },
     "Column Width" : {
-      "comment" : "VoiceOver label of the column width choice in Reader's text and color choices."
+      "comment" : "VoiceOver label of the column width choice in Reader's text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "栏宽"
+          }
+        }
+      }
     },
     "Connect 1Password to Zigzag" : {
       "comment" : "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag.",
@@ -3329,7 +3813,15 @@
       }
     },
     "Copyright %@ Zigao Wang. The code is licensed under the Apache License, Version 2.0, in full at the end." : {
-      "comment" : "In the Acknowledgments window, under Zigzag. “Apache License, Version 2.0” is the license's name."
+      "comment" : "In the Acknowledgments window, under Zigzag. “Apache License, Version 2.0” is the license's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版权所有 %@ Zigao Wang。代码依据 Apache License, Version 2.0 授权，全文附在末尾。"
+          }
+        }
+      }
     },
     "Correct Spelling Automatically" : {
       "comment" : "Edit › Spelling and Grammar menu item.",
@@ -3475,7 +3967,15 @@
       }
     },
     "Couldn’t save it in that folder" : {
-      "comment" : "Why a download failed, under its name in the downloads panel."
+      "comment" : "Why a download failed, under its name in the downloads panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能存储到该文件夹"
+          }
+        }
+      }
     },
     "Couldn’t save the PDF" : {
       "comment" : "Toast when saving a copy of a PDF fails; a reason may follow as its own sentence.",
@@ -3610,10 +4110,26 @@
       }
     },
     "Dark" : {
-      "comment" : "Color choice in Reader."
+      "comment" : "Color choice in Reader.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        }
+      }
     },
     "Dark Pages" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer. Shows the pages dark."
+      "comment" : "Toolbar button tooltip in the PDF viewer. Shows the pages dark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色页面"
+          }
+        }
+      }
     },
     "Dark mode for every site" : {
       "comment" : "Under Dark Reader in the welcome window’s list of extensions.",
@@ -3627,7 +4143,15 @@
       }
     },
     "Darkest" : {
-      "comment" : "VoiceOver, the Shade slider's value at its deepest."
+      "comment" : "VoiceOver, the Shade slider's value at its deepest.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最暗"
+          }
+        }
+      }
     },
     "Data." : {
       "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
@@ -3751,7 +4275,15 @@
       }
     },
     "Didn’t finish" : {
-      "comment" : "Under a download's name in the downloads panel: the download failed."
+      "comment" : "Under a download's name in the downloads panel: the download failed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完成"
+          }
+        }
+      }
     },
     "Didn’t finish. %@." : {
       "comment" : "Under a download's name in the downloads panel: the download failed, then why, like Not enough space on your Mac.",
@@ -3798,16 +4330,48 @@
       }
     },
     "Don’t Open" : {
-      "comment" : "Button on a page's question to open an app."
+      "comment" : "Button on a page's question to open an app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不打开"
+          }
+        }
+      }
     },
     "Don’t let this page show more dialogs" : {
-      "comment" : "Tooltip of Block Dialogs in a page's JavaScript dialog sheet."
+      "comment" : "Tooltip of Block Dialogs in a page's JavaScript dialog sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再让此页面显示对话框"
+          }
+        }
+      }
     },
     "Download Again" : {
-      "comment" : "Tooltip of a download's button in the downloads panel: downloads the missing file again."
+      "comment" : "Tooltip of a download's button in the downloads panel: downloads the missing file again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新下载"
+          }
+        }
+      }
     },
     "Download PDF" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer."
+      "comment" : "Toolbar button tooltip in the PDF viewer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 PDF"
+          }
+        }
+      }
     },
     "Download files and manage your downloads" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
@@ -3986,7 +4550,15 @@
       }
     },
     "Email" : {
-      "comment" : "Button of the Send Feedback sheet: write an email."
+      "comment" : "Button of the Send Feedback sheet: write an email.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电子邮件"
+          }
+        }
+      }
     },
     "Email %@" : {
       "comment" : "Shown at the bottom of the window while pointing at an email link. The address is the link's.",
@@ -4000,7 +4572,15 @@
       }
     },
     "Email Report" : {
-      "comment" : "Button of the Report a Problem sheet."
+      "comment" : "Button of the Report a Problem sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用电子邮件发送报告"
+          }
+        }
+      }
     },
     "Empty" : {
       "comment" : "Under a space's name in Settings › Spaces: it has no tabs.",
@@ -4047,10 +4627,26 @@
       }
     },
     "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay." : {
-      "comment" : "Message of the sheet that asks before clearing all of History."
+      "comment" : "Message of the sheet that asks before clearing all of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 会忘掉你访问过的所有页面，命令栏也不再推荐它们。标签页、已固定标签页和密码会保留。"
+          }
+        }
+      }
     },
     "Every shortcut you changed goes back to its default." : {
-      "comment" : "Message of the sheet that puts every shortcut back."
+      "comment" : "Message of the sheet that puts every shortcut back.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你更改过的所有快捷键都会恢复为默认设置。"
+          }
+        }
+      }
     },
     "Every tab, at a glance" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
@@ -4343,7 +4939,15 @@
       }
     },
     "Find on page" : {
-      "comment" : "Placeholder of the find bar's field."
+      "comment" : "Placeholder of the find bar's field.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在页面上查找"
+          }
+        }
+      }
     },
     "Find one in the Chrome Web Store and choose Add to Zigzag." : {
       "comment" : "Explanation under “No extensions yet” in Settings › Extensions.",
@@ -4379,7 +4983,15 @@
       }
     },
     "Folder" : {
-      "comment" : "Name of an imported folder that had none."
+      "comment" : "Name of an imported folder that had none.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件夹"
+          }
+        }
+      }
     },
     "Folder name" : {
       "comment" : "Placeholder of the field that renames a folder, in its sidebar row.",
@@ -4536,7 +5148,15 @@
       }
     },
     "GitHub Issues" : {
-      "comment" : "Button of the Send Feedback sheet: open GitHub's issue page. A product name."
+      "comment" : "Button of the Send Feedback sheet: open GitHub's issue page. A product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub Issues"
+          }
+        }
+      }
     },
     "Glass" : {
       "comment" : "A row in the space editor's Effects, for a see-through space: clear or frosted glass.\nTooltip and accessibility label of a preset look in the space editor. Clear, see-through glass.",
@@ -4561,7 +5181,15 @@
       }
     },
     "Go to Page" : {
-      "comment" : "Tooltip of the page number in the PDF viewer's toolbar."
+      "comment" : "Tooltip of the page number in the PDF viewer's toolbar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往页面"
+          }
+        }
+      }
     },
     "Go to Space 1 to 9" : {
       "comment" : "A shortcut in Settings › Shortcuts, under View.",
@@ -4911,13 +5539,37 @@
       }
     },
     "It loads a little slower the first time. You stay signed in." : {
-      "comment" : "Message of the sheet that asks before clearing one site's cache."
+      "comment" : "Message of the sheet that asks before clearing one site's cache.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一次载入时会稍慢一些。你会保持登录状态。"
+          }
+        }
+      }
     },
     "It may have been moved, renamed or deleted." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它可能已被移动、重新命名或删除。"
+          }
+        }
+      }
     },
     "It may need more memory than your Mac can spare right now. Close some tabs, then try again." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它可能需要比你的 Mac 当前能腾出的更多内存。请关闭一些标签页，然后再试一次。"
+          }
+        }
+      }
     },
     "It opens beside this one" : {
       "comment" : "Under the split view step's title in the getting-started guide, a card in the window.",
@@ -4931,7 +5583,15 @@
       }
     },
     "It redirected the page in a loop. Clearing this site’s cookies often fixes it." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它让页面陷入了循环重定向。清除此网站的 Cookie 通常可以解决。"
+          }
+        }
+      }
     },
     "It stays at the top of this space" : {
       "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
@@ -5000,7 +5660,15 @@
       }
     },
     "Its pages load fresh next time." : {
-      "comment" : "Message of the sheet that removes one site's data."
+      "comment" : "Message of the sheet that removes one site's data.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次会重新载入它的页面。"
+          }
+        }
+      }
     },
     "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store." : {
       "comment" : "Message of the sheet that asks before removing an extension.",
@@ -5047,7 +5715,15 @@
       }
     },
     "Just downloaded" : {
-      "comment" : "Under a download's name in the downloads panel: the file has just finished downloading."
+      "comment" : "Under a download's name in the downloads panel: the file has just finished downloading.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚下载"
+          }
+        }
+      }
     },
     "Just the word" : {
       "comment" : "Under the hint to type youtube, in the getting-started guide, a card in the window.",
@@ -5162,7 +5838,15 @@
       }
     },
     "Larger Text" : {
-      "comment" : "VoiceOver label of the button in Reader's text choices that makes the text larger."
+      "comment" : "VoiceOver label of the button in Reader's text choices that makes the text larger.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更大的文字"
+          }
+        }
+      }
     },
     "Last Tab" : {
       "comment" : "Hidden View menu item, named in Settings › Shortcuts.",
@@ -5187,10 +5871,26 @@
       }
     },
     "Last night" : {
-      "comment" : "Name of a History session that began yesterday."
+      "comment" : "Name of a History session that began yesterday.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天夜里"
+          }
+        }
+      }
     },
     "Late last night" : {
-      "comment" : "Name of a History session that began today. Between midnight and 5 AM."
+      "comment" : "Name of a History session that began today. Between midnight and 5 AM.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天凌晨"
+          }
+        }
+      }
     },
     "Lavender" : {
       "comment" : "Name of a curated space color, in the space editor.",
@@ -5204,10 +5904,26 @@
       }
     },
     "Light" : {
-      "comment" : "Color choice in Reader."
+      "comment" : "Color choice in Reader.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅色"
+          }
+        }
+      }
     },
     "Lightest" : {
-      "comment" : "VoiceOver, the Shade slider's value at its lightest."
+      "comment" : "VoiceOver, the Shade slider's value at its lightest.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最浅"
+          }
+        }
+      }
     },
     "Link copied" : {
       "comment" : "Toast after the page's address is copied.",
@@ -5397,7 +6113,15 @@
       }
     },
     "Medium" : {
-      "comment" : "Choice of column width in Reader's text and color choices."
+      "comment" : "Choice of column width in Reader's text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中"
+          }
+        }
+      }
     },
     "Minimize" : {
       "comment" : "Window menu item.",
@@ -5626,7 +6350,15 @@
       }
     },
     "Moved or deleted" : {
-      "comment" : "Under a download's name in the downloads panel: the downloaded file is no longer where it was saved."
+      "comment" : "Under a download's name in the downloads panel: the downloaded file is no longer where it was saved.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移动或删除"
+          }
+        }
+      }
     },
     "Moved to %@" : {
       "comment" : "Toast after a tab moves to another space. The name is the space's.",
@@ -5728,7 +6460,15 @@
       }
     },
     "Narrow" : {
-      "comment" : "Choice of column width in Reader's text and color choices."
+      "comment" : "Choice of column width in Reader's text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窄"
+          }
+        }
+      }
     },
     "Needed to fill from Bitwarden" : {
       "comment" : "Under Bitwarden in the welcome window’s list of extensions. Bitwarden is a product name.",
@@ -5885,7 +6625,15 @@
       }
     },
     "Next" : {
-      "comment" : "Tooltip of the find bar's button that goes to the next match."
+      "comment" : "Tooltip of the find bar's button that goes to the next match.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个"
+          }
+        }
+      }
     },
     "Next Space" : {
       "comment" : "View menu item.",
@@ -5976,7 +6724,15 @@
       }
     },
     "No matches" : {
-      "comment" : "Find bar count when the page has nothing that matches."
+      "comment" : "Find bar count when the page has nothing that matches.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无匹配项"
+          }
+        }
+      }
     },
     "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export." : {
       "comment" : "Import window, when no other browser was found.",
@@ -6221,7 +6977,15 @@
       }
     },
     "Nothing downloaded yet" : {
-      "comment" : "The downloads panel when nothing was downloaded yet."
+      "comment" : "The downloads panel when nothing was downloaded yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有下载任何内容"
+          }
+        }
+      }
     },
     "Nothing in your history matches" : {
       "comment" : "Under the command bar's search-the-web result, when nothing in history matches.",
@@ -6235,7 +6999,15 @@
       }
     },
     "Nothing in your history matches “%@”." : {
-      "comment" : "On the History page when a search finds nothing. The placeholder is what was typed."
+      "comment" : "On the History page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录中没有与“%@”匹配的内容。"
+          }
+        }
+      }
     },
     "Nothing new to bring over" : {
       "comment" : "Under “All set” when an import finishes and everything was already in Zigzag.",
@@ -6458,10 +7230,26 @@
       }
     },
     "Open 1Password" : {
-      "comment" : "Button that opens the 1Password app. 1Password is a product name."
+      "comment" : "Button that opens the 1Password app. 1Password is a product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 1Password"
+          }
+        }
+      }
     },
     "Open Downloads Folder" : {
-      "comment" : "Last row of the downloads panel: opens the folder downloads are saved to."
+      "comment" : "Last row of the downloads panel: opens the folder downloads are saved to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开下载文件夹"
+          }
+        }
+      }
     },
     "Open Favorite" : {
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the favorite.",
@@ -6805,7 +7593,15 @@
       }
     },
     "Page" : {
-      "comment" : "Placeholder of the page number field in the PDF viewer's toolbar."
+      "comment" : "Placeholder of the page number field in the PDF viewer's toolbar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页码"
+          }
+        }
+      }
     },
     "Page %lld of %lld" : {
       "comment" : "VoiceOver label of the page number in the PDF viewer's toolbar.",
@@ -6814,6 +7610,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Page %1$lld of %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 页，共 %2$lld 页"
           }
         }
       }
@@ -6841,7 +7643,15 @@
       }
     },
     "Pages and Contents" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer."
+      "comment" : "Toolbar button tooltip in the PDF viewer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面和目录"
+          }
+        }
+      }
     },
     "Pages in these languages are translated as soon as they open." : {
       "comment" : "Under the list of languages in Settings › Translation.",
@@ -6855,7 +7665,15 @@
       }
     },
     "Pages load a little slower the first time you open them again. You stay signed in." : {
-      "comment" : "Message of the sheet that asks before clearing every site's cache.\nMessage of the sheet that clears the cache."
+      "comment" : "Message of the sheet that asks before clearing every site's cache.\nMessage of the sheet that clears the cache.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次打开页面时，第一次会稍慢一些。你会保持登录状态。"
+          }
+        }
+      }
     },
     "Pages you visit show up here" : {
       "comment" : "Under No history yet, in the command bar searching history.",
@@ -6869,16 +7687,48 @@
       }
     },
     "Pages you visit show up here." : {
-      "comment" : "On the History page while History is empty."
+      "comment" : "On the History page while History is empty.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你访问的页面会显示在这里。"
+          }
+        }
+      }
     },
     "Pages you visited in the last hour are forgotten on this Mac. Tabs, pinned tabs and passwords stay." : {
-      "comment" : "Message of the sheet that asks before clearing part of History."
+      "comment" : "Message of the sheet that asks before clearing part of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 会忘掉你在过去一小时内访问的页面。标签页、已固定标签页和密码会保留。"
+          }
+        }
+      }
     },
     "Pages you visited today and yesterday are forgotten on this Mac. Tabs, pinned tabs and passwords stay." : {
-      "comment" : "Message of the sheet that asks before clearing part of History."
+      "comment" : "Message of the sheet that asks before clearing part of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 会忘掉你今天和昨天访问的页面。标签页、已固定标签页和密码会保留。"
+          }
+        }
+      }
     },
     "Pages you visited today are forgotten on this Mac. Tabs, pinned tabs and passwords stay." : {
-      "comment" : "Message of the sheet that asks before clearing part of History."
+      "comment" : "Message of the sheet that asks before clearing part of History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 会忘掉你今天访问的页面。标签页、已固定标签页和密码会保留。"
+          }
+        }
+      }
     },
     "Paper" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
@@ -7057,7 +7907,15 @@
       }
     },
     "Paused" : {
-      "comment" : "Under a download's name in the downloads panel: the download is paused."
+      "comment" : "Under a download's name in the downloads panel: the download is paused.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停"
+          }
+        }
+      }
     },
     "Paused, %@ of %@" : {
       "comment" : "Under a download's name in the downloads panel: a paused download, and how much of it has come, like 3.7 MB of 9 MB.",
@@ -7066,6 +7924,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Paused, %1$@ of %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，%1$@ / %2$@"
           }
         }
       }
@@ -7359,7 +8223,15 @@
       }
     },
     "Previous" : {
-      "comment" : "Tooltip of the find bar's button that goes to the previous match."
+      "comment" : "Tooltip of the find bar's button that goes to the previous match.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一个"
+          }
+        }
+      }
     },
     "Previous Space" : {
       "comment" : "View menu item.",
@@ -7483,7 +8355,15 @@
       }
     },
     "Quit" : {
-      "comment" : "Button of the sheet that asks before quitting."
+      "comment" : "Button of the sheet that asks before quitting.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出"
+          }
+        }
+      }
     },
     "Quit Zigzag" : {
       "comment" : "Zigzag menu item.",
@@ -7497,7 +8377,15 @@
       }
     },
     "Quit Zigzag?" : {
-      "comment" : "Title of the sheet that asks before quitting."
+      "comment" : "Title of the sheet that asks before quitting.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要退出 Zigzag 吗？"
+          }
+        }
+      }
     },
     "Read and change cookies on the sites it can access" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
@@ -7621,7 +8509,15 @@
       }
     },
     "Read the original on %@" : {
-      "comment" : "Link at the end of an article in Reader, to the page it came from. The placeholder is the site's name."
+      "comment" : "Link at the end of an article in Reader, to the page it came from. The placeholder is the site's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 上阅读原文"
+          }
+        }
+      }
     },
     "Reader" : {
       "comment" : "Action in the site panel, under its icon: opens or closes Reader.",
@@ -7734,7 +8630,15 @@
       }
     },
     "Release Notes" : {
-      "comment" : "Row in the About window."
+      "comment" : "Row in the About window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发行说明"
+          }
+        }
+      }
     },
     "Reload" : {
       "comment" : "Tooltip of a button in the strip on top of each page of a split view: reloads the page.\nTooltip of the sidebar's reload button.",
@@ -7803,7 +8707,15 @@
       }
     },
     "Remove %lld Pages from History" : {
-      "comment" : "Tooltip of the × on a site's group of pages on the History page. Always two or more."
+      "comment" : "Tooltip of the × on a site's group of pages on the History page. Always two or more.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除 %lld 个页面"
+          }
+        }
+      }
     },
     "Remove %lld Pinned Pages" : {
       "comment" : "Menu item: takes several picked pinned pages out of the sidebar",
@@ -7872,10 +8784,26 @@
       }
     },
     "Remove Session from History" : {
-      "comment" : "Tooltip of the × on a session's heading on the History page."
+      "comment" : "Tooltip of the × on a session's heading on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除这段浏览"
+          }
+        }
+      }
     },
     "Remove data for %@?" : {
-      "comment" : "Title of the sheet that removes one site's data; the site, like apple.com."
+      "comment" : "Title of the sheet that removes one site's data; the site, like apple.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除 %@ 的数据吗？"
+          }
+        }
+      }
     },
     "Remove from Favorites" : {
       "comment" : "Item in a favorite's context menu.\nUndo action name, shown in the Edit menu as Undo Remove from Favorites.",
@@ -7900,7 +8828,15 @@
       }
     },
     "Remove from History" : {
-      "comment" : "Tooltip of the × on a page on the History page."
+      "comment" : "Tooltip of the × on a page on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除"
+          }
+        }
+      }
     },
     "Remove from Zigzag" : {
       "comment" : "Tooltip of the trash button on an extension's row in Settings › Extensions.",
@@ -7936,7 +8872,15 @@
       }
     },
     "Remove these %lld pages from History?" : {
-      "comment" : "Title of the sheet that asks before removing the pages a search found from History. Always two or more."
+      "comment" : "Title of the sheet that asks before removing the pages a search found from History. Always two or more.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要从历史记录中移除这 %lld 个页面吗？"
+          }
+        }
+      }
     },
     "Remove this extension?" : {
       "comment" : "Title of the sheet that asks before removing an extension without a name.",
@@ -7950,7 +8894,15 @@
       }
     },
     "Remove this page from History?" : {
-      "comment" : "Title of the sheet that asks before removing one page a search found from History."
+      "comment" : "Title of the sheet that asks before removing one page a search found from History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要从历史记录中移除此页面吗？"
+          }
+        }
+      }
     },
     "Removed %lld pinned pages" : {
       "comment" : "Toast after removing several pinned pages",
@@ -8063,7 +9015,15 @@
       }
     },
     "Report a Problem" : {
-      "comment" : "Title of the Report a Problem sheet."
+      "comment" : "Title of the Report a Problem sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题"
+          }
+        }
+      }
     },
     "Report a Problem…" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nHelp menu item.",
@@ -8110,13 +9070,37 @@
       }
     },
     "Reset all shortcuts?" : {
-      "comment" : "Title of the sheet that puts every shortcut back."
+      "comment" : "Title of the sheet that puts every shortcut back.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重置所有快捷键吗？"
+          }
+        }
+      }
     },
     "Reset choices made for single sites?" : {
-      "comment" : "Title of the sheet that forgets the choices made for single sites."
+      "comment" : "Title of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重置为单个网站所做的选择吗？"
+          }
+        }
+      }
     },
     "Restore and Restart" : {
-      "comment" : "Button of the sheet that restores the backup."
+      "comment" : "Button of the sheet that restores the backup.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复并重新启动"
+          }
+        }
+      }
     },
     "Restore from before the last update" : {
       "comment" : "A setting in Settings › General.",
@@ -8130,7 +9114,15 @@
       }
     },
     "Restore from before the last update?" : {
-      "comment" : "Title of the sheet that restores the backup."
+      "comment" : "Title of the sheet that restores the backup.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要恢复到上次更新之前吗？"
+          }
+        }
+      }
     },
     "Restore…" : {
       "comment" : "Button in Settings › General that restores the backup from before the last update.",
@@ -8155,7 +9147,15 @@
       }
     },
     "Resume" : {
-      "comment" : "Tooltip of a download's button in the downloads panel: carries on with a paused download."
+      "comment" : "Tooltip of a download's button in the downloads panel: carries on with a paused download.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
     },
     "Return keeps it, Esc cancels" : {
       "comment" : "Under a hint in the getting-started guide, a card in the window, while the new space's editor is open. Return and Esc are keys.",
@@ -8279,7 +9279,15 @@
       }
     },
     "Sans" : {
-      "comment" : "Choice of typeface in Reader's text and color choices: sans serif."
+      "comment" : "Choice of typeface in Reader's text and color choices: sans serif.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无衬线"
+          }
+        }
+      }
     },
     "Save" : {
       "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton that saves the changes to a login in the Passwords window.",
@@ -8293,7 +9301,15 @@
       }
     },
     "Save Downloads To" : {
-      "comment" : "Heading in the downloads panel's … menu, over the folder choices."
+      "comment" : "Heading in the downloads panel's … menu, over the folder choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载内容存储到"
+          }
+        }
+      }
     },
     "Save Page As…" : {
       "comment" : "File menu item.",
@@ -8307,7 +9323,15 @@
       }
     },
     "Save a Copy…" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer. For a PDF already on the Mac."
+      "comment" : "Toolbar button tooltip in the PDF viewer. For a PDF already on the Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储副本…"
+          }
+        }
+      }
     },
     "Save downloads to" : {
       "comment" : "A setting in Settings › General.",
@@ -8558,7 +9582,15 @@
       }
     },
     "Search the web for “%@”" : {
-      "comment" : "Command bar result when nothing in history matches. The query is what was typed."
+      "comment" : "Command bar result when nothing in history matches. The query is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在网上搜索“%@”"
+          }
+        }
+      }
     },
     "Search with %@" : {
       "comment" : "Item in a page's right-click menu. The placeholder is the search engine's name, like “Google”.",
@@ -8671,7 +9703,15 @@
       }
     },
     "Send Feedback" : {
-      "comment" : "Title of the Send Feedback sheet."
+      "comment" : "Title of the Send Feedback sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送反馈"
+          }
+        }
+      }
     },
     "Send Feedback…" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nHelp menu item.",
@@ -8718,10 +9758,26 @@
       }
     },
     "Sepia" : {
-      "comment" : "Color choice in Reader: warm paper."
+      "comment" : "Color choice in Reader: warm paper.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "棕褐色"
+          }
+        }
+      }
     },
     "Serif" : {
-      "comment" : "Choice of typeface in Reader's text and color choices."
+      "comment" : "Choice of typeface in Reader's text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "衬线"
+          }
+        }
+      }
     },
     "Services" : {
       "comment" : "Submenu of the Zigzag menu, filled by macOS.",
@@ -8801,7 +9857,15 @@
       }
     },
     "Share your screen" : {
-      "comment" : "Title of the prompt when a site asks to share the screen."
+      "comment" : "Title of the prompt when a site asks to share the screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享你的屏幕"
+          }
+        }
+      }
     },
     "Share…" : {
       "comment" : "File menu item.",
@@ -8848,7 +9912,15 @@
       }
     },
     "Show %lld More" : {
-      "comment" : "Button under a site's first hundred pages on the History page."
+      "comment" : "Button under a site's first hundred pages on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再显示 %lld 个"
+          }
+        }
+      }
     },
     "Show Ads" : {
       "comment" : "Answer in the welcome window’s ad blocking step.",
@@ -8873,7 +9945,15 @@
       }
     },
     "Show All Downloads" : {
-      "comment" : "Last row of the downloads panel, opened on one download: shows the rest of the list."
+      "comment" : "Last row of the downloads panel, opened on one download: shows the rest of the list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有下载"
+          }
+        }
+      }
     },
     "Show All Tabs" : {
       "comment" : "View menu item.",
@@ -8964,7 +10044,15 @@
       }
     },
     "Show Report" : {
-      "comment" : "Button of the Report a Problem sheet: shows the report in Finder."
+      "comment" : "Button of the Report a Problem sheet: shows the report in Finder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示报告"
+          }
+        }
+      }
     },
     "Show Sidebar" : {
       "comment" : "Menu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden.",
@@ -9011,7 +10099,15 @@
       }
     },
     "Show details" : {
-      "comment" : "Disclosure on the page Zigzag shows for a site whose certificate can't be trusted."
+      "comment" : "Disclosure on the page Zigzag shows for a site whose certificate can't be trusted.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示详细信息"
+          }
+        }
+      }
     },
     "Show in Finder" : {
       "comment" : "Button in the Import window: show the exported passwords file in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
@@ -9091,7 +10187,15 @@
       }
     },
     "Sign In" : {
-      "comment" : "Button in a site's HTTP sign-in sheet."
+      "comment" : "Button in a site's HTTP sign-in sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录"
+          }
+        }
+      }
     },
     "Sign In for %@" : {
       "comment" : "Title of the window where an extension signs in to an account. The placeholder is the extension's name.",
@@ -9105,7 +10209,15 @@
       }
     },
     "Sign in to %@" : {
-      "comment" : "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."
+      "comment" : "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录 %@"
+          }
+        }
+      }
     },
     "Sign in to each one after it’s added." : {
       "comment" : "Note under the welcome window’s list of extensions.",
@@ -9262,7 +10374,15 @@
       }
     },
     "Smaller Text" : {
-      "comment" : "VoiceOver label of the button in Reader's text choices that makes the text smaller."
+      "comment" : "VoiceOver label of the button in Reader's text choices that makes the text smaller.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更小的文字"
+          }
+        }
+      }
     },
     "Smart Copy/Paste" : {
       "comment" : "Edit › Substitutions menu item.",
@@ -9320,7 +10440,15 @@
       }
     },
     "Smooth" : {
-      "comment" : "VoiceOver, the Grain slider's value with no grain."
+      "comment" : "VoiceOver, the Grain slider's value with no grain.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平滑"
+          }
+        }
+      }
     },
     "So ⌘Q never closes everything by accident." : {
       "comment" : "Explanation under “Ask before quitting” in Settings › General.",
@@ -9334,7 +10462,15 @@
       }
     },
     "Solid" : {
-      "comment" : "VoiceOver, the See-through slider's value when nothing shows through."
+      "comment" : "VoiceOver, the See-through slider's value when nothing shows through.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不透明"
+          }
+        }
+      }
     },
     "Some content isn’t secure" : {
       "comment" : "Under the site's name in the site panel, for an https page with some parts loaded over plain http.",
@@ -9359,19 +10495,59 @@
       }
     },
     "Something went wrong on the site’s side. Try again in a moment." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站那边出了问题。请稍后再试。"
+          }
+        }
+      }
     },
     "Something went wrong while loading it. Try again in a moment." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "载入时出了问题。请稍后再试。"
+          }
+        }
+      }
     },
     "Source Code" : {
-      "comment" : "Row in the About window; GitHub is beside it."
+      "comment" : "Row in the About window; GitHub is beside it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "源代码"
+          }
+        }
+      }
     },
     "Source of %@" : {
-      "comment" : "Title of the tab that shows a page's HTML source. The host is the site's, like example.com."
+      "comment" : "Title of the tab that shows a page's HTML source. The host is the site's, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的源代码"
+          }
+        }
+      }
     },
     "Source of page" : {
-      "comment" : "Title of the tab that shows a page's HTML source, for a page with no host."
+      "comment" : "Title of the tab that shows a page's HTML source, for a page with no host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面源代码"
+          }
+        }
+      }
     },
     "Space %@" : {
       "comment" : "Accessibility label of a space's button at the bottom of the sidebar. The placeholder is the space's name.",
@@ -9743,7 +10919,15 @@
       }
     },
     "Tell us what works, what doesn’t, and what you’d like. Email reaches the developer directly. GitHub Issues are public, so leave out anything personal." : {
-      "comment" : "Message of the Send Feedback sheet. GitHub Issues is a product name."
+      "comment" : "Message of the Send Feedback sheet. GitHub Issues is a product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "告诉我们哪些好用、哪些不好用，以及你想要什么。电子邮件会直接发给开发者。GitHub Issues 是公开的，请不要写入任何个人信息。"
+          }
+        }
+      }
     },
     "Text %lld%%" : {
       "comment" : "Toast when Reader's text size changes, like Text 120%.",
@@ -9768,7 +10952,15 @@
       }
     },
     "Text and Colors" : {
-      "comment" : "Tooltip of the button in Reader's bar that shows its text and color choices."
+      "comment" : "Tooltip of the button in Reader's bar that shows its text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字和颜色"
+          }
+        }
+      }
     },
     "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way." : {
       "comment" : "Thank-you note from the maker at the end of the getting-started guide, a card in the window, signed by him.",
@@ -9859,10 +11051,26 @@
       }
     },
     "The Last Hour…" : {
-      "comment" : "Item in the Clear History menu on the History page."
+      "comment" : "Item in the Clear History menu on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "过去一小时…"
+          }
+        }
+      }
     },
     "The Zigzag name, the app icon and the logo are trademarks of Zigao Wang, all rights reserved. They aren’t covered by the Apache License: see [TRADEMARKS.md](TRADEMARKS.md)." : {
-      "comment" : "In the Acknowledgments window. Keep the Markdown link [TRADEMARKS.md](TRADEMARKS.md) as it is."
+      "comment" : "In the Acknowledgments window. Keep the Markdown link [TRADEMARKS.md](TRADEMARKS.md) as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 名称、App 图标和标志是 Zigao Wang 的商标，保留所有权利。它们不在 Apache License 的授权范围内：请参阅 [TRADEMARKS.md](TRADEMARKS.md)。"
+          }
+        }
+      }
     },
     "The cache makes pages load faster. Cookies keep you signed in." : {
       "comment" : "Explanation under “Website data” in Settings › Privacy.",
@@ -9876,7 +11084,15 @@
       }
     },
     "The connection dropped" : {
-      "comment" : "Why a download failed, under its name in the downloads panel."
+      "comment" : "Why a download failed, under its name in the downloads panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接已中断"
+          }
+        }
+      }
     },
     "The file isn’t protected: anyone who opens it can read every password. Keep it somewhere safe and delete it when you’re done." : {
       "comment" : "Message of the sheet that confirms exporting passwords.",
@@ -9923,7 +11139,15 @@
       }
     },
     "The page belongs to an extension that has been removed or turned off. Turn it back on in Settings › Extensions, or close this tab." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面属于一个已被移除或关闭的扩展。请在“设置 › 扩展”中重新打开它，或者关闭此标签页。"
+          }
+        }
+      }
     },
     "The page meets the window’s edges instead of floating inside it." : {
       "comment" : "Explanation under “Borderless page” in Settings › General.",
@@ -9948,34 +11172,114 @@
       }
     },
     "The secure connection was cut off, often by the network you’re on. Try again, or try another network." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全连接被切断了，通常是你所在的网络造成的。请再试一次，或换一个网络。"
+          }
+        }
+      }
     },
     "The site couldn’t send it" : {
-      "comment" : "Why a download failed, under its name in the downloads panel."
+      "comment" : "Why a download failed, under its name in the downloads panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站无法发送该文件"
+          }
+        }
+      }
     },
     "The site didn’t respond in time. Try again in a moment." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站没有及时响应。请稍后再试。"
+          }
+        }
+      }
     },
     "The site may be down right now. Try again in a moment." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站现在可能无法访问。请稍后再试。"
+          }
+        }
+      }
     },
     "The site only opens for Macs with a certificate it trusts, often one from work or school." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站只对带有它信任的证书的 Mac 开放，这种证书通常来自工作单位或学校。"
+          }
+        }
+      }
     },
     "The site refused it" : {
-      "comment" : "Why a download failed, under its name in the downloads panel."
+      "comment" : "Why a download failed, under its name in the downloads panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站拒绝了该请求"
+          }
+        }
+      }
     },
     "The site’s certificate has expired, or your Mac’s date and time are wrong." : {
-      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it."
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书已过期，或者你 Mac 的日期和时间不正确。"
+          }
+        }
+      }
     },
     "The site’s certificate is for a different address, or can’t be trusted. Someone could be pretending to be this site." : {
-      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it."
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书属于另一个地址，或者不可信。可能有人在冒充这个网站。"
+          }
+        }
+      }
     },
     "The site’s certificate isn’t valid yet. Check your Mac’s date and time." : {
-      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it."
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书尚未生效。请检查你 Mac 的日期和时间。"
+          }
+        }
+      }
     },
     "The site’s certificate wasn’t issued by anyone your Mac trusts. Sites on your own network, like a router, often look like this." : {
-      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it."
+      "comment" : "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该网站的证书不是由你的 Mac 信任的机构颁发的。你自己网络上的网站（比如路由器）常常是这样。"
+          }
+        }
+      }
     },
     "They leave the sidebar. Type a few letters in the address bar to bring one back." : {
       "comment" : "Explanation under “Archive tabs you haven’t used” in Settings › General.",
@@ -9989,7 +11293,15 @@
       }
     },
     "They’re forgotten on this Mac. Tabs, pinned tabs and passwords stay." : {
-      "comment" : "Message of the sheet that asks before removing pages a search found from History."
+      "comment" : "Message of the sheet that asks before removing pages a search found from History.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 会忘掉它们。标签页、已固定标签页和密码会保留。"
+          }
+        }
+      }
     },
     "Things appear in place instead of sliding or growing. Fades stay." : {
       "comment" : "Explanation under “Reduce motion” in Settings › General.",
@@ -10014,7 +11326,15 @@
       }
     },
     "This afternoon" : {
-      "comment" : "Name of a History session that began today."
+      "comment" : "Name of a History session that began today.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天下午"
+          }
+        }
+      }
     },
     "This build doesn’t update itself. Release builds of Zigzag update automatically." : {
       "comment" : "Toast after Check for Updates in a development build.",
@@ -10028,10 +11348,26 @@
       }
     },
     "This connection isn’t private" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此连接不是私密连接"
+          }
+        }
+      }
     },
     "This evening" : {
-      "comment" : "Name of a History session that began today."
+      "comment" : "Name of a History session that began today.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天晚上"
+          }
+        }
+      }
     },
     "This extension" : {
       "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.\nStands in for an extension's name when it has none, at the start of a sentence.",
@@ -10045,7 +11381,15 @@
       }
     },
     "This extension isn’t here" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展不在这里"
+          }
+        }
+      }
     },
     "This extension wants more access" : {
       "comment" : "Title of the sheet shown when an update of an extension with no name asks for more access.",
@@ -10081,13 +11425,37 @@
       }
     },
     "This file isn’t there" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件不在这里"
+          }
+        }
+      }
     },
     "This morning" : {
-      "comment" : "Name of a History session that began today."
+      "comment" : "Name of a History session that began today.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天上午"
+          }
+        }
+      }
     },
     "This page" : {
-      "comment" : "Stands for the site in a page's JavaScript dialog when the page has no host, as in “This page says”.\nStands for the site in a question when the page has no host."
+      "comment" : "Stands for the site in a page's JavaScript dialog when the page has no host, as in “This page says”.\nStands for the site in a question when the page has no host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面"
+          }
+        }
+      }
     },
     "This page doesn’t have an article to read" : {
       "comment" : "Toast when Reader can't find an article on the page.",
@@ -10123,10 +11491,26 @@
       }
     },
     "This page isn’t available" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面不可用"
+          }
+        }
+      }
     },
     "This page keeps stopping" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面一直停止响应"
+          }
+        }
+      }
     },
     "This password is easy to guess. Change it on the site, and use a strong password Zigzag makes for you." : {
       "comment" : "Warning on a weak password in the Passwords window.",
@@ -10151,7 +11535,15 @@
       }
     },
     "This site needs a name and password." : {
-      "comment" : "Message in the sheet a site's HTTP sign-in asks with."
+      "comment" : "Message in the sheet a site's HTTP sign-in asks with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站需要名称和密码。"
+          }
+        }
+      }
     },
     "This site’s password rules didn’t fit a strong password. Type one yourself." : {
       "comment" : "Toast when Zigzag couldn't make a strong password the site accepts.",
@@ -10209,7 +11601,15 @@
       }
     },
     "Today and Yesterday…" : {
-      "comment" : "Item in the Clear History menu on the History page."
+      "comment" : "Item in the Clear History menu on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天和昨天…"
+          }
+        }
+      }
     },
     "Today’s news" : {
       "comment" : "Heading of a sample news page in the welcome window’s picture of Zigzag.",
@@ -10223,10 +11623,26 @@
       }
     },
     "Today…" : {
-      "comment" : "Item in the Clear History menu on the History page."
+      "comment" : "Item in the Clear History menu on the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天…"
+          }
+        }
+      }
     },
     "Tonight" : {
-      "comment" : "Name of a History session that began today."
+      "comment" : "Name of a History session that began today.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天夜里"
+          }
+        }
+      }
     },
     "Transformations" : {
       "comment" : "Submenu of the Edit menu.",
@@ -10350,7 +11766,15 @@
       }
     },
     "Try again in a moment." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请稍后再试。"
+          }
+        }
+      }
     },
     "Try new versions first, on your own tabs and data." : {
       "comment" : "Explanation under “Beta updates” in Settings › General.",
@@ -10386,7 +11810,15 @@
       }
     },
     "Two Pages" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer. Shows two pages side by side."
+      "comment" : "Toolbar button tooltip in the PDF viewer. Shows two pages side by side.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双页"
+          }
+        }
+      }
     },
     "Two pages, side by side" : {
       "comment" : "Under a step's title in the getting-started guide, a card in the window.",
@@ -10444,7 +11876,15 @@
       }
     },
     "Typeface" : {
-      "comment" : "VoiceOver label of the typeface choice in Reader's text and color choices."
+      "comment" : "VoiceOver label of the typeface choice in Reader's text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字体"
+          }
+        }
+      }
     },
     "Under sign-in fields, only on the site each was saved for." : {
       "comment" : "Explanation under “Fill saved passwords” in Settings › Passwords.",
@@ -10748,7 +12188,15 @@
       }
     },
     "Use %@" : {
-      "comment" : "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."
+      "comment" : "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 %@"
+          }
+        }
+      }
     },
     "Use Selection for Find" : {
       "comment" : "Edit › Find menu item.",
@@ -10784,16 +12232,48 @@
       }
     },
     "Use your camera" : {
-      "comment" : "A site's permission question, without its question mark."
+      "comment" : "A site's permission question, without its question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的摄像头"
+          }
+        }
+      }
     },
     "Use your camera and microphone" : {
-      "comment" : "A site's permission question, without its question mark."
+      "comment" : "A site's permission question, without its question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的摄像头和麦克风"
+          }
+        }
+      }
     },
     "Use your location" : {
-      "comment" : "A site's permission question, without its question mark."
+      "comment" : "A site's permission question, without its question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的位置"
+          }
+        }
+      }
     },
     "Use your microphone" : {
-      "comment" : "A site's permission question, without its question mark."
+      "comment" : "A site's permission question, without its question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的麦克风"
+          }
+        }
+      }
     },
     "Used for “%@”" : {
       "comment" : "In Settings › Shortcuts while recording, when the keys belong to a fixed command; its name.",
@@ -10902,6 +12382,12 @@
             "state" : "new",
             "value" : "Version %1$@ (%2$@)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %1$@（%2$@）"
+          }
         }
       }
     },
@@ -10950,7 +12436,15 @@
       }
     },
     "Visit this site anyway" : {
-      "comment" : "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details."
+      "comment" : "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然访问此网站"
+          }
+        }
+      }
     },
     "Waiting" : {
       "comment" : "By a browser in the welcome window while another one is imported first.\nBy an extension in the welcome window while others are added first.",
@@ -11041,7 +12535,15 @@
       }
     },
     "What happened, and what were you doing just before?" : {
-      "comment" : "First line of the problem report email, for the person to answer."
+      "comment" : "First line of the problem report email, for the person to answer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发生了什么？在那之前你正在做什么？"
+          }
+        }
+      }
     },
     "What stopped it is below, with a way to fix it." : {
       "comment" : "Under “Not yet” when an import finishes with a problem.",
@@ -11121,7 +12623,15 @@
       }
     },
     "Wide" : {
-      "comment" : "Choice of column width in Reader's text and color choices."
+      "comment" : "Choice of column width in Reader's text and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "宽"
+          }
+        }
+      }
     },
     "Window" : {
       "comment" : "A heading in Settings › General.\nA menu in the menu bar.",
@@ -11146,7 +12656,15 @@
       }
     },
     "Works by others" : {
-      "comment" : "Heading in the Acknowledgments window, above the open source works Zigzag ships with."
+      "comment" : "Heading in the Acknowledgments window, above the open source works Zigzag ships with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他人的作品"
+          }
+        }
+      }
     },
     "Works in Zigzag" : {
       "comment" : "On the bar over a Chrome Web Store page for an extension that works in Zigzag.",
@@ -11182,16 +12700,48 @@
       }
     },
     "Yesterday afternoon" : {
-      "comment" : "Name of a History session that began yesterday."
+      "comment" : "Name of a History session that began yesterday.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天下午"
+          }
+        }
+      }
     },
     "Yesterday evening" : {
-      "comment" : "Name of a History session that began yesterday."
+      "comment" : "Name of a History session that began yesterday.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天晚上"
+          }
+        }
+      }
     },
     "Yesterday late night" : {
-      "comment" : "Name of a History session that began yesterday. Between midnight and 5 AM."
+      "comment" : "Name of a History session that began yesterday. Between midnight and 5 AM.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天凌晨"
+          }
+        }
+      }
     },
     "Yesterday morning" : {
-      "comment" : "Name of a History session that began yesterday."
+      "comment" : "Name of a History session that began yesterday.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天上午"
+          }
+        }
+      }
     },
     "You searched YouTube from here" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
@@ -11205,10 +12755,26 @@
       }
     },
     "Your Mac doesn’t let Zigzag open it." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Mac 不允许 Zigzag 打开它。"
+          }
+        }
+      }
     },
     "Your Mac may not be connected to the internet, or the address may have a typo. Check both, then try again." : {
-      "comment" : "Message on the page Zigzag shows when a page can't load."
+      "comment" : "Message on the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Mac 可能没有连接到互联网，或者地址可能有误。请检查这两项，然后再试一次。"
+          }
+        }
+      }
     },
     "Your Spaces" : {
       "comment" : "A heading in Settings › Spaces.",
@@ -11310,10 +12876,26 @@
       }
     },
     "Your spaces, tabs, favorites and history go back to how they were before the last update, and Zigzag restarts. Logins and passwords aren’t affected." : {
-      "comment" : "Message of the sheet that restores the backup."
+      "comment" : "Message of the sheet that restores the backup.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的空间、标签页、收藏和历史记录会恢复到上次更新之前的样子，然后 Zigzag 会重新启动。登录信息和密码不受影响。"
+          }
+        }
+      }
     },
     "Your tabs and spaces will be right here when you open it again." : {
-      "comment" : "Message of the sheet that asks before quitting; “it” is Zigzag."
+      "comment" : "Message of the sheet that asks before quitting; “it” is Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次打开时，你的标签页和空间都会在这里。"
+          }
+        }
+      }
     },
     "Your top sites" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
@@ -11327,13 +12909,37 @@
       }
     },
     "You’ll be signed out of %@, and its pages load fresh next time." : {
-      "comment" : "Message of the sheet that removes one site's data."
+      "comment" : "Message of the sheet that removes one site's data.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你将退出 %@ 的登录，下次会重新载入它的页面。"
+          }
+        }
+      }
     },
     "You’ll be signed out of %@. Other sites aren’t touched." : {
-      "comment" : "Message of the sheet that asks before clearing one site's cookies."
+      "comment" : "Message of the sheet that asks before clearing one site's cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你将退出 %@ 的登录。其他网站不受影响。"
+          }
+        }
+      }
     },
     "You’ll be signed out of every site. Your passwords, pinned tabs and history stay." : {
-      "comment" : "Message of the sheet that asks before clearing every site's cookies.\nMessage of the sheet that clears cookies."
+      "comment" : "Message of the sheet that asks before clearing every site's cookies.\nMessage of the sheet that clears cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你将在所有网站上退出登录。你的密码、已固定标签页和历史记录会保留。"
+          }
+        }
+      }
     },
     "You’re all set" : {
       "comment" : "Title of the Import window when the import is done.\nTitle of the getting-started guide, a card in the window once every step is done.",
@@ -11347,7 +12953,15 @@
       }
     },
     "You’re offline" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load.\nWhy a download failed, under its name in the downloads panel."
+      "comment" : "Title of the page Zigzag shows when a page can't load.\nWhy a download failed, under its name in the downloads panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已离线"
+          }
+        }
+      }
     },
     "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings." : {
       "comment" : "Import window when the import is done and sign-ins came over.",
@@ -11383,10 +12997,26 @@
       }
     },
     "Zigzag can’t open this address" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 无法打开此地址"
+          }
+        }
+      }
     },
     "Zigzag can’t read this file" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 无法读取此文件"
+          }
+        }
+      }
     },
     "Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts." : {
       "comment" : "Toast when filling a form from Contacts isn't allowed. System Settings › Privacy › Contacts and My Card are names macOS uses; match them.",
@@ -11494,7 +13124,15 @@
       }
     },
     "Zigzag is made by Zigao Wang and is open source under the Apache License, Version 2.0. It builds on the work of others, listed below with their licenses. Thank you." : {
-      "comment" : "First paragraph of the Acknowledgments window. “Apache License, Version 2.0” is the license's name."
+      "comment" : "First paragraph of the Acknowledgments window. “Apache License, Version 2.0” is the license's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 由 Zigao Wang 制作，依据 Apache License, Version 2.0 开源。它建立在他人的成果之上，下面列出了这些作品及其许可证。谢谢你们。"
+          }
+        }
+      }
     },
     "Zigzag is your default browser" : {
       "comment" : "In Settings › General, in place of Set as Default once it's done.",
@@ -11552,10 +13190,26 @@
       }
     },
     "Zigzag won’t open this port" : {
-      "comment" : "Title of the page Zigzag shows when a page can't load."
+      "comment" : "Title of the page Zigzag shows when a page can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 不会打开此端口"
+          }
+        }
+      }
     },
     "Zigzag writes a short report for your email: its version, your Mac, what went wrong lately and on which sites, and crash and freeze reports. Never the pages’ addresses, your tabs or history. Show Report lets you read it first." : {
-      "comment" : "Message of the Report a Problem sheet. “Show Report” is the sheet's other button."
+      "comment" : "Message of the Report a Problem sheet. “Show Report” is the sheet's other button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 会为你的电子邮件写一份简短的报告：它的版本、你的 Mac、最近出了什么问题以及在哪些网站上，还有崩溃和卡顿报告。绝不包含页面地址、你的标签页或历史记录。点按“显示报告”可以先读一读。"
+          }
+        }
+      }
     },
     "Zoom" : {
       "comment" : "Row in the site panel's This Site group.\nWindow menu item.",
@@ -11591,10 +13245,26 @@
       }
     },
     "a few seconds left" : {
-      "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma."
+      "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还剩几秒"
+          }
+        }
+      }
     },
     "a minute left" : {
-      "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma."
+      "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还剩 1 分钟"
+          }
+        }
+      }
     },
     "about %lld hours left" : {
       "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma.",
@@ -11616,11 +13286,31 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "还剩大约 %lld 小时"
+                }
+              }
+            }
+          }
         }
       }
     },
     "about an hour left" : {
-      "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma."
+      "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还剩大约 1 小时"
+          }
+        }
+      }
     },
     "accessibility.state-separator" : {
       "comment" : "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”.",
@@ -11630,6 +13320,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : ", "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "，"
           }
         }
       }
@@ -11756,7 +13452,15 @@
       }
     },
     "current tab" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name: it's the tab you're on."
+      "comment" : "Spoken by VoiceOver after a tab row's name: it's the tab you're on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前标签页"
+          }
+        }
+      }
     },
     "email" : {
       "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.",
@@ -12168,7 +13872,15 @@
       }
     },
     "muted" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name: the tab is muted."
+      "comment" : "Spoken by VoiceOver after a tab row's name: the tab is muted.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已静音"
+          }
+        }
+      }
     },
     "notifications allowed" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
@@ -12193,7 +13905,15 @@
       }
     },
     "open" : {
-      "comment" : "Spoken by VoiceOver after a favorite's name: its page is loaded."
+      "comment" : "Spoken by VoiceOver after a favorite's name: its page is loaded.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已打开"
+          }
+        }
+      }
     },
     "opens %@" : {
       "comment" : "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name.",
@@ -12218,7 +13938,15 @@
       }
     },
     "playing audio" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name: the tab plays sound."
+      "comment" : "Spoken by VoiceOver after a tab row's name: the tab plays sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在播放音频"
+          }
+        }
+      }
     },
     "pop-ups allowed" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
@@ -12254,7 +13982,15 @@
       }
     },
     "selected" : {
-      "comment" : "What VoiceOver says after a checked item in one of Zigzag's menus."
+      "comment" : "What VoiceOver says after a checked item in one of Zigzag's menus.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选中"
+          }
+        }
+      }
     },
     "shortcut" : {
       "comment" : "A word that finds keyboard shortcuts with Find a setting in Settings. Not shown.",
@@ -12365,6 +14101,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "© %1$@ Zigao Wang. %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "© %1$@ Zigao Wang。%2$@。"
           }
         }
       }
