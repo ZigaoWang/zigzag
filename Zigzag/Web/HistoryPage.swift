@@ -287,6 +287,8 @@ enum HistoryPage {
         }
         func pages(_ n: Int) -> String { String(localized: "\(n) pages", comment: "Count of pages in a session, or under a site, on the History page.") }
         let words: [String: String] = [
+            // The locale the page writes times in, like "en-US" ("2:10 PM") or "zh-Hans" ("14:10").
+            "locale": Words.dates.identifier(.bcp47),
             "span": String(localized: "\("{from}") to \("{to}")", comment: "The time a session or a site's pages span on the History page, like “2:10 to 4:45 PM”."),
             "page": pages(1).replacingOccurrences(of: "1", with: "{n}"),
             "pages": counted(pages),
@@ -416,7 +418,7 @@ const bar = document.getElementById('bar');
 let sessions = [], done = false, loading = false, searching = '';
 const batch = 100;
 
-const timeOf = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const timeOf = (ms) => new Date(ms).toLocaleTimeString(words.locale, { hour: 'numeric', minute: '2-digit' });
 // "2:10 to 4:45 PM", or "11:40 AM to 1:05 PM" across noon; items are newest first.
 const span = (items) => {
   const newest = timeOf(items[0].time), oldest = timeOf(items[items.length - 1].time);

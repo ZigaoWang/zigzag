@@ -206,6 +206,7 @@ enum SettingsVersionRow {
     static func restore() -> FormRow? {
         guard let date = ProfileBackup.latestDate else { return nil }
         let formatter = DateFormatter()
+        formatter.locale = Words.locale
         formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
         let saved = formatter.string(from: date)
         var detail = String(localized: "Saved \(saved)", comment: "Under “Restore from before the last update” in Settings › General: when the backup was made.")

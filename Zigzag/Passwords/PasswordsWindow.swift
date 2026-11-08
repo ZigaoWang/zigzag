@@ -738,7 +738,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         [neverBody, allowButton].forEach { $0.isHidden = true }
         icon.image = SiteIcon.image(for: credential.origin)
         title.stringValue = credential.title.isEmpty ? credential.origin.displayName : credential.title
-        let changed = credential.modified.formatted(date: .abbreviated, time: .omitted)
+        let changed = credential.modified.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Words.locale))
         subtitle.stringValue = String(localized: "Last changed \(changed)", comment: "Under a saved login's name in the Passwords window. The placeholder is a date, like Nov 8, 2026.")
         usernameRow.value = credential.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : credential.username
         usernameRow.isPlaceholder = credential.username.isEmpty

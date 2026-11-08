@@ -49,13 +49,13 @@ enum PageTranslator {
         return supported.compactMap { language -> (String, String)? in
             let id = language.minimalIdentifier
             guard seen.insert(id).inserted else { return nil }
-            let name = Locale.current.localizedString(forIdentifier: id) ?? id
+            let name = Words.locale.localizedString(forIdentifier: id) ?? id
             return (id, name)
         }.sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
     }
 
     static func name(of language: Locale.Language) -> String {
-        Locale.current.localizedString(forLanguageCode: language.languageCode?.identifier ?? language.minimalIdentifier)
+        Words.locale.localizedString(forLanguageCode: language.languageCode?.identifier ?? language.minimalIdentifier)
             ?? language.minimalIdentifier
     }
 
