@@ -60,10 +60,6 @@ nonisolated enum HistoryClusters {
         default: .lateNight
         }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0
-        let formatter = DateFormatter()
-        formatter.locale = Words.dates
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
         // Each name whole, so a language can put the day and the time of day in its own order.
         switch days {
         case ...0:
@@ -83,8 +79,7 @@ nonisolated enum HistoryClusters {
             case .evening: String(localized: "Yesterday evening", comment: "Name of a History session that began yesterday.")
             }
         case 2..<7:
-            formatter.setLocalizedDateFormatFromTemplate("EEEE")
-            let weekday = formatter.string(from: start)
+            let weekday = formatter("EEEE", calendar: calendar).string(from: start)
             return switch part {
             case .morning: String(localized: "\(weekday) morning", comment: "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.")
             case .afternoon: String(localized: "\(weekday) afternoon", comment: "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.")
@@ -94,11 +89,9 @@ nonisolated enum HistoryClusters {
             }
         default:
             let sameYear = calendar.component(.year, from: start) == calendar.component(.year, from: now)
-            formatter.setLocalizedDateFormatFromTemplate("EEEE")
-            let weekday = formatter.string(from: start)
+            let weekday = formatter("EEEE", calendar: calendar).string(from: start)
             // "October 18" or "October 18, 2025"; "10月18日" or "2025年12月12日".
-            formatter.setLocalizedDateFormatFromTemplate(sameYear ? "MMMMd" : "yMMMMd")
-            let date = formatter.string(from: start)
+            let date = formatter(sameYear ? "MMMMd" : "yMMMMd", calendar: calendar).string(from: start)
             return switch part {
             case .morning: String(localized: "\(weekday) morning, \(date)", comment: "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”.")
             case .afternoon: String(localized: "\(weekday) afternoon, \(date)", comment: "Name of an older History session: the weekday, then the date, like “Sunday afternoon, October 18”.")
@@ -108,6 +101,24 @@ nonisolated enum HistoryClusters {
             }
         }
     }
+
+    /// A formatter for each template, kept: making one takes long, and a search can name hundreds of sessions.
+    private static func formatter(_ template: String, calendar: Calendar) -> DateFormatter {
+        let key = [template, Words.dates.identifier, calendar.identifier.debugDescription, calendar.timeZone.identifier].joined(separator: " ")
+        return formattersLock.withLock {
+            if let kept = formatters[key] { return kept }
+            let formatter = DateFormatter()
+            formatter.locale = Words.dates
+            formatter.calendar = calendar
+            formatter.timeZone = calendar.timeZone
+            formatter.setLocalizedDateFormatFromTemplate(template)
+            formatters[key] = formatter
+            return formatter
+        }
+    }
+
+    private static let formattersLock = NSLock()
+    nonisolated(unsafe) private static var formatters: [String: DateFormatter] = [:]
 
     /// The time of day a session began.
     private enum Part { case morning, afternoon, evening, night, lateNight }
