@@ -19,6 +19,8 @@ final class TabManager {
     /// Most recently used first. Drives Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     private var closedTabs: [ClosedTab] = []
+    /// Closed tabs brought back, by the id each had: the new tab's id.
+    private var reopenedAs: [UUID: UUID] = [:]
     /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty more than the biggest lot closed at once. It never
     /// shrinks back, or closing two more after Clear took sixty would leave ⌘Z on the sixty short.
     private var closedLimit = 50
@@ -822,11 +824,17 @@ final class TabManager {
         var list = tabsBySpace[space] ?? []
         list.insert(tab, at: min(closed.index, list.count))
         tabsBySpace[space] = list
+        // A reopened tab is a new tab: its partner, closed with it and back first, is found by the id it had.
+        reopenedAs[closed.id] = tab.id
+        if reopenedAs.count > 500 { reopenedAs = [closed.id: tab.id] }
         // Half of a split: back beside its partner, on the same side and at the same size, if that's still free.
-        if let pair = closed.split, let other = self.tab(with: pair.left == closed.id ? pair.right : pair.left),
+        let otherID = closed.split.map { $0.left == closed.id ? $0.right : $0.left }
+        if let pair = closed.split, let otherID, let other = self.tab(with: reopenedAs[otherID] ?? otherID),
            other.spaceID == space, split(for: other) == nil, canSplit(tab, with: other) {
             var restored = pair
-            if restored.left == closed.id { restored.left = tab.id } else { restored.right = tab.id }
+            let onLeft = pair.left == closed.id
+            restored.left = onLeft ? tab.id : other.id
+            restored.right = onLeft ? other.id : tab.id
             splits.append(restored)
         }
         changed.send(.structure)
