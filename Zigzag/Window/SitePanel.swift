@@ -147,8 +147,8 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Content
 
-    /// What this page can do right now, as named tiles: sharing, the link and a screenshot always, Reader, Translate and
-    /// Picture in Picture when the page has them. The steady ones come first, so they never move.
+    /// What this page can do right now, as named tiles: sharing, the link, a screenshot and translating always, Reader
+    /// and Picture in Picture when the page has them. The steady ones come first, so they never move.
     private func buildTiles() {
         guard let controller else { return }
         let readerOn = controller.isShowingReader
@@ -167,11 +167,11 @@ final class SitePanel: FloatingPanelView {
                 PageScreenshot.take(self.tab, in: controller)
             }))
         }
+        // Always here, as in the menu, for when the offer went by or never came: a page that's already in your
+        // language says so, and a translated one goes back to its original.
+        specs.append(("translate", tab.isTranslated ? "Original" : "Translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
         if tab.isArticle || readerOn {
             specs.append(("doc.plaintext", "Reader", readerOn ? "Hide Reader" : "Show Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
-        }
-        if tab.foreignLanguage != nil || tab.isTranslated {
-            specs.append(("translate", tab.isTranslated ? "Original" : "Translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
         }
         let floating = tab.webView?.isPictureInPictureActive ?? false
         if floating || tab.webView?.canTogglePictureInPicture ?? false {
