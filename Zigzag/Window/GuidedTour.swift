@@ -14,14 +14,14 @@ final class GuidedTour: NSView {
     private let title = Label("", font: .systemFont(ofSize: 22, weight: .semibold), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
-    private let skip = TextButton(title: "Skip", font: Tokens.Font.small(.medium))
+    private let skip = TextButton(title: String(localized: "Skip", comment: "Button in the getting-started guide, a card in the window: skips the step."), font: Tokens.Font.small(.medium))
     /// Ends the guide for good; Help › Getting Started brings it back.
-    private let close = IconButton(symbol: "xmark", size: .compact, toolTip: "End Getting Started")
-    private let finish = PrimaryButton(title: "Start Browsing")
+    private let close = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "End Getting Started", comment: "Tooltip of the close button of the getting-started guide, a card in the window."))
+    private let finish = PrimaryButton(title: String(localized: "Start Browsing", comment: "Button that ends the getting-started guide, a card in the window, after its last step."))
     // The last card: a note from the person who made Zigzag.
     private let wordmark = WordmarkView()
     private let letter = NSTextField(wrappingLabelWithString: "")
-    private let signature = Label("Zigao, who makes Zigzag", font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
+    private let signature = Label(String(localized: "Zigao, who makes Zigzag", comment: "Signature under the thank-you note at the end of the getting-started guide, a card in the window. Zigao is the maker's name."), font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
     /// The step shown being done, in the window itself, on your own tabs and buttons.
     private lazy var demo = TourDemo(in: layer!)
     /// Where Peek's link is on the page, looked up now and then as you scroll.
@@ -93,7 +93,7 @@ final class GuidedTour: NSView {
         letter.textColor = Tokens.Color.textPrimary
         letter.alignment = .center
         signature.alignment = .center
-        letter.stringValue = "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way."
+        letter.stringValue = String(localized: "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way.", comment: "Thank-you note from the maker at the end of the getting-started guide, a card in the window, signed by him.")
         
         addSubview(card)
         // One skip per step: a burst of clicks never runs past steps you haven't seen.
@@ -263,35 +263,44 @@ final class GuidedTour: NSView {
         guard let controller else { return Display(keys: [], title: "", note: "", count: "", isDone: false, isFinal: true, target: "") }
         // The + opened the new space's editor: say what it's for, and finish once it's closed.
         if editingNewSpace {
-            return Display(keys: ["↩"], title: "Name it, then pick its color", note: "Return keeps it, Esc cancels", count: "", isDone: false, isFinal: false, target: "editor")
+            return Display(keys: ["↩"], title: String(localized: "Name it, then pick its color", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while the new space's editor is open."),
+                           note: String(localized: "Return keeps it, Esc cancels", comment: "Under a hint in the getting-started guide, a card in the window, while the new space's editor is open. Return and Esc are keys."), count: "", isDone: false, isFinal: false, target: "editor")
         }
         if let done = confirming {
             return Display(keys: [], title: done.done, note: done.doneNote, count: "", isDone: true, isFinal: false, target: "done." + done.id)
         }
         guard let task = Tutorial.current, let index = Tutorial.tasks.firstIndex(where: { $0.id == task.id }) else {
-            return Display(keys: [], title: "You’re all set", note: "", count: "", isDone: false, isFinal: true, target: "")
+            return Display(keys: [], title: String(localized: "You’re all set", comment: "Title of the getting-started guide, a card in the window once every step is done."), note: "", count: "", isDone: false, isFinal: true, target: "")
         }
-        let count = "Step \(index + 1) of \(Tutorial.tasks.count)"
+        let step = index + 1, steps = Tutorial.tasks.count
+        let count = String(localized: "Step \(step) of \(steps)", comment: "Which step of the getting-started guide, a card in the window this is, like Step 2 of 7.")
         // Mid-step hints, where you are, for the moment you'd otherwise stall.
         // Searching a site, a key at a time: its name, Tab, then what to find.
         if task.id == "newTab", controller.commandBar.isVisible {
             if controller.commandBar.isSearchingSite {
-                return Display(keys: ["↩"], title: "Type what to find, then Return", note: "For example: lofi music", count: "", isDone: false, isFinal: false, target: "bar")
+                return Display(keys: ["↩"], title: String(localized: "Type what to find, then Return", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while searching a site from the command bar. Return is the key."),
+                               note: String(localized: "For example: lofi music", comment: "Under a hint in the getting-started guide, a card in the window: something to search YouTube for."), count: "", isDone: false, isFinal: false, target: "bar")
             }
             if controller.commandBar.isOfferingSiteSearch {
-                return Display(keys: ["Tab"], title: "Press Tab", note: "Now you’re searching on YouTube", count: "", isDone: false, isFinal: false, target: "bar")
+                return Display(keys: ["Tab"], title: String(localized: "Press Tab", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, when the command bar offers to search YouTube. Tab is the key."),
+                               note: String(localized: "Now you’re searching on YouTube", comment: "Under a hint in the getting-started guide, a card in the window, when the command bar offers to search YouTube."), count: "", isDone: false, isFinal: false, target: "bar")
             }
-            return Display(keys: [], title: "Type “youtube”", note: "Just the word", count: "", isDone: false, isFinal: false, target: "bar")
+            return Display(keys: [], title: String(localized: "Type “youtube”", comment: "A hint in the middle of a step in the getting-started guide, a card in the window. Keep youtube as it is: it's what to type."),
+                           note: String(localized: "Just the word", comment: "Under the hint to type youtube, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "bar")
         }
         if task.id == "peek", controller.peek.isVisible {
-            return Display(keys: ["Esc"], title: "Close it", note: "Or click outside it", count: "", isDone: false, isFinal: false, target: "peek")
+            return Display(keys: ["Esc"], title: String(localized: "Close it", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it."),
+                           note: String(localized: "Or click outside it", comment: "Under the hint to close a Peek, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "peek")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article") }
         // Names the very tab to drag, and a cursor in the window shows the drag on it: a ring alone reads as the tab
         // you're on.
         if task.id == "split" {
-            let title = splitCandidate.map { "Drag “\(Self.shortName($0.title))” onto the page" } ?? task.title
-            return Display(keys: [], title: title, note: "It opens beside this one",
+            let title = splitCandidate.map {
+                let name = Self.shortName($0.title)
+                return String(localized: "Drag “\(name)” onto the page", comment: "The split view step's title in the getting-started guide, a card in the window, naming the tab to drag. The name is a page's title.")
+            } ?? task.title
+            return Display(keys: [], title: title, note: String(localized: "It opens beside this one", comment: "Under the split view step's title in the getting-started guide, a card in the window."),
                            count: count, isDone: false, isFinal: false, target: "split")
         }
         return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: task.id)
