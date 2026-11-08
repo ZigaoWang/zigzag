@@ -423,7 +423,15 @@
           const url = (port.sender && port.sender.url) || '';
           const client = {
             id: `zigzag-${Date.now()}-${Math.random().toString(36).slice(2)}`, type: 'window', frameType: 'top-level', url,
-            postMessage: (message) => { try { port.postMessage({ kind: 'message', data: portable(message) }); } catch (e) {} },
+            // A port handed over with the message (a MessageChannel's) can't travel this way: refused, as postMessage
+            // refuses what it can't carry, so the caller takes its other way. Tampermonkey hands its offscreen page
+            // one and waits on it for the answer, so it waited for good and .user.js links no longer opened its
+            // install page.
+            postMessage: (message, transfer) => {
+              const handed = Array.isArray(transfer) ? transfer : transfer && transfer.transfer;
+              if (handed && handed.length) throw new DOMException('A port or buffer handed over cannot reach this page.', 'DataCloneError');
+              try { port.postMessage({ kind: 'message', data: portable(message) }); } catch (e) {}
+            },
           };
           pages.set(port, client);
           if (keepOpen) keepOpen(port);
