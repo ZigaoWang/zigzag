@@ -9,21 +9,24 @@ enum ProblemReport {
     nonisolated static let file = CrashReports.folder.appendingPathComponent("Zigzag Problem Report.txt")
 
     static func show(in controller: BrowserWindowController) {
-        ConfirmSheet.choose(in: controller.root.overlay, title: "Report a Problem",
-                            message: "Zigzag writes a short report for your email: its version, your Mac, what went wrong lately and on which sites, and crash and freeze reports. Never the pages’ addresses, your tabs or history. Show Report lets you read it first.",
-                            confirmTitle: "Email Report", alternateTitle: "Show Report") { choice in
+        ConfirmSheet.choose(in: controller.root.overlay, title: String(localized: "Report a Problem", comment: "Title of the Report a Problem sheet."),
+                            message: String(localized: "Zigzag writes a short report for your email: its version, your Mac, what went wrong lately and on which sites, and crash and freeze reports. Never the pages’ addresses, your tabs or history. Show Report lets you read it first.",
+                                            comment: "Message of the Report a Problem sheet. “Show Report” is the sheet's other button."),
+                            confirmTitle: String(localized: "Email Report", comment: "Button of the Report a Problem sheet."),
+                            alternateTitle: String(localized: "Show Report", comment: "Button of the Report a Problem sheet: shows the report in Finder.")) { choice in
             guard choice != .cancel else { return }
             Task { @MainActor in
                 // Written away from the window, so it never stops; anything slower than a moment says it's working.
                 let notice = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(250))
-                    if !Task.isCancelled { Toast.working("Writing report…", in: controller) }
+                    if !Task.isCancelled { Toast.working(String(localized: "Writing report…", comment: "Toast while the problem report is written."), in: controller) }
                 }
                 let report = await write()
                 notice.cancel()
                 Toast.hide(in: controller)
                 guard let report else {
-                    Toast.show("Couldn’t write the report", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    Toast.show(String(localized: "Couldn’t write the report", comment: "Toast when the problem report can't be written."), symbol: "exclamationmark.triangle",
+                               duration: 3, in: controller)
                     return
                 }
                 if choice == .confirm { email(report, in: controller) } else { NSWorkspace.shared.activateFileViewerSelecting([report]) }
@@ -35,7 +38,9 @@ enum ProblemReport {
     /// mail app that takes attachments, a plain email opens and the report is shown in Finder, to drag in.
     private static func email(_ report: URL, in controller: BrowserWindowController) {
         let attachments = [report] + CrashReports.recent.prefix(5).map(\.json).filter { FileManager.default.fileExists(atPath: $0.path) }
-        let body = "What happened, and what were you doing just before?\n\n\n" + Feedback.versions
+        // The question is for the person writing; the report itself stays in English, for the developer.
+        let body = String(localized: "What happened, and what were you doing just before?", comment: "First line of the problem report email, for the person to answer.")
+            + "\n\n\n" + Feedback.versions
         if let mail = NSSharingService(named: .composeEmail) {
             mail.recipients = [Feedback.address]
             mail.subject = "Zigzag problem report"
@@ -48,7 +53,8 @@ enum ProblemReport {
         parts.queryItems = [URLQueryItem(name: "subject", value: "Zigzag problem report"), URLQueryItem(name: "body", value: body)]
         if let url = parts.url { NSWorkspace.shared.open(url) }
         NSWorkspace.shared.activateFileViewerSelecting([report])
-        Toast.show("Attach the report from Finder to your email", symbol: "paperclip", duration: 6, in: controller)
+        Toast.show(String(localized: "Attach the report from Finder to your email", comment: "Toast after the problem report email opens; the report is shown in Finder."),
+                   symbol: "paperclip", duration: 6, in: controller)
     }
 
     /// Writes the report and returns where, or nil if it couldn't be saved. What's open is read here, the rest

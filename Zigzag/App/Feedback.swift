@@ -7,9 +7,11 @@ enum Feedback {
     static let issuesURL = URL(string: "https://github.com/ZigaoWang/zigzag/issues/new?template=bug_report.yml")!
 
     static func show(in controller: BrowserWindowController) {
-        ConfirmSheet.choose(in: controller.root.overlay, title: "Send Feedback",
-                            message: "Tell us what works, what doesn’t, and what you’d like. Email reaches the developer directly. GitHub Issues are public, so leave out anything personal.",
-                            confirmTitle: "Email", alternateTitle: "GitHub Issues") { choice in
+        ConfirmSheet.choose(in: controller.root.overlay, title: String(localized: "Send Feedback", comment: "Title of the Send Feedback sheet."),
+                            message: String(localized: "Tell us what works, what doesn’t, and what you’d like. Email reaches the developer directly. GitHub Issues are public, so leave out anything personal.",
+                                            comment: "Message of the Send Feedback sheet. GitHub Issues is a product name."),
+                            confirmTitle: String(localized: "Email", comment: "Button of the Send Feedback sheet: write an email."),
+                            alternateTitle: String(localized: "GitHub Issues", comment: "Button of the Send Feedback sheet: open GitHub's issue page. A product name.")) { choice in
             switch choice {
             case .confirm: if let url = emailURL { NSWorkspace.shared.open(url) }
             case .alternate: NSWorkspace.shared.open(issuesURL)

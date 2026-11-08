@@ -15,7 +15,7 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
         let view = AboutView(frame: NSRect(x: 0, y: 0, width: Tokens.Welcome.aboutSize.width, height: AboutView.height))
         let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
-        window.title = "About Zigzag"
+        window.title = String(localized: "About Zigzag", comment: "Title of the About window.")
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
@@ -42,11 +42,14 @@ private final class AboutView: NSView {
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     /// Each a name, where it goes in quiet text, and an arrow that says whether it opens here or on the web.
     private let rows: [AboutRow] = [
-        AboutRow("Release Notes", open: WhatsNew.allNotes),
-        AboutRow("Acknowledgments", run: { AcknowledgementsWindowController.show() }),
-        AboutRow("Website", detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
-        AboutRow("Source Code", detail: "GitHub", open: URL(string: "https://github.com/ZigaoWang/zigzag")!),
-        AboutRow("Developer", detail: "zigao.wang", open: URL(string: "https://www.zigao.wang")!),
+        AboutRow(String(localized: "Release Notes", comment: "Row in the About window."), open: WhatsNew.allNotes),
+        AboutRow(String(localized: "Acknowledgments", comment: "Row in the About window: the licenses of the works Zigzag uses."),
+                 run: { AcknowledgementsWindowController.show() }),
+        AboutRow(String(localized: "Website", comment: "Row in the About window."), detail: "zigzagbrowser.com", open: URL(string: "https://zigzagbrowser.com")!),
+        AboutRow(String(localized: "Source Code", comment: "Row in the About window; GitHub is beside it."), detail: "GitHub",
+                 open: URL(string: "https://github.com/ZigaoWang/zigzag")!),
+        AboutRow(String(localized: "Developer", comment: "Row in the About window: the developer's website."), detail: "zigao.wang",
+                 open: URL(string: "https://www.zigao.wang")!),
     ]
     /// Hairlines between the rows, inset from the card's edges as a grouped list has them.
     private let lines: [ColorView] = (0..<4).map { _ in ColorView(color: Tokens.Color.separator) }
@@ -61,7 +64,8 @@ private final class AboutView: NSView {
         // As a Mac app's About says it: the version, with the build in brackets for anyone reporting a problem.
         let short = info?["CFBundleShortVersionString"] as? String ?? ""
         let build = info?["CFBundleVersion"] as? String
-        version.stringValue = "Version \(short)" + (build.map { " (\($0))" } ?? "")
+        version.stringValue = build.map { String(localized: "Version \(short) (\($0))", comment: "In the About window: the version, then the build number in brackets.") }
+            ?? String(localized: "Version \(short)", comment: "In the About window: the version.")
         version.alignment = .center
         // Selectable, so its link can be clicked.
         legal.isSelectable = true
@@ -87,11 +91,15 @@ private final class AboutView: NSView {
         let center = NSMutableParagraphStyle()
         center.alignment = .center
         let quiet: [NSAttributedString.Key: Any] = [.font: Tokens.Font.small(), .foregroundColor: Tokens.Color.textTertiary, .paragraphStyle: center]
-        let text = NSMutableAttributedString(string: "© \(Calendar.current.component(.year, from: Date())) Zigao Wang. ", attributes: quiet)
-        var link = quiet
-        link[.link] = URL(string: "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE")
-        text.append(NSAttributedString(string: "Apache License 2.0", attributes: link))
-        text.append(NSAttributedString(string: ".", attributes: quiet))
+        // The license's name is the link, wherever the sentence puts it.
+        let license = "Apache License 2.0"
+        let year = String(Calendar.current.component(.year, from: Date()))
+        let line = String(localized: "© \(year) Zigao Wang. \(license).",
+                          comment: "Small print in the About window: the year, the developer's name, then the license's name, which is a link.")
+        let text = NSMutableAttributedString(string: line, attributes: quiet)
+        if let range = line.range(of: license, options: .backwards) {
+            text.addAttribute(.link, value: URL(string: "https://github.com/ZigaoWang/zigzag/blob/main/LICENSE")!, range: NSRange(range, in: line))
+        }
         return text
     }
 

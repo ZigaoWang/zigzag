@@ -22,9 +22,11 @@ enum MoveToApplications {
         #if !DEBUG
         let here = Bundle.main.bundleURL
         guard needsMove(here) else { return }
-        ConfirmSheet.show(in: controller.root.overlay, title: "Move Zigzag to Applications?",
-                          message: "Zigzag is running from the disk image or a download, where it can’t update itself. In Applications, updates install on their own.",
-                          confirmTitle: "Move to Applications") { confirmed in
+        ConfirmSheet.show(in: controller.root.overlay,
+                          title: String(localized: "Move Zigzag to Applications?", comment: "Title of the sheet offering to move the app into the Applications folder."),
+                          message: String(localized: "Zigzag is running from the disk image or a download, where it can’t update itself. In Applications, updates install on their own.",
+                                          comment: "Message of the sheet offering to move the app into the Applications folder."),
+                          confirmTitle: String(localized: "Move to Applications", comment: "Button of the sheet offering to move the app into the Applications folder.")) { confirmed in
             guard confirmed else { return }
             move(from: original(of: here), in: controller)
         }
@@ -55,7 +57,7 @@ enum MoveToApplications {
             if manager.fileExists(atPath: destination.path) { try manager.trashItem(at: destination, resultingItemURL: nil) }
             try manager.copyItem(at: source, to: destination)
         } catch {
-            Toast.show(SaveFailure.message("Couldn’t move Zigzag to Applications", error), symbol: "exclamationmark.triangle",
+            Toast.show(SaveFailure.message(String(localized: "Couldn’t move Zigzag to Applications", comment: "Toast when moving the app into Applications fails."), error), symbol: "exclamationmark.triangle",
                        duration: 6, in: controller)
             return
         }

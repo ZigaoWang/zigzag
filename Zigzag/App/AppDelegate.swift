@@ -135,10 +135,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.reply(toApplicationShouldTerminate: true)
             }
         }
-        let message = downloading == 0 ? "Your tabs and spaces will be right here when you open it again."
-            : downloading == 1 ? "A download is still in progress. It pauses, and you can resume it from Downloads when you open Zigzag again."
-            : "\(downloading) downloads are still in progress. They pause, and you can resume them from Downloads when you open Zigzag again."
-        ConfirmSheet.show(in: host, title: "Quit Zigzag?", message: message, confirmTitle: "Quit") { answer($0) }
+        let message = downloading == 0
+            ? String(localized: "Your tabs and spaces will be right here when you open it again.",
+                     comment: "Message of the sheet that asks before quitting; “it” is Zigzag.")
+            : String(localized: "\(downloading) downloads are still in progress. They pause, and you can resume them from Downloads when you open Zigzag again.",
+                     comment: "Message of the sheet that asks before quitting while files download.")
+        ConfirmSheet.show(in: host, title: String(localized: "Quit Zigzag?", comment: "Title of the sheet that asks before quitting."), message: message,
+                          confirmTitle: String(localized: "Quit", comment: "Button of the sheet that asks before quitting.")) { answer($0) }
         // While it asks, ⌘Q again means yes (macOS doesn't ask the app a second time on its own).
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
@@ -186,8 +189,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Right-click the Dock icon: a new window, or a private one, as every browser offers.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
-        menu.addItem(withTitle: "New Window", action: #selector(newWindow(_:)), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "New Private Window", action: #selector(newPrivateWindow(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "New Window", comment: "Item in the Dock icon's menu."), action: #selector(newWindow(_:)),
+                     keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "New Private Window", comment: "Item in the Dock icon's menu."), action: #selector(newPrivateWindow(_:)),
+                     keyEquivalent: "").target = self
         return menu
     }
 
@@ -217,7 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             guard let controller = WindowManager.shared.keyController else { return }
             defaults.set(true, forKey: "DefaultBrowserOffered")
-            Toast.show("Open links in Zigzag?", symbol: "safari", action: ("Set as Default", { DefaultBrowser.make() }),
+            Toast.show(String(localized: "Open links in Zigzag?", comment: "Toast offering to make Zigzag the default browser."), symbol: "safari",
+                       action: (String(localized: "Set as Default", comment: "Button in the toast offering to make Zigzag the default browser."),
+                                { DefaultBrowser.make() }),
                        duration: 8, closes: true, in: controller)
         }
     }

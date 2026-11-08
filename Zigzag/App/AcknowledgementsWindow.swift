@@ -14,7 +14,7 @@ final class AcknowledgementsWindowController: NSWindowController, NSWindowDelega
         }
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: Tokens.Welcome.acknowledgementsSize),
                               styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
-        window.title = "Acknowledgments"
+        window.title = String(localized: "Acknowledgments", comment: "Title of the window with the licenses of the works Zigzag uses.")
         // The page says its own name, large, as About does.
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -66,22 +66,24 @@ enum Acknowledgements {
     static func text() -> NSAttributedString {
         let out = NSMutableAttributedString()
         let style = NoticeStyle()
-        out.append(style.title("Acknowledgments"))
-        out.append(style.paragraph("Zigzag is made by Zigao Wang and is open source under the Apache License, Version 2.0. "
-                                   + "It builds on the work of others, listed below with their licenses. Thank you."))
+        out.append(style.title(String(localized: "Acknowledgments", comment: "Title of the window with the licenses of the works Zigzag uses.")))
+        out.append(style.paragraph(String(localized: "Zigzag is made by Zigao Wang and is open source under the Apache License, Version 2.0. It builds on the work of others, listed below with their licenses. Thank you.",
+                                          comment: "First paragraph of the Acknowledgments window. “Apache License, Version 2.0” is the license's name.")))
 
         // What NOTICE and TRADEMARKS.md say, in a sentence each.
         out.append(style.heading("Zigzag", level: 2))
-        out.append(style.paragraph("Copyright \(Calendar.current.component(.year, from: Date())) Zigao Wang. The code is licensed under the "
-                                   + "Apache License, Version 2.0, in full at the end."))
-        out.append(style.paragraph("The Zigzag name, the app icon and the logo are trademarks of Zigao Wang, all rights reserved. "
-                                   + "They aren’t covered by the Apache License: see [TRADEMARKS.md](TRADEMARKS.md)."))
+        let year = String(Calendar.current.component(.year, from: Date()))
+        out.append(style.paragraph(String(localized: "Copyright \(year) Zigao Wang. The code is licensed under the Apache License, Version 2.0, in full at the end.",
+                                          comment: "In the Acknowledgments window, under Zigzag. “Apache License, Version 2.0” is the license's name.")))
+        out.append(style.paragraph(String(localized: "The Zigzag name, the app icon and the logo are trademarks of Zigao Wang, all rights reserved. They aren’t covered by the Apache License: see [TRADEMARKS.md](TRADEMARKS.md).",
+                                          comment: "In the Acknowledgments window. Keep the Markdown link [TRADEMARKS.md](TRADEMARKS.md) as it is.")))
 
         // The works shipped in the app, and the note on names and marks; what's only used to build or test stays in
         // the repository's copy.
         if let notices = bundled("THIRD_PARTY_NOTICES", "md") {
             let shown = sections(of: notices, keeping: ["Shipped in the app", "Names and marks"])
-                .replacingOccurrences(of: "## Shipped in the app", with: "## Works by others")
+                .replacingOccurrences(of: "## Shipped in the app",
+                                      with: "## " + String(localized: "Works by others", comment: "Heading in the Acknowledgments window, above the open source works Zigzag ships with."))
             out.append(style.markdown(shown))
         }
 

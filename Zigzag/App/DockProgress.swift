@@ -34,12 +34,16 @@ final class DockProgress {
         let announce = { [weak controller] in
             guard let controller, !DownloadsPanel.isOpen(in: controller.window) else { return }
             if failed {
-                Toast.show("Couldn’t download \(item.filename)", symbol: "exclamationmark.triangle",
-                           action: DownloadManager.shared.canRetry(item) ? ("Try Again", { DownloadManager.shared.retry(item) }) : nil,
+                Toast.show(String(localized: "Couldn’t download \(item.filename)", comment: "Toast when a download fails; the file's name."),
+                           symbol: "exclamationmark.triangle",
+                           action: DownloadManager.shared.canRetry(item)
+                               ? (String(localized: "Try Again", comment: "Button in the toast when a download fails."), { DownloadManager.shared.retry(item) }) : nil,
                            duration: 5, in: controller)
             } else {
-                Toast.show("Downloaded \(item.filename)", symbol: "arrow.down.circle",
-                           action: ("Show", { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
+                Toast.show(String(localized: "Downloaded \(item.filename)", comment: "Toast when a download finishes; the file's name."),
+                           symbol: "arrow.down.circle",
+                           action: (String(localized: "Show", comment: "Button in the toast when a download finishes: shows the file in Finder."),
+                                    { DownloadManager.shared.reveal(item) }), duration: 3, in: controller)
             }
         }
         if !failed, controller.flyingDownloads.contains(item.id) {
