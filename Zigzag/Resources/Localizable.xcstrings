@@ -470,7 +470,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nJoins the items of a short list in the Import window, like “6 passwords, history”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
+      "comment" : "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13700,6 +13700,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个空间"
+          }
+        }
+      }
+    },
+    "import.short-list" : {
+      "comment" : "Joins the items of a short list in the Import window, like “6 passwords, history”.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、%2$@"
           }
         }
       }

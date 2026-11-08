@@ -178,7 +178,9 @@ enum ImportCoordinator {
     /// "Spaces, 6 passwords, history": what a browser holds, in one short line.
     nonisolated private static func sentence(_ parts: [String]) -> String {
         let line = parts.dropFirst().reduce(parts[0]) {
-            String(localized: "\($0), \($1)", comment: "Joins the items of a short list in the Import window, like “6 passwords, history”.")
+            // Its own key: Chinese joins a list's items with 、, where a comma joins other things.
+            String(localized: "import.short-list", defaultValue: "\($0), \($1)",
+                   comment: "Joins the items of a short list in the Import window, like “6 passwords, history”.")
         }
         return line.prefix(1).uppercased() + line.dropFirst()
     }
