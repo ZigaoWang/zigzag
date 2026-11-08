@@ -952,6 +952,8 @@ final class ClearTabsButton: InteractiveView {
     private let arrow = NSImageView()
     private let label = Label(String(localized: "Clear", comment: "Button at the end of the Tabs label in the sidebar: closes tabs."), font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     private static let arrowSide: CGFloat = Tokens.Symbol.inline
+    /// The capsule's room at each end: the arrow's own margin and the text's rounding make the two look the same.
+    private static let pad: CGFloat = 6
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -984,7 +986,7 @@ final class ClearTabsButton: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    var fittingWidth: CGFloat { ceil(6 + Self.arrowSide + 3 + label.inkWidth + Tokens.Space.x2) }
+    var fittingWidth: CGFloat { ceil(Self.pad + Self.arrowSide + 3 + label.inkWidth + Self.pad) }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
@@ -995,7 +997,7 @@ final class ClearTabsButton: InteractiveView {
         super.layout()
         // A capsule, so its hover fill reads as one small button on the line.
         layer?.cornerRadius = bounds.height / 2
-        arrow.frame = NSRect(x: 6, y: (bounds.height - Self.arrowSide) / 2, width: Self.arrowSide, height: Self.arrowSide)
+        arrow.frame = NSRect(x: Self.pad, y: (bounds.height - Self.arrowSide) / 2, width: Self.arrowSide, height: Self.arrowSide)
         let h = label.lineHeight
         label.frame = NSRect(x: arrow.frame.maxX + 3 - Label.inset, y: (bounds.height - h) / 2, width: label.inkWidth + Label.inset * 2, height: h)
     }
