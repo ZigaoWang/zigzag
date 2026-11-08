@@ -3,7 +3,7 @@ import Foundation
 /// History the way people remember it: in sittings, and within a sitting by the site they were on. A break with
 /// nothing visited (lunch, a meeting) ends a session; pages visited one after another on the same site fold into
 /// one cluster, so an afternoon of reading docs is one row, not forty.
-enum HistoryClusters {
+nonisolated enum HistoryClusters {
     /// How long nothing is visited before the next page starts a new session.
     static let sessionGap: TimeInterval = 40 * 60
 

@@ -122,7 +122,15 @@ enum HistoryPage {
                 replyHandler(HistoryPage.sessions(HistoryPage.batch(before: before)), nil)
             case "search":
                 let query = (body["query"] as? String) ?? ""
-                replyHandler(HistoryPage.sessions(HistoryStore.shared.search(query, limit: 300)), nil)
+                // Read and grouped off the main thread, and handed over as one string, so each letter typed shows at
+                // once however big History is. A search the same tab typed over answers nothing; the page drops it.
+                let asker = message.webView.map { ObjectIdentifier($0).hashValue } ?? 0
+                Task {
+                    let json = await HistoryStore.shared.search(query, limit: 300, asker: asker) { found in
+                        (try? JSONSerialization.data(withJSONObject: HistoryPage.sessions(found))).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+                    }
+                    replyHandler(json, nil)
+                }
             case "delete":
                 // One page, or every page in a cluster.
                 let strings = (body["urls"] as? [String]) ?? [body["url"] as? String].compactMap { $0 }
@@ -161,7 +169,7 @@ enum HistoryPage {
     }
 
     /// Sessions of clusters, as the page draws them.
-    private static func sessions(_ entries: [HistoryEntry]) -> [[String: Any]] {
+    nonisolated private static func sessions(_ entries: [HistoryEntry]) -> [[String: Any]] {
         HistoryClusters.group(entries).map { session in
             [
                 "title": HistoryClusters.title(startingAt: session.start),
@@ -172,7 +180,7 @@ enum HistoryPage {
         }
     }
 
-    private static func row(_ entry: HistoryEntry) -> [String: Any] {
+    nonisolated private static func row(_ entry: HistoryEntry) -> [String: Any] {
         [
             "url": entry.url.absoluteString,
             "title": entry.title.isEmpty ? (entry.url.host() ?? entry.url.absoluteString) : entry.title,
@@ -573,8 +581,9 @@ async function search() {
   searching = query.value.trim();
   if (searching) {
     const mine = ++generation;
-    const found = await ask({ action: 'search', query: searching });
-    if (mine !== generation) return;
+    const answer = await ask({ action: 'search', query: searching });
+    if (mine !== generation || answer == null) return;
+    const found = JSON.parse(answer);
     // Clusters that hold a match open by themselves.
     found.forEach((s) => s.clusters.forEach((c) => c.open = true));
     sessions = found; done = true; render();

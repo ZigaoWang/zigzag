@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 
-struct HistoryEntry {
+nonisolated struct HistoryEntry: Sendable {
     let url: URL
     let title: String
     let visitCount: Int
@@ -24,9 +24,12 @@ final class HistoryStore {
 
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    /// Where the History page's searches run; nil for a store in memory, which no second connection can see.
+    private let reader: HistoryReader?
 
     /// The one store is `shared`; tests open their own, ":memory:", so they never see your history.
     init(path: String) {
+        reader = path == ":memory:" ? nil : HistoryReader(path: path)
         guard open(path) else {
             // A damaged file (a disk error, a half-copied restore) would leave history off for good, silently: it's
             // set aside, named for when, and history starts afresh.
@@ -204,7 +207,7 @@ final class HistoryStore {
         guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits" + (condition.map { " WHERE " + $0 } ?? "")) else { return [] }
         defer { sqlite3_finalize(statement) }
         bind(statement)
-        return collect(statement)
+        return Self.collect(statement)
     }
 
 
@@ -213,33 +216,48 @@ final class HistoryStore {
         guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits WHERE last_visit < ?1 ORDER BY last_visit DESC LIMIT \(limit)") else { return [] }
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_double(statement, 1, (date ?? .distantFuture).timeIntervalSince1970)
-        return collect(statement)
+        return Self.collect(statement)
     }
 
-    static func normalizedHost(_ url: URL) -> String {
+    nonisolated static func normalizedHost(_ url: URL) -> String {
         let host = url.host()?.lowercased() ?? ""
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
+    nonisolated static func words(_ query: String) -> [String] {
+        query.lowercased().split(separator: " ").map(String.init).filter { !$0.isEmpty }
+    }
+
     /// Ranked matches: every word must appear in the URL or title.
     func search(_ query: String, limit: Int = 12) -> [HistoryEntry] {
-        let words = query.lowercased().split(separator: " ").map(String.init).filter { !$0.isEmpty }
+        let words = Self.words(query)
         guard !words.isEmpty else { return [] }
         // Asked again for the same text with nothing recorded since (the command bar does, when suggestions
         // arrive): the last answer, rather than reading every visit once more.
         let key = "\(limit)|\(words.joined(separator: " "))|\(sqlite3_total_changes(db))"
         if let last = lastSearch, last.key == key { return last.results }
-        let results = runSearch(words, limit: limit)
+        let results = Self.runSearch(words, limit: limit, in: db)
         lastSearch = (key, results)
         return results
     }
 
     private var lastSearch: (key: String, results: [HistoryEntry])?
 
-    private func runSearch(_ words: [String], limit: Int) -> [HistoryEntry] {
+    /// The same search, off the main thread, for the History page: typing there never waits on reading every visit,
+    /// however big History grows. `then` shapes the answer there too. Nil when a newer search from the same `asker`
+    /// took over: it's stopped where it was, as its answer would only be dropped.
+    func search<T: Sendable>(_ query: String, limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
+        guard let reader else { return then(search(query, limit: limit)) }
+        return await reader.search(Self.words(query), limit: limit, asker: asker, then: then)
+    }
+
+    nonisolated fileprivate static func runSearch(_ words: [String], limit: Int, in db: OpaquePointer?) -> [HistoryEntry] {
+        guard !words.isEmpty else { return [] }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
         let clause = words.indices.map { "(url LIKE ?\($0 + 1) ESCAPE '\\' OR title LIKE ?\($0 + 1) ESCAPE '\\')" }.joined(separator: " AND ")
         let sql = "SELECT url, title, visit_count, last_visit FROM visits WHERE \(clause) ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit * 3)"
-        guard let statement = prepare(sql) else { return [] }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return [] }
         defer { sqlite3_finalize(statement) }
         for (i, word) in words.enumerated() {
             let escaped = word.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
@@ -329,7 +347,7 @@ final class HistoryStore {
     func mostVisited(limit: Int) -> [HistoryEntry] {
         guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits ORDER BY visit_count * 1.0 / (1 + (strftime('%s','now') - last_visit) / 604800.0) DESC LIMIT \(limit)") else { return [] }
         defer { sqlite3_finalize(statement) }
-        return collect(statement)
+        return Self.collect(statement)
     }
 
     /// Takes out what was last visited between two times, for `history.deleteRange`.
@@ -342,10 +360,10 @@ final class HistoryStore {
     func recent(limit: Int = 8) -> [HistoryEntry] {
         guard let statement = prepare("SELECT url, title, visit_count, last_visit FROM visits ORDER BY last_visit DESC LIMIT \(limit)") else { return [] }
         defer { sqlite3_finalize(statement) }
-        return collect(statement)
+        return Self.collect(statement)
     }
 
-    private func collect(_ statement: OpaquePointer) -> [HistoryEntry] {
+    nonisolated private static func collect(_ statement: OpaquePointer) -> [HistoryEntry] {
         var results: [HistoryEntry] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             guard let cURL = sqlite3_column_text(statement, 0), let url = URL(string: String(cString: cURL)) else { continue }
@@ -356,4 +374,56 @@ final class HistoryStore {
         }
         return results
     }
+}
+
+/// History's searches for the History page, on a connection of their own and a queue of their own. The file is in WAL
+/// mode, so reading here never waits on a visit being written on the main thread, nor holds one up.
+nonisolated final class HistoryReader: @unchecked Sendable {
+    private let path: String
+    private let queue = DispatchQueue(label: "app.zigzag.history.search", qos: .userInitiated)
+    // Only touched on `queue`.
+    private var db: OpaquePointer?
+    // Under `lock`: the newest search each asker (a History tab) has made, and which one is running now.
+    private let lock = NSLock()
+    private var newest: [Int: Int] = [:]
+    private var running: (asker: Int, ticket: Int)?
+    private var tickets = 0
+
+    init(path: String) { self.path = path }
+
+    deinit { sqlite3_close(db) }
+
+    func search<T: Sendable>(_ words: [String], limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
+        let ticket: Int = lock.withLock {
+            tickets += 1
+            newest[asker] = tickets
+            // The same tab's last search, still reading: stopped, since the page drops what it would find.
+            if let running, running.asker == asker { sqlite3_interrupt(db) }
+            return tickets
+        }
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: self.run(words, limit: limit, asker: asker, ticket: ticket, then: then))
+            }
+        }
+    }
+
+    private func run<T>(_ words: [String], limit: Int, asker: Int, ticket: Int, then: ([HistoryEntry]) -> T) -> T? {
+        // Typed over before it started: never run at all.
+        guard isNewest(asker, ticket) else { return nil }
+        if db == nil {
+            var opened: OpaquePointer?
+            guard sqlite3_open_v2(path, &opened, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { sqlite3_close(opened); return then([]) }
+            sqlite3_busy_timeout(opened, 2000)
+            lock.withLock { db = opened }
+        }
+        lock.withLock { running = (asker, ticket) }
+        let found = HistoryStore.runSearch(words, limit: limit, in: db)
+        lock.withLock { running = nil }
+        guard isNewest(asker, ticket) else { return nil }
+        let shaped = then(found)
+        return isNewest(asker, ticket) ? shaped : nil
+    }
+
+    private func isNewest(_ asker: Int, _ ticket: Int) -> Bool { lock.withLock { newest[asker] == ticket } }
 }
