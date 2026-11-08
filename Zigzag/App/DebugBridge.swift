@@ -585,6 +585,14 @@ enum DebugBridge {
             // extoffsite <site> on|off
             let f = arg.split(separator: " ").map(String.init)
             if f.count == 2 { var sites = ExtensionStore.extensionsOffSites; if f[1] == "on" { sites.insert(f[0]) } else { sites.remove(f[0]) }; ExtensionStore.extensionsOffSites = sites }
+        case "extpopupstate":
+            // extpopupstate <id> [script]: where its popup page is, even before WebKit asks to show it.
+            if #available(macOS 15.4, *), let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == String(arg.prefix { $0 != " " }) }),
+               let view = item.context.action(for: controller.tabManager.selectedTab)?.popupWebView {
+                let script = arg.contains(" ") ? String(arg.drop { $0 != " " }.dropFirst()) : "document.readyState"
+                debugLog("extpopupstate url=\(view.url?.absoluteString ?? "-") loading=\(view.isLoading) progress=\(view.estimatedProgress) size=\(view.frame.size)")
+                view.evaluateJavaScript(script) { result, error in debugLog("extpopupstate => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")") }
+            } else { debugLog("extpopupstate: no popup page") }
         case "extpopup":
             if let item = ExtensionHost.shared.actions(for: controller.tabManager.selectedTab).first(where: { $0.id == arg }) {
                 ExtensionHost.shared.performAction(item, tab: controller.tabManager.selectedTab, anchor: controller.sidebar.address)
