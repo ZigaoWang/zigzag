@@ -5,6 +5,20 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-08
+
+### New
+- Zigzag speaks Simplified Chinese. On a Mac set to Chinese it is in Chinese everywhere: menus, Settings, the sidebar, import and the welcome, extensions, passwords and the permission prompts, with dates and times written the Chinese way. To choose a language for Zigzag alone, pick it in Settings › General › Language, and Zigzag restarts in it.
+- Picking several tabs works the way it does in Finder. Picked rows stay picked after you unpin, pin, file or drag them, so the next action applies to the same rows. ⌘W closes all of them in one step that ⌘Z brings back, and File › Close Tab says how many. Esc lets go, ⇧-click picks a run from the last row you ⌘-clicked, and ⌘A picks the rest of their section.
+- Pinned pages can be removed from the sidebar, one or many at once, with Delete or Remove Pinned Page in the right-click menu, and undone.
+- The right-click menu for picked rows says how many it acts on and does it to all of them: Close, Pin, Unpin, Add to Folder, Add to Favorites and Move to Space.
+
+### Fixed
+- Undo brings back every tab after closing more than fifty at once.
+- Closing, unpinning or moving many tabs at once is quick, and redraws the window once.
+- Shift-click on the tab overview picks a run of cards, as in the sidebar.
+- In the welcome, staying signed in reads as a setting under the browsers instead of one more browser, and checked boxes are solid, with no dark ring.
+
 ## [0.5.19] - 2026-11-08
 
 ### New
