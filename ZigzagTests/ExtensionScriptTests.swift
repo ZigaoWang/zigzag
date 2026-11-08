@@ -190,6 +190,22 @@ struct ExtensionScriptTests {
         #expect(offscreen.evaluateScript("clients.matchAll !== __matchAll").toBool())
     }
 
+    @Test func aPageReachedOverThePortRefusesAPortHandedOver() {
+        // Tampermonkey hands its offscreen page a MessageChannel port and waits on it: refused at once, so it goes on.
+        let worker = Self.workerWorld(worker: true)
+        worker.evaluateScript("""
+        var DOMException = class extends Error { constructor(message, name) { super(message); this.name = name; } };
+        var __page = __port('__zigzagWorkerClient', { url: 'webkit-extension://x/offscreen.html' });
+        chrome.runtime.onConnect.fire(__page);
+        clients.matchAll({ includeUncontrolled: true }).then((all) => { globalThis.__client = all[0]; }); __flush();
+        """)
+        worker.evaluateScript("__flush()")
+        let refused = worker.evaluateScript("try { __client.postMessage({ action: 'objectURL' }, [{}]); 'sent' } catch (e) { e.name }")
+        #expect(refused?.toString() == "DataCloneError")
+        worker.evaluateScript("__client.postMessage('plain', []); __client.postMessage('also')")
+        #expect(worker.evaluateScript("__page.sent.map((m) => m.data).join()").toString() == "plain,also")
+    }
+
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
     }
