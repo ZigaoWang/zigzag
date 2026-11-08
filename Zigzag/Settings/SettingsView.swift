@@ -1488,7 +1488,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Actions
 
     /// Whether the app has more than English to choose from.
-    private static var hasLanguages: Bool { Bundle.main.localizations.filter { $0 != "Base" }.count > 1 }
+    private static var hasLanguages: Bool { Set(Bundle.main.localizations.filter { $0 != "Base" }).count > 1 }
 
     /// A new language takes a fresh start: macOS gives an app its language as it launches. Asked once, with Later
     /// leaving it for the next time Zigzag opens.
@@ -2011,9 +2011,10 @@ enum AppLanguage {
         let title: String
     }
 
-    /// Zigzag's languages, English first, each named in itself.
+    /// Zigzag's languages, English first, each once: a release build lists each twice, from its Info.plist and from
+    /// its .lproj folders.
     private static var languages: [String] {
-        Bundle.main.localizations.filter { $0 != "Base" }.sorted { $0 == "en" ? true : $1 == "en" ? false : $0 < $1 }
+        Set(Bundle.main.localizations.filter { $0 != "Base" }).sorted { $0 == "en" ? true : $1 == "en" ? false : $0 < $1 }
     }
 
     static var choices: [Choice] {
