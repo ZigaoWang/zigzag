@@ -463,6 +463,23 @@ enum DebugBridge {
                 let info = "\(window.windowNumber) \(ProcessInfo.processInfo.processIdentifier) \(Int(window.frame.minX)) \(Int(screenHeight - window.frame.maxY))"
                 try? info.write(toFile: String(arg[arg.index(after: space)...]), atomically: true, encoding: .utf8)
             }
+        case "inspector":
+            // inspector [toggle|console|pick]: does it, then logs whether the inspector shows and is picking an element.
+            switch arg {
+            case "toggle": controller.showWebInspector(nil)
+            case "console": controller.showJavaScriptConsole(nil)
+            case "pick": controller.inspectElement(nil)
+            default: break
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                guard let webView = controller.selectedWebView,
+                      let inspector = webView.perform(NSSelectorFromString("_inspector"))?.takeUnretainedValue() as? NSObject else { return }
+                func flag(_ name: String) -> Bool {
+                    typealias Getter = @convention(c) (AnyObject, Selector) -> Bool
+                    return unsafeBitCast(inspector.method(for: NSSelectorFromString(name)), to: Getter.self)(inspector, NSSelectorFromString(name))
+                }
+                debugLog("inspector \(arg) => visible=\(flag("isVisible")) picking=\(flag("isElementSelectionActive"))")
+            }
         case "altsvc":
             // altsvc [forget]: the sites WebKit keeps HTTP/3 for, and the other data they have, before and after forgetting.
             Task { @MainActor in

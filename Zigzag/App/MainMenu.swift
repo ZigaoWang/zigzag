@@ -151,6 +151,9 @@ enum MainMenu {
             .separator(),
             submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [
                 item(String(localized: "Web Inspector", comment: "View › Developer menu item."), #selector(C.showWebInspector(_:)), "i", [.command, .option]),
+                // Chrome's keys, so its habits work here too.
+                item(String(localized: "JavaScript Console", comment: "View › Developer menu item: opens the Web Inspector's console."), #selector(C.showJavaScriptConsole(_:)), "j", [.command, .option]),
+                item(String(localized: "Inspect Element", comment: "View › Developer menu item: pick an element on the page to see it in the Web Inspector."), #selector(C.inspectElement(_:)), "c", [.command, .option]),
                 item(String(localized: "View Source", comment: "View › Developer menu item."), #selector(C.viewSource(_:)), "u", [.command, .option]),
             ]),
             .separator(),

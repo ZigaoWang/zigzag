@@ -5580,6 +5580,17 @@
         }
       }
     },
+    "Inspect Element" : {
+      "comment" : "View › Developer menu item: pick an element on the page to see it in the Web Inspector.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查元素"
+          }
+        }
+      }
+    },
     "Installed" : {
       "comment" : "A heading in Settings › Extensions: the extensions you have.",
       "localizations" : {
@@ -5752,6 +5763,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它的标签页和已固定标签页都会关闭。你可以在浏览器窗口中用“撤销”找回它们。"
+          }
+        }
+      }
+    },
+    "JavaScript Console" : {
+      "comment" : "View › Developer menu item: opens the Web Inspector's console.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JavaScript 控制台"
           }
         }
       }

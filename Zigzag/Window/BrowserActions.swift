@@ -273,6 +273,17 @@ extension BrowserWindowController: NSMenuItemValidation {
         inspector.callIfPresent(inspector.inspectorFlag("isVisible") ? "close" : "show")
     }
 
+    @objc func showJavaScriptConsole(_ sender: Any?) {
+        selectedInspector?.callIfPresent("showConsole")
+    }
+
+    /// Pick an element on the page to see it in the inspector, as Chrome's ⌥⌘C does. Again, and picking stops.
+    @objc func inspectElement(_ sender: Any?) {
+        guard let inspector = selectedInspector else { return }
+        if !inspector.inspectorFlag("isVisible") { inspector.callIfPresent("show") }
+        inspector.callIfPresent("toggleElementSelection")
+    }
+
     @objc func viewSource(_ sender: Any?) {
         guard let url = selectedTab?.url, url.scheme?.hasPrefix("http") == true else { return }
         selectedWebView?.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] result, _ in
@@ -489,7 +500,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
-             #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(viewSource(_:)), #selector(duplicateTab(_:)),
+             #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(showJavaScriptConsole(_:)), #selector(inspectElement(_:)),
+             #selector(viewSource(_:)), #selector(duplicateTab(_:)),
              #selector(useSelectionForFind(_:)), #selector(jumpToSelection(_:)):
             return tab != nil
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)):
