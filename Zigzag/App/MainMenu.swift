@@ -29,176 +29,177 @@ enum MainMenu {
         typealias C = BrowserWindowController
 
         main.addItem(submenu("Zigzag", [
-            item("About Zigzag", #selector(AppDelegate.showAbout(_:)), ""),
-            item("Check for Updates…", #selector(AppDelegate.checkForUpdates(_:)), ""),
+            item(String(localized: "About Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.showAbout(_:)), ""),
+            item(String(localized: "Check for Updates…", comment: "Zigzag menu item."), #selector(AppDelegate.checkForUpdates(_:)), ""),
             .separator(),
-            item("Settings…", #selector(AppDelegate.showSettings(_:)), ","),
-            item("Passwords", #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
-            item("Set as Default Browser", #selector(AppDelegate.makeDefaultBrowser(_:)), ""),
+            item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),
+            item(String(localized: "Passwords", comment: "Zigzag menu item."), #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
+            item(String(localized: "Set as Default Browser", comment: "Zigzag menu item."), #selector(AppDelegate.makeDefaultBrowser(_:)), ""),
             .separator(),
             servicesItem(),
             .separator(),
-            item("Hide Zigzag", #selector(NSApplication.hide(_:)), "h"),
-            item("Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
-            item("Show All", #selector(NSApplication.unhideAllApplications(_:)), ""),
+            item(String(localized: "Hide Zigzag", comment: "Zigzag menu item."), #selector(NSApplication.hide(_:)), "h"),
+            item(String(localized: "Hide Others", comment: "Zigzag menu item."), #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
+            item(String(localized: "Show All", comment: "Zigzag menu item."), #selector(NSApplication.unhideAllApplications(_:)), ""),
             .separator(),
-            item("Quit Zigzag", #selector(NSApplication.terminate(_:)), "q"),
+            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(NSApplication.terminate(_:)), "q"),
         ]))
 
-        main.addItem(submenu("File", [
-            item("New Tab", #selector(C.newTab(_:)), "t"),
-            item("New Window", #selector(AppDelegate.newWindow(_:)), "n"),
-            item("New Private Window", #selector(AppDelegate.newPrivateWindow(_:)), "n", [.command, .shift]),
-            item("Open Location…", #selector(C.openLocation(_:)), "l"),
-            item("Open File…", #selector(C.openDocument(_:)), "o"),
+        main.addItem(submenu(String(localized: "File", comment: "A menu in the menu bar."), [
+            item(String(localized: "New Tab", comment: "File menu item."), #selector(C.newTab(_:)), "t"),
+            item(String(localized: "New Window", comment: "File menu item."), #selector(AppDelegate.newWindow(_:)), "n"),
+            item(String(localized: "New Private Window", comment: "File menu item."), #selector(AppDelegate.newPrivateWindow(_:)), "n", [.command, .shift]),
+            item(String(localized: "Open Location…", comment: "File menu item."), #selector(C.openLocation(_:)), "l"),
+            item(String(localized: "Open File…", comment: "File menu item."), #selector(C.openDocument(_:)), "o"),
             .separator(),
-            item("Import from Another Browser…", #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
+            item(String(localized: "Import from Another Browser…", comment: "File menu item."), #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
             .separator(),
             // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
-            item("Duplicate Tab", #selector(C.duplicateTab(_:)), ""),
-            item("Pin Tab", #selector(C.toggleBookmark(_:)), "d"),
-            item("Add to Favorites", #selector(C.addToFavorites(_:)), ""),
-            item("Move Tab to New Window", #selector(C.moveTabToNewWindow(_:)), ""),
+            item(String(localized: "Duplicate Tab", comment: "File menu item."), #selector(C.duplicateTab(_:)), ""),
+            item(String(localized: "Pin Tab", comment: "File menu item."), #selector(C.toggleBookmark(_:)), "d"),
+            item(String(localized: "Add to Favorites", comment: "File menu item."), #selector(C.addToFavorites(_:)), ""),
+            item(String(localized: "Move Tab to New Window", comment: "File menu item."), #selector(C.moveTabToNewWindow(_:)), ""),
             .separator(),
-            item("Close Tab", #selector(C.closeTab(_:)), "w"),
-            item("Close Other Tabs", #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),
-            item("Close Window", #selector(NSWindow.performClose(_:)), "w", [.command, .shift]),
+            item(String(localized: "Close Tab", comment: "File menu item."), #selector(C.closeTab(_:)), "w"),
+            item(String(localized: "Close Other Tabs", comment: "File menu item."), #selector(C.closeOtherTabs(_:)), "w", [.command, .option]),
+            item(String(localized: "Close Window", comment: "File menu item."), #selector(NSWindow.performClose(_:)), "w", [.command, .shift]),
             .separator(),
-            item("Share…", #selector(C.sharePage(_:)), ""),
-            item("Save Page As…", #selector(C.savePageAs(_:)), "s"),
-            item("Export as PDF…", #selector(C.exportAsPDF(_:)), ""),
-            item("Take Screenshot of Whole Page", #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
-            item("Print…", #selector(C.printPage(_:)), "p"),
+            item(String(localized: "Share…", comment: "File menu item."), #selector(C.sharePage(_:)), ""),
+            item(String(localized: "Save Page As…", comment: "File menu item."), #selector(C.savePageAs(_:)), "s"),
+            item(String(localized: "Export as PDF…", comment: "File menu item."), #selector(C.exportAsPDF(_:)), ""),
+            item(String(localized: "Take Screenshot of Whole Page", comment: "File menu item."), #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
+            item(String(localized: "Print…", comment: "File menu item."), #selector(C.printPage(_:)), "p"),
         ]))
 
-        main.addItem(submenu("Edit", [
-            item("Undo", Selector(("undo:")), "z"),
-            item("Redo", Selector(("redo:")), "z", [.command, .shift]),
+        main.addItem(submenu(String(localized: "Edit", comment: "A menu in the menu bar."), [
+            item(String(localized: "Undo", comment: "Edit menu item."), Selector(("undo:")), "z"),
+            item(String(localized: "Redo", comment: "Edit menu item."), Selector(("redo:")), "z", [.command, .shift]),
             .separator(),
-            item("Cut", #selector(NSText.cut(_:)), "x"),
-            item("Copy", #selector(NSText.copy(_:)), "c"),
-            item("Paste", #selector(NSText.paste(_:)), "v"),
-            item("Paste and Match Style", #selector(NSTextView.pasteAsPlainText(_:)), "v", [.command, .option, .shift]),
-            item("Select All", #selector(NSText.selectAll(_:)), "a"),
+            item(String(localized: "Cut", comment: "Edit menu item."), #selector(NSText.cut(_:)), "x"),
+            item(String(localized: "Copy", comment: "Edit menu item."), #selector(NSText.copy(_:)), "c"),
+            item(String(localized: "Paste", comment: "Edit menu item."), #selector(NSText.paste(_:)), "v"),
+            item(String(localized: "Paste and Match Style", comment: "Edit menu item."), #selector(NSTextView.pasteAsPlainText(_:)), "v", [.command, .option, .shift]),
+            item(String(localized: "Select All", comment: "Edit menu item."), #selector(NSText.selectAll(_:)), "a"),
             .separator(),
-            item("Copy Link", #selector(C.copyPageURL(_:)), "c", [.command, .shift]),
-            item("Copy Link as Markdown", #selector(C.copyPageURLAsMarkdown(_:)), "c", [.command, .shift, .option]),
+            item(String(localized: "Copy Link", comment: "Edit menu item."), #selector(C.copyPageURL(_:)), "c", [.command, .shift]),
+            item(String(localized: "Copy Link as Markdown", comment: "Edit menu item."), #selector(C.copyPageURLAsMarkdown(_:)), "c", [.command, .shift, .option]),
             .separator(),
-            submenu("Find", [
-                item("Find…", #selector(C.showFindBar(_:)), "f"),
-                item("Find Next", #selector(C.findNextMatch(_:)), "g"),
-                item("Find Previous", #selector(C.findPreviousMatch(_:)), "g", [.command, .shift]),
-                item("Use Selection for Find", #selector(C.useSelectionForFind(_:)), "e"),
-                item("Jump to Selection", #selector(C.jumpToSelection(_:)), "j"),
+            submenu(String(localized: "Find", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Find…", comment: "Edit › Find menu item."), #selector(C.showFindBar(_:)), "f"),
+                item(String(localized: "Find Next", comment: "Edit › Find menu item."), #selector(C.findNextMatch(_:)), "g"),
+                item(String(localized: "Find Previous", comment: "Edit › Find menu item."), #selector(C.findPreviousMatch(_:)), "g", [.command, .shift]),
+                item(String(localized: "Use Selection for Find", comment: "Edit › Find menu item."), #selector(C.useSelectionForFind(_:)), "e"),
+                item(String(localized: "Jump to Selection", comment: "Edit › Find menu item."), #selector(C.jumpToSelection(_:)), "j"),
             ]),
-            submenu("Spelling and Grammar", [
-                item("Show Spelling and Grammar", #selector(NSText.showGuessPanel(_:)), ":"),
-                item("Check Document Now", #selector(NSText.checkSpelling(_:)), ";"),
+            submenu(String(localized: "Spelling and Grammar", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Show Spelling and Grammar", comment: "Edit › Spelling and Grammar menu item."), #selector(NSText.showGuessPanel(_:)), ":"),
+                item(String(localized: "Check Document Now", comment: "Edit › Spelling and Grammar menu item."), #selector(NSText.checkSpelling(_:)), ";"),
                 .separator(),
-                item("Check Spelling While Typing", #selector(NSTextView.toggleContinuousSpellChecking(_:)), ""),
-                item("Check Grammar With Spelling", #selector(NSTextView.toggleGrammarChecking(_:)), ""),
-                item("Correct Spelling Automatically", #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), ""),
+                item(String(localized: "Check Spelling While Typing", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleContinuousSpellChecking(_:)), ""),
+                item(String(localized: "Check Grammar With Spelling", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleGrammarChecking(_:)), ""),
+                item(String(localized: "Correct Spelling Automatically", comment: "Edit › Spelling and Grammar menu item."), #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), ""),
             ]),
-            submenu("Substitutions", [
-                item("Show Substitutions", #selector(NSTextView.orderFrontSubstitutionsPanel(_:)), ""),
+            submenu(String(localized: "Substitutions", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Show Substitutions", comment: "Edit › Substitutions menu item."), #selector(NSTextView.orderFrontSubstitutionsPanel(_:)), ""),
                 .separator(),
-                item("Smart Copy/Paste", #selector(NSTextView.toggleSmartInsertDelete(_:)), ""),
-                item("Smart Quotes", #selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)), ""),
-                item("Smart Dashes", #selector(NSTextView.toggleAutomaticDashSubstitution(_:)), ""),
-                item("Smart Links", #selector(NSTextView.toggleAutomaticLinkDetection(_:)), ""),
-                item("Text Replacement", #selector(NSTextView.toggleAutomaticTextReplacement(_:)), ""),
+                item(String(localized: "Smart Copy/Paste", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleSmartInsertDelete(_:)), ""),
+                item(String(localized: "Smart Quotes", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)), ""),
+                item(String(localized: "Smart Dashes", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticDashSubstitution(_:)), ""),
+                item(String(localized: "Smart Links", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticLinkDetection(_:)), ""),
+                item(String(localized: "Text Replacement", comment: "Edit › Substitutions menu item."), #selector(NSTextView.toggleAutomaticTextReplacement(_:)), ""),
             ]),
-            submenu("Transformations", [
-                item("Make Upper Case", #selector(NSResponder.uppercaseWord(_:)), ""),
-                item("Make Lower Case", #selector(NSResponder.lowercaseWord(_:)), ""),
-                item("Capitalize", #selector(NSResponder.capitalizeWord(_:)), ""),
+            submenu(String(localized: "Transformations", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Make Upper Case", comment: "Edit › Transformations menu item."), #selector(NSResponder.uppercaseWord(_:)), ""),
+                item(String(localized: "Make Lower Case", comment: "Edit › Transformations menu item."), #selector(NSResponder.lowercaseWord(_:)), ""),
+                item(String(localized: "Capitalize", comment: "Edit › Transformations menu item."), #selector(NSResponder.capitalizeWord(_:)), ""),
             ]),
-            submenu("Speech", [
-                item("Start Speaking", #selector(NSTextView.startSpeaking(_:)), ""),
-                item("Stop Speaking", #selector(NSTextView.stopSpeaking(_:)), ""),
+            submenu(String(localized: "Speech", comment: "Submenu of the Edit menu."), [
+                item(String(localized: "Start Speaking", comment: "Edit › Speech menu item."), #selector(NSTextView.startSpeaking(_:)), ""),
+                item(String(localized: "Stop Speaking", comment: "Edit › Speech menu item."), #selector(NSTextView.stopSpeaking(_:)), ""),
             ]),
         ]))
 
         var viewItems: [NSMenuItem] = [
-            item("Hide Sidebar", #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
-            item("Show All Tabs", #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
-            item("Stack Vertically", #selector(C.toggleSplitOrientation(_:)), ""),
-            item("Separate Tabs", #selector(C.closeSplitView(_:)), "\\", [.command, .option]),
+            item(String(localized: "Hide Sidebar", comment: "View menu item."), #selector(C.toggleBrowserSidebar(_:)), "s", [.control]),
+            item(String(localized: "Show All Tabs", comment: "View menu item."), #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
+            item(String(localized: "Stack Vertically", comment: "View menu item."), #selector(C.toggleSplitOrientation(_:)), ""),
+            item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.command, .option]),
             .separator(),
-            item("Back", #selector(C.goBack(_:)), "["),
-            item("Forward", #selector(C.goForward(_:)), "]"),
-            item("Reload Page", #selector(C.reloadPage(_:)), "r"),
-            item("Reload Ignoring Cache", #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .option]),
-            item("Stop", #selector(C.stopLoading(_:)), "."),
+            item(String(localized: "Back", comment: "View menu item."), #selector(C.goBack(_:)), "["),
+            item(String(localized: "Forward", comment: "View menu item."), #selector(C.goForward(_:)), "]"),
+            item(String(localized: "Reload Page", comment: "View menu item."), #selector(C.reloadPage(_:)), "r"),
+            item(String(localized: "Reload Ignoring Cache", comment: "View menu item."), #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .option]),
+            item(String(localized: "Stop", comment: "View menu item."), #selector(C.stopLoading(_:)), "."),
             .separator(),
-            item("Next Tab", #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
-            item("Previous Tab", #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
-            item("Move Tab Up", #selector(C.moveTabUp(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.control, .shift]),
-            item("Move Tab Down", #selector(C.moveTabDown(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.control, .shift]),
-            item("Next Space", #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
-            item("Previous Space", #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
-            item("New Space", #selector(C.newSpace(_:)), "n", [.command, .option]),
-            item("Edit Space…", #selector(C.renameSpace(_:)), ""),
+            item(String(localized: "Next Tab", comment: "View menu item."), #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
+            item(String(localized: "Previous Tab", comment: "View menu item."), #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
+            item(String(localized: "Move Tab Up", comment: "View menu item."), #selector(C.moveTabUp(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.control, .shift]),
+            item(String(localized: "Move Tab Down", comment: "View menu item."), #selector(C.moveTabDown(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.control, .shift]),
+            item(String(localized: "Next Space", comment: "View menu item."), #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
+            item(String(localized: "Previous Space", comment: "View menu item."), #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
+            item(String(localized: "New Space", comment: "View menu item."), #selector(C.newSpace(_:)), "n", [.command, .option]),
+            item(String(localized: "Edit Space…", comment: "View menu item."), #selector(C.renameSpace(_:)), ""),
             .separator(),
-            item("Actual Size", #selector(C.actualSize(_:)), "0"),
-            item("Zoom In", #selector(C.zoomIn(_:)), "+"),
-            item("Zoom Out", #selector(C.zoomOut(_:)), "-"),
-            item("Mute Tab", #selector(C.toggleMute(_:)), "m", [.command, .shift]),
-            item("Picture in Picture", #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
-            item("Show Reader", #selector(C.toggleReader(_:)), "r", [.command, .shift]),
-            item("Translate Page", #selector(C.translatePage(_:)), "t", [.command, .option]),
+            item(String(localized: "Actual Size", comment: "View menu item."), #selector(C.actualSize(_:)), "0"),
+            item(String(localized: "Zoom In", comment: "View menu item."), #selector(C.zoomIn(_:)), "+"),
+            item(String(localized: "Zoom Out", comment: "View menu item."), #selector(C.zoomOut(_:)), "-"),
+            item(String(localized: "Mute Tab", comment: "View menu item."), #selector(C.toggleMute(_:)), "m", [.command, .shift]),
+            item(String(localized: "Picture in Picture", comment: "View menu item."), #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
+            item(String(localized: "Show Reader", comment: "View menu item."), #selector(C.toggleReader(_:)), "r", [.command, .shift]),
+            item(String(localized: "Translate Page", comment: "View menu item."), #selector(C.translatePage(_:)), "t", [.command, .option]),
             .separator(),
-            submenu("Developer", [
-                item("Web Inspector", #selector(C.showWebInspector(_:)), "i", [.command, .option]),
-                item("View Source", #selector(C.viewSource(_:)), "u", [.command, .option]),
+            submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [
+                item(String(localized: "Web Inspector", comment: "View › Developer menu item."), #selector(C.showWebInspector(_:)), "i", [.command, .option]),
+                item(String(localized: "View Source", comment: "View › Developer menu item."), #selector(C.viewSource(_:)), "u", [.command, .option]),
             ]),
             .separator(),
-            item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
+            item(String(localized: "Enter Full Screen", comment: "View menu item."), #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
         ]
         // Shortcuts that don't need a visible menu line: they work, they just don't clutter the menu.
         viewItems += [
-            alternate(item("Zoom In", #selector(C.zoomIn(_:)), "=")),
-            alternate(item("Back", #selector(C.goBack(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!))),
-            alternate(item("Forward", #selector(C.goForward(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!))),
-            alternate(item("Next Tab", #selector(C.selectNextTab(_:)), "}", [.command, .shift])),
-            alternate(item("Previous Tab", #selector(C.selectPreviousTab(_:)), "{", [.command, .shift])),
-            alternate(item("Close Tabs Below", #selector(C.closeTabsBelow(_:)), "")),
+            alternate(item(String(localized: "Zoom In", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.zoomIn(_:)), "=")),
+            alternate(item(String(localized: "Back", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.goBack(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!))),
+            alternate(item(String(localized: "Forward", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.goForward(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!))),
+            alternate(item(String(localized: "Next Tab", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.selectNextTab(_:)), "}", [.command, .shift])),
+            alternate(item(String(localized: "Previous Tab", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.selectPreviousTab(_:)), "{", [.command, .shift])),
+            alternate(item(String(localized: "Close Tabs Below", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.closeTabsBelow(_:)), "")),
         ]
         for n in 1...9 {
-            viewItems.append(alternate(item(n == 9 ? "Last Tab" : "Tab \(n)", #selector(C.selectTabByNumber(_:)), "\(n)", tag: n)))
-            viewItems.append(alternate(item("Space \(n)", #selector(C.selectSpaceByNumber(_:)), "\(n)", [.control], tag: n)))
+            viewItems.append(alternate(item(n == 9 ? String(localized: "Last Tab", comment: "Hidden View menu item, named in Settings › Shortcuts.")
+                                                     : String(localized: "Tab \(n)", comment: "Hidden View menu item that goes to the tab with this number."), #selector(C.selectTabByNumber(_:)), "\(n)", tag: n)))
+            viewItems.append(alternate(item(String(localized: "Space \(n)", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.selectSpaceByNumber(_:)), "\(n)", [.control], tag: n)))
         }
-        main.addItem(submenu("View", viewItems))
+        main.addItem(submenu(String(localized: "View", comment: "A menu in the menu bar."), viewItems))
 
-        main.addItem(submenu("History", [
+        main.addItem(submenu(String(localized: "History", comment: "A menu in the menu bar."), [
             // One History, as in Chrome: the window, with its own search.
-            item("Show History", #selector(AppDelegate.showHistory(_:)), "y"),
-            item("Reopen Closed Tab", #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
-            item("Reopen Closed Window", #selector(AppDelegate.reopenClosedWindow(_:)), ""),
+            item(String(localized: "Show History", comment: "History menu item."), #selector(AppDelegate.showHistory(_:)), "y"),
+            item(String(localized: "Reopen Closed Tab", comment: "History menu item."), #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
+            item(String(localized: "Reopen Closed Window", comment: "History menu item."), #selector(AppDelegate.reopenClosedWindow(_:)), ""),
             .separator(),
-            item("Clear History…", #selector(C.clearHistory(_:)), ""),
-            item("Clear Cache…", #selector(C.clearCache(_:)), ""),
-            item("Clear Cookies…", #selector(C.clearCookies(_:)), ""),
+            item(String(localized: "Clear History…", comment: "History menu item."), #selector(C.clearHistory(_:)), ""),
+            item(String(localized: "Clear Cache…", comment: "History menu item."), #selector(C.clearCache(_:)), ""),
+            item(String(localized: "Clear Cookies…", comment: "History menu item."), #selector(C.clearCookies(_:)), ""),
         ]))
 
-        let window = submenu("Window", [
-            item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"),
-            item("Zoom", #selector(NSWindow.performZoom(_:)), ""),
+        let window = submenu(String(localized: "Window", comment: "A menu in the menu bar."), [
+            item(String(localized: "Minimize", comment: "Window menu item."), #selector(NSWindow.performMiniaturize(_:)), "m"),
+            item(String(localized: "Zoom", comment: "Window menu item."), #selector(NSWindow.performZoom(_:)), ""),
             .separator(),
-            item("Downloads", #selector(C.showDownloads(_:)), "l", [.command, .option]),
+            item(String(localized: "Downloads", comment: "Window menu item."), #selector(C.showDownloads(_:)), "l", [.command, .option]),
             .separator(),
-            item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:)), ""),
+            item(String(localized: "Bring All to Front", comment: "Window menu item."), #selector(NSApplication.arrangeInFront(_:)), ""),
         ])
         main.addItem(window)
         NSApp.windowsMenu = window.submenu
 
-        let help = submenu("Help", [
-            item("Getting Started", #selector(C.showGettingStarted(_:)), ""),
-            item("What’s New in Zigzag", #selector(C.showWhatsNew(_:)), ""),
-            item("Send Feedback…", #selector(C.sendFeedback(_:)), ""),
-            item("Report a Problem…", #selector(C.reportProblem(_:)), ""),
+        let help = submenu(String(localized: "Help", comment: "A menu in the menu bar."), [
+            item(String(localized: "Getting Started", comment: "Help menu item."), #selector(C.showGettingStarted(_:)), ""),
+            item(String(localized: "What’s New in Zigzag", comment: "Help menu item."), #selector(C.showWhatsNew(_:)), ""),
+            item(String(localized: "Send Feedback…", comment: "Help menu item."), #selector(C.sendFeedback(_:)), ""),
+            item(String(localized: "Report a Problem…", comment: "Help menu item."), #selector(C.reportProblem(_:)), ""),
             .separator(),
-            item("Zigzag on GitHub", #selector(AppDelegate.showSourceCode(_:)), ""),
+            item(String(localized: "Zigzag on GitHub", comment: "Help menu item."), #selector(AppDelegate.showSourceCode(_:)), ""),
         ])
         main.addItem(help)
         NSApp.helpMenu = help.submenu
@@ -206,8 +207,9 @@ enum MainMenu {
     }
 
     private static func servicesItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
-        let menu = NSMenu(title: "Services")
+        let title = String(localized: "Services", comment: "Submenu of the Zigzag menu, filled by macOS.")
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: title)
         item.submenu = menu
         NSApp.servicesMenu = menu
         return item
