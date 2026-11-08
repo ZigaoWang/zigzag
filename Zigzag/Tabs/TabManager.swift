@@ -142,7 +142,7 @@ final class TabManager {
 
     /// Where a new tab lands in a space's list: next to the tab it came from (after the others it already opened, so a
     /// row of links stays in reading order), or below the tab you're on; on top when neither is in the list.
-    private func newTabIndex(in space: UUID, opener: Tab?) -> Int {
+    private func newTabIndex(in space: UUID, opener: Tab?, select: Bool) -> Int {
         let list = tabsBySpace[space] ?? []
         switch Self.newTabPlace {
         case .top: return 0
@@ -156,7 +156,7 @@ final class TabManager {
             if space == currentSpaceID, let here = selectedTab, let at = list.firstIndex(where: { $0 === here }) {
                 // Several opened in a row beside the same tab (an extension opening a few pages) keep their order:
                 // each goes after the last one placed there, not in front of it.
-                if let beside = placedBeside, beside.anchor === here, let last = beside.last,
+                if !select, let beside = placedBeside, beside.anchor === here, let last = beside.last,
                    let after = list.firstIndex(where: { $0 === last }), after > at { return after + 1 }
                 return at + 1
             }
@@ -177,7 +177,7 @@ final class TabManager {
         watch(tab)
         tab.opener = opener
         // Placed once, as Settings says; the list never reorders itself after that.
-        tabsBySpace[space, default: []].insert(tab, at: newTabIndex(in: space, opener: opener))
+        tabsBySpace[space, default: []].insert(tab, at: newTabIndex(in: space, opener: opener, select: select))
         if opener == nil, !select, Self.newTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
