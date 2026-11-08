@@ -115,6 +115,14 @@ class InteractiveView: NSView {
     var pressScales = false
     /// Things that read as objects sink a point instead and settle back with weight (`showSink`).
     var pressSinks = false
+    /// How far past its edges a press still counts, for a small control whose parent hands it the clicks around it
+    /// (the address's buttons take the field's rim). Its look stays its own size.
+    var pressOutset = NSEdgeInsets()
+    /// Where a press lands on this control: its bounds, grown by `pressOutset`.
+    var pressArea: NSRect {
+        NSRect(x: bounds.minX - pressOutset.left, y: bounds.minY - pressOutset.top,
+               width: bounds.width + pressOutset.left + pressOutset.right, height: bounds.height + pressOutset.top + pressOutset.bottom)
+    }
     var isSelected = false {
         didSet {
             guard oldValue != isSelected else { return }
@@ -214,7 +222,7 @@ class InteractiveView: NSView {
             }
         }
         if !dragging {
-            let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+            let inside = pressArea.contains(convert(event.locationInWindow, from: nil))
             if inside != isPressed { isPressed = inside }
         }
     }
@@ -222,7 +230,7 @@ class InteractiveView: NSView {
     override func mouseUp(with event: NSEvent) {
         defer { mouseDownEvent = nil; dragging = false }
         guard isEnabled, mouseDownEvent != nil else { isPressed = false; return }
-        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+        let inside = pressArea.contains(convert(event.locationInWindow, from: nil))
         isPressed = false
         if inside && !clicksOnMouseDown { onClick?(event) }
     }

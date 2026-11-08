@@ -147,15 +147,28 @@ final class AddressView: InteractiveView {
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         var right = bounds.width - inset
         let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
-        for button in trailingButtons.reversed() {
+        for (index, button) in trailingButtons.enumerated().reversed() {
             button.frame = NSRect(x: right - side, y: inset, width: side, height: side)
             // Concentric with the field's corners.
             button.radius = Tokens.Sidebar.addressRadius - inset
+            // The field's rim around it presses it too: top to bottom, out to the field's end, half the gap to a
+            // neighbor.
+            button.pressOutset = NSEdgeInsets(top: inset, left: 1, bottom: inset, right: index == trailingButtons.count - 1 ? inset : 1)
             right = button.frame.minX - 2
         }
         let trailing = trailingButtons.isEmpty ? bounds.width - pad : right - Tokens.Space.x1
         let h = ceil(label.intrinsicContentSize.height)
         label.frame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: trailing - x + Label.inset * 2, height: h)
+    }
+
+    /// The field's trailing end belongs to its buttons (`pressOutset`): a press on the rim around one presses it
+    /// rather than opening the command bar.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        for button in [readerButton, captureButton] + actionButtons where !button.isHidden {
+            if button.pressArea.contains(button.convert(local, from: self)) { return button }
+        }
+        return super.hitTest(point)
     }
 
     override func stateDidChange(animated: Bool) {
