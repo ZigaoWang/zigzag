@@ -167,6 +167,7 @@ enum MainMenu {
             alternate(item(String(localized: "Next Tab", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.selectNextTab(_:)), "}", [.command, .shift])),
             alternate(item(String(localized: "Previous Tab", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.selectPreviousTab(_:)), "{", [.command, .shift])),
             alternate(item(String(localized: "Close Tabs Below", comment: "Hidden View menu item, named in Settings › Shortcuts."), #selector(C.closeTabsBelow(_:)), "")),
+            alternate(item(String(localized: "Web Inspector", comment: "View › Developer menu item."), #selector(C.showWebInspector(_:)), String(UnicodeScalar(NSF12FunctionKey)!), [])),
         ]
         for n in 1...9 {
             viewItems.append(alternate(item(n == 9 ? String(localized: "Last Tab", comment: "Hidden View menu item, named in Settings › Shortcuts.")
