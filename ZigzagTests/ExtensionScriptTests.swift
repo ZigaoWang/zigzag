@@ -225,6 +225,32 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("__other").toBool() == false)
     }
 
+    @Test func webRequestListenersForMainFramesHearThem() {
+        // WebKit's filters: only main_frame hears nothing, only sub_frame hears main frames too. Violentmonkey watches
+        // main_frame for .user.js loads; it hears those and nothing else, as in Chrome.
+        let page = Self.workerWorld(worker: false, setup: """
+        var __listeners = [];
+        chrome.webRequest = { onBeforeRequest: {
+          addListener: (f, filter) => { __listeners.push({ f, types: filter.types }); },
+          removeListener: (f) => { __listeners = __listeners.filter((l) => l.f !== f); },
+          hasListener: (f) => __listeners.some((l) => l.f === f),
+        } };
+        var __load = (type) => __listeners.filter((l) => !l.types || l.types.includes('sub_frame')).forEach((l) => l.f({ type, url: 'http://a.test/x.user.js' }));
+        """)
+        page.evaluateScript("""
+        var __heard = [];
+        var main = (d) => { __heard.push('main ' + d.type); }, sub = (d) => { __heard.push('sub ' + d.type); };
+        chrome.webRequest.onBeforeRequest.addListener(main, { urls: ['*://*/*.user.js'], types: ['main_frame'] }, []);
+        chrome.webRequest.onBeforeRequest.addListener(sub, { urls: ['<all_urls>'], types: ['sub_frame'] });
+        __load('main_frame'); __load('sub_frame');
+        """)
+        #expect(page.evaluateScript("__heard.join()").toString() == "main main_frame,sub sub_frame")
+        #expect(page.evaluateScript("chrome.webRequest.onBeforeRequest.hasListener(main)").toBool())
+        page.evaluateScript("chrome.webRequest.onBeforeRequest.removeListener(main); __heard = []; __load('main_frame')")
+        #expect(page.evaluateScript("chrome.webRequest.onBeforeRequest.hasListener(main)").toBool() == false)
+        #expect(page.evaluateScript("__heard.length").toInt32() == 0)
+    }
+
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
     }
