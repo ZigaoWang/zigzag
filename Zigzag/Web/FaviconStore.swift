@@ -149,15 +149,14 @@ final class FaviconStore {
     }
 
     /// The icon links a page's head declares, read from its HTML without loading it in a web view. Asked as the
-    /// browser (some sites turn other clients away). A page that sends you elsewhere (to a sign-in on another
-    /// host) lists that host's icons, not its own: none then.
+    /// browser (some sites turn other clients away). A page that sends you to a sign-in lists the sign-in's icons
+    /// (Google Calendar's would be Google's account page's), not its own: none then.
     private func declaredIcons(of url: URL, completion: @escaping @MainActor ([[String: String]]) -> Void) {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("text/html", forHTTPHeaderField: "Accept")
         session.dataTask(with: request) { data, response, _ in
             let landed = response?.url ?? url
-            let sameHost = landed.host()?.lowercased() == url.host()?.lowercased()
-            let html = sameHost ? data.flatMap { String(data: $0.prefix(200_000), encoding: .utf8) } ?? "" : ""
+            let html = Self.isSignIn(landed, from: url) ? "" : data.flatMap { String(data: $0.prefix(200_000), encoding: .utf8) } ?? ""
             // Made absolute, as a page's own script reports them.
             let links = Self.iconLinks(in: html).map { link -> [String: String] in
                 var link = link
@@ -166,6 +165,14 @@ final class FaviconStore {
             }
             Task { @MainActor in completion(links) }
         }.resume()
+    }
+
+    /// Whether asking for `asked` landed on a sign-in somewhere else rather than on the site (a site that moved,
+    /// notion.so to notion.com, still counts as itself).
+    nonisolated static func isSignIn(_ landed: URL, from asked: URL) -> Bool {
+        guard landed.host()?.lowercased() != asked.host()?.lowercased() else { return false }
+        let text = ((landed.host() ?? "") + landed.path()).lowercased()
+        return ["login", "signin", "sign-in", "sign_in", "accounts.", "auth", "sso"].contains { text.contains($0) }
     }
 
     /// `<link rel="…icon…" href="…" sizes="…">` tags, as the page's own icon script reports them.

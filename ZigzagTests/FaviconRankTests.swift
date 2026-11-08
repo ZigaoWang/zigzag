@@ -48,3 +48,13 @@ struct FaviconFetchTests {
         #expect(FaviconStore.retryWait(after: 20 * 3600) == 24 * 3600)
     }
 }
+
+struct FaviconSignInTests {
+    @Test func aSignInElsewhereIsNotTheSite() throws {
+        let calendar = try #require(URL(string: "https://calendar.google.com/calendar/"))
+        #expect(FaviconStore.isSignIn(try #require(URL(string: "https://accounts.google.com/v3/signin/identifier")), from: calendar))
+        let notion = try #require(URL(string: "https://www.notion.so/"))
+        #expect(!FaviconStore.isSignIn(try #require(URL(string: "https://www.notion.com/")), from: notion))
+        #expect(!FaviconStore.isSignIn(try #require(URL(string: "https://example.com/login")), from: try #require(URL(string: "https://example.com/"))))
+    }
+}
