@@ -133,6 +133,7 @@
 		9FEEA537DE55BC1099D8DB0D /* TabStateCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD11485F83B11770DF38CE2 /* TabStateCache.swift */; };
 		A05782BC7540B79FF1021BF4 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91506D36CD561CBD7E11897D /* ContentBlocker.swift */; };
 		A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111BB58676C39406F3B81A0E /* FavoriteTests.swift */; };
+		A0A0EF24BC36F7C73F38E37A /* NetworkChangesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */; };
 		A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */; };
 		A1B642C243114E42A13CF1D0 /* api-surface.js in Resources */ = {isa = PBXBuildFile; fileRef = 0A6D4409217ACDE22F8A28EA /* api-surface.js */; };
 		A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */; };
@@ -252,6 +253,7 @@
 		1EE88C88464115895D3647DF /* PopupWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupWindowController.swift; sourceTree = "<group>"; };
 		1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxImporter.swift; sourceTree = "<group>"; };
 		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
+		1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChangesTests.swift; sourceTree = "<group>"; };
 		253D16FCBE561D267ED6957C /* BrowserRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRootView.swift; sourceTree = "<group>"; };
 		256245226DA14768B001589E /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
 		25F6D89709F01D7AD083FC85 /* Readability.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Readability.js; sourceTree = "<group>"; };
@@ -777,6 +779,7 @@
 				9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */,
 				05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */,
 				6B89CCE006086C641D713AAB /* LocalizationTests.swift */,
+				1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */,
 				F2773876C78493A8043AE850 /* NumberHintsTests.swift */,
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
 				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
@@ -1146,6 +1149,7 @@
 				AD420686AFB0AEBB23F9ADF7 /* InlineCompletionTests.swift in Sources */,
 				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
 				3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */,
+				A0A0EF24BC36F7C73F38E37A /* NetworkChangesTests.swift in Sources */,
 				0C2258B7291E37CBE925C8D0 /* NumberHintsTests.swift in Sources */,
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
