@@ -705,9 +705,8 @@ enum ExtensionProfile {
     private static let profiles: [String: Profile] = [
         ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
-        // Its popup app loops in WebKit and never draws (found in the 2026-10-25 test pass).
-        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
-                                                   knownIssue: "Its popup"),
+        // Bitwarden: its popup loop is answered by the prelude; its popup draws again (checked 2026-11-08).
+        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
         // Return YouTube Dislike, as "Bring Back YouTube Dislikes".
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
