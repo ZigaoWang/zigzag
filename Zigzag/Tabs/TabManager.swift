@@ -70,6 +70,8 @@ final class TabManager {
         var customTitle: String? = nil
         /// The split it was half of, so bringing it back puts it beside its partner again.
         var split: SplitPair? = nil
+        /// When it was last looked at: brought back, it's as recent as it was, so Clear and the fading see it so too.
+        var lastActivated = Date()
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -758,7 +760,7 @@ final class TabManager {
         }
         guard var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { return }
         closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                                    interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair))
+                                    interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair, lastActivated: tab.lastActivated))
         if closedTabs.count > closedLimit { closedTabs.removeFirst(closedTabs.count - closedLimit) }
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
@@ -775,7 +777,7 @@ final class TabManager {
             bookmarkTabs[bookmarkID] = nil
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
             closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
-                                        interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair))
+                                        interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair, lastActivated: tab.lastActivated))
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
         }
@@ -847,7 +849,8 @@ final class TabManager {
         guard let index = found else { return nil }
         let closed = closedTabs.remove(at: index)
         let space = Library.shared.space(closed.spaceID) != nil ? closed.spaceID : currentSpaceID
-        let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState)
+        let tab = Tab(url: closed.url, title: closed.title, spaceID: space, interactionState: closed.interactionState,
+                      lastActivated: closed.lastActivated)
         tab.customTitle = closed.customTitle
         tab.host = host
         watch(tab)
