@@ -29,9 +29,12 @@ struct ExtensionReport {
 
         var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
         let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
-        for permission in requested.subtracting(recognized).subtracting(covered).sorted() {
+        // A proxy extension's sign-in provider answers its proxy's password, which the bridge passes on (BridgeProxy).
+        let answered: Set<String> = requested.contains("proxy") ? ["webRequestAuthProvider"] : []
+        for permission in requested.subtracting(recognized).subtracting(covered).subtracting(answered).sorted() {
             if let name = Self.limitNames[permission], !limits.contains(name) { limits.append(name) }
         }
+        for (permission, name) in Self.partLimits where requested.contains(permission) && !limits.contains(name) { limits.append(name) }
         for (key, name) in Self.manifestLimits where manifest[key] != nil && !limits.contains(name) { limits.append(name) }
         self.limits = limits
     }
@@ -100,6 +103,9 @@ struct ExtensionReport {
         if permissions.contains("cookies") {
             lines.append(Line(symbol: "lock", text: String(localized: "Read and change cookies on the sites it can access", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
+        if permissions.contains("proxy") {
+            lines.append(Line(symbol: "network", text: String(localized: "Send your browsing through a proxy server", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
+        }
         if permissions.contains("management") {
             lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "See your other extensions", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
         }
@@ -147,13 +153,18 @@ struct ExtensionReport {
         "clipboardRead": String(localized: "Reading what you copy", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "management": String(localized: "Managing other extensions", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "privacy": String(localized: "Privacy settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "proxy": String(localized: "Proxy settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "debugger": String(localized: "Debugging pages", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "pageCapture": String(localized: "Saving pages", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "desktopCapture": String(localized: "Recording your screen", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "tabCapture": String(localized: "Recording tabs", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "system.display": String(localized: "Display information", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
         "power": String(localized: "Keeping your Mac awake", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
+    ]
+
+    /// The part of an API the bridge answers that still won't work, by the permission that brings it.
+    private static let partLimits: [(String, String)] = [
+        // Fixed proxy servers work; WebKit has nothing to run a proxy auto-config script on.
+        ("proxy", String(localized: "Proxy scripts (PAC)", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag: proxy auto-config scripts, which choose a proxy for each site.")),
     ]
 
     /// Manifest features with no WebKit equivalent.

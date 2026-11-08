@@ -8506,13 +8506,13 @@
         }
       }
     },
-    "Proxy settings" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+    "Proxy scripts (PAC)" : {
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag: proxy auto-config scripts, which choose a proxy for each site.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "代理设置"
+            "value" : "代理脚本（PAC）"
           }
         }
       }
@@ -9938,6 +9938,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "发送反馈…"
+          }
+        }
+      }
+    },
+    "Send your browsing through a proxy server" : {
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让你的浏览经过代理服务器"
           }
         }
       }
