@@ -495,6 +495,89 @@
     try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
   }
 
+  // userScripts (BridgeUserScripts in Swift): each user script is a content script of the extension's own, which
+  // WebKit registers from a file Zigzag writes. Calls run one at a time, the first being the background's look at what
+  // WebKit still has registered, so Zigzag's list and WebKit's never disagree.
+  const scripting = api.scripting;
+  if (asked.has('userScripts') && scripting && typeof scripting.registerContentScripts === 'function') {
+    const PREFIX = 'zz-us-';
+    let queue = Promise.resolve();
+    const serial = (work) => { const run = queue.then(work); queue = run.catch(() => {}); return run; };
+    // Zigzag registers them again each time the background starts, from its own list, so WebKit needn't keep them.
+    const toWebKit = (made) => ({ ...made, id: PREFIX + made.id, persistAcrossSessions: false });
+    const registered = async () => new Set((await scripting.getRegisteredContentScripts()).map((s) => s.id).filter((id) => id.startsWith(PREFIX)));
+    const forget = async (ids) => {
+      const have = await registered();
+      const gone = ids.map((id) => PREFIX + id).filter((id) => have.has(id));
+      if (gone.length) await scripting.unregisterContentScripts({ ids: gone });
+    };
+    // Chrome checks the arguments' shape before anything runs, and throws.
+    const RUN_AT = ['document_end', 'document_idle', 'document_start'], WORLDS = ['MAIN', 'USER_SCRIPT'];
+    const shape = (fn, scripts) => {
+      const fail = (index, text) => { throw new TypeError(`Error in invocation of userScripts.${fn}(array scripts, optional function callback): Error at parameter 'scripts': ${index === null ? text : `Error at index ${index}: ${text}`}`); };
+      if (!Array.isArray(scripts)) fail(null, 'Invalid type: expected array, found ' + typeof scripts + '.');
+      scripts.forEach((script, index) => {
+        if (!script || typeof script !== 'object') fail(index, 'Invalid type: expected object.');
+        if (typeof script.id !== 'string') fail(index, "Error at property 'id': Invalid type: expected string, found " + typeof script.id + '.');
+        if (script.runAt !== undefined && !RUN_AT.includes(script.runAt)) fail(index, `Error at property 'runAt': Value must be one of ${RUN_AT.join(', ')}.`);
+        if (script.world !== undefined && !WORLDS.includes(script.world)) fail(index, `Error at property 'world': Value must be one of ${WORLDS.join(', ')}.`);
+      });
+    };
+    // A promise, or the trailing callback; checks throw straight away, as Chrome's do.
+    const call = (fn, check, work) => (...args) => {
+      const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+      if (check) check(...args);
+      const result = serial(() => work(...args));
+      if (!callback) return result;
+      result.then((value) => callback(value), (error) => { console.warn(`chrome.userScripts.${fn}:`, error.message); callback(undefined); });
+    };
+    const inBackground = !inPage || (api.extension && typeof api.extension.getBackgroundPage === 'function' && api.extension.getBackgroundPage() === window);
+    if (inBackground) {
+      serial(async () => {
+        const all = await send('userScripts', 'restore', []);
+        const have = await registered();
+        const stale = [...have].filter((id) => !all.some((made) => PREFIX + made.id === id));
+        if (stale.length) await scripting.unregisterContentScripts({ ids: stale });
+        // One at a time: a script WebKit refuses (a match pattern it doesn't take) doesn't keep the others from running.
+        for (const made of all.filter((made) => !have.has(PREFIX + made.id))) {
+          try { await scripting.registerContentScripts([toWebKit(made)]); } catch (e) { console.warn(`chrome.userScripts: ${made.id}:`, e.message); }
+        }
+      }).catch((e) => console.warn('chrome.userScripts:', e.message));
+    }
+    install('userScripts', {
+      register: call('register', (scripts) => shape('register', scripts), async (scripts) => {
+        const made = await send('userScripts', 'register', [scripts]);
+        try { await scripting.registerContentScripts(made.map(toWebKit)); } catch (error) {
+          await send('userScripts', 'unregister', [{ ids: made.map((m) => m.id) }]).catch(() => {});
+          throw error;
+        }
+      }),
+      update: call('update', (scripts) => shape('update', scripts), async (scripts) => {
+        const made = await send('userScripts', 'update', [scripts]);
+        await forget(made.map((m) => m.id));
+        await scripting.registerContentScripts(made.map(toWebKit));
+      }),
+      unregister: call('unregister', null, async (filter) => { await forget(await send('userScripts', 'unregister', [filter || {}])); }),
+      getScripts: call('getScripts', null, (filter) => send('userScripts', 'getScripts', [filter || {}])),
+      execute: call('execute', null, async (injection) => {
+        const made = await send('userScripts', 'execute', [injection]);
+        const results = await scripting.executeScript({ target: injection.target, files: made.js, world: made.world, injectImmediately: !!injection.injectImmediately });
+        return (results || []).map((r) => ({ frameId: r.frameId, documentId: r.documentId, result: r.result, ...(r.error ? { error: String(r.error.message || r.error) } : {}) }));
+      }),
+      configureWorld: call('configureWorld', null, (properties) => send('userScripts', 'configureWorld', [properties || {}])),
+      getWorldConfigurations: call('getWorldConfigurations', null, () => send('userScripts', 'getWorldConfigurations', [])),
+      resetWorldConfiguration: call('resetWorldConfiguration', null, (worldId) => send('userScripts', 'resetWorldConfiguration', [worldId === undefined ? null : worldId])),
+      ExecutionWorld: { MAIN: 'MAIN', USER_SCRIPT: 'USER_SCRIPT' },
+    });
+    // In Chrome, user scripts' messages come to these instead of onMessage and onConnect. Here they're content
+    // scripts, whose messages come to onMessage and onConnect, where Tampermonkey listens as well; these never fire.
+    const silent = () => ({ addListener() {}, removeListener() {}, hasListener: () => false, hasListeners: () => false });
+    for (const name of ['onUserScriptMessage', 'onUserScriptConnect']) {
+      if (api.runtime[name]) continue;
+      try { Object.defineProperty(api.runtime, name, { value: silent(), configurable: true, enumerable: true }); } catch (e) {}
+    }
+  }
+
   // system.display sits under chrome.system, beside any other system namespace WebKit has.
   if (asked.has('system.display')) {
     for (const target of new Set([globalThis.chrome, globalThis.browser])) {
