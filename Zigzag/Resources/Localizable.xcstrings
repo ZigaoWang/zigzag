@@ -1548,6 +1548,17 @@
         }
       }
     },
+    "A small window for the page, without the sidebar. Open it in Zigzag to keep it as a tab." : {
+      "comment" : "Explanation under “Open links from other apps in a mini window” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为页面单独开一个小窗口，没有边栏。在 Zigzag 中打开即可留作标签页。"
+          }
+        }
+      }
+    },
     "A tab on %@ is using a lot of energy in the background" : {
       "comment" : "Toast when a tab in the background uses a lot of energy. The site is a domain, like example.com.",
       "localizations" : {
@@ -1857,7 +1868,7 @@
       }
     },
     "Address" : {
-      "comment" : "VoiceOver name of the address in a split view page's strip, while it has none.",
+      "comment" : "VoiceOver label of the address field in a mini window's top strip.\nVoiceOver name of the address in a split view page's strip, while it has none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6655,6 +6666,17 @@
         }
       }
     },
+    "New Mini Window" : {
+      "comment" : "File menu item: a small window for one page, without the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建迷你窗口"
+          }
+        }
+      }
+    },
     "New Private Window" : {
       "comment" : "File menu item.\nItem in the Dock icon's menu.",
       "localizations" : {
@@ -7597,6 +7619,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在分屏浏览中打开"
+          }
+        }
+      }
+    },
+    "Open in Zigzag" : {
+      "comment" : "Tooltip of the button in a mini window's top strip that moves its page into a Zigzag window as a tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag 中打开"
+          }
+        }
+      }
+    },
+    "Open links from other apps in a mini window" : {
+      "comment" : "A setting in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在迷你窗口中打开来自其他 App 的链接"
           }
         }
       }
