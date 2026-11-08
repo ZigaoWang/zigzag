@@ -16,7 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Importing from newer Arc brings each space's pinned tabs, folders and Favorites, instead of empty spaces.
 - Favorites you haven't opened yet show their site's icon far more often, including sites that moved to a new address.
 - Keys nothing uses, like the arrows at the end of a page, no longer make the error sound.
-- Bitwarden signs in without "Symbol.dispose is not defined", and extensions built the same way run, inside web pages too.
+- Bitwarden works: it signs in without "Symbol.dispose is not defined", its vault loads instead of spinning, and its autofill keeps working. An extension's background now stays running while its popup or a tab is talking to it, as in Chrome, where WebKit stopped it after 30 seconds mid-conversation.
 - When an import can't finish, its result says how far it got, instead of "You're all set", and its lines no longer overlap.
 - In Chinese, two characters of a command's name are enough to find it in the command bar.
 - Closing several cards in the tab overview shows "Closed N tabs" with Undo, as in the sidebar.
