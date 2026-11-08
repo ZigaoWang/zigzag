@@ -31,9 +31,9 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
   the current key; the selected card's top edge catching the light by one pixel at night (`Chrome.rim`, `setCardRim`; by day the card is too near white for a lit edge to read at 1x, so it has none); a
   hairline under the toolbar only while the list is scrolled under it.
 - **Edges.** The sidebar has three, and everything sits on one of them: the container edge (6pt: the address field,
-  the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, and the
-  space's name, whose ink is pulled back by its side bearing to meet it), and the text column (36pt: every row's
-  title, "tabs", "new tab"). The large name stands on the outer edge as a heading, a full 24pt out from the rows'
+  the favorites, the cards), the icon column (12pt: the traffic lights, the address's host, every icon, the
+  "Tabs" label, and the space's name, whose ink is pulled back by its side bearing to meet it), and the text column
+  (36pt: every row's title, "New Tab"). The large name stands on the outer edge as a heading, a full 24pt out from the rows'
   text, not a near miss. No state moves anything: hover, selection, the sliding card and switching spaces change
   fills and color only.
 
@@ -77,8 +77,8 @@ Four layers, front to back. Each has one material and one depth cue; nothing els
 
 The sidebar has no surface of its own: it is the frame, in the space's full color. What sits on it is quiet (rows at
 rest, labels) or a soft wash of that color: the address and the favorites are soft fields (`Chrome.field`) with no
-line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 80% by day, 16% at night)
-with a crisp quiet edge and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
+line around them; the tab you're on is a light card of the color (`Chrome.card`, white at 96% by day, 18% at night)
+with an edge only just there and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
 No bevels, no puffy shadows, no boxes.
 
 No glass gimmicks: in the browser, see-through spaces frost the desktop under the frame, and that is the only blur (brand moments keep their `GlassSurface`, under Materials).
@@ -91,7 +91,7 @@ Mac-like. The browser window's chrome (the sidebar and a split pane's header) is
 
 SF Pro, one weight per role. Secondary text is light gray and never bold; selection never changes weight. The
 space's name in the sidebar is the one heading there: 26 light, tracked tight, in the case you typed it (`Font.spaceName`), in the
-space's own ink (`Brand.Theme.ink`), low in a 52pt slot.
+space's own ink (`Brand.Theme.ink`), low in a 36pt slot.
 
 | Text | Token | Size, weight | For |
 |---|---|---|---|
@@ -130,11 +130,11 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 22pt with 13pt glyphs; the accent ring from the keyboard |
 | Favorites | 4 to a row, 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is open, the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
-| Space name | 26 light, as typed (`Font.spaceName`), kern -0.6, 52pt slot, its ink on the icon column |
+| Space name | 26 light, as typed (`Font.spaceName`), kern -0.6, 36pt slot, its ink on the icon column |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
 | Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
-| Section labels | 11pt medium, `textTertiary`, in the titles' column, low in a 28pt slot |
+| Section labels | 11pt medium, the space's quiet ink, on the icon column, low in a 24pt slot; Clear at its end in the same ink |
 | Bottom bar | 14pt glyphs in 26pt buttons; a space key for each space (`SpaceDotView`): an 18pt matte key, radius 5, its number in 10pt tabular figures; the current key lit and pressed in, a 5pt `Color.live` tick under it |
 | Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field |
 
@@ -144,7 +144,7 @@ A 4pt grid (`Space.x1`...`x16`). Rhythm:
 
 - Sidebar: 6pt from its edges (`Sidebar.edge`); rows 30 with 2 between, so rows sit 32pt apart; 6pt from a row's
   edge to its 16pt icon and 8pt from the icon to its title, so one left edge runs down the sidebar: the traffic
-  lights and every icon at 12, every title and section label at 36. The address 40pt from the top, the favorites 8pt
+  lights, every icon and the "Tabs" label at 12, every title at 36. The address 40pt from the top, the favorites 8pt
   under it, the list 12pt (`Sidebar.sectionGap`) under them.
 - Sections are separated by space and a quiet label, low in its slot (`Metric.sectionLabelHeight`, 32, on pages and
   panels; `Sidebar.labelHeight`, 24, in the sidebar's compact scale), never by divider lines.
