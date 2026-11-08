@@ -210,6 +210,7 @@ final class SidebarListView: NSView {
         // Collapsed, the section still shows the pinned page you're on, so where you are never disappears.
         let folders = Library.shared.folders(in: spaceID)
         rowDepth = [:]
+        folderPageCounts = [:]
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
         let riders = Set(Library.shared.pinnedSplits(in: spaceID).map(\.right))
         let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
@@ -222,19 +223,32 @@ final class SidebarListView: NSView {
             var folderOf: [UUID: UUID] = [:]
             for folder in folders { for id in folder.bookmarkIDs { folderOf[id] = folder.id } }
             let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            var chains: [UUID: [UUID]] = [:]
             func path(to folder: UUID?) -> [UUID] {
-                var chain: [UUID] = [], next = folder, seen: Set<UUID> = []
-                while let id = next, seen.insert(id).inserted { chain.insert(id, at: 0); next = byID[id]?.parentID }
+                guard let folder else { return [] }
+                if let known = chains[folder] { return known }
+                var chain: [UUID] = [], next: UUID? = folder, seen: Set<UUID> = []
+                while let id = next, seen.insert(id).inserted { chain.append(id); next = byID[id]?.parentID }
+                chain.reverse()
+                chains[folder] = chain
                 return chain
+            }
+            // How many pages each folder holds, its folders' too, for its row to say.
+            for folder in folders {
+                var next: UUID? = folder.id, seen: Set<UUID> = []
+                while let id = next, seen.insert(id).inserted { folderPageCounts[id, default: 0] += folder.bookmarkIDs.count; next = byID[id]?.parentID }
             }
             var stack: [UUID] = []
             var firstShut: Int? { stack.firstIndex { byID[$0]?.isOpen == false } }
+            // Worked out once for the whole tree, not again for each folder: an imported one can have hundreds.
+            let holding = folders.holdingPages
+            let inside = Dictionary(grouping: folders, by: \.parentID)
             func enter(_ id: UUID) {
                 if firstShut == nil { result.append(.folder(id)); rowDepth[.folder(id)] = stack.count }
                 stack.append(id)
-                for child in folders.children(of: id) where folders.pages(in: child.id).isEmpty { enter(child.id); stack.removeLast() }
+                for child in inside[id] ?? [] where !holding.contains(child.id) { enter(child.id); stack.removeLast() }
             }
-            for folder in folders.children(of: nil) where folders.pages(in: folder.id).isEmpty { enter(folder.id); stack.removeLast() }
+            for folder in inside[nil] ?? [] where !holding.contains(folder.id) { enter(folder.id); stack.removeLast() }
             for bookmark in bookmarks where !riders.contains(bookmark.id) {
                 let chain = path(to: folderOf[bookmark.id])
                 while !stack.isEmpty, stack.count > chain.count || Array(chain.prefix(stack.count)) != stack { stack.removeLast() }
@@ -467,6 +481,8 @@ final class SidebarListView: NSView {
     static let folderIndent: CGFloat = 14
     /// How many folders in each pinned row is drawn, in the list as last built.
     private var rowDepth: [SidebarItem: Int] = [:]
+    /// How many pinned pages each folder holds, at any depth, in the list as last built.
+    private var folderPageCounts: [UUID: Int] = [:]
 
     /// The folder a drop at the gap would go into: right under an open folder, between two of its pages, or just
     /// after its last page with the pointer set in.
@@ -738,7 +754,8 @@ final class SidebarListView: NSView {
             row.isMarked = marked.contains(item)
         case .folder(let id):
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
-            row.configure(name: folder.name, open: folder.isOpen, count: Library.shared.allBookmarkIDs(inFolder: id).count, icon: folder.icon)
+            let count = folderPageCounts[id] ?? Library.shared.allBookmarkIDs(inFolder: id).count
+            row.configure(name: folder.name, open: folder.isOpen, count: count, icon: folder.icon)
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)

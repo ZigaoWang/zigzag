@@ -25,18 +25,32 @@ extension Array where Element == BookmarkFolder {
 
     /// Every folder inside `id`, at any depth.
     nonisolated func descendants(of id: UUID) -> [UUID] {
-        var result: [UUID] = [], queue = [id]
+        // The folders in each one, looked up once: a big imported tree has hundreds.
+        let inside = Dictionary(grouping: filter { $0.parentID != nil }, by: { $0.parentID! })
+        var result: [UUID] = [], seen: Set<UUID> = [id], queue = [id]
         while let next = queue.popLast() {
-            for child in children(of: next) where !result.contains(child.id) { result.append(child.id); queue.append(child.id) }
+            for child in inside[next] ?? [] where seen.insert(child.id).inserted { result.append(child.id); queue.append(child.id) }
         }
         return result
     }
 
     /// Every pinned page in a folder or its subfolders.
     nonisolated func pages(in id: UUID) -> Set<UUID> {
-        var ids = Set(first { $0.id == id }?.bookmarkIDs ?? [])
-        for sub in descendants(of: id) { ids.formUnion(first { $0.id == sub }?.bookmarkIDs ?? []) }
+        let all = Set(descendants(of: id) + [id])
+        var ids: Set<UUID> = []
+        for folder in self where all.contains(folder.id) { ids.formUnion(folder.bookmarkIDs) }
         return ids
+    }
+
+    /// The folders with a pinned page in them or in a folder inside them.
+    nonisolated var holdingPages: Set<UUID> {
+        let parent = Dictionary(map { ($0.id, $0.parentID) }, uniquingKeysWith: { a, _ in a })
+        var result: Set<UUID> = []
+        for folder in self where !folder.bookmarkIDs.isEmpty {
+            var next: UUID? = folder.id
+            while let id = next, result.insert(id).inserted { next = parent[id] ?? nil }
+        }
+        return result
     }
 
     /// How many folders a folder is inside (0 at the top level).

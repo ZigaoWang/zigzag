@@ -243,4 +243,20 @@ struct ArcFolderTests {
         #expect(Library.folderDropIndex(5, in: b, folders: folders, splits: splits) == 4)
         #expect(Library.folderDropIndex(99, in: b, folders: folders, splits: splits) == 6)
     }
+
+    /// What's inside a folder at any depth, and which folders hold pages somewhere in them.
+    @Test func folderTreeLookups() {
+        let p = (0..<2).map { _ in UUID() }
+        var top = BookmarkFolder(name: "Top"), mid = BookmarkFolder(name: "Mid"), low = BookmarkFolder(name: "Low")
+        let empty = BookmarkFolder(name: "Empty")
+        mid.parentID = top.id; low.parentID = mid.id
+        top.bookmarkIDs = [p[0]]; low.bookmarkIDs = [p[1]]
+        var lone = BookmarkFolder(name: "Lone"); lone.parentID = empty.id
+        let folders = [low, top, empty, mid, lone]
+        #expect(Set(folders.descendants(of: top.id)) == [mid.id, low.id])
+        #expect(folders.descendants(of: low.id).isEmpty)
+        #expect(folders.pages(in: top.id) == Set(p))
+        #expect(folders.pages(in: mid.id) == [p[1]])
+        #expect(folders.holdingPages == [top.id, mid.id, low.id])
+    }
 }
