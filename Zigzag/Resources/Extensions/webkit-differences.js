@@ -196,6 +196,14 @@
           let held = true;
           for (let tries = 0; ; tries++) {
             try { return held && await contains(query); } catch (error) {
+              // An origin with a port ("http://127.0.0.1:8777/*"), which Chrome reads and WebKit refuses: asked
+              // without it, as a pattern without a port covers every port. 1Password asks so on local sites.
+              const pattern = /'([^']+)' is not a valid pattern/.exec(String(error && error.message));
+              const portless = pattern && pattern[1].replace(/^([a-z*]+:\/\/[^/:]+):(\d+|\*)(?=\/)/, '$1');
+              if (portless && portless !== pattern[1] && tries <= 30 && Array.isArray(query.origins)) {
+                query = Object.assign({}, query, { origins: query.origins.map((origin) => (origin === pattern[1] ? portless : origin)) });
+                continue;
+              }
               const unknown = /'([^']+)' is not a valid permission/.exec(String(error && error.message));
               if (!unknown || tries > 30 || !Array.isArray(query.permissions)) throw error;
               held = held && required.includes(unknown[1]);
