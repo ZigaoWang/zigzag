@@ -408,8 +408,20 @@ final class Library {
     }
 
     private func commit() {
+        if holding > 0 { held = true; return }
         save()
         changed.send()
+    }
+
+    private var holding = 0
+    private var held = false
+
+    /// Many changes as one: saved and shown once, at the end, not once for each (a hundred picked rows unpinned).
+    func together(_ body: () -> Void) {
+        holding += 1
+        body()
+        holding -= 1
+        if holding == 0, held { held = false; commit() }
     }
 
     // MARK: Spaces
