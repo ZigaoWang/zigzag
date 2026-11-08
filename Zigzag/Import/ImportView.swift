@@ -693,6 +693,12 @@ private final class ImportHero: NSView {
         super.init(frame: frame)
         [surface, wordmark, count, caption, detail].forEach { addSubview($0) }
         [count, caption, detail].forEach { $0.isHidden = true }
+        // A long name or a longer language wraps rather than ending in "…"; layout makes room for it.
+        for label in [caption, detail] {
+            label.usesSingleLineMode = false
+            label.maximumNumberOfLines = 2
+            label.lineBreakMode = .byWordWrapping
+        }
         applyTheme()
     }
 
@@ -719,6 +725,13 @@ private final class ImportHero: NSView {
             Brand.enter([wordmark], delay: 0.04)
             surface.watermark.drawIn(delay: 0.2)
         }
+    }
+
+    /// The big line, in a face of its own size: the label lays out its line by its font, so a smaller text set
+    /// over the larger face would sit low and run into the caption.
+    private func setCount(_ text: String, size: CGFloat) {
+        count.font = Brand.displayFont(size)
+        count.attributedStringValue = Brand.display(text, size: size, color: theme.tint)
     }
 
     func showSuccess(_ summaries: [ImportCoordinator.Summary]) {
@@ -774,14 +787,14 @@ private final class ImportHero: NSView {
         if let lead {
             caption.stringValue = lead.1
             detail.stringValue = rest.isEmpty ? "" : String(localized: "Plus \(Words.list(rest)).", comment: "Under the big number when an import finishes: the rest of what came over, like “Plus 86 bookmarks and 3 spaces.”")
-            count.attributedStringValue = Brand.display(lead.0.formatted(), size: 60, color: theme.tint)
+            setCount(lead.0.formatted(), size: Tokens.Welcome.countSize)
         } else if summaries.contains(where: { !$0.problems.isEmpty }) {
             // Never a cheerful "all set" over a failure: say nothing came, and the rows below say why.
-            count.attributedStringValue = Brand.display(String(localized: "Not yet", comment: "Shown large when an import finishes and nothing came over because of a problem."), size: 44, color: theme.tint)
+            setCount(String(localized: "Not yet", comment: "Shown large when an import finishes and nothing came over because of a problem."), size: 44)
             caption.stringValue = String(localized: "Nothing came over", comment: "Under “Not yet” when an import finishes with a problem.")
             detail.stringValue = String(localized: "What stopped it is below, with a way to fix it.", comment: "Under “Not yet” when an import finishes with a problem.")
         } else {
-            count.attributedStringValue = Brand.display(String(localized: "All set", comment: "Shown large when an import finishes and everything was already in Zigzag."), size: 44, color: theme.tint)
+            setCount(String(localized: "All set", comment: "Shown large when an import finishes and everything was already in Zigzag."), size: 44)
             caption.stringValue = String(localized: "Nothing new to bring over", comment: "Under “All set” when an import finishes and everything was already in Zigzag.")
             detail.stringValue = String(localized: "Everything was already here.", comment: "Under “All set” when an import finishes and everything was already in Zigzag.")
         }
@@ -801,12 +814,15 @@ private final class ImportHero: NSView {
         // Measured from the text itself: the label's own size can lag a change of text.
         let countHeight = ceil(count.attributedStringValue.size().height)
         let textWidth = bounds.width * 0.62
-        let total = countHeight + caption.lineHeight + (detail.stringValue.isEmpty ? 0 : 4 + detail.lineHeight)
-        var y = (bounds.height - total) / 2
+        func height(_ label: Label) -> CGFloat { ceil(label.sizeThatFits(NSSize(width: textWidth, height: 200)).height) }
+        let captionHeight = height(caption)
+        let detailHeight = detail.stringValue.isEmpty ? 0 : height(detail)
+        let total = countHeight + captionHeight + (detailHeight > 0 ? 4 + detailHeight : 0)
+        var y = max(0, (bounds.height - total) / 2)
         count.frame = NSRect(x: pad - 3, y: y, width: textWidth, height: countHeight)
         y = count.frame.maxY
-        caption.frame = NSRect(x: pad, y: y, width: textWidth, height: caption.lineHeight)
+        caption.frame = NSRect(x: pad, y: y, width: textWidth, height: captionHeight)
         y = caption.frame.maxY + 4
-        detail.frame = NSRect(x: pad, y: y, width: textWidth, height: detail.lineHeight)
+        detail.frame = NSRect(x: pad, y: y, width: textWidth, height: detailHeight)
     }
 }
