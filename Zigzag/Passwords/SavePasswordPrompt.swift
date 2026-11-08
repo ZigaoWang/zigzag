@@ -226,8 +226,9 @@ final class SavePasswordPrompt: FloatingPanelView {
     static func debugClose() { current?.close(saved: false) }
 
     /// For the debug bridge: Save or Not Now on the prompt showing, as its buttons would.
+    /// Says so when there's none yet: it comes up a moment after the sign-in, and an answer sent before then is lost.
     static func debugAnswer(saved: Bool) {
-        guard let current, !current.isHidden else { return }
+        guard let current, !current.isHidden else { debugLog("minisave: no Save password? showing"); return }
         current.close(saved: saved)
     }
 
