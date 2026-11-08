@@ -34,3 +34,21 @@ struct TabDropIndexTests {
         #expect(SidebarListView.listIndex(forRow: 1, rows: rows, in: [a, c]) == 1)
     }
 }
+
+/// ⌘A with rows picked picks the rest of the section they're in.
+struct PickAllTests {
+    let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+    var all: [SidebarItem] { [.bookmark(a), .bookmark(b), .tab(c), .tab(d)] }
+
+    @Test func tabsPickTheTabs() {
+        #expect(SidebarListView.rowsToPick(all: all, marked: [.tab(c)]) == [.tab(c), .tab(d)])
+    }
+
+    @Test func pinnedPagesPickThePinnedPages() {
+        #expect(SidebarListView.rowsToPick(all: all, marked: [.bookmark(b)]) == [.bookmark(a), .bookmark(b)])
+    }
+
+    @Test func bothPickEverything() {
+        #expect(SidebarListView.rowsToPick(all: all, marked: [.bookmark(a), .tab(d)]) == all)
+    }
+}
