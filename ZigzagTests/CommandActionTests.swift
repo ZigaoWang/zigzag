@@ -92,4 +92,19 @@ struct CommandActionTests {
         #expect(!titles("cl", onATab).contains("Close Other Tabs"))
         #expect(titles("pin", onATab).contains("Pin Tab"))
     }
+
+    @Test func chineseCountsByCharacters() {
+        let names = ["固定标签页", "关闭其他标签页", "关闭下方的标签页", "设置"]
+        // Two characters are a word; one is when it starts just one name.
+        #expect(CommandRanker.isEnough("关闭", for: names))
+        #expect(CommandRanker.isEnough("其他", for: names))
+        #expect(CommandRanker.isEnough("固", for: names))
+        #expect(!CommandRanker.isEnough("关", for: names))
+        #expect(!CommandRanker.isEnough("其", for: names))
+        // Latin still waits for three, and a Latin letter beside a character counts as Latin.
+        #expect(!CommandRanker.isEnough("pi", for: ["Pin Tab"]))
+        #expect(!CommandRanker.isEnough("p固", for: names))
+        #expect(CommandRanker.isEnough("pin", for: ["Pin Tab"]))
+        #expect(!CommandRanker.isEnough(" ", for: names))
+    }
 }
