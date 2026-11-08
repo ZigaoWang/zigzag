@@ -92,6 +92,33 @@
       if (has) setMember(['cookies', 'onChanged'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // permissions.contains: WebKit refuses the whole question, and throws, when it names a permission WebKit doesn't
+    // know ("downloads"), where Chrome answers. Violentmonkey asks about "downloads" on its background's first line,
+    // so its background stopped there. Such a permission counts as held when the extension's manifest asks for it
+    // outright (Zigzag's bridge answers for those), and not otherwise; the rest is still WebKit's to answer.
+    const permissions = api.permissions;
+    if (permissions && typeof permissions.contains === 'function') {
+      const contains = permissions.contains.bind(permissions);
+      let required = [];
+      try { required = api.runtime.getManifest().permissions || []; } catch (e) {}
+      setMember(['permissions'], 'contains', (asked, callback) => {
+        const answer = (async () => {
+          let query = Object.assign({}, asked);
+          let held = true;
+          for (let tries = 0; ; tries++) {
+            try { return held && await contains(query); } catch (error) {
+              const unknown = /'([^']+)' is not a valid permission/.exec(String(error && error.message));
+              if (!unknown || tries > 30 || !Array.isArray(query.permissions)) throw error;
+              held = held && required.includes(unknown[1]);
+              query = Object.assign({}, query, { permissions: query.permissions.filter((name) => name !== unknown[1]) });
+            }
+          }
+        })();
+        if (typeof callback !== 'function') return answer;
+        answer.then((value) => callback(value), () => callback(false));
+      });
+    }
+
     // runtime.sendMessage's answer: WebKit cuts a string in the answer short at its first NUL character, which Chrome
     // carries whole; the message itself and port messages arrive whole. Tampermonkey's dashboard gets site icons from
     // its background as binary strings, so each arrived as "PNG" and showed a question mark. Between the extension's
