@@ -732,8 +732,19 @@ final class TabManager {
         let order = tabs.filter { $0 !== selected } + (closingSelected ? [selected].compactMap { $0 } : [])
         let ids = order.filter { $0.bookmarkID == nil }.map(\.id)
         closedLimit = max(50, ids.count)
-        order.forEach { close($0) }
+        together { order.forEach { close($0) } }
         return ids
+    }
+
+    /// Set while many tabs open or close at once: the window redraws once, at the end, not once for each.
+    private(set) var isBatching = false
+
+    func together(_ body: () -> Void) {
+        if isBatching { body(); return }
+        isBatching = true
+        body()
+        isBatching = false
+        changed.send(.structure)
     }
 
     /// Set while Clear closes the last tabs: the space is left empty rather than opening a pinned page you

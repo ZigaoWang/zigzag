@@ -238,6 +238,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func tabManagerChanged(_ change: TabManager.Change) {
         switch change {
         case .structure:
+            // Many at once (`TabManager.together`): once, when they're all done.
+            if tabManager.isBatching { break }
             sidebar.list.reload(animated: window?.isVisible == true)
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()

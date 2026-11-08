@@ -161,10 +161,12 @@ extension BrowserWindowController {
             // By id, so a tab reopened meanwhile with ⇧⌘T doesn't make this bring back an unrelated one.
             var reopened: [Tab] = []
             var selected = selectedID.flatMap { controller.tabManager.tab(with: $0) }
-            for id in ids.reversed() {
-                guard let tab = controller.tabManager.reopenClosedTab(id) else { continue }
-                reopened.append(tab)
-                if id == selectedID { selected = tab }
+            controller.tabManager.together {
+                for id in ids.reversed() {
+                    guard let tab = controller.tabManager.reopenClosedTab(id, select: false) else { continue }
+                    reopened.append(tab)
+                    if id == selectedID { selected = tab }
+                }
             }
             if let selected { controller.tabManager.select(selected) }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.closeManyWithUndo(reopened) }
