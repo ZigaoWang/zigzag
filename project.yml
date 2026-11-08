@@ -71,9 +71,10 @@ targets:
     info:
       path: Zigzag/Info.plist
       properties:
-        # English only for now. The catalogs are ready for Simplified Chinese (zh-Hans), but it joins
-        # CFBundleLocalizations only once its translations are in: listed sooner, the app would claim a language it
-        # can't yet speak, and macOS would offer it in Language & Region.
+        # The languages Zigzag speaks, so macOS offers them in Language & Region and the frameworks' own words
+        # (Sparkle's update windows) follow. A language joins only once its catalogs are fully translated; xcodegen
+        # adds it to the project's known regions from the catalogs themselves.
+        CFBundleLocalizations: [en, zh-Hans]
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
         CFBundleIconName: AppIcon
         CFBundleName: $(APP_DISPLAY_NAME)
