@@ -1295,18 +1295,33 @@ final class SidebarListView: NSView {
 
     /// How many pinned pages (in `order`) come before a row's place ends: up to its last page for a pinned page or a
     /// shut folder, up to its first page for an open folder, whose pages follow as rows of their own. Pages tucked in
-    /// shut folders, and the ones a shut pinned section hides, count too.
-    private func pinsThrough(_ row: SidebarItem, in order: [UUID]) -> Int {
-        switch row {
-        case .bookmark(let id):
-            let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
-            return ids.compactMap(order.firstIndex(of:)).max().map { $0 + 1 } ?? 0
-        case .folder(let id):
-            guard let folder = Library.shared.folder(id) else { return 0 }
-            let at = Library.shared.allBookmarkIDs(inFolder: id).compactMap(order.firstIndex(of:))
-            return (folder.isOpen ? at.min() : at.max().map { $0 + 1 }) ?? 0
-        default:
-            return 0
+    /// shut folders, and the ones a shut pinned section hides, count too. For a pass over every row while a page is
+    /// carried: where each page sits is looked up once, not searched for again at each row of thousands.
+    private func pinsThrough(in order: [UUID]) -> (SidebarItem) -> Int {
+        let at = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        let folders = shownSpaceID.map { Library.shared.folders(in: $0) } ?? []
+        // The first and last place of each folder's pages, its folders' too, gathered up the tree once.
+        let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var span: [UUID: ClosedRange<Int>] = [:]
+        for folder in folders {
+            guard let low = folder.bookmarkIDs.compactMap({ at[$0] }).min(), let high = folder.bookmarkIDs.compactMap({ at[$0] }).max() else { continue }
+            var next: UUID? = folder.id, seen: Set<UUID> = []
+            while let id = next, seen.insert(id).inserted {
+                span[id] = span[id].map { min($0.lowerBound, low)...max($0.upperBound, high) } ?? low...high
+                next = byID[id]?.parentID
+            }
+        }
+        return { row in
+            switch row {
+            case .bookmark(let id):
+                let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
+                return ids.compactMap { at[$0] }.max().map { $0 + 1 } ?? 0
+            case .folder(let id):
+                guard let folder = byID[id], let places = span[id] else { return 0 }
+                return folder.isOpen ? places.lowerBound : places.upperBound + 1
+            default:
+                return 0
+            }
         }
     }
 
@@ -1316,11 +1331,11 @@ final class SidebarListView: NSView {
         var base = items
         switch section {
         case .bookmarks:
-            let order = pinnedOrder(without: carried)
+            let through = pinsThrough(in: pinnedOrder(without: carried))
             var at = (base.firstIndex(of: .header) ?? 0) + 1
             for i in at..<base.count {
                 if base[i] == .separator || base[i] == .newTab { break }
-                if pinsThrough(base[i], in: order) <= index { at = i + 1 }
+                if through(base[i]) <= index { at = i + 1 }
             }
             base.insert(.placeholder, at: min(at, base.count))
         case .tabs:
@@ -1341,8 +1356,8 @@ final class SidebarListView: NSView {
         // A folder stays among the pinned pages, and lands between groups, not inside one.
         let folder: UUID? = carried.lazy.compactMap { if case .folder(let id) = $0 { id } else { nil } }.first
         if allowsPinned, y < boundary || folder != nil {
-            let order = pinnedOrder(without: carried)
-            var count = layout.filter { $0.1.midY < y }.map { pinsThrough($0.0, in: order) }.max() ?? 0
+            let through = pinsThrough(in: pinnedOrder(without: carried))
+            var count = layout.filter { $0.1.midY < y }.map { through($0.0) }.max() ?? 0
             if let folder, let space = shownSpaceID {
                 count = Library.shared.folderDropIndex(count, moving: folder, in: space)
             }
