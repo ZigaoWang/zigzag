@@ -29,10 +29,10 @@ final class TabArchive {
 
         var title: String {
             switch self {
-            case .twelveHours: "After 12 Hours"
-            case .day: "After a Day"
-            case .week: "After a Week"
-            case .never: "Never"
+            case .twelveHours: String(localized: "After 12 Hours", comment: "A choice in Settings for when tabs you haven't used are archived.")
+            case .day: String(localized: "After a Day", comment: "A choice in Settings for when tabs you haven't used are archived.")
+            case .week: String(localized: "After a Week", comment: "A choice in Settings for when tabs you haven't used are archived.")
+            case .never: String(localized: "Never", comment: "A choice in Settings for when tabs you haven't used are archived. Tabs are never archived.")
             }
         }
     }
@@ -49,7 +49,8 @@ final class TabArchive {
         guard after == .never, d.string(forKey: "ArchiveTabsAfter") == nil, !d.bool(forKey: "ArchiveOffered"), tabCount >= 20,
               let controller = WindowManager.shared.keyController, !controller.tabManager.isPrivate else { return }
         d.set(true, forKey: "ArchiveOffered")
-        Toast.show("Tidy tabs you haven’t used in a day?", symbol: "archivebox", action: ("Turn On", { after = .day }),
+        Toast.show(String(localized: "Tidy tabs you haven’t used in a day?", comment: "Toast offered once when a space has many tabs: archive the ones unused for a day."), symbol: "archivebox",
+                   action: (String(localized: "Turn On", comment: "Button in the toast that offers to archive unused tabs."), { after = .day }),
                    duration: 10, in: controller)
     }
 

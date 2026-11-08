@@ -128,7 +128,7 @@ final class Tab: NSObject {
          interactionState: Data? = nil, lastActivated: Date = Date(), createdAt: Date = Date()) {
         self.id = id
         self.url = url
-        self.title = title ?? (SettingsPage.isSettings(url) ? "Settings" : url?.host() ?? "New Tab")
+        self.title = title ?? (SettingsPage.isSettings(url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
         self.pendingConfiguration = configuration
         self.pendingInteractionState = interactionState
@@ -158,14 +158,14 @@ final class Tab: NSObject {
     var displayTitle: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
         // Zigzag's own pages go by their names wherever the chrome names them.
-        if SettingsPage.isSettings(url) { return "Settings" }
-        if HistoryPage.isHistory(url) { return "History" }
+        if SettingsPage.isSettings(url) { return String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") }
+        if HistoryPage.isHistory(url) { return String(localized: "History", comment: "The name of the tab showing Zigzag's History.") }
         if !title.isEmpty { return title }
         // A file on your Mac, or a PDF from the web, is called by its name: it has no title of its own.
         if let url, url.isFileURL || url.pathExtension.lowercased() == "pdf", !url.lastPathComponent.isEmpty, url.lastPathComponent != "/" {
             return url.lastPathComponent
         }
-        return url?.host() ?? "New Tab"
+        return url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet.")
     }
     var isBlank: Bool { url == nil }
 
@@ -989,7 +989,8 @@ extension Tab: WKUIDelegate {
                 return
             }
             let answer = await PermissionPrompt.ask(host: origin.host, what: "your screen", symbol: "rectangle.on.rectangle",
-                                                    in: controller, tab: self, title: "Share your screen")
+                                                    in: controller, tab: self,
+                                                    title: String(localized: "Share your screen", comment: "Title of the prompt when a site asks to share the screen."))
             decisionHandler(answer == .allow ? 1 : 0)
         }
     }
