@@ -779,22 +779,31 @@ final class Library {
         commit()
     }
 
+    /// How deep folders nest when they come over from another browser: as deep as people keep them there. A page
+    /// deeper than this goes in the deepest of its folders that's kept.
+    nonisolated static let folderDepthLimit = 8
+
     /// Puts pages in folders by their paths (outermost first), making the folders that aren't there yet, nested as
-    /// the paths say; a folder of the same name in the same place is used again. Deeper than four levels flattens.
+    /// the paths say; a folder of the same name in the same place is used again. Deeper than `folderDepthLimit`
+    /// levels flattens.
     nonisolated static func filed(_ ids: [UUID], paths: [[String]], into existing: [BookmarkFolder]) -> [BookmarkFolder] {
         var folders = existing
+        // Each folder by where it is and its name, so thousands of pages find theirs without a search each.
+        struct Place: Hashable { let parent: UUID?; let name: String }
+        var known = Dictionary(folders.indices.map { (Place(parent: folders[$0].parentID, name: folders[$0].name), $0) }, uniquingKeysWith: { a, _ in a })
         func folder(_ path: ArraySlice<String>, parent: UUID?) -> Int? {
             guard let name = path.first else { return nil }
-            let at = folders.firstIndex { $0.name == name && $0.parentID == parent } ?? {
+            let at = known[Place(parent: parent, name: name)] ?? {
                 var made = BookmarkFolder(name: name)
                 made.parentID = parent
                 folders.append(made)
+                known[Place(parent: parent, name: name)] = folders.count - 1
                 return folders.count - 1
             }()
             return path.count == 1 ? at : folder(path.dropFirst(), parent: folders[at].id)
         }
         for (id, path) in zip(ids, paths) where !path.isEmpty {
-            if let f = folder(path.prefix(4), parent: nil) { folders[f].bookmarkIDs.append(id) }
+            if let f = folder(path.prefix(folderDepthLimit), parent: nil) { folders[f].bookmarkIDs.append(id) }
         }
         return folders
     }

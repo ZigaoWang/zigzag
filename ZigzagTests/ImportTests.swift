@@ -107,7 +107,7 @@ struct CSVImportTests {
         #expect(docs?.parentID == work?.id)
         #expect(work?.bookmarkIDs == [ids[0], ids[3]])
         #expect(docs?.bookmarkIDs == [ids[1]])
-        #expect(Library.filed([UUID()], paths: [["A", "B", "C", "D", "E", "F"]], into: []).count == 4)
+        #expect(Library.filed([UUID()], paths: [["A", "B", "C", "D", "E", "F"]], into: []).count == 6)
     }
 
     /// Firefox's bookmarks come with their folders, its own roots left out.

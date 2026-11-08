@@ -244,6 +244,32 @@ struct ArcFolderTests {
         #expect(Library.folderDropIndex(99, in: b, folders: folders, splits: splits) == 6)
     }
 
+    /// A tree imported eight deep keeps every level; deeper pages go in the eighth, never a level left out between.
+    @Test func importedFoldersKeepEightLevels() {
+        let ids = (0..<3).map { _ in UUID() }
+        let deep = (1...10).map { "L\($0)" }
+        let folders = Library.filed(ids, paths: [Array(deep.prefix(8)), deep, Array(deep.prefix(5))], into: [])
+        #expect(folders.count == Library.folderDepthLimit)
+        let eighth = folders.first { $0.name == "L8" }, fifth = folders.first { $0.name == "L5" }
+        #expect(eighth.map { folders.depth(of: $0.id) } == 7)
+        // The page ten deep sits with the one eight deep.
+        #expect(eighth?.bookmarkIDs == [ids[0], ids[1]])
+        #expect(fifth?.bookmarkIDs == [ids[2]])
+        #expect(!folders.contains { $0.name == "L9" || $0.name == "L10" })
+    }
+
+    /// Filing into folders already there uses them again, by their place and name, the same name elsewhere apart.
+    @Test func filingReusesFoldersByPlace() {
+        let a = (0..<2).map { _ in UUID() }, b = (0..<2).map { _ in UUID() }
+        let first = Library.filed(a, paths: [["Work", "Docs"], ["Home", "Docs"]], into: [])
+        let second = Library.filed(b, paths: [["Work", "Docs"], ["Docs"]], into: first)
+        #expect(second.count == 5)
+        let work = second.first { $0.name == "Work" }
+        let workDocs = second.first { $0.name == "Docs" && $0.parentID == work?.id }
+        #expect(workDocs?.bookmarkIDs == [a[0], b[0]])
+        #expect(second.first { $0.name == "Docs" && $0.parentID == nil }?.bookmarkIDs == [b[1]])
+    }
+
     /// What's inside a folder at any depth, and which folders hold pages somewhere in them.
     @Test func folderTreeLookups() {
         let p = (0..<2).map { _ in UUID() }
@@ -258,5 +284,15 @@ struct ArcFolderTests {
         #expect(folders.pages(in: top.id) == Set(p))
         #expect(folders.pages(in: mid.id) == [p[1]])
         #expect(folders.holdingPages == [top.id, mid.id, low.id])
+    }
+
+    /// Rows step in a full indent for the first levels, then half as far, every level still a step in.
+    @Test func deepRowsStepInLess() {
+        let full = SidebarListView.folderIndent
+        #expect(SidebarListView.indent(depth: 0) == 0)
+        #expect(SidebarListView.indent(depth: SidebarListView.fullIndentLevels) == CGFloat(SidebarListView.fullIndentLevels) * full)
+        let steps = (0...Library.folderDepthLimit).map { SidebarListView.indent(depth: $0) }
+        #expect(zip(steps, steps.dropFirst()).allSatisfy { $1 > $0 })
+        #expect(steps[Library.folderDepthLimit] < CGFloat(Library.folderDepthLimit) * full)
     }
 }

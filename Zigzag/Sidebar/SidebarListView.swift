@@ -290,7 +290,7 @@ final class SidebarListView: NSView {
         for item in items {
             let h = item.height
             var inset: CGFloat = 0
-            inset = CGFloat(rowDepth[item] ?? 0) * Self.folderIndent
+            inset = Self.indent(depth: rowDepth[item] ?? 0)
             result.append((item, NSRect(x: inset, y: y, width: bounds.width - inset, height: h)))
             y += h + (item == .separator || item == .header ? 0 : rowGap)
         }
@@ -602,6 +602,15 @@ final class SidebarListView: NSView {
 
     /// Pinned pages shown inside an open folder, set in by this much.
     static let folderIndent: CGFloat = 14
+    /// Folders this deep set their rows in a full step each; deeper ones half a step, so a tree imported eight deep
+    /// still leaves its names room in a narrow sidebar, each level a step in from the one it's in.
+    static let fullIndentLevels = 3
+
+    /// How far in a row sits, `depth` folders deep.
+    nonisolated static func indent(depth: Int) -> CGFloat {
+        let full = min(depth, fullIndentLevels), half = max(0, depth - fullIndentLevels)
+        return CGFloat(full) * folderIndent + CGFloat(half) * (folderIndent / 2).rounded()
+    }
     /// How many folders in each pinned row is drawn, in the list as last built.
     private var rowDepth: [SidebarItem: Int] = [:]
     /// How many pinned pages each folder holds, at any depth, in the list as last built.
@@ -634,7 +643,7 @@ final class SidebarListView: NSView {
         var candidate = folder(of: before)
         while let id = candidate {
             if id == below { return id }
-            if pointX > CGFloat(Library.shared.depth(ofFolder: id) + 1) * Self.folderIndent + Tokens.Space.x2 { return id }
+            if pointX > Self.indent(depth: Library.shared.depth(ofFolder: id) + 1) + Tokens.Space.x2 { return id }
             candidate = Library.shared.folder(id)?.parentID
         }
         return nil
@@ -1537,7 +1546,7 @@ final class SidebarListView: NSView {
         }
         y = round(y)
         // Set in as far as the folder it would land in holds its pages.
-        let x = folderForGap(in: placed, pointX: pointX).map { CGFloat(Library.shared.depth(ofFolder: $0) + 1) * Self.folderIndent } ?? 0
+        let x = folderForGap(in: placed, pointX: pointX).map { Self.indent(depth: Library.shared.depth(ofFolder: $0) + 1) } ?? 0
         if insertionLine.superview !== self { addSubview(insertionLine) }
         Tokens.Motion.withoutAnimation {
             insertionLine.frame = NSRect(x: x, y: y - 3, width: bounds.width - x, height: 6)
