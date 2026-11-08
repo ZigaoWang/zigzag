@@ -817,13 +817,29 @@
       "comment" : "Label on a sample ad in the welcome window’s picture of Zigzag."
     },
     "About Zigzag" : {
-      "comment" : "Title of the About window.\nZigzag menu item."
+      "comment" : "Title of the About window.\nZigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于 Zigzag"
+          }
+        }
+      }
     },
     "Acknowledgments" : {
       "comment" : "Row in the About window: the licenses of the works Zigzag uses.\nTitle of the window with the licenses of the works Zigzag uses."
     },
     "Actual Size" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实际大小"
+          }
+        }
+      }
     },
     "Ad blocking" : {
       "comment" : "Row in the site panel's This Site group."
@@ -835,13 +851,37 @@
       "comment" : "Main button of the welcome window’s extensions step: add the ones picked, with how many."
     },
     "Add %lld to Favorites" : {
-      "comment" : "Menu item for several picked sidebar rows"
+      "comment" : "Menu item for several picked sidebar rows",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项添加到收藏"
+          }
+        }
+      }
     },
     "Add %lld to Folder" : {
-      "comment" : "Menu item for several picked sidebar rows"
+      "comment" : "Menu item for several picked sidebar rows",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项添加到文件夹"
+          }
+        }
+      }
     },
     "Add %lld to New Folder" : {
-      "comment" : "Menu item for several picked sidebar rows"
+      "comment" : "Menu item for several picked sidebar rows",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项添加到新文件夹"
+          }
+        }
+      }
     },
     "Add Extension" : {
       "comment" : "Button that adds the extension, in the sheet that asks first."
@@ -853,13 +893,37 @@
       "comment" : "Title of the sheet that asks before adding an extension that has no name."
     },
     "Add to Favorites" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites."
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到收藏"
+          }
+        }
+      }
     },
     "Add to Folder" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of folders.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Folder."
+      "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of folders.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到文件夹"
+          }
+        }
+      }
     },
     "Add to New Folder" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar."
+      "comment" : "Item in a pinned tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到新文件夹"
+          }
+        }
+      }
     },
     "Add to Zigzag" : {
       "comment" : "Button on the bar over a Chrome Web Store page: installs the extension."
@@ -973,7 +1037,15 @@
       "comment" : "Button on a row in the site panel's This Site group: forgets the answer, so the site asks next time."
     },
     "Ask Again Next Time" : {
-      "comment" : "Menu item of the address bar's camera button: forgets the site's camera and microphone answer."
+      "comment" : "Menu item of the address bar's camera button: forgets the site's camera and microphone answer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次重新询问"
+          }
+        }
+      }
     },
     "Ask Each Time" : {
       "comment" : "Choice in the menu of where downloads go, in Settings and the downloads panel.\nItem in the downloads panel's … menu: asks where to save each download."
@@ -991,16 +1063,40 @@
       "comment" : "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is."
     },
     "Back" : {
-      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the sidebar's back button.\nView menu item."
+      "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the sidebar's back button.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退"
+          }
+        }
+      }
     },
     "Back to Favorite’s Page" : {
-      "comment" : "Item in a favorite's context menu. Goes back to the page the favorite was saved with."
+      "comment" : "Item in a favorite's context menu. Goes back to the page the favorite was saved with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到收藏的页面"
+          }
+        }
+      }
     },
     "Back to Page" : {
       "comment" : "Tooltip of the Float action in the site panel, while the video floats: puts it back in its page."
     },
     "Back to Pinned Page" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.\nTooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page."
+      "comment" : "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.\nTooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到固定的页面"
+          }
+        }
+      }
     },
     "Back to Zigzag’s Shortcut" : {
       "comment" : "Tooltip of the button that puts a changed shortcut back, in Settings › Shortcuts."
@@ -1054,7 +1150,15 @@
       "comment" : "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"
     },
     "Bring All to Front" : {
-      "comment" : "Window menu item."
+      "comment" : "Window menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前置全部窗口"
+          }
+        }
+      }
     },
     "Bring your passwords from %@" : {
       "comment" : "A row in the fill-password menu when nothing is saved yet. The placeholder is a browser, like Chrome."
@@ -1170,16 +1274,40 @@
       "comment" : "Toast when ⌘Z can't take back a change because the tabs changed since."
     },
     "Capitalize" : {
-      "comment" : "Edit › Transformations menu item."
+      "comment" : "Edit › Transformations menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首字母大写"
+          }
+        }
+      }
     },
     "Capture" : {
       "comment" : "Action in the site panel, under its icon: takes a screenshot of the whole page."
     },
     "Change Icon" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Change Icon."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Change Icon.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改图标"
+          }
+        }
+      }
     },
     "Change Icon…" : {
-      "comment" : "Item in a folder's context menu in the sidebar."
+      "comment" : "Item in a folder's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改图标…"
+          }
+        }
+      }
     },
     "Change in System Settings…" : {
       "comment" : "Button in Settings › General that opens Language & Region in System Settings."
@@ -1191,16 +1319,48 @@
       "comment" : "Button by a browser in the welcome window: check again whether macOS allows reading it."
     },
     "Check Document Now" : {
-      "comment" : "Edit › Spelling and Grammar menu item."
+      "comment" : "Edit › Spelling and Grammar menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即检查文稿"
+          }
+        }
+      }
     },
     "Check Grammar With Spelling" : {
-      "comment" : "Edit › Spelling and Grammar menu item."
+      "comment" : "Edit › Spelling and Grammar menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查拼写和语法"
+          }
+        }
+      }
     },
     "Check Spelling While Typing" : {
-      "comment" : "Edit › Spelling and Grammar menu item."
+      "comment" : "Edit › Spelling and Grammar menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键入时检查拼写"
+          }
+        }
+      }
     },
     "Check for Updates…" : {
-      "comment" : "Button in Settings › General, beside Zigzag's version.\nZigzag menu item."
+      "comment" : "Button in Settings › General, beside Zigzag's version.\nZigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新…"
+          }
+        }
+      }
     },
     "Check the address for typos." : {
       "comment" : "Message on the page Zigzag shows when a page can't load."
@@ -1251,7 +1411,15 @@
       "comment" : "Item in the … menu of the site panel."
     },
     "Clear Cache…" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nButton in Settings › Privacy.\nHistory menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nButton in Settings › Privacy.\nHistory menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除缓存…"
+          }
+        }
+      }
     },
     "Clear Cookies" : {
       "comment" : "Button of the sheet that clears cookies.\nButton that clears cookies, in the sheet that asks first."
@@ -1260,16 +1428,40 @@
       "comment" : "Item in the … menu of the site panel."
     },
     "Clear Cookies…" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nButton in Settings › Privacy.\nHistory menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nButton in Settings › Privacy.\nHistory menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 Cookie…"
+          }
+        }
+      }
     },
     "Clear Finished Downloads" : {
       "comment" : "Item in the downloads panel's … menu."
     },
     "Clear History" : {
-      "comment" : "Button of the sheet that clears history.\nButton that clears History, and the name of that change in the Edit menu, as in “Undo Clear History”.\nButton that clears all history, in the sheet that asks first.\nUndo action name, shown in the Edit menu as Undo Clear History.\nWhat Edit › Undo undoes after history is cleared."
+      "comment" : "Button of the sheet that clears history.\nButton that clears History, and the name of that change in the Edit menu, as in “Undo Clear History”.\nButton that clears all history, in the sheet that asks first.\nUndo action name, shown in the Edit menu as Undo Clear History.\nWhat Edit › Undo undoes after history is cleared.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除历史记录"
+          }
+        }
+      }
     },
     "Clear History…" : {
-      "comment" : "Button in Settings › Privacy.\nHistory menu item."
+      "comment" : "Button in Settings › Privacy.\nHistory menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除历史记录…"
+          }
+        }
+      }
     },
     "Clear Old" : {
       "comment" : "Button at the end of the Tabs label in the sidebar, while some tabs went unused for a while: closes those."
@@ -1373,14 +1565,42 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "关闭 %lld 个标签页"
+                }
+              }
+            }
+          }
         }
       }
     },
     "Close Folder" : {
-      "comment" : "Item in a folder's context menu in the sidebar."
+      "comment" : "Item in a folder's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭文件夹"
+          }
+        }
+      }
     },
     "Close Other Tabs" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar."
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭其他标签页"
+          }
+        }
+      }
     },
     "Close Peek" : {
       "comment" : "Tooltip of the close button in Peek's top strip."
@@ -1389,16 +1609,48 @@
       "comment" : "Tooltip of the close button on an extension's side panel."
     },
     "Close Tab" : {
-      "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu item\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab."
+      "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu item\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭标签页"
+          }
+        }
+      }
     },
     "Close Tabs" : {
-      "comment" : "In the tab overview (all spaces' tabs as cards), a button that closes the picked tabs.\nUndo action name, shown in the Edit menu as Undo Close Tabs."
+      "comment" : "In the tab overview (all spaces' tabs as cards), a button that closes the picked tabs.\nUndo action name, shown in the Edit menu as Undo Close Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭标签页"
+          }
+        }
+      }
     },
     "Close Tabs Below" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nHidden View menu item, named in Settings › Shortcuts.\nItem in a tab's context menu in the sidebar."
+      "comment" : "A command in the command bar, named as in the menu bar.\nHidden View menu item, named in Settings › Shortcuts.\nItem in a tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭下方的标签页"
+          }
+        }
+      }
     },
     "Close Window" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭窗口"
+          }
+        }
+      }
     },
     "Close it" : {
       "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it."
@@ -1538,13 +1790,37 @@
       "comment" : "Toast after taking a screenshot of the whole page. Only the visible part could be taken."
     },
     "Copy" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝"
+          }
+        }
+      }
     },
     "Copy Link" : {
-      "comment" : "Action in the site panel: copies the page's address.\nEdit menu item.\nItem in a favorite's context menu.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar."
+      "comment" : "Action in the site panel: copies the page's address.\nEdit menu item.\nItem in a favorite's context menu.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝链接"
+          }
+        }
+      }
     },
     "Copy Link as Markdown" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将链接拷贝为 Markdown"
+          }
+        }
+      }
     },
     "Copy Password" : {
       "comment" : "Tooltip of a button by a login's password in the Passwords window."
@@ -1556,7 +1832,15 @@
       "comment" : "In the Acknowledgments window, under Zigzag. “Apache License, Version 2.0” is the license's name."
     },
     "Correct Spelling Automatically" : {
-      "comment" : "Edit › Spelling and Grammar menu item."
+      "comment" : "Edit › Spelling and Grammar menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动纠正拼写"
+          }
+        }
+      }
     },
     "Couldn’t add" : {
       "comment" : "By an extension in the welcome window when it couldn’t be added."
@@ -1631,7 +1915,15 @@
       "comment" : "A search engine choice in Settings: one you give an address for."
     },
     "Cut" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剪切"
+          }
+        }
+      }
     },
     "Dark" : {
       "comment" : "Color choice in Reader."
@@ -1658,7 +1950,15 @@
       "comment" : "Button on a saved login in the Passwords window."
     },
     "Delete Space" : {
-      "comment" : "Button of the sheet that deletes a space from Settings.\nItem in a space's context menu.\nTooltip of the trash button on a space's row in Settings › Spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Delete Space."
+      "comment" : "Button of the sheet that deletes a space from Settings.\nItem in a space's context menu.\nTooltip of the trash button on a space's row in Settings › Spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Delete Space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除空间"
+          }
+        }
+      }
     },
     "Delete Space…" : {
       "comment" : "Item in the menu of a space's row in Settings › Spaces."
@@ -1673,7 +1973,15 @@
       "comment" : "Toast after a space is deleted. The name is the space's."
     },
     "Developer" : {
-      "comment" : "Row in the About window: the developer's website.\nSubmenu of the View menu."
+      "comment" : "Row in the About window: the developer's website.\nSubmenu of the View menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者"
+          }
+        }
+      }
     },
     "Developer mode" : {
       "comment" : "A setting in Settings › Extensions."
@@ -1721,7 +2029,15 @@
       "comment" : "On the bar over a Chrome Web Store page while the extension downloads."
     },
     "Downloads" : {
-      "comment" : "A heading in Settings › General.\nFeature name in the list of things an extension uses that won’t work in Zigzag.\nTitle of the downloads panel.\nTooltip of the floating downloads button, shown while the sidebar is hidden.\nTooltip of the sidebar's downloads button.\nWindow menu item."
+      "comment" : "A heading in Settings › General.\nFeature name in the list of things an extension uses that won’t work in Zigzag.\nTitle of the downloads panel.\nTooltip of the floating downloads button, shown while the sidebar is hidden.\nTooltip of the sidebar's downloads button.\nWindow menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载"
+          }
+        }
+      }
     },
     "Drag a space to change its order." : {
       "comment" : "Hint under Your Spaces in Settings › Spaces."
@@ -1733,19 +2049,51 @@
       "comment" : "The split view step's title in the getting-started guide, a card in the window, naming the tab to drag. The name is a page's title."
     },
     "Duplicate Tab" : {
-      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar."
+      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制标签页"
+          }
+        }
+      }
     },
     "Each one stays at the top of your sidebar." : {
       "comment" : "Line under the title of the welcome window’s step that picks favorite sites."
     },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nButton on a space's row in Settings › Spaces."
+      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nButton on a space's row in Settings › Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
+          }
+        }
+      }
     },
     "Edit Space" : {
-      "comment" : "Undo action name, shown in Edit › Undo."
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间"
+          }
+        }
+      }
     },
     "Edit Space…" : {
-      "comment" : "Item in a space's context menu.\nItem in the menu of a space's row in Settings › Spaces.\nView menu item."
+      "comment" : "Item in a space's context menu.\nItem in the menu of a space's row in Settings › Spaces.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间…"
+          }
+        }
+      }
     },
     "Edit this page’s address" : {
       "comment" : "VoiceOver hint of the address in a split view page's strip."
@@ -1769,7 +2117,15 @@
       "comment" : "Tooltip of the close button of the getting-started guide, a card in the window."
     },
     "Enter Full Screen" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进入全屏幕"
+          }
+        }
+      }
     },
     "Espresso" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor."
@@ -1816,7 +2172,15 @@
       }
     },
     "Export as PDF…" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出为 PDF…"
+          }
+        }
+      }
     },
     "Export passwords to a file" : {
       "comment" : "Tooltip of the Export button in the Passwords window."
@@ -1857,7 +2221,15 @@
       "comment" : "A section of Settings.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel."
     },
     "File" : {
-      "comment" : "A menu in the menu bar."
+      "comment" : "A menu in the menu bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件"
+          }
+        }
+      }
     },
     "Fill forms from My Card" : {
       "comment" : "A setting in Settings › Passwords."
@@ -1875,13 +2247,37 @@
       "comment" : "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”."
     },
     "Find" : {
-      "comment" : "Submenu of the Edit menu."
+      "comment" : "Submenu of the Edit menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找"
+          }
+        }
+      }
     },
     "Find Next" : {
-      "comment" : "Edit › Find menu item."
+      "comment" : "Edit › Find menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找下一个"
+          }
+        }
+      }
     },
     "Find Previous" : {
-      "comment" : "Edit › Find menu item."
+      "comment" : "Edit › Find menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找上一个"
+          }
+        }
+      }
     },
     "Find a setting" : {
       "comment" : "Placeholder of the search field at the top of Settings."
@@ -1893,7 +2289,15 @@
       "comment" : "Explanation under “No extensions yet” in Settings › Extensions."
     },
     "Find…" : {
-      "comment" : "Edit › Find menu item."
+      "comment" : "Edit › Find menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找…"
+          }
+        }
+      }
     },
     "Float" : {
       "comment" : "Action in the site panel, under its icon: plays the page's video in Picture in Picture."
@@ -1914,7 +2318,15 @@
       "comment" : "Button on a site's row in Settings › Privacy › Sites: forgets the choices made for it."
     },
     "Forward" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes forward.\nTooltip of the sidebar's forward button.\nView menu item."
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes forward.\nTooltip of the sidebar's forward button.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前进"
+          }
+        }
+      }
     },
     "From %@" : {
       "comment" : "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome."
@@ -1941,7 +2353,15 @@
       "comment" : "Button on the first screen of the welcome window."
     },
     "Getting Started" : {
-      "comment" : "Help menu item."
+      "comment" : "Help menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入门"
+          }
+        }
+      }
     },
     "GitHub Issues" : {
       "comment" : "Button of the Send Feedback sheet: open GitHub's issue page. A product name."
@@ -1980,34 +2400,90 @@
       "comment" : "Title of the prompt asking whether an extension may hear the sound a tab plays."
     },
     "Help" : {
-      "comment" : "A menu in the menu bar."
+      "comment" : "A menu in the menu bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帮助"
+          }
+        }
+      }
     },
     "Here’s an article to try it on" : {
       "comment" : "Under a step's title in the getting-started guide, a card in the window."
     },
     "Hide Others" : {
-      "comment" : "Zigzag menu item."
+      "comment" : "Zigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏其他"
+          }
+        }
+      }
     },
     "Hide Password" : {
       "comment" : "Tooltip of the button that hides a shown password in the Passwords window."
     },
     "Hide Pinned Tabs" : {
-      "comment" : "Item in the context menu of the space's name above its pinned tabs: folds them away.\nVoiceOver action on the space's name: folds its pinned tabs away."
+      "comment" : "Item in the context menu of the space's name above its pinned tabs: folds them away.\nVoiceOver action on the space's name: folds its pinned tabs away.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏已固定标签页"
+          }
+        }
+      }
     },
     "Hide Reader" : {
-      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.\nTooltip of the button in Reader's bar that closes Reader."
+      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.\nTooltip of the button in Reader's bar that closes Reader.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏阅读器"
+          }
+        }
+      }
     },
     "Hide Sidebar" : {
-      "comment" : "Menu bar item: hides the sidebar.\nTooltip of the sidebar button while the sidebar shows.\nView menu item."
+      "comment" : "Menu bar item: hides the sidebar.\nTooltip of the sidebar button while the sidebar shows.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏边栏"
+          }
+        }
+      }
     },
     "Hide Zigzag" : {
-      "comment" : "Zigzag menu item."
+      "comment" : "Zigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏 Zigzag"
+          }
+        }
+      }
     },
     "Hide pinned tabs" : {
       "comment" : "Accessibility help of the space's name above its pinned tabs."
     },
     "History" : {
-      "comment" : "A menu in the menu bar.\nA setting in Settings › Privacy.\nChoice in the Import window: bring browsing history over.\nThe address bar's name for Zigzag's History page.\nThe name of the tab showing Zigzag's History.\nTitle of the History page."
+      "comment" : "A menu in the menu bar.\nA setting in Settings › Privacy.\nChoice in the Import window: bring browsing history over.\nThe address bar's name for Zigzag's History page.\nThe name of the tab showing Zigzag's History.\nTitle of the History page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录"
+          }
+        }
+      }
     },
     "History cleared" : {
       "comment" : "Toast after History is cleared."
@@ -2022,7 +2498,15 @@
       "comment" : "Link in the welcome window’s import step: choose a passwords export file."
     },
     "Import from Another Browser…" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从其他浏览器导入…"
+          }
+        }
+      }
     },
     "Import from another browser" : {
       "comment" : "A setting in Settings › General."
@@ -2102,7 +2586,15 @@
       "comment" : "Message of the sheet that deletes a space from Settings."
     },
     "Jump to Selection" : {
-      "comment" : "Edit › Find menu item."
+      "comment" : "Edit › Find menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳到所选内容"
+          }
+        }
+      }
     },
     "Just downloaded" : {
       "comment" : "Under a download's name in the downloads panel: the file has just finished downloading."
@@ -2146,7 +2638,15 @@
       "comment" : "A setting in Settings › General."
     },
     "Large Space Names" : {
-      "comment" : "Item in a space's context menu. A checkmark item: shows every space's name large at the top of the sidebar."
+      "comment" : "Item in a space's context menu. A checkmark item: shows every space's name large at the top of the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大号空间名称"
+          }
+        }
+      }
     },
     "Large space names" : {
       "comment" : "A setting in Settings › General."
@@ -2155,7 +2655,15 @@
       "comment" : "VoiceOver label of the button in Reader's text choices that makes the text larger."
     },
     "Last Tab" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts."
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最后一个标签页"
+          }
+        }
+      }
     },
     "Last changed %@" : {
       "comment" : "Under a saved login's name in the Passwords window. The placeholder is a date, like Nov 8, 2026."
@@ -2200,13 +2708,37 @@
       "comment" : "Under a browser's name in the Import window while counting what it holds."
     },
     "Make Lower Case" : {
-      "comment" : "Edit › Transformations menu item."
+      "comment" : "Edit › Transformations menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转换为小写"
+          }
+        }
+      }
     },
     "Make This Page the Favorite" : {
-      "comment" : "Item in a favorite's context menu."
+      "comment" : "Item in a favorite's context menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将此页面设为收藏"
+          }
+        }
+      }
     },
     "Make Upper Case" : {
-      "comment" : "Edit › Transformations menu item."
+      "comment" : "Edit › Transformations menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转换为大写"
+          }
+        }
+      }
     },
     "Make Zigzag your default browser?" : {
       "comment" : "Title of the welcome window’s last step."
@@ -2230,7 +2762,15 @@
       "comment" : "Choice of column width in Reader's text and color choices."
     },
     "Minimize" : {
-      "comment" : "Window menu item."
+      "comment" : "Window menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最小化"
+          }
+        }
+      }
     },
     "Mint" : {
       "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale green."
@@ -2239,52 +2779,164 @@
       "comment" : "Tooltip of the … button in the downloads panel.\nTooltip of the … button in the site panel."
     },
     "Move %lld to Space" : {
-      "comment" : "Menu item for several picked sidebar rows"
+      "comment" : "Menu item for several picked sidebar rows",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项移到空间"
+          }
+        }
+      }
     },
     "Move Favorite" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Move Favorite."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move Favorite.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动收藏"
+          }
+        }
+      }
     },
     "Move Folder" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Move Folder."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move Folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动文件夹"
+          }
+        }
+      }
     },
     "Move Out of Folder" : {
-      "comment" : "Item in a folder's context menu in the sidebar. Moves the folder up a level, out of the folder it's in."
+      "comment" : "Item in a folder's context menu in the sidebar. Moves the folder up a level, out of the folder it's in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移出文件夹"
+          }
+        }
+      }
     },
     "Move Pinned Tab" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Move Pinned Tab."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动已固定标签页"
+          }
+        }
+      }
     },
     "Move Space" : {
-      "comment" : "What Edit › Undo undoes after a space is dragged to a new place."
+      "comment" : "What Edit › Undo undoes after a space is dragged to a new place.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动空间"
+          }
+        }
+      }
     },
     "Move Tab" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Move Tab."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动标签页"
+          }
+        }
+      }
     },
     "Move Tab Down" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下移标签页"
+          }
+        }
+      }
     },
     "Move Tab Up" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上移标签页"
+          }
+        }
+      }
     },
     "Move Tab to New Window" : {
-      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar."
+      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将标签页移到新窗口"
+          }
+        }
+      }
     },
     "Move into Folder" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Move into Folder."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move into Folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移入文件夹"
+          }
+        }
+      }
     },
     "Move to %@" : {
       "comment" : "A command in the command bar: moves the tab to another space. The name is the space's."
     },
     "Move to Space" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nItem in a tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space."
+      "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nItem in a tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到空间"
+          }
+        }
+      }
     },
     "Move to Tabs" : {
-      "comment" : "Item in a favorite's context menu. Turns the favorite back into a pinned tab.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs."
+      "comment" : "Item in a favorite's context menu. Turns the favorite back into a pinned tab.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到标签页"
+          }
+        }
+      }
     },
     "Move to Trash" : {
       "comment" : "Button in the Import window: move the exported passwords file to the Trash."
     },
     "Move to Window" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Move to Window."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move to Window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到窗口"
+          }
+        }
+      }
     },
     "Moved %lld to %@" : {
       "comment" : "Toast after moving several picked sidebar rows to another space",
@@ -2310,7 +2962,15 @@
       "comment" : "The Move to Trash button in the Import window, once the file is in the Trash."
     },
     "Mute Tab" : {
-      "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: silences the tab.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nView menu item."
+      "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: silences the tab.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将标签页静音"
+          }
+        }
+      }
     },
     "My Card" : {
       "comment" : "The person's own card in Contacts, as macOS calls it, in the menu that fills a form."
@@ -2355,31 +3015,95 @@
       "comment" : "Tooltip of the Never button in the save-password prompt. The placeholder is a site, like github.com."
     },
     "New Folder" : {
-      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder."
+      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建文件夹"
+          }
+        }
+      }
     },
     "New Folder Inside" : {
-      "comment" : "Item in a folder's context menu in the sidebar."
+      "comment" : "Item in a folder's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在里面新建文件夹"
+          }
+        }
+      }
     },
     "New Private Window" : {
-      "comment" : "File menu item.\nItem in the Dock icon's menu."
+      "comment" : "File menu item.\nItem in the Dock icon's menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建无痕浏览窗口"
+          }
+        }
+      }
     },
     "New Space" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nButton beside Your Spaces in Settings › Spaces.\nItem in a space's context menu.\nTooltip of the button that adds a space, at the bottom of the sidebar.\nUndo action name, shown in the Edit menu as Undo New Space.\nView menu item.\nWhat Edit › Undo undoes after a space is added."
+      "comment" : "A command in the command bar, named as in the menu bar.\nButton beside Your Spaces in Settings › Spaces.\nItem in a space's context menu.\nTooltip of the button that adds a space, at the bottom of the sidebar.\nUndo action name, shown in the Edit menu as Undo New Space.\nView menu item.\nWhat Edit › Undo undoes after a space is added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建空间"
+          }
+        }
+      }
     },
     "New Tab" : {
-      "comment" : "A tab’s title before it has a page, in the sidebar.\nFile menu item.\nIn the tab overview (all spaces' tabs as cards), a button in a space with no tabs.\nName the site panel shows for a new tab with no page.\nThe New Tab row in the sidebar, above the tabs.\nThe name of a tab with no page yet."
+      "comment" : "A tab’s title before it has a page, in the sidebar.\nFile menu item.\nIn the tab overview (all spaces' tabs as cards), a button in a space with no tabs.\nName the site panel shows for a new tab with no page.\nThe New Tab row in the sidebar, above the tabs.\nThe name of a tab with no page yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建标签页"
+          }
+        }
+      }
     },
     "New Window" : {
-      "comment" : "File menu item.\nItem in the Dock icon's menu."
+      "comment" : "File menu item.\nItem in the Dock icon's menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建窗口"
+          }
+        }
+      }
     },
     "Next" : {
       "comment" : "Tooltip of the find bar's button that goes to the next match."
     },
     "Next Space" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个空间"
+          }
+        }
+      }
     },
     "Next Tab" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nView menu item."
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个标签页"
+          }
+        }
+      }
     },
     "Next hue" : {
       "comment" : "VoiceOver, in the space editor's color wheel: an action that turns the knob to the next hue."
@@ -2547,28 +3271,92 @@
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the favorite."
     },
     "Open File…" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开文件…"
+          }
+        }
+      }
     },
     "Open Folder" : {
-      "comment" : "Item in a folder's context menu in the sidebar."
+      "comment" : "Item in a folder's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开文件夹"
+          }
+        }
+      }
     },
     "Open Image in New Tab" : {
-      "comment" : "Item in a page's right-click menu."
+      "comment" : "Item in a page's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在新标签页中打开图像"
+          }
+        }
+      }
     },
     "Open Link in New Tab" : {
-      "comment" : "Item in a page's right-click menu."
+      "comment" : "Item in a page's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在新标签页中打开链接"
+          }
+        }
+      }
     },
     "Open Link in New Window" : {
-      "comment" : "Item in a page's right-click menu."
+      "comment" : "Item in a page's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在新窗口中打开链接"
+          }
+        }
+      }
     },
     "Open Link in Peek" : {
-      "comment" : "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page."
+      "comment" : "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在速览中打开链接"
+          }
+        }
+      }
     },
     "Open Link in Private Window" : {
-      "comment" : "Item in a page's right-click menu."
+      "comment" : "Item in a page's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在无痕浏览窗口中打开链接"
+          }
+        }
+      }
     },
     "Open Location…" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置…"
+          }
+        }
+      }
     },
     "Open Passwords" : {
       "comment" : "Button in Settings › Passwords that opens the Passwords window.\nButton under a note in the Import window: open Apple's Passwords app to export from it."
@@ -2586,7 +3374,15 @@
       "comment" : "Button by a browser in the welcome window. System Settings is macOS’s app.\nButton under a problem in the Import window. System Settings is macOS's app."
     },
     "Open Video in New Tab" : {
-      "comment" : "Item in a page's right-click menu."
+      "comment" : "Item in a page's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在新标签页中打开视频"
+          }
+        }
+      }
     },
     "Open Website" : {
       "comment" : "Tooltip of a button by a login's website in the Passwords window."
@@ -2598,7 +3394,15 @@
       "comment" : "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead."
     },
     "Open in Split View" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar. Shows this pinned tab beside the current one.\nItem in a tab's context menu in the sidebar. Shows this tab beside the current one."
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar. Shows this pinned tab beside the current one.\nItem in a tab's context menu in the sidebar. Shows this tab beside the current one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在分屏浏览中打开"
+          }
+        }
+      }
     },
     "Open links in Zigzag?" : {
       "comment" : "Toast offering to make Zigzag the default browser."
@@ -2699,7 +3503,15 @@
       "comment" : "Toast after the save-password prompt updated a password."
     },
     "Passwords" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nA section of Settings.\nChoice in the Import window: bring passwords over.\nLink at the bottom of the menu that fills a password into a page: opens the Passwords window.\nTitle of the Passwords window.\nTitle over the column of kinds in the Passwords window.\nWhat VoiceOver calls the menu that fills a password into a page.\nZigzag menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nA section of Settings.\nChoice in the Import window: bring passwords over.\nLink at the bottom of the menu that fills a password into a page: opens the Passwords window.\nTitle of the Passwords window.\nTitle over the column of kinds in the Passwords window.\nWhat VoiceOver calls the menu that fills a password into a page.\nZigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
     },
     "Passwords you save while signing in, or bring over from another browser, show up here." : {
       "comment" : "Shown in the Passwords window with no passwords saved yet."
@@ -2714,16 +3526,48 @@
       "comment" : "Line under the title of the welcome window’s import step."
     },
     "Paste" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴"
+          }
+        }
+      }
     },
     "Paste and Go" : {
-      "comment" : "Item in the command bar field's right-click menu: opens the copied address."
+      "comment" : "Item in the command bar field's right-click menu: opens the copied address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴并前往"
+          }
+        }
+      }
     },
     "Paste and Match Style" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴并匹配样式"
+          }
+        }
+      }
     },
     "Paste and Search" : {
-      "comment" : "Item in the command bar field's right-click menu: searches for the copied text."
+      "comment" : "Item in the command bar field's right-click menu: searches for the copied text.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴并搜索"
+          }
+        }
+      }
     },
     "Pause" : {
       "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a download's button in the downloads panel: pauses the download."
@@ -2752,7 +3596,15 @@
       "comment" : "Name of the first space, in the welcome window’s picture of Zigzag.\nThe name of the first space in a new Zigzag. People can rename it."
     },
     "Picture in Picture" : {
-      "comment" : "Tooltip of the Float action in the site panel.\nView menu item."
+      "comment" : "Tooltip of the Float action in the site panel.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画中画"
+          }
+        }
+      }
     },
     "Pin %lld Tabs" : {
       "comment" : "Menu item for several picked tabs",
@@ -2774,23 +3626,67 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "固定 %lld 个标签页"
+                }
+              }
+            }
+          }
         }
       }
     },
     "Pin Split View" : {
-      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view."
+      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定分屏浏览"
+          }
+        }
+      }
     },
     "Pin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab."
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定标签页"
+          }
+        }
+      }
     },
     "Pin Tabs" : {
-      "comment" : "Undo action name, shown in Edit › Undo."
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定标签页"
+          }
+        }
+      }
     },
     "Pin This Page" : {
       "comment" : "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead."
     },
     "Pin This Page Instead" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one."
+      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改为固定此页面"
+          }
+        }
+      }
     },
     "Pin the sites you use" : {
       "comment" : "Title of the welcome window’s step that picks favorite sites."
@@ -2838,10 +3734,26 @@
       "comment" : "Tooltip of the find bar's button that goes to the previous match."
     },
     "Previous Space" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一个空间"
+          }
+        }
+      }
     },
     "Previous Tab" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nView menu item."
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一个标签页"
+          }
+        }
+      }
     },
     "Previous hue" : {
       "comment" : "VoiceOver, in the space editor's color wheel: an action that turns the knob to the previous hue."
@@ -2850,7 +3762,15 @@
       "comment" : "Placeholder of the field for Firefox's primary password, in the Import window."
     },
     "Print…" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打印…"
+          }
+        }
+      }
     },
     "Privacy" : {
       "comment" : "A section of Settings."
@@ -2874,7 +3794,15 @@
       "comment" : "Button of the sheet that asks before quitting."
     },
     "Quit Zigzag" : {
-      "comment" : "Zigzag menu item."
+      "comment" : "Zigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 Zigzag"
+          }
+        }
+      }
     },
     "Quit Zigzag?" : {
       "comment" : "Title of the sheet that asks before quitting."
@@ -2958,7 +3886,15 @@
       "comment" : "VoiceOver, in the space editor's color wheel: a color's family."
     },
     "Redo" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重做"
+          }
+        }
+      }
     },
     "Reduce motion" : {
       "comment" : "A setting in Settings › General."
@@ -2970,10 +3906,26 @@
       "comment" : "Tooltip of a button in the strip on top of each page of a split view: reloads the page.\nTooltip of the sidebar's reload button."
     },
     "Reload Ignoring Cache" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新载入并忽略缓存"
+          }
+        }
+      }
     },
     "Reload Page" : {
-      "comment" : "Item in a tab's context menu in the sidebar.\nView menu item."
+      "comment" : "Item in a tab's context menu in the sidebar.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新载入页面"
+          }
+        }
+      }
     },
     "Reload from Its Folder" : {
       "comment" : "Tooltip of the reload button on an unpacked extension's row in Settings › Extensions."
@@ -2988,22 +3940,70 @@
       "comment" : "Tooltip of the × on a site's group of pages on the History page. Always two or more."
     },
     "Remove %lld Pinned Pages" : {
-      "comment" : "Menu item: takes several picked pinned pages out of the sidebar"
+      "comment" : "Menu item: takes several picked pinned pages out of the sidebar",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %lld 个固定页面"
+          }
+        }
+      }
     },
     "Remove Folder" : {
-      "comment" : "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.\nUndo action name, shown in Edit › Undo."
+      "comment" : "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除文件夹"
+          }
+        }
+      }
     },
     "Remove Page from History" : {
-      "comment" : "Name of the undoable change in the Edit menu, as in “Undo Remove Page from History”."
+      "comment" : "Name of the undoable change in the Edit menu, as in “Undo Remove Page from History”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除页面"
+          }
+        }
+      }
     },
     "Remove Pages from History" : {
-      "comment" : "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."
+      "comment" : "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除页面"
+          }
+        }
+      }
     },
     "Remove Pinned Page" : {
-      "comment" : "Menu item: takes a pinned page out of the sidebar"
+      "comment" : "Menu item: takes a pinned page out of the sidebar",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除固定页面"
+          }
+        }
+      }
     },
     "Remove Pinned Pages" : {
-      "comment" : "Undo action name, shown in Edit › Undo."
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除固定页面"
+          }
+        }
+      }
     },
     "Remove Session from History" : {
       "comment" : "Tooltip of the × on a session's heading on the History page."
@@ -3012,10 +4012,26 @@
       "comment" : "Title of the sheet that removes one site's data; the site, like apple.com."
     },
     "Remove from Favorites" : {
-      "comment" : "Item in a favorite's context menu.\nUndo action name, shown in the Edit menu as Undo Remove from Favorites."
+      "comment" : "Item in a favorite's context menu.\nUndo action name, shown in the Edit menu as Undo Remove from Favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从收藏中移除"
+          }
+        }
+      }
     },
     "Remove from Folder" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar.\nUndo action name, shown in the Edit menu as Undo Remove from Folder."
+      "comment" : "Item in a pinned tab's context menu in the sidebar.\nUndo action name, shown in the Edit menu as Undo Remove from Folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从文件夹中移除"
+          }
+        }
+      }
     },
     "Remove from History" : {
       "comment" : "Tooltip of the × on a page on the History page."
@@ -3048,31 +4064,95 @@
       "comment" : "Button on a site's row in Settings › Privacy › Site Data."
     },
     "Rename" : {
-      "comment" : "Button that saves a favorite's new name.\nItem in a folder's context menu in the sidebar.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar."
+      "comment" : "Button that saves a favorite's new name.\nItem in a folder's context menu in the sidebar.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名"
+          }
+        }
+      }
     },
     "Rename Favorite" : {
-      "comment" : "Undo action name, shown in Edit › Undo."
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名收藏"
+          }
+        }
+      }
     },
     "Rename Folder" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Rename Folder."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Rename Folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名文件夹"
+          }
+        }
+      }
     },
     "Rename Pinned Tab" : {
-      "comment" : "Undo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Rename Pinned Tab."
+      "comment" : "Undo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Rename Pinned Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名已固定标签页"
+          }
+        }
+      }
     },
     "Rename…" : {
-      "comment" : "Item in a favorite's context menu."
+      "comment" : "Item in a favorite's context menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名…"
+          }
+        }
+      }
     },
     "Reopen Closed Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nHistory menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nHistory menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新打开已关闭的标签页"
+          }
+        }
+      }
     },
     "Reopen Closed Window" : {
-      "comment" : "History menu item."
+      "comment" : "History menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新打开已关闭的窗口"
+          }
+        }
+      }
     },
     "Report a Problem" : {
       "comment" : "Title of the Report a Problem sheet."
     },
     "Report a Problem…" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nHelp menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nHelp menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题…"
+          }
+        }
+      }
     },
     "Reset" : {
       "comment" : "Button on the Zoom row of the site panel. It sets the page back to 100%."
@@ -3150,7 +4230,15 @@
       "comment" : "Heading in the downloads panel's … menu, over the folder choices."
     },
     "Save Page As…" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将页面存储为…"
+          }
+        }
+      }
     },
     "Save a Copy…" : {
       "comment" : "Toolbar button tooltip in the PDF viewer. For a PDF already on the Mac."
@@ -3233,7 +4321,15 @@
       "comment" : "Command bar result when nothing in history matches. The query is what was typed."
     },
     "Search with %@" : {
-      "comment" : "Item in a page's right-click menu. The placeholder is the search engine's name, like “Google”."
+      "comment" : "Item in a page's right-click menu. The placeholder is the search engine's name, like “Google”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 %@ 搜索"
+          }
+        }
+      }
     },
     "Search your passwords" : {
       "comment" : "Under the row saying nothing is saved for a site, in the fill-password menu."
@@ -3260,22 +4356,62 @@
       "comment" : "A slider in the space editor: how much of the desktop shows through the window."
     },
     "Select All" : {
-      "comment" : "Edit menu item."
+      "comment" : "Edit menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全选"
+          }
+        }
+      }
     },
     "Send Feedback" : {
       "comment" : "Title of the Send Feedback sheet."
     },
     "Send Feedback…" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nHelp menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nHelp menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送反馈…"
+          }
+        }
+      }
     },
     "Separate Tabs" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a favorite's context menu. Parts a split favorite into two favorites.\nItem in a pinned tab's context menu in the sidebar. Parts a pinned split view into two pinned tabs.\nItem in a tab's context menu in the sidebar. Ends the split view the tab is in.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item."
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a favorite's context menu. Parts a split favorite into two favorites.\nItem in a pinned tab's context menu in the sidebar. Parts a pinned split view into two pinned tabs.\nItem in a tab's context menu in the sidebar. Ends the split view the tab is in.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分开标签页"
+          }
+        }
+      }
     },
     "Separate from Favorite" : {
-      "comment" : "Item in a favorite's context menu. The page wandered off; this opens it as a tab of its own."
+      "comment" : "Item in a favorite's context menu. The page wandered off; this opens it as a tab of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从收藏中分离"
+          }
+        }
+      }
     },
     "Separate from Pinned Tab" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own."
+      "comment" : "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从已固定标签页中分离"
+          }
+        }
+      }
     },
     "Sepia" : {
       "comment" : "Color choice in Reader: warm paper."
@@ -3284,19 +4420,43 @@
       "comment" : "Choice of typeface in Reader's text and color choices."
     },
     "Services" : {
-      "comment" : "Submenu of the Zigzag menu, filled by macOS."
+      "comment" : "Submenu of the Zigzag menu, filled by macOS.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务"
+          }
+        }
+      }
     },
     "Set as Default" : {
       "comment" : "Answer in the welcome window’s default browser step.\nButton in Settings › General that makes Zigzag the default browser.\nButton in the toast offering to make Zigzag the default browser."
     },
     "Set as Default Browser" : {
-      "comment" : "Zigzag menu item."
+      "comment" : "Zigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设为默认浏览器"
+          }
+        }
+      }
     },
     "Settings" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nItem in an extension's menu: opens the extension's own settings page.\nThe address bar's name for Zigzag's Settings page.\nThe name of the tab showing Zigzag's Settings.\nTitle of the Settings page, also its tab's name."
     },
     "Settings…" : {
-      "comment" : "Zigzag menu item."
+      "comment" : "Zigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置…"
+          }
+        }
+      }
     },
     "Shade" : {
       "comment" : "A slider in the space editor: how light or deep the color is."
@@ -3308,7 +4468,15 @@
       "comment" : "Title of the prompt when a site asks to share the screen."
     },
     "Share…" : {
-      "comment" : "File menu item."
+      "comment" : "File menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享…"
+          }
+        }
+      }
     },
     "Shift-click a blue link" : {
       "comment" : "A step's title in the getting-started guide, a card in the window."
@@ -3326,22 +4494,54 @@
       "comment" : "Answer in the welcome window’s ad blocking step."
     },
     "Show All" : {
-      "comment" : "Button under the first 30 sites in Settings › Privacy.\nZigzag menu item."
+      "comment" : "Button under the first 30 sites in Settings › Privacy.\nZigzag menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部显示"
+          }
+        }
+      }
     },
     "Show All Downloads" : {
       "comment" : "Last row of the downloads panel, opened on one download: shows the rest of the list."
     },
     "Show All Tabs" : {
-      "comment" : "View menu item."
+      "comment" : "View menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有标签页"
+          }
+        }
+      }
     },
     "Show History" : {
-      "comment" : "Button in Settings › Privacy that opens History.\nHistory menu item."
+      "comment" : "Button in Settings › Privacy that opens History.\nHistory menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示历史记录"
+          }
+        }
+      }
     },
     "Show Me How" : {
       "comment" : "Button under a note in the welcome window: show how to export passwords."
     },
     "Show Original" : {
-      "comment" : "Button in the toast after a page is translated: shows it untranslated again.\nMenu bar item: shows the translated page as it was.\nTooltip of the Original action in the site panel."
+      "comment" : "Button in the toast after a page is translated: shows it untranslated again.\nMenu bar item: shows the translated page as it was.\nTooltip of the Original action in the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示原文"
+          }
+        }
+      }
     },
     "Show Password" : {
       "comment" : "Tooltip of a button by a login's password in the Passwords window."
@@ -3350,22 +4550,62 @@
       "comment" : "Button in the Import window after passwords came over."
     },
     "Show Pinned Tabs" : {
-      "comment" : "Item in the context menu of the space's name above its pinned tabs: unfolds them.\nVoiceOver action on the space's name: unfolds its pinned tabs."
+      "comment" : "Item in the context menu of the space's name above its pinned tabs: unfolds them.\nVoiceOver action on the space's name: unfolds its pinned tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示已固定标签页"
+          }
+        }
+      }
     },
     "Show Reader" : {
-      "comment" : "Menu bar item: opens the page in Reader.\nTooltip of the Reader action in the site panel.\nTooltip of the address bar's Reader button.\nView menu item."
+      "comment" : "Menu bar item: opens the page in Reader.\nTooltip of the Reader action in the site panel.\nTooltip of the address bar's Reader button.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示阅读器"
+          }
+        }
+      }
     },
     "Show Report" : {
       "comment" : "Button of the Report a Problem sheet: shows the report in Finder."
     },
     "Show Sidebar" : {
-      "comment" : "Menu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden."
+      "comment" : "Menu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示边栏"
+          }
+        }
+      }
     },
     "Show Spelling and Grammar" : {
-      "comment" : "Edit › Spelling and Grammar menu item."
+      "comment" : "Edit › Spelling and Grammar menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示拼写和语法"
+          }
+        }
+      }
     },
     "Show Substitutions" : {
-      "comment" : "Edit › Substitutions menu item."
+      "comment" : "Edit › Substitutions menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示替换"
+          }
+        }
+      }
     },
     "Show Tab" : {
       "comment" : "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound."
@@ -3389,7 +4629,15 @@
       "comment" : "Explanation under “Large space names” in Settings › General."
     },
     "Side by Side" : {
-      "comment" : "Menu bar item: lays the split view's two pages side by side.\nTooltip of a button in the strip on top of each page of a split view: lays the two pages side by side."
+      "comment" : "Menu bar item: lays the split view's two pages side by side.\nTooltip of a button in the strip on top of each page of a split view: lays the two pages side by side.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左右并排"
+          }
+        }
+      }
     },
     "Side panel" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
@@ -3416,7 +4664,15 @@
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
     },
     "Site Access" : {
-      "comment" : "Submenu of an extension's menu: which sites the extension may read and change."
+      "comment" : "Submenu of an extension's menu: which sites the extension may read and change.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站访问权限"
+          }
+        }
+      }
     },
     "Site Controls" : {
       "comment" : "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."
@@ -3449,16 +4705,48 @@
       "comment" : "VoiceOver label of the button in Reader's text choices that makes the text smaller."
     },
     "Smart Copy/Paste" : {
-      "comment" : "Edit › Substitutions menu item."
+      "comment" : "Edit › Substitutions menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能拷贝/粘贴"
+          }
+        }
+      }
     },
     "Smart Dashes" : {
-      "comment" : "Edit › Substitutions menu item."
+      "comment" : "Edit › Substitutions menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能破折号"
+          }
+        }
+      }
     },
     "Smart Links" : {
-      "comment" : "Edit › Substitutions menu item."
+      "comment" : "Edit › Substitutions menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能链接"
+          }
+        }
+      }
     },
     "Smart Quotes" : {
-      "comment" : "Edit › Substitutions menu item."
+      "comment" : "Edit › Substitutions menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能引号"
+          }
+        }
+      }
     },
     "Smoke" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. Dark, smoky see-through glass."
@@ -3497,7 +4785,15 @@
       "comment" : "Accessibility label of a space's button at the bottom of the sidebar. The placeholder is the space's name."
     },
     "Space %lld" : {
-      "comment" : "A new space's made-up name, like “Space 2”.\nHidden View menu item, named in Settings › Shortcuts.\nName of an imported space that had none in Arc: Space 1, Space 2…\nThe name of a new space: its number. People can rename it."
+      "comment" : "A new space's made-up name, like “Space 2”.\nHidden View menu item, named in Settings › Shortcuts.\nName of an imported space that had none in Arc: Space 1, Space 2…\nThe name of a new space: its number. People can rename it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间 %lld"
+          }
+        }
+      }
     },
     "Spaces" : {
       "comment" : "A section of Settings."
@@ -3506,22 +4802,62 @@
       "comment" : "Choice in the Import window: bring Arc's spaces and tabs over."
     },
     "Speech" : {
-      "comment" : "Submenu of the Edit menu."
+      "comment" : "Submenu of the Edit menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音"
+          }
+        }
+      }
     },
     "Spelling and Grammar" : {
-      "comment" : "Submenu of the Edit menu."
+      "comment" : "Submenu of the Edit menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拼写和语法"
+          }
+        }
+      }
     },
     "Split View" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Split View."
+      "comment" : "Undo action name, shown in the Edit menu as Undo Split View.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分屏浏览"
+          }
+        }
+      }
     },
     "Stack Vertically" : {
-      "comment" : "Menu bar item: stacks the split view's two pages one above the other.\nTooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other.\nView menu item."
+      "comment" : "Menu bar item: stacks the split view's two pages one above the other.\nTooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下堆叠"
+          }
+        }
+      }
     },
     "Start Browsing" : {
       "comment" : "Button that ends the getting-started guide, a card in the window, after its last step.\nLast button of the welcome window, after importing."
     },
     "Start Speaking" : {
-      "comment" : "Edit › Speech menu item."
+      "comment" : "Edit › Speech menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始朗读"
+          }
+        }
+      }
     },
     "Stay signed in to your sites" : {
       "comment" : "Row with a checkbox in the welcome window’s import step: bring over the sites you’re signed in to."
@@ -3538,19 +4874,51 @@
       }
     },
     "Stop" : {
-      "comment" : "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.\nTooltip of the sidebar's reload button while the page loads: stops loading.\nView menu item."
+      "comment" : "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.\nTooltip of the sidebar's reload button while the page loads: stops loading.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
+          }
+        }
+      }
     },
     "Stop Camera and Microphone" : {
-      "comment" : "Menu item of the address bar's camera button: stops the page using the camera and microphone."
+      "comment" : "Menu item of the address bar's camera button: stops the page using the camera and microphone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止使用摄像头和麦克风"
+          }
+        }
+      }
     },
     "Stop Speaking" : {
-      "comment" : "Edit › Speech menu item."
+      "comment" : "Edit › Speech menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止朗读"
+          }
+        }
+      }
     },
     "Strong password saved for %@" : {
       "comment" : "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."
     },
     "Substitutions" : {
-      "comment" : "Submenu of the Edit menu."
+      "comment" : "Submenu of the Edit menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换"
+          }
+        }
+      }
     },
     "Swap Sides" : {
       "comment" : "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages."
@@ -3571,7 +4939,15 @@
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: goes to the open tab."
     },
     "Tab %lld" : {
-      "comment" : "Hidden View menu item that goes to the tab with this number."
+      "comment" : "Hidden View menu item that goes to the tab with this number.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页 %lld"
+          }
+        }
+      }
     },
     "Tab groups" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
@@ -3580,7 +4956,15 @@
       "comment" : "A heading in Settings › General.\nThe quiet label above today's tabs in the sidebar, below the pinned tabs."
     },
     "Take Screenshot of Whole Page" : {
-      "comment" : "File menu item.\nTooltip of the Capture action in the site panel."
+      "comment" : "File menu item.\nTooltip of the Capture action in the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为整个页面截图"
+          }
+        }
+      }
     },
     "Taken from “%@”, which has no shortcut now" : {
       "comment" : "Under a shortcut in Settings › Shortcuts, after it took keys from another command; that command's name."
@@ -3607,7 +4991,15 @@
       "comment" : "Toast when Reader's text size changes, like Text 120%."
     },
     "Text Replacement" : {
-      "comment" : "Edit › Substitutions menu item."
+      "comment" : "Edit › Substitutions menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本替换"
+          }
+        }
+      }
     },
     "Text and Colors" : {
       "comment" : "Tooltip of the button in Reader's bar that shows its text and color choices."
@@ -3799,13 +5191,29 @@
       "comment" : "Name of a History session that began today."
     },
     "Transformations" : {
-      "comment" : "Submenu of the Edit menu."
+      "comment" : "Submenu of the Edit menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转换"
+          }
+        }
+      }
     },
     "Translate" : {
       "comment" : "Action in the site panel: translates the page.\nButton in the toast that offers to translate a page."
     },
     "Translate Page" : {
-      "comment" : "Menu bar item: translates the page.\nView menu item."
+      "comment" : "Menu bar item: translates the page.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译网页"
+          }
+        }
+      }
     },
     "Translate pages into" : {
       "comment" : "A setting in Settings › Translation."
@@ -3868,7 +5276,15 @@
       "comment" : "Explanation under “Fill saved passwords” in Settings › Passwords."
     },
     "Undo" : {
-      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nEdit menu item.\nToast button"
+      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nEdit menu item.\nToast button",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤销"
+          }
+        }
+      }
     },
     "Unload %lld Pages" : {
       "comment" : "Menu item for several picked pinned pages",
@@ -3890,20 +5306,56 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "卸载 %lld 个页面"
+                }
+              }
+            }
+          }
         }
       }
     },
     "Unload Page" : {
-      "comment" : "Item in a favorite's context menu. Unloads the page; the favorite stays.\nItem in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.\nMenu item\nTooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.\nTooltip of a favorite's close button: unloads its page; the favorite stays."
+      "comment" : "Item in a favorite's context menu. Unloads the page; the favorite stays.\nItem in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.\nMenu item\nTooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.\nTooltip of a favorite's close button: unloads its page; the favorite stays.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卸载页面"
+          }
+        }
+      }
     },
     "Unload Pages" : {
-      "comment" : "Item in a favorite's context menu. Unloads both pages of a split favorite.\nItem in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view."
+      "comment" : "Item in a favorite's context menu. Unloads both pages of a split favorite.\nItem in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卸载页面"
+          }
+        }
+      }
     },
     "Unlock" : {
       "comment" : "Button in the Import window after typing Firefox's primary password.\nButton in the Import window after typing Firefox’s primary password.\nButton in the locked Passwords window: unlocks with Touch ID or the Mac's password."
     },
     "Unmute Tab" : {
-      "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: turns the tab's sound back on.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar."
+      "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: turns the tab's sound back on.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消标签页静音"
+          }
+        }
+      }
     },
     "Unpacked" : {
       "comment" : "Under an extension's name in Settings › Extensions: it was loaded from a folder."
@@ -3928,17 +5380,53 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "取消固定 %lld 个标签页"
+                }
+              }
+            }
+          }
         }
       }
     },
     "Unpin Split View" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar."
+      "comment" : "Item in a pinned tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定分屏浏览"
+          }
+        }
+      }
     },
     "Unpin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab."
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定标签页"
+          }
+        }
+      }
     },
     "Unpin Tabs" : {
-      "comment" : "Undo action name, shown in Edit › Undo."
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定标签页"
+          }
+        }
+      }
     },
     "Unpinned" : {
       "comment" : "Toast after a pinned tab is unpinned."
@@ -3947,10 +5435,26 @@
       "comment" : "Button in the prompt that offers to update a saved password."
     },
     "Update Favorite" : {
-      "comment" : "Undo action name, shown in Edit › Undo."
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新收藏"
+          }
+        }
+      }
     },
     "Update Pinned Page" : {
-      "comment" : "Undo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Update Pinned Page."
+      "comment" : "Undo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Update Pinned Page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新固定页面"
+          }
+        }
+      }
     },
     "Update password?" : {
       "comment" : "Title of the prompt that offers to update a saved password."
@@ -3995,7 +5499,15 @@
       "comment" : "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."
     },
     "Use Selection for Find" : {
-      "comment" : "Edit › Find menu item."
+      "comment" : "Edit › Find menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用所选内容查找"
+          }
+        }
+      }
     },
     "Use Strong Password" : {
       "comment" : "A row in the fill-password menu on a sign-up form: fill in a password Zigzag makes."
@@ -4060,10 +5572,26 @@
       "comment" : "Under the title of the sheet that asks before adding an extension."
     },
     "View" : {
-      "comment" : "A menu in the menu bar."
+      "comment" : "A menu in the menu bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        }
+      }
     },
     "View Source" : {
-      "comment" : "View › Developer menu item."
+      "comment" : "View › Developer menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示网页源代码"
+          }
+        }
+      }
     },
     "Visit this site anyway" : {
       "comment" : "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details."
@@ -4078,7 +5606,15 @@
       "comment" : "A kind of password in the Passwords window's column: easy to guess."
     },
     "Web Inspector" : {
-      "comment" : "View › Developer menu item."
+      "comment" : "View › Developer menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页检查器"
+          }
+        }
+      }
     },
     "Website" : {
       "comment" : "Name of a field of a saved login in the Passwords window.\nRow in the About window."
@@ -4105,7 +5641,15 @@
       "comment" : "Button in the toast after an update: shows the release notes.\nTitle of the sheet with this version's release notes."
     },
     "What’s New in Zigzag" : {
-      "comment" : "Help menu item.\nVoiceOver name of the What’s New sheet."
+      "comment" : "Help menu item.\nVoiceOver name of the What’s New sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 新功能"
+          }
+        }
+      }
     },
     "When You Click It" : {
       "comment" : "Site Access choice: the extension works on a site only after its button is clicked."
@@ -4120,7 +5664,15 @@
       "comment" : "Choice of column width in Reader's text and color choices."
     },
     "Window" : {
-      "comment" : "A heading in Settings › General.\nA menu in the menu bar."
+      "comment" : "A heading in Settings › General.\nA menu in the menu bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口"
+          }
+        }
+      }
     },
     "Won’t work in Zigzag: %@." : {
       "comment" : "In the extension install sheet. The placeholder lists features the extension uses that Zigzag lacks, like “side panel and notifications”.\nTooltip of an extension's row in Settings › Extensions: a list of the features Zigzag lacks."
@@ -4180,7 +5732,15 @@
       "comment" : "Shown in the locked Passwords window."
     },
     "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords." : {
-      "comment" : "Import window when the import is done. Zigzag › Passwords is the menu item's path; Keychain and iCloud Keychain are Apple's names."
+      "comment" : "Import window when the import is done. Zigzag › Passwords is the menu item's path; Keychain and iCloud Keychain are Apple's names.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密码存储在 Zigzag 中，保存在你 Mac 的钥匙串里，并通过 iCloud 钥匙串同步。可以在“Zigzag › 密码”中找到它们。"
+          }
+        }
+      }
     },
     "Your sign-ins from %@ couldn’t come over, so sites will ask you to sign in again." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to."
@@ -4269,7 +5829,15 @@
       "comment" : "Why a file couldn't be saved, said after what failed, like “Couldn’t save the page. Not enough space on your Mac.”"
     },
     "Zigzag on GitHub" : {
-      "comment" : "Help menu item."
+      "comment" : "Help menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 上的 Zigzag"
+          }
+        }
+      }
     },
     "Zigzag updated to %@" : {
       "comment" : "Toast after an update, with the new version number, like 0.5.2."
@@ -4284,13 +5852,37 @@
       "comment" : "Message of the Report a Problem sheet. “Show Report” is the sheet's other button."
     },
     "Zoom" : {
-      "comment" : "Row in the site panel's This Site group.\nWindow menu item."
+      "comment" : "Row in the site panel's This Site group.\nWindow menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放"
+          }
+        }
+      }
     },
     "Zoom In" : {
-      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nToolbar button tooltip in the PDF viewer.\nView menu item."
+      "comment" : "Hidden View menu item, named in Settings › Shortcuts.\nToolbar button tooltip in the PDF viewer.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大"
+          }
+        }
+      }
     },
     "Zoom Out" : {
-      "comment" : "Toolbar button tooltip in the PDF viewer.\nView menu item."
+      "comment" : "Toolbar button tooltip in the PDF viewer.\nView menu item.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小"
+          }
+        }
+      }
     },
     "a few seconds left" : {
       "comment" : "Under a download's name in the downloads panel: time left, after the amount and a comma."
