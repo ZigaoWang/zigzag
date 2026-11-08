@@ -730,20 +730,30 @@ private final class ImportHero: NSView {
         let signedIn = summaries.map(\.signedInSites).reduce(0, +)
         // The biggest thing that came over leads, its number large and what it counts under it; the rest follow in a line.
         let kinds: [(n: Int, unit: (Int) -> String, phrase: (Int) -> String)] = [
-            (passwords, { String(localized: "import.lead.passwords", defaultValue: "\($0) passwords",
-                                 comment: "Under the big number when an import finishes, so without the number: password or passwords.") },
+            (passwords, { $0 == 1 ? String(localized: "import.lead.passwords.one", defaultValue: "password",
+                                           comment: "Under the big number when an import finishes, which is 1, so without the number.")
+                                 : String(localized: "import.lead.passwords", defaultValue: "passwords",
+                                          comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
              { String(localized: "\($0) passwords", comment: "Item in a list of what a browser holds or what came over, in the Import window.") }),
-            (bookmarks, { String(localized: "import.lead.bookmarks", defaultValue: "\($0) bookmarks",
-                                 comment: "Under the big number when an import finishes, so without the number: bookmark or bookmarks.") },
+            (bookmarks, { $0 == 1 ? String(localized: "import.lead.bookmarks.one", defaultValue: "bookmark",
+                                           comment: "Under the big number when an import finishes, which is 1, so without the number.")
+                                 : String(localized: "import.lead.bookmarks", defaultValue: "bookmarks",
+                                          comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
              { String(localized: "\($0) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.") }),
-            (spaces, { String(localized: "import.lead.spaces", defaultValue: "\($0) spaces",
-                              comment: "Under the big number when an import finishes, so without the number: space or spaces.") },
+            (spaces, { $0 == 1 ? String(localized: "import.lead.spaces.one", defaultValue: "space",
+                                        comment: "Under the big number when an import finishes, which is 1, so without the number.")
+                              : String(localized: "import.lead.spaces", defaultValue: "spaces",
+                                       comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
              { String(localized: "\($0) spaces", comment: "Item in the list of what came over, in the Import window.") }),
-            (signedIn, { String(localized: "import.lead.sites-with-sign-ins", defaultValue: "\($0) sites with sign-ins",
-                                comment: "Under the big number when an import finishes, so without the number: site with sign-ins or sites with sign-ins.") },
+            (signedIn, { $0 == 1 ? String(localized: "import.lead.sites-with-sign-ins.one", defaultValue: "site with sign-ins",
+                                          comment: "Under the big number when an import finishes, which is 1, so without the number.")
+                                : String(localized: "import.lead.sites-with-sign-ins", defaultValue: "sites with sign-ins",
+                                         comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
              { String(localized: "\($0) sites with sign-ins", comment: "Item in the list of what came over, in the Import window.") }),
-            (history, { String(localized: "import.lead.pages-of-history", defaultValue: "\($0) pages of history",
-                               comment: "Under the big number when an import finishes, so without the number: page of history or pages of history.") },
+            (history, { $0 == 1 ? String(localized: "import.lead.pages-of-history.one", defaultValue: "page of history",
+                                         comment: "Under the big number when an import finishes, which is 1, so without the number.")
+                               : String(localized: "import.lead.pages-of-history", defaultValue: "pages of history",
+                                        comment: "Under the big number when an import finishes, so without the number. Several, never 1.") },
              { String(localized: "\($0) pages of history", comment: "Item in the list of what came over, in the Import window.") }),
         ]
         var lead: (Int, String)?
