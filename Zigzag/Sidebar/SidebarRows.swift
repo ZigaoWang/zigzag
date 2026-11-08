@@ -594,7 +594,9 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     override func layout() {
         super.layout()
         let side = Tokens.Space.x3
-        chevron.frame = NSRect(x: bounds.width - Self.inset - side, y: (bounds.height - side) / 2, width: side, height: side)
+        // Centered where a tab's close button is, so the trailing marks run down one column.
+        let column = bounds.width - Self.buttonEdge - Tokens.Sidebar.rowButton / 2
+        chevron.frame = NSRect(x: round(column - side / 2), y: (bounds.height - side) / 2, width: side, height: side)
         folderIcon.frame = icon.frame
         turnChevron(animated: false)
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
