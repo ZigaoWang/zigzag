@@ -571,7 +571,7 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
         var window: NSWindow?
         if interactive {
             let made = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-            made.title = "Sign In for \(ExtensionHost.shared.displayName(for: extensionID))"
+            made.title = String(localized: "Sign In for \(ExtensionHost.shared.displayName(for: extensionID))", comment: "Title of the window where an extension signs in to an account. The placeholder is the extension's name.")
             made.subtitle = url.host() ?? ""
             made.contentView = webView
             made.isReleasedWhenClosed = false
@@ -866,7 +866,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 // sound, so the extension hears it from the start.
                 if result?["streamed"] as? Bool == true { switchToSystemAudio(id) }
             }
-            Toast.show("\(host.displayName(for: extensionID)) is listening to this tab", symbol: "waveform", duration: 3, in: controller)
+            Toast.show(String(localized: "\(host.displayName(for: extensionID)) is listening to this tab", comment: "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."), symbol: "waveform", duration: 3, in: controller)
             return ["id": id, "tabId": tab.id.hashValue & 0x7fffffff]
         case "read":
             // The page collects what's arrived since it last asked: steadier than pushing to it, since WebKit can
@@ -1025,7 +1025,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         var allowed = UserDefaults.standard.stringArray(forKey: Self.allowedKey) ?? []
         if allowed.contains(extensionID) { return true }
         let answer = await PermissionPrompt.ask(host: name, what: "the sound this tab plays", symbol: "waveform", in: controller, tab: tab,
-                                                title: "Hear what this tab plays", allowTitle: "Allow", denyTitle: "Don’t Allow")
+                                                title: String(localized: "Hear what this tab plays", comment: "Title of the prompt asking whether an extension may hear the sound a tab plays."), allowTitle: String(localized: "Allow", comment: "Button in the prompt asking whether an extension may hear a tab's sound."), denyTitle: String(localized: "Don’t Allow", comment: "Button in the prompt asking whether an extension may hear a tab's sound."))
         guard answer == .allow else { return false }
         allowed.append(extensionID)
         UserDefaults.standard.set(allowed, forKey: Self.allowedKey)

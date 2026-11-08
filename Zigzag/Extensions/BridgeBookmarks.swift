@@ -223,7 +223,7 @@ final class BridgeBookmarks: BridgeNamespace {
             }
         }
         // A folder.
-        let name = title.isEmpty ? "New Folder" : title
+        let name = title.isEmpty ? String(localized: "New Folder", comment: "Name of a folder an extension makes without giving it one.") : title
         switch parentID {
         case Self.spaces, Self.root: return "s:\(library.addSpace(name: name).id)"
         case Self.favorites: throw BridgeError("Favorites hold pages, not folders")

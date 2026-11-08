@@ -103,7 +103,7 @@ final class ExtensionHost: NSObject {
 
     /// The extension's name, for saying who's asking (a keep-awake, a notification).
     func displayName(for id: String) -> String {
-        context(for: id)?.webExtension.displayName ?? installed[id]?.displayName ?? "an extension"
+        context(for: id)?.webExtension.displayName ?? installed[id]?.displayName ?? String(localized: "an extension", comment: "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”.")
     }
 
     func unload(_ id: String) {
@@ -302,7 +302,7 @@ final class ExtensionHost: NSObject {
                     }
                 })
             }
-            Toast.show("\(attention.title): in its settings, choose Browser, then Add Browser", symbol: "exclamationmark.triangle",
+            Toast.show(String(localized: "\(attention.title): in its settings, choose Browser, then Add Browser", comment: "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings."), symbol: "exclamationmark.triangle",
                        action: open, duration: 6, in: controller)
         }
         // "When you click it": clicking gives it this site from now on.
@@ -394,26 +394,26 @@ final class ExtensionHost: NSObject {
         if type == "BrowserVerificationFailed", !Self.toldAboutVerification,
            let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
             Self.toldAboutVerification = true
-            Toast.show("1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag.",
-                       symbol: "exclamationmark.triangle", action: ("Open 1Password", {
+            Toast.show(String(localized: "1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag.", comment: "Toast when the 1Password app turns Zigzag away. Settings › Browser › Add Browser are names in 1Password; match 1Password's own translation."),
+                       symbol: "exclamationmark.triangle", action: (String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), {
                            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
                                NSWorkspace.shared.openApplication(at: app, configuration: .init())
                            }
                        }), duration: 15, in: controller)
         }
         setAttention(type == "BrowserVerificationFailed" ? Attention(
-            title: "Connect 1Password to Zigzag",
-            message: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.",
-            buttonTitle: "Open 1Password", appBundleID: "com.1password.1password") : nil, for: id)
+            title: String(localized: "Connect 1Password to Zigzag", comment: "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag."),
+            message: String(localized: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.", comment: "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password."),
+            buttonTitle: String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), appBundleID: "com.1password.1password") : nil, for: id)
     }
 
     /// An extension asked for its companion app, and that app isn't on this Mac.
     fileprivate func companionAppMissing(for context: WKWebExtensionContext) {
-        let name = context.webExtension.displayName ?? "This extension"
+        let name = context.webExtension.displayName ?? String(localized: "This extension", comment: "Stands in for an extension's name when it has none, at the start of a sentence.")
         setAttention(Attention(
-            title: "\(name) needs its app",
-            message: "\(name) works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag.",
-            buttonTitle: "OK", appBundleID: nil), for: context.uniqueIdentifier)
+            title: String(localized: "\(name) needs its app", comment: "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."),
+            message: String(localized: "\(name) works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag.", comment: "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."),
+            buttonTitle: String(localized: "OK", comment: "Button that closes the note about an extension's missing app."), appBundleID: nil), for: context.uniqueIdentifier)
     }
 
     // MARK: Event fan-out from our model
@@ -1035,8 +1035,8 @@ final class NativeMessagingHost {
             guard id == ExtensionStore.onePasswordID, !Self.pointedAtApp,
                   let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
             Self.pointedAtApp = true
-            Toast.show("1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks.",
-                       symbol: "lock.open", action: ("Open 1Password", {
+            Toast.show(String(localized: "1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks.", comment: "Toast when the 1Password extension waits on the 1Password app."),
+                       symbol: "lock.open", action: (String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), {
                            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
                                NSWorkspace.shared.openApplication(at: app, configuration: .init())
                            }

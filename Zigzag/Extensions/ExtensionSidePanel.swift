@@ -8,7 +8,7 @@ final class ExtensionSidePanelView: NSView {
     private let header = NSView()
     private let icon = NSImageView()
     private let title = Label("", font: Tokens.Font.body(.semibold))
-    private let close = IconButton(symbol: "xmark", size: .compact, toolTip: "Close Side Panel")
+    private let close = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Close Side Panel", comment: "Tooltip of the close button on an extension's side panel."))
     private let separator = CALayer()
     private(set) var webView: WKWebView?
     /// The extension the panel belongs to.
@@ -45,7 +45,7 @@ final class ExtensionSidePanelView: NSView {
         self.extensionID = extensionID
         title.stringValue = name
         icon.image = image ?? Tokens.Symbol.image("puzzlepiece.extension", size: 14)
-        setAccessibilityLabel("\(name) side panel")
+        setAccessibilityLabel(String(localized: "\(name) side panel", comment: "What VoiceOver calls an extension's side panel. The placeholder is the extension's name."))
         addSubview(webView, positioned: .below, relativeTo: header)
         needsLayout = true
     }
