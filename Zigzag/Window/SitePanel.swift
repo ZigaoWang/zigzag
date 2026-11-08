@@ -377,6 +377,21 @@ final class SitePanel: FloatingPanelView {
     private func layoutContent() { _ = layoutContent(dryRun: false) }
 
     @discardableResult
+    /// The site's name at its size, a little smaller when it's long, and past that cut with an ellipsis, never
+    /// clipped mid-letter.
+    private static func fitted(_ name: String, in width: CGFloat) -> NSAttributedString {
+        for size in stride(from: CGFloat(20), through: 15, by: -1) {
+            let text = Tokens.Font.voiceText(name, size: size)
+            if text.size().width <= width || size == 15 {
+                guard text.size().width > width else { return text }
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.lineBreakMode = .byTruncatingTail
+                return Tokens.Font.voiceText(name, size: size, paragraph: paragraph)
+            }
+        }
+        return Tokens.Font.voiceText(name, size: 20)
+    }
+
     fileprivate func layoutContent(dryRun: Bool) -> CGFloat {
         func place(_ view: NSView, _ rect: NSRect) { if !dryRun { view.frame = rect } }
         let inner = width - pad * 2
@@ -389,6 +404,7 @@ final class SitePanel: FloatingPanelView {
         place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
         let textWidth = width - textX - pad - moreSide
+        siteName.attributedStringValue = Self.fitted(site, in: textWidth)
         place(siteName, NSRect(x: textX, y: y, width: textWidth, height: siteName.lineHeight))
         let lockSide: CGFloat = 10
         place(securityIcon, NSRect(x: textX, y: y + siteName.lineHeight + 3, width: lockSide, height: lockSide))
