@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Importing from Arc brings over everything in your sidebar, whether or not Arc's sync is on: each space's name, pinned tabs, folders like Imported From Chrome with every page inside, and Favorites, in Arc's order. Arc keeps several copies of the sidebar; Zigzag now reads them all and keeps the fullest, where before it could read a stale one and bring over empty or half-empty spaces.
+- Importing from Arc again keeps Arc's folders in a space you already have, and puts back in their folders any pages an earlier import left loose.
 
 ## [0.6.1] - 2026-11-08
 
