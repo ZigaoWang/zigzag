@@ -44,6 +44,7 @@ enum SettingsPage {
 
     /// What the tab's web view shows under Settings: just its name, and the page's surface so nothing flashes.
     static var html: String {
-        #"<!doctype html><meta charset="utf-8"><title>Settings</title><style>"# + PageStyle.css(theme: .brand) + "</style>"
+        let title = String(localized: "Settings", comment: "Title of the Settings page, also its tab's name.")
+        return #"<!doctype html><meta charset="utf-8"><title>"# + title + "</title><style>" + PageStyle.css(theme: .brand) + "</style>"
     }
 }

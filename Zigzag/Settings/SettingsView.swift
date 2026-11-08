@@ -184,10 +184,10 @@ final class FormRow: NSView, SettingsSearchable {
 enum SettingsVersionRow {
     static func make() -> FormRow {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        let update = PillButton(title: "Check for Updates…")
+        let update = PillButton(title: String(localized: "Check for Updates…", comment: "Button in Settings › General, beside Zigzag's version."))
         update.onClick = { _ in Updater.shared.checkForUpdates() }
-        let row = FormRow(title: "Zigzag", detail: "Version \(version)", control: update)
-        row.keywords = "check for updates"
+        let row = FormRow(title: "Zigzag", detail: String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General."), control: update)
+        row.keywords = String(localized: "check for updates", comment: "Words that find the version row with Find a setting in Settings. Not shown.")
         return row
     }
 
@@ -195,8 +195,10 @@ enum SettingsVersionRow {
     static func betas() -> FormRow {
         let toggle = Toggle(isOn: Updater.getsBetas)
         toggle.onChange = { on in Updater.getsBetas = on }
-        let row = FormRow(title: "Beta updates", detail: "Try new versions first, on your own tabs and data.", control: toggle)
-        row.keywords = "beta channel prerelease"
+        let row = FormRow(title: String(localized: "Beta updates", comment: "A setting in Settings › General."),
+                          detail: String(localized: "Try new versions first, on your own tabs and data.", comment: "Explanation under “Beta updates” in Settings › General."),
+                          control: toggle)
+        row.keywords = String(localized: "beta channel prerelease", comment: "Words that find the Beta updates setting with Find a setting in Settings. Not shown.")
         return row
     }
 
@@ -205,21 +207,25 @@ enum SettingsVersionRow {
         guard let date = ProfileBackup.latestDate else { return nil }
         let formatter = DateFormatter()
         formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
-        var detail = "Saved \(formatter.string(from: date))"
+        let saved = formatter.string(from: date)
+        var detail = String(localized: "Saved \(saved)", comment: "Under “Restore from before the last update” in Settings › General: when the backup was made.")
         if let name = ProfileBackup.latest?.lastPathComponent, let space = name.firstIndex(of: " ") {
-            detail += ", before updating from \(name[name.index(after: space)...])"
+            let version = String(name[name.index(after: space)...])
+            detail = String(localized: "Saved \(saved), before updating from \(version)",
+                            comment: "Under “Restore from before the last update” in Settings › General: when the backup was made, and the version updated from.")
         }
-        let button = PillButton(title: "Restore…")
+        let button = PillButton(title: String(localized: "Restore…", comment: "Button in Settings › General that restores the backup from before the last update."))
         button.onClick = { [weak button] _ in
             guard let host = button?.window?.contentView else { return }
-            ConfirmSheet.show(in: host, title: "Restore from before the last update?",
-                              message: "Your spaces, tabs, favorites and history go back to how they were before the last update, and Zigzag restarts. Logins and passwords aren’t affected.",
-                              confirmTitle: "Restore and Restart") { confirmed in
+            ConfirmSheet.show(in: host, title: String(localized: "Restore from before the last update?", comment: "Title of the sheet that restores the backup."),
+                              message: String(localized: "Your spaces, tabs, favorites and history go back to how they were before the last update, and Zigzag restarts. Logins and passwords aren’t affected.",
+                                              comment: "Message of the sheet that restores the backup."),
+                              confirmTitle: String(localized: "Restore and Restart", comment: "Button of the sheet that restores the backup.")) { confirmed in
                 if confirmed { ProfileBackup.restoreLatestAndRelaunch() }
             }
         }
-        let row = FormRow(title: "Restore from before the last update", detail: detail, control: button)
-        row.keywords = "backup undo update rollback"
+        let row = FormRow(title: String(localized: "Restore from before the last update", comment: "A setting in Settings › General."), detail: detail, control: button)
+        row.keywords = String(localized: "backup undo update rollback", comment: "Words that find the restore row with Find a setting in Settings. Not shown.")
         return row
     }
 }
@@ -243,8 +249,9 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     private let tile = NSImageView()
     private let name: Label
     private let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
-    private let editButton = PillButton(title: "Edit")
-    private let deleteButton = IconButton(symbol: "trash", size: .compact, toolTip: "Delete Space")
+    private let editButton = PillButton(title: String(localized: "Edit", comment: "Button on a space's row in Settings › Spaces."))
+    private let deleteButton = IconButton(symbol: "trash", size: .compact,
+                                          toolTip: String(localized: "Delete Space", comment: "Tooltip of the trash button on a space's row in Settings › Spaces."))
     /// True while the row is being dragged; it draws as lifted.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
     /// True while any space is carried: rows sliding under the pointer don't count as hovered.
@@ -343,20 +350,24 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     private static func summary(of space: SpaceInfo) -> String {
         let pinned = space.bookmarks.count
         let open = BrowserWindowController.undoTarget?.tabManager.tabs(in: space.id).count ?? 0
-        func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
+        let pinnedTabs = String(localized: "\(pinned) pinned tabs", comment: "Under a space's name in Settings › Spaces.")
+        let openTabs = String(localized: "\(open) open tabs", comment: "Under a space's name in Settings › Spaces.")
         switch (pinned, open) {
-        case (0, 0): return "Empty"
-        case (_, 0): return count(pinned, "pinned tab", "pinned tabs")
-        case (0, _): return count(open, "open tab", "open tabs")
-        default: return count(pinned, "pinned tab", "pinned tabs") + " and " + count(open, "open tab", "open tabs")
+        case (0, 0): return String(localized: "Empty", comment: "Under a space's name in Settings › Spaces: it has no tabs.")
+        case (_, 0): return pinnedTabs
+        case (0, _): return openTabs
+        default: return String(localized: "\(pinnedTabs) and \(openTabs)",
+                               comment: "Under a space's name in Settings › Spaces: its pinned tabs, then its open tabs, like “3 pinned tabs and 2 open tabs”.")
         }
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
-        menu.addItem(SidebarMenus.Item("Edit Space…") { [weak self] in self?.openEditor() })
+        menu.addItem(SidebarMenus.Item(String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
+            self?.openEditor()
+        })
         if Library.shared.spaces.count > 1 {
-            menu.addItem(SidebarMenus.Item("Delete Space…") { [weak self] in
+            menu.addItem(SidebarMenus.Item(String(localized: "Delete Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
                 guard let self, let host = self.host else { return }
                 SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
             })
@@ -407,10 +418,13 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         // The sidebar deletes right away, ⌘Z being right there. Here Undo is in a browser window, or with none open
         // nowhere at all, so it asks first and says which.
         let undoable = BrowserWindowController.undoTarget != nil
-        ConfirmSheet.show(in: host, title: "Delete “\(space.name)”?",
-                          message: undoable ? "Its tabs and pinned tabs close. You can bring them back with Undo in a browser window."
-                                            : "Its tabs and pinned tabs close. This can’t be undone.",
-                          confirmTitle: "Delete Space", destructive: true) { confirmed in
+        ConfirmSheet.show(in: host, title: String(localized: "Delete “\(space.name)”?", comment: "Title of the sheet that deletes a space from Settings; the space's name."),
+                          message: undoable
+                              ? String(localized: "Its tabs and pinned tabs close. You can bring them back with Undo in a browser window.",
+                                       comment: "Message of the sheet that deletes a space from Settings.")
+                              : String(localized: "Its tabs and pinned tabs close. This can’t be undone.", comment: "Message of the sheet that deletes a space from Settings."),
+                          confirmTitle: String(localized: "Delete Space", comment: "Button of the sheet that deletes a space from Settings."),
+                          destructive: true) { confirmed in
             guard confirmed else { return }
             if let controller = BrowserWindowController.undoTarget { controller.removeSpaceWithUndo(id) } else { Library.shared.removeSpace(id) }
         }
@@ -425,13 +439,13 @@ enum SettingsPane: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .general: "General"
-        case .spaces: "Spaces"
-        case .passwords: "Passwords"
-        case .privacy: "Privacy"
-        case .translation: "Translation"
-        case .extensions: "Extensions"
-        case .shortcuts: "Shortcuts"
+        case .general: String(localized: "General", comment: "A section of Settings.")
+        case .spaces: String(localized: "Spaces", comment: "A section of Settings.")
+        case .passwords: String(localized: "Passwords", comment: "A section of Settings.")
+        case .privacy: String(localized: "Privacy", comment: "A section of Settings.")
+        case .translation: String(localized: "Translation", comment: "A section of Settings: translating web pages.")
+        case .extensions: String(localized: "Extensions", comment: "A section of Settings.")
+        case .shortcuts: String(localized: "Shortcuts", comment: "A section of Settings: keyboard shortcuts.")
         }
     }
 
@@ -473,7 +487,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The chosen section's fill, gliding to the one you pick.
     private let sectionSelection = SelectionGlide()
     /// The wordmark and "Settings" at the top of the column, where History has its own.
-    private let columnTitle = PageTitleView("Settings")
+    private let columnTitle = PageTitleView(String(localized: "Settings", comment: "Title of the Settings page, also its tab's name."))
     /// Over the chosen section: its name, and the search at the right, as History's header has them.
     private let header = PageHeader()
     private let paneTitle = PageTitleView("")
@@ -482,7 +496,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let documentView = FlippedView()
     private(set) var pane = SettingsPane.general
     /// Finds a setting in any section, at the top right of the page.
-    private let settingSearch = FilledField.search("Find a setting")
+    private let settingSearch = FilledField.search(String(localized: "Find a setting", comment: "Placeholder of the search field at the top of Settings."))
     /// You picked another section: the tab's address follows, so the tab comes back to it.
     var onPaneChange: ((SettingsPane) -> Void)?
 
@@ -523,10 +537,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         field.heightAnchor.constraint(equalToConstant: Tokens.Page.controlHeight).isActive = true
         return field
     }()
-    private lazy var customSearchRow = FormRow(title: "Search address", detail: "Put %s where the words you search for go.", control: customSearch)
+    private lazy var customSearchRow = FormRow(title: String(localized: "Search address", comment: "A setting in Settings › General, shown when the search engine is Custom."),
+                                               detail: String(localized: "Put %s where the words you search for go.",
+                                                              comment: "Explanation under “Search address” in Settings › General. Keep %s as it is: it's what the address uses."),
+                                               control: customSearch)
     private let archiveAfter = DropdownButton()
-    private let defaultButton = PillButton(title: "Set as Default")
-    private let defaultStatus = StatusLabel("Zigzag is your default browser")
+    private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
+    private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
     private let pipToggle = Toggle()
     private let suggestionsToggle = Toggle()
@@ -543,9 +560,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translateOffer = Toggle()
     private let translateInto = DropdownButton()
     private var languages: [(id: String, name: String)] = []
-    private let addSpaceButton = PillButton(title: "New Space")
-    private let getExtensionsButton = PillButton(title: "Get Extensions")
-    private let loadUnpackedButton = PillButton(title: "Load Unpacked…")
+    private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
+    private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
+    private let loadUnpackedButton = PillButton(title: String(localized: "Load Unpacked…", comment: "Button in Settings › Extensions, in developer mode: loads an extension from a folder."))
     private var spaceRows: [SpaceSettingsRow] = []
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
@@ -622,38 +639,62 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         versionGroup.add(SettingsVersionRow.make())
         versionGroup.add(SettingsVersionRow.betas())
         if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
-        generalGroup.add(FormRow(title: "Search engine", detail: "Used when what you type isn’t an address.", control: engine))
+        generalGroup.add(FormRow(title: String(localized: "Search engine", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "Used when what you type isn’t an address.", comment: "Explanation under “Search engine” in Settings › General."),
+                                 control: engine))
         generalGroup.add(customSearchRow)
         refreshCustomSearch()
         suggestionsToggle.onChange = { on in SuggestionFetcher.isOn = on }
-        generalGroup.add(FormRow(title: "Search suggestions", detail: "What you type in the address bar is sent to your search engine for suggestions.", control: suggestionsToggle))
+        generalGroup.add(FormRow(title: String(localized: "Search suggestions", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "What you type in the address bar is sent to your search engine for suggestions.", comment: "Explanation under “Search suggestions” in Settings › General."),
+                                 control: suggestionsToggle))
         // Searching a site with Tab is taught where it's used (the address bar shows the key), not listed here.
-        generalGroup.add(FormRow(title: "Default browser", detail: "Links from other apps open here.", control: defaultControl))
+        generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
+                                 control: defaultControl))
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
         downloadPlaceToken = DownloadPlace.changed.observe { [weak self] in self?.refreshDownloadPlace() }
         archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
-        tabsGroup.add(FormRow(title: "Archive tabs you haven’t used", detail: "They leave the sidebar. Type a few letters in the address bar to bring one back.", control: archiveAfter))
-        tabsGroup.add(FormRow(title: "Keep videos playing when you switch tabs", detail: "A playing video floats in its own window until you come back.", control: pipToggle))
-        downloadsGroup.add(FormRow(title: "Save downloads to", detail: "Or have Zigzag ask where, each time.", control: downloadPlace))
+        tabsGroup.add(FormRow(title: String(localized: "Archive tabs you haven’t used", comment: "A setting in Settings › General."),
+                              detail: String(localized: "They leave the sidebar. Type a few letters in the address bar to bring one back.", comment: "Explanation under “Archive tabs you haven’t used” in Settings › General."),
+                              control: archiveAfter))
+        tabsGroup.add(FormRow(title: String(localized: "Keep videos playing when you switch tabs", comment: "A setting in Settings › General."),
+                              detail: String(localized: "A playing video floats in its own window until you come back.", comment: "Explanation under “Keep videos playing when you switch tabs” in Settings › General."),
+                              control: pipToggle))
+        downloadsGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
+                                   detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
+                                   control: downloadPlace))
         // EasyList's licence asks for credit; this is where people look for what does the blocking.
-        blockingGroup.add(FormRow(title: "Block ads and trackers", detail: "Uses EasyList and EasyPrivacy, by the EasyList authors.", control: blockingToggle))
+        blockingGroup.add(FormRow(title: String(localized: "Block ads and trackers", comment: "A setting in Settings › Privacy."),
+                                  detail: String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy."),
+                                  control: blockingToggle))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
-        let importButton = PillButton(title: "Import…")
+        let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
         importButton.onClick = { _ in ImportWindowController.show() }
-        importGroup.add(FormRow(title: "Import from another browser", detail: "Passwords, bookmarks and history. The other browser isn’t changed.", control: importButton))
+        importGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
+                                control: importButton))
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
         borderlessToggle.onChange = { on in BrowserRootView.isBorderless = on }
-        windowGroup.add(FormRow(title: "Borderless page", detail: "The page meets the window’s edges instead of floating inside it.", control: borderlessToggle))
+        windowGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › General."),
+                                detail: String(localized: "The page meets the window’s edges instead of floating inside it.", comment: "Explanation under “Borderless page” in Settings › General."),
+                                control: borderlessToggle))
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
-        windowGroup.add(FormRow(title: "Large space names", detail: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", control: largeNamesToggle))
-        windowGroup.add(FormRow(title: "Ask before quitting", detail: "So ⌘Q never closes everything by accident.", control: quitToggle))
+        windowGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › General."),
+                                control: largeNamesToggle))
+        windowGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
+                                detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
+                                control: quitToggle))
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
-        windowGroup.add(FormRow(title: "Reduce motion", detail: "Things appear in place instead of sliding or growing. Fades stay.", control: motionToggle))
+        windowGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › General."),
+                                control: motionToggle))
 
         // Passwords
         saveToggle.onChange = { [weak self] on in
@@ -769,7 +810,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The header's title: the chosen section, or "results" while a search goes through all of them (the column
     /// already says "settings").
     private func refreshTitle() {
-        paneTitle.title = isSearching ? "Results" : pane.title
+        paneTitle.title = isSearching ? String(localized: "Results", comment: "Title of Settings while it shows what Find a setting found.") : pane.title
         header.needsLayout = true
     }
 
@@ -881,9 +922,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
         if installed.isEmpty {
-            let get = PillButton(title: "Get Extensions")
+            let get = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
             get.onClick = { [weak self] _ in self?.getExtensions() }
-            extensionsGroup.add(FormRow(title: "No extensions yet", detail: "Find one in the Chrome Web Store and choose Add to Zigzag.", control: get))
+            extensionsGroup.add(FormRow(title: String(localized: "No extensions yet", comment: "A setting in Settings › Extensions."),
+                                        detail: String(localized: "Find one in the Chrome Web Store and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions."),
+                                        control: get))
         }
         for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
         let developer = Toggle(isOn: ExtensionStore.developerMode)
@@ -891,14 +934,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ExtensionStore.developerMode = on
             self?.reloadExtensions()
         }
-        developerGroup.add(FormRow(title: "Developer mode", detail: "Load an extension from a folder to test it.", control: developer))
+        developerGroup.add(FormRow(title: String(localized: "Developer mode", comment: "A setting in Settings › Extensions."),
+                                   detail: String(localized: "Load an extension from a folder to test it.", comment: "Explanation under “Developer mode” in Settings › Extensions."),
+                                   control: developer))
     }
 
     @available(macOS 15.4, *)
     private func extensionRow(id: String, ext: WKWebExtension) -> FormRow {
         var controls: [NSView] = []
         if ExtensionStore.needsApproval(id) {
-            let review = PillButton(title: "Review Update")
+            let review = PillButton(title: String(localized: "Review Update", comment: "Button on an extension's row in Settings › Extensions, when its update asks for more access."))
             review.onClick = { [weak self] _ in
                 guard let controller = self?.browser else { return }
                 controller.window?.makeKeyAndOrderFront(nil)
@@ -907,11 +952,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.append(review)
         }
         if ExtensionStore.isUnpacked(id) {
-            let reload = IconButton(symbol: "arrow.clockwise", size: .compact, toolTip: "Reload from Its Folder")
+            let reload = IconButton(symbol: "arrow.clockwise", size: .compact, toolTip: String(localized: "Reload from Its Folder", comment: "Tooltip of the reload button on an unpacked extension's row in Settings › Extensions."))
             reload.onClick = { _ in Task { await ExtensionStore.reloadUnpacked(id) } }
             controls.append(reload)
         }
-        let remove = IconButton(symbol: "trash", size: .compact, toolTip: "Remove from Zigzag")
+        let remove = IconButton(symbol: "trash", size: .compact,
+                                toolTip: String(localized: "Remove from Zigzag", comment: "Tooltip of the trash button on an extension's row in Settings › Extensions."))
         remove.onClick = { [weak self] _ in if let self { ConfirmSheet.removeExtension(id: id, name: ext.displayName, in: self) } }
         controls.append(remove)
         let toggle = Toggle(isOn: ExtensionStore.isEnabled(id))
@@ -921,19 +967,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         stack.spacing = Tokens.Space.x2
 
         // What matters about it at a glance, as one plain sentence.
-        var detail: [String] = [ext.version.map { "Version \($0)" } ?? ""].filter { !$0.isEmpty }
-        if ExtensionStore.isUnpacked(id) { detail.append("Unpacked") }
-        if ExtensionStore.needsApproval(id) { detail.append("Update wants more access") }
+        var detail: [String] = [ext.version.map { String(localized: "Version \($0)", comment: "An extension's version, under its name in Settings › Extensions.") } ?? ""]
+            .filter { !$0.isEmpty }
+        if ExtensionStore.isUnpacked(id) {
+            detail.append(String(localized: "Unpacked", comment: "Under an extension's name in Settings › Extensions: it was loaded from a folder."))
+        }
+        if ExtensionStore.needsApproval(id) {
+            detail.append(String(localized: "Update wants more access", comment: "Under an extension's name in Settings › Extensions."))
+        }
         var limitsNote: String?
         if let manifest = ExtensionStore.manifest(for: id) {
             let limits = ExtensionReport(extension: ext, manifest: manifest, id: id).limits
             if !limits.isEmpty {
-                detail.append(limits.count == 1 ? "1 feature won’t work here" : "\(limits.count) features won’t work here")
-                let names = limits.map { $0.prefix(1).lowercased() + $0.dropFirst() }
-                limitsNote = "Won’t work in Zigzag: " + ListFormatter.localizedString(byJoining: names) + "."
+                detail.append(String(localized: "\(limits.count) features won’t work here", comment: "Under an extension's name in Settings › Extensions."))
+                let names = Words.list(limits.map { $0.prefix(1).lowercased() + $0.dropFirst() })
+                limitsNote = String(localized: "Won’t work in Zigzag: \(names).",
+                                    comment: "Tooltip of an extension's row in Settings › Extensions: a list of the features Zigzag lacks.")
             }
         }
-        let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? "" : ListFormatter.localizedString(byJoining: detail), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        let row = FormRow(title: ext.displayName ?? id, detail: detail.isEmpty ? "" : Words.list(detail), icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
         row.toolTip = limitsNote
         return row
     }
@@ -943,13 +995,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.prompt = "Load"
-        panel.message = "Choose the folder that contains the extension’s manifest.json."
+        panel.prompt = String(localized: "Load", comment: "Button of the panel that loads an unpacked extension from a folder.")
+        panel.message = String(localized: "Choose the folder that contains the extension’s manifest.json.",
+                               comment: "Message of the panel that loads an unpacked extension. manifest.json is a file name.")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor in
                 if await ExtensionStore.loadUnpacked(url) == nil, let host = self {
-                    ConfirmSheet.notice(in: host, title: "Couldn’t load this extension", message: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.")
+                    ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),
+                                        message: String(localized: "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it.",
+                                                        comment: "Message of the notice when an unpacked extension can't load. manifest.json is a file name."))
                 }
             }
         }
@@ -978,31 +1033,52 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
         let manager = PasswordManagers.active
-        let saveNote = manager != nil && !PasswordCapture.offersToSave ? "Off while \(manager!) handles passwords. Turn on to use both." : "After you sign in. Kept in your Keychain, synced with iCloud."
-        let fillNote = manager != nil && !Autofill.isOn ? "Off while \(manager!) handles passwords. Turn on to use both." : "Under sign-in fields, only on the site each was saved for."
-        passwordsGroup.add(FormRow(title: "Offer to save passwords", detail: saveNote, control: saveToggle))
-        passwordsGroup.add(FormRow(title: "Fill saved passwords", detail: fillNote, control: fillToggle))
+        let managerNote = manager.map {
+            String(localized: "Off while \($0) handles passwords. Turn on to use both.",
+                   comment: "Under a password setting in Settings › Passwords, while a password manager extension (its name, like 1Password) is on.")
+        }
+        let saveNote = manager != nil && !PasswordCapture.offersToSave ? managerNote!
+            : String(localized: "After you sign in. Kept in your Keychain, synced with iCloud.", comment: "Explanation under “Offer to save passwords” in Settings › Passwords.")
+        let fillNote = manager != nil && !Autofill.isOn ? managerNote!
+            : String(localized: "Under sign-in fields, only on the site each was saved for.", comment: "Explanation under “Fill saved passwords” in Settings › Passwords.")
+        passwordsGroup.add(FormRow(title: String(localized: "Offer to save passwords", comment: "A setting in Settings › Passwords."),
+                                   detail: saveNote,
+                                   control: saveToggle))
+        passwordsGroup.add(FormRow(title: String(localized: "Fill saved passwords", comment: "A setting in Settings › Passwords."),
+                                   detail: fillNote,
+                                   control: fillToggle))
         cardToggle.isOn = ContactCard.isOn
         cardToggle.onChange = { on in ContactCard.isOn = on }
-        passwordsGroup.add(FormRow(title: "Fill forms from My Card", detail: "Your name, email, phone and address, from your own card in Contacts.", control: cardToggle))
-        let open = PillButton(title: "Open Passwords")
+        passwordsGroup.add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
+                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
+                                   control: cardToggle))
+        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
         open.onClick = { _ in PasswordsWindowController.show() }
         // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: "Saved passwords", detail: "See, edit, import and export them.", control: open))
+        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
+                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
+                                         control: open))
     }
 
     private func reloadTranslation() {
         translationGroup.removeAllRows()
         alwaysGroup.removeAllRows()
         let system = Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
-        translateInto.options = [DropdownButton.Option(title: "\(PageTranslator.name(of: system)) (System)", image: nil)] + languages.map { DropdownButton.Option(title: $0.name, image: nil) }
+        let systemName = PageTranslator.name(of: system)
+        translateInto.options = [DropdownButton.Option(title: String(localized: "\(systemName) (System)",
+                                                                     comment: "The first choice of Translate pages into, in Settings › Translation: the Mac's language, by name."), image: nil)]
+            + languages.map { DropdownButton.Option(title: $0.name, image: nil) }
         translateInto.selectedIndex = PageTranslator.chosenLanguage.flatMap { chosen in languages.firstIndex { $0.id == chosen }.map { $0 + 1 } } ?? 0
         translateOffer.isOn = PageTranslator.offers
-        translationGroup.add(FormRow(title: "Translate pages into", detail: "The language you read.", control: translateInto))
-        translationGroup.add(FormRow(title: "Offer to translate", detail: "When a page is in another language, Zigzag asks once per site.", control: translateOffer))
+        translationGroup.add(FormRow(title: String(localized: "Translate pages into", comment: "A setting in Settings › Translation."),
+                                     detail: String(localized: "The language you read.", comment: "Explanation under “Translate pages into” in Settings › Translation."),
+                                     control: translateInto))
+        translationGroup.add(FormRow(title: String(localized: "Offer to translate", comment: "A setting in Settings › Translation."),
+                                     detail: String(localized: "When a page is in another language, Zigzag asks once per site.", comment: "Explanation under “Offer to translate” in Settings › Translation."),
+                                     control: translateOffer))
         let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
         // Laid out like Sites in Privacy: a heading, Reset All beside it only when there's something to reset.
-        let reset = PillButton(title: "Reset All")
+        let reset = PillButton(title: String(localized: "Reset All", comment: "Button beside Always Translate in Settings › Translation."))
         reset.onClick = { [weak self] _ in
             PageTranslator.alwaysLanguages = []
             self?.reloadTranslation()
@@ -1010,8 +1086,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         alwaysReset = always.isEmpty ? nil : reset
         alwaysGroup.add(always.isEmpty
-            ? FormRow(title: "None yet", detail: "To always translate a language, choose it in a page’s site controls.", control: NSView())
-            : FormRow(title: ListFormatter.localizedString(byJoining: always), detail: "Pages in these languages are translated as soon as they open.", control: NSView()))
+            ? FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
+                      detail: String(localized: "To always translate a language, choose it in a page’s site controls.", comment: "Under Always Translate in Settings › Translation."),
+                      control: NSView())
+            : FormRow(title: Words.list(always),
+                      detail: String(localized: "Pages in these languages are translated as soon as they open.", comment: "Under the list of languages in Settings › Translation."),
+                      control: NSView()))
     }
 
     // MARK: Shortcuts
@@ -1027,7 +1107,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     if let sub = item.submenu { walk(sub, prefix: item.title + " › "); continue }
                     // Items with keys, and ones whose keys you took away (so you can give them back).
                     guard !item.isAlternate, !item.keyEquivalent.isEmpty || Shortcuts.isCustom(item),
-                          !item.isHidden || item.title.hasPrefix("Close Tabs") else { continue }
+                          !item.isHidden || item.action == #selector(BrowserWindowController.closeTabsBelow(_:)) else { continue }
                     // A list of what each key does doesn't need the menu's "…".
                     let title = prefix + (item.title.hasSuffix("…") ? String(item.title.dropLast()) : item.title)
                     let row = ShortcutRow(title: title, item: item)
@@ -1040,8 +1120,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
             }
             walk(menu, prefix: "")
-            if top.title == "View" {
-                for (title, keys) in [("Go to Tab 1 to 8 or the Last Tab", ["⌘", "1–9"]), ("Go to Space 1 to 9", ["⌃", "1–9"])] {
+            // The View menu, found by what it holds rather than by its name.
+            if menu.items.contains(where: { $0.action == #selector(BrowserWindowController.selectTabByNumber(_:)) }) {
+                for (title, keys) in [(String(localized: "Go to Tab 1 to 8 or the Last Tab", comment: "A shortcut in Settings › Shortcuts, under View."), ["⌘", "1–9"]),
+                                      (String(localized: "Go to Space 1 to 9", comment: "A shortcut in Settings › Shortcuts, under View."), ["⌃", "1–9"])] {
                     group.add(ShortcutRow(title: title, keys: keys))
                 }
             }
@@ -1088,15 +1170,48 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         window?.makeFirstResponder(settingSearch.field)
     }
 
+    // The groups' headings, each said once for the page and its search.
+    private static var tabsHeading: String { String(localized: "Tabs", comment: "A heading in Settings › General.") }
+    private static var windowHeading: String { String(localized: "Window", comment: "A heading in Settings › General.") }
+    private static var downloadsHeading: String { String(localized: "Downloads", comment: "A heading in Settings › General.") }
+    private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
+    private static var browsingDataHeading: String { String(localized: "Browsing Data", comment: "A heading in Settings › Privacy.") }
+    private static var siteDataHeading: String { String(localized: "Site Data", comment: "A heading in Settings › Privacy: what each site keeps on this Mac.") }
+    private static var sitesHeading: String { String(localized: "Sites", comment: "A heading in Settings › Privacy: choices made for single sites.") }
+    private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
+    private static var installedHeading: String { String(localized: "Installed", comment: "A heading in Settings › Extensions: the extensions you have.") }
+    /// What a button says for a moment once it has cleared something.
+    private static var cleared: String { String(localized: "Cleared", comment: "Shown on a Clear button in Settings › Privacy for a moment after it clears.") }
+
+    /// A permission chosen for a site, as Settings › Privacy › Sites lists it: "camera allowed".
+    private static func siteChoice(_ kind: String, allowed: Bool) -> String? {
+        switch (kind, allowed) {
+        case ("camera", true): String(localized: "camera allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("camera", false): String(localized: "camera blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("microphone", true): String(localized: "microphone allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("microphone", false): String(localized: "microphone blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("cameraAndMicrophone", true): String(localized: "camera and microphone allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("cameraAndMicrophone", false): String(localized: "camera and microphone blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("location", true): String(localized: "location allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("location", false): String(localized: "location blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("notifications", true): String(localized: "notifications allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("notifications", false): String(localized: "notifications blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("popups", true): String(localized: "pop-ups allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        case ("popups", false): String(localized: "pop-ups blocked", comment: "A choice made for a site in Settings › Privacy, in a list of them.")
+        default: nil
+        }
+    }
+
     /// Each section's groups and their headings, as a search goes through them.
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
-        case .general: [(nil, generalGroup), ("Tabs", tabsGroup), ("Window", windowGroup), ("Downloads", downloadsGroup), (nil, importGroup), (nil, versionGroup)]
-        case .spaces: [("Your Spaces", spacesGroup)]
+        case .general: [(nil, generalGroup), (Self.tabsHeading, tabsGroup), (Self.windowHeading, windowGroup), (Self.downloadsHeading, downloadsGroup),
+                        (nil, importGroup), (nil, versionGroup)]
+        case .spaces: [(Self.spacesHeading, spacesGroup)]
         case .passwords: [(nil, passwordsGroup), (nil, passwordsWindowGroup)]
-        case .privacy: [(nil, blockingGroup), ("Browsing Data", privacyGroup), ("Site Data", siteDataGroup), ("Sites", sitesGroup)]
-        case .translation: [(nil, translationGroup), ("Always Translate", alwaysGroup)]
-        case .extensions: [("Installed", extensionsGroup), (nil, developerGroup)]
+        case .privacy: [(nil, blockingGroup), (Self.browsingDataHeading, privacyGroup), (Self.siteDataHeading, siteDataGroup), (Self.sitesHeading, sitesGroup)]
+        case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
+        case .extensions: [(Self.installedHeading, extensionsGroup), (nil, developerGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         }
     }
@@ -1155,7 +1270,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 y += Tokens.Space.x2
             }
             if !found {
-                let none = Label("No settings match “\(settingSearch.stringValue.trimmingCharacters(in: .whitespaces))”.", font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+                let words = settingSearch.stringValue.trimmingCharacters(in: .whitespaces)
+                let none = Label(String(localized: "No settings match “\(words)”.", comment: "In Settings when Find a setting finds nothing; what was typed."),
+                                 font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
                 none.frame = NSRect(x: pad - Label.inset, y: y, width: contentWidth, height: none.lineHeight)
                 documentView.addSubview(none)
                 y = none.frame.maxY + Tokens.Space.x6
@@ -1167,16 +1284,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         switch pane {
         case .general:
             section(nil, generalGroup)
-            section("Tabs", tabsGroup)
-            section("Window", windowGroup)
-            section("Downloads", downloadsGroup)
+            section(Self.tabsHeading, tabsGroup)
+            section(Self.windowHeading, windowGroup)
+            section(Self.downloadsHeading, downloadsGroup)
             section(nil, importGroup)
             section(nil, versionGroup)
         case .spaces:
-            section("Your Spaces", spacesGroup, accessory: addSpaceButton)
+            section(Self.spacesHeading, spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
-                let hint = Label("Drag a space to change its order.", font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
+                let hint = Label(String(localized: "Drag a space to change its order.", comment: "Hint under Your Spaces in Settings › Spaces."),
+                                 font: Tokens.Font.detail(), color: Tokens.Color.textTertiary)
                 hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y - Tokens.Page.groupGap + Tokens.Space.x2,
                                     width: contentWidth - Tokens.Page.groupPad, height: hint.lineHeight)
                 documentView.addSubview(hint)
@@ -1187,25 +1305,27 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(nil, passwordsWindowGroup)
         case .privacy:
             section(nil, blockingGroup)
-            section("Browsing Data", privacyGroup)
-            section("Site Data", siteDataGroup)
-            section("Sites", sitesGroup, accessory: sitesReset)
+            section(Self.browsingDataHeading, privacyGroup)
+            section(Self.siteDataHeading, siteDataGroup)
+            section(Self.sitesHeading, sitesGroup, accessory: sitesReset)
         case .translation:
             section(nil, translationGroup)
-            section("Always Translate", alwaysGroup, accessory: alwaysReset)
+            section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
             let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
             buttons.spacing = Tokens.Space.x2
-            section("Installed", extensionsGroup, accessory: buttons)
+            section(Self.installedHeading, extensionsGroup, accessory: buttons)
             section(nil, developerGroup)
         case .shortcuts:
-            let resetAll = PillButton(title: "Reset All…")
+            let resetAll = PillButton(title: String(localized: "Reset All…", comment: "Button in Settings › Shortcuts that puts every shortcut back."))
             resetAll.isHidden = !Shortcuts.hasChanges
             // Every shortcut you set, back to how Zigzag comes: asked first, as Sites' Reset All is.
             resetAll.onClick = { [weak self] _ in
-                self?.confirm(title: "Reset all shortcuts?", message: "Every shortcut you changed goes back to its default.", action: "Reset All") {
+                self?.confirm(title: String(localized: "Reset all shortcuts?", comment: "Title of the sheet that puts every shortcut back."),
+                              message: String(localized: "Every shortcut you changed goes back to its default.", comment: "Message of the sheet that puts every shortcut back."),
+                              action: String(localized: "Reset All", comment: "Button of the sheet that puts every shortcut back.")) {
                     Shortcuts.resetAll()
                     ShortcutRow.lastTaken = nil
                     self?.reloadShortcuts()
@@ -1215,7 +1335,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let rw = resetAll.fittingWidth, rh = Tokens.Page.controlHeight
             resetAll.frame = NSRect(x: pad + contentWidth - rw, y: y, width: rw, height: rh)
             documentView.addSubview(resetAll)
-            let hint = Label("Click a shortcut to change it. To find one, type its name or keys in Find a setting.", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+            let hint = Label(String(localized: "Click a shortcut to change it. To find one, type its name or keys in Find a setting.",
+                                    comment: "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder."),
+                             font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
             hint.lineBreakMode = .byTruncatingTail
             hint.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y + (rh - hint.lineHeight) / 2,
                                 width: max(0, contentWidth - rw - Tokens.Space.x4 - Tokens.Page.groupPad), height: hint.lineHeight)
@@ -1263,7 +1385,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     @objc private func customSearchChanged() {
         let text = customSearch.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.isEmpty || SearchEngine.isValidTemplate(text) else {
-            Toast.show("Use a web address with %s where the words go.", symbol: "exclamationmark.triangle", duration: 3, over: self, area: bounds)
+            Toast.show(String(localized: "Use a web address with %s where the words go.",
+                              comment: "Toast when the custom search address in Settings › General isn't valid. Keep %s as it is."),
+                       symbol: "exclamationmark.triangle", duration: 3, over: self, area: bounds)
             return
         }
         SearchEngine.customTemplate = text
@@ -1328,7 +1452,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         SpaceSettingsRow.isReordering = false
         let spaceID = row.spaceID
         if released != nil, target != startIndex {
-            BrowserWindowController.changeLibrary("Move Space") { Library.shared.moveSpace(spaceID, to: target) }
+            BrowserWindowController.changeLibrary(String(localized: "Move Space", comment: "What Edit › Undo undoes after a space is dragged to a new place.")) {
+                Library.shared.moveSpace(spaceID, to: target)
+            }
         }
         reloadSpaces()
         layoutSubtreeIfNeeded()
@@ -1353,7 +1479,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refresh(); self?.layoutDocument() }
     }
 
-    private func addSpace() { BrowserWindowController.changeLibrary("New Space") { Library.shared.addSpace() } }
+    private func addSpace() {
+        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { Library.shared.addSpace() }
+    }
 
     // MARK: Privacy
 
@@ -1362,56 +1490,69 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadPrivacy() {
         privacyGroup.removeAllRows()
         sitesGroup.removeAllRows()
-        let history = PillButton(title: "Clear History…")
+        let history = PillButton(title: String(localized: "Clear History…", comment: "Button in Settings › Privacy."))
         history.onClick = { [weak self, weak history] _ in
-            self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage, action: "Clear History") {
-                BrowserWindowController.historyChange("Clear History") { HistoryStore.shared.remove() }
-                if let controller = self?.browser { HistoryPage.clearedToast(in: controller) } else { history?.flash("Cleared") }
+            self?.confirm(title: HistoryPage.clearTitle, message: HistoryPage.clearMessage,
+                          action: String(localized: "Clear History", comment: "Button of the sheet that clears history.")) {
+                BrowserWindowController.historyChange(String(localized: "Clear History", comment: "What Edit › Undo undoes after history is cleared.")) {
+                    HistoryStore.shared.remove()
+                }
+                if let controller = self?.browser { HistoryPage.clearedToast(in: controller) } else { history?.flash(Self.cleared) }
             }
         }
-        let showHistory = PillButton(title: "Show History")
+        let showHistory = PillButton(title: String(localized: "Show History", comment: "Button in Settings › Privacy that opens History."))
         showHistory.onClick = { [weak self] _ in
             guard let controller = self?.browser else { return }
             HistoryPage.open(in: controller)
         }
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "History", detail: "The pages you’ve visited, used for suggestions in the command bar.", control: historyButtons))
+        privacyGroup.add(FormRow(title: String(localized: "History", comment: "A setting in Settings › Privacy."),
+                                 detail: String(localized: "The pages you’ve visited, used for suggestions in the command bar.", comment: "Explanation under “History” in Settings › Privacy."),
+                                 control: historyButtons))
 
-        let cache = PillButton(title: "Clear Cache…")
+        let cache = PillButton(title: String(localized: "Clear Cache…", comment: "Button in Settings › Privacy."))
         cache.onClick = { [weak self, weak cache] _ in
-            self?.confirm(title: "Clear the cache for every site?", message: "Pages load a little slower the first time you open them again. You stay signed in.", action: "Clear Cache", destructive: false) {
+            self?.confirm(title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that clears the cache."),
+                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears the cache."),
+                          action: String(localized: "Clear Cache", comment: "Button of the sheet that clears the cache."), destructive: false) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cache)
-                    cache?.flash("Cleared")
+                    cache?.flash(Self.cleared)
                     self?.reloadSiteData()
                 }
             }
         }
-        let cookies = PillButton(title: "Clear Cookies…")
+        let cookies = PillButton(title: String(localized: "Clear Cookies…", comment: "Button in Settings › Privacy."))
         cookies.onClick = { [weak self, weak cookies] _ in
-            self?.confirm(title: "Clear cookies for every site?", message: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", action: "Clear Cookies") {
+            self?.confirm(title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies."),
+                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies."),
+                          action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
                 Task { @MainActor in
                     await WebsiteData.clear(.cookies)
-                    cookies?.flash("Cleared")
+                    cookies?.flash(Self.cleared)
                     self?.reloadSiteData()
                 }
             }
         }
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
-        privacyGroup.add(FormRow(title: "Website data", detail: "The cache makes pages load faster. Cookies keep you signed in.", control: data))
+        privacyGroup.add(FormRow(title: String(localized: "Website data", comment: "A setting in Settings › Privacy."),
+                                 detail: String(localized: "The cache makes pages load faster. Cookies keep you signed in.", comment: "Explanation under “Website data” in Settings › Privacy."),
+                                 control: data))
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let ads = ContentBlocker.allowedSites.count, extensions = ExtensionStore.extensionsOffSites.count
         let media = SitePermissions.sites.count, zoom = ZoomLevels.count
         func phrase(_ n: Int, _ text: String) -> String? { n > 0 ? "\(text) on \(n) \(n == 1 ? "site" : "sites")" : nil }
         let parts = [phrase(ads, "Ads allowed"), phrase(extensions, "extensions off"), phrase(media, "permissions set"), phrase(zoom, "zoom set")].compactMap { $0 }
-        let reset = PillButton(title: "Reset All…")
+        let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = parts.isEmpty ? nil : reset
         reset.onClick = { [weak self] _ in
-            self?.confirm(title: "Reset choices made for single sites?", message: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
-                          action: "Reset All") {
+            self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%.",
+                                          comment: "Message of the sheet that forgets the choices made for single sites."),
+                          action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
                 ExtensionStore.extensionsOffSites = []
                 SitePermissions.forgetAll()
@@ -1421,7 +1562,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         }
         if parts.isEmpty {
-            sitesGroup.add(FormRow(title: "None yet", detail: "Choices you make for one site, like allowing ads, a camera or notifications, show up here.", control: NSView()))
+            sitesGroup.add(FormRow(title: String(localized: "None yet", comment: "A setting in Settings › Privacy."),
+                                   detail: String(localized: "Choices you make for one site, like allowing ads, a camera or notifications, show up here.", comment: "Explanation under “None yet” in Settings › Privacy."),
+                                   control: NSView()))
         }
 
         // Then each site, with what was chosen for it, and a way to forget just that one.
@@ -1430,21 +1573,28 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         for site in sites.sorted() {
             var said: [String] = []
             let choices = SitePermissions.choices(host: site)
-            for (kind, name) in [("camera", "camera"), ("microphone", "microphone"), ("cameraAndMicrophone", "camera and microphone"),
-                                 ("location", "location"), ("notifications", "notifications"), ("popups", "pop-ups")] {
-                if let allowed = choices[kind] { said.append("\(name) \(allowed ? "allowed" : "blocked")") }
+            for kind in ["camera", "microphone", "cameraAndMicrophone", "location", "notifications", "popups"] {
+                if let allowed = choices[kind], let choice = Self.siteChoice(kind, allowed: allowed) { said.append(choice) }
             }
             for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
-                said.append("opens \(ExternalLinks.appName(forScheme: String(kind.dropFirst(4))))")
+                let app = ExternalLinks.appName(forScheme: String(kind.dropFirst(4)))
+                said.append(String(localized: "opens \(app)", comment: "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name."))
             }
-            if ContentBlocker.allowedSites.contains(site) { said.append("ads allowed") }
-            if ExtensionStore.extensionsOffSites.contains(site) { said.append("extensions off") }
-            if let zoom = ZoomLevels.all[site] { said.append("zoom \(Int((zoom * 100).rounded()))%") }
+            if ContentBlocker.allowedSites.contains(site) {
+                said.append(String(localized: "ads allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them."))
+            }
+            if ExtensionStore.extensionsOffSites.contains(site) {
+                said.append(String(localized: "extensions off", comment: "A choice made for a site in Settings › Privacy, in a list of them."))
+            }
+            if let zoom = ZoomLevels.all[site] {
+                let percent = Int((zoom * 100).rounded())
+                said.append(String(localized: "zoom \(percent)%", comment: "A choice made for a site in Settings › Privacy, in a list of them: its zoom, like “zoom 125%”."))
+            }
             guard !said.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
             listed += 1
-            let forget = PillButton(title: "Forget")
+            let forget = PillButton(title: String(localized: "Forget", comment: "Button on a site's row in Settings › Privacy › Sites: forgets the choices made for it."))
             forget.onClick = { [weak self] _ in
                 SitePermissions.forgetEverything(host: site)
                 WebNotifications.shared.removeAll(host: site)
@@ -1456,19 +1606,24 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
-            let line = said.joined(separator: ", ")
+            let line = said.joined(separator: String(localized: "site-choices.separator", defaultValue: ", ",
+                                                     comment: "Between the choices made for a site in Settings › Privacy › Sites, like “camera allowed, zoom 125%”."))
             let siteURL = URL(string: "https://\(site)")
             let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
-            sitesGroup.add(FormRow(title: site, detail: line.prefix(1).uppercased() + line.dropFirst() + ".", icon: favicon, control: forget))
+            let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
+            sitesGroup.add(FormRow(title: site,
+                                   detail: String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
+                                                  comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
+                                   icon: favicon, control: forget))
         }
         if more > 0 {
-            let all = PillButton(title: "Show All")
+            let all = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
             all.onClick = { [weak self] _ in
                 self?.sitesShowAll = true
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
-            sitesGroup.add(FormRow(title: more == 1 ? "1 more site" : "\(more) more sites", control: all))
+            sitesGroup.add(FormRow(title: String(localized: "\(more) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), control: all))
         }
         reloadSiteData()
     }
@@ -1483,17 +1638,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             self.siteDataGroup.removeAllRows()
             let sorted = records.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
             if sorted.isEmpty {
-                self.siteDataGroup.add(FormRow(title: "None yet", detail: "Sites you visit can keep cookies and files here, to keep you signed in and load faster.", control: NSView()))
+                self.siteDataGroup.add(FormRow(title: String(localized: "None yet", comment: "A setting in Settings › Privacy."),
+                                               detail: String(localized: "Sites you visit can keep cookies and files here, to keep you signed in and load faster.", comment: "Explanation under “None yet” in Settings › Privacy."),
+                                               control: NSView()))
             }
             let shown = self.siteDataShowsAll ? sorted[...] : sorted.prefix(30)
             for record in shown {
                 let site = record.displayName
-                let remove = PillButton(title: "Remove…")
+                let remove = PillButton(title: String(localized: "Remove…", comment: "Button on a site's row in Settings › Privacy › Site Data."))
                 let signsOut = record.dataTypes.contains(WKWebsiteDataTypeCookies)
                 remove.onClick = { [weak self] _ in
-                    self?.confirm(title: "Remove data for \(site)?",
-                                  message: signsOut ? "You’ll be signed out of \(site), and its pages load fresh next time." : "Its pages load fresh next time.",
-                                  action: "Remove") {
+                    self?.confirm(title: String(localized: "Remove data for \(site)?", comment: "Title of the sheet that removes one site's data; the site, like apple.com."),
+                                  message: signsOut
+                                      ? String(localized: "You’ll be signed out of \(site), and its pages load fresh next time.", comment: "Message of the sheet that removes one site's data.")
+                                      : String(localized: "Its pages load fresh next time.", comment: "Message of the sheet that removes one site's data."),
+                                  action: String(localized: "Remove", comment: "Button of the sheet that removes one site's data.")) {
                         Task { @MainActor in
                             await WKWebsiteDataStore.default().removeData(ofTypes: record.dataTypes, for: [record])
                             self?.reloadSiteData()
@@ -1504,13 +1663,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self.siteDataGroup.add(FormRow(title: site, detail: Self.describe(record.dataTypes), icon: icon, control: remove))
             }
             if shown.count < sorted.count {
-                let more = PillButton(title: "Show All")
+                let more = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
                 more.onClick = { [weak self] _ in
                     self?.siteDataShowsAll = true
                     self?.reloadSiteData()
                 }
                 let rest = sorted.count - shown.count
-                self.siteDataGroup.add(FormRow(title: rest == 1 ? "1 more site" : "\(rest) more sites", control: more))
+                self.siteDataGroup.add(FormRow(title: String(localized: "\(rest) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), control: more))
             }
             self.layoutDocument()
         }
@@ -1519,13 +1678,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What a site keeps, in a few plain words: "Cookies, saved data and cache."
     private static func describe(_ types: Set<String>) -> String {
         let cache: Set<String> = [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache, WKWebsiteDataTypeOfflineWebApplicationCache]
-        var parts: [String] = []
-        if types.contains(WKWebsiteDataTypeCookies) { parts.append("cookies") }
-        if !types.subtracting(cache).subtracting([WKWebsiteDataTypeCookies]).isEmpty { parts.append("saved data") }
-        if !types.isDisjoint(with: cache) { parts.append("cache") }
-        guard !parts.isEmpty else { return "Data." }
-        let list = parts.count > 1 ? parts.dropLast().joined(separator: ", ") + " and " + parts.last! : parts[0]
-        return list.prefix(1).uppercased() + list.dropFirst() + "."
+        let cookies = types.contains(WKWebsiteDataTypeCookies)
+        let saved = !types.subtracting(cache).subtracting([WKWebsiteDataTypeCookies]).isEmpty
+        let cached = !types.isDisjoint(with: cache)
+        // Each combination a whole sentence, so a language can say it its own way.
+        switch (cookies, saved, cached) {
+        case (true, true, true): return String(localized: "Cookies, saved data and cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (true, true, false): return String(localized: "Cookies and saved data.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (true, false, true): return String(localized: "Cookies and cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (true, false, false): return String(localized: "Cookies.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (false, true, true): return String(localized: "Saved data and cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (false, true, false): return String(localized: "Saved data.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (false, false, true): return String(localized: "Cache.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        case (false, false, false): return String(localized: "Data.", comment: "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.")
+        }
     }
 
     private func confirm(title: String, message: String, action: String, destructive: Bool = true, then run: @escaping () -> Void) {
@@ -1555,7 +1721,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     var searchText: String {
         let names = ["⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl"]
         let spoken = keys.map { names[$0] ?? $0 }.joined(separator: " ")
-        return title.stringValue + " shortcut " + keys.joined() + " " + keys.joined(separator: " ") + " " + spoken
+        let shortcut = String(localized: "shortcut", comment: "A word that finds keyboard shortcuts with Find a setting in Settings. Not shown.")
+        return title.stringValue + " " + shortcut + " " + keys.joined() + " " + keys.joined(separator: " ") + " " + spoken
     }
     private var keys: [String] = []
     private let item: NSMenuItem?
@@ -1564,7 +1731,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private var caps: [KeyCap] = []
     private let field = ColorView(color: .clear)
     private let fieldLabel = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
-    private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: .compact, toolTip: "Back to Zigzag’s Shortcut")
+    private let resetButton = IconButton(symbol: "arrow.uturn.backward", size: .compact, toolTip: String(localized: "Back to Zigzag’s Shortcut", comment: "Tooltip of the button that puts a changed shortcut back, in Settings › Shortcuts."))
     private var monitor: Any?
     private var isRecording = false { didSet { refresh() } }
     /// Called after the keys change, so the list can redraw rows that lost theirs.
@@ -1577,7 +1744,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         title = Label(text, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
         setup(keys: Shortcuts.caps(item))
-        toolTip = "Click to change"
+        toolTip = String(localized: "Click to change", comment: "Tooltip of a shortcut in Settings › Shortcuts.")
         onClick = { [weak self] _ in self?.startRecording() }
         resetButton.onClick = { [weak self] _ in
             guard let self, let item = self.item else { return }
@@ -1619,7 +1786,10 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         resetButton.isHidden = !(item.map(Shortcuts.isCustom) ?? false)
         addSubview(resetButton)
         setAccessibilityRole(item == nil ? .staticText : .button)
-        setAccessibilityLabel("\(title.stringValue): \(keys.isEmpty ? "no shortcut" : keys.joined(separator: " "))")
+        let name = title.stringValue, shortcut = keys.joined(separator: " ")
+        setAccessibilityLabel(keys.isEmpty
+            ? String(localized: "\(name): no shortcut", comment: "Accessibility label of a command with no keys in Settings › Shortcuts.")
+            : String(localized: "\(name): \(shortcut)", comment: "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys."))
         refresh()
     }
 
@@ -1642,7 +1812,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
             field.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: w, height: h)
             fieldLabel.frame = NSRect(x: Tokens.Space.x2, y: (h - fieldLabel.lineHeight) / 2, width: w - Tokens.Space.x4, height: fieldLabel.lineHeight)
         } else if caps.isEmpty && item != nil {
-            fieldLabel.stringValue = "None"
+            fieldLabel.stringValue = String(localized: "None", comment: "In place of the keys of a command with no shortcut, in Settings › Shortcuts.")
         } else {
             for cap in caps.reversed() {
                 x -= cap.width
@@ -1686,7 +1856,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         field.layer?.borderColor = isRecording ? cgColor(accent.withAlphaComponent(Tokens.Color.focusAlpha)) : nil
         field.layer?.borderWidth = isRecording ? Tokens.Metric.fieldRing : 0
         field.layer?.backgroundColor = isRecording ? cgColor(Tokens.Color.fieldFill) : nil
-        if !isRecording && none { fieldLabel.stringValue = "None"; fieldLabel.textColor = Tokens.Color.textTertiary }
+        if !isRecording && none { fieldLabel.stringValue = String(localized: "None", comment: "In place of the keys of a command with no shortcut, in Settings › Shortcuts."); fieldLabel.textColor = Tokens.Color.textTertiary }
         needsLayout = true
     }
 
@@ -1718,12 +1888,12 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
                     return nil
                 }
                 guard let combo = Shortcuts.combo(from: event) else {
-                    self.fieldLabel.stringValue = "Add ⌘, ⌥ or ⌃"
+                    self.fieldLabel.stringValue = String(localized: "Add ⌘, ⌥ or ⌃", comment: "In Settings › Shortcuts while recording, when the keys need a modifier.")
                     self.fieldLabel.textColor = Tokens.Color.caution
                     return nil
                 }
                 if let fixed = Shortcuts.reserved(combo) {
-                    self.fieldLabel.stringValue = "Used for “\(fixed)”"
+                    self.fieldLabel.stringValue = String(localized: "Used for “\(fixed)”", comment: "In Settings › Shortcuts while recording, when the keys belong to a fixed command; its name.")
                     self.fieldLabel.textColor = Tokens.Color.caution
                     return nil
                 }
@@ -1741,7 +1911,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         if flags.contains(.option) { held += "⌥" }
         if flags.contains(.shift) { held += "⇧" }
         if flags.contains(.command) { held += "⌘" }
-        fieldLabel.stringValue = held.isEmpty ? "Type a shortcut" : held + " …"
+        fieldLabel.stringValue = held.isEmpty ? String(localized: "Type a shortcut", comment: "In Settings › Shortcuts while recording a new shortcut.") : held + " …"
         fieldLabel.textColor = held.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
     }
 
@@ -1757,7 +1927,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
 
     func showTakenNoteIfNeeded() {
         guard let taken = ShortcutRow.lastTaken, taken.item === item else { return }
-        say("Taken from “\(taken.from)”, which has no shortcut now")
+        say(String(localized: "Taken from “\(taken.from)”, which has no shortcut now",
+                   comment: "Under a shortcut in Settings › Shortcuts, after it took keys from another command; that command's name."))
     }
 
     private func stopRecording() {
