@@ -135,6 +135,31 @@
       });
     }
 
+    // runtime.onInstalled: WebKit says "install" each time an extension is turned back on, where Chrome says nothing.
+    // Tampermonkey takes "install" to mean the scripts it already has were planted, and turns every one off. Zigzag
+    // knows what it installed (BridgeRuntime): only a real install is passed on as one, a moment later.
+    const installed = api.runtime.onInstalled;
+    if (installed && typeof installed.addListener === 'function' && typeof api.runtime.sendNativeMessage === 'function') {
+      let fresh = null;
+      const isFresh = () => fresh || (fresh = Promise.resolve(api.runtime.sendNativeMessage('zigzag.bridge', { ns: 'runtime', fn: 'isNewInstall', args: [] }))
+        .then((reply) => !reply || typeof reply.error === 'string' || !!reply.value, () => true));
+      const add = installed.addListener.bind(installed);
+      const remove = installed.removeListener && installed.removeListener.bind(installed);
+      const has = installed.hasListener && installed.hasListener.bind(installed);
+      const guarded = new WeakMap();
+      setMember(['runtime', 'onInstalled'], 'addListener', (listener) => {
+        if (typeof listener !== 'function') return add(listener);
+        const wrapped = (details, ...rest) => {
+          if (!details || details.reason !== 'install') return listener(details, ...rest);
+          isFresh().then((yes) => { if (yes) listener(details, ...rest); });
+        };
+        guarded.set(listener, wrapped);
+        return add(wrapped);
+      });
+      if (remove) setMember(['runtime', 'onInstalled'], 'removeListener', (listener) => remove(guarded.get(listener) || listener));
+      if (has) setMember(['runtime', 'onInstalled'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
+    }
+
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
     // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
     if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {

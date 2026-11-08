@@ -188,6 +188,23 @@ final class BridgeContexts: BridgeNamespace {
     }
 }
 
+// MARK: - runtime.onInstalled
+
+/// Whether the extension's `runtime.onInstalled` should say "install" (webkit-differences.js asks). WebKit says it each
+/// time an extension is turned back on, which Chrome never does, and Tampermonkey then turns off every script it has
+/// as planted. Zigzag knows what it installed this session; it says so once, to the start that follows.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeRuntime: BridgeNamespace {
+    static let name = "runtime"
+    static let permission = ""
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        guard fn == "isNewInstall" else { throw BridgeError.unsupported(Self.name, fn) }
+        return ExtensionStore.newlyInstalled.remove(extensionID) != nil
+    }
+}
+
 // MARK: - system.display
 
 /// `chrome.system.display`: your screens' sizes and places, as Chrome reports them (from the top left of the main

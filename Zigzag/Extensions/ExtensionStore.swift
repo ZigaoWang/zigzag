@@ -124,6 +124,9 @@ enum ExtensionStore {
         set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: removedKey) }
     }
 
+    /// Installed since Zigzag started, until the extension's background has heard so (BridgeRuntime).
+    static var newlyInstalled: Set<String> = []
+
     /// Shows "Load Unpacked…" in Settings.
     static var developerMode: Bool {
         get { UserDefaults.standard.bool(forKey: developerModeKey) }
@@ -215,6 +218,7 @@ enum ExtensionStore {
     @available(macOS 15.4, *)
     static func finishInstall(_ prepared: PreparedInstall) async -> Result<String, InstallError> {
         let id = prepared.id
+        let isNew = state(id) == nil
         guard store((prepared.folder, prepared.version), for: id) else { return .failure(.unpack) }
         var next = state(id) ?? State(version: prepared.version)
         next.version = prepared.version
@@ -226,6 +230,7 @@ enum ExtensionStore {
         save(next, for: id)
         removedIDs.remove(id)
         removeVersions(of: id, keeping: [prepared.version])
+        if isNew { newlyInstalled.insert(id) }
         ExtensionHost.shared.unload(id)
         let context = await ExtensionHost.shared.load(id)
         return .success(context?.webExtension.displayName ?? prepared.extensionInfo.displayName ?? id)
@@ -260,6 +265,7 @@ enum ExtensionStore {
         guard #available(macOS 15.4, *),
               FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else { return nil }
         let id = CRXPackage.extensionID(Array(SHA256.hash(data: Data(url.standardizedFileURL.path.utf8)).prefix(16)))
+        if state(id) == nil { newlyInstalled.insert(id) }
         save(State(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path), for: id)
         removedIDs.remove(id)
         let context = await ExtensionHost.shared.load(id)
