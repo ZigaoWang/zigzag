@@ -108,6 +108,14 @@ final class BrowserWindow: NSWindow {
         return false
     }
 
+    /// A key nothing took (an arrow at a page's end, Return on picked sidebar rows) goes by quietly, as in Safari and
+    /// Chrome: AppKit's beep there says nothing useful. A ⌘ shortcut that matches nothing still beeps, as on any Mac.
+    override func noResponder(for eventSelector: Selector) {
+        if eventSelector == #selector(NSResponder.keyDown(with:)), let event = currentEvent, event.type == .keyDown,
+           !event.modifierFlags.contains(.command) { return }
+        super.noResponder(for: eventSelector)
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, !event.modifierFlags.contains(.command), firstResponder is WKWebView {
             UndoClock.lastPageEdit = Date()
