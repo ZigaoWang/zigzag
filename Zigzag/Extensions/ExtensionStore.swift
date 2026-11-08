@@ -1056,6 +1056,9 @@ extension ExtensionStore {
         // lacks. Real native hosts stay out of reach unless the extension asked for them itself (ExtensionHost).
         var permissions = manifest["permissions"] as? [String] ?? []
         if !permissions.contains("nativeMessaging") { permissions.append("nativeMessaging") }
+        // User scripts are WebKit content scripts the extension registers (BridgeUserScripts), which takes "scripting";
+        // Chrome's userScripts doesn't, so an extension that asked for userScripts may not have asked for it.
+        if permissions.contains("userScripts"), !permissions.contains("scripting") { permissions.append("scripting") }
         manifest["permissions"] = permissions
         guard let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) else { return false }
         do {

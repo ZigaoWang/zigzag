@@ -174,6 +174,10 @@ final class ExtensionHost: NSObject {
         for permission in permissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
         // For Zigzag's own bridge; ExtensionHost keeps real native hosts to extensions that asked for them.
         context.setPermissionStatus(.grantedExplicitly, for: .nativeMessaging)
+        // User scripts go through WebKit's scripting API (BridgeUserScripts), so asking for them brings it.
+        if ExtensionStore.declaredPermissions(context.uniqueIdentifier).required.contains("userScripts") {
+            context.setPermissionStatus(.grantedExplicitly, for: .scripting)
+        }
         for pattern in patterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         if state?.grantedPermissions == nil { saveGrants(of: context) }
         applySiteAccess(to: context)
