@@ -158,6 +158,11 @@ nonisolated enum ProfileBackup {
     @MainActor static func restoreLatestAndRelaunch() {
         guard let latest else { return }
         try? latest.lastPathComponent.write(to: folder(in: Paths.support).appendingPathComponent(restoreMarker), atomically: true, encoding: .utf8)
+        relaunch()
+    }
+
+    /// Quits and opens Zigzag again, as when a restore or a new language needs a fresh start.
+    @MainActor static func relaunch() {
         let app = Bundle.main.bundleURL
         AppDelegate.quitConfirmed = true
         // The new copy waits for this one to finish saving before it starts reading.
