@@ -135,7 +135,7 @@ enum Tokens {
     /// small wordmark and a semibold title at the top left, the search field and actions at the top right, quiet
     /// rows under it. History's CSS is generated from these values (`PageStyle`), so the two never drift.
     /// The sidebar's own proportions: compact and precise, in the spirit of Linear and shadcn on the window's glass.
-    /// 13pt rows 30 tall, 16pt favicons, four small favorites to a row, 26pt toolbar buttons with 14pt glyphs. Nothing
+    /// 13pt rows 30 tall, 16pt favicons, small favorites as many to a row as fit, 26pt toolbar buttons with 14pt glyphs. Nothing
     /// bigger than its role needs. Light structure, always visible: faint fills and 1px edges on the address and the
     /// favorites, a clear fill on the row you're on. One left edge runs down it: the traffic lights and every icon at
     /// 12pt, every title and label at 36pt. Pages (Settings, History) keep the calmer app scale (`Metric`,
@@ -177,8 +177,10 @@ enum Tokens {
         /// Between the favorites and the list.
         static let sectionGap: CGFloat = Space.x3
 
-        /// Favorites: four to a row, small tiles with a faint fill and a 1px edge.
-        static let favoriteColumns = 4
+        /// Favorites: as many to a row as fit at least `favoriteMinWidth` wide (three at the sidebar's usual width,
+        /// four from about 255, up to `favoriteMaxColumns`), or as many as chosen in Settings; soft tiles.
+        static let favoriteMinWidth: CGFloat = 56
+        static let favoriteMaxColumns = 6
         static let favoriteHeight: CGFloat = 36
         static let favoriteIcon: CGFloat = 18
         static let favoriteGap: CGFloat = 6

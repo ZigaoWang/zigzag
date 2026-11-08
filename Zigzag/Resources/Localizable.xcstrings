@@ -2186,6 +2186,28 @@
         }
       }
     },
+    "Automatic" : {
+      "comment" : "A choice for “Favorites per row” in Settings › General: as many as fit the sidebar's width.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        }
+      }
+    },
+    "Automatic fits fewer, larger ones in a narrow sidebar." : {
+      "comment" : "Explanation under “Favorites per row” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选“自动”时，边栏窄就放得少一些、大一些。"
+          }
+        }
+      }
+    },
     "Back" : {
       "comment" : "Button of a step in the welcome window: the step before.\nHidden View menu item, named in Settings › Shortcuts.\nTooltip of a button in the strip on top of each page of a split view: goes back.\nTooltip of the sidebar's back button.\nView menu item.",
       "localizations" : {
@@ -4813,6 +4835,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展"
+          }
+        }
+      }
+    },
+    "Favorites per row" : {
+      "comment" : "A setting in Settings › General: how many favorites' tiles sit side by side in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每行收藏数"
           }
         }
       }

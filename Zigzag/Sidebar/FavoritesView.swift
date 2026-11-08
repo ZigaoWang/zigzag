@@ -120,7 +120,28 @@ final class FavoritesView: NSView {
     var onJoin: ((Bookmark, UUID, Bool) -> Void)?
 
     static let tileHeight = Tokens.Sidebar.favoriteHeight
-    static let maxColumns = Tokens.Sidebar.favoriteColumns
+
+    /// How many favorites to a row, a setting: 0 for as many as fit (`Sidebar.favoriteMinWidth`), or 2, 3 or 4.
+    static var perRow: Int {
+        get { UserDefaults.standard.integer(forKey: "FavoritesPerRow") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "FavoritesPerRow")
+            NotificationCenter.default.post(name: perRowChanged, object: nil)
+        }
+    }
+    static let perRowChanged = Notification.Name("FavoritesPerRowChanged")
+    static let perRowChoices = [0, 2, 3, 4]
+
+    /// The columns a grid this wide has: the chosen count, or as many tiles as fit at their narrowest.
+    static func columns(for width: CGFloat) -> Int {
+        if perRow > 0 { return perRow }
+        let gap = Tokens.Sidebar.favoriteGap
+        let fit = Int((width + gap) / (Tokens.Sidebar.favoriteMinWidth + gap))
+        return min(max(fit, 2), Tokens.Sidebar.favoriteMaxColumns)
+    }
+
+    /// The setting changing: the tiles glide to their new rows and widths, and the sidebar makes room.
+    private var perRowObserver: NSObjectProtocol?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -132,6 +153,13 @@ final class FavoritesView: NSView {
         dropBar.layer?.cornerRadius = 1
         dropBar.isHidden = true
         addSubview(dropBar)
+        perRowObserver = NotificationCenter.default.addObserver(forName: Self.perRowChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.onHeightChange?()
+                self.relayout(gliding: true)
+            }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -140,9 +168,14 @@ final class FavoritesView: NSView {
 
     private var tileCount: Int { tiles.count + (isDropTarget && tiles.isEmpty ? 1 : 0) }
 
-    var preferredHeight: CGFloat {
+    /// How tall the grid is at its own width.
+    var preferredHeight: CGFloat { preferredHeight(for: bounds.width) }
+
+    /// How tall the grid is at a width: its rows of tiles and the gaps between them.
+    func preferredHeight(for width: CGFloat) -> CGFloat {
         guard tileCount > 0 else { return 0 }
-        let rows = (tileCount + Self.maxColumns - 1) / Self.maxColumns
+        let columns = Self.columns(for: width)
+        let rows = (tileCount + columns - 1) / columns
         return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Sidebar.favoriteGap
     }
 
@@ -268,9 +301,9 @@ final class FavoritesView: NSView {
         var all = tiles
         if isDropTarget, tiles.isEmpty { all.append(dropTile) }
         let gap = Tokens.Sidebar.favoriteGap
-        // Up to four columns, every tile one size, a shorter last row from the left. A lone favorite is never
-        // wider than two would be: half the row, not a long bar around a small icon.
-        let columns = max(2, min(Self.maxColumns, all.count))
+        // As many columns as fit or were chosen, every tile one size, a shorter last row from the left. A lone
+        // favorite is never wider than two would be: half the row, not a long bar around a small icon.
+        let columns = max(2, min(Self.columns(for: bounds.width), all.count))
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
         for (i, tile) in all.enumerated() {
             let row = i / columns, column = i % columns

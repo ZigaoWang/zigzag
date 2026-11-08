@@ -459,7 +459,7 @@ final class SidebarView: NSView {
         // Its buttons sit as far from the bottom edge as from the side.
         let buttonInset = (bottomHeight - Tokens.Sidebar.button) / 2
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
-        let favoritesHeight = favorites.preferredHeight
+        let favoritesHeight = favorites.preferredHeight(for: width - pad * 2)
         favorites.isHidden = favoritesHeight == 0
         favorites.frame = NSRect(x: pad, y: address.frame.maxY + Tokens.Space.x2, width: width - pad * 2, height: favoritesHeight)
         let listTop = (favoritesHeight > 0 ? favorites.frame.maxY : address.frame.maxY) + Tokens.Sidebar.sectionGap

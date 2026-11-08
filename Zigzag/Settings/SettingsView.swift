@@ -543,6 +543,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                               comment: "Explanation under “Search address” in Settings › General. Keep %s as it is: it's what the address uses."),
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
+    private let favoritesPerRow = DropdownButton()
     private let languagePicker = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
@@ -701,6 +702,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         windowGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › General."),
                                 detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › General."),
                                 control: largeNamesToggle))
+        favoritesPerRow.options = FavoritesView.perRowChoices.map { count in
+            DropdownButton.Option(title: count == 0 ? String(localized: "Automatic", comment: "A choice for “Favorites per row” in Settings › General: as many as fit the sidebar's width.") : count.formatted())
+        }
+        favoritesPerRow.onSelect = { index in FavoritesView.perRow = FavoritesView.perRowChoices[index] }
+        windowGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › General: how many favorites' tiles sit side by side in the sidebar."),
+                                detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › General."),
+                                control: favoritesPerRow))
         windowGroup.add(FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                                 detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                                 control: quitToggle))
@@ -1424,6 +1432,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
+        favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
         saveToggle.isOn = PasswordCapture.offersToSave
         fillToggle.isOn = Autofill.isOn
         translateOffer.isOn = PageTranslator.offers
