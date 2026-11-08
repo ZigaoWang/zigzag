@@ -10,7 +10,7 @@
 
 <p align="center">
   Your tabs in a sidebar, grouped into spaces. A native Mac app in Swift on WebKit,<br>
-  17 MB installed, with no account and no telemetry.
+  18 MB installed, with no account and no telemetry.
 </p>
 
 ## Coming from Arc
@@ -57,7 +57,7 @@ Zigzag connects to on its own.
 | **Clear** | Closes tabs you haven't looked at in a while first, and keeps today's. |
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
 | **Ad blocking** | Built in and on: about 123,000 EasyList and EasyPrivacy rules, compiled into WebKit content rule lists. |
-| **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Dark Reader and most popular ones work; see below for what doesn't. |
+| **Extensions** | From the Chrome Web Store, with an Add to Zigzag button on each listing. 1Password, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
 | **Import** | Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Firefox and Zen. |
 | **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), translation, picture in picture, private windows, Web Inspector. |
 
@@ -76,14 +76,14 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 
 ## How it's built
 
-Zigzag is about 53,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
+Zigzag is about 56,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
 engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
 with macOS updates rather than from me.
 
 | Part | How |
 |---|---|
 | **Pages** | One `WKWebView` per tab. Tabs you haven't used in a while can be suspended: the web view is released and the tab keeps its snapshot and state, then reloads when you come back. Private windows use a non-persistent data store. |
-| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. Native messaging connects 1Password's helper. |
+| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages, user scripts and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. Native messaging connects 1Password's helper. |
 | **Ad blocking** | EasyList and EasyPrivacy converted ahead of time with SafariConverterLib into content rule lists (`WKContentRuleListStore`), compiled once and cached. |
 | **Passwords** | Saved as Keychain items, so iCloud Keychain syncs them and Touch ID unlocks them. Passkeys go through Apple's browser passkey entitlement. Autofill is a small content script that only fills fields you can see. |
 | **Import** | Reads each browser's own files: Arc's `StorableSidebar.json`, Chromium's bookmarks and SQLite history, Safari's `Bookmarks.plist`, Firefox's `places.sqlite`. Chromium passwords are decrypted with the key from that browser's Keychain item, after macOS asks you. |
