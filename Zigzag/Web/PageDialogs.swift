@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 enum PageDialogs {
     private static func originText(_ frame: WKFrameInfo) -> String {
         let origin = frame.securityOrigin
-        return origin.host.isEmpty ? "This page" : origin.host
+        return origin.host.isEmpty ? String(localized: "This page", comment: "Stands for the site in a page's JavaScript dialog when the page has no host, as in “This page says”.") : origin.host
     }
 
     /// Dialogs shown per page (web view and the address it's on), and pages whose dialogs were blocked.
@@ -32,7 +32,7 @@ enum PageDialogs {
             count = shown[page].map { $0.url == url ? $0.count + 1 : 1 } ?? 1
             shown[page] = (url, count)
         }
-        let result = await PageDialogSheet.ask(in: window, title: "\(originText(frame)) says", message: message, fields: fields,
+        let result = await PageDialogSheet.ask(in: window, title: String(localized: "\(originText(frame)) says", comment: "Title of a page's JavaScript alert, confirm or prompt sheet. The placeholder is the site's host name, or “This page”."), message: message, fields: fields,
                                                showsCancel: showsCancel, offersBlock: count >= 2, page: frame.webView)
         if case .blocked = result, let page { blocked[page] = true }
         if case .blocked = result {
@@ -195,10 +195,10 @@ enum AuthenticationPrompt {
                             page: WKWebView?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: page?.configuration.websiteDataStore.isPersistent != true)
-        let message = challenge.previousFailureCount > 0 ? "That name or password didn’t work. Try again." : "This site needs a name and password."
-        let result = await PageDialogSheet.ask(in: window, title: "Sign in to \(challenge.protectionSpace.host)", message: message,
-                                               fields: [.init(placeholder: "Username"), .init(placeholder: "Password", secure: true)],
-                                               confirmTitle: "Sign In", showsCancel: true, offersBlock: false, page: page)
+        let message = challenge.previousFailureCount > 0 ? String(localized: "That name or password didn’t work. Try again.", comment: "Message in the sheet a site's HTTP sign-in asks with, after a wrong name or password.") : String(localized: "This site needs a name and password.", comment: "Message in the sheet a site's HTTP sign-in asks with.")
+        let result = await PageDialogSheet.ask(in: window, title: String(localized: "Sign in to \(challenge.protectionSpace.host)", comment: "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."), message: message,
+                                               fields: [.init(placeholder: String(localized: "Username", comment: "Placeholder of the name field in a site's HTTP sign-in sheet.")), .init(placeholder: String(localized: "Password", comment: "Placeholder of the password field in a site's HTTP sign-in sheet."), secure: true)],
+                                               confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page)
         guard case .confirmed(let values) = result, values.count == 2 else { return (.cancelAuthenticationChallenge, nil) }
         return (.useCredential, URLCredential(user: values[0], password: values[1], persistence: .forSession))
     }
@@ -235,8 +235,8 @@ enum ErrorPage {
         if canProceed, offersProceed(error) {
             if let link = CertificateExceptions.proceedLink(for: url, nonce: CertificateExceptions.nonce) {
                 proceed = """
-                <details><summary>Show details</summary><p class="why">\(escape(certificateReason(error.code)))</p>
-                <a class="anyway" href="\(escape(link.absoluteString))">Visit this site anyway</a></details>
+                <details><summary>\(escape(String(localized: "Show details", comment: "Disclosure on the page Zigzag shows for a site whose certificate can't be trusted.")))</summary><p class="why">\(escape(certificateReason(error.code)))</p>
+                <a class="anyway" href="\(escape(link.absoluteString))">\(escape(String(localized: "Visit this site anyway", comment: "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details.")))</a></details>
                 """
             }
         }
@@ -259,7 +259,7 @@ enum ErrorPage {
         </style></head><body><main>
         \(WordmarkView.svg(class: "mark", label: nil))
         <h1>\(escape(title))</h1><p>\(escape(message))</p>
-        \(url.scheme == "webkit-extension" ? "" : #"<button class="button prominent" onclick="location.reload()">Try Again</button>"#)
+        \(url.scheme == "webkit-extension" ? "" : #"<button class="button prominent" onclick="location.reload()">"# + escape(String(localized: "Try Again", comment: "Button on the page Zigzag shows when a page can't load.")) + "</button>")
         \(proceed)
         \(error.code == NSURLErrorNotConnectedToInternet || error.code == NSURLErrorNetworkConnectionLost ? "<script>addEventListener('online', () => location.reload())</script>" : "")
         </main></body></html>
@@ -277,66 +277,66 @@ enum ErrorPage {
         let host = url.host() ?? url.absoluteString
         // An extension's own page, from an extension that's been removed or turned off.
         if url.scheme == "webkit-extension" {
-            return ("This extension isn’t here", "The page belongs to an extension that has been removed or turned off. Turn it back on in Settings › Extensions, or close this tab.")
+            return (String(localized: "This extension isn’t here", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "The page belongs to an extension that has been removed or turned off. Turn it back on in Settings › Extensions, or close this tab.", comment: "Message on the page Zigzag shows when a page can't load."))
         }
         if error.domain == crashDomain {
-            return ("This page keeps stopping", "It may need more memory than your Mac can spare right now. Close some tabs, then try again.")
+            return (String(localized: "This page keeps stopping", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "It may need more memory than your Mac can spare right now. Close some tabs, then try again.", comment: "Message on the page Zigzag shows when a page can't load."))
         }
         // WebKit's own errors.
         if error.domain == "WebKitErrorDomain" {
             switch error.code {
             // A port browsers keep closed, because other services (like email) use it.
-            case 103: return ("Zigzag won’t open this port", "\(host) is on a port kept for other things, like email, so browsers don’t open it.")
-            case 101: return ("Zigzag can’t open this address", "Check the address for typos.")
+            case 103: return (String(localized: "Zigzag won’t open this port", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "\(host) is on a port kept for other things, like email, so browsers don’t open it.", comment: "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name."))
+            case 101: return (String(localized: "Zigzag can’t open this address", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "Check the address for typos.", comment: "Message on the page Zigzag shows when a page can't load."))
             default: return generic
             }
         }
         guard error.domain == NSURLErrorDomain else { return generic }
         switch error.code {
         case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed, NSURLErrorInternationalRoamingOff:
-            return ("You’re offline", "Check your internet connection, then try again.")
+            return (String(localized: "You’re offline", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "Check your internet connection, then try again.", comment: "Message on the page Zigzag shows when a page can't load."))
         // Most often the internet is down, or the address has a typo; the site itself rarely vanishes.
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-            return ("Can’t find \(host)", "Your Mac may not be connected to the internet, or the address may have a typo. Check both, then try again.")
+            return (String(localized: "Can’t find \(host)", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "Your Mac may not be connected to the internet, or the address may have a typo. Check both, then try again.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorTimedOut:
-            return ("\(host) took too long", "The site didn’t respond in time. Try again in a moment.")
+            return (String(localized: "\(host) took too long", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "The site didn’t respond in time. Try again in a moment.", comment: "Message on the page Zigzag shows when a page can't load."))
         // The secure connection itself failed (reset, blocked by a network): nothing says the site is an impostor.
         case NSURLErrorSecureConnectionFailed:
-            return ("Can’t connect securely to \(host)", "The secure connection was cut off, often by the network you’re on. Try again, or try another network.")
+            return (String(localized: "Can’t connect securely to \(host)", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "The secure connection was cut off, often by the network you’re on. Try again, or try another network.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateNotYetValid, NSURLErrorServerCertificateHasUnknownRoot:
-            return ("This connection isn’t private", "\(host) can’t prove it is who it says it is, so Zigzag didn’t open it.")
+            return (String(localized: "This connection isn’t private", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "\(host) can’t prove it is who it says it is, so Zigzag didn’t open it.", comment: "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name."))
         case NSURLErrorClientCertificateRequired, NSURLErrorClientCertificateRejected:
-            return ("\(host) wants a certificate", "The site only opens for Macs with a certificate it trusts, often one from work or school.")
+            return (String(localized: "\(host) wants a certificate", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "The site only opens for Macs with a certificate it trusts, often one from work or school.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorCannotConnectToHost:
-            return ("Can’t connect to \(host)", "The site may be down right now. Try again in a moment.")
+            return (String(localized: "Can’t connect to \(host)", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "The site may be down right now. Try again in a moment.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorHTTPTooManyRedirects:
-            return ("\(host) keeps sending you around", "It redirected the page in a loop. Clearing this site’s cookies often fixes it.")
+            return (String(localized: "\(host) keeps sending you around", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "It redirected the page in a loop. Clearing this site’s cookies often fixes it.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorBadServerResponse, NSURLErrorZeroByteResource, NSURLErrorCannotDecodeRawData, NSURLErrorCannotDecodeContentData,
              NSURLErrorCannotParseResponse:
-            return ("\(host) sent a broken page", "Something went wrong on the site’s side. Try again in a moment.")
+            return (String(localized: "\(host) sent a broken page", comment: "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."), String(localized: "Something went wrong on the site’s side. Try again in a moment.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorBadURL, NSURLErrorUnsupportedURL:
-            return ("Zigzag can’t open this address", "Check the address for typos.")
+            return (String(localized: "Zigzag can’t open this address", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "Check the address for typos.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorFileDoesNotExist:
-            return ("This file isn’t there", "It may have been moved, renamed or deleted.")
+            return (String(localized: "This file isn’t there", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "It may have been moved, renamed or deleted.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorNoPermissionsToReadFile:
-            return ("Zigzag can’t read this file", "Your Mac doesn’t let Zigzag open it.")
+            return (String(localized: "Zigzag can’t read this file", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "Your Mac doesn’t let Zigzag open it.", comment: "Message on the page Zigzag shows when a page can't load."))
         case NSURLErrorResourceUnavailable:
-            return ("This page isn’t available", "Try again in a moment.")
+            return (String(localized: "This page isn’t available", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "Try again in a moment.", comment: "Message on the page Zigzag shows when a page can't load."))
         default:
             return generic
         }
     }
 
     /// For anything not described above.
-    private static let generic = ("Can’t open this page", "Something went wrong while loading it. Try again in a moment.")
+    private static let generic = (String(localized: "Can’t open this page", comment: "Title of the page Zigzag shows when a page can't load."), String(localized: "Something went wrong while loading it. Try again in a moment.", comment: "Message on the page Zigzag shows when a page can't load."))
 
     private static func certificateReason(_ code: Int) -> String {
         switch code {
-        case NSURLErrorServerCertificateHasBadDate: "The site’s certificate has expired, or your Mac’s date and time are wrong."
-        case NSURLErrorServerCertificateNotYetValid: "The site’s certificate isn’t valid yet. Check your Mac’s date and time."
-        case NSURLErrorServerCertificateHasUnknownRoot: "The site’s certificate wasn’t issued by anyone your Mac trusts. Sites on your own network, like a router, often look like this."
-        default: "The site’s certificate is for a different address, or can’t be trusted. Someone could be pretending to be this site."
+        case NSURLErrorServerCertificateHasBadDate: String(localized: "The site’s certificate has expired, or your Mac’s date and time are wrong.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case NSURLErrorServerCertificateNotYetValid: String(localized: "The site’s certificate isn’t valid yet. Check your Mac’s date and time.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        case NSURLErrorServerCertificateHasUnknownRoot: String(localized: "The site’s certificate wasn’t issued by anyone your Mac trusts. Sites on your own network, like a router, often look like this.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
+        default: String(localized: "The site’s certificate is for a different address, or can’t be trusted. Someone could be pretending to be this site.", comment: "Why a site's certificate can't be trusted, under Show details on the page Zigzag shows for it.")
         }
     }
 

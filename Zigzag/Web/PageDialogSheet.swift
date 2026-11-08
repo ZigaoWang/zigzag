@@ -25,8 +25,8 @@ final class PageDialogSheet: NSView {
     private var inputs: [FilledField] = []
     private let buttons = DialogButtons()
     private let confirm: PillButton
-    private let cancel = PillButton(title: "Cancel", style: .plain)
-    private let block = PillButton(title: "Block Dialogs", style: .quiet)
+    private let cancel = PillButton(title: String(localized: "Cancel", comment: "Button in a page's JavaScript dialog sheet."), style: .plain)
+    private let block = PillButton(title: String(localized: "Block Dialogs", comment: "Button in a page's JavaScript dialog sheet, once it has shown a second dialog."), style: .quiet)
     private var monitor: Any?
     private var closeObserver: Any?
     /// The page that asked, when a page did: the sheet sits on it, and goes when the page does.
@@ -62,7 +62,7 @@ final class PageDialogSheet: NSView {
         }
         buttons.trailing = showsCancel ? [cancel, confirm] : [confirm]
         if offersBlock {
-            block.toolTip = "Don’t let this page show more dialogs"
+            block.toolTip = String(localized: "Don’t let this page show more dialogs", comment: "Tooltip of Block Dialogs in a page's JavaScript dialog sheet.")
             buttons.leading = [block]
         }
         confirm.onClick = { [weak self] _ in self?.finish(.confirmed(self?.inputs.map(\.stringValue) ?? [])) }
@@ -77,7 +77,7 @@ final class PageDialogSheet: NSView {
     override var isFlipped: Bool { true }
 
     @MainActor
-    static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = "OK",
+    static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = String(localized: "OK", comment: "Button that answers a page's JavaScript dialog sheet."),
                     showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil) async -> Result {
         // Over the page that asked, so it stays with its tab; a dialog without a page covers the window.
         guard let host = page ?? window.contentView else { return .cancelled }
