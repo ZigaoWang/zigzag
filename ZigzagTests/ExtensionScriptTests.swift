@@ -118,6 +118,78 @@ struct ExtensionScriptTests {
         #expect(background.evaluateScript("__three").toString() == "script answer")
     }
 
+    /// A fake service worker background or extension page for the worker-messaging stand-in in webkit-differences.js.
+    private static func workerWorld(worker: Bool) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        const event = () => { const l = []; return { addListener: (f) => l.push(f), removeListener: () => {}, hasListener: (f) => l.includes(f), fire: (...a) => l.map((f) => f(...a)) }; };
+        var __port = (name, sender) => ({ name, sender, sent: [], onMessage: event(), onDisconnect: event(), postMessage(m) { this.sent.push(m); }, disconnect: () => {} });
+        var location = { protocol: 'webkit-extension:', origin: 'webkit-extension://x', href: 'webkit-extension://x/' + (\(worker) ? 'sw.js' : 'popup.html'), pathname: '/', search: '' };
+        var __asked = [], __ports = [];
+        var chrome = {
+          runtime: { id: 'x', getURL: (p) => 'webkit-extension://x/' + p, getManifest: () => ({}), onMessage: event(), onConnect: event(),
+                     sendMessage: (m) => { __asked.push(m); return Promise.resolve(); },
+                     connect: (info) => { const port = __port(info.name, {}); __ports.push(port); return port; } },
+          offscreen: { createDocument: () => Promise.resolve() },
+        };
+        if (\(worker)) {
+          var ServiceWorkerGlobalScope = class { static [Symbol.hasInstance](o) { return o === globalThis; } };
+          var MessageEvent = class { constructor(type, init) { this.type = type; this.data = init.data; } };
+          var __heard = [];
+          var dispatchEvent = (e) => { __heard.push(e.data); };
+          var __matchAll = async () => [], __get = async () => undefined;
+          var clients = { matchAll: __matchAll, get: __get };
+        } else {
+          var ServiceWorker = class { constructor(url) { this.scriptURL = url; } postMessage(m) { __native.push(m); } };
+          var __native = [];
+          var navigator = { serviceWorker: { controller: null, dispatchEvent: () => true } };
+        }
+        """)
+        context.evaluateScript(ExtensionBridgeScript.differences)
+        return context
+    }
+
+    @Test func workerMessagingIsLeftAloneUntilAnExtensionUsesIt() {
+        // A page: controller stays WebKit's, and only posts to the extension's own worker take the hidden port.
+        let page = Self.workerWorld(worker: false)
+        #expect(page.evaluateScript("navigator.serviceWorker.controller === null").toBool())
+        page.evaluateScript("new ServiceWorker('https://site.example/sw.js').postMessage('theirs')")
+        #expect(page.evaluateScript("__ports.length").toInt32() == 0)
+        page.evaluateScript("new ServiceWorker('webkit-extension://x/zigzag-entry.js').postMessage('ours')")
+        #expect(page.evaluateScript("__native.join()").toString() == "theirs")
+        #expect(page.evaluateScript("__ports.length === 1 && __ports[0].sent[0].data").toString() == "ours")
+
+        // A worker no page has posted to: WebKit's clients, untouched, asked nothing.
+        let quiet = Self.workerWorld(worker: true)
+        #expect(quiet.evaluateScript("clients.matchAll === __matchAll && clients.get === __get").toBool())
+        quiet.evaluateScript("clients.matchAll().then((all) => { globalThis.__all = all.length; }); __flush();")
+        #expect(quiet.evaluateScript("__all").toInt32() == 0)
+        #expect(quiet.evaluateScript("__asked.length").toInt32() == 0)
+
+        // Once a page connects, its messages arrive and the worker's clients include it.
+        let used = Self.workerWorld(worker: true)
+        used.evaluateScript("""
+        var __page = __port('__zigzagWorkerClient', { url: 'webkit-extension://x/popup.html' });
+        chrome.runtime.onConnect.fire(__page);
+        __page.onMessage.fire({ kind: 'message', data: 'hello' });
+        clients.matchAll().then((all) => { globalThis.__urls = all.map((c) => c.url).join(); }); __flush();
+        """)
+        #expect(used.evaluateScript("__heard.join()").toString() == "hello")
+        #expect(used.evaluateScript("clients.matchAll !== __matchAll").toBool())
+        used.evaluateScript("__flush()")
+        #expect(used.evaluateScript("__urls").toString() == "webkit-extension://x/popup.html")
+
+        // Making an offscreen page counts too: Violentmonkey looks for it among its clients right after.
+        let offscreen = Self.workerWorld(worker: true)
+        offscreen.evaluateScript("chrome.offscreen.createDocument({ url: 'offscreen.html' })")
+        #expect(offscreen.evaluateScript("clients.matchAll !== __matchAll").toBool())
+    }
+
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
     }
