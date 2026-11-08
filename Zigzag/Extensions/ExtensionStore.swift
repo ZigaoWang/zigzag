@@ -705,7 +705,22 @@ enum ExtensionProfile {
         // Return YouTube Dislike, as "Bring Back YouTube Dislikes".
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
+        // Tampermonkey.
+        "dhdgffkkebhmkfjojejmpbldmpobfkfo": Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch]),
     ]
+
+    /// Tampermonkey's background lets itself add listeners only in the first moment of starting, until the first
+    /// promise settles. Near the end of its start it loads an empty test.js with importScripts, and WebKit settles
+    /// waiting promises after each imported script, which Chrome doesn't. So that moment is over before its last
+    /// listeners are added, the first of them throws, and the rest of its start never runs: its popup waits forever,
+    /// and no script is ever registered. The empty file isn't loaded.
+    private static let tampermonkeyStartPatch = Patch(file: "background.js", find: #"try{importScripts("/test.js")}catch(e){console.error(e)}"#, replace: "")
+
+    /// Its background answers its popup and dashboard only when their address starts with Chrome's
+    /// "chrome-extension:", written into it; WebKit's extension pages are "webkit-extension:". So every popup
+    /// request went unanswered and the popup stayed blank.
+    private static let tampermonkeyPagesPatch = Patch(file: "background.js", find: #"INTERNAL_PAGE_PROTOCOLS:["chrome-extension:"]"#,
+                                                      replace: #"INTERNAL_PAGE_PROTOCOLS:["webkit-extension:"]"#)
 
     /// Return YouTube Dislike writes its count into a copy of YouTube's label, class names and all. YouTube's
     /// own like and dislike code find their labels by class, so both write into the copy, in turns ("0", the
