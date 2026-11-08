@@ -167,6 +167,23 @@
       if (has) setMember(['cookies', 'onChanged'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // action.setIcon: WebKit refuses details that give both imageData and path, where Chrome takes imageData and
+    // passes over path. Violentmonkey gives both each time it marks a tab, so its button's icon never changed.
+    for (const name of ['action', 'browserAction']) {
+      const action = api[name];
+      if (!action || typeof action.setIcon !== 'function') continue;
+      const setIcon = action.setIcon.bind(action);
+      setMember([name], 'setIcon', (details, ...rest) => {
+        if (details && typeof details === 'object' && details.imageData != null && details.path != null) {
+          const images = typeof details.imageData === 'object' && !(ArrayBuffer.isView(details.imageData) || 'data' in details.imageData)
+            ? Object.values(details.imageData).some((image) => image != null) : true;
+          const { path, imageData, ...others } = details;
+          details = images ? { ...others, imageData } : { ...others, path };
+        }
+        return setIcon(details, ...rest);
+      });
+    }
+
     // permissions.contains: WebKit refuses the whole question, and throws, when it names a permission WebKit doesn't
     // know ("downloads"), where Chrome answers. Violentmonkey asks about "downloads" on its background's first line,
     // so its background stopped there. Such a permission counts as held when the extension's manifest asks for it
