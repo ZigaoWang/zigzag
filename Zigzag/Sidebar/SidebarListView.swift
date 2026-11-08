@@ -465,7 +465,8 @@ final class SidebarListView: NSView {
 
     /// What's on screen of the list and a screenful above and below it.
     private var nearRect: NSRect {
-        guard let clip = enclosingScrollView?.contentView else { return bounds }
+        // VoiceOver walks every row, not only the ones in sight: with it on, every row has its view.
+        guard !NSWorkspace.shared.isVoiceOverEnabled, let clip = enclosingScrollView?.contentView else { return bounds }
         let shown = convert(clip.bounds, from: clip)
         let reach = max(shown.height, 400)
         return NSRect(x: 0, y: shown.minY - reach, width: bounds.width, height: shown.height + reach * 2)
