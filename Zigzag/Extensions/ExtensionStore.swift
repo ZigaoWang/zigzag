@@ -712,9 +712,23 @@ enum ExtensionProfile {
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         // Tampermonkey.
-        "dhdgffkkebhmkfjojejmpbldmpobfkfo": Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
-                                                              tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch]),
+        tampermonkeyID: Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
+                                          tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch]),
     ]
+
+    static let tampermonkeyID = "dhdgffkkebhmkfjojejmpbldmpobfkfo"
+    static let violentmonkeyID = "jinjaccalgkegednnccohejagnlnfdag"
+
+    /// With Tampermonkey and Violentmonkey both on, opening a .user.js address has each put its own install page in
+    /// the same tab, and the slower one wins: a different one from one time to the next. Tampermonkey, the one most
+    /// people have, goes first: Violentmonkey's page is left out while the tab is still on a script's address or
+    /// already on Tampermonkey's page. Anywhere else (its own "Install from URL") it opens as usual.
+    static func leavesInstallToTampermonkey(_ extensionID: String, loading url: URL, tabURL: URL?, tampermonkeyOn: Bool) -> Bool {
+        guard tampermonkeyOn, extensionID == violentmonkeyID, url.scheme == "webkit-extension", url.host() == violentmonkeyID,
+              url.path() == "/confirm/index.html", let tabURL else { return false }
+        if tabURL.scheme == "webkit-extension" { return tabURL.host() == tampermonkeyID }
+        return ["http", "https", "file"].contains(tabURL.scheme ?? "") && tabURL.path().lowercased().hasSuffix(".user.js")
+    }
 
     /// Tampermonkey's background lets itself add listeners only in the first moment of starting, until the first
     /// promise settles. Near the end of its start it loads an empty test.js with importScripts, and WebKit settles
