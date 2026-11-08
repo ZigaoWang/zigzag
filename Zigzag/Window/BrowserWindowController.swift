@@ -1658,9 +1658,14 @@ extension BrowserWindowController: SidebarDelegate {
                                             parent: inside.map { .some($0) } ?? .none)
         }
         guard let made else { return }
+        revealNewFolder(made.id)
+    }
+
+    /// A folder just made shows, with its name ready to type.
+    func revealNewFolder(_ id: UUID) {
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
         sidebar.list.reload(animated: true)
-        DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(made.id) }
+        DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(id) }
     }
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { moveWithUndo(tab, to: index, in: spaceID) }
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {

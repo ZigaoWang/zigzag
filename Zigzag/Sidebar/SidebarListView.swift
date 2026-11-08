@@ -131,7 +131,20 @@ final class SidebarListView: NSView {
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
-    private(set) var marked: [SidebarItem] = []
+    private(set) var marked: [SidebarItem] = [] {
+        didSet {
+            markedTabs = [:]
+            for item in marked {
+                switch item {
+                case .tab(let id): markedTabs[item] = id
+                case .bookmark(let id): markedTabs[item] = manager?.bookmarkTab(for: id)?.id
+                default: break
+                }
+            }
+        }
+    }
+    /// The open page behind each picked row, so a row that changes kind (pinned, unpinned) stays picked.
+    private var markedTabs: [SidebarItem: UUID] = [:]
     private var springWork: DispatchWorkItem?
     private var wasOverFavorites = false
     private var lastFolderTarget: UUID?
@@ -262,7 +275,7 @@ final class SidebarListView: NSView {
     }
 
     func reload(animated: Bool) {
-        defer { marked = marked.filter { items.contains($0) }; if marked.count < 2 { marked = [] } }
+        defer { followMarks() }
         guard drag == nil else { return }
         items = buildItems()
         apply(items: items, animated: animated)
@@ -771,6 +784,38 @@ final class SidebarListView: NSView {
         if marked.count < 2 { marked = [] }
         refreshRows()
         return true
+    }
+
+    /// The rows these pages and pinned pages show as now, picked; the ones not in the list are left out. After a
+    /// change to the picked rows, so the next one applies to the same set without picking them again.
+    func mark(pages: [Tab] = [], pins: [UUID] = []) {
+        let rows = pages.compactMap(rowItem(for:)) + pins.map { SidebarItem.bookmark(Self.rowID($0)) }
+        var picked: [SidebarItem] = []
+        for item in rows where items.contains(item) && !picked.contains(item) { picked.append(item) }
+        picked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
+        marked = picked.count < 2 ? [] : picked
+        refreshRows()
+    }
+
+    /// The row a tab shows in: its pinned page's, its own, or for the right half of a split, the pair's.
+    private func rowItem(for tab: Tab) -> SidebarItem? {
+        if let id = tab.bookmarkID { return .bookmark(Self.rowID(id)) }
+        if items.contains(.tab(tab.id)) { return .tab(tab.id) }
+        return manager?.partner(of: tab).map { .tab($0.id) }
+    }
+
+    /// After the list changes, picked rows stay picked: one that became the other kind (a tab pinned, a pinned page
+    /// unpinned) is picked in its new row. Rows that left the list (closed, moved to another space) let go.
+    private func followMarks() {
+        guard !marked.isEmpty else { return }
+        var picked: [SidebarItem] = []
+        for item in marked {
+            let now = items.contains(item) ? item : markedTabs[item].flatMap { manager?.tab(with: $0) }.flatMap(rowItem(for:))
+            if let now, items.contains(now), !picked.contains(now) { picked.append(now) }
+        }
+        picked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
+        let next = picked.count < 2 ? [] : picked
+        if next != marked { marked = next; refreshRows() }
     }
 
     #if DEBUG
@@ -1486,7 +1531,6 @@ final class SidebarListView: NSView {
         lastSplitTarget = nil
         wasOverFavorites = false
         for view in rows.values { (view as? TabRowView)?.splitDropSide = nil }
-        if drag.together.count > 1 { clearMarks() }
 
         var landing: NSView?
         if let mouse {

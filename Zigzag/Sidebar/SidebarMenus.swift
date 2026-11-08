@@ -28,16 +28,13 @@ enum SidebarMenus {
         // A private window's tabs never join the pins every window shares, in a folder or on their own.
         let isPrivate = controller.tabManager.isPrivate
         if !isPrivate || tabs.isEmpty {
-            menu.addItem(Item("Add \(count) to New Folder") { controller.sidebar.list.clearMarks(); controller.newFolder(with: controller.pinnedIDs(for: items)) })
+            menu.addItem(Item("Add \(count) to New Folder") { controller.fileMarked(items, in: nil) })
             let folders = Library.shared.folders(in: controller.tabManager.currentSpaceID)
             if !folders.isEmpty {
                 let add = NSMenuItem(title: "Add \(count) to Folder", action: nil, keyEquivalent: "")
                 let sub = NSMenu()
                 for folder in folders {
-                    sub.addItem(Item(folder.name) {
-                        controller.sidebar.list.clearMarks()
-                        for id in controller.pinnedIDs(for: items) { controller.listSetFolder(of: id, to: folder.id) }
-                    })
+                    sub.addItem(Item(folder.name) { controller.fileMarked(items, in: folder.id) })
                 }
                 add.submenu = sub
                 menu.addItem(add)
@@ -65,26 +62,18 @@ enum SidebarMenus {
             }
             if !pages.isEmpty {
                 menu.addItem(Item(pages.count == 1 ? "Unload Page" : "Unload \(pages.count) Pages") {
-                    controller.sidebar.list.clearMarks()
                     manager.close(pages)
                 })
             }
             // Pins are shared by every window: a private one doesn't take them away.
             if !isPrivate {
-                menu.addItem(Item(pins.count == 1 ? "Unpin Tab" : "Unpin \(pins.count) Tabs") {
-                    controller.sidebar.list.clearMarks()
-                    // Each comes down to the top of the tabs, the last first, so they keep their order.
-                    for id in pins.reversed() { controller.unbookmarkWithUndo(id, to: 0) }
-                })
+                menu.addItem(Item(pins.count == 1 ? "Unpin Tab" : "Unpin \(pins.count) Tabs") { controller.unpinMarked(pins) })
             }
         }
         if !tabs.isEmpty {
             if !pins.isEmpty, !menu.items.isEmpty { menu.addItem(.separator()) }
             if !isPrivate {
-                menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") {
-                    controller.sidebar.list.clearMarks()
-                    for tab in tabs where tab.bookmarkID == nil { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
-                })
+                menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") { controller.pinMarked(tabs) })
                 menu.addItem(.separator())
             }
             menu.addItem(Item(tabs.count == 1 ? "Close Tab" : "Close \(tabs.count) Tabs") {
@@ -435,4 +424,45 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         done = nil
         dismiss()
     }
+}
+
+/// What picked rows do together. Each is one change, saved and shown once however many rows there are: one ⌘Z
+/// takes it all back, and the rows stay picked after it, so the next action applies to the same ones.
+extension BrowserWindowController {
+    func unpinMarked(_ pins: [UUID]) {
+        var pages: [Tab] = []
+        pageChange("Unpin Tabs") { [tabManager] in
+            pages = []
+            // Each comes down to the top of the tabs, the last first, so they keep their order.
+            Library.shared.together { for id in pins.reversed() { if let tab = tabManager.unbookmark(id, toIndex: 0) { pages.append(tab) } } }
+        }
+        sidebar.list.mark(pages: pages)
+    }
+
+    func pinMarked(_ tabs: [Tab]) {
+        Tutorial.complete("pin")
+        pageChange("Pin Tabs") { [tabManager] in
+            Library.shared.together { for tab in tabs where tab.bookmarkID == nil { tabManager.bookmarkTab(tab, in: tab.spaceID) } }
+        }
+        sidebar.list.mark(pages: tabs)
+    }
+
+    /// Into a folder of this space (nil: a new one, named right away), the tabs among them pinned first.
+    func fileMarked(_ items: [SidebarItem], in folder: UUID?) {
+        var ids: [UUID] = []
+        var made: BookmarkFolder?
+        pageChange(folder == nil ? "New Folder" : "Add to Folder") { [self] in
+            Library.shared.together {
+                ids = pinnedIDs(for: items)
+                if let folder {
+                    for id in ids { Library.shared.setFolder(of: id, to: folder) }
+                } else {
+                    made = Library.shared.addFolder(named: "New Folder", with: ids, in: tabManager.currentSpaceID)
+                }
+            }
+        }
+        if let made { revealNewFolder(made.id) }
+        sidebar.list.mark(pins: ids)
+    }
+
 }
