@@ -218,7 +218,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let controller = WindowManager.shared.keyController else { return }
             defaults.set(true, forKey: "DefaultBrowserOffered")
             Toast.show("Open links in Zigzag?", symbol: "safari", action: ("Set as Default", { DefaultBrowser.make() }),
-                       duration: 8, in: controller)
+                       duration: 8, closes: true, in: controller)
         }
     }
 
