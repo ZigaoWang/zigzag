@@ -101,7 +101,12 @@ final class EnergyWatch {
         let now = Date()
         var slept: [Tab] = [], awake: [Tab] = [], soon = false
         for owner in WindowManager.shared.controllers {
-            for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner) {
+            // Each window's own page (and its split partner) never sleeps here, even in a covered or minimized window:
+            // it would only load again at once, losing what it was doing, as idle tabs that sleep never do either.
+            let selected = owner.tabManager.selectedTab
+            let kept = [selected, selected.flatMap(owner.tabManager.partner(of:))].compactMap { $0 }
+            for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner)
+                && !kept.contains(where: { $0 === tab }) {
                 let mustStay = url.scheme == "webkit-extension" || tab.isPlayingAudio || tab.isInUse || tab.notifiesUser
                 if mustStay { awake.append(tab) } else if now.timeIntervalSince(tab.lastActivated) <= Self.recentlySeen { soon = true } else {
                     tab.suspend()
@@ -116,7 +121,8 @@ final class EnergyWatch {
 
     private func warn(about tab: Tab, url: URL, asleep: Bool, in controller: BrowserWindowController) {
         let site = ContentBlocker.site(of: url) ?? url.host() ?? url.absoluteString
-        guard told.insert(url.scheme == "webkit-extension" ? "\(tab.id)" : site).inserted else { return }
+        // Once per site for each kind of note, so a later sleep is still said after a note that it stayed awake.
+        guard told.insert(url.scheme == "webkit-extension" ? "\(tab.id)" : "\(site)|\(asleep)").inserted else { return }
         // An extension's own page: name the extension, and offer to close the page.
         if url.scheme == "webkit-extension", #available(macOS 15.4, *) {
             let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName
