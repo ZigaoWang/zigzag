@@ -284,7 +284,22 @@ enum DebugBridge {
                 if arg == "picker" { controller.chooseFolderIcon(folder.id) } else { Library.shared.setIcon(arg == "none" ? nil : arg, forFolder: folder.id) }
             }
         case "togglefolder":
-            if let folder = Library.shared.folders(in: controller.tabManager.currentSpaceID).first { controller.listSetFolderOpen(folder.id, !folder.isOpen) }
+            // togglefolder [name]: opens or shuts the current space's folder of that name (or its first), and logs how
+            // long the main thread took to show it.
+            let folders = Library.shared.folders(in: controller.tabManager.currentSpaceID)
+            if let folder = folders.first(where: { $0.name == arg }) ?? (arg.isEmpty ? folders.first : nil) {
+                let start = CACurrentMediaTime()
+                controller.listSetFolderOpen(folder.id, !folder.isOpen)
+                controller.window?.contentView?.layoutSubtreeIfNeeded()
+                controller.window?.displayIfNeeded()
+                CATransaction.flush()
+                let shown = (CACurrentMediaTime() - start) * 1000
+                DispatchQueue.main.async {
+                    debugLog(String(format: "togglefolder %@ %@ => %.1f ms, next turn %.1f ms, rows %d", folder.name, folder.isOpen ? "shut" : "open",
+                                    shown, (CACurrentMediaTime() - start) * 1000, controller.sidebar.list.debugRows().count))
+                }
+            }
+        case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
         case "listhover": controller.sidebar.list.debugHover(arg != "off")
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
@@ -972,6 +987,47 @@ enum DebugBridge {
         }
         HistoryStore.shared.importVisits(entries)
         debugLog("seedhistory => \(entries.count) visits back to \(time)")
+    }
+
+    /// A made-up bookmarks tree as a big Chrome import brings it, for timing the sidebar's folders: `count` pages in
+    /// about 150 folders, up to eight deep, one of them holding 400 pages of its own, all shut but the outermost. Only into a test copy's own data.
+    static func seedFolders(_ count: Int, in controller: BrowserWindowController) {
+        guard ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil else { debugLog("seedfolders refused: not a test copy"); return }
+        let names = ["Spring", "Boot", "Config", "Profiles", "Notes", "Guides", "Docs", "Tools", "Archive", "Old", "设计", "学习"]
+        var paths: [[String]] = []
+        func grow(_ path: [String], branches: Int) {
+            paths.append(path)
+            guard path.count < 8 else { return }
+            for b in 0..<branches { grow(path + [names[(path.count + b) % names.count] + (b == 0 ? "" : " \(b + 1)")], branches: path.count < 2 ? 2 : 1) }
+        }
+        let root = "资料文档"
+        for top in ["Java", "Web", "正则表达式"] { grow([root, top], branches: 2) }
+        paths += [[root, "Linux"], [root, "Linux", "Docker"], [root, "Linux", "vpn"], [root, "镜像"]]
+        for i in 1...10 { grow(["收藏 \(i)"], branches: 2) }
+        // The big one: a folder of 400 pages, opened and shut while timing.
+        let big = [root, "镜像"]
+        let hosts = (0..<300).map { "site\($0)." + ($0 % 2 == 0 ? "com" : "test") }
+        let icon = NSImage(size: NSSize(width: 32, height: 32), flipped: false) { rect in
+            NSColor.systemTeal.setFill(); NSBezierPath(ovalIn: rect).fill(); return true
+        }
+        if let tiff = icon.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            for host in hosts where host.hasSuffix(".com") { try? png.write(to: Paths.favicons.appendingPathComponent(host + ".png")) }
+        }
+        var pages: [(url: URL, title: String)] = [], folders: [[String]] = []
+        for i in 0..<count {
+            let path = i < 400 ? big : paths[i % paths.count]
+            guard let url = URL(string: "https://\(hosts[i % hosts.count])/page/\(i)") else { continue }
+            pages.append((url, "\(path.last ?? "") page \(i)"))
+            folders.append(path)
+        }
+        let space = Library.shared.addSpace(name: "Seeded")
+        _ = Library.shared.appendBookmarks(pages, to: space.id, folders: folders)
+        // Shut but the outermost, as you'd keep a big tree, so each one can be opened while timing.
+        Library.shared.together {
+            for folder in Library.shared.folders(in: space.id) where folder.name != root { Library.shared.setFolderOpen(folder.id, false) }
+        }
+        controller.tabManager.switchToSpace(space.id)
+        debugLog("seedfolders => \(pages.count) pages in \(Library.shared.folders(in: space.id).count) folders, deepest \(Library.shared.folders(in: space.id).map { Library.shared.depth(ofFolder: $0.id) }.max() ?? 0)")
     }
     #endif
 }
