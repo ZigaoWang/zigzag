@@ -27,6 +27,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         // On the desk, the card you're on.
         if desk.isVisible { desk.closeFocused(); return }
         if dismissFloatingContent() { return }
+        // Rows picked in the sidebar, with the keys still there: all of them, as one step.
+        if sidebar.list.marksHaveFocus { closeMarked(sidebar.list.marked); return }
         guard let tab = selectedTab else {
             // An empty space in a window that still has tabs in other spaces: closing the window would take those
             // too, so ⌘W stops here. With nothing open anywhere, it closes the window as on any Mac.
@@ -492,6 +494,12 @@ extension BrowserWindowController: NSMenuItemValidation {
             let split = tab.flatMap { tabManager.split(for: $0) }
             item.title = split?.vertical == true ? "Side by Side" : "Stack Vertically"
             return split != nil
+        case #selector(closeTab(_:)):
+            // Says how many when ⌘W would close several picked rows.
+            let count = sidebar.list.marksHaveFocus ? closingCount(sidebar.list.marked) : 1
+            item.title = count > 1 ? String(localized: "Close \(count) Tabs", comment: "File menu item while several sidebar rows are picked")
+                : String(localized: "Close Tab", comment: "File menu item")
+            return true
         case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
         case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"

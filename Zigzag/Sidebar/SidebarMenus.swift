@@ -429,6 +429,26 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
 /// What picked rows do together. Each is one change, saved and shown once however many rows there are: one ⌘Z
 /// takes it all back, and the rows stay picked after it, so the next action applies to the same ones.
 extension BrowserWindowController {
+    /// The tab of each picked tab row, the left half for a split.
+    func markedTabRows(_ items: [SidebarItem]) -> [Tab] {
+        items.compactMap { item in if case .tab(let id) = item { tabManager.tab(with: id) } else { nil } }
+    }
+
+    /// The tabs of the picked tab rows, both halves of a split, as closing its row closes both.
+    func markedTabs(_ items: [SidebarItem]) -> [Tab] {
+        markedTabRows(items).flatMap { tab in [tab] + (tabManager.partner(of: tab).map { [$0] } ?? []) }
+    }
+
+    /// The pinned page of each picked pinned row, the left one for a pinned split.
+    func markedPinRows(_ items: [SidebarItem]) -> [UUID] {
+        items.compactMap { item in if case .bookmark(let id) = item { id } else { nil } }
+    }
+
+    /// Every pinned page in these rows, both of a pinned split.
+    func markedPinPages(_ pins: [UUID]) -> [UUID] {
+        pins.flatMap { id in Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id] }
+    }
+
     func unpinMarked(_ pins: [UUID]) {
         var pages: [Tab] = []
         pageChange("Unpin Tabs") { [tabManager] in
@@ -465,4 +485,18 @@ extension BrowserWindowController {
         sidebar.list.mark(pins: ids)
     }
 
+    /// ⌘W on picked rows: what it does to one row, to all of them. Tabs close, with the count and Undo; pinned
+    /// pages unload and stay pinned.
+    func closeMarked(_ items: [SidebarItem]) {
+        let tabs = markedTabs(items)
+        let pages = markedPinPages(markedPinRows(items)).compactMap(tabManager.bookmarkTab(for:))
+        if tabs.isEmpty { tabManager.close(pages); return }
+        closeManyWithUndo(pages + tabs)
+        showClosedToast(tabs.count, kind: "tab")
+    }
+
+    /// What ⌘W closes with these rows picked, for the File menu to say: their tabs and open pinned pages.
+    func closingCount(_ items: [SidebarItem]) -> Int {
+        markedTabRows(items).count + markedPinRows(items).filter { id in markedPinPages([id]).contains { tabManager.bookmarkTab(for: $0) != nil } }.count
+    }
 }

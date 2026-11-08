@@ -141,6 +141,7 @@ final class SidebarListView: NSView {
                 default: break
                 }
             }
+            if marked.isEmpty, !oldValue.isEmpty { giveBackFocus() }
         }
     }
     /// The open page behind each picked row, so a row that changes kind (pinned, unpinned) stays picked.
@@ -787,6 +788,7 @@ final class SidebarListView: NSView {
         }
         marked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
         if marked.count < 2 { marked = [] }
+        takeFocus()
         refreshRows()
         return true
     }
@@ -799,6 +801,7 @@ final class SidebarListView: NSView {
         for item in rows where items.contains(item) && !picked.contains(item) { picked.append(item) }
         picked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
         marked = picked.count < 2 ? [] : picked
+        if !marked.isEmpty { takeFocus() }
         refreshRows()
     }
 
@@ -821,6 +824,30 @@ final class SidebarListView: NSView {
         picked.sort { (items.firstIndex(of: $0) ?? 0) < (items.firstIndex(of: $1) ?? 0) }
         let next = picked.count < 2 ? [] : picked
         if next != marked { marked = next; refreshRows() }
+    }
+
+    // MARK: Keys for picked rows
+
+    /// Picking rows gives the list the keyboard, as selecting in Finder does: ⌘W closes them all. Clicking into the
+    /// page takes the keys back, and the picked rows wait.
+    override var acceptsFirstResponder: Bool { marked.count > 1 }
+    /// Where the keys were before picking started, to hand them back when it ends.
+    private weak var focusBeforeMarking: NSResponder?
+
+    /// Whether the keys act on the picked rows: there are some, and nothing else has taken the keyboard since.
+    var marksHaveFocus: Bool { marked.count > 1 && window?.firstResponder === self }
+
+    private func takeFocus() {
+        guard marked.count > 1, let window, window.firstResponder !== self else { return }
+        focusBeforeMarking = window.firstResponder
+        window.makeFirstResponder(self)
+    }
+
+    private func giveBackFocus() {
+        guard let window, window.firstResponder === self else { return }
+        let back = focusBeforeMarking.flatMap { $0 as? NSView }.flatMap { $0.window === window ? $0 : nil }
+        focusBeforeMarking = nil
+        window.makeFirstResponder(back)
     }
 
     #if DEBUG
