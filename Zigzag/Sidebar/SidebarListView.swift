@@ -133,8 +133,11 @@ final class SidebarListView: NSView {
 
     /// While ⌘ is held: each row's number, by its place in `pageRows`. Empty: none.
     func showNumbers(_ numbers: [SidebarItem: Int]) {
+        self.numbers = numbers
         for (item, view) in rows { (view as? TabRowView)?.number = numbers[item] }
     }
+    /// The numbers ⌘ shows, for rows made while it's held.
+    private var numbers: [SidebarItem: Int] = [:]
 
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
@@ -308,6 +311,9 @@ final class SidebarListView: NSView {
     private func apply(items displayed: [SidebarItem], animated: Bool) {
         let layout = frames(for: displayed)
         let visible = Set(displayed)
+        shownLayout = layout
+        shownFrames = Dictionary(layout, uniquingKeysWith: { a, _ in a })
+        let near = nearRect, inSight = sightRect
 
         // A page that changes kind (a tab pinned with ⌘D, or a pinned page made a tab again) keeps one row that
         // glides from where it was to where it now belongs, instead of one fading out and another fading in.
@@ -325,14 +331,14 @@ final class SidebarListView: NSView {
             if animated, let id = pageID(item) { departing[id] = view.frame }
         }
 
-        // Leaving rows fade out where they are.
+        // Leaving rows fade out where they are; out of sight, they simply go.
         for (item, view) in rows where !visible.contains(item) && view !== drag?.view {
             rows[item] = nil
             if let id = pageID(item), departing[id] != nil, displayed.contains(where: { pageID($0) == id }) {
                 view.removeFromSuperview()
                 continue
             }
-            if animated {
+            if animated, Self.overlaps(view.frame, near) {
                 collapse(view)
             } else {
                 view.removeFromSuperview()
@@ -343,16 +349,23 @@ final class SidebarListView: NSView {
         var moves: [(NSView, NSRect)] = []
         for (item, frame) in layout {
             if let view = rows[item] {
+                // A row out of sight, staying out of sight, gives its view up: only the rows near what's on screen
+                // have one.
+                if view !== drag?.view, !keepsView(item, view), !Self.overlaps(frame, near), !Self.overlaps(view.frame, near) {
+                    rows[item] = nil
+                    view.removeFromSuperview()
+                    continue
+                }
                 configure(view, for: item)
                 if view === drag?.view { continue }
                 if view.frame != frame {
                     if animated { moves.append((view, frame)) } else { view.frame = frame }
                 }
             } else {
-                let view = makeView(for: item)
-                rows[item] = view
-                configure(view, for: item)
-                addSubview(view, positioned: .below, relativeTo: drag?.view)
+                // Out of sight it waits, made just after (or when a scroll comes to it), unless it's a page on its way
+                // from a row in sight.
+                guard Self.overlaps(frame, inSight) || Self.alwaysMade(item) || (animated && pageID(item).map { departing[$0] != nil } == true) else { continue }
+                let view = makeRow(item)
                 if animated, let id = pageID(item), let from = departing[id] {
                     view.frame = from
                     carry(view, to: frame)
@@ -386,6 +399,7 @@ final class SidebarListView: NSView {
         updateDocumentHeight()
         pinHeader()
         slideCard()
+        fillSoon()
     }
 
     /// A row that's going (a closed tab) folds away: it stops taking clicks at once, and its height closes to nothing
@@ -439,6 +453,109 @@ final class SidebarListView: NSView {
     /// The page each row showed at the last update.
     private var shownPages: [SidebarItem: UUID] = [:]
 
+    // MARK: Rows near the screen
+    //
+    // Every row of the list has a place, but only the ones on screen or a screenful from it have a view: a folder of
+    // hundreds of pages opens at once, and a scroll makes the rows it comes to.
+
+    /// Where each row of the list as last laid out sits, whether it has a view or not.
+    private var shownLayout: [(SidebarItem, NSRect)] = []
+    private var shownFrames: [SidebarItem: NSRect] = [:]
+    private var scrollObservers: [NSObjectProtocol] = []
+
+    /// What's on screen of the list and a screenful above and below it.
+    private var nearRect: NSRect {
+        guard let clip = enclosingScrollView?.contentView else { return bounds }
+        let shown = convert(clip.bounds, from: clip)
+        let reach = max(shown.height, 400)
+        return NSRect(x: 0, y: shown.minY - reach, width: bounds.width, height: shown.height + reach * 2)
+    }
+
+    /// What's on screen of the list now: the rows a change makes at once.
+    private var sightRect: NSRect {
+        guard let clip = enclosingScrollView?.contentView else { return bounds }
+        return convert(clip.bounds, from: clip).insetBy(dx: 0, dy: -Tokens.Sidebar.rowHeight)
+    }
+
+    private var fillPending = false
+
+    /// The rows a screenful either side get their views on the next turn, once what's on screen has shown.
+    private func fillSoon() {
+        guard !fillPending else { return }
+        fillPending = true
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                self?.fillPending = false
+                self?.fillNear()
+            }
+        }
+    }
+
+    /// Only up and down counts: a row's width can be nothing yet before the list is laid out.
+    private static func overlaps(_ frame: NSRect, _ area: NSRect) -> Bool { frame.maxY >= area.minY && frame.minY <= area.maxY }
+
+    /// The rows that always have a view, wherever the list is scrolled: the code around the list reaches for them.
+    private static func alwaysMade(_ item: SidebarItem) -> Bool { item == .header || item == .separator || item == .newTab }
+
+    /// A row out of sight that still keeps its view: one being renamed, or one still moving.
+    private func keepsView(_ item: SidebarItem, _ view: NSView) -> Bool {
+        if Self.alwaysMade(item) { return true }
+        if let responder = window?.firstResponder as? NSView, responder.isDescendant(of: view) { return true }
+        return view.layer?.animationKeys()?.isEmpty == false
+    }
+
+    /// A row's view, made and set up as the list stands now.
+    private func makeRow(_ item: SidebarItem) -> NSView {
+        let view = makeView(for: item)
+        rows[item] = view
+        configure(view, for: item)
+        (view as? TabRowView)?.number = numbers[item]
+        if let drag, carriedRowShown, drag.faint.contains(item) { view.alphaValue = CarriedCopy.faint }
+        if case .folder(let id) = item, let drag { (view as? FolderRowView)?.isDropTarget = drag.folderTarget == id }
+        addSubview(view, positioned: .below, relativeTo: drag?.view)
+        return view
+    }
+
+    /// A row's view, made for it now if it's in the list but out of sight.
+    private func madeRow(_ item: SidebarItem) -> NSView? {
+        if let view = rows[item] { return view }
+        guard let frame = shownFrames[item] else { return nil }
+        let view = makeRow(item)
+        view.frame = NSRect(x: frame.minX, y: frame.minY, width: bounds.width - frame.minX, height: frame.height)
+        return view
+    }
+
+    /// After a scroll or a resize: rows coming near the screen get their views, and ones well away give theirs up.
+    private func fillNear() {
+        guard !shownLayout.isEmpty else { return }
+        let near = nearRect
+        for (item, frame) in shownLayout where rows[item] == nil && (Self.overlaps(frame, near) || Self.alwaysMade(item)) {
+            let view = makeRow(item)
+            view.frame = NSRect(x: frame.minX, y: frame.minY, width: bounds.width - frame.minX, height: frame.height)
+        }
+        // A little further out before letting go, so a row near the edge doesn't come and go with each small scroll.
+        let far = near.insetBy(dx: 0, dy: -near.height / 4)
+        for (item, view) in rows where view !== drag?.view && !keepsView(item, view) && !Self.overlaps(view.frame, far) {
+            rows[item] = nil
+            view.removeFromSuperview()
+        }
+    }
+
+    /// The list takes in its scroll view's scrolling, to make the rows it comes to.
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        scrollObservers.forEach(NotificationCenter.default.removeObserver)
+        scrollObservers = []
+        guard let clip = enclosingScrollView?.contentView else { return }
+        clip.postsBoundsChangedNotifications = true
+        clip.postsFrameChangedNotifications = true
+        for name in [NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
+            scrollObservers.append(NotificationCenter.default.addObserver(forName: name, object: clip, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated { self?.fillNear() }
+            })
+        }
+    }
+
     /// A page moving between the tabs and the pinned section travels there for you to see: it lifts above the other
     /// rows with a soft shadow, glides to its new place, and settles back down.
     private func carry(_ view: NSView, to frame: NSRect) {
@@ -469,10 +586,16 @@ final class SidebarListView: NSView {
     override func resizeSubviews(withOldSize oldSize: NSSize) {
         super.resizeSubviews(withOldSize: oldSize)
         guard oldSize.width != bounds.width else { return }
-        for (item, frame) in frames(for: items) {
+        let layout = frames(for: items)
+        for (item, frame) in layout {
             if let view = rows[item], view !== drag?.view { view.frame = frame }
         }
         drag?.view.frame.size.width = bounds.width
+        if drag == nil {
+            shownLayout = layout
+            shownFrames = Dictionary(layout, uniquingKeysWith: { a, _ in a })
+        }
+        fillNear()
     }
 
     // MARK: Folders
@@ -547,7 +670,7 @@ final class SidebarListView: NSView {
     /// Starts renaming a folder's row (a new folder, or Rename in its menu).
     func renameFolder(_ id: UUID) {
         layoutSubtreeIfNeeded()
-        (rows[.folder(id)] as? FolderRowView)?.beginRename()
+        (shownRow(.folder(id)) as? FolderRowView)?.beginRename()
     }
 
     // MARK: Hover
@@ -1066,18 +1189,25 @@ final class SidebarListView: NSView {
         }
     }
     #endif
-    func folderRow(_ id: UUID) -> NSView? { rows[.folder(id)] }
+    func folderRow(_ id: UUID) -> NSView? { madeRow(.folder(id)) }
+
+    /// A row scrolled into sight, to type in.
+    private func shownRow(_ item: SidebarItem) -> NSView? {
+        guard let frame = shownFrames[item] else { return nil }
+        scrollToVisible(frame)
+        return madeRow(item)
+    }
 
     /// Starts renaming a pinned page right in its row.
     func beginRenaming(bookmark id: UUID) -> Bool {
-        guard let row = rows[.bookmark(id)] as? TabRowView else { return false }
+        guard let row = shownRow(.bookmark(id)) as? TabRowView else { return false }
         row.beginRename()
         return true
     }
 
     /// A tab's row turns into a field for its name, as a double-click does.
     func beginRenaming(tab id: UUID) {
-        (rows[.tab(id)] as? TabRowView)?.beginRename()
+        (shownRow(.tab(id)) as? TabRowView)?.beginRename()
     }
 
 
@@ -1114,12 +1244,12 @@ final class SidebarListView: NSView {
 
     /// The row showing a tab: its own, its pinned page's, or for the right half of a split, the row of the pair.
     func row(for tab: Tab) -> NSView? {
-        if let bookmarkID = tab.bookmarkID { return rows[.bookmark(Self.rowID(bookmarkID))] }
-        return rows[.tab(tab.id)] ?? manager?.partner(of: tab).flatMap { rows[.tab($0.id)] }
+        if let bookmarkID = tab.bookmarkID { return madeRow(.bookmark(Self.rowID(bookmarkID))) }
+        return madeRow(.tab(tab.id)) ?? manager?.partner(of: tab).flatMap { madeRow(.tab($0.id)) }
     }
 
     /// The row showing a pinned page (a pinned split's row for either of its pages).
-    func row(forBookmark id: UUID) -> NSView? { rows[.bookmark(Self.rowID(id))] }
+    func row(forBookmark id: UUID) -> NSView? { madeRow(.bookmark(Self.rowID(id))) }
 
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
@@ -1324,7 +1454,7 @@ final class SidebarListView: NSView {
     /// while you drag): below them, every row sits that much lower than it will.
     private func reorderTarget(pointerY y: CGFloat, dragging drag: DragState) -> (Section, Int) {
         var y = y
-        if carriedRowShown, let block = drag.carried.compactMap({ rows[$0]?.frame }).reduce(nil, { $0?.union($1) ?? $1 }) {
+        if carriedRowShown, let block = drag.carried.compactMap({ shownFrames[$0] }).reduce(nil, { $0?.union($1) ?? $1 }) {
             if y > block.maxY { y -= block.height + rowGap } else if y >= block.minY { y = block.minY }
         }
         return target(at: y, allowsPinned: manager?.isPrivate == false, carried: drag.carried)
@@ -1394,13 +1524,13 @@ final class SidebarListView: NSView {
             insertionLine.isHidden = true
             return
         }
-        let before = placed[..<gap].last { rows[$0] != nil }
-        let after = placed[(gap + 1)...].first { rows[$0] != nil }
+        let before = placed[..<gap].last { shownFrames[$0] != nil }
+        let after = placed[(gap + 1)...].first { shownFrames[$0] != nil }
         var y: CGFloat
-        if let after, after != .separator, let next = rows[after] {
-            y = next.frame.minY - rowGap / 2
-        } else if let before, let previous = rows[before] {
-            y = previous.frame.maxY + rowGap / 2
+        if let after, after != .separator, let next = shownFrames[after] {
+            y = next.minY - rowGap / 2
+        } else if let before, let previous = shownFrames[before] {
+            y = previous.maxY + rowGap / 2
         } else {
             insertionLine.isHidden = true
             return
