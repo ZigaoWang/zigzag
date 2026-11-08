@@ -198,7 +198,7 @@ final class NumberHints {
 
     /// Only in the window you're in, while its sidebar is on screen (slid out, when it's hidden) and nothing sits over
     /// it. In the tab overview the numbers pick its cards instead, so there are none in the sidebar then.
-    /// `focused`: false skips the window being the one you're in.
+    /// `focused`: false skips the window being the one you're in (debug builds drive it from outside).
     private func canShow(focused: Bool) -> Bool {
         guard let controller, let window = controller.window, window.attachedSheet == nil, !controller.desk.isVisible else { return false }
         if focused, !window.isKeyWindow || !NSApp.isActive { return false }
@@ -218,6 +218,11 @@ final class NumberHints {
         controller.sidebar.list.showNumbers(rowNumbers)
         isShown = true
     }
+
+    #if DEBUG
+    /// As holding ⌘ would show them, whether or not the window is in front.
+    func debugShow() { if canShow(focused: false) { show(force: true) } }
+    #endif
 
     func hide() {
         guard isShown, let controller else { return }
