@@ -82,6 +82,10 @@ struct ExtensionReport {
         if permissions.contains("declarativeNetRequest") || permissions.contains("declarativeNetRequestWithHostAccess") {
             lines.append(Line(symbol: "hand.raised", text: "Block content on pages"))
         }
+        // Installing it is the go-ahead Chrome asks for separately ("Allow user scripts"), so the sheet says so.
+        if permissions.contains("userScripts") {
+            lines.append(Line(symbol: "curlybraces", text: "Run scripts you add on the sites it can access"))
+        }
         if permissions.contains("cookies") {
             lines.append(Line(symbol: "lock", text: "Read and change cookies on the sites it can access"))
         }
@@ -118,7 +122,6 @@ struct ExtensionReport {
         "downloads.open": "Downloads",
         "idle": "Knowing when you’re away",
         "offscreen": "Background audio and clipboard",
-        "userScripts": "Your own custom scripts",
         "webRequestBlocking": "Blocking requests the old way",
         "webRequestAuthProvider": "Filling in sign-in dialogs",
         "history": "Your browsing history",
