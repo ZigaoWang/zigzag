@@ -940,25 +940,18 @@ final class ClearTabsButton: InteractiveView {
         stateDidChange(animated: false)
     }
 
-    /// What a click does now, and its label says so: the old (faded) tabs while there are any, then every tab but
-    /// the one you're on. Never yours.
-    enum Step: Equatable { case old(Int), others(Int), last(Int) }
+    /// What a click does now, and its tooltip says so: every tab but the one you're on, then that one too.
+    enum Step: Equatable { case others(Int), last(Int) }
     var step: Step = .others(0) {
         didSet {
             switch step {
-            case .old(let n):
-                label.stringValue = String(localized: "Clear Old", comment: "Button at the end of the Tabs label in the sidebar, while some tabs went unused for a while: closes those.")
-                toolTip = String(localized: "Close the \(n) tabs you haven’t used in a while", comment: "Tooltip of the sidebar's Clear Old button.")
             case .others(let n):
-                label.stringValue = String(localized: "Clear", comment: "Button at the end of the Tabs label in the sidebar: closes tabs.")
                 toolTip = String(localized: "Close the other \(n) tabs", comment: "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.")
             case .last(let n):
-                label.stringValue = String(localized: "Clear", comment: "Button at the end of the Tabs label in the sidebar: closes tabs.")
                 toolTip = n == 1 ? String(localized: "Close this tab too, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tab left is the one you're on.")
                                  : String(localized: "Close these tabs too, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the split view you're on.")
             }
             setAccessibilityLabel(toolTip)
-            if oldValue != step { needsLayout = true; superview?.needsLayout = true }
         }
     }
 

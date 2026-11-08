@@ -52,3 +52,30 @@ struct PickAllTests {
         #expect(SidebarListView.rowsToPick(all: all, marked: [.bookmark(a), .tab(d)]) == all)
     }
 }
+
+/// Clear closes every tab but yours, however new, and never one playing sound or in a call.
+struct ClearTabsTests {
+    let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+
+    @Test func everyTabButYours() {
+        #expect(TabManager.clearing([a, b, c], current: b, partner: nil, busy: []) == [a, c])
+    }
+
+    @Test func keepsYourSplitTogether() {
+        #expect(TabManager.clearing([a, b, c, d], current: b, partner: c, busy: []) == [a, d])
+    }
+
+    @Test func onAPinnedPageItsEveryTab() {
+        #expect(TabManager.clearing([a, b], current: d, partner: nil, busy: []) == [a, b])
+    }
+
+    @Test func leavesWhatsPlaying() {
+        #expect(TabManager.clearing([a, b, c], current: a, partner: nil, busy: [c]) == [b])
+    }
+
+    @Test func yoursOnlyOnceTheyAreAllThatsLeft() {
+        #expect(TabManager.clearing([a, b], current: a, partner: b, busy: []) == [a, b])
+        // A tab still playing beside yours keeps yours open: Clear has nothing to do.
+        #expect(TabManager.clearing([a, b], current: a, partner: nil, busy: [b]).isEmpty)
+    }
+}

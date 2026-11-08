@@ -1655,19 +1655,16 @@ extension BrowserWindowController: SidebarDelegate {
     func listNewTab() { commandBar.show(mode: .newTab) }
 
     func listClearTabs() {
-        // Old (faded) tabs first, then the rest but yours (TabManager.tabsToClear).
-        let (closing, faded) = tabManager.tabsToClear(in: tabManager.currentSpaceID)
+        // Every tab but yours, however new (TabManager.tabsToClear).
+        let closing = tabManager.tabsToClear(in: tabManager.currentSpaceID)
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing, leavingSpaceEmpty: true)
-        showClosedToast(closing.count, old: faded)
+        showClosedToast(closing.count)
     }
 
     /// "Closed 3 tabs", with an Undo that brings back these tabs, never whatever else was done since.
-    /// `old`: they were the tabs left untouched long enough to fade.
-    func showClosedToast(_ count: Int, old: Bool = false) {
-        let what = old ? String(localized: "Closed \(count) old tabs", comment: "Toast after Clear closed the tabs that had faded, with Undo.")
-                       : String(localized: "Closed \(count) tabs", comment: "Toast after tabs are closed, with Undo.")
-        Toast.show(what, symbol: "xmark.circle", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
+    func showClosedToast(_ count: Int) {
+        Toast.show(String(localized: "Closed \(count) tabs", comment: "Toast after tabs are closed, with Undo."), symbol: "xmark.circle", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Close Tabs", comment: "Undo action name, shown in the Edit menu as Undo Close Tabs.") else { return }
             undo.undo()
         }), duration: 4, in: self)

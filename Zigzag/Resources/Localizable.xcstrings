@@ -3145,17 +3145,6 @@
         }
       }
     },
-    "Clear Old" : {
-      "comment" : "Button at the end of the Tabs label in the sidebar, while some tabs went unused for a while: closes those.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "清除旧标签页"
-          }
-        }
-      }
-    },
     "Clear all history?" : {
       "comment" : "Title of the sheet that asks before clearing all of History, from the History page, the menu or Settings.",
       "localizations" : {
@@ -3507,41 +3496,6 @@
         }
       }
     },
-    "Close the %lld tabs you haven’t used in a while" : {
-      "comment" : "Tooltip of the sidebar's Clear Old button.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Close the tab you haven’t used in a while"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Close the %lld tabs you haven’t used in a while"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "关闭 %lld 个你一段时间没用的标签页"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "Close the other %lld tabs" : {
       "comment" : "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.",
       "localizations" : {
@@ -3595,41 +3549,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "把这个标签页也关闭，空间将变为空"
-          }
-        }
-      }
-    },
-    "Closed %lld old tabs" : {
-      "comment" : "Toast after Clear closed the tabs that had faded, with Undo.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Closed %lld old tab"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Closed %lld old tabs"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "已关闭 %lld 个旧标签页"
-                }
-              }
-            }
           }
         }
       }

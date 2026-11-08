@@ -38,7 +38,7 @@ struct LocalizationTests {
                 == "Read and change what you see on github.com and 1 other site")
         // Every plural form the catalog keeps reaches the built app.
         let plurals = Self.catalogPlurals()
-        #expect(plurals.count > 30)
+        #expect(plurals.count > 25)
         for (key, forms) in plurals {
             if let one = forms["one"] { #expect(count(key, 1) == String.localizedStringWithFormat(one, 1), "\(key) for 1") }
             if let other = forms["other"] { #expect(count(key, 3) == String.localizedStringWithFormat(other, 3), "\(key) for 3") }

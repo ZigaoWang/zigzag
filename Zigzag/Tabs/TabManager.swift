@@ -418,19 +418,21 @@ final class TabManager {
         changed.send(.selection)
     }
 
-    /// What Clear closes in a space, in steps, one click each: first the faded tabs (unseen long enough to fade, not
-    /// playing), keeping today's; once none are faded, every tab but the one you're on; once that's the last, it too,
-    /// leaving the space empty. `faded` says which step it is, so the button can say so.
-    func tabsToClear(in spaceID: UUID, now: Date = Date()) -> (tabs: [Tab], faded: Bool) {
+    /// What Clear closes in a space: every tab but the one you're on (and the page beside it in a split), however
+    /// new; once those are all that's left, them too, leaving the space empty. Never a tab playing sound or in a call.
+    func tabsToClear(in spaceID: UUID) -> [Tab] {
         let tabs = self.tabs(in: spaceID)
         let current = selectedTab(in: spaceID)
         let partner = current.flatMap { self.partner(of: $0) }
-        let others = tabs.filter { $0 !== current && $0 !== partner }
-        let faded = others.filter { now.timeIntervalSince($0.lastActivated) > Tokens.Fade.start && !$0.isPlayingAudio }
-        if !faded.isEmpty { return (faded, true) }
-        if !others.isEmpty { return (others, false) }
-        // Last, the tab you're on (and the page beside it in a split).
-        return ([current, partner].compactMap { $0 }.filter { tabs.contains($0) }, false)
+        let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse }.map(\.id))
+        let ids = Self.clearing(tabs.map(\.id), current: current?.id, partner: partner?.id, busy: busy)
+        return tabs.filter { ids.contains($0.id) }
+    }
+
+    /// Clear's choice, by id. While other tabs are left, even only busy ones, yours stay.
+    nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partner: UUID?, busy: Set<UUID>) -> Set<UUID> {
+        let others = tabs.filter { $0 != current && $0 != partner }
+        return Set((others.isEmpty ? tabs : others).filter { !busy.contains($0) })
     }
 
     /// Ends a drag that opened another space and was dropped there: it becomes the space you're in, its colors and
