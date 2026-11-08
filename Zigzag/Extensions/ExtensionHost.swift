@@ -155,7 +155,11 @@ final class ExtensionHost: NSObject {
             announceExistingWindows(to: context)
             Passkeys.refresh()
             changed.send()
-            context.loadBackgroundContent { _ in }
+            // A background that won't start leaves its popup waiting with nothing in the log; it says why here.
+            context.loadBackgroundContent { [weak self] error in
+                guard let error else { return }
+                ExtensionLog.write("background for \(self?.displayName(for: id) ?? id) didn't start: \(error.localizedDescription)")
+            }
             return context
         } catch {
             debugLog("Extension \(id) failed to load: \(error.localizedDescription)")
