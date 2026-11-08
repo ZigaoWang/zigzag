@@ -87,20 +87,20 @@ final class OnboardingView: NSView {
         switch next {
         case .bring:
             content = BringPicker()
-            title = "Bring your stuff over"
-            body = "Passwords, bookmarks and history. Your old browser stays as it is."
+            title = String(localized: "Bring your stuff over", comment: "Title of the welcome window’s import step.")
+            body = String(localized: "Passwords, bookmarks and history. Your old browser stays as it is.", comment: "Line under the title of the welcome window’s import step.")
         case .sites:
             content = SitesPicker()
-            title = "Pin the sites you use"
-            body = "Each one stays at the top of your sidebar."
+            title = String(localized: "Pin the sites you use", comment: "Title of the welcome window’s step that picks favorite sites.")
+            body = String(localized: "Each one stays at the top of your sidebar.", comment: "Line under the title of the welcome window’s step that picks favorite sites.")
         case .ads:
             content = AdsPicker()
-            title = "Block ads?"
-            body = "Zigzag has a blocker built in. Pages load faster, with fewer trackers."
+            title = String(localized: "Block ads?", comment: "Title of the welcome window’s ad blocking step.")
+            body = String(localized: "Zigzag has a blocker built in. Pages load faster, with fewer trackers.", comment: "Line under the title of the welcome window’s ad blocking step.")
         default:
             content = ReadyPicker()
-            title = "Make Zigzag your default browser?"
-            body = "Links from Mail, Messages and other apps will open here."
+            title = String(localized: "Make Zigzag your default browser?", comment: "Title of the welcome window’s last step.")
+            body = String(localized: "Links from Mail, Messages and other apps will open here.", comment: "Line under the title of the welcome window’s last step. Mail and Messages are Apple’s apps.")
         }
         // The steps share one frame: moving between them changes only what's on it.
         let isNew = shell == nil
@@ -175,7 +175,7 @@ final class OnboardingView: NSView {
 /// One step's choice (left), and the picture of what it does (right).
 class StepContent: NSView {
     var onChange: (() -> Void)?
-    var primaryTitle: String { "Continue" }
+    var primaryTitle: String { String(localized: "Continue", comment: "Main button of a step in the welcome window.") }
     var primaryEnabled: Bool { true }
     var isBusy: Bool { false }
     /// What the step shows on the right: a Zigzag window that changes as you choose.
@@ -203,9 +203,9 @@ private final class StepPage: NSView {
     private var dots: [ColorView] = []
     private var title = Onboard.title("")
     private var body = Onboard.subtitle("")
-    private let back = Onboard.quietLight("Back")
-    private let next = Onboard.light("Continue")
-    private let skip = Onboard.quietLight("Skip")
+    private let back = Onboard.quietLight(String(localized: "Back", comment: "Button of a step in the welcome window: the step before."))
+    private let next = Onboard.light(String(localized: "Continue", comment: "Main button of a step in the welcome window."))
+    private let skip = Onboard.quietLight(String(localized: "Skip", comment: "Button of a step in the welcome window: go on without choosing."))
     private var content = StepContent()
     private var index = 0
 
@@ -505,9 +505,9 @@ private enum Onboard {
 /// "Welcome to", then the wordmark writing itself in, then one button. Nothing else on the screen moves.
 private final class HelloPage: NSView {
     var onStart: (() -> Void)?
-    private let welcome = Label("Welcome to", font: Tokens.Font.title(.light), color: Brand.ribbon.withAlphaComponent(0.78))
+    private let welcome = Label(String(localized: "Welcome to", comment: "First words of the welcome window, above the drawn ZIGZAG wordmark."), font: Tokens.Font.title(.light), color: Brand.ribbon.withAlphaComponent(0.78))
     private let wordmark = WordmarkView()
-    private let start = Onboard.light("Get Started")
+    private let start = Onboard.light(String(localized: "Get Started", comment: "Button on the first screen of the welcome window."))
     private var drewIn = false
 
     override init(frame: NSRect) {
@@ -767,11 +767,11 @@ private final class BrowserRow: InteractiveView {
         Task { @MainActor [weak self] in
             let text = await ImportCoordinator.preview(source)
             guard let self, case .idle = self.state else { return }
-            if text.contains("permission") {
+            if ImportCoordinator.asksPermission(text) {
                 // Found before starting, so it's fixed first instead of failing midway. A browser you use stays
                 // checked: Import asks for the OK, then carries on, rather than quietly leaving it behind.
                 self.needsAccess = true
-                self.detail.stringValue = "Needs your OK once"
+                self.detail.stringValue = String(localized: "Needs your OK once", comment: "Under a browser’s name in the welcome window: macOS has to allow reading it first.")
                 self.fixKind = .fullDiskAccess
                 self.onChange?()
             } else {
@@ -827,9 +827,10 @@ private final class BrowserRow: InteractiveView {
         Task { @MainActor in
             await touchFiles()
             let text = await ImportCoordinator.preview(source)
-            if text.contains("permission") {
-                note(waitingForSettings ? "Not yet. In Files & Folders, under Zigzag, turn on \(source.name), then click Check Again."
-                                        : "macOS still keeps it private. One switch in System Settings fixes it.")
+            if ImportCoordinator.asksPermission(text) {
+                note(waitingForSettings ? String(localized: "Not yet. In Files & Folders, under Zigzag, turn on \(source.name), then click Check Again.",
+                                                 comment: "Under a browser in the welcome window. The placeholder is a browser’s name; Files & Folders is a pane in macOS’s System Settings, Check Again a button here.")
+                                        : String(localized: "macOS still keeps it private. One switch in System Settings fixes it.", comment: "Under a browser in the welcome window."))
             } else {
                 needsAccess = false
                 waitingForSettings = false
@@ -876,11 +877,13 @@ private final class BrowserRow: InteractiveView {
         switch state {
         case .idle:
             if needsAccess {
-                fixButton.title = waitingForSettings ? "Check Again" : triedPicker && !isSafari ? "Open System Settings" : "Allow"
+                fixButton.title = waitingForSettings ? String(localized: "Check Again", comment: "Button by a browser in the welcome window: check again whether macOS allows reading it.")
+                    : triedPicker && !isSafari ? String(localized: "Open System Settings", comment: "Button by a browser in the welcome window. System Settings is macOS’s app.")
+                    : String(localized: "Allow", comment: "Button by a browser in the welcome window: let Zigzag read it.")
                 fixButton.isHidden = false
             }
         case .waiting:
-            status.stringValue = "Waiting"
+            status.stringValue = String(localized: "Waiting", comment: "By a browser in the welcome window while another one is imported first.")
             status.textColor = Onboard.dim(0.6)
             status.isHidden = !isChosen
         case .working:
@@ -888,20 +891,20 @@ private final class BrowserRow: InteractiveView {
             spinner.startLooping()
         case .done(let summary):
             if let first = summary.problems.first {
-                problem.stringValue = (summary.problems.map(\.message) + summary.notes).joined(separator: " ")
+                problem.stringValue = Self.sentences(summary.problems.map(\.message) + summary.notes)
                 problem.textColor = Tokens.Color.caution
                 fixKind = first.fix
                 switch first.fix {
-                case .retry: fixButton.title = "Try Again"
-                case .fullDiskAccess: fixButton.title = "Allow Access"
-                case .primaryPassword: fixButton.title = "Unlock"
-                case .exportFromApplePasswords: fixButton.title = "Show Me How"
+                case .retry: fixButton.title = String(localized: "Try Again", comment: "Button under a problem in the Import window.")
+                case .fullDiskAccess: fixButton.title = String(localized: "Allow Access", comment: "Button under a problem in the welcome window: let Zigzag read a browser’s data.")
+                case .primaryPassword: fixButton.title = String(localized: "Unlock", comment: "Button in the Import window after typing Firefox’s primary password.")
+                case .exportFromApplePasswords: fixButton.title = String(localized: "Show Me How", comment: "Button under a note in the welcome window: show how to export passwords.")
                 case .none: break
                 }
                 fixButton.isHidden = first.fix == .none
             } else {
                 // A note (some sign-ins stayed behind) reads quietly under a row that went fine.
-                problem.stringValue = summary.notes.joined(separator: " ")
+                problem.stringValue = Self.sentences(summary.notes)
                 problem.textColor = Onboard.dim(0.8)
                 status.stringValue = ""
                 status.isHidden = true
@@ -926,11 +929,24 @@ private final class BrowserRow: InteractiveView {
 
     /// "6 passwords, 3 spaces and 58 bookmarks".
     private static func sentence(_ s: ImportCoordinator.Summary) -> String {
-        func n(_ v: Int, _ one: String, _ many: String) -> String? { v > 0 ? "\(v.formatted()) \(v == 1 ? one : many)" : nil }
-        let parts = [n(s.passwords + s.updatedPasswords, "password", "passwords"), n(s.spaces, "space", "spaces"),
-                     n(s.bookmarks, "bookmark", "bookmarks"), n(s.signedInSites, "site with sign-ins", "sites with sign-ins"),
-                     n(s.history, "page of history", "pages of history")].compactMap { $0 }
-        return parts.isEmpty ? "Nothing new: it was already here" : ListFormatter.localizedString(byJoining: parts)
+        let passwords = s.passwords + s.updatedPasswords
+        let parts = [
+            passwords > 0 ? String(localized: "\(passwords) passwords", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil,
+            s.spaces > 0 ? String(localized: "\(s.spaces) spaces", comment: "Item in the list of what came over, in the Import window.") : nil,
+            s.bookmarks > 0 ? String(localized: "\(s.bookmarks) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil,
+            s.signedInSites > 0 ? String(localized: "\(s.signedInSites) sites with sign-ins", comment: "Item in the list of what came over, in the Import window.") : nil,
+            s.history > 0 ? String(localized: "\(s.history) pages of history", comment: "Item in the list of what came over, in the Import window.") : nil,
+        ].compactMap { $0 }
+        return parts.isEmpty ? String(localized: "Nothing new: it was already here", comment: "By a browser in the welcome window after importing, when nothing new came over.")
+            : Words.list(parts)
+    }
+
+    /// Sentences one after another, as the language writes them.
+    private static func sentences(_ list: [String]) -> String {
+        guard let first = list.first else { return "" }
+        return list.dropFirst().reduce(first) {
+            String(localized: "\($0) \($1)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
+        }
     }
 
     override func stateDidChange(animated: Bool) {
@@ -999,14 +1015,15 @@ private final class BringPicker: StepContent {
     private let list = ColorView(color: .clear)
     private var rows: [BrowserRow] = []
     private var separators: [ColorView] = []
-    private let empty = Onboard.line("No other browsers with something to bring were found on this Mac.")
+    private let empty = Onboard.line(String(localized: "No other browsers with something to bring were found on this Mac.", comment: "Welcome window’s import step, when no other browser was found."))
     private let hint = Label("", font: Tokens.Font.small(), color: Onboard.dim(0.7))
-    private let bringLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
+    private let bringLabel = Label(String(localized: "Bring", comment: "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"), font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
     private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
-    private let fileLink = Onboard.quiet("Import a password file…")
+    private let fileLink = Onboard.quiet(String(localized: "Import a password file…", comment: "Link in the welcome window’s import step: choose a passwords export file."))
     /// The one choice shown here: unlike bookmarks or history, sign-ins open your accounts, so you see it and can
     /// leave it off. On to start with, as passwords are.
-    private let signIns = OptionRow("Stay signed in to your sites", detail: "Brings over your sign-ins from this Mac. Nothing leaves it.",
+    private let signIns = OptionRow(String(localized: "Stay signed in to your sites", comment: "Row with a checkbox in the welcome window’s import step: bring over the sites you’re signed in to."),
+                                    detail: String(localized: "Brings over your sign-ins from this Mac. Nothing leaves it.", comment: "Under Stay signed in to your sites, in the welcome window’s import step."),
                                     symbol: "person.badge.key")
     /// Between the browsers and the sign-ins choice, as between two browsers.
     private let signInsRule = ColorView(color: Onboard.tint.withAlphaComponent(0.09))
@@ -1038,7 +1055,10 @@ private final class BringPicker: StepContent {
             add(source, chosen: suggested.contains(source.id))
         }
         if rows.isEmpty { addSubview(empty) }
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces and Tabs")] {
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
+                               (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
+                               (.history, String(localized: "History", comment: "Choice in the Import window: bring browsing history over.")),
+                               (.tabs, String(localized: "Spaces and Tabs", comment: "Choice in the Import window: bring Arc's spaces and tabs over."))] {
             let pill = DataToggle(name)
             pill.onChange = { [weak self] in self?.refresh() }
             addSubview(pill)
@@ -1055,7 +1075,11 @@ private final class BringPicker: StepContent {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var primaryTitle: String { isImporting ? "Importing…" : waiting.isEmpty ? "Continue" : "Import" }
+    override var primaryTitle: String {
+        isImporting ? String(localized: "Importing…", comment: "Main button in the Import window while importing.")
+            : waiting.isEmpty ? String(localized: "Continue", comment: "Main button of a step in the welcome window.")
+            : String(localized: "Import", comment: "Main button in the Import window.")
+    }
     override var primaryEnabled: Bool { waiting.isEmpty || !choice.isEmpty }
     override var isBusy: Bool { isImporting }
 
@@ -1160,9 +1184,12 @@ private final class BringPicker: StepContent {
         signIns.isHidden = !offersSignIns
         signInsRule.isHidden = signIns.isHidden
         // One line: with sign-ins too, it says the one prompt covers both rather than listing them.
-        hint.stringValue = isImporting ? (choice.contains(.signIns) ? "macOS will ask for your Mac’s password once. Type it, then click Always Allow."
-                                                                    : "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.")
-            : problems ? "Not everything came over yet." : ""
+        hint.stringValue = isImporting
+            ? (choice.contains(.signIns) ? String(localized: "macOS will ask for your Mac’s password once. Type it, then click Always Allow.",
+                                                  comment: "Welcome window’s import step while importing. Always Allow is macOS's own button.")
+                                         : String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.",
+                                                  comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button."))
+            : problems ? String(localized: "Not everything came over yet.", comment: "Welcome window’s import step when something didn’t come over.") : ""
         needsLayout = true
         onChange?()
     }
@@ -1184,7 +1211,7 @@ private final class BringPicker: StepContent {
                 let summary = await ImportCoordinator.run(row.source, wanted)
                 row.state = .done(summary)
                 if isSafari, choice.contains(.passwords), summary.problems.isEmpty {
-                    row.note("Safari’s passwords are in the Passwords app. Export them there, then use Import a password file.")
+                    row.note(String(localized: "Safari’s passwords are in the Passwords app. Export them there, then use Import a password file.", comment: "Under Safari in the welcome window. Passwords is Apple’s app; Import a password file is a link here."))
                     self.fileLink.isHidden = false
                 }
                 self.needsLayout = true
@@ -1227,7 +1254,8 @@ private final class BringPicker: StepContent {
             // macOS 27 keeps some browsers' folders private unless you switch them on, under Zigzag, in
             // Privacy & Security › Files & Folders.
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
-            row.note("In Files & Folders, find Zigzag and turn on \(browser.name). Then come back and click Check Again.")
+            row.note(String(localized: "In Files & Folders, find Zigzag and turn on \(browser.name). Then come back and click Check Again.",
+                             comment: "Under a browser in the welcome window. The placeholder is a browser’s name; Files & Folders is a pane in macOS’s System Settings, Check Again a button here."))
             row.awaitSettings()
         case .chromium(let browser):
             row.triedPicker = true
@@ -1237,8 +1265,9 @@ private final class BringPicker: StepContent {
             panel.canChooseFiles = false
             panel.allowsMultipleSelection = false
             panel.directoryURL = folder.deletingLastPathComponent()
-            panel.prompt = "Allow"
-            panel.message = "Click Allow to let Zigzag read \(browser.name)’s bookmarks and passwords. Nothing in \(browser.name) changes."
+            panel.prompt = String(localized: "Allow", comment: "Button of the folder panel that lets Zigzag read a browser’s data, from the welcome window.")
+            panel.message = String(localized: "Click Allow to let Zigzag read \(browser.name)’s bookmarks and passwords. Nothing in \(browser.name) changes.",
+                                   comment: "Message of the folder panel that lets Zigzag read a browser’s data. The placeholder is a browser’s name.")
             panel.beginSheetModal(for: window) { [weak self, weak row] _ in
                 guard let self, let row else { return }
                 row.recheckAccess()
@@ -1251,8 +1280,9 @@ private final class BringPicker: StepContent {
             panel.canChooseDirectories = true
             panel.canChooseFiles = false
             panel.directoryURL = folder
-            panel.prompt = "Allow"
-            panel.message = "Click Allow to let Zigzag read Safari’s bookmarks and history. Nothing in Safari changes."
+            panel.prompt = String(localized: "Allow", comment: "Button of the folder panel that lets Zigzag read a browser’s data, from the welcome window.")
+            panel.message = String(localized: "Click Allow to let Zigzag read Safari’s bookmarks and history. Nothing in Safari changes.",
+                                   comment: "Message of the folder panel that lets Zigzag read Safari’s data.")
             panel.beginSheetModal(for: window) { [weak self, weak row] _ in
                 guard let self, let row else { return }
                 row.recheckAccess()
@@ -1268,8 +1298,9 @@ private final class BringPicker: StepContent {
         guard let window, !isImporting else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)."
-        panel.prompt = "Import"
+        panel.message = String(localized: "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file).",
+                               comment: "Message of the open panel from the welcome window’s Import a password file… link.")
+        panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
             let row = self.add(ImportCoordinator.fileSource(url), chosen: true)
@@ -1404,7 +1435,8 @@ final class IntoZigzag: NSView {
             both.beginTime = now
             dot.add(both, forKey: "run")
         }
-        caption.stringValue = new == .importing ? "Bringing it over…" : new == .done ? "All in Zigzag" : ""
+        caption.stringValue = new == .importing ? String(localized: "Bringing it over…", comment: "Title of the Import window while importing.")
+            : new == .done ? String(localized: "All in Zigzag", comment: "Welcome window’s import step, once everything came over.") : ""
         badge.isHidden = true
         if new == .done {
             // Each browser glides into Zigzag and fades, one after another; then Zigzag gets a little pop.
@@ -1501,7 +1533,7 @@ final class IntoZigzag: NSView {
                 .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: Tokens.TypeSize.title, weight: .semibold).applying(.init(paletteColors: [.white, Tokens.Color.success])))
             check.image = symbol
             let text = NSMutableAttributedString(attachment: check)
-            text.append(NSAttributedString(string: "  All in Zigzag", attributes: [.font: Tokens.Font.title(.semibold), .foregroundColor: Brand.ribbon]))
+            text.append(NSAttributedString(string: "  " + String(localized: "All in Zigzag", comment: "Welcome window’s import step, once everything came over."), attributes: [.font: Tokens.Font.title(.semibold), .foregroundColor: Brand.ribbon]))
             let style = NSMutableParagraphStyle(); style.alignment = .center
             text.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: text.length))
             caption.attributedStringValue = text
@@ -1736,7 +1768,7 @@ final class SitesPicker: StepContent {
             loadIcon(tile, site: site.url, app: site.appURL, explicit: site.icon, bundled: site.bundled)
         }
         preview.page = .blank
-        preview.tabs = ["New Tab"]
+        preview.tabs = [String(localized: "New Tab", comment: "A tab’s title before it has a page, in the sidebar.")]
         preview.favoritesView.onReorder = { [weak self] bookmark, index in
             guard let self, let from = self.order.firstIndex(where: { $0.id == bookmark.id }) else { return }
             self.order.remove(at: from)
@@ -1768,7 +1800,7 @@ final class SitesPicker: StepContent {
         preview.liveFavorites = order
         onChange?()
     }
-    override var primaryTitle: String { "Continue" }
+    override var primaryTitle: String { String(localized: "Continue", comment: "Main button of a step in the welcome window.") }
 
     override func commit(_ done: @escaping () -> Void) {
         let have = Set(Library.shared.favorites.map { TabManager.normalize($0.url) })
@@ -1801,19 +1833,19 @@ final class SitesPicker: StepContent {
 private final class ExtensionsPicker: StepContent {
     private static let suggestions: [(id: String, name: String, kind: String, site: String, app: String?)] = [
         // A password app on your Mac fills nothing in a browser by itself: its browser extension is what does.
-        (ExtensionStore.onePasswordID, "1Password", "Needed to fill from the 1Password app", "https://1password.com", "com.1password.1password"),
-        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", "Needed to fill from Bitwarden", "https://bitwarden.com", "com.bitwarden.desktop"),
-        ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", "Checks your writing", "https://www.grammarly.com", nil),
-        ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", "Dark mode for every site", "https://darkreader.org", nil),
-        ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", "Saves pages to Notion", "https://www.notion.so", nil),
-        ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", "Translates what you select", "https://translate.google.com", nil),
+        (ExtensionStore.onePasswordID, "1Password", String(localized: "Needed to fill from the 1Password app", comment: "Under 1Password in the welcome window’s list of extensions. 1Password is a product name."), "https://1password.com", "com.1password.1password"),
+        ("nngceckbapebfimnlniiiahkandclblb", "Bitwarden", String(localized: "Needed to fill from Bitwarden", comment: "Under Bitwarden in the welcome window’s list of extensions. Bitwarden is a product name."), "https://bitwarden.com", "com.bitwarden.desktop"),
+        ("kbfnbcaeplbcioakkpcpgfkobkghlhen", "Grammarly", String(localized: "Checks your writing", comment: "Under Grammarly in the welcome window’s list of extensions."), "https://www.grammarly.com", nil),
+        ("eimadpbcbfnmbkopoojfekhnkhdbieeh", "Dark Reader", String(localized: "Dark mode for every site", comment: "Under Dark Reader in the welcome window’s list of extensions."), "https://darkreader.org", nil),
+        ("knheggckgoiihginacbkhaalnibhilkk", "Notion Web Clipper", String(localized: "Saves pages to Notion", comment: "Under Notion Web Clipper in the welcome window’s list of extensions. Notion is a product name."), "https://www.notion.so", nil),
+        ("aapbdbdomjkkjkaonfhkkikfgjllcleb", "Google Translate", String(localized: "Translates what you select", comment: "Under Google Translate in the welcome window’s list of extensions."), "https://translate.google.com", nil),
     ]
     private let list = ColorView(color: .clear)
     private var rows: [(ExtensionRow, String)] = []
     private var separators: [ColorView] = []
     private var installing = false
     private var finished = false
-    private let note = Label("Sign in to each one after it’s added.", font: Tokens.Font.small(), color: Onboard.dim(0.65))
+    private let note = Label(String(localized: "Sign in to each one after it’s added.", comment: "Note under the welcome window’s list of extensions."), font: Tokens.Font.small(), color: Onboard.dim(0.65))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1854,7 +1886,11 @@ private final class ExtensionsPicker: StepContent {
         preview.extensions = rows.filter { $0.0.isChosen || $0.0.state == .added }.compactMap { $0.0.iconTile.icon.image }
         onChange?()
     }
-    override var primaryTitle: String { installing ? "Adding…" : toAdd.isEmpty ? "Continue" : "Add \(toAdd.count)" }
+    override var primaryTitle: String {
+        installing ? String(localized: "Adding…", comment: "Main button of the welcome window’s extensions step while it adds them.")
+            : toAdd.isEmpty ? String(localized: "Continue", comment: "Main button of a step in the welcome window.")
+            : String(localized: "Add \(toAdd.count)", comment: "Main button of the welcome window’s extensions step: add the ones picked, with how many.")
+    }
     override var isBusy: Bool { installing }
 
     override func commit(_ done: @escaping () -> Void) {
@@ -1879,7 +1915,7 @@ private final class ExtensionsPicker: StepContent {
             self.rows.forEach { $0.0.isLocked = false }
             if failed {
                 // Say so and wait: Next then moves on.
-                self.note.stringValue = "Some couldn’t be added. You can add them later from the Chrome Web Store."
+                self.note.stringValue = String(localized: "Some couldn’t be added. You can add them later from the Chrome Web Store.", comment: "Welcome window’s extensions step, when some failed. Chrome Web Store is Google’s name.")
                 self.onChange?()
             } else {
                 // A beat to see them all marked Added, then on.
@@ -1966,15 +2002,15 @@ private final class ExtensionRow: InteractiveView {
         toolTip = nil
         switch state {
         case .idle: status.stringValue = ""
-        case .waiting: status.stringValue = "Waiting"; status.textColor = Onboard.dim(0.55)
-        case .working: status.stringValue = "Adding"
+        case .waiting: status.stringValue = String(localized: "Waiting", comment: "By an extension in the welcome window while others are added first."); status.textColor = Onboard.dim(0.55)
+        case .working: status.stringValue = String(localized: "Adding", comment: "By an extension in the welcome window while it’s added.")
         case .added:
-            status.stringValue = "Added"
+            status.stringValue = String(localized: "Added", comment: "By an extension in the welcome window once it’s added.")
             statusIcon.image = Tokens.Symbol.image("checkmark.circle.fill", size: 15)
             statusIcon.contentTintColor = Tokens.Color.success
             statusIcon.isHidden = false
         case .failed(let message):
-            status.stringValue = "Couldn’t add"
+            status.stringValue = String(localized: "Couldn’t add", comment: "By an extension in the welcome window when it couldn’t be added.")
             status.textColor = Tokens.Color.caution
             // Why, where you're already looking, not only on hover.
             kind.stringValue = message
@@ -2013,8 +2049,8 @@ private final class ExtensionRow: InteractiveView {
 /// Two clear answers, one picked, over a page that shows the difference: with ads, banners and a pop-up crowd
 /// the article; blocked, it's just the article.
 private final class AdsPicker: StepContent {
-    private let yes = Onboard.outline("Block Ads")
-    private let no = Onboard.outline("Show Ads")
+    private let yes = Onboard.outline(String(localized: "Block Ads", comment: "Answer in the welcome window’s ad blocking step."))
+    private let no = Onboard.outline(String(localized: "Show Ads", comment: "Answer in the welcome window’s ad blocking step."))
     private var block = true { didSet { Onboard.mark(chosen: block ? yes : no, other: block ? no : yes) } }
 
     override init(frame: NSRect) {
@@ -2048,7 +2084,7 @@ private final class ChoiceCard: InteractiveView {
     private let dot = ColorView(color: Onboard.accent)
     private let title: Label
     private let detail: Label
-    private let badge = Label("Recommended", font: Tokens.Font.small(.semibold), color: NSColor.white)
+    private let badge = Label(String(localized: "Recommended", comment: "Badge on the suggested answer in the welcome window."), font: Tokens.Font.small(.semibold), color: NSColor.white)
     private let badgeFill = ColorView(color: Onboard.accent)
 
     init(title text: String, detail line: String, recommended: Bool) {
@@ -2122,7 +2158,8 @@ final class LiveBrowser: NSView {
     private let side: CGFloat = 170
     private var shotsToken: SignalToken?
     var page: Page = .wikipedia { didSet { needsDisplay = true } }
-    var tabs = ["Wikipedia", "Recipes", "Trip ideas"] { didSet { needsDisplay = true } }
+    var tabs = ["Wikipedia", String(localized: "Recipes", comment: "A sample tab’s title in the welcome window’s picture of Zigzag."),
+                String(localized: "Trip ideas", comment: "A sample tab’s title in the welcome window’s picture of Zigzag.")] { didSet { needsDisplay = true } }
     private var background: NSColor = SpaceColor.sky.background
     /// Where a gradient ends, which way it runs, how grainy, and whether it's see-through: the frame as the real one draws it.
     private var background2: NSColor?
@@ -2214,7 +2251,7 @@ final class LiveBrowser: NSView {
         // Address field, with extension icons at its end once you've added some.
         let address = NSRect(x: pad, y: 32, width: side - pad * 2, height: 24)
         box(address, ink.withAlphaComponent(0.07), 7)
-        let label: String = { switch page { case .news: "thedailyfield.com"; case .wikipedia: "wikipedia.org"; case .blank: "Search or enter address" } }()
+        let label: String = { switch page { case .news: "thedailyfield.com"; case .wikipedia: "wikipedia.org"; case .blank: String(localized: "Search or enter address", comment: "Placeholder of the address field, in the welcome window’s picture of Zigzag.") } }()
         text(label, NSPoint(x: address.minX + 8, y: address.minY + 5), size: 10.5, color: ink.withAlphaComponent(0.5), width: address.width - 16)
         // Favorites: the sites you picked, with their own icons.
         let favs = liveFavorites != nil ? [] : favorites ?? Library.shared.favorites.prefix(8).compactMap { FaviconStore.shared.cachedIcon(for: $0.url) }
@@ -2237,7 +2274,7 @@ final class LiveBrowser: NSView {
             }
         }
         y += CGFloat(max(1, (slots + cols - 1) / cols)) * 37 + 8
-        text(Library.shared.spaces.first?.name ?? "Personal", NSPoint(x: pad + 2, y: y), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
+        text(Library.shared.spaces.first?.name ?? String(localized: "Personal", comment: "Name of the first space, in the welcome window’s picture of Zigzag."), NSPoint(x: pad + 2, y: y), size: 9.5, weight: .semibold, color: ink.withAlphaComponent(0.5))
         y += 18
         for (i, title) in tabs.enumerated() {
             let r = NSRect(x: pad - 3, y: y + CGFloat(i) * 26, width: side - pad * 2 + 6, height: 23)
@@ -2269,7 +2306,7 @@ final class LiveBrowser: NSView {
             if case .news(false) = page {
                 let badge = NSRect(x: pageRect.minX + 16, y: pageRect.maxY - 42, width: 180, height: 26)
                 box(badge, accent, 8)
-                text("Ads and trackers blocked", NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: .white, width: 170)
+                text(String(localized: "Ads and trackers blocked", comment: "Badge on a sample page in the welcome window’s picture of Zigzag."), NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: .white, width: 170)
             }
         } else {
         switch page {
@@ -2277,23 +2314,23 @@ final class LiveBrowser: NSView {
             break
         case .wikipedia:
             text("Wikipedia", NSPoint(x: px, y: pageRect.minY + 20), size: 18, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: pageRect.width - 44)
-            text("The free encyclopedia", NSPoint(x: px, y: pageRect.minY + 46), size: 11, color: pageInk.withAlphaComponent(0.5), width: pageRect.width - 44)
+            text(String(localized: "The free encyclopedia", comment: "Wikipedia’s tagline, on a sample page in the welcome window’s picture of Zigzag."), NSPoint(x: px, y: pageRect.minY + 46), size: 11, color: pageInk.withAlphaComponent(0.5), width: pageRect.width - 44)
             for (k, w) in [0.9, 0.82, 0.86, 0.64].enumerated() {
                 box(NSRect(x: px, y: pageRect.minY + 76 + CGFloat(k) * 13, width: (pageRect.width - 44) * w, height: 6), pageInk.withAlphaComponent(0.12), 3)
             }
             let card = NSRect(x: px, y: pageRect.minY + 142, width: pageRect.width - 44, height: pageRect.height - 162)
             box(card, accent.withAlphaComponent(0.16), 9)
             box(NSRect(x: card.minX + 14, y: card.minY + 14, width: 78, height: 22), accent, 6)
-            text("Read more", NSPoint(x: card.minX + 23, y: card.minY + 18), size: 10, weight: .semibold, color: .white, width: 70)
+            text(String(localized: "Read more", comment: "A button on a sample news page in the welcome window’s picture of Zigzag."), NSPoint(x: card.minX + 23, y: card.minY + 18), size: 10, weight: .semibold, color: .white, width: 70)
         case .news(let ads):
-            text("Today’s news", NSPoint(x: px, y: pageRect.minY + 20), size: 18, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: pageRect.width - 44)
+            text(String(localized: "Today’s news", comment: "Heading of a sample news page in the welcome window’s picture of Zigzag."), NSPoint(x: px, y: pageRect.minY + 20), size: 18, weight: .semibold, color: pageInk.withAlphaComponent(0.85), width: pageRect.width - 44)
             for (k, w) in [0.92, 0.84, 0.88, 0.7, 0.9, 0.8, 0.86, 0.6, 0.88, 0.75].enumerated() {
                 box(NSRect(x: px, y: pageRect.minY + 58 + CGFloat(k) * 15 + (k > 4 ? 12 : 0), width: (pageRect.width - 44) * w, height: 6), pageInk.withAlphaComponent(0.12), 3)
             }
             if ads {
                 func ad(_ r: NSRect, _ c: NSColor) {
                     box(r, c, 6)
-                    text("AD", NSPoint(x: r.minX + 8, y: r.minY + 6), size: 10, weight: .heavy, color: .white.withAlphaComponent(0.9))
+                    text(String(localized: "AD", comment: "Label on a sample ad in the welcome window’s picture of Zigzag."), NSPoint(x: r.minX + 8, y: r.minY + 6), size: 10, weight: .heavy, color: .white.withAlphaComponent(0.9))
                 }
                 ad(NSRect(x: px, y: pageRect.minY + 50, width: pageRect.width - 44, height: 40), NSColor.systemOrange)
                 ad(NSRect(x: pageRect.maxX - 140, y: pageRect.minY + 110, width: 118, height: 110), NSColor.systemPink)
@@ -2307,7 +2344,7 @@ final class LiveBrowser: NSView {
             } else {
                 let badge = NSRect(x: pageRect.maxX - 196, y: pageRect.maxY - 40, width: 180, height: 26)
                 box(badge, accent.withAlphaComponent(0.14), 8)
-                text("Ads and trackers blocked", NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: accent, width: 170)
+                text(String(localized: "Ads and trackers blocked", comment: "Badge on a sample page in the welcome window’s picture of Zigzag."), NSPoint(x: badge.minX + 12, y: badge.minY + 6), size: 10.5, weight: .semibold, color: accent, width: 170)
             }
         }
         }
@@ -2327,15 +2364,15 @@ final class LiveBrowser: NSView {
                 favicon.draw(in: NSRect(x: inset, y: panel.minY + 12, width: 16, height: 16))
             }
             text("wikipedia.org", NSPoint(x: inset + 24, y: panel.minY + 11), size: 11.5, weight: .semibold, color: pageInk.withAlphaComponent(0.85))
-            text("Secure connection", NSPoint(x: inset + 24, y: panel.minY + 26), size: 9.5, color: pageInk.withAlphaComponent(0.45))
+            text(String(localized: "Secure connection", comment: "In the site panel, in the welcome window’s picture of Zigzag."), NSPoint(x: inset + 24, y: panel.minY + 26), size: 9.5, color: pageInk.withAlphaComponent(0.45))
             box(NSRect(x: inset, y: panel.minY + 46, width: panel.width - 28, height: 1), pageInk.withAlphaComponent(0.08), 0)
-            text("Extensions", NSPoint(x: inset, y: panel.minY + 54), size: 9.5, weight: .semibold, color: pageInk.withAlphaComponent(0.45))
+            text(String(localized: "Extensions", comment: "Heading in the site panel, in the welcome window’s picture of Zigzag."), NSPoint(x: inset, y: panel.minY + 54), size: 9.5, weight: .semibold, color: pageInk.withAlphaComponent(0.45))
             for (k, icon) in extensions.prefix(6).enumerated() {
                 let r = NSRect(x: inset + CGFloat(k) * 32, y: panel.minY + 70, width: 28, height: 28)
                 box(r, pageInk.withAlphaComponent(0.06), 8)
                 icon.draw(in: r.insetBy(dx: 5, dy: 5))
             }
-            text("Block ads and trackers", NSPoint(x: inset, y: panel.minY + 112), size: 10.5, color: pageInk.withAlphaComponent(0.75))
+            text(String(localized: "Block ads and trackers", comment: "Switch in the site panel, in the welcome window’s picture of Zigzag."), NSPoint(x: inset, y: panel.minY + 112), size: 10.5, color: pageInk.withAlphaComponent(0.75))
             let toggle = NSRect(x: panel.maxX - 14 - 26, y: panel.minY + 110, width: 26, height: 16)
             box(toggle, accent, 8)
             NSColor.white.setFill()
@@ -2348,8 +2385,8 @@ final class LiveBrowser: NSView {
 
 /// The last step: make Zigzag the browser links open in, then start.
 private final class ReadyPicker: StepContent {
-    private let yes = Onboard.outline("Set as Default")
-    private let no = Onboard.outline("Not Now")
+    private let yes = Onboard.outline(String(localized: "Set as Default", comment: "Answer in the welcome window’s default browser step."))
+    private let no = Onboard.outline(String(localized: "Not Now", comment: "Answer in the welcome window’s default browser step."))
     private var makeDefault = true { didSet { Onboard.mark(chosen: makeDefault ? yes : no, other: makeDefault ? no : yes) } }
 
     override init(frame: NSRect) {
@@ -2363,7 +2400,7 @@ private final class ReadyPicker: StepContent {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isQuestion: Bool { true }
-    override var primaryTitle: String { "Start Browsing" }
+    override var primaryTitle: String { String(localized: "Start Browsing", comment: "Last button of the welcome window, after importing.") }
     override func preferredHeight(for width: CGFloat) -> CGFloat { Onboard.answerHeight }
 
     override func commit(_ done: @escaping () -> Void) {
