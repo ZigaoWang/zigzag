@@ -18,6 +18,12 @@ class SidebarRowView: InteractiveView {
     var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
     /// A pinned page that's open: a fine edge, as on a favorite's tile, so you can tell which are loaded.
     var showsOpenEdge = false { didSet { if oldValue != showsOpenEdge { stateDidChange(animated: false) } } }
+    /// Set while the pointer is leaving: the wash fades (`Motion.hoverFade`) rather than snapping off.
+    private var isLeavingHover = false
+    override var isHovered: Bool {
+        willSet { isLeavingHover = isHovered && !newValue }
+        didSet { isLeavingHover = false }
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -79,7 +85,12 @@ class SidebarRowView: InteractiveView {
         } else {
             base = nil
         }
-        layer?.set(backgroundColor: base.map { cgColor($0) }, animated: animated && !isHovered)
+        let fades = isLeavingHover && !showsCard && !Tokens.Motion.isFromKey
+        let animates = (animated && !isHovered) || fades
+        // Back under the pointer or chosen mid-fade, the new fill shows at once, not the fade still running.
+        if !animates { layer?.removeAnimation(forKey: "backgroundColor") }
+        layer?.set(backgroundColor: base.map { cgColor($0) }, animated: animates,
+                   duration: fades ? Tokens.Motion.hoverFade : Tokens.Motion.quick)
         // The tab you're on: a soft light card of the space's color, a crisp quiet edge and a shadow-sm. A row picked
         // up to carry stands off the list.
         if isLifted {

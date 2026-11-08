@@ -179,7 +179,9 @@ One look for each state, everywhere:
 - Rest: nothing (rows), `fieldFill` (fields, plain pills), `Chrome.field` (the sidebar's address and favorites), `glassFill` (glass tiles).
 - Hover: on the frame `Chrome.hover` (rows, the toolbar's buttons, the space dots); elsewhere `Color.hoverFill`
   (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
-  dark primary. Instant, both ways: a fade on something you sweep past all day reads as lag.
+  dark primary. Instant on the way in: a fade on something you sweep past all day reads as lag. A sidebar row's wash
+  goes softly as the pointer leaves (`Motion.hoverFade`, 150ms), so a sweep down the list trails off instead of
+  flickering.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
   rest. Things that read as objects (space keys, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
@@ -223,7 +225,7 @@ something came from, answers at once, and can be interrupted.
 
 - Curve: `Motion.easeOut` for anything arriving, leaving or settling; `easeInOut` only for something traveling
   across the screen. Never ease-in, never overshoot.
-- Durations: hover and press 0 (instant); `quick` 0.1 for small feedback; `selection` 0.15 for the card moving to a
+- Durations: hover and press 0 (instant), a row's hover leaving `hoverFade` 0.15; `quick` 0.1 for small feedback; `selection` 0.15 for the card moving to a
   new row; `standard` 0.2 for most transitions; panels arrive in 0.18 growing from 97% of their size out of what
   opened them (`FloatingPanelView.present`); `large` 0.3 is the ceiling.
 - Anything opened or changed from the keyboard is instant (`Motion.isFromKey`, `Motion.animate`); only the window's
