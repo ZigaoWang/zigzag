@@ -14,6 +14,61 @@
     }
   }
 
+  // An extension's pages and its background service worker posting to each other (navigator.serviceWorker and the
+  // worker's clients): in Chrome the worker controls its extension's pages and they reach it, in WebKit nothing the
+  // pages post arrives, and the worker's clients don't include them. Violentmonkey's popup and dashboard ask its
+  // background for everything that way, so its buttons did nothing and its dashboard stayed blank. Here it travels
+  // over a runtime port instead: the page connects when it first posts (or when the worker looks for its clients),
+  // and each end sees the other's messages as message events, as in Chrome.
+  const WORKER_PORT = '__zigzagWorkerClient';
+  const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
+  // What can travel over a port: Chrome would carry an Error across, so its name and message go along.
+  const portable = (value) => {
+    try { return JSON.parse(JSON.stringify(value, (key, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v))); } catch (e) { return value; }
+  };
+  const workerPage = (() => {
+    if (isWorker || typeof location === 'undefined' || location.protocol !== 'webkit-extension:') return null;
+    const container = globalThis.navigator && navigator.serviceWorker;
+    if (!container || typeof ServiceWorker === 'undefined' || typeof ServiceWorkerContainer === 'undefined') return null;
+    const own = location.origin + '/';
+    let port = null;
+    const connect = () => {
+      if (port) return port;
+      const api = globalThis.chrome || globalThis.browser;
+      port = api.runtime.connect({ name: WORKER_PORT });
+      port.onMessage.addListener((message) => {
+        if (!message || message.kind !== 'message') return;
+        const event = new MessageEvent('message', { data: message.data, origin: location.origin });
+        Object.defineProperty(event, 'source', { value: container.controller });
+        container.dispatchEvent(event);
+      });
+      // The worker was unloaded: the next message wakes it, over a new port.
+      port.onDisconnect.addListener(() => { port = null; });
+      return port;
+    };
+    const send = (message) => connect().postMessage({ kind: 'message', data: portable(message) });
+    const scriptURL = () => {
+      try { return new URL((globalThis.chrome || globalThis.browser).runtime.getManifest().background.service_worker, own).href; } catch (e) { return own; }
+    };
+    const standIn = Object.create(ServiceWorker.prototype, {
+      scriptURL: { get: scriptURL }, state: { value: 'activated' },
+      onstatechange: { value: null, writable: true }, onerror: { value: null, writable: true },
+      postMessage: { value: (message) => send(message) },
+      addEventListener: { value: () => {} }, removeEventListener: { value: () => {} }, dispatchEvent: { value: () => true },
+    });
+    try {
+      const controller = Object.getOwnPropertyDescriptor(ServiceWorkerContainer.prototype, 'controller').get;
+      Object.defineProperty(container, 'controller', { configurable: true, get: () => controller.call(container) || standIn });
+      const post = ServiceWorker.prototype.postMessage;
+      ServiceWorker.prototype.postMessage = function (message, ...rest) {
+        let url = '';
+        try { url = String(this.scriptURL); } catch (e) {}
+        return url.startsWith(own) ? send(message) : post.call(this, message, ...rest);
+      };
+    } catch (e) { return null; }
+    return { connect };
+  })();
+
   const start = () => {
     const api = globalThis.chrome || globalThis.browser;
     if (globalThis.__zigzagDifferences) return true;
@@ -56,6 +111,11 @@
       return setMemberIn(root, path.slice(0, -1), path[path.length - 1], standIn);
     };
     Object.defineProperty(globalThis, '__zigzagSetMember', { value: setMember, configurable: true });
+
+    // A page asked to connect to its worker (below), when the worker looks for its clients.
+    if (workerPage && api.runtime.onMessage && typeof api.runtime.onMessage.addListener === 'function') {
+      api.runtime.onMessage.addListener((message) => { if (message && message[WORKER_PORT] === 'connect') workerPage.connect(); });
+    }
 
     // webRequest: WebKit refuses a whole listener when its filter names a resource type it doesn't know ("webbundle")
     // or an address it won't match ("ws://*/*"), and the extension's blocking stops there (AdBlock, Adblock Plus).
@@ -157,6 +217,7 @@
       setMember(['runtime', 'onMessage'], 'addListener', (listener) => {
         if (typeof listener !== 'function') return add(listener);
         const wrapped = (message, sender, sendResponse) => {
+          if (message && message[WORKER_PORT]) return undefined;
           if (!sender || typeof sender.url !== 'string' || !sender.url.startsWith(ownPages)) return listener(message, sender, sendResponse);
           const result = listener(message, sender, (value) => sendResponse(withNul(value)));
           return result && typeof result.then === 'function' ? result.then(withNul) : result;
@@ -208,8 +269,9 @@
     // worker going while its ports are in use. Bitwarden's popup reads its vault over one, so it hung on a spinner.
     // While a port into the worker is open, it asks for its background page every 20 seconds: WebKit wakes the
     // background to answer, which starts its 30 seconds over.
-    const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
     const onConnect = api.runtime.onConnect;
+    const connectRaw = onConnect && typeof onConnect.addListener === 'function' ? onConnect.addListener.bind(onConnect) : null;
+    let keepOpen = null;
     if (isWorker && onConnect && typeof onConnect.addListener === 'function' && typeof api.runtime.getBackgroundPage === 'function') {
       const open = new Set();
       let beat = null;
@@ -224,17 +286,85 @@
       const watch = () => {
         if (watching) return;
         watching = true;
-        add((port) => {
-          open.add(port);
-          port.onDisconnect.addListener(() => { open.delete(port); settle(); });
-          settle();
-        });
+        add((port) => keepOpen(port));
+      };
+      keepOpen = (port) => {
+        if (open.has(port)) return;
+        open.add(port);
+        port.onDisconnect.addListener(() => { open.delete(port); settle(); });
+        settle();
       };
       setMember(['runtime', 'onConnect'], 'addListener', (listener) => {
         const result = add(listener);
         if (typeof listener === 'function') watch();
         return result;
       });
+    }
+
+    // The pages' way to the worker (above), at the worker's end; kept going while open, as other ports into it are.
+    // The extension's own listeners never see these ports, nor the ask to connect.
+    if (onConnect && typeof onConnect.addListener === 'function') {
+      const add = connectRaw;
+      const current = api.runtime.onConnect;
+      const extensionAdd = current.addListener.bind(current);
+      const remove = onConnect.removeListener && onConnect.removeListener.bind(onConnect);
+      const has = onConnect.hasListener && onConnect.hasListener.bind(onConnect);
+      if (isWorker) {
+        const pages = new Map();
+        add((port) => {
+          if (!port || port.name !== WORKER_PORT) return;
+          const url = (port.sender && port.sender.url) || '';
+          const client = {
+            id: `zigzag-${Date.now()}-${Math.random().toString(36).slice(2)}`, type: 'window', frameType: 'top-level', url,
+            postMessage: (message) => { try { port.postMessage({ kind: 'message', data: portable(message) }); } catch (e) {} },
+          };
+          pages.set(port, client);
+          if (keepOpen) keepOpen(port);
+          port.onMessage.addListener((message) => {
+            if (!message || message.kind !== 'message') return;
+            const event = new MessageEvent('message', { data: message.data });
+            Object.defineProperty(event, 'source', { value: client });
+            Object.defineProperty(event, 'waitUntil', { value: (promise) => { Promise.resolve(promise).catch(() => {}); } });
+            globalThis.dispatchEvent(event);
+          });
+          port.onDisconnect.addListener(() => pages.delete(port));
+        });
+        // The worker's clients include the pages, as in Chrome (Violentmonkey finds its offscreen page so). Pages not
+        // yet connected are asked to, and given a moment.
+        const workerClients = globalThis.clients;
+        if (workerClients && typeof workerClients.matchAll === 'function') {
+          const matchAll = workerClients.matchAll.bind(workerClients);
+          const get = typeof workerClients.get === 'function' ? workerClients.get.bind(workerClients) : null;
+          const gather = async () => {
+            try { const asked = api.runtime.sendMessage({ [WORKER_PORT]: 'connect' }); if (asked && asked.catch) asked.catch(() => {}); } catch (e) {}
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            return [...pages.values()];
+          };
+          try {
+            Object.defineProperty(workerClients, 'matchAll', { configurable: true, writable: true, value: async (options = {}) => {
+              const real = await matchAll(options);
+              if (options && options.type && options.type !== 'window' && options.type !== 'all') return real;
+              const ours = await gather();
+              return ours.concat([...real].filter((client) => !ours.some((page) => page.url === client.url)));
+            } });
+            if (get) {
+              Object.defineProperty(workerClients, 'get', { configurable: true, writable: true, value: async (id) => {
+                const page = [...pages.values()].find((client) => client.id === id);
+                return page || get(id);
+              } });
+            }
+          } catch (e) {}
+        }
+      }
+      const shown = new WeakMap();
+      setMember(['runtime', 'onConnect'], 'addListener', (listener) => {
+        if (typeof listener !== 'function') return extensionAdd(listener);
+        const wrapped = (port, ...rest) => { if (!port || port.name !== WORKER_PORT) return listener(port, ...rest); };
+        shown.set(listener, wrapped);
+        return extensionAdd(wrapped);
+      });
+      if (remove) setMember(['runtime', 'onConnect'], 'removeListener', (listener) => remove(shown.get(listener) || listener));
+      if (has) setMember(['runtime', 'onConnect'], 'hasListener', (listener) => has(shown.get(listener) || listener));
     }
 
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
