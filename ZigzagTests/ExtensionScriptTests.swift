@@ -119,7 +119,7 @@ struct ExtensionScriptTests {
     }
 
     /// A fake service worker background or extension page for the worker-messaging stand-in in webkit-differences.js.
-    private static func workerWorld(worker: Bool) -> JSContext {
+    private static func workerWorld(worker: Bool, setup: String = "") -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -150,6 +150,7 @@ struct ExtensionScriptTests {
           var navigator = { serviceWorker: { controller: null, dispatchEvent: () => true } };
         }
         """)
+        context.evaluateScript(setup)
         context.evaluateScript(ExtensionBridgeScript.differences)
         return context
     }
@@ -204,6 +205,24 @@ struct ExtensionScriptTests {
         #expect(refused?.toString() == "DataCloneError")
         worker.evaluateScript("__client.postMessage('plain', []); __client.postMessage('also')")
         #expect(worker.evaluateScript("__page.sent.map((m) => m.data).join()").toString() == "plain,also")
+    }
+
+    @Test func permissionsContainsAnswersForAnOriginWithAPort() {
+        // WebKit refuses a pattern with a port, as 1Password asks on local sites; Chrome answers, as the pattern without it does.
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.permissions = { contains: (query) => {
+          for (const origin of query.origins || []) {
+            if (/:\\d+\\//.test(origin)) throw new Error(`Invalid call to permissions.contains(). The 'origins' value is invalid, because '${origin}' is not a valid pattern.`);
+          }
+          return Promise.resolve((query.origins || []).every((origin) => origin === 'http://127.0.0.1/*'));
+        } };
+        """)
+        page.evaluateScript("""
+        chrome.permissions.contains({ origins: ['http://127.0.0.1:8777/*'] }).then((held) => { globalThis.__local = held; });
+        chrome.permissions.contains({ origins: ['https://example.com:8443/*'] }).then((held) => { globalThis.__other = held; });
+        """)
+        #expect(page.evaluateScript("__local").toBool() == true)
+        #expect(page.evaluateScript("__other").toBool() == false)
     }
 
     private static func quoted(_ text: String) -> String {
