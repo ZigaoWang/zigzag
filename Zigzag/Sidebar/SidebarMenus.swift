@@ -19,68 +19,81 @@ enum SidebarMenus {
         return item
     }
 
-    /// For several picked rows: what makes sense for all of them at once.
+    /// For several picked rows: what makes sense for all of them at once, each item saying how many it acts on.
+    /// With pinned pages and tabs picked together, each acts on the rows it makes sense for. The rows stay picked
+    /// after it, wherever they now are, so the next one applies to the same set.
     static func markedMenu(for items: [SidebarItem], controller: BrowserWindowController) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        let tabs = items.compactMap { item -> Tab? in if case .tab(let id) = item { controller.tabManager.tab(with: id) } else { nil } }
+        let manager = controller.tabManager
+        let rows = controller.markedTabRows(items)
+        let pins = controller.markedPinRows(items)
         let count = items.count
-        // A private window's tabs never join the pins every window shares, in a folder or on their own.
-        let isPrivate = controller.tabManager.isPrivate
-        if !isPrivate || tabs.isEmpty {
-            menu.addItem(Item("Add \(count) to New Folder") { controller.fileMarked(items, in: nil) })
-            let folders = Library.shared.folders(in: controller.tabManager.currentSpaceID)
+        // A private window's tabs never join the pins and favorites every window shares.
+        let isPrivate = manager.isPrivate
+        if !isPrivate || rows.isEmpty {
+            menu.addItem(Item(String(localized: "Add \(count) to New Folder", comment: "Menu item for several picked sidebar rows")) {
+                controller.fileMarked(items, in: nil)
+            })
+            let folders = Library.shared.folders(in: manager.currentSpaceID)
             if !folders.isEmpty {
-                let add = NSMenuItem(title: "Add \(count) to Folder", action: nil, keyEquivalent: "")
+                let add = NSMenuItem(title: String(localized: "Add \(count) to Folder", comment: "Menu item for several picked sidebar rows"), action: nil, keyEquivalent: "")
                 let sub = NSMenu()
-                for folder in folders {
-                    sub.addItem(Item(folder.name) { controller.fileMarked(items, in: folder.id) })
-                }
+                for folder in folders { sub.addItem(Item(folder.name) { controller.fileMarked(items, in: folder.id) }) }
                 add.submenu = sub
                 menu.addItem(add)
             }
         }
-        // Picked pinned rows, a pinned split's as one.
-        let pins = items.compactMap { item -> UUID? in if case .bookmark(let id) = item { id } else { nil } }
-        let pages = pins.flatMap { id in Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id] }
-            .compactMap(controller.tabManager.bookmarkTab(for:))
-        if !pins.isEmpty, Library.shared.spaces.count > 1 || !pages.isEmpty || !isPrivate {
-            let manager = controller.tabManager
-            if !menu.items.isEmpty { menu.addItem(.separator()) }
-            if Library.shared.spaces.count > 1 {
-                let move = NSMenuItem(title: "Move to Space", action: nil, keyEquivalent: "")
-                let sub = NSMenu()
-                let current = Library.shared.spaceID(ofBookmark: pins[0])
-                for space in Library.shared.spaces where space.id != current {
-                    sub.addItem(Item(space.name) {
-                        controller.sidebar.list.clearMarks()
-                        controller.libraryChange("Move to Space") { for id in pins { Library.shared.moveBookmark(id, to: Int.max, in: space.id) } }
-                    })
-                }
-                move.submenu = sub
-                menu.addItem(move)
+        if !isPrivate {
+            menu.addItem(Item(String(localized: "Add \(count) to Favorites", comment: "Menu item for several picked sidebar rows")) {
+                controller.favoriteMarked(items)
+            })
+        }
+        if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
+            let move = NSMenuItem(title: String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"), action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for space in Library.shared.spaces where space.id != manager.currentSpaceID {
+                sub.addItem(Item(space.name) { controller.moveMarked(items, to: space.id) })
             }
+            move.submenu = sub
+            menu.addItem(move)
+        }
+        if !pins.isEmpty {
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
+            let pages = controller.markedPinPages(pins).compactMap(manager.bookmarkTab(for:))
             if !pages.isEmpty {
-                menu.addItem(Item(pages.count == 1 ? "Unload Page" : "Unload \(pages.count) Pages") {
+                menu.addItem(Item(pages.count == 1 ? String(localized: "Unload Page", comment: "Menu item")
+                                  : String(localized: "Unload \(pages.count) Pages", comment: "Menu item for several picked pinned pages")) {
                     manager.close(pages)
                 })
             }
             // Pins are shared by every window: a private one doesn't take them away.
             if !isPrivate {
-                menu.addItem(Item(pins.count == 1 ? "Unpin Tab" : "Unpin \(pins.count) Tabs") { controller.unpinMarked(pins) })
-                menu.addItem(Item(Self.removePinsTitle(pins.count)) { controller.removePinnedWithUndo(pins) })
+                menu.addItem(Item(pins.count == 1 ? String(localized: "Unpin Tab", comment: "Menu item")
+                                  : String(localized: "Unpin \(pins.count) Tabs", comment: "Menu item for several picked pinned pages")) {
+                    controller.unpinMarked(pins)
+                })
             }
         }
-        if !tabs.isEmpty {
-            if !pins.isEmpty, !menu.items.isEmpty { menu.addItem(.separator()) }
+        if !rows.isEmpty {
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
             if !isPrivate {
-                menu.addItem(Item(tabs.count == 1 ? "Pin Tab" : "Pin \(tabs.count) Tabs") { controller.pinMarked(tabs) })
-                menu.addItem(.separator())
+                menu.addItem(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item")
+                                  : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
+                    controller.pinMarked(rows)
+                })
             }
-            menu.addItem(Item(tabs.count == 1 ? "Close Tab" : "Close \(tabs.count) Tabs") {
-                controller.sidebar.list.clearMarks()
-                controller.closeManyWithUndo(tabs)
+        }
+        // What goes, last, as in a single row's menu.
+        if !rows.isEmpty || (!pins.isEmpty && !isPrivate) { menu.addItem(.separator()) }
+        if !rows.isEmpty {
+            menu.addItem(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
+                              : String(localized: "Close \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
+                controller.closeManyWithUndoToast(controller.markedTabs(items))
             })
+        }
+        if !pins.isEmpty, !isPrivate {
+            menu.addItem(Item(Self.removePinsTitle(pins.count)) { controller.removePinnedWithUndo(pins) })
         }
         return menu
     }
@@ -496,6 +509,46 @@ extension BrowserWindowController {
         }
         if let made { revealNewFolder(made.id) }
         sidebar.list.mark(pins: ids)
+    }
+
+    /// Into the favorites, in order. They leave the list for the grid, so nothing stays picked.
+    func favoriteMarked(_ items: [SidebarItem]) {
+        pageChange("Add to Favorites") { [tabManager] in
+            Library.shared.together {
+                for item in items {
+                    switch item {
+                    case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.favoriteTab(tab) }
+                    case .bookmark(let id):
+                        Library.shared.makeFavorite(id)
+                        tabManager.bookmarkTab(for: id)?.isFavorite = true
+                    default: break
+                    }
+                }
+            }
+        }
+    }
+
+    /// Into another space, tabs and pinned pages each at the top of their own section there, in order. They leave
+    /// the list on show, so a toast says where they went, with Undo, as moving one tab does.
+    func moveMarked(_ items: [SidebarItem], to spaceID: UUID) {
+        guard let name = Library.shared.space(spaceID)?.name else { return }
+        let tabs = markedTabRows(items)
+        let pins = markedPinRows(items)
+        pageChange("Move to Space") { [tabManager] in
+            Library.shared.together {
+                for tab in tabs.reversed() { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: 0) }
+                var at = 0
+                for id in pins {
+                    Library.shared.moveBookmark(id, to: at, in: spaceID)
+                    at += Library.shared.pinnedSplit(containing: id) == nil ? 1 : 2
+                }
+            }
+        }
+        Toast.show(String(localized: "Moved \(items.count) to \(name)", comment: "Toast after moving several picked sidebar rows to another space"),
+                   symbol: "arrow.right.square", action: (String(localized: "Undo", comment: "Toast button"), { [weak self] in
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Move to Space" else { return }
+            undo.undo()
+        }), duration: 4, in: self)
     }
 
     /// Takes pinned pages out of the sidebar, open ones closing first. ⌘Z (or Undo on the toast) puts them back.
