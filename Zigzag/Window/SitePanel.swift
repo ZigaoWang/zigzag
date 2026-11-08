@@ -358,12 +358,16 @@ final class SitePanel: FloatingPanelView {
 
         // Actions are named tiles, as many to a row as fit; extensions are icons on the same rhythm below.
         var gap = Tokens.Space.x2
-        func grid(_ tiles: [PanelTile], columns: Int, height: ((CGFloat) -> CGFloat)? = nil) {
+        func grid(_ tiles: [PanelTile], columns: Int, centered: Bool = false, height: ((CGFloat) -> CGFloat)? = nil) {
             let side = floor((inner - gap * CGFloat(columns - 1)) / CGFloat(columns))
             let h = height?(side) ?? side
+            let rows = (tiles.count + columns - 1) / columns
             for (i, tile) in tiles.enumerated() {
                 let column = i % columns, row = i / columns
-                place(tile, NSRect(x: pad + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (h + gap), width: side, height: h))
+                // A shorter last row sits in the middle under the full ones (three over two), not hanging to the left.
+                let inRow = row == rows - 1 ? tiles.count - row * columns : columns
+                let shift = centered ? CGFloat(columns - inRow) * (side + gap) / 2 : 0
+                place(tile, NSRect(x: pad + shift + CGFloat(column) * (side + gap), y: y + CGFloat(row) * (h + gap), width: side, height: h))
             }
             y += CGFloat((tiles.count + columns - 1) / columns) * (h + gap) - gap
         }
@@ -376,7 +380,7 @@ final class SitePanel: FloatingPanelView {
             let widest = actionTiles.map(\.captionWidth).max() ?? 0
             let fit = max(1, Int(inner / max(widest, 1)))
             let rows = fit >= actionTiles.count ? 1 : (actionTiles.count + fit - 1) / fit
-            grid(actionTiles, columns: (actionTiles.count + rows - 1) / rows) { _ in PanelTile.captionedHeight }
+            grid(actionTiles, columns: (actionTiles.count + rows - 1) / rows, centered: true) { _ in PanelTile.captionedHeight }
             gap = spacing
             y += Tokens.Space.x5
         }
