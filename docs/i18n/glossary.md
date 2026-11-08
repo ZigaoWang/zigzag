@@ -8,8 +8,27 @@ Where macOS or Safari already has a word for the same thing, Zigzag uses Apple's
 considered and not used, so a translator doesn't bring them back.
 
 Brand and product names stay as they are in every sentence: Zigzag, Arc, Chrome, Safari, Firefox, Brave, Edge,
-macOS, iCloud, Google. A space goes between Chinese and a Latin word or a number ("从 Chrome 导入", "3 个标签页"),
-as Apple writes it.
+macOS, iCloud, Google, 1Password.
+
+## Typography
+
+The rules the catalog follows, checked by `LocalizationTests`:
+
+- **A space between Chinese and a Latin word or a number**, as Apple's zh-Hans UI writes it (使用 iCloud 钥匙串,
+  在“访达”中显示, Finder's 12 项): 从 Chrome 导入, 关闭 3 个标签页, 第 2 步，共 7 步. No space beside full-width
+  punctuation or quotes: “%@”的页面, 已从“个人”归档.
+- A placeholder gets the same spacing as what fills it: a site, a browser, a count or an extension's name is
+  Latin or a number, so it gets spaces (已清除 %@ 的 Cookie); a weekday or a language is Chinese, so none
+  (%@下午, 此页面为%@).
+- **Full-width punctuation** in Chinese sentences: ，。：；？！（）. A sentence that is all Latin keeps its own
+  (© 2026 Zigao Wang. Apache License 2.0.). Lists of short items join with 、 (6 个密码、历史记录).
+- **Quotes** “” around names the person gave (a space, a file) and around Zigzag's and macOS's own buttons and
+  places named in a sentence (点按“始终允许”, “系统设置 › 隐私与安全性”). Not around an extension's name: when it
+  has none, the sentence gets 一个扩展 or 此扩展 in its place.
+- Menu paths keep Zigzag's ›, inside one pair of quotes: “设置 › 扩展”.
+- Times of day in History's session names: 上午 (5–12), 下午 (12–17), 晚上 (17–21), 夜里 (21–24), 凌晨 (0–5).
+- Plurals: Chinese has one form, so one reads like many (关闭 1 个标签页). Sentences that said “it” for one and
+  “they” for many are worded to fit both.
 
 ## Places and things
 
@@ -44,6 +63,7 @@ as Apple writes it.
 | Archive (old tabs put away) | 归档 | 存档 | Arc's Chinese users say 归档. |
 | Getting Started (the guide) | 入门 | 新手指南 | Short, Apple-like. |
 | What's New | 新功能 | 更新内容 | Apple uses 新功能. |
+| Chrome Web Store | Chrome 网上应用店 | Chrome 应用商店 | Google's own Chinese name for it. |
 
 ## Actions
 
@@ -65,6 +85,9 @@ as Apple writes it.
 | Find… | 查找… | | macOS. |
 | Zoom In / Out | 放大 / 缩小 | | macOS. |
 | Set as Default Browser | 设为默认浏览器 | | macOS's own wording in Desktop & Dock. |
+| Not Now | 以后 | 以后再说, 现在不 | Apple's button. |
+| Copy | 拷贝 | 复制 | macOS's Edit menu. 复制 is Duplicate (复制标签页). |
+| Save | 存储 | 保存 | macOS's File menu (存储为…). |
 
 ## How it reads
 
