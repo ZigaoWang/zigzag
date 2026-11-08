@@ -76,7 +76,7 @@ nonisolated enum JSONStore {
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
-                Toast.show(SaveFailure.message("Zigzag couldn’t save your tabs and spaces", error), symbol: "exclamationmark.triangle",
+                Toast.show(SaveFailure.message(String(localized: "Zigzag couldn’t save your tabs and spaces", comment: "Toast when Zigzag can't write its library of spaces and tabs; a reason may follow as its own sentence."), error), symbol: "exclamationmark.triangle",
                            duration: 8, in: controller)
             }
         }
