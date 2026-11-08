@@ -19,6 +19,8 @@ final class TabManager {
     /// Most recently used first. Drives Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     private var closedTabs: [ClosedTab] = []
+    /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty, or every one of the last lot closed at once.
+    private var closedLimit = 50
 
     weak var host: TabHost? {
         didSet { allTabs.forEach { $0.host = host } }
@@ -696,7 +698,7 @@ final class TabManager {
         guard var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) else { return }
         closedTabs.append(ClosedTab(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
                                     interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, split: pair))
-        if closedTabs.count > 50 { closedTabs.removeFirst() }
+        if closedTabs.count > closedLimit { closedTabs.removeFirst(closedTabs.count - closedLimit) }
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
         recentTabIDs.removeAll { $0 == tab.id }
@@ -729,6 +731,7 @@ final class TabManager {
         let closingSelected = tabs.contains { $0 === selected }
         let order = tabs.filter { $0 !== selected } + (closingSelected ? [selected].compactMap { $0 } : [])
         let ids = order.filter { $0.bookmarkID == nil }.map(\.id)
+        closedLimit = max(50, ids.count)
         order.forEach { close($0) }
         return ids
     }
