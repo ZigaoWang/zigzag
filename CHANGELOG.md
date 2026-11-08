@@ -21,6 +21,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - In full screen the window buttons come down in a proper bar, not over the page.
 - Toasts stay centered over the page when the sidebar or full screen changes, and the translate and default browser offers have a close button.
 - Site controls are the sidebar's width whether it's shown or hidden.
+- Installing Bitwarden no longer warns that its popup doesn't work: it opens.
 
 ## [0.5.18] - 2026-11-08
 
