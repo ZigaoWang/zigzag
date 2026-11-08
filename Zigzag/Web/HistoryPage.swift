@@ -280,7 +280,11 @@ enum HistoryPage {
     private static var words: String {
         // A number no translation holds, to find where the count goes.
         let many = 1_000_000_007
-        func counted(_ text: (Int) -> String) -> String { text(many).replacingOccurrences(of: String(many), with: "{n}") }
+        // As written in the sentence, with the language's digit grouping ("1,000,000,007"), or plain where it has none.
+        func counted(_ text: (Int) -> String) -> String {
+            text(many).replacingOccurrences(of: String.localizedStringWithFormat("%lld", many), with: "{n}")
+                .replacingOccurrences(of: String(many), with: "{n}")
+        }
         func pages(_ n: Int) -> String { String(localized: "\(n) pages", comment: "Count of pages in a session, or under a site, on the History page.") }
         let words: [String: String] = [
             "span": String(localized: "\("{from}") to \("{to}")", comment: "The time a session or a site's pages span on the History page, like “2:10 to 4:45 PM”."),
