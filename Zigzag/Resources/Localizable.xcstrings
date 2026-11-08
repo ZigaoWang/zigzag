@@ -834,11 +834,14 @@
     "Add %lld" : {
       "comment" : "Main button of the welcome window’s extensions step: add the ones picked, with how many."
     },
+    "Add %lld to Favorites" : {
+      "comment" : "Menu item for several picked sidebar rows"
+    },
     "Add %lld to Folder" : {
-      "comment" : "Item in the sidebar's context menu for several picked rows. Opens a list of folders. Count is how many rows are picked."
+      "comment" : "Menu item for several picked sidebar rows"
     },
     "Add %lld to New Folder" : {
-      "comment" : "Item in the sidebar's context menu for several picked rows. Count is how many rows are picked."
+      "comment" : "Menu item for several picked sidebar rows"
     },
     "Add Extension" : {
       "comment" : "Button that adds the extension, in the sheet that asks first."
@@ -1063,7 +1066,7 @@
       "comment" : "Title of the Import window while importing.\nUnder a browser's name in the Import window while importing from it."
     },
     "Brings over your sign-ins from this Mac. Nothing leaves it." : {
-      "comment" : "Note under the Stay signed in to your sites switch, in the welcome window."
+      "comment" : "Under Stay signed in to your sites, in the welcome window’s import step."
     },
     "Brought over sign-ins for %lld sites from %@." : {
       "comment" : "Import window, when only sign-ins came over: how many sites, then a browser's name, like Chrome.",
@@ -1351,7 +1354,7 @@
       }
     },
     "Close %lld Tabs" : {
-      "comment" : "In the tab overview (all spaces' tabs as cards), a button that closes the picked tabs.\nIn the tab overview (all spaces' tabs as cards), an item in a card's context menu: closes the picked tabs.\nItem in the sidebar's context menu for several picked rows.",
+      "comment" : "File menu item while several sidebar rows are picked\nIn the tab overview (all spaces' tabs as cards), a button that closes the picked tabs.\nIn the tab overview (all spaces' tabs as cards), an item in a card's context menu: closes the picked tabs.\nMenu item for several picked tabs",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1386,7 +1389,7 @@
       "comment" : "Tooltip of the close button on an extension's side panel."
     },
     "Close Tab" : {
-      "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab."
+      "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu item\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab."
     },
     "Close Tabs" : {
       "comment" : "In the tab overview (all spaces' tabs as cards), a button that closes the picked tabs.\nUndo action name, shown in the Edit menu as Undo Close Tabs."
@@ -2089,9 +2092,6 @@
     "Its pages load fresh next time." : {
       "comment" : "Message of the sheet that removes one site's data."
     },
-    "Its popup" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag: the panel an extension opens from its button."
-    },
     "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store." : {
       "comment" : "Message of the sheet that asks before removing an extension."
     },
@@ -2238,6 +2238,9 @@
     "More" : {
       "comment" : "Tooltip of the … button in the downloads panel.\nTooltip of the … button in the site panel."
     },
+    "Move %lld to Space" : {
+      "comment" : "Menu item for several picked sidebar rows"
+    },
     "Move Favorite" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Move Favorite."
     },
@@ -2272,7 +2275,7 @@
       "comment" : "A command in the command bar: moves the tab to another space. The name is the space's."
     },
     "Move to Space" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nItem in a tab's context menu in the sidebar. Opens a list of spaces.\nItem in the sidebar's context menu for several picked rows. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space."
+      "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nItem in a tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space."
     },
     "Move to Tabs" : {
       "comment" : "Item in a favorite's context menu. Turns the favorite back into a pinned tab.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs."
@@ -2282,6 +2285,17 @@
     },
     "Move to Window" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Move to Window."
+    },
+    "Moved %lld to %@" : {
+      "comment" : "Toast after moving several picked sidebar rows to another space",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Moved %1$lld to %2$@"
+          }
+        }
+      }
     },
     "Moved or deleted" : {
       "comment" : "Under a download's name in the downloads panel: the downloaded file is no longer where it was saved."
@@ -2341,7 +2355,7 @@
       "comment" : "Tooltip of the Never button in the save-password prompt. The placeholder is a site, like github.com."
     },
     "New Folder" : {
-      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in the Edit menu as Undo New Folder."
+      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder."
     },
     "New Folder Inside" : {
       "comment" : "Item in a folder's context menu in the sidebar."
@@ -2741,7 +2755,7 @@
       "comment" : "Tooltip of the Float action in the site panel.\nView menu item."
     },
     "Pin %lld Tabs" : {
-      "comment" : "Item in the sidebar's context menu for several picked rows.",
+      "comment" : "Menu item for several picked tabs",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -2767,7 +2781,10 @@
       "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view."
     },
     "Pin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab."
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab."
+    },
+    "Pin Tabs" : {
+      "comment" : "Undo action name, shown in Edit › Undo."
     },
     "Pin This Page" : {
       "comment" : "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead."
@@ -2970,6 +2987,9 @@
     "Remove %lld Pages from History" : {
       "comment" : "Tooltip of the × on a site's group of pages on the History page. Always two or more."
     },
+    "Remove %lld Pinned Pages" : {
+      "comment" : "Menu item: takes several picked pinned pages out of the sidebar"
+    },
     "Remove Folder" : {
       "comment" : "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.\nUndo action name, shown in Edit › Undo."
     },
@@ -2978,6 +2998,12 @@
     },
     "Remove Pages from History" : {
       "comment" : "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."
+    },
+    "Remove Pinned Page" : {
+      "comment" : "Menu item: takes a pinned page out of the sidebar"
+    },
+    "Remove Pinned Pages" : {
+      "comment" : "Undo action name, shown in Edit › Undo."
     },
     "Remove Session from History" : {
       "comment" : "Tooltip of the × on a session's heading on the History page."
@@ -3011,6 +3037,12 @@
     },
     "Remove this page from History?" : {
       "comment" : "Title of the sheet that asks before removing one page a search found from History."
+    },
+    "Removed %lld pinned pages" : {
+      "comment" : "Toast after removing several pinned pages"
+    },
+    "Removed 1 pinned page" : {
+      "comment" : "Toast"
     },
     "Remove…" : {
       "comment" : "Button on a site's row in Settings › Privacy › Site Data."
@@ -3492,7 +3524,7 @@
       "comment" : "Edit › Speech menu item."
     },
     "Stay signed in to your sites" : {
-      "comment" : "Switch in the welcome window’s import step: bring over the sites you’re signed in to."
+      "comment" : "Row with a checkbox in the welcome window’s import step: bring over the sites you’re signed in to."
     },
     "Step %lld of %lld" : {
       "comment" : "Which step of the getting-started guide, a card in the window this is, like Step 2 of 7.",
@@ -3836,10 +3868,10 @@
       "comment" : "Explanation under “Fill saved passwords” in Settings › Passwords."
     },
     "Undo" : {
-      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nEdit menu item."
+      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nEdit menu item.\nToast button"
     },
     "Unload %lld Pages" : {
-      "comment" : "Item in the sidebar's context menu for several picked rows. Unloads the open pages of the picked pinned tabs.",
+      "comment" : "Menu item for several picked pinned pages",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -3862,7 +3894,7 @@
       }
     },
     "Unload Page" : {
-      "comment" : "Item in a favorite's context menu. Unloads the page; the favorite stays.\nItem in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.\nTooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.\nTooltip of a favorite's close button: unloads its page; the favorite stays."
+      "comment" : "Item in a favorite's context menu. Unloads the page; the favorite stays.\nItem in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.\nMenu item\nTooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.\nTooltip of a favorite's close button: unloads its page; the favorite stays."
     },
     "Unload Pages" : {
       "comment" : "Item in a favorite's context menu. Unloads both pages of a split favorite.\nItem in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view."
@@ -3877,7 +3909,7 @@
       "comment" : "Under an extension's name in Settings › Extensions: it was loaded from a folder."
     },
     "Unpin %lld Tabs" : {
-      "comment" : "Item in the sidebar's context menu for several picked rows.",
+      "comment" : "Menu item for several picked pinned pages",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -3903,7 +3935,10 @@
       "comment" : "Item in a pinned tab's context menu in the sidebar."
     },
     "Unpin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nUndo action name, shown in the Edit menu as Undo Unpin Tab."
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab."
+    },
+    "Unpin Tabs" : {
+      "comment" : "Undo action name, shown in Edit › Undo."
     },
     "Unpinned" : {
       "comment" : "Toast after a pinned tab is unpinned."
