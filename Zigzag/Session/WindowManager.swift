@@ -165,6 +165,12 @@ final class WindowManager {
     /// Opens a URL from outside (another app, Finder, the Dock) in the frontmost window. Never a private one: a link
     /// from elsewhere doesn't get to choose that.
     func openExternal(_ url: URL) {
+        // Settings › General can send links to a mini window of their own instead; files and links before onboarding
+        // still open here. Mini windows are never saved, so nothing about the session changes.
+        if opensInMini(url) {
+            MiniWindowController.open(url: url)
+            return
+        }
         // A link opened before onboarding was finished: you're browsing now, so the next launch restores this window
         // instead of starting over with the welcome (and then saving over what you opened).
         if Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
@@ -175,6 +181,11 @@ final class WindowManager {
         } else {
             newWindow(url: url)
         }
+    }
+
+    /// A page from another app goes to a mini window rather than a tab here.
+    func opensInMini(_ url: URL) -> Bool {
+        MiniWindowController.takes(url, settingOn: MiniWindowController.opensExternalLinks, needsOnboarding: Self.needsOnboarding)
     }
 
     // MARK: Saving

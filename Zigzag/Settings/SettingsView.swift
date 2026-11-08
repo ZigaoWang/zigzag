@@ -548,6 +548,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let favoritesPerRow = DropdownButton()
     private let newTabPlace = DropdownButton()
     private let pinOfferToggle = Toggle()
+    private let miniToggle = Toggle()
     private let energyToggle = Toggle()
     private let languagePicker = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
@@ -675,6 +676,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
                                  control: defaultControl))
+        miniToggle.onChange = { on in MiniWindowController.opensExternalLinks = on }
+        generalGroup.add(FormRow(title: String(localized: "Open links from other apps in a mini window", comment: "A setting in Settings › General."),
+                                 detail: String(localized: "A small window for the page, without the sidebar. Open it in Zigzag to keep it as a tab.", comment: "Explanation under “Open links from other apps in a mini window” in Settings › General."),
+                                 control: miniToggle))
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
             // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
@@ -1481,6 +1486,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
+        miniToggle.isOn = MiniWindowController.opensExternalLinks
         energyToggle.isOn = EnergyWatch.sleepsBusyTabs
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
         refreshDownloadPlace()

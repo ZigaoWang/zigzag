@@ -67,7 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MoveToApplications.offerWhenReady()
         launched = true
         if !pendingURLs.isEmpty {
-            if !restored { WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false) }
+            // A link for a mini window opens just that, as it would with Zigzag already running.
+            if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
+                WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
+            }
             pendingURLs.forEach { WindowManager.shared.openExternal($0) }
             pendingURLs = []
         } else if !restored {
