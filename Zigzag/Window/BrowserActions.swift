@@ -260,14 +260,17 @@ extension BrowserWindowController: NSMenuItemValidation {
         Toast.show("\(Int((zoom * 100).rounded()))%", symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass", in: self)
     }
 
-    @objc func showWebInspector(_ sender: Any?) {
-        guard let webView = selectedWebView else { return }
-        // There is no public API to open the inspector; WebKit's private one is stable and widely used.
+    /// The page in front's Web Inspector. There is no public API to open it; WebKit's private one is stable and widely used.
+    private var selectedInspector: NSObject? {
         let inspectorSelector = NSSelectorFromString("_inspector")
-        guard webView.responds(to: inspectorSelector),
-              let inspector = webView.perform(inspectorSelector)?.takeUnretainedValue() as? NSObject else { return }
-        let show = NSSelectorFromString("show")
-        if inspector.responds(to: show) { inspector.perform(show) }
+        guard let webView = selectedWebView, webView.responds(to: inspectorSelector) else { return nil }
+        return webView.perform(inspectorSelector)?.takeUnretainedValue() as? NSObject
+    }
+
+    /// ⌥⌘I again puts it away, as in Safari and Chrome.
+    @objc func showWebInspector(_ sender: Any?) {
+        guard let inspector = selectedInspector else { return }
+        inspector.callIfPresent(inspector.inspectorFlag("isVisible") ? "close" : "show")
     }
 
     @objc func viewSource(_ sender: Any?) {
@@ -575,5 +578,20 @@ enum ZoomLevels {
         let host = HistoryStore.normalizedHost(url)
         if abs(zoom - 1) < 0.001 { levels[host] = nil } else { levels[host] = Double(zoom) }
         UserDefaults.standard.set(levels, forKey: key)
+    }
+}
+
+/// Calls on WebKit's private inspector object, each checked first, so a name WebKit drops does nothing rather than crash.
+private extension NSObject {
+    func callIfPresent(_ name: String) {
+        let selector = NSSelectorFromString(name)
+        if responds(to: selector) { perform(selector) }
+    }
+
+    func inspectorFlag(_ name: String) -> Bool {
+        let selector = NSSelectorFromString(name)
+        guard responds(to: selector) else { return false }
+        typealias Getter = @convention(c) (AnyObject, Selector) -> Bool
+        return unsafeBitCast(method(for: selector), to: Getter.self)(self, selector)
     }
 }
