@@ -30,19 +30,19 @@ enum PageScreenshot {
     static func take(_ tab: Tab, in controller: BrowserWindowController) {
         guard !isTaking, canTake(tab), let webView = tab.webView else { return }
         isTaking = true
-        Toast.show("Taking a screenshot of the whole page…", symbol: "camera.viewfinder", duration: 30, in: controller)
+        Toast.show(String(localized: "Taking a screenshot of the whole page…", comment: "Toast while Zigzag takes a screenshot of the whole page."), symbol: "camera.viewfinder", duration: 30, in: controller)
         Task { @MainActor in
             defer { isTaking = false }
             let (data, onScreenOnly) = await capture(webView)
             guard let data else {
-                Toast.show("Couldn’t take a screenshot of this page", symbol: "exclamationmark.triangle", in: controller)
+                Toast.show(String(localized: "Couldn’t take a screenshot of this page", comment: "Toast when a screenshot of the whole page fails."), symbol: "exclamationmark.triangle", in: controller)
                 return
             }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setData(data, forType: .png)
             let name = fileName(for: tab)
-            let note = onScreenOnly ? "Copied what’s on screen: this page scrolls inside itself" : "Screenshot copied"
-            Toast.show(note, symbol: "camera.viewfinder", action: ("Save", { [weak controller] in
+            let note = onScreenOnly ? String(localized: "Copied what’s on screen: this page scrolls inside itself", comment: "Toast after taking a screenshot of the whole page. Only the visible part could be taken.") : String(localized: "Screenshot copied", comment: "Toast after taking a screenshot of the whole page.")
+            Toast.show(note, symbol: "camera.viewfinder", action: (String(localized: "Save", comment: "Button in the toast after taking a screenshot: saves it as a file."), { [weak controller] in
                 guard let controller else { return }
                 save(data, name: name, in: controller)
             }), duration: 8, in: controller)
@@ -492,9 +492,9 @@ enum PageScreenshot {
             MainActor.assumeIsolated {
                 do {
                     try data.write(to: url)
-                    Toast.show("Screenshot saved", symbol: "checkmark.circle", in: controller)
+                    Toast.show(String(localized: "Screenshot saved", comment: "Toast after saving a screenshot of the whole page."), symbol: "checkmark.circle", in: controller)
                 } catch {
-                    Toast.show(SaveFailure.message("Couldn’t save the screenshot", error), symbol: "exclamationmark.triangle", duration: 4, in: controller)
+                    Toast.show(SaveFailure.message(String(localized: "Couldn’t save the screenshot", comment: "Toast when saving a screenshot fails; a reason may follow as its own sentence."), error), symbol: "exclamationmark.triangle", duration: 4, in: controller)
                 }
             }
         }

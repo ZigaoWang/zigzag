@@ -72,8 +72,8 @@ final class BrowserWebView: WKWebView {
         for item in menu.items {
             switch item.identifier?.rawValue {
             case "WKMenuItemIdentifierOpenLinkInNewWindow":
-                item.title = "Open Link in New Tab"
-                let peek = NSMenuItem(title: "Open Link in Peek", action: #selector(openInPeek(_:)), keyEquivalent: "")
+                item.title = String(localized: "Open Link in New Tab", comment: "Item in a page's right-click menu.")
+                let peek = NSMenuItem(title: String(localized: "Open Link in Peek", comment: "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page."), action: #selector(openInPeek(_:)), keyEquivalent: "")
                 peek.target = self
                 peek.representedObject = item
                 if let index = menu.items.firstIndex(of: item) { menu.insertItem(peek, at: index + 1) }
@@ -85,8 +85,8 @@ final class BrowserWebView: WKWebView {
                     menu.removeItem(at: index)
                     menu.insertItem(tabItem, at: index)
                     // Below Peek: a new window, and a private one.
-                    for (offset, (title, selector)) in [("Open Link in New Window", #selector(openInNewWindow(_:))),
-                                                        ("Open Link in Private Window", #selector(openInPrivateWindow(_:)))].enumerated() {
+                    for (offset, (title, selector)) in [(String(localized: "Open Link in New Window", comment: "Item in a page's right-click menu."), #selector(openInNewWindow(_:))),
+                                                        (String(localized: "Open Link in Private Window", comment: "Item in a page's right-click menu."), #selector(openInPrivateWindow(_:)))].enumerated() {
                         let windowItem = NSMenuItem(title: title, action: selector, keyEquivalent: "")
                         windowItem.target = self
                         windowItem.representedObject = original
@@ -94,14 +94,14 @@ final class BrowserWebView: WKWebView {
                     }
                 }
             case "WKMenuItemIdentifierOpenImageInNewWindow":
-                item.title = "Open Image in New Tab"
+                item.title = String(localized: "Open Image in New Tab", comment: "Item in a page's right-click menu.")
             case "WKMenuItemIdentifierOpenMediaInNewWindow":
-                item.title = "Open Video in New Tab"
+                item.title = String(localized: "Open Video in New Tab", comment: "Item in a page's right-click menu.")
             case "WKMenuItemIdentifierOpenFrameInNewWindow":
                 item.isHidden = true
             case "WKMenuItemIdentifierSearchWeb":
                 // Searches with the engine you chose in Settings, in a new tab, not always Google in Safari.
-                item.title = "Search with \(Library.shared.searchEngine.name)"
+                item.title = String(localized: "Search with \(Library.shared.searchEngine.name)", comment: "Item in a page's right-click menu. The placeholder is the search engine's name, like “Google”.")
                 item.action = #selector(searchSelection(_:))
                 item.target = self
             default:
