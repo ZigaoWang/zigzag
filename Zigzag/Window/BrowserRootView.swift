@@ -1,6 +1,7 @@
 import AppKit
 
-/// Holds the sidebar. Docked it is invisible chrome; floating it becomes a card with its own shadow.
+/// Holds the sidebar. Docked it is invisible chrome; floating it becomes a card of glass with its own shadow: the page
+/// under it blurred, the space's color over the blur (`Frame.floatingCover`), so it stays that space's.
 final class SidebarContainer: NSView {
     let sidebar: SidebarView
     var isFloating = false { didSet { refresh() } }
@@ -11,9 +12,16 @@ final class SidebarContainer: NSView {
     var grain: Double = 0 { didSet { refresh() } }
     private let gradientLayer = CAGradientLayer()
     private let grainLayer = CALayer()
-    /// Floating over the page in a see-through space: the page under it is frosted, the way the desktop is under the
-    /// docked sidebar, so it never reads through the sidebar's own rows.
+    /// Floating, the page under it is frosted, so it shows as soft color and never reads through the sidebar's own
+    /// rows. Liquid Glass where the Mac has it; the sidebar's own frosting before.
     private let frost = NSVisualEffectView()
+    private var liquidGlass: NSView?
+    /// Reduce Transparency, or Low Power Mode on a Mac with Liquid Glass: floating it's the space's solid color, as
+    /// before glass. On battery alone it stays glass: it's there only while the sidebar is out.
+    private var isGlass: Bool {
+        isFloating && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+            && !(SpaceInfo.hasClearGlass && ProcessInfo.processInfo.isLowPowerModeEnabled)
+    }
 
     init(sidebar: SidebarView) {
         self.sidebar = sidebar
@@ -136,6 +144,7 @@ final class SidebarContainer: NSView {
         super.layout()
         sidebar.frame = bounds
         frost.frame = bounds
+        liquidGlass?.frame = bounds
         Tokens.Motion.withoutAnimation {
             backdrop?.frame = sidebar.bounds
             backdrop?.cornerRadius = isFloating ? Tokens.Radius.card : 0
@@ -154,14 +163,43 @@ final class SidebarContainer: NSView {
         refresh()
     }
 
+    /// Liquid Glass, made the first time the sidebar floats as glass.
+    private func showLiquidGlass(_ on: Bool) {
+        guard #available(macOS 26.0, *) else { return }
+        guard on else { liquidGlass?.isHidden = true; return }
+        let glass = liquidGlass as? NSGlassEffectView ?? {
+            let made = NSGlassEffectView()
+            // Regular: blurred enough that a page behind reads as color and shape, never as text under the rows.
+            made.style = .regular
+            made.cornerRadius = Tokens.Radius.card
+            addSubview(made, positioned: .below, relativeTo: sidebar)
+            liquidGlass = made
+            return made
+        }()
+        glass.isHidden = false
+        glass.frame = bounds
+    }
+
+    /// The space's color as it lies over the glass: thinned to the floating cover, or thinner if it already is
+    /// (see-through spaces).
+    private func overGlass(_ color: NSColor) -> CGColor {
+        let solid = cgColor(color)
+        guard isGlass else { return solid }
+        let cover = effectiveAppearance.isDark ? Tokens.Frame.floatingCoverDark : Tokens.Frame.floatingCover
+        return solid.copy(alpha: min(solid.alpha, cover)) ?? solid
+    }
+
     private func refresh() {
         Tokens.Motion.withoutAnimation {
             sidebar.layer?.cornerRadius = isFloating ? Tokens.Radius.card : 0
-            sidebar.layer?.backgroundColor = isFloating ? cgColor(tint) : nil
-            frost.isHidden = !isFloating || cgColor(tint).alpha > 0.99
+            // As glass the color lies once, in the backdrop: twice would thicken it.
+            sidebar.layer?.backgroundColor = isFloating && !isGlass ? cgColor(tint) : nil
+            let liquid = isGlass && SpaceInfo.hasClearGlass
+            showLiquidGlass(liquid)
+            frost.isHidden = !isFloating || liquid || (!isGlass && cgColor(tint).alpha > 0.99)
             frost.layer?.cornerRadius = Tokens.Radius.card
             // The grain blends inside this clipped layer, so the color sits here too, under it, as in the window.
-            backdrop?.backgroundColor = isFloating ? cgColor(tint) : nil
+            backdrop?.backgroundColor = isFloating ? overGlass(tint) : nil
             backdrop?.isHidden = !isFloating
             if let gradient, isFloating {
                 let r = gradient.angle * .pi / 180
@@ -169,7 +207,7 @@ final class SidebarContainer: NSView {
                 // A gradient's points count up from the bottom even in a top-down layer: the vertical turns over.
                 gradientLayer.startPoint = CGPoint(x: 0.5 - dx, y: 0.5 + dy)
                 gradientLayer.endPoint = CGPoint(x: 0.5 + dx, y: 0.5 - dy)
-                gradientLayer.colors = [cgColor(tint), cgColor(gradient.end)]
+                gradientLayer.colors = [overGlass(tint), overGlass(gradient.end)]
                 gradientLayer.isHidden = false
             } else {
                 gradientLayer.isHidden = true
