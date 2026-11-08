@@ -194,12 +194,12 @@ enum Reader {
         // A credit that names no one ("Contributors to Wikimedia projects") says nothing; leave it out.
         let author = article.byline.lowercased().contains("contributors") ? "" : article.byline
         // Where it's from, and who wrote it when the page says.
-        let meta = escape(author.isEmpty ? article.site : "\(article.site), by \(author)")
+        let meta = escape(author.isEmpty ? article.site : String(localized: "\(article.site), by \(author)", comment: "Under an article's title in Reader: the site it's from, then who wrote it."))
         let dek = (article.dek ?? "").isEmpty ? "" : "<p class=\"dek\">\(escape(article.dek ?? ""))</p>"
         let heroSource = article.image.map { leadPictures[$0] ?? $0 } ?? ""
         let hero = heroSource.isEmpty ? "" : "<figure class=\"hero\"><img src=\"\(escape(heroSource))\" alt=\"\"></figure>"
         let source = (article.url ?? "").isEmpty ? "" :
-            "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">Read the original on \(escape(article.site))</a></footer>"
+            "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">\(escape(String(localized: "Read the original on \(article.site)", comment: "Link at the end of an article in Reader, to the page it came from. The placeholder is the site's name.")))</a></footer>"
         return """
         <!doctype html><html lang="\(escape(article.lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="--size: \(preferences.size)px; --measure: \(preferences.width.measure)">
         <head><meta charset="utf-8">
@@ -389,8 +389,8 @@ final class ReaderControls: FloatingPanelView {
     var onClose: (() -> Void)?
     var preferences = Reader.Preferences.saved { didSet { options.preferences = preferences } }
 
-    private let style = IconButton(symbol: "textformat.size", toolTip: "Text and Colors")
-    private let close = IconButton(symbol: "xmark", toolTip: "Hide Reader")
+    private let style = IconButton(symbol: "textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the button in Reader's bar that shows its text and color choices."))
+    private let close = IconButton(symbol: "xmark", toolTip: String(localized: "Hide Reader", comment: "Tooltip of the button in Reader's bar that closes Reader."))
     private let options = ReaderOptions()
     private var monitor: Any?
 
@@ -468,9 +468,10 @@ private final class ReaderOptions: FloatingPanelView {
     var preferences = Reader.Preferences.saved { didSet { refresh() } }
 
     private let size = ReaderSizeButtons()
-    private let face = SlidingSwitch([.styled("Serif", NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
-                                      .text("Sans")])
-    private let measure = SlidingSwitch([.text("Narrow"), .text("Medium"), .text("Wide")])
+    private let face = SlidingSwitch([.styled(String(localized: "Serif", comment: "Choice of typeface in Reader's text and color choices."), NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
+                                      .text(String(localized: "Sans", comment: "Choice of typeface in Reader's text and color choices: sans serif."))])
+    private let measure = SlidingSwitch([.text(String(localized: "Narrow", comment: "Choice of column width in Reader's text and color choices.")), .text(String(localized: "Medium", comment: "Choice of column width in Reader's text and color choices.")),
+                                         .text(String(localized: "Wide", comment: "Choice of column width in Reader's text and color choices."))])
     private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
 
     static let width: CGFloat = 252
@@ -481,8 +482,8 @@ private final class ReaderOptions: FloatingPanelView {
         super.init(frame: frame)
         radius = Tokens.Radius.large
         [size, face, measure].forEach { addSubview($0) }
-        face.setAccessibilityLabel("Typeface")
-        measure.setAccessibilityLabel("Column Width")
+        face.setAccessibilityLabel(String(localized: "Typeface", comment: "VoiceOver label of the typeface choice in Reader's text and color choices."))
+        measure.setAccessibilityLabel(String(localized: "Column Width", comment: "VoiceOver label of the column width choice in Reader's text and color choices."))
         for theme in Reader.Preferences.Theme.allCases {
             let tile = ThemeTile(theme: theme)
             tile.onClick = { [weak self] _ in self?.change { $0.theme = theme } }
@@ -547,7 +548,8 @@ private final class ReaderSizeButtons: NSView {
         layer?.cornerCurve = .continuous
         layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
         addSubview(divider)
-        for (button, label, name, larger) in [(smaller, smallLabel, "Smaller Text", false), (self.larger, largeLabel, "Larger Text", true)] {
+        for (button, label, name, larger) in [(smaller, smallLabel, String(localized: "Smaller Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text smaller."), false),
+                                                (self.larger, largeLabel, String(localized: "Larger Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text larger."), true)] {
             button.wantsLayer = true
             button.layer?.cornerRadius = Tokens.Radius.field
             button.layer?.cornerCurve = .continuous
@@ -608,6 +610,15 @@ private final class ThemeTile: InteractiveView {
         }
     }
 
+    private static func name(_ theme: Reader.Preferences.Theme) -> String {
+        switch theme {
+        case .auto: String(localized: "Auto", comment: "Color choice in Reader: follows the Mac's light or dark look.")
+        case .light: String(localized: "Light", comment: "Color choice in Reader.")
+        case .sepia: String(localized: "Sepia", comment: "Color choice in Reader: warm paper.")
+        case .dark: String(localized: "Dark", comment: "Color choice in Reader.")
+        }
+    }
+
     init(theme: Reader.Preferences.Theme) {
         self.theme = theme
         super.init(frame: .zero)
@@ -637,9 +648,9 @@ private final class ThemeTile: InteractiveView {
         ring.lineWidth = 2
         ring.isHidden = true
         layer?.addSublayer(ring)
-        toolTip = theme == .auto ? "Auto: follows your Mac" : theme.rawValue.capitalized
+        toolTip = theme == .auto ? String(localized: "Auto: follows your Mac", comment: "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is.") : Self.name(theme)
         setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(theme.rawValue.capitalized)
+        setAccessibilityLabel(Self.name(theme))
     }
 
     required init?(coder: NSCoder) { fatalError() }

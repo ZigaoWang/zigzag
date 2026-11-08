@@ -23,17 +23,17 @@ final class PDFViewerView: NSView, PDFViewDelegate {
     private let sidebar = NSView()
     private let sidebarEdge = ColorView(color: Tokens.Color.separator)
     private let thumbnails = PDFThumbnailView()
-    private let sidebarSwitch = SlidingSwitch([.text("Pages"), .text("Contents")])
+    private let sidebarSwitch = SlidingSwitch([.text(String(localized: "Pages", comment: "Switch in the PDF viewer's sidebar: shows the pages as thumbnails.")), .text(String(localized: "Contents", comment: "Switch in the PDF viewer's sidebar: shows the document's table of contents."))])
     private let contents = PDFContentsView()
 
     private let bar = FloatingPanelView()
-    private let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: "Pages and Contents")
+    private let sidebarButton = IconButton(symbol: "sidebar.left", toolTip: String(localized: "Pages and Contents", comment: "Toolbar button tooltip in the PDF viewer."))
     private let pageButton = PageNumberButton()
-    private let zoomOutButton = IconButton(symbol: "minus.magnifyingglass", toolTip: "Zoom Out")
-    private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", toolTip: "Zoom In")
-    private let twoPagesButton = IconButton(symbol: "book", toolTip: "Two Pages")
-    private let darkButton = IconButton(symbol: "moon", toolTip: "Dark Pages")
-    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: "Download PDF")
+    private let zoomOutButton = IconButton(symbol: "minus.magnifyingglass", toolTip: String(localized: "Zoom Out", comment: "Toolbar button tooltip in the PDF viewer."))
+    private let zoomInButton = IconButton(symbol: "plus.magnifyingglass", toolTip: String(localized: "Zoom In", comment: "Toolbar button tooltip in the PDF viewer."))
+    private let twoPagesButton = IconButton(symbol: "book", toolTip: String(localized: "Two Pages", comment: "Toolbar button tooltip in the PDF viewer. Shows two pages side by side."))
+    private let darkButton = IconButton(symbol: "moon", toolTip: String(localized: "Dark Pages", comment: "Toolbar button tooltip in the PDF viewer. Shows the pages dark."))
+    private let saveButton = IconButton(symbol: "arrow.down.circle", toolTip: String(localized: "Download PDF", comment: "Toolbar button tooltip in the PDF viewer."))
     private var showsSidebar = false
     private var saveWork: DispatchWorkItem?
 
@@ -116,7 +116,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
         saveButton.onClick = { [weak self] _ in self?.save() }
         // A PDF already on your Mac has nothing to download; the button saves a copy elsewhere.
         if url.isFileURL {
-            saveButton.toolTip = "Save a Copy…"
+            saveButton.toolTip = String(localized: "Save a Copy…", comment: "Toolbar button tooltip in the PDF viewer. For a PDF already on the Mac.")
             saveButton.symbol = "square.and.arrow.down"
         }
         pageButton.onJump = { [weak self] number in self?.jump(toPage: number) }
@@ -436,7 +436,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
                 guard response == .OK, let target = panel.url else { return }
                 MainActor.assumeIsolated {
                     do { try data.write(to: target) } catch {
-                        if let controller { Toast.show(SaveFailure.message("Couldn’t save the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                        if let controller { Toast.show(SaveFailure.message(String(localized: "Couldn’t save the PDF", comment: "Toast when saving a copy of a PDF fails; a reason may follow as its own sentence."), error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
                     }
                 }
             }
@@ -451,7 +451,7 @@ final class PDFViewerView: NSView, PDFViewDelegate {
                 // The saved copy, opened later, opens on the same page.
                 if !self.isPrivate { Self.setPlace(page, for: file) }
             } catch {
-                if let controller { Toast.show(SaveFailure.message("Couldn’t download the PDF", error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                if let controller { Toast.show(SaveFailure.message(String(localized: "Couldn’t download the PDF", comment: "Toast when downloading a PDF fails; a reason may follow as its own sentence."), error), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
             }
         }
     }
@@ -568,7 +568,7 @@ final class ZigzagPDFView: PDFView {
 /// "3 of 42" in the bar. Click it and type a page number to go there.
 private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
     private let label = Label("", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
-    private let field = PlainTextField(font: Tokens.Font.small(.medium), placeholder: "Page")
+    private let field = PlainTextField(font: Tokens.Font.small(.medium), placeholder: String(localized: "Page", comment: "Placeholder of the page number field in the PDF viewer's toolbar."))
     private var page = 0, count = 0
     var onJump: ((Int) -> Void)?
     /// Return or Esc in the field: typing goes back to the pages, not to a hidden field.
@@ -582,7 +582,7 @@ private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
         field.isHidden = true
         field.delegate = self
         [label, field].forEach { addSubview($0) }
-        toolTip = "Go to Page"
+        toolTip = String(localized: "Go to Page", comment: "Tooltip of the page number in the PDF viewer's toolbar.")
         setAccessibilityRole(.button)
         onClick = { [weak self] _ in self?.beginTyping() }
     }
@@ -592,12 +592,12 @@ private final class PageNumberButton: InteractiveView, NSTextFieldDelegate {
     func set(page: Int, of count: Int) {
         self.page = page
         self.count = count
-        label.stringValue = "\(page) of \(count)"
-        setAccessibilityLabel("Page \(page) of \(count)")
+        label.stringValue = String(localized: "\(page) of \(count)", comment: "The page you're on in the PDF viewer's toolbar, like “3 of 12”.")
+        setAccessibilityLabel(String(localized: "Page \(page) of \(count)", comment: "VoiceOver label of the page number in the PDF viewer's toolbar."))
     }
 
     func fittingWidth(pages: Int) -> CGFloat {
-        let widest = Label("\(pages) of \(pages)", font: Tokens.Font.small(.medium), color: .clear)
+        let widest = Label(String(localized: "\(pages) of \(pages)", comment: "The page you're on in the PDF viewer's toolbar, like “3 of 12”."), font: Tokens.Font.small(.medium), color: .clear)
         return ceil(widest.textWidth) + Tokens.Space.x4
     }
 
