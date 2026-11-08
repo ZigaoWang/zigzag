@@ -2771,17 +2771,6 @@
         }
       }
     },
-    "Change in System Settings…" : {
-      "comment" : "Button in Settings › General that opens Language & Region in System Settings.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在“系统设置”中更改…"
-          }
-        }
-      }
-    },
     "Charcoal" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
       "localizations" : {
@@ -9091,6 +9080,28 @@
         }
       }
     },
+    "Restart Now" : {
+      "comment" : "Button of the sheet after picking a language in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重新启动"
+          }
+        }
+      }
+    },
+    "Restart Zigzag in %@?" : {
+      "comment" : "Title of the sheet after picking a language in Settings › General. The placeholder is the language’s name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要以%@重新启动 Zigzag 吗？"
+          }
+        }
+      }
+    },
     "Restore and Restart" : {
       "comment" : "Button of the sheet that restores the backup.",
       "localizations" : {
@@ -10804,6 +10815,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切换到标签页"
+          }
+        }
+      }
+    },
+    "System (%@)" : {
+      "comment" : "First choice of the Language menu in Settings › General. The placeholder is the language the Mac would pick, named in itself.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统（%@）"
           }
         }
       }
@@ -12908,6 +12930,17 @@
         }
       }
     },
+    "Your windows and tabs come back as they are. Or it switches the next time you open Zigzag." : {
+      "comment" : "Message of the sheet after picking a language in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的窗口和标签页会原样回来。也可以等下次打开 Zigzag 时再切换。"
+          }
+        }
+      }
+    },
     "You’ll be signed out of %@, and its pages load fresh next time." : {
       "comment" : "Message of the sheet that removes one site's data.",
       "localizations" : {
@@ -13101,13 +13134,13 @@
         }
       }
     },
-    "Zigzag follows your Mac’s language. You can choose a different one for Zigzag here." : {
+    "Zigzag follows your Mac’s language unless you pick one here." : {
       "comment" : "Explanation under “Language” in Settings › General.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zigzag 跟随你 Mac 的语言。你可以在这里为 Zigzag 选择其他语言。"
+            "value" : "Zigzag 跟随你的 Mac 的语言，除非你在这里另选一种。"
           }
         }
       }

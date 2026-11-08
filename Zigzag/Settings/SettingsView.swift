@@ -543,6 +543,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                               comment: "Explanation under “Search address” in Settings › General. Keep %s as it is: it's what the address uses."),
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
+    private let languagePicker = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
@@ -655,13 +656,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: defaultControl))
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
-            let languageButton = PillButton(title: String(localized: "Change in System Settings…",
-                                                          comment: "Button in Settings › General that opens Language & Region in System Settings."))
-            languageButton.onClick = { _ in Self.openLanguageSettings() }
+            // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
+            languagePicker.options = AppLanguage.choices.map { DropdownButton.Option(title: $0.title) }
+            languagePicker.selectedIndex = AppLanguage.choices.firstIndex { $0.code == AppLanguage.chosen } ?? 0
+            languagePicker.onSelect = { [weak self] index in self?.chooseLanguage(AppLanguage.choices[index].code) }
             generalGroup.add(FormRow(title: String(localized: "Language", comment: "A setting in Settings › General."),
-                                     detail: String(localized: "Zigzag follows your Mac’s language. You can choose a different one for Zigzag here.",
+                                     detail: String(localized: "Zigzag follows your Mac’s language unless you pick one here.",
                                                     comment: "Explanation under “Language” in Settings › General."),
-                                     control: languageButton))
+                                     control: languagePicker))
         }
         blockingToggle.onChange = { on in ContentBlocker.isEnabled = on }
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
@@ -1488,11 +1490,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Whether the app has more than English to choose from.
     private static var hasLanguages: Bool { Bundle.main.localizations.filter { $0 != "Base" }.count > 1 }
 
-    /// Language & Region in System Settings, where Applications gives each app its own language; System Settings
-    /// itself if that pane can't be opened.
-    private static func openLanguageSettings() {
-        let pane = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!
-        if !NSWorkspace.shared.open(pane) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:")!) }
+    /// A new language takes a fresh start: macOS gives an app its language as it launches. Asked once, with Later
+    /// leaving it for the next time Zigzag opens.
+    private func chooseLanguage(_ code: String?) {
+        guard code != AppLanguage.chosen else { return }
+        AppLanguage.chosen = code
+        guard let host = window?.contentView else { return }
+        let name = AppLanguage.choices.first { $0.code == code }.map { code == nil ? AppLanguage.systemName : $0.title } ?? ""
+        ConfirmSheet.show(in: host, title: String(localized: "Restart Zigzag in \(name)?", comment: "Title of the sheet after picking a language in Settings › General. The placeholder is the language’s name."),
+                          message: String(localized: "Your windows and tabs come back as they are. Or it switches the next time you open Zigzag.",
+                                          comment: "Message of the sheet after picking a language in Settings › General."),
+                          confirmTitle: String(localized: "Restart Now", comment: "Button of the sheet after picking a language in Settings › General.")) { confirmed in
+            if confirmed { ProfileBackup.relaunch() }
+        }
     }
 
     private func makeDefault() {
@@ -1988,6 +1998,53 @@ enum DefaultBrowser {
                       NSWorkspace.shared.urlForApplication(toOpen: https)?.standardizedFileURL != app.standardizedFileURL else { return }
                 NSWorkspace.shared.setDefaultApplication(at: app, toOpenURLsWithScheme: "https") { _ in }
             }
+        }
+    }
+}
+
+/// The language Zigzag shows when you pick one in Settings instead of leaving it to the Mac. Kept where macOS keeps
+/// an app's own language, which System Settings › Language & Region › Applications writes too, so both agree.
+enum AppLanguage {
+    struct Choice {
+        /// Nil: whatever the Mac's own languages pick.
+        let code: String?
+        let title: String
+    }
+
+    /// Zigzag's languages, English first, each named in itself.
+    private static var languages: [String] {
+        Bundle.main.localizations.filter { $0 != "Base" }.sorted { $0 == "en" ? true : $1 == "en" ? false : $0 < $1 }
+    }
+
+    static var choices: [Choice] {
+        [Choice(code: nil, title: String(localized: "System (\(systemName))", comment: "First choice of the Language menu in Settings › General. The placeholder is the language the Mac would pick, named in itself."))]
+            + languages.map { Choice(code: $0, title: ownName($0)) }
+    }
+
+    /// A language as its speakers write it.
+    static func ownName(_ code: String) -> String {
+        switch code {
+        case "en": "English"
+        case "zh-Hans": "简体中文"
+        default: Locale(identifier: code).localizedString(forIdentifier: code) ?? code
+        }
+    }
+
+    /// The language the Mac's own list picks from Zigzag's, ignoring a choice made here.
+    static var systemName: String {
+        let mac = CFPreferencesCopyValue("AppleLanguages" as CFString, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? [String] ?? ["en"]
+        return ownName(Bundle.preferredLocalizations(from: languages, forPreferences: mac).first ?? "en")
+    }
+
+    /// The language picked for Zigzag alone, or nil to follow the Mac.
+    static var chosen: String? {
+        get {
+            guard let id = Bundle.main.bundleIdentifier,
+                  let own = UserDefaults.standard.persistentDomain(forName: id)?["AppleLanguages"] as? [String], !own.isEmpty else { return nil }
+            return Bundle.preferredLocalizations(from: languages, forPreferences: own).first
+        }
+        set {
+            if let newValue { UserDefaults.standard.set([newValue], forKey: "AppleLanguages") } else { UserDefaults.standard.removeObject(forKey: "AppleLanguages") }
         }
     }
 }
