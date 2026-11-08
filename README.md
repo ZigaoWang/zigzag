@@ -70,7 +70,7 @@ Zigzag is a beta. It's my everyday browser, but you'll find bugs. Things Arc use
 - Space icons and emoji don't exist yet, so they don't come over from Arc. Space colors come over as the nearest Zigzag color.
 - No Little Arc. Links from other apps open as a tab in your window.
 - No Boosts, Easels, Notes, or AI features.
-- A few Chrome extension APIs aren't there yet: tab groups, proxy and debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Bitwarden installs, but its popup doesn't show.
+- A few Chrome extension APIs aren't there yet: tab groups, proxy and debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest.
 - The ad blocking lists update with Zigzag, not on their own.
 - macOS 15.4 or later only.
 
