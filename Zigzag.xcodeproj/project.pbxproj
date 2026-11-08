@@ -48,6 +48,7 @@
 		36E2C35A81D3127D10680928 /* chrome-api.json in Resources */ = {isa = PBXBuildFile; fileRef = 95FCFEE43D95B1A09B1F883D /* chrome-api.json */; };
 		37872776DAE6F6D005D98E10 /* SidebarUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */; };
 		3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A868C3F6FC798AA3459ACF /* DownloadsPanel.swift */; };
+		3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B89CCE006086C641D713AAB /* LocalizationTests.swift */; };
 		3C594139A69C469E17BC1FA4 /* DeskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D49789A1E612924BE5AD995 /* DeskController.swift */; };
 		3CBD062C1C7BADC2672D4998 /* webkit-differences.js in Resources */ = {isa = PBXBuildFile; fileRef = 3EA686DC56C7EA8E8C9FFD3D /* webkit-differences.js */; };
 		3CC1FECBB9087F53BF03AD3F /* key4.db in Resources */ = {isa = PBXBuildFile; fileRef = 17A229EAFF40049CACFF0C03 /* key4.db */; };
@@ -286,6 +287,7 @@
 		672B7AF38828D9E9738B29FD /* LinkStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkStatus.swift; sourceTree = "<group>"; };
 		67B6B0BECF34D62E3B175E0A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPage.swift; sourceTree = "<group>"; };
+		6B89CCE006086C641D713AAB /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		6CE05E70848504F5FE346B61 /* ZigzagRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZigzagRelease.entitlements; sourceTree = "<group>"; };
 		6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		6E9E28B1061F9D52B96C814E /* ZigzagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZigzagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -755,6 +757,7 @@
 				3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */,
 				9B09FDD82E339C4D35FD657C /* InlineCompletionTests.swift */,
 				05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */,
+				6B89CCE006086C641D713AAB /* LocalizationTests.swift */,
 				C4FF79EB77C0154782DD662A /* PasswordGeneratorTests.swift */,
 				F5442E175B150EB5CA4E9BB9 /* PasswordHealthTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
@@ -1115,6 +1118,7 @@
 				3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */,
 				AD420686AFB0AEBB23F9ADF7 /* InlineCompletionTests.swift in Sources */,
 				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
+				3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */,
 				44ECB58B498642EB6DB3648B /* PasswordGeneratorTests.swift in Sources */,
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */,
