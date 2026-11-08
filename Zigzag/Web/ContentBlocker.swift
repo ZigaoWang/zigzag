@@ -1,6 +1,6 @@
 import WebKit
 
-/// Built-in ad and tracker blocking: EasyList and EasyPrivacy, converted to WebKit's own content-blocker
+/// Built-in ad and tracker blocking: EasyList, EasyPrivacy and EasyList China, converted to WebKit's own content-blocker
 /// rules when the app is built (scripts/update_blocklists.sh) and matched natively as pages load, with no
 /// extension and no JavaScript per request. On by default; can be turned off for everything, or allowed on a site.
 enum ContentBlocker {

@@ -1,5 +1,6 @@
 #!/bin/zsh
-# Refreshes Zigzag's built-in ad and tracker blocking from EasyList and EasyPrivacy.
+# Refreshes Zigzag's built-in ad and tracker blocking from EasyList, EasyPrivacy and EasyList China (the Chinese
+# supplement every major blocker ships; its rules only match Chinese sites).
 #
 # The lists are converted to WebKit content-blocker rules with AdGuard's SafariConverterLib, run here as a
 # separate tool (it is GPL-3.0; only its output ships in the app). The result is one rule list, compressed,
@@ -30,12 +31,13 @@ work=$(mktemp -d)
 trap 'rm -rf $work' EXIT
 
 echo "Downloading lists…"
-curl -fsSL https://easylist.to/easylist/easylist.txt -o $work/easylist.txt
-curl -fsSL https://easylist.to/easylist/easyprivacy.txt -o $work/easyprivacy.txt
+curl -fsSL --retry 4 --retry-all-errors --retry-delay 3 https://easylist.to/easylist/easylist.txt -o $work/easylist.txt
+curl -fsSL --retry 4 --retry-all-errors --retry-delay 3 https://easylist.to/easylist/easyprivacy.txt -o $work/easyprivacy.txt
+curl -fsSL --retry 4 --retry-all-errors --retry-delay 3 https://easylist-downloads.adblockplus.org/easylistchina.txt -o $work/easylistchina.txt
 version() { grep -m1 '^! Version:' $1 | sed 's/^! Version: *//' }
 
 echo "Converting…"
-cat $work/easylist.txt $work/easyprivacy.txt > $work/combined.txt
+cat $work/easylist.txt $work/easyprivacy.txt $work/easylistchina.txt > $work/combined.txt
 $converter convert -s $safari_version --input-path $work/combined.txt \
   --safari-rules-json-path $work/blocklist.json --advanced-blocking-rules-path $work/advanced.txt >/dev/null
 
@@ -51,6 +53,7 @@ cat > $out/blocklist.info.json <<JSON
 {
   "easylist": "$(version $work/easylist.txt)",
   "easyprivacy": "$(version $work/easyprivacy.txt)",
+  "easylistchina": "$(version $work/easylistchina.txt)",
   "rules": $count,
   "safari": "$safari_version",
   "converter": "SafariConverterLib $converter_version"
