@@ -951,15 +951,15 @@ enum Tokens {
     enum Chrome {
         private static func white(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
 
-        /// The tab you're on: a soft, light card of the space's own color, a crisp quiet edge and a shadow-sm
-        /// (`cardShadow`, `Shadow.lift`). Seen at a glance on any color, never a slab.
-        static let card = Color.dynamic(light: white(0.82), dark: white(0.18))
-        static let cardHover = Color.dynamic(light: white(0.9), dark: white(0.21))
+        /// The tab you're on: by day a near-white card lifted by one soft shadow (`cardShadow`, `Shadow.lift`), its edge
+        /// only just there, so it reads as a card rather than an outline; at night a lighter step of the space's color.
+        static let card = Color.dynamic(light: white(0.96), dark: white(0.18))
+        static let cardHover = Color.dynamic(light: white(1), dark: white(0.21))
         /// At night the card's top edge catches the light: one pixel inside its upper rim (`setCardRim`). By day the
         /// card is nearly white already and a lit edge can't read at 1x, so there is none.
         static let rim = Color.dynamic(light: .clear, dark: white(0.14))
-        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.14))
-        static let cardShadow = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: Color.hex(0x000000, alpha: 0.3))
+        static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.08))
+        static let cardShadow = Color.dynamic(light: Color.hex(0x1E2A44, alpha: 0.10), dark: Color.hex(0x000000, alpha: 0.3))
         /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
         static let hover = Color.dynamic(light: white(0.38), dark: white(0.05))
         /// New Tab under the pointer: a lighter wash than a tab's, so the one quiet row stays quiet.
@@ -1092,9 +1092,10 @@ enum Tokens {
         /// Floating panels sit just above the page: one soft, small shadow that falls below them, never above.
         static let panelRadius: CGFloat = 16
         static let panelDrop: CGFloat = 3
-        /// The selected row and a selected tile: a shadow-sm, tiny and crisp, just under them.
-        static let liftRadius: CGFloat = 1
-        static let liftDrop: CGFloat = 1
+        /// The selected row and a selected tile: a small, soft shadow just under them, so the card lifts off the
+        /// sidebar instead of being outlined.
+        static let liftRadius: CGFloat = 4
+        static let liftDrop: CGFloat = 1.5
         /// A row carried to its new place: a small, crisp lift while it travels.
         static let carryRadius: CGFloat = 4
         static let carryDrop: CGFloat = 2
