@@ -41,9 +41,10 @@ struct CapitalizationTests {
         #expect(Self.lowercaseWord(in: "in Folder") == "in")
     }
 
-    /// Buttons, menu items, a sheet's answers and an icon button's name: each in title case.
+    /// Buttons, menu items, a sheet's answers and an icon button's name: each in title case, written plain or as
+    /// String(localized:).
     @Test func controlsAreTitleCase() {
-        let pattern = try! NSRegularExpression(pattern: #"(?:PillButton\(title:|TextButton\(title:|confirmTitle:|alternateTitle:|allowTitle:|denyTitle:|toolTip:|SidebarMenus\.Item\(|\bitem\(|Item\(title:)\s*"((?:[^"\\]|\\.)*)""#)
+        let pattern = try! NSRegularExpression(pattern: #"(?:PillButton\(title:|TextButton\(title:|confirmTitle:|alternateTitle:|allowTitle:|denyTitle:|toolTip:|SidebarMenus\.Item\(|\bitem\(|Item\(title:)\s*(?:String\(localized:\s*)?"((?:[^"\\]|\\.)*)""#)
         var found: [String] = []
         for (path, lines) in Self.sources {
             for (i, line) in lines.enumerated() {
