@@ -69,6 +69,9 @@ class SidebarRowView: InteractiveView {
             base = isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card
         } else if isMarked {
             base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
+        } else if isSelected {
+            // Waiting for the sliding card: no wash of its own under the pointer, so one card arrives, not a second box.
+            base = nil
         } else if isPressed {
             base = Tokens.Chrome.pressed
         } else if isHovered {
