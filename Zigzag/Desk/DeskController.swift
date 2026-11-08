@@ -19,7 +19,7 @@ final class DeskHeaderView: InteractiveView {
     let duplicatesButton = TextButton(title: "", font: Tokens.Font.body())
     var duplicates = 0 {
         didSet {
-            duplicatesButton.title = duplicates == 1 ? "Close Duplicate" : "Close \(duplicates) Duplicates"
+            duplicatesButton.title = String(localized: "Close \(duplicates) Duplicates", comment: "In the tab overview (all spaces' tabs as cards), a button beside a space's name: closes the tabs that show a page already open.")
             duplicatesButton.isHidden = duplicates == 0
             needsLayout = true
         }
@@ -178,8 +178,8 @@ final class DeskCanvasView: NSView {
 /// Stands in a space with no tabs, where its first card would be: a tile of soft glass that says so, with a way to
 /// start one there.
 final class DeskEmptySpaceView: NSView {
-    let newTab = PillButton(title: "New Tab", symbol: "plus", style: .plain)
-    private let label = Label("No tabs", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    let newTab = PillButton(title: String(localized: "New Tab", comment: "In the tab overview (all spaces' tabs as cards), a button in a space with no tabs."), symbol: "plus", style: .plain)
+    private let label = Label(String(localized: "No tabs", comment: "In the tab overview (all spaces' tabs as cards), in a space with no tabs."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     /// Room left under the box for a title, as a card has, so the two line up.
     var titleArea: CGFloat = 0 { didSet { needsLayout = true } }
     private let box = ColorView()
@@ -245,8 +245,8 @@ final class DeskController {
     private let scrollView = NSScrollView()
     private let canvas = DeskCanvasView()
     private let actionBar = FloatingPanelView()
-    private let closeButton = PillButton(title: "Close Tabs", style: .prominent)
-    private let doneButton = PillButton(title: "Done", style: .quiet)
+    private let closeButton = PillButton(title: String(localized: "Close Tabs", comment: "In the tab overview (all spaces' tabs as cards), a button that closes the picked tabs."), style: .prominent)
+    private let doneButton = PillButton(title: String(localized: "Done", comment: "In the tab overview (all spaces' tabs as cards), a button that leaves the overview."), style: .quiet)
     private var headers: [UUID: DeskHeaderView] = [:]
     private var cards: [UUID: TabThumbnailView] = [:]
     /// Spaces with no tabs, by space.
@@ -268,9 +268,9 @@ final class DeskController {
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
     private let searchBox = ColorView()
     private let searchIcon = NSImageView()
-    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: "Search tabs")
+    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
     private let searchDelegate = DeskSearchDelegate()
-    private let noMatches = Label("No tabs match", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let noMatches = Label(String(localized: "No tabs match", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
     private static let searchHeight = Tokens.Metric.controlHeight
     private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
@@ -857,7 +857,7 @@ final class DeskController {
                 guard let self, let tab else { return nil }
                 if !self.selection.contains(tab.id) { self.selection = [tab.id]; self.updateSelection() }
                 let menu = NSMenu()
-                menu.addItem(SidebarMenus.Item(self.selection.count > 1 ? "Close \(self.selection.count) Tabs" : "Close Tab") { self.closeSelected() })
+                menu.addItem(SidebarMenus.Item(String(localized: "Close \(self.selection.count) Tabs", comment: "In the tab overview (all spaces' tabs as cards), an item in a card's context menu: closes the picked tabs.")) { self.closeSelected() })
                 return menu
             }
             cards[tab.id] = card
@@ -908,8 +908,9 @@ final class DeskController {
             let count = manager?.tabs(in: id).count ?? 0
             // While searching, how many of them match: a split that matches is both its tabs.
             let shown = query.isEmpty ? count : cardTabs(in: id).reduce(0) { $0 + (partner(of: $1) == nil ? 1 : 2) }
-            let tabs = count == 1 ? "1 tab" : "\(count) tabs"
-            header.count.stringValue = count == 0 ? "" : shown == count ? tabs : "\(shown) of \(tabs)"
+            let tabs = String(localized: "\(count) tabs", comment: "In the tab overview (all spaces' tabs as cards), beside a space's name: how many tabs it has.")
+            header.count.stringValue = count == 0 ? "" : shown == count ? tabs
+                : String(localized: "\(shown) of \(tabs)", comment: "In the tab overview (all spaces' tabs as cards), beside a space's name while searching: how many of its tabs match, then how many it has, like “2 of 5 tabs”.")
             header.duplicates = query.isEmpty ? duplicateTabs(in: id).count : 0
             if let empty = empties[id] {
                 // Where its first card would be, as long as there's none and nothing is being dragged in.
@@ -1048,8 +1049,8 @@ final class DeskController {
             if actionBar.superview != nil { actionBar.dismiss() }
             return
         }
-        closeButton.title = selection.count == 1 ? "Close Tab" : "Close \(selection.count) Tabs"
-        doneButton.title = "Done"
+        closeButton.title = String(localized: "Close \(selection.count) Tabs", comment: "In the tab overview (all spaces' tabs as cards), a button that closes the picked tabs.")
+        doneButton.title = String(localized: "Done", comment: "In the tab overview (all spaces' tabs as cards), a button that leaves the overview.")
         let cw = closeButton.fittingWidth, dw = doneButton.fittingWidth
         let height = Self.actionBarHeight
         let control = Tokens.Page.controlHeight

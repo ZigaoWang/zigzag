@@ -5,18 +5,18 @@ import WebKit
 final class PeekHeaderView: NSView {
     let icon = FaviconView()
     let host = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
-    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: "Open Peek as Tab")
-    let closeButton = IconButton(symbol: "xmark", toolTip: "Close Peek")
+    let expandButton = IconButton(symbol: "arrow.up.left.and.arrow.down.right", toolTip: String(localized: "Open Peek as Tab", comment: "Tooltip of the button in Peek's top strip that keeps the page as a tab."))
+    let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Close Peek", comment: "Tooltip of the close button in Peek's top strip."))
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         [icon, host, expandButton, closeButton].forEach { addSubview($0) }
         // Out of the strip, "Close" alone doesn't say what closes.
-        expandButton.setAccessibilityLabel("Open Peek as Tab")
-        closeButton.setAccessibilityLabel("Close Peek")
+        expandButton.setAccessibilityLabel(String(localized: "Open Peek as Tab", comment: "Tooltip of the button in Peek's top strip that keeps the page as a tab."))
+        closeButton.setAccessibilityLabel(String(localized: "Close Peek", comment: "Tooltip of the close button in Peek's top strip."))
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Peek")
+        setAccessibilityLabel(String(localized: "Peek", comment: "Accessibility label of Peek's top strip. Peek shows a link's page in a panel over the current one."))
     }
 
     required init?(coder: NSCoder) { fatalError() }

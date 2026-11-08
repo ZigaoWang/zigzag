@@ -73,7 +73,7 @@ final class TabThumbnailView: InteractiveView {
     private let title2 = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let ring = CALayer()
     /// A page playing sound: a speaker after its title, as in the sidebar. Clicking it mutes the page, or unmutes it.
-    private let audioButton = IconButton(symbol: "speaker.wave.2", size: .compact, toolTip: "Mute Tab")
+    private let audioButton = IconButton(symbol: "speaker.wave.2", size: .compact, toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab)."))
     var showsTitle = true { didSet { needsLayout = true } }
     /// Desk view marks selection with an accent ring; the switcher uses a quiet highlight.
     var showsRing = false
@@ -84,7 +84,7 @@ final class TabThumbnailView: InteractiveView {
     var isFocused = false { didSet { if oldValue != isFocused { refreshColors() } } }
     /// Desk view: an × on the card while the pointer is over it.
     var onClose: (() -> Void)? { didSet { closeButton.isHidden = true } }
-    private let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Close Tab")
+    private let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Close Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab)."))
     /// A dark disc under the close button, so its white × reads on any page, light or busy.
     private let closeDisc = ColorView(color: NSColor(white: 0, alpha: 0.62))
     /// A page with no picture yet, or only a blank one (asleep, or caught before it drew): its site instead.
@@ -151,7 +151,7 @@ final class TabThumbnailView: InteractiveView {
         title.stringValue = tab.displayTitle
         icon2.image = partner?.favicon
         title2.stringValue = partner?.displayTitle ?? ""
-        setAccessibilityLabel(partner.map { "\(tab.displayTitle) and \($0.displayTitle)" } ?? tab.displayTitle)
+        setAccessibilityLabel(partner.map { Words.list([tab.displayTitle, $0.displayTitle]) } ?? tab.displayTitle)
         refreshImage()
         refreshAudio()
         needsLayout = true
@@ -165,7 +165,7 @@ final class TabThumbnailView: InteractiveView {
     private func refreshAudio() {
         let page = audioTab
         audioButton.symbol = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-        audioButton.toolTip = page?.isMuted == true ? "Unmute Tab" : "Mute Tab"
+        audioButton.toolTip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab).") : String(localized: "Mute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab).")
         needsLayout = true
     }
 
