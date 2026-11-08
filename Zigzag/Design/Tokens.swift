@@ -203,12 +203,12 @@ enum Tokens {
         static let glyph: CGFloat = 14
 
         /// The address: a 30pt field with 8pt corners, the favorites' faint fill and 1px edge, the host 10pt in; its
-        /// own buttons 22pt with 13pt glyphs, inset evenly.
+        /// own buttons the toolbar's 26pt with 14pt glyphs, inset evenly, so they're as easy to hit as the ones above.
         static let addressTop: CGFloat = 40
         static let addressHeight: CGFloat = 30
         static let addressRadius: CGFloat = Radius.field
-        static let addressButton: CGFloat = 22
-        static let addressGlyph: CGFloat = 13
+        static let addressButton: CGFloat = button
+        static let addressGlyph: CGFloat = glyph
 
         /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
