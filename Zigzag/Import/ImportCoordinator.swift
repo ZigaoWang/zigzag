@@ -177,34 +177,50 @@ enum ImportCoordinator {
     /// What a source holds, counted without decrypting anything: "6 passwords, 57 bookmarks and history".
     /// "Spaces, 6 passwords, history": what a browser holds, in one short line.
     nonisolated private static func sentence(_ parts: [String]) -> String {
-        let line = parts.joined(separator: ", ")
+        let line = parts.dropFirst().reduce(parts[0]) {
+            String(localized: "\($0), \($1)", comment: "Joins the items of a short list in the Import window, like “6 passwords, history”.")
+        }
         return line.prefix(1).uppercased() + line.dropFirst()
     }
+
+    /// The previews of a browser macOS keeps private until you allow Zigzag to read it.
+    nonisolated static let needsPermission = String(localized: "macOS will need your permission to read it", comment: "Under a browser's name in the Import window's list.")
+    nonisolated static let safariNeedsPermission = String(localized: "Bookmarks and history, with your permission",
+                                                          comment: "Under Safari's name in the Import window's list: what can come over from it.")
+
+    /// Whether a preview says macOS has to allow reading the browser first.
+    static func asksPermission(_ preview: String) -> Bool { preview == needsPermission || preview == safariNeedsPermission }
 
     static func preview(_ source: Source) async -> String {
         let kind = source.kind
         return await Task.detached(priority: .utility) { () -> String in
-            func phrase(_ n: Int, _ one: String, _ many: String) -> String? { n > 0 ? "\(n) \(n == 1 ? one : many)" : nil }
+            let spaces = String(localized: "spaces", comment: "Item in the short list of what a browser holds, in the Import window: Arc's spaces.")
+            let history = String(localized: "history", comment: "Item in the short list of what a browser holds, in the Import window: its browsing history.")
+            let signIns = String(localized: "sign-ins", comment: "Item in the short list of what a browser holds, in the Import window: the sites it keeps you signed in to.")
+            func passwords(_ n: Int) -> String? { n > 0 ? String(localized: "\(n) passwords", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil }
+            func bookmarks(_ n: Int) -> String? { n > 0 ? String(localized: "\(n) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.") : nil }
             switch kind {
             case .chromium(let browser):
                 let profiles = ChromiumImporter.profiles(of: browser)
                 let files = profiles.flatMap { p in ["Login Data", "Bookmarks", "History"].map { p.appendingPathComponent($0) } }
                 if files.contains(where: { FileManager.default.fileExists(atPath: $0.path) && !FileManager.default.isReadableFile(atPath: $0.path) }) {
-                    return "macOS will need your permission to read it"
+                    return Self.needsPermission
                 }
                 let counts = ChromiumImporter.counts(browser)
                 // Short enough for one line in the list: Arc's spaces first, then what's counted.
-                let parts = [browser.name == "Arc" ? "spaces" : nil, phrase(counts.passwords, "password", "passwords"),
-                             phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil,
-                             SignInImporter.hasAny(chromium: profiles) ? "sign-ins" : nil].compactMap { $0 }
-                return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
+                let parts = [browser.name == "Arc" ? spaces : nil, passwords(counts.passwords),
+                             bookmarks(counts.bookmarks), counts.history > 0 ? history : nil,
+                             SignInImporter.hasAny(chromium: profiles) ? signIns : nil].compactMap { $0 }
+                return parts.isEmpty ? String(localized: "Nothing to bring over", comment: "Under a browser's name in the Import window's list.") : Self.sentence(parts)
             case .firefox(let browser):
                 let counts = FirefoxImporter.counts(browser)
-                let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil,
-                             SignInImporter.hasAny(firefox: FirefoxImporter.profiles(of: browser)) ? "sign-ins" : nil].compactMap { $0 }
-                return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
+                let parts = [passwords(counts.passwords), bookmarks(counts.bookmarks), counts.history > 0 ? history : nil,
+                             SignInImporter.hasAny(firefox: FirefoxImporter.profiles(of: browser)) ? signIns : nil].compactMap { $0 }
+                return parts.isEmpty ? String(localized: "Nothing to bring over", comment: "Under a browser's name in the Import window's list.") : Self.sentence(parts)
             case .safari:
-                return SafariImporter.hasAccess ? "Bookmarks and history, no passwords" : "Bookmarks and history, with your permission"
+                return SafariImporter.hasAccess
+                    ? String(localized: "Bookmarks and history, no passwords", comment: "Under Safari's name in the Import window's list: what can come over from it.")
+                    : Self.safariNeedsPermission
             case .file(let url):
                 return url.lastPathComponent
             }
@@ -229,19 +245,33 @@ enum ImportCoordinator {
         /// "Imported 214 passwords and 86 bookmarks from Arc."
         var sentence: String {
             var parts: [String] = []
-            func count(_ n: Int, _ one: String, _ many: String) -> String { "\(n) \(n == 1 ? one : many)" }
-            if passwords > 0 { parts.append(count(passwords, "password", "passwords")) }
-            if bookmarks > 0 { parts.append(count(bookmarks, "bookmark", "bookmarks")) }
-            if spaces > 0 { parts.append(count(spaces, "space", "spaces")) }
-            if history > 0 { parts.append(count(history, "page of history", "pages of history")) }
-            let signedIn = signedInSites > 0 ? " Brought over sign-ins for \(count(signedInSites, "site", "sites"))." : ""
-            let kept = keptPasswords > 0 ? " Kept \(count(keptPasswords, "password", "passwords")) already in Zigzag instead of the imported \(keptPasswords == 1 ? "one" : "ones")." : ""
-            guard !parts.isEmpty else {
-                if signedInSites > 0 { return "Brought over sign-ins for \(count(signedInSites, "site", "sites")) from \(source)." + kept }
-                return (updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source).") + kept
+            if passwords > 0 { parts.append(String(localized: "\(passwords) passwords", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
+            if bookmarks > 0 { parts.append(String(localized: "\(bookmarks) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.")) }
+            if spaces > 0 { parts.append(String(localized: "\(spaces) spaces", comment: "Item in the list of what came over, in the Import window.")) }
+            if history > 0 { parts.append(String(localized: "\(history) pages of history", comment: "Item in the list of what came over, in the Import window.")) }
+            var sentences: [String] = []
+            if parts.isEmpty {
+                sentences.append(signedInSites > 0
+                    ? String(localized: "Brought over sign-ins for \(signedInSites) sites from \(source).",
+                             comment: "Import window, when only sign-ins came over: how many sites, then a browser's name, like Chrome.")
+                    : updatedPasswords > 0
+                    ? String(localized: "Updated \(updatedPasswords) passwords from \(source).", comment: "Import window: how many passwords were updated, then a browser's name, like Chrome.")
+                    : String(localized: "Nothing new to bring over from \(source).", comment: "Import window. The placeholder is a browser's name, like Chrome."))
+            } else {
+                let list = Words.list(parts)
+                sentences.append(String(localized: "Imported \(list) from \(source).",
+                                        comment: "Import window: a list like “214 passwords and 86 bookmarks”, then a browser's name, like Chrome."))
+                if signedInSites > 0 {
+                    sentences.append(String(localized: "Brought over sign-ins for \(signedInSites) sites.", comment: "Import window, after what was imported: how many sites' sign-ins came over."))
+                }
             }
-            let list = ListFormatter.localizedString(byJoining: parts)
-            return "Imported \(list) from \(source)." + signedIn + kept
+            if keptPasswords > 0 {
+                sentences.append(String(localized: "Kept \(keptPasswords) passwords already in Zigzag instead of the imported ones.",
+                                        comment: "Import window: passwords that stayed as they were because the imported ones weren't known to be newer."))
+            }
+            return sentences.dropFirst().reduce(sentences[0]) {
+                String(localized: "\($0) \($1)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
+            }
         }
     }
 
@@ -287,7 +317,9 @@ enum ImportCoordinator {
                 if url.pathExtension.lowercased() == "zip" { return SafariImporter.readExport(url) }
                 switch CSVImporter.read(url) {
                 case .success(let (_, batch)): return batch
-                case .failure: return ImportBatch(problems: [ImportProblem(message: "\(url.lastPathComponent) isn’t a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it.", fix: .none)])
+                case .failure: return ImportBatch(problems: [ImportProblem(message: String(localized: "\(url.lastPathComponent) isn’t a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it.",
+                                                                                    comment: "Problem in the Import window. The placeholder is the chosen file's name."),
+                                                                  fix: .none)])
                 }
             }
         }.value
@@ -335,7 +367,7 @@ enum ImportCoordinator {
         var here: [Key: Credential] = [:]
         // Unreadable (the Keychain locked, or refusing): adding now would put a second copy of every login here.
         guard let existing = try? await store.all() else {
-            summary.problems.append(ImportProblem(message: "Zigzag couldn’t read the passwords it already has, so it didn’t add any. Try again.",
+            summary.problems.append(ImportProblem(message: String(localized: "Zigzag couldn’t read the passwords it already has, so it didn’t add any. Try again.", comment: "Problem in the Import window."),
                                                   fix: .retry, retries: Choice.passwords.rawValue))
             return
         }
@@ -378,14 +410,14 @@ enum ImportCoordinator {
             UserDefaults.standard.set(Date(), forKey: Autofill.importedAtKey)
         }
         if failed > 0 {
-            summary.problems.append(ImportProblem(message: "\(failed) \(failed == 1 ? "password" : "passwords") couldn’t be saved. Try again.",
+            summary.problems.append(ImportProblem(message: String(localized: "\(failed) passwords couldn’t be saved. Try again.", comment: "Problem in the Import window: how many passwords couldn't be saved."),
                                                   fix: .retry, retries: Choice.passwords.rawValue))
         }
     }
 
     /// Bookmarks go into a space of their own ("From Chrome"), so nothing already here gets crowded.
     private static func addBookmarks(_ bookmarks: [ImportBatch.Bookmark], from name: String) -> Int {
-        let spaceName = "From \(name)"
+        let spaceName = String(localized: "From \(name)", comment: "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome.")
         let space = Library.shared.spaces.first { $0.name == spaceName } ?? Library.shared.addSpace(name: spaceName)
         var known = Set((Library.shared.spaces.first { $0.id == space.id }?.bookmarks ?? []).map { TabManager.normalize($0.url) })
         var new: [(url: URL, title: String)] = [], paths: [[String]] = []
