@@ -5,6 +5,23 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.5.19] - 2026-11-08
+
+### New
+- Importing from Arc, Chrome, Edge, Brave, Dia, Vivaldi, Opera, Firefox or Zen can keep you signed in to your sites: your sign-ins come over from that browser on this Mac, with one Keychain prompt shared with passwords. Sites you're already signed in to here keep their own session, and private windows never get any.
+- Dragging the sidebar's edge far enough closes it, as in other Mac apps, and dragging back out in the same drag opens it again.
+- Site controls always offer Translate, so you can translate a page after the offer at the top has gone.
+- A site that asked to show notifications can be allowed later from site controls, even if the question went before you answered it.
+- New people start with small space names, a plain heading. Large and light is one right-click away on the name, and anyone who had large names keeps them.
+
+### Fixed
+- The tab you're on is a clean white card with a soft shadow, not an outlined box, by day and by night, and it slides under other tabs' titles rather than over them.
+- New Tab in the sidebar is quieter, the space name and Tabs sit tighter, Clear matches Tabs, a folder's arrow lines up with the close buttons, and a row's highlight fades gently as the pointer leaves.
+- Pressing a favorite or the address no longer flashes darker than it sits.
+- In full screen the window buttons come down in a proper bar, not over the page.
+- Toasts stay centered over the page when the sidebar or full screen changes, and the translate and default browser offers have a close button.
+- Site controls are the sidebar's width whether it's shown or hidden.
+
 ## [0.5.18] - 2026-11-08
 
 ### New
