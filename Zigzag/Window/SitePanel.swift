@@ -276,8 +276,13 @@ final class SitePanel: FloatingPanelView {
                 self?.rebuildRows()
             })
         }
-        if !tab.isPrivate, let allowed = SitePermissions.notifications(host: host.lowercased()) {
-            rows.append(.toggle("Notifications", on: allowed, status: { $0 ? "Allowed" : "Blocked" }) { on in
+        // Once answered, the answer; asked and not answered (the question went before you got to it), off until
+        // you turn it on here.
+        let answer = SitePermissions.notifications(host: host.lowercased())
+        if !tab.isPrivate, answer != nil || WebNotifications.shared.hasAsked(host: host) {
+            var decided = answer != nil
+            rows.append(.toggle("Notifications", on: answer ?? false, status: { $0 ? "Allowed" : (decided ? "Blocked" : "Not allowed yet") }) { on in
+                decided = true
                 SitePermissions.setNotifications(on, host: host.lowercased())
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
