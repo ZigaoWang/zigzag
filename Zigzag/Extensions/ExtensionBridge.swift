@@ -28,7 +28,7 @@ final class ExtensionBridge {
 
     private init() {
         let all: [any BridgeNamespace] = [BridgeHistory(), BridgeTopSites(), BridgeBookmarks(), BridgeDownloads(), BridgeNotifications(), BridgeIdle(), BridgeDisplay(), BridgeContexts(), BridgeRuntime(),
-                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture]
+                                          BridgeSpeech(), BridgePower(), offscreen, BridgeIdentity(), sidePanel, tabCapture, BridgeUserScripts()]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 
@@ -144,7 +144,7 @@ struct BridgeError: Error {
 /// The script side of the bridge (Resources/Extensions/bridge.js), run before an extension's own code.
 enum ExtensionBridgeScript {
     /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
-    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display"]
+    static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts"]
 
     static let source: String = {
         guard let url = Bundle.main.url(forResource: "bridge", withExtension: "js"),

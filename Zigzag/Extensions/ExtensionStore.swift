@@ -972,7 +972,7 @@ extension ExtensionStore {
         let prelude = profile?.backgroundPrelude
         let patches = profile?.patches ?? []
         guard prelude != nil || !patches.isEmpty else { return package }
-        let overlay = folder(for: id).appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(state.version, isDirectory: true)
+        let overlay = overlayFolder(for: id, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude or a patch changes.
         let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined()
         let marker = overlay.appendingPathComponent("zigzag-profile.txt")
@@ -990,6 +990,18 @@ extension ExtensionStore {
         }
         try? signature.write(to: marker, atomically: true, encoding: .utf8)
         return overlay
+    }
+
+    /// The loaded copy's folder, where Zigzag may add files of its own (user scripts' code). Nil when WebKit loads the
+    /// package itself, which is never written to.
+    static func overlayDirectory(for id: String) -> URL? {
+        guard let state = state(id) else { return nil }
+        let overlay = overlayFolder(for: id, version: state.version)
+        return FileManager.default.fileExists(atPath: overlay.appendingPathComponent("zigzag-profile.txt").path) ? overlay : nil
+    }
+
+    private static func overlayFolder(for id: String, version: String) -> URL {
+        folder(for: id).appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(version, isDirectory: true)
     }
 
     /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
