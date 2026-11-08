@@ -33,7 +33,9 @@ enum DebugBridge {
     /// minitype <text> (typed into the address field and entered), minimove (Open in Zigzag), miniclose,
     /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to the mini window),
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
-    /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit.
+    /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
+    /// miniask notifications, minianswer allow|deny|notnow (the site's question), minisave save|notnow,
+    /// minieval <path> <script>.
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
@@ -47,6 +49,26 @@ enum DebugBridge {
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
         case "miniesc": mini?.debugEscape()
         case "miniquit": NSApp.terminate(nil)
+        case "miniask":
+            // miniask notifications: the question a page's Notification.requestPermission() asks, without the click
+            // it needs first.
+            guard let mini, let host = mini.tab.url?.host() else { break }
+            Task {
+                let answer = await SitePermissions.requestNotifications(host: host, window: mini.window, isPrivate: false, tab: mini.tab)
+                debugLog("miniask \(arg): \(answer.map { $0 ? "allowed" : "not allowed" } ?? "put off")")
+            }
+        case "minianswer":
+            guard let mini else { break }
+            PermissionPrompt.debugAnswer(arg == "allow" ? .allow : arg == "deny" ? .deny : .notNow, in: mini)
+        case "minisave": SavePasswordPrompt.debugAnswer(saved: arg == "save")
+        case "minieval":
+            // minieval <path> <script>: the script's result (it may await), written to the file.
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard f.count == 2, let webView = mini?.tab.webView else { break }
+            Task {
+                let result = try? await webView.callAsyncJavaScript(f[1], arguments: [:], in: nil, contentWorld: .page)
+                try? String(describing: result ?? "nil").write(toFile: f[0], atomically: true, encoding: .utf8)
+            }
         case "minimenu":
             let f = arg.split(separator: " ").map(String.init)
             guard let ch = f.first, let window = mini?.window else { break }
@@ -82,8 +104,19 @@ enum DebugBridge {
                  "pageShown": c.selectedWebView.map { $0.window === c.window } ?? false]
             }
             let saved = JSONStore.load(SessionState.self, from: Paths.session)?.windows.map { $0.spaces.flatMap { $0.tabs.compactMap { $0.url?.absoluteString } } } ?? []
-            let json: [String: Any] = ["minis": minis, "windows": windows, "savedTabs": saved, "setting": MiniWindowController.opensExternalLinks]
-            if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+            var json: [String: Any] = ["minis": minis, "windows": windows, "savedTabs": saved, "setting": MiniWindowController.opensExternalLinks]
+            // The questions on screen, and which window each is in.
+            if let mini { json["permissionInMini"] = PermissionPrompt.debugShowing(in: mini) ?? "" }
+            if let save = SavePasswordPrompt.debugShowing {
+                json["savePrompt"] = save.text
+                json["savePromptInMini"] = save.window != nil && save.window === mini?.window
+            }
+            // Only a test vault is ever read here, never the person's passwords.
+            let path = arg
+            Task {
+                if PasswordStore.isTestVault { json["testVault"] = ((try? await PasswordStore.shared.all()) ?? []).map { "\($0.origin.host) \($0.username)" } }
+                if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: path)) }
+            }
         case "minishot":
             guard let view = mini?.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
             view.cacheDisplay(in: view.bounds, to: rep)

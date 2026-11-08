@@ -457,6 +457,22 @@ final class PermissionPrompt: FloatingPanelView {
         if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
     }
 
+    #if DEBUG
+    /// For the debug bridge: answers the question showing in `host`, as its buttons would. Allow still waits out its
+    /// first half second.
+    static func debugAnswer(_ answer: Answer, in host: PromptHost) {
+        guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden else { return }
+        if answer == .allow, !prompt.acceptsAllow { return }
+        prompt.finish(answer)
+    }
+
+    /// The question showing in `host`, as its words read.
+    static func debugShowing(in host: PromptHost) -> String? {
+        guard let prompt = shown[ObjectIdentifier(host)], prompt.superview != nil, !prompt.isHidden else { return nil }
+        return prompt.request.stringValue + " " + prompt.asker.stringValue
+    }
+    #endif
+
     private static let width: CGFloat = 340
     private static let pad: CGFloat = 16
     private static let iconSide = Tokens.Dialog.iconSide

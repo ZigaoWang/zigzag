@@ -224,6 +224,18 @@ final class SavePasswordPrompt: FloatingPanelView {
     }
 
     static func debugClose() { current?.close(saved: false) }
+
+    /// For the debug bridge: Save or Not Now on the prompt showing, as its buttons would.
+    static func debugAnswer(saved: Bool) {
+        guard let current, !current.isHidden else { return }
+        current.close(saved: saved)
+    }
+
+    /// The prompt showing, as its title and site read, and the window it's in.
+    static var debugShowing: (text: String, window: NSWindow?)? {
+        guard let current, current.superview != nil, !current.isHidden else { return nil }
+        return (current.header.title.stringValue + " " + current.header.subtitle.stringValue + " user=" + current.usernameField.stringValue, current.window)
+    }
     #endif
 
     /// Goes away on its own after a while, unless the pointer is on it.
