@@ -82,6 +82,115 @@ struct LocalizationTests {
         #expect(found.isEmpty, "Not localizable:\n\(found.joined(separator: "\n"))")
     }
 
+    // MARK: Simplified Chinese
+
+    /// The built app's Chinese, as String(localized:) finds it when Zigzag runs in Simplified Chinese.
+    private static func chinese(_ key: String) -> String {
+        let bundle = Bundle(path: Bundle.main.path(forResource: "zh-Hans", ofType: "lproj") ?? "") ?? .main
+        return bundle.localizedString(forKey: key, value: "⟨missing⟩", table: nil)
+    }
+
+    /// Every string, and every plural form, has its Chinese, and none is empty.
+    @Test func everyStringHasChinese() throws {
+        var missing: [String] = []
+        for (key, entry) in try Self.catalog() {
+            let forms = Self.forms(entry, "zh-Hans")
+            let state = ((((entry as? [String: Any])?["localizations"] as? [String: Any])?["zh-Hans"] as? [String: Any])?["stringUnit"] as? [String: Any])?["state"] as? String
+            if forms.isEmpty || forms.contains(where: { $0.trimmingCharacters(in: .whitespaces).isEmpty }) || (state != nil && state != "translated") {
+                missing.append(key)
+            }
+        }
+        #expect(missing.isEmpty, "No Chinese for: \(missing.sorted().prefix(20))")
+        #expect(Bundle.main.localizations.contains("zh-Hans"))
+    }
+
+    /// Each Chinese string takes the same arguments as its English, of the same types, so a translation that
+    /// reorders them can't read the wrong one or crash.
+    @Test func chineseKeepsTheFormatSpecifiers() throws {
+        var wrong: [String] = []
+        for (key, entry) in try Self.catalog() {
+            let english = Self.forms(entry, "en")
+            let chinese = Self.forms(entry, "zh-Hans")
+            guard let zh = chinese.first else { continue }
+            let en = english.first ?? key
+            if Self.arguments(en, entry, "en") != Self.arguments(zh, entry, "zh-Hans") { wrong.append("\(key) → \(zh)") }
+        }
+        #expect(wrong.isEmpty, "Arguments differ:\n\(wrong.joined(separator: "\n"))")
+    }
+
+    /// The glossary's words, everywhere: one English term is one Chinese term, and the words Zigzag decided
+    /// against never come back.
+    @Test func chineseFollowsTheGlossary() throws {
+        let terms: [(english: String, chinese: String)] = [
+            (#"\bSpaces?\b"#, "空间"), ("Favorite", "收藏"), (#"\bPeek\b"#, "速览"), ("[Cc]ommand bar", "命令栏"),
+            ("[Ss]idebar", "边栏"), (#"\bShare"#, "共享"), (#"\bReload"#, "重新载入"), ("Private [Ww]indow", "无痕浏览窗口"),
+            (#"\bReader\b"#, "阅读器"), ("Split View", "分屏浏览"), ("[Ss]ign-ins", "登录状态"), (#"\bArchive"#, "归档"),
+        ]
+        let avoided = ["您", "侧边栏", "分享", "刷新", "工作区", "隐私浏览", "扩展程序"]
+        var off: [String] = []
+        for (key, entry) in try Self.catalog() where key != "key.space-bar" {
+            guard let zh = Self.forms(entry, "zh-Hans").first else { continue }
+            let en = Self.forms(entry, "en").first ?? key
+            for term in terms where en.range(of: term.english, options: .regularExpression) != nil && !zh.contains(term.chinese) {
+                off.append("\(en) → \(zh), wants \(term.chinese)")
+            }
+            for word in avoided where zh.contains(word) { off.append("\(zh) says \(word)") }
+            // Full-width punctuation in Chinese sentences: no half-width comma or full stop beside a Chinese word.
+            if zh.range(of: #"\p{Han}[,.;:?!]\s|\p{Han}[,;?!]"#, options: .regularExpression) != nil { off.append("\(zh): half-width punctuation") }
+        }
+        #expect(off.isEmpty, "\(off.joined(separator: "\n"))")
+    }
+
+    /// The built app speaks Chinese, counts included: Chinese has one plural form, used for one as for many.
+    @Test func chineseReachesTheApp() {
+        #expect(Self.chinese("New Tab") == "新建标签页")
+        #expect(Self.chinese("Reopen Closed Tab") == "重新打开已关闭的标签页")
+        #expect(Self.chinese("key.space-bar") == "空格键")
+        func count(_ key: String, _ n: Int) -> String { String.localizedStringWithFormat(Self.chinese(key), n) }
+        #expect(count("%lld tabs", 3) == "3 个标签页")
+        #expect(count("Close %lld Tabs", 2) == "关闭 2 个标签页")
+        #expect(String.localizedStringWithFormat(Self.chinese("Updated %lld passwords from %@."), 5, "Chrome") == "已从 Chrome 更新 5 个密码。")
+        #expect(String(format: Self.chinese("%@ (%@)"), "重新载入", "⌘R") == "重新载入（⌘R）")
+    }
+
+    /// A catalog entry's strings in one language: its single string, or each plural form and substitution.
+    private static func forms(_ entry: Any, _ language: String) -> [String] {
+        guard let unit = ((entry as? [String: Any])?["localizations"] as? [String: Any])?[language] as? [String: Any] else { return [] }
+        func value(_ any: Any?) -> String? { ((any as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String }
+        var forms: [String] = []
+        if let main = value(unit) { forms.append(main) }
+        if let plural = (unit["variations"] as? [String: Any])?["plural"] as? [String: Any] {
+            forms += ["other", "one", "zero", "few", "many", "two"].compactMap { plural[$0] }.compactMap(value)
+        }
+        for case let sub as [String: Any] in (unit["substitutions"] as? [String: Any])?.values.map({ $0 }) ?? [] {
+            let plural = (sub["variations"] as? [String: Any])?["plural"] as? [String: Any] ?? [:]
+            forms += plural.values.compactMap(value)
+        }
+        return forms
+    }
+
+    /// The arguments a format reads, as argument number and type: "%2$@ has %lld" reads [1: lld, 2: @].
+    private static func arguments(_ format: String, _ entry: Any, _ language: String) -> [Int: String] {
+        let unit = ((entry as? [String: Any])?["localizations"] as? [String: Any])?[language] as? [String: Any]
+        let subs = unit?["substitutions"] as? [String: Any] ?? [:]
+        let pattern = try! NSRegularExpression(pattern: #"%(?:(\d+)\$)?(#@\w+@|[-+ 0#]*\d*(?:\.\d+)?(?:ll|l|h|hh|q|z|t|j)?[@dDuUxXoOfeEgGcCsSpaFi]|%)"#)
+        var arguments: [Int: String] = [:]
+        var next = 0
+        for match in pattern.matches(in: format, range: NSRange(format.startIndex..., in: format)) {
+            let type = String(format[Range(match.range(at: 2), in: format)!])
+            guard type != "%" else { continue }
+            next += 1
+            let position = Range(match.range(at: 1), in: format).flatMap { Int(format[$0]) } ?? next
+            if type.hasPrefix("#@") {
+                let sub = subs[String(type.dropFirst(2).dropLast())] as? [String: Any]
+                arguments[sub?["argNum"] as? Int ?? position] = sub?["formatSpecifier"] as? String
+            } else {
+                arguments[position] = type.hasSuffix("lld") ? "lld" : String(type.suffix(1))
+            }
+        }
+        return arguments
+    }
+
     private static func catalog() throws -> [String: Any] {
         let data = try Data(contentsOf: repo.appendingPathComponent("Zigzag/Resources/Localizable.xcstrings"))
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
