@@ -90,11 +90,25 @@
             "state" : "new",
             "value" : "%1$@ from %2$@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，来自 %2$@"
+          }
         }
       }
     },
     "%@ has a primary password. Type it to bring its passwords over." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 设置了主密码。输入主密码即可导入其中的密码。"
+          }
+        }
+      }
     },
     "%@ is listening to this tab" : {
       "comment" : "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."
@@ -103,10 +117,26 @@
       "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name."
     },
     "%@ isn’t a Safari export Zigzag can open. In Safari, choose File › Export Browsing Data, then choose the zip it makes." : {
-      "comment" : "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording."
+      "comment" : "Problem in the Import window. The placeholder is the file's name; File › Export Browsing Data is Safari's own menu wording.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”不是 Zigzag 能打开的 Safari 导出文件。在 Safari 中，选取“文件 › 导出浏览数据”，然后选择它生成的 zip 文件。"
+          }
+        }
+      }
     },
     "%@ isn’t a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it." : {
-      "comment" : "Problem in the Import window. The placeholder is the chosen file's name."
+      "comment" : "Problem in the Import window. The placeholder is the chosen file's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”不是 Zigzag 能识别的密码导出文件。请从你的密码管理器或浏览器导出 CSV 文件，然后选择它。"
+          }
+        }
+      }
     },
     "%@ keeps its %lld passwords in a newer format Zigzag can’t read yet. Export them from %@’s Passwords page as a CSV file, then choose it here." : {
       "comment" : "Problem in the Import window. The placeholders are a browser's name, like Firefox, and how many passwords it has.",
@@ -115,6 +145,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ keeps its %2$lld passwords in a newer format Zigzag can’t read yet. Export them from %3$@’s Passwords page as a CSV file, then choose it here."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 的 %2$lld 个密码使用了 Zigzag 暂时无法读取的新格式。请在 %3$@ 的“密码”页面将它们导出为 CSV 文件，然后在这里选择。"
           }
         }
       }
@@ -226,6 +262,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@, %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，%2$@"
           }
         }
       }
@@ -349,7 +391,15 @@
       "comment" : "Toast when an extension's own page uses a lot of energy. The name is the extension's."
     },
     "%@’s passwords and sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的密码和登录状态仍处于锁定状态。请点按“再试一次”，在 macOS 询问时输入你的 Mac 密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "%@’s passwords are in a format Zigzag can’t read. Export them from %@’s Passwords page as a CSV file, then choose it here." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Firefox.",
@@ -359,14 +409,36 @@
             "state" : "new",
             "value" : "%1$@’s passwords are in a format Zigzag can’t read. Export them from %2$@’s Passwords page as a CSV file, then choose it here."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 的密码格式 Zigzag 无法读取。请在 %2$@ 的“密码”页面将它们导出为 CSV 文件，然后在这里选择。"
+          }
         }
       }
     },
     "%@’s passwords stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的密码仍处于锁定状态。请点按“再试一次”，在 macOS 询问时输入你的 Mac 密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "%@’s sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的登录状态仍处于锁定状态。请点按“再试一次”，在 macOS 询问时输入你的 Mac 密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "%lld bookmarks" : {
       "comment" : "Item in a list of what a browser holds or what came over, in the Import window.",
@@ -384,6 +456,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld bookmarks"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个书签"
                 }
               }
             }
@@ -441,6 +525,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld entries had no website or no password, so they were left out."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个条目缺少网站或密码，已略过。"
                 }
               }
             }
@@ -664,6 +760,18 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个历史记录页面"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -687,6 +795,18 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个密码"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -706,6 +826,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld passwords couldn’t be saved. Try again."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个密码未能保存。请再试一次。"
                 }
               }
             }
@@ -737,6 +869,28 @@
                     "stringUnit" : {
                       "state" : "translated",
                       "value" : "%arg passwords"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ 中有 %#@passwords@无法打开。请退出 %3$@，然后再试一次。"
+          },
+          "substitutions" : {
+            "passwords" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg 个密码"
                     }
                   }
                 }
@@ -838,6 +992,18 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个网站的登录状态"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -857,6 +1023,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld spaces"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个空间"
                 }
               }
             }
@@ -913,7 +1091,15 @@
       "comment" : "Toast when the 1Password extension waits on the 1Password app."
     },
     "A few of your sign-ins from %@ couldn’t come over, so some sites may ask you to sign in again." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 中有少数登录状态未能导入，所以一些网站可能会要求你重新登录。"
+          }
+        }
+      }
     },
     "A password can’t be empty." : {
       "comment" : "Toast when saving a login with its password cleared."
@@ -930,13 +1116,29 @@
       }
     },
     "A quick look, without losing your place" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window. Peek is a Zigzag feature's name."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window. Peek is a Zigzag feature's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看一眼，不离开当前位置"
+          }
+        }
+      }
     },
     "A tab on %@ is using a lot of energy in the background" : {
       "comment" : "Toast when a tab in the background uses a lot of energy. The site is a domain, like example.com."
     },
     "AD" : {
-      "comment" : "Label on a sample ad in the welcome window’s picture of Zigzag."
+      "comment" : "Label on a sample ad in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告"
+          }
+        }
+      }
     },
     "About Zigzag" : {
       "comment" : "Title of the About window.\nZigzag menu item.",
@@ -970,7 +1172,15 @@
       "comment" : "Title of the sheet that asks before adding an extension. The name is the extension's."
     },
     "Add %lld" : {
-      "comment" : "Main button of the welcome window’s extensions step: add the ones picked, with how many."
+      "comment" : "Main button of the welcome window’s extensions step: add the ones picked, with how many.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 %lld 个"
+          }
+        }
+      }
     },
     "Add %lld to Favorites" : {
       "comment" : "Menu item for several picked sidebar rows",
@@ -1070,7 +1280,15 @@
       }
     },
     "Added" : {
-      "comment" : "By an extension in the welcome window once it’s added."
+      "comment" : "By an extension in the welcome window once it’s added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加"
+          }
+        }
+      }
     },
     "Added %@" : {
       "comment" : "Toast after an extension is added. The name is the extension's."
@@ -1082,13 +1300,29 @@
       "comment" : "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address."
     },
     "Adding" : {
-      "comment" : "By an extension in the welcome window while it’s added."
+      "comment" : "By an extension in the welcome window while it’s added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在添加"
+          }
+        }
+      }
     },
     "Adding to Zigzag…" : {
       "comment" : "On the bar over a Chrome Web Store page while the extension installs."
     },
     "Adding…" : {
-      "comment" : "Main button of the welcome window’s extensions step while it adds them.\nToast while an extension is being added."
+      "comment" : "Main button of the welcome window’s extensions step while it adds them.\nToast while an extension is being added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在添加…"
+          }
+        }
+      }
     },
     "Address" : {
       "comment" : "VoiceOver name of the address in a split view page's strip, while it has none."
@@ -1097,7 +1331,15 @@
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
     },
     "Ads and trackers blocked" : {
-      "comment" : "Badge on a sample page in the welcome window’s picture of Zigzag."
+      "comment" : "Badge on a sample page in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拦截广告和跟踪器"
+          }
+        }
+      }
     },
     "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, and zoom goes back to 100%." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites."
@@ -1156,16 +1398,48 @@
       "comment" : "Button in the What’s New sheet: opens every version's notes on the website."
     },
     "All in Zigzag" : {
-      "comment" : "Welcome window’s import step, once everything came over."
+      "comment" : "Welcome window’s import step, once everything came over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "都已在 Zigzag 中"
+          }
+        }
+      }
     },
     "All set" : {
-      "comment" : "Shown large when an import finishes and everything was already in Zigzag."
+      "comment" : "Shown large when an import finishes and everything was already in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一切就绪"
+          }
+        }
+      }
     },
     "Allow" : {
-      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton in the prompt asking whether an extension may hear a tab's sound.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question."
+      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton in the prompt asking whether an extension may hear a tab's sound.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许"
+          }
+        }
+      }
     },
     "Allow Access" : {
-      "comment" : "Button under a problem in the welcome window: let Zigzag read a browser’s data."
+      "comment" : "Button under a problem in the welcome window: let Zigzag read a browser’s data.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许访问"
+          }
+        }
+      }
     },
     "Allow Saving" : {
       "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again."
@@ -1337,7 +1611,15 @@
       }
     },
     "Block Ads" : {
-      "comment" : "Answer in the welcome window’s ad blocking step."
+      "comment" : "Answer in the welcome window’s ad blocking step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拦截广告"
+          }
+        }
+      }
     },
     "Block Dialogs" : {
       "comment" : "Button in a page's JavaScript dialog sheet, once it has shown a second dialog."
@@ -1354,7 +1636,15 @@
       }
     },
     "Block ads?" : {
-      "comment" : "Title of the welcome window’s ad blocking step."
+      "comment" : "Title of the welcome window’s ad blocking step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要拦截广告吗？"
+          }
+        }
+      }
     },
     "Block content on pages" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
@@ -1385,13 +1675,37 @@
       }
     },
     "Bookmarks" : {
-      "comment" : "Choice in the Import window: bring bookmarks over."
+      "comment" : "Choice in the Import window: bring bookmarks over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "书签"
+          }
+        }
+      }
     },
     "Bookmarks and history, no passwords" : {
-      "comment" : "Under Safari's name in the Import window's list: what can come over from it."
+      "comment" : "Under Safari's name in the Import window's list: what can come over from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "书签和历史记录，不含密码"
+          }
+        }
+      }
     },
     "Bookmarks and history, with your permission" : {
-      "comment" : "Under Safari's name in the Import window's list: what can come over from it."
+      "comment" : "Under Safari's name in the Import window's list: what can come over from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "书签和历史记录，需要你的许可"
+          }
+        }
+      }
     },
     "Borderless page" : {
       "comment" : "A setting in Settings › General.",
@@ -1405,7 +1719,15 @@
       }
     },
     "Bring" : {
-      "comment" : "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"
+      "comment" : "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入"
+          }
+        }
+      }
     },
     "Bring All to Front" : {
       "comment" : "Window menu item.",
@@ -1422,13 +1744,37 @@
       "comment" : "A row in the fill-password menu when nothing is saved yet. The placeholder is a browser, like Chrome."
     },
     "Bring your stuff over" : {
-      "comment" : "Title of the Import window.\nTitle of the welcome window’s import step."
+      "comment" : "Title of the Import window.\nTitle of the welcome window’s import step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把你的东西搬过来"
+          }
+        }
+      }
     },
     "Bringing it over…" : {
-      "comment" : "Title of the Import window while importing.\nUnder a browser's name in the Import window while importing from it."
+      "comment" : "Title of the Import window while importing.\nUnder a browser's name in the Import window while importing from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在导入…"
+          }
+        }
+      }
     },
     "Brings over your sign-ins from this Mac. Nothing leaves it." : {
-      "comment" : "Under Stay signed in to your sites, in the welcome window’s import step."
+      "comment" : "Under Stay signed in to your sites, in the welcome window’s import step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入这台 Mac 上的登录状态。数据不会离开这台 Mac。"
+          }
+        }
+      }
     },
     "Brought over sign-ins for %lld sites from %@." : {
       "comment" : "Import window, when only sign-ins came over: how many sites, then a browser's name, like Chrome.",
@@ -1460,6 +1806,28 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已从 %2$@ 导入 %#@sites@的登录状态。"
+          },
+          "substitutions" : {
+            "sites" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg 个网站"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1479,6 +1847,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Brought over sign-ins for %lld sites."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已导入 %lld 个网站的登录状态。"
                 }
               }
             }
@@ -1614,7 +1994,15 @@
       }
     },
     "Check Again" : {
-      "comment" : "Button by a browser in the welcome window: check again whether macOS allows reading it."
+      "comment" : "Button by a browser in the welcome window: check again whether macOS allows reading it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次检查"
+          }
+        }
+      }
     },
     "Check Document Now" : {
       "comment" : "Edit › Spelling and Grammar menu item.",
@@ -1667,7 +2055,15 @@
       "comment" : "Message on the page Zigzag shows when a page can't load."
     },
     "Checks your writing" : {
-      "comment" : "Under Grammarly in the welcome window’s list of extensions."
+      "comment" : "Under Grammarly in the welcome window’s list of extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查你的写作"
+          }
+        }
+      }
     },
     "Choices you make for one site, like allowing ads, a camera or notifications, show up here." : {
       "comment" : "Explanation under “None yet” in Settings › Privacy.",
@@ -1684,7 +2080,15 @@
       "comment" : "Button of the panel that picks the downloads folder."
     },
     "Choose File…" : {
-      "comment" : "Button in the Import window: choose a passwords export or Safari export file."
+      "comment" : "Button in the Import window: choose a passwords export or Safari export file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取文件…"
+          }
+        }
+      }
     },
     "Choose Folder…" : {
       "comment" : "Choice in the menu of where downloads go, in Settings and the downloads panel.\nItem in the downloads panel's … menu: picks the folder downloads are saved to.",
@@ -1709,10 +2113,26 @@
       }
     },
     "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file)." : {
-      "comment" : "Message of the open panel from the Import window's Choose File… button."
+      "comment" : "Message of the open panel from the Import window's Choose File… button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取一个密码导出文件（.csv 文件）或 Safari 的浏览数据导出文件（.zip 文件）。"
+          }
+        }
+      }
     },
     "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)." : {
-      "comment" : "Message of the open panel from the welcome window’s Import a password file… link."
+      "comment" : "Message of the open panel from the welcome window’s Import a password file… link.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取一个密码导出文件（.csv 文件）或 Safari 导出的浏览数据（.zip 文件）。"
+          }
+        }
+      }
     },
     "Choose the folder that contains the extension’s manifest.json." : {
       "comment" : "Message of the panel that loads an unpacked extension. manifest.json is a file name."
@@ -1840,10 +2260,26 @@
       }
     },
     "Click" : {
-      "comment" : "A key in the getting-started guide, after ⇧: click with the mouse or trackpad."
+      "comment" : "A key in the getting-started guide, after ⇧: click with the mouse or trackpad.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按"
+          }
+        }
+      }
     },
     "Click + at the bottom of the sidebar" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按边栏底部的 +"
+          }
+        }
+      }
     },
     "Click Allow to let Zigzag read %@’s bookmarks and passwords. Nothing in %@ changes." : {
       "comment" : "Message of the folder panel that lets Zigzag read a browser’s data. The placeholder is a browser’s name.",
@@ -1871,7 +2307,15 @@
       }
     },
     "Click one to go to it, or pinch out to go back" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按一个即可前往，或双指张开返回"
+          }
+        }
+      }
     },
     "Click to change" : {
       "comment" : "Tooltip of a shortcut in Settings › Shortcuts.",
@@ -2015,7 +2459,15 @@
       }
     },
     "Close it" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it."
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭它"
+          }
+        }
+      }
     },
     "Close the %lld tabs you haven’t used in a while" : {
       "comment" : "Tooltip of the sidebar's Clear Old button.",
@@ -2136,7 +2588,15 @@
       "comment" : "Switch in the PDF viewer's sidebar: shows the document's table of contents."
     },
     "Continue" : {
-      "comment" : "Main button of a step in the welcome window."
+      "comment" : "Main button of a step in the welcome window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
     },
     "Cookies and cache." : {
       "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac.",
@@ -2245,7 +2705,15 @@
       }
     },
     "Couldn’t add" : {
-      "comment" : "By an extension in the welcome window when it couldn’t be added."
+      "comment" : "By an extension in the welcome window when it couldn’t be added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能添加"
+          }
+        }
+      }
     },
     "Couldn’t delete it. Try again." : {
       "comment" : "Toast in the Passwords window when a login couldn't be deleted."
@@ -2342,7 +2810,15 @@
       "comment" : "Toolbar button tooltip in the PDF viewer. Shows the pages dark."
     },
     "Dark mode for every site" : {
-      "comment" : "Under Dark Reader in the welcome window’s list of extensions."
+      "comment" : "Under Dark Reader in the welcome window’s list of extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为每个网站开启深色模式"
+          }
+        }
+      }
     },
     "Darkest" : {
       "comment" : "VoiceOver, the Shade slider's value at its deepest."
@@ -2446,7 +2922,15 @@
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
     },
     "Done" : {
-      "comment" : "Button that closes the Import window when the import is done.\nButton that closes the What’s New sheet.\nIn the tab overview (all spaces' tabs as cards), a button that leaves the overview.\nTooltip of the find bar's close button."
+      "comment" : "Button that closes the Import window when the import is done.\nButton that closes the What’s New sheet.\nIn the tab overview (all spaces' tabs as cards), a button that leaves the overview.\nTooltip of the find bar's close button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
     },
     "Don’t Allow" : {
       "comment" : "Button in the prompt asking whether an extension may hear a tab's sound.\nButton on a site's permission question."
@@ -2517,10 +3001,26 @@
       }
     },
     "Drag a tab onto the page" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把一个标签页拖到页面上"
+          }
+        }
+      }
     },
     "Drag “%@” onto the page" : {
-      "comment" : "The split view step's title in the getting-started guide, a card in the window, naming the tab to drag. The name is a page's title."
+      "comment" : "The split view step's title in the getting-started guide, a card in the window, naming the tab to drag. The name is a page's title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把“%@”拖到页面上"
+          }
+        }
+      }
     },
     "Duplicate Tab" : {
       "comment" : "File menu item.\nItem in a tab's context menu in the sidebar.",
@@ -2534,7 +3034,15 @@
       }
     },
     "Each one stays at the top of your sidebar." : {
-      "comment" : "Line under the title of the welcome window’s step that picks favorite sites."
+      "comment" : "Line under the title of the welcome window’s step that picks favorite sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个都会留在边栏顶部。"
+          }
+        }
+      }
     },
     "Edit" : {
       "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nButton on a space's row in Settings › Spaces.",
@@ -2604,7 +3112,15 @@
       }
     },
     "End Getting Started" : {
-      "comment" : "Tooltip of the close button of the getting-started guide, a card in the window."
+      "comment" : "Tooltip of the close button of the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束入门"
+          }
+        }
+      }
     },
     "Enter Full Screen" : {
       "comment" : "View menu item.",
@@ -2635,13 +3151,37 @@
       "comment" : "Message of the sheet that puts every shortcut back."
     },
     "Every tab, at a glance" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有标签页，一目了然"
+          }
+        }
+      }
     },
     "Everything that came over is in your sidebar. You can bring more over anytime from Settings." : {
-      "comment" : "Import window when the import is done."
+      "comment" : "Import window when the import is done.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入的所有内容都在你的边栏中。你可以随时从“设置”导入更多内容。"
+          }
+        }
+      }
     },
     "Everything was already here." : {
-      "comment" : "Under “All set” when an import finishes and everything was already in Zigzag."
+      "comment" : "Under “All set” when an import finishes and everything was already in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有内容都已在这里。"
+          }
+        }
+      }
     },
     "Export" : {
       "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords."
@@ -2850,7 +3390,15 @@
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
     },
     "For example: lofi music" : {
-      "comment" : "Under a hint in the getting-started guide, a card in the window: something to search YouTube for."
+      "comment" : "Under a hint in the getting-started guide, a card in the window: something to search YouTube for.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：lofi music"
+          }
+        }
+      }
     },
     "Forget" : {
       "comment" : "Button on a site's row in Settings › Privacy › Sites: forgets the choices made for it.",
@@ -2928,7 +3476,15 @@
       "comment" : "Item at the bottom of the extensions menu: opens the Chrome Web Store."
     },
     "Get Started" : {
-      "comment" : "Button on the first screen of the welcome window."
+      "comment" : "Button on the first screen of the welcome window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始使用"
+          }
+        }
+      }
     },
     "Getting Started" : {
       "comment" : "Help menu item.",
@@ -2956,7 +3512,15 @@
       }
     },
     "Go back to your first space" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到你的第一个空间"
+          }
+        }
+      }
     },
     "Go to Page" : {
       "comment" : "Tooltip of the page number in the PDF viewer's toolbar."
@@ -3053,7 +3617,15 @@
       }
     },
     "Here’s an article to try it on" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这里有一篇文章，可以拿来试试"
+          }
+        }
+      }
     },
     "Hide Others" : {
       "comment" : "Zigzag menu item.",
@@ -3131,13 +3703,29 @@
       "comment" : "Toast after History is cleared."
     },
     "Import" : {
-      "comment" : "Main button in the Import window.\nTitle of the Import window."
+      "comment" : "Main button in the Import window.\nTitle of the Import window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入"
+          }
+        }
+      }
     },
     "Import Passwords…" : {
       "comment" : "Button in the empty Passwords window."
     },
     "Import a password file…" : {
-      "comment" : "Link in the welcome window’s import step: choose a passwords export file."
+      "comment" : "Link in the welcome window’s import step: choose a passwords export file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入密码文件…"
+          }
+        }
+      }
     },
     "Import from Another Browser…" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.",
@@ -3175,11 +3763,25 @@
             "state" : "new",
             "value" : "Imported %1$@ from %2$@."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已从 %2$@ 导入 %1$@。"
+          }
         }
       }
     },
     "Importing…" : {
-      "comment" : "Main button in the Import window while importing."
+      "comment" : "Main button in the Import window while importing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在导入…"
+          }
+        }
+      }
     },
     "Import…" : {
       "comment" : "Button in Settings › General that opens the Import window.\nButton in the Passwords window that imports passwords.",
@@ -3224,13 +3826,29 @@
       "comment" : "Message on the page Zigzag shows when a page can't load."
     },
     "It opens beside this one" : {
-      "comment" : "Under the split view step's title in the getting-started guide, a card in the window."
+      "comment" : "Under the split view step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它会在这个页面旁边打开"
+          }
+        }
+      }
     },
     "It redirected the page in a loop. Clearing this site’s cookies often fixes it." : {
       "comment" : "Message on the page Zigzag shows when a page can't load."
     },
     "It stays at the top of this space" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它会留在这个空间的顶部"
+          }
+        }
+      }
     },
     "It will be able to" : {
       "comment" : "Heading over the list of what an extension can do, in the sheet that asks before adding it."
@@ -3239,7 +3857,15 @@
       "comment" : "Heading over the list of what an extension's update could also do."
     },
     "Its own tabs and pinned tabs, in its own color" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有自己的标签页和已固定标签页，还有自己的颜色"
+          }
+        }
+      }
     },
     "Its package couldn’t be verified." : {
       "comment" : "One line beside an extension's name when its update didn't pass the signature check."
@@ -3290,7 +3916,15 @@
       "comment" : "Under a download's name in the downloads panel: the file has just finished downloading."
     },
     "Just the word" : {
-      "comment" : "Under the hint to type youtube, in the getting-started guide, a card in the window."
+      "comment" : "Under the hint to type youtube, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只需输入这个词"
+          }
+        }
+      }
     },
     "Keep videos playing when you switch tabs" : {
       "comment" : "A setting in Settings › General.",
@@ -3322,6 +3956,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Kept %lld passwords already in Zigzag instead of the imported ones."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "保留了 Zigzag 中已有的 %lld 个密码，没有用导入的密码替换。"
                 }
               }
             }
@@ -3409,7 +4055,15 @@
       "comment" : "Toast after the page's address is copied."
     },
     "Links from Mail, Messages and other apps will open here." : {
-      "comment" : "Line under the title of the welcome window’s last step. Mail and Messages are Apple’s apps."
+      "comment" : "Line under the title of the welcome window’s last step. Mail and Messages are Apple’s apps.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自“邮件”“信息”和其他 App 的链接会在这里打开。"
+          }
+        }
+      }
     },
     "Links from other apps open here." : {
       "comment" : "Explanation under “Default browser” in Settings › General.",
@@ -3451,7 +4105,15 @@
       "comment" : "Row in the site panel's This Site group."
     },
     "Looking…" : {
-      "comment" : "Under a browser's name in the Import window while counting what it holds."
+      "comment" : "Under a browser's name in the Import window while counting what it holds.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找…"
+          }
+        }
+      }
     },
     "Make Lower Case" : {
       "comment" : "Edit › Transformations menu item.",
@@ -3487,10 +4149,26 @@
       }
     },
     "Make Zigzag your default browser?" : {
-      "comment" : "Title of the welcome window’s last step."
+      "comment" : "Title of the welcome window’s last step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要将 Zigzag 设为默认浏览器吗？"
+          }
+        }
+      }
     },
     "Make a space" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建一个空间"
+          }
+        }
+      }
     },
     "Manage Extensions…" : {
       "comment" : "Item at the bottom of the extensions menu: opens Settings › Extensions.",
@@ -3695,7 +4373,15 @@
       }
     },
     "Move to Trash" : {
-      "comment" : "Button in the Import window: move the exported passwords file to the Trash."
+      "comment" : "Button in the Import window: move the exported passwords file to the Trash.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到废纸篓"
+          }
+        }
+      }
     },
     "Move to Window" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Move to Window.",
@@ -3729,7 +4415,15 @@
       "comment" : "Toast after a favorite moves back to the tabs."
     },
     "Moved to Trash" : {
-      "comment" : "The Move to Trash button in the Import window, once the file is in the Trash."
+      "comment" : "The Move to Trash button in the Import window, once the file is in the Trash.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移到废纸篓"
+          }
+        }
+      }
     },
     "Mute Tab" : {
       "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: silences the tab.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nView menu item.",
@@ -3749,7 +4443,15 @@
       "comment" : "Placeholder of the field that renames a favorite.\nPlaceholder of the field that renames a tab, in its sidebar row."
     },
     "Name it, then pick its color" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while the new space's editor is open."
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while the new space's editor is open.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给它起个名字，再选一个颜色"
+          }
+        }
+      }
     },
     "Name this space" : {
       "comment" : "Placeholder of the name field in the space editor.",
@@ -3769,16 +4471,40 @@
       "comment" : "Choice of column width in Reader's text and color choices."
     },
     "Needed to fill from Bitwarden" : {
-      "comment" : "Under Bitwarden in the welcome window’s list of extensions. Bitwarden is a product name."
+      "comment" : "Under Bitwarden in the welcome window’s list of extensions. Bitwarden is a product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Bitwarden 填写时需要"
+          }
+        }
+      }
     },
     "Needed to fill from the 1Password app" : {
-      "comment" : "Under 1Password in the welcome window’s list of extensions. 1Password is a product name."
+      "comment" : "Under 1Password in the welcome window’s list of extensions. 1Password is a product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 1Password App 填写时需要"
+          }
+        }
+      }
     },
     "Needs attention" : {
       "comment" : "VoiceOver value of an extension's button in the site panel when the extension asks for attention."
     },
     "Needs your OK once" : {
-      "comment" : "Under a browser’s name in the welcome window: macOS has to allow reading it first."
+      "comment" : "Under a browser’s name in the welcome window: macOS has to allow reading it first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要你允许一次"
+          }
+        }
+      }
     },
     "Never" : {
       "comment" : "A choice in Settings for when tabs you haven't used are archived. Tabs are never archived.\nButton in the save-password prompt: never offer to save on this site.",
@@ -3937,10 +4663,26 @@
       "comment" : "Find bar count when the page has nothing that matches."
     },
     "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export." : {
-      "comment" : "Import window, when no other browser was found."
+      "comment" : "Import window, when no other browser was found.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台 Mac 上没有找到其他存有数据的浏览器。你仍然可以从导出的 CSV 文件导入密码。"
+          }
+        }
+      }
     },
     "No other browsers with something to bring were found on this Mac." : {
-      "comment" : "Welcome window’s import step, when no other browser was found."
+      "comment" : "Welcome window’s import step, when no other browser was found.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台 Mac 上没有找到有可导入内容的其他浏览器。"
+          }
+        }
+      }
     },
     "No reused passwords. Each site has a password of its own." : {
       "comment" : "Shown in the Passwords window's Reused list when it's empty."
@@ -3997,7 +4739,15 @@
       }
     },
     "Not Now" : {
-      "comment" : "Answer in the welcome window’s default browser step.\nButton in the Import window: close it without importing.\nButton in the save-password prompt.\nButton that leaves an extension's update waiting.\nTooltip of the close button on a toast that offers something, like translating the page.\nTooltip of the close button on the bar over a Chrome Web Store page.\nTooltip of the × on a site's permission question."
+      "comment" : "Answer in the welcome window’s default browser step.\nButton in the Import window: close it without importing.\nButton in the save-password prompt.\nButton that leaves an extension's update waiting.\nTooltip of the close button on a toast that offers something, like translating the page.\nTooltip of the close button on the bar over a Chrome Web Store page.\nTooltip of the × on a site's permission question.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以后"
+          }
+        }
+      }
     },
     "Not allowed yet" : {
       "comment" : "Under Notifications in the site panel's This Site group: the site asked to send notifications, and no one answered yet."
@@ -4006,7 +4756,15 @@
       "comment" : "Why a download failed, under its name in the downloads panel.\nWhy a file couldn't be saved, said after what failed, like “Couldn’t save the page. Not enough space on your Mac.”"
     },
     "Not everything came over yet." : {
-      "comment" : "Welcome window’s import step when something didn’t come over."
+      "comment" : "Welcome window’s import step when something didn’t come over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有一些内容没有导入。"
+          }
+        }
+      }
     },
     "Not secure" : {
       "comment" : "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.\nVoiceOver label of the warning before the address in a pop-up window."
@@ -4015,7 +4773,15 @@
       "comment" : "Shown in the locked Passwords window after Touch ID was cancelled or failed."
     },
     "Not yet" : {
-      "comment" : "Shown large when an import finishes and nothing came over because of a problem."
+      "comment" : "Shown large when an import finishes and nothing came over because of a problem.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有"
+          }
+        }
+      }
     },
     "Not yet. In Files & Folders, under Zigzag, turn on %@, then click Check Again." : {
       "comment" : "Under a browser in the welcome window. The placeholder is a browser’s name; Files & Folders is a pane in macOS’s System Settings, Check Again a button here.",
@@ -4032,7 +4798,15 @@
       "comment" : "Name of a field of a saved login in the Passwords window."
     },
     "Nothing came over" : {
-      "comment" : "Under “Not yet” when an import finishes with a problem."
+      "comment" : "Under “Not yet” when an import finishes with a problem.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有导入任何内容"
+          }
+        }
+      }
     },
     "Nothing downloaded yet" : {
       "comment" : "The downloads panel when nothing was downloaded yet."
@@ -4044,16 +4818,48 @@
       "comment" : "On the History page when a search finds nothing. The placeholder is what was typed."
     },
     "Nothing new to bring over" : {
-      "comment" : "Under “All set” when an import finishes and everything was already in Zigzag."
+      "comment" : "Under “All set” when an import finishes and everything was already in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有新内容需要导入"
+          }
+        }
+      }
     },
     "Nothing new to bring over from %@." : {
-      "comment" : "Import window. The placeholder is a browser's name, like Chrome."
+      "comment" : "Import window. The placeholder is a browser's name, like Chrome.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 中没有新内容需要导入。"
+          }
+        }
+      }
     },
     "Nothing new: it was already here" : {
-      "comment" : "By a browser in the welcome window after importing, when nothing new came over."
+      "comment" : "By a browser in the welcome window after importing, when nothing new came over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有新内容：都已在这里"
+          }
+        }
+      }
     },
     "Nothing to bring over" : {
-      "comment" : "Under a browser's name in the Import window's list."
+      "comment" : "Under a browser's name in the Import window's list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可导入的内容"
+          }
+        }
+      }
     },
     "Notifications" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.\nRow in the site panel's This Site group."
@@ -4065,7 +4871,15 @@
       "comment" : "Accessibility label of the sidebar's Now Playing control. The placeholder is the playing tab's title."
     },
     "Now you’re searching on YouTube" : {
-      "comment" : "Under a hint in the getting-started guide, a card in the window, when the command bar offers to search YouTube."
+      "comment" : "Under a hint in the getting-started guide, a card in the window, when the command bar offers to search YouTube.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在你正在 YouTube 上搜索"
+          }
+        }
+      }
     },
     "OK" : {
       "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.\nButton that closes the note about an extension's missing app."
@@ -4133,7 +4947,15 @@
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app."
     },
     "Open %@" : {
-      "comment" : "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”.\nButton under a problem in the Import window: open a browser, like Firefox, to export from it."
+      "comment" : "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”.\nButton under a problem in the Import window: open a browser, like Firefox, to export from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 %@"
+          }
+        }
+      }
     },
     "Open 1Password" : {
       "comment" : "Button that opens the 1Password app. 1Password is a product name."
@@ -4250,7 +5072,15 @@
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the pinned tab."
     },
     "Open Safari" : {
-      "comment" : "Button under a note in the Import window: open Safari to export from it."
+      "comment" : "Button under a note in the Import window: open Safari to export from it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Safari"
+          }
+        }
+      }
     },
     "Open System Settings" : {
       "comment" : "Button by a browser in the welcome window. System Settings is macOS’s app.\nButton under a problem in the Import window. System Settings is macOS's app.",
@@ -4278,7 +5108,15 @@
       "comment" : "Tooltip of a button by a login's website in the Passwords window."
     },
     "Open a new tab" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开一个新标签页"
+          }
+        }
+      }
     },
     "Open in New Tab" : {
       "comment" : "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead."
@@ -4310,7 +5148,15 @@
       "comment" : "Accessibility help of the address in the sidebar."
     },
     "Or click outside it" : {
-      "comment" : "Under the hint to close a Peek, in the getting-started guide, a card in the window."
+      "comment" : "Under the hint to close a Peek, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或者点按它外面的地方"
+          }
+        }
+      }
     },
     "Or have Zigzag ask where, each time." : {
       "comment" : "Explanation under “Save downloads to” in Settings › General.",
@@ -4324,7 +5170,15 @@
       }
     },
     "Or pinch in on the trackpad" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或在触控板上双指捏合"
+          }
+        }
+      }
     },
     "Or type an emoji" : {
       "comment" : "Placeholder of the field under the icon choices, for a space's or a folder's icon."
@@ -4447,7 +5301,15 @@
       "comment" : "Shown in the Passwords window with no passwords saved yet."
     },
     "Passwords, bookmarks and history, from any browser on this Mac." : {
-      "comment" : "Subtitle of the Import window."
+      "comment" : "Subtitle of the Import window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自这台 Mac 上任何浏览器的密码、书签和历史记录。"
+          }
+        }
+      }
     },
     "Passwords, bookmarks and history. The other browser isn’t changed." : {
       "comment" : "Explanation under “Import from another browser” in Settings › General.",
@@ -4461,7 +5323,15 @@
       }
     },
     "Passwords, bookmarks and history. Your old browser stays as it is." : {
-      "comment" : "Line under the title of the welcome window’s import step."
+      "comment" : "Line under the title of the welcome window’s import step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码、书签和历史记录。你原来的浏览器保持原样。"
+          }
+        }
+      }
     },
     "Paste" : {
       "comment" : "Edit menu item.",
@@ -4539,7 +5409,15 @@
       "comment" : "Accessibility label of Peek's top strip. Peek shows a link's page in a panel over the current one."
     },
     "Personal" : {
-      "comment" : "Name of the first space, in the welcome window’s picture of Zigzag.\nThe name of the first space in a new Zigzag. People can rename it."
+      "comment" : "Name of the first space, in the welcome window’s picture of Zigzag.\nThe name of the first space in a new Zigzag. People can rename it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人"
+          }
+        }
+      }
     },
     "Picture in Picture" : {
       "comment" : "Tooltip of the Float action in the site panel.\nView menu item.",
@@ -4635,10 +5513,26 @@
       }
     },
     "Pin the sites you use" : {
-      "comment" : "Title of the welcome window’s step that picks favorite sites."
+      "comment" : "Title of the welcome window’s step that picks favorite sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定你常用的网站"
+          }
+        }
+      }
     },
     "Pin this page" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定这个页面"
+          }
+        }
+      }
     },
     "Pine" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep green.",
@@ -4663,16 +5557,40 @@
       }
     },
     "Pinned" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定"
+          }
+        }
+      }
     },
     "Pinned tabs stay, even after you quit" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定标签页会一直保留，即使退出也不会消失"
+          }
+        }
+      }
     },
     "Play" : {
       "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."
     },
     "Plus %@." : {
-      "comment" : "Under the big number when an import finishes: the rest of what came over, like “Plus 86 bookmarks and 3 spaces.”"
+      "comment" : "Under the big number when an import finishes: the rest of what came over, like “Plus 86 bookmarks and 3 spaces.”",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另有 %@。"
+          }
+        }
+      }
     },
     "Point at a video and choose Picture in Picture" : {
       "comment" : "Toast when Picture in Picture finds no video to float."
@@ -4687,10 +5605,26 @@
       "comment" : "Toast after allowing a site's pop-ups."
     },
     "Press Tab" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, when the command bar offers to search YouTube. Tab is the key."
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, when the command bar offers to search YouTube. Tab is the key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下 Tab 键"
+          }
+        }
+      }
     },
     "Press these keys, then search YouTube" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下这些键，然后在 YouTube 上搜索"
+          }
+        }
+      }
     },
     "Previous" : {
       "comment" : "Tooltip of the find bar's button that goes to the previous match."
@@ -4729,7 +5663,15 @@
       }
     },
     "Primary password" : {
-      "comment" : "Placeholder of the field for Firefox's primary password, in the Import window."
+      "comment" : "Placeholder of the field for Firefox's primary password, in the Import window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主密码"
+          }
+        }
+      }
     },
     "Print…" : {
       "comment" : "File menu item.",
@@ -4912,7 +5854,15 @@
       }
     },
     "Read more" : {
-      "comment" : "A button on a sample news page in the welcome window’s picture of Zigzag."
+      "comment" : "A button on a sample news page in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读全文"
+          }
+        }
+      }
     },
     "Read the original on %@" : {
       "comment" : "Link at the end of an article in Reader, to the page it came from. The placeholder is the site's name."
@@ -4927,10 +5877,26 @@
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
     },
     "Recipes" : {
-      "comment" : "A sample tab’s title in the welcome window’s picture of Zigzag."
+      "comment" : "A sample tab’s title in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "食谱"
+          }
+        }
+      }
     },
     "Recommended" : {
-      "comment" : "Badge on the suggested answer in the welcome window."
+      "comment" : "Badge on the suggested answer in the welcome window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐"
+          }
+        }
+      }
     },
     "Recording tabs" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
@@ -5332,7 +6298,15 @@
       "comment" : "Tooltip of a download's button in the downloads panel: carries on with a paused download."
     },
     "Return keeps it, Esc cancels" : {
-      "comment" : "Under a hint in the getting-started guide, a card in the window, while the new space's editor is open. Return and Esc are keys."
+      "comment" : "Under a hint in the getting-started guide, a card in the window, while the new space's editor is open. Return and Esc are keys.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 Return 键保留，按 Esc 键取消"
+          }
+        }
+      }
     },
     "Reused" : {
       "comment" : "A kind of password in the Passwords window's column: used on more than one site."
@@ -5377,10 +6351,26 @@
       }
     },
     "Safari’s passwords are in the Passwords app. Export them there, then use Import a password file." : {
-      "comment" : "Under Safari in the welcome window. Passwords is Apple’s app; Import a password file is a link here."
+      "comment" : "Under Safari in the welcome window. Passwords is Apple’s app; Import a password file is a link here.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safari 的密码存放在“密码”App 中。请在那里导出，然后使用“导入密码文件”。"
+          }
+        }
+      }
     },
     "Safari’s passwords are kept by the Passwords app. Export them there (File › Export All Passwords), then choose the file here." : {
-      "comment" : "Note in the Import window. File › Export All Passwords is the Passwords app's own menu wording."
+      "comment" : "Note in the Import window. File › Export All Passwords is the Passwords app's own menu wording.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safari 的密码由“密码”App 保管。请在那里导出（文件 › 导出所有密码），然后在这里选择该文件。"
+          }
+        }
+      }
     },
     "Sage" : {
       "comment" : "Name of a curated space color, in the space editor.",
@@ -5509,7 +6499,15 @@
       "comment" : "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com."
     },
     "Saves pages to Notion" : {
-      "comment" : "Under Notion Web Clipper in the welcome window’s list of extensions. Notion is a product name."
+      "comment" : "Under Notion Web Clipper in the welcome window’s list of extensions. Notion is a product name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将页面存储到 Notion"
+          }
+        }
+      }
     },
     "Saving pages" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
@@ -5552,7 +6550,15 @@
       "comment" : "Placeholder of the command bar's field while it searches history.\nPlaceholder of the search field on the History page."
     },
     "Search or enter address" : {
-      "comment" : "Placeholder of the address field, in the welcome window’s picture of Zigzag.\nPlaceholder of the address in the sidebar, on a new tab.\nPlaceholder of the command bar's field."
+      "comment" : "Placeholder of the address field, in the welcome window’s picture of Zigzag.\nPlaceholder of the address in the sidebar, on a new tab.\nPlaceholder of the command bar's field.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索或输入地址"
+          }
+        }
+      }
     },
     "Search sites and usernames" : {
       "comment" : "Placeholder of the search field in the Passwords window."
@@ -5600,10 +6606,26 @@
       }
     },
     "Secure connection" : {
-      "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nUnder the site's name in the site panel, for a page loaded over https.\nVoiceOver label of the lock before the address in a pop-up window."
+      "comment" : "In the site panel, in the welcome window’s picture of Zigzag.\nUnder the site's name in the site panel, for a page loaded over https.\nVoiceOver label of the lock before the address in a pop-up window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全连接"
+          }
+        }
+      }
     },
     "See all your tabs" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看你所有的标签页"
+          }
+        }
+      }
     },
     "See the sites you visit" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
@@ -5797,7 +6819,15 @@
       }
     },
     "Shift-click a blue link" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window."
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 Shift 键点按蓝色链接"
+          }
+        }
+      }
     },
     "Shortcuts" : {
       "comment" : "A section of Settings: keyboard shortcuts.",
@@ -5817,7 +6847,15 @@
       "comment" : "Button under a site's first hundred pages on the History page."
     },
     "Show Ads" : {
-      "comment" : "Answer in the welcome window’s ad blocking step."
+      "comment" : "Answer in the welcome window’s ad blocking step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示广告"
+          }
+        }
+      }
     },
     "Show All" : {
       "comment" : "Button under the first 30 sites in Settings › Privacy.\nZigzag menu item.",
@@ -5856,7 +6894,15 @@
       }
     },
     "Show Me How" : {
-      "comment" : "Button under a note in the welcome window: show how to export passwords."
+      "comment" : "Button under a note in the welcome window: show how to export passwords.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "告诉我怎么做"
+          }
+        }
+      }
     },
     "Show Original" : {
       "comment" : "Button in the toast after a page is translated: shows it untranslated again.\nMenu bar item: shows the translated page as it was.\nTooltip of the Original action in the site panel.",
@@ -5873,7 +6919,15 @@
       "comment" : "Tooltip of a button by a login's password in the Passwords window."
     },
     "Show Passwords" : {
-      "comment" : "Button in the Import window after passwords came over."
+      "comment" : "Button in the Import window after passwords came over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示密码"
+          }
+        }
+      }
     },
     "Show Pinned Tabs" : {
       "comment" : "Item in the context menu of the space's name above its pinned tabs: unfolds them.\nVoiceOver action on the space's name: unfolds its pinned tabs.",
@@ -5940,7 +6994,15 @@
       "comment" : "Disclosure on the page Zigzag shows for a site whose certificate can't be trusted."
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder."
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“访达”中显示"
+          }
+        }
+      }
     },
     "Show its own page when you open a new tab" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
@@ -6002,13 +7064,37 @@
       "comment" : "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."
     },
     "Sign in to each one after it’s added." : {
-      "comment" : "Note under the welcome window’s list of extensions."
+      "comment" : "Note under the welcome window’s list of extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个扩展添加后，请分别登录。"
+          }
+        }
+      }
     },
     "Sign-ins" : {
-      "comment" : "Choice in the Import window: bring over the sites you're signed in to."
+      "comment" : "Choice in the Import window: bring over the sites you're signed in to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录状态"
+          }
+        }
+      }
     },
     "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it." : {
-      "comment" : "Note under the choices in the Import window, explaining Sign-ins."
+      "comment" : "Note under the choices in the Import window, explaining Sign-ins.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录状态能让你在网站上保持登录，不必重新登录。它们来自这台 Mac，也只留在这台 Mac 上。"
+          }
+        }
+      }
     },
     "Signing in with your account" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
@@ -6067,7 +7153,15 @@
       }
     },
     "Skip" : {
-      "comment" : "Button in the getting-started guide, a card in the window: skips the step.\nButton in the welcome window's import step: go on without importing.\nButton of a step in the welcome window: go on without choosing."
+      "comment" : "Button in the getting-started guide, a card in the window: skips the step.\nButton in the welcome window's import step: go on without importing.\nButton of a step in the welcome window: go on without choosing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
+        }
+      }
     },
     "Sky" : {
       "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale blue.",
@@ -6213,7 +7307,15 @@
       }
     },
     "Spaces and Tabs" : {
-      "comment" : "Choice in the Import window: bring Arc's spaces and tabs over."
+      "comment" : "Choice in the Import window: bring Arc's spaces and tabs over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间和标签页"
+          }
+        }
+      }
     },
     "Speech" : {
       "comment" : "Submenu of the Edit menu.",
@@ -6260,7 +7362,15 @@
       }
     },
     "Start Browsing" : {
-      "comment" : "Button that ends the getting-started guide, a card in the window, after its last step.\nLast button of the welcome window, after importing."
+      "comment" : "Button that ends the getting-started guide, a card in the window, after its last step.\nLast button of the welcome window, after importing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始浏览"
+          }
+        }
+      }
     },
     "Start Speaking" : {
       "comment" : "Edit › Speech menu item.",
@@ -6274,7 +7384,15 @@
       }
     },
     "Stay signed in to your sites" : {
-      "comment" : "Row with a checkbox in the welcome window’s import step: bring over the sites you’re signed in to."
+      "comment" : "Row with a checkbox in the welcome window’s import step: bring over the sites you’re signed in to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在网站上保持登录"
+          }
+        }
+      }
     },
     "Step %lld of %lld" : {
       "comment" : "Which step of the getting-started guide, a card in the window this is, like Step 2 of 7.",
@@ -6283,6 +7401,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Step %1$lld of %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 步，共 %2$lld 步"
           }
         }
       }
@@ -6341,10 +7465,26 @@
       "comment" : "Tooltip of a button in the strip on top of each page of a split view: swaps the two stacked pages."
     },
     "Swipe or click a dot anytime, or press ⌥⌘← and ⌥⌘→" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随时轻扫或点按圆点，也可以按 ⌥⌘← 和 ⌥⌘→"
+          }
+        }
+      }
     },
     "Swipe two fingers across the sidebar, or click its dot" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在边栏上双指轻扫，或点按它的圆点"
+          }
+        }
+      }
     },
     "Switch to %@" : {
       "comment" : "A command in the command bar: goes to another space. The name is the space's."
@@ -6467,7 +7607,15 @@
       "comment" : "Tooltip of the button in Reader's bar that shows its text and color choices."
     },
     "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way." : {
-      "comment" : "Thank-you note from the maker at the end of the getting-started guide, a card in the window, signed by him."
+      "comment" : "Thank-you note from the maker at the end of the getting-started guide, a card in the window, signed by him.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "感谢你试用 Zigzag。我做它，是想给你在网上做的一切一个安静的家。希望它给你的感觉也是这样。"
+          }
+        }
+      }
     },
     "That disk can’t be written to" : {
       "comment" : "Why a file couldn't be saved, said after what failed, like “Couldn’t save the page. Not enough space on your Mac.”"
@@ -6476,19 +7624,51 @@
       "comment" : "Message of the notice when an unpacked extension can't load. manifest.json is a file name."
     },
     "That isn’t %@’s primary password. Check it and try again." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这不是 %@ 的主密码。请检查后再试一次。"
+          }
+        }
+      }
     },
     "That name or password didn’t work. Try again." : {
       "comment" : "Message in the sheet a site's HTTP sign-in asks with, after a wrong name or password."
     },
     "That’s Peek" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这就是速览"
+          }
+        }
+      }
     },
     "That’s Split View" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这就是分屏浏览"
+          }
+        }
+      }
     },
     "That’s switching spaces" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这就是切换空间"
+          }
+        }
+      }
     },
     "The Last Hour…" : {
       "comment" : "Item in the Clear History menu on the History page."
@@ -6514,10 +7694,26 @@
       "comment" : "Message of the sheet that confirms exporting passwords."
     },
     "The file still holds your passwords unprotected. It’s safer to move it to the Trash." : {
-      "comment" : "Import window, after passwords came over from an exported file."
+      "comment" : "Import window, after passwords came over from an exported file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该文件中的密码仍未受保护。将它移到废纸篓会更安全。"
+          }
+        }
+      }
     },
     "The free encyclopedia" : {
-      "comment" : "Wikipedia’s tagline, on a sample page in the welcome window’s picture of Zigzag."
+      "comment" : "Wikipedia’s tagline, on a sample page in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自由的百科全书"
+          }
+        }
+      }
     },
     "The language you read." : {
       "comment" : "Explanation under “Translate pages into” in Settings › Translation.",
@@ -6691,16 +7887,40 @@
       }
     },
     "To bring over Safari’s bookmarks and history, export them from Safari (File › Export Browsing Data to File) and choose that file here. Nothing else needs your permission." : {
-      "comment" : "Note in the Import window. File › Export Browsing Data to File is Safari's own menu wording."
+      "comment" : "Note in the Import window. File › Export Browsing Data to File is Safari's own menu wording.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要导入 Safari 的书签和历史记录，请从 Safari 导出（文件 › 将浏览数据导出到文件），然后在这里选择该文件。其他内容无需你的许可。"
+          }
+        }
+      }
     },
     "To separate them, click the split button at the top right of either page" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要分开它们，请点按任一页面右上角的分屏按钮"
+          }
+        }
+      }
     },
     "Today and Yesterday…" : {
       "comment" : "Item in the Clear History menu on the History page."
     },
     "Today’s news" : {
-      "comment" : "Heading of a sample news page in the welcome window’s picture of Zigzag."
+      "comment" : "Heading of a sample news page in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日新闻"
+          }
+        }
+      }
     },
     "Today…" : {
       "comment" : "Item in the Clear History menu on the History page."
@@ -6751,7 +7971,15 @@
       "comment" : "Under a language's name in the site panel's This Site group: pages in it are translated only when asked."
     },
     "Translates what you select" : {
-      "comment" : "Under Google Translate in the welcome window’s list of extensions."
+      "comment" : "Under Google Translate in the welcome window’s list of extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译你选中的内容"
+          }
+        }
+      }
     },
     "Translating from %@…" : {
       "comment" : "Toast while a page is translated. The language is its name, like French."
@@ -6768,10 +7996,26 @@
       }
     },
     "Trip ideas" : {
-      "comment" : "A sample tab’s title in the welcome window’s picture of Zigzag."
+      "comment" : "A sample tab’s title in the welcome window’s picture of Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旅行灵感"
+          }
+        }
+      }
     },
     "Try Again" : {
-      "comment" : "Button in the Passwords window after the passwords couldn't be read.\nButton in the toast when a download fails.\nButton on the bar over a Chrome Web Store page after installing failed.\nButton on the page Zigzag shows when a page can't load.\nButton under a problem in the Import window.\nTooltip of a download's button in the downloads panel: downloads the file again."
+      "comment" : "Button in the Passwords window after the passwords couldn't be read.\nButton in the toast when a download fails.\nButton on the bar over a Chrome Web Store page after installing failed.\nButton on the page Zigzag shows when a page can't load.\nButton under a problem in the Import window.\nTooltip of a download's button in the downloads panel: downloads the file again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再试一次"
+          }
+        }
+      }
     },
     "Try again in a moment." : {
       "comment" : "Message on the page Zigzag shows when a page can't load."
@@ -6797,7 +8041,15 @@
       "comment" : "Toolbar button tooltip in the PDF viewer. Shows two pages side by side."
     },
     "Two pages, side by side" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window."
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两个页面，左右并排"
+          }
+        }
+      }
     },
     "Type a shortcut" : {
       "comment" : "In Settings › Shortcuts while recording a new shortcut.",
@@ -6811,13 +8063,37 @@
       }
     },
     "Type any site’s name, then Tab, to search it" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window. Tab is the key."
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window. Tab is the key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键入任意网站的名称，再按 Tab 键，即可在该网站中搜索"
+          }
+        }
+      }
     },
     "Type what to find, then Return" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while searching a site from the command bar. Return is the key."
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while searching a site from the command bar. Return is the key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键入要查找的内容，然后按 Return 键"
+          }
+        }
+      }
     },
     "Type “youtube”" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window. Keep youtube as it is: it's what to type."
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window. Keep youtube as it is: it's what to type.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键入“youtube”"
+          }
+        }
+      }
     },
     "Typeface" : {
       "comment" : "VoiceOver label of the typeface choice in Reader's text and color choices."
@@ -6902,7 +8178,15 @@
       }
     },
     "Unlock" : {
-      "comment" : "Button in the Import window after typing Firefox's primary password.\nButton in the Import window after typing Firefox’s primary password.\nButton in the locked Passwords window: unlocks with Touch ID or the Mac's password."
+      "comment" : "Button in the Import window after typing Firefox's primary password.\nButton in the Import window after typing Firefox’s primary password.\nButton in the locked Passwords window: unlocks with Touch ID or the Mac's password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁"
+          }
+        }
+      }
     },
     "Unmute Tab" : {
       "comment" : "Item in a tab's context menu in the sidebar.\nMenu bar item: turns the tab's sound back on.\nTooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.",
@@ -7066,6 +8350,28 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已从 %2$@ 更新 %#@passwords@。"
+          },
+          "substitutions" : {
+            "passwords" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg 个密码"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -7211,10 +8517,26 @@
       "comment" : "Link on the page Zigzag shows for a site whose certificate can't be trusted, under Show details."
     },
     "Waiting" : {
-      "comment" : "By a browser in the welcome window while another one is imported first.\nBy an extension in the welcome window while others are added first."
+      "comment" : "By a browser in the welcome window while another one is imported first.\nBy an extension in the welcome window while others are added first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待中"
+          }
+        }
+      }
     },
     "Waiting…" : {
-      "comment" : "Under a browser's name in the Import window, while another browser is imported first."
+      "comment" : "Under a browser's name in the Import window, while another browser is imported first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待…"
+          }
+        }
+      }
     },
     "Weak" : {
       "comment" : "A kind of password in the Passwords window's column: easy to guess."
@@ -7245,16 +8567,40 @@
       }
     },
     "Welcome to" : {
-      "comment" : "First words of the welcome window, above the drawn ZIGZAG wordmark."
+      "comment" : "First words of the welcome window, above the drawn ZIGZAG wordmark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎使用"
+          }
+        }
+      }
     },
     "Welcome to Zigzag" : {
-      "comment" : "Title of the welcome window shown on first launch."
+      "comment" : "Title of the welcome window shown on first launch.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎使用 Zigzag"
+          }
+        }
+      }
     },
     "What happened, and what were you doing just before?" : {
       "comment" : "First line of the problem report email, for the person to answer."
     },
     "What stopped it is below, with a way to fix it." : {
-      "comment" : "Under “Not yet” when an import finishes with a problem."
+      "comment" : "Under “Not yet” when an import finishes with a problem.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下面列出了导致问题的原因，以及解决方法。"
+          }
+        }
+      }
     },
     "What you type in the address bar is sent to your search engine for suggestions." : {
       "comment" : "Explanation under “Search suggestions” in Settings › General.",
@@ -7364,7 +8710,15 @@
       "comment" : "Name of a History session that began yesterday."
     },
     "You searched YouTube from here" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你刚才从这里搜索了 YouTube"
+          }
+        }
+      }
     },
     "Your Mac doesn’t let Zigzag open it." : {
       "comment" : "Message on the page Zigzag shows when a page can't load."
@@ -7404,7 +8758,15 @@
       }
     },
     "Your new space" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window."
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的新空间"
+          }
+        }
+      }
     },
     "Your passwords are locked. Unlock with Touch ID or your Mac’s password." : {
       "comment" : "Shown in the locked Passwords window."
@@ -7421,7 +8783,15 @@
       }
     },
     "Your sign-ins from %@ couldn’t come over, so sites will ask you to sign in again." : {
-      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to."
+      "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 中的登录状态未能导入，所以网站会要求你重新登录。"
+          }
+        }
+      }
     },
     "Your spaces, tabs, favorites and history go back to how they were before the last update, and Zigzag restarts. Logins and passwords aren’t affected." : {
       "comment" : "Message of the sheet that restores the backup."
@@ -7442,16 +8812,40 @@
       "comment" : "Message of the sheet that asks before clearing every site's cookies.\nMessage of the sheet that clears cookies."
     },
     "You’re all set" : {
-      "comment" : "Title of the Import window when the import is done.\nTitle of the getting-started guide, a card in the window once every step is done."
+      "comment" : "Title of the Import window when the import is done.\nTitle of the getting-started guide, a card in the window once every step is done.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一切就绪"
+          }
+        }
+      }
     },
     "You’re offline" : {
       "comment" : "Title of the page Zigzag shows when a page can't load.\nWhy a download failed, under its name in the downloads panel."
     },
     "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings." : {
-      "comment" : "Import window when the import is done and sign-ins came over."
+      "comment" : "Import window when the import is done and sign-ins came over.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在这里也已登录你的网站，其他所有内容都在你的边栏中。你可以随时从“设置”导入更多内容。"
+          }
+        }
+      }
     },
     "Zigao, who makes Zigzag" : {
-      "comment" : "Signature under the thank-you note at the end of the getting-started guide, a card in the window. Zigao is the maker's name."
+      "comment" : "Signature under the thank-you note at the end of the getting-started guide, a card in the window. Zigao is the maker's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigao，Zigzag 的作者"
+          }
+        }
+      }
     },
     "Zigzag Passwords.csv" : {
       "comment" : "The file name suggested when exporting passwords. Keep .csv."
@@ -7474,7 +8868,15 @@
       }
     },
     "Zigzag couldn’t move it to the Trash. Show it in Finder and delete it there." : {
-      "comment" : "Import window, when the exported passwords file couldn't be moved to the Trash."
+      "comment" : "Import window, when the exported passwords file couldn't be moved to the Trash.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能将它移到废纸篓。请在“访达”中显示它，然后在那里删除。"
+          }
+        }
+      }
     },
     "Zigzag couldn’t open %@’s passwords. Quit %@, then try again." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome.",
@@ -7484,17 +8886,47 @@
             "state" : "new",
             "value" : "Zigzag couldn’t open %1$@’s passwords. Quit %2$@, then try again."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能打开 %1$@ 的密码。请退出 %2$@，然后再试一次。"
+          }
         }
       }
     },
     "Zigzag couldn’t read Arc’s history. Try again." : {
-      "comment" : "Problem in the Import window. Arc is a browser's name."
+      "comment" : "Problem in the Import window. Arc is a browser's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能读取 Arc 的历史记录。请再试一次。"
+          }
+        }
+      }
     },
     "Zigzag couldn’t read Arc’s spaces and pinned tabs. Try again." : {
-      "comment" : "Problem in the Import window. Arc is a browser's name."
+      "comment" : "Problem in the Import window. Arc is a browser's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能读取 Arc 的空间和已固定标签页。请再试一次。"
+          }
+        }
+      }
     },
     "Zigzag couldn’t read the passwords it already has, so it didn’t add any. Try again." : {
-      "comment" : "Problem in the Import window."
+      "comment" : "Problem in the Import window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能读取它已有的密码，所以没有添加任何密码。请再试一次。"
+          }
+        }
+      }
     },
     "Zigzag couldn’t save your tabs and spaces" : {
       "comment" : "Toast when Zigzag can't write its library of spaces and tabs; a reason may follow as its own sentence."
@@ -7511,7 +8943,15 @@
       }
     },
     "Zigzag has a blocker built in. Pages load faster, with fewer trackers." : {
-      "comment" : "Line under the title of the welcome window’s ad blocking step."
+      "comment" : "Line under the title of the welcome window’s ad blocking step.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 内置了拦截器。页面载入更快，跟踪器更少。"
+          }
+        }
+      }
     },
     "Zigzag is made by Zigao Wang and is open source under the Apache License, Version 2.0. It builds on the work of others, listed below with their licenses. Thank you." : {
       "comment" : "First paragraph of the Acknowledgments window. “Apache License, Version 2.0” is the license's name."
@@ -7766,7 +9206,15 @@
       }
     },
     "history" : {
-      "comment" : "Item in the short list of what a browser holds, in the Import window: its browsing history."
+      "comment" : "Item in the short list of what a browser holds, in the Import window: its browsing history.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录"
+          }
+        }
+      }
     },
     "import.lead.bookmarks" : {
       "comment" : "Under the big number when an import finishes, so without the number. Several, never 1.",
@@ -7776,6 +9224,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "bookmarks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个书签"
           }
         }
       }
@@ -7789,6 +9243,12 @@
             "state" : "new",
             "value" : "bookmark"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个书签"
+          }
         }
       }
     },
@@ -7800,6 +9260,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "pages of history"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个历史记录页面"
           }
         }
       }
@@ -7813,6 +9279,12 @@
             "state" : "new",
             "value" : "page of history"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个历史记录页面"
+          }
         }
       }
     },
@@ -7824,6 +9296,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "passwords"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个密码"
           }
         }
       }
@@ -7837,6 +9315,12 @@
             "state" : "new",
             "value" : "password"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个密码"
+          }
         }
       }
     },
@@ -7848,6 +9332,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "sites with sign-ins"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个网站的登录状态"
           }
         }
       }
@@ -7861,6 +9351,12 @@
             "state" : "new",
             "value" : "site with sign-ins"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个网站的登录状态"
+          }
         }
       }
     },
@@ -7873,6 +9369,12 @@
             "state" : "new",
             "value" : "spaces"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个空间"
+          }
         }
       }
     },
@@ -7884,6 +9386,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "space"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个空间"
           }
         }
       }
@@ -7962,22 +9470,70 @@
       }
     },
     "macOS still keeps it private. One switch in System Settings fixes it." : {
-      "comment" : "Under a browser in the welcome window."
+      "comment" : "Under a browser in the welcome window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 仍在对它保密。在“系统设置”中打开一个开关即可解决。"
+          }
+        }
+      }
     },
     "macOS will ask for your Mac’s password once. Type it, then click Always Allow." : {
-      "comment" : "Welcome window’s import step while importing. Always Allow is macOS's own button."
+      "comment" : "Welcome window’s import step while importing. Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 会询问一次你的 Mac 密码。输入密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "macOS will ask for your Mac’s password to open your passwords and sign-ins. Type it, then click Always Allow." : {
-      "comment" : "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button."
+      "comment" : "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 会要求输入你的 Mac 密码，以打开你的密码和登录状态。输入密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow." : {
-      "comment" : "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button."
+      "comment" : "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 会要求输入你的 Mac 密码，以打开你的密码。输入密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "macOS will ask for your Mac’s password to open your sign-ins. Type it, then click Always Allow." : {
-      "comment" : "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button."
+      "comment" : "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 会要求输入你的 Mac 密码，以打开你的登录状态。输入密码，然后点按“始终允许”。"
+          }
+        }
+      }
     },
     "macOS will need your permission to read it" : {
-      "comment" : "Under a browser's name in the Import window's list."
+      "comment" : "Under a browser's name in the Import window's list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 需要你的许可才能读取它"
+          }
+        }
+      }
     },
     "microphone allowed" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
@@ -8089,7 +9645,15 @@
       "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”. The placeholder is a site, like github.com."
     },
     "sign-ins" : {
-      "comment" : "Item in the short list of what a browser holds, in the Import window: the sites it keeps you signed in to."
+      "comment" : "Item in the short list of what a browser holds, in the Import window: the sites it keeps you signed in to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录状态"
+          }
+        }
+      }
     },
     "site-choices.sentence" : {
       "comment" : "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence.",
@@ -8128,7 +9692,15 @@
       }
     },
     "spaces" : {
-      "comment" : "Item in the short list of what a browser holds, in the Import window: Arc's spaces."
+      "comment" : "Item in the short list of what a browser holds, in the Import window: Arc's spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间"
+          }
+        }
+      }
     },
     "with %@" : {
       "comment" : "Under the command bar's Open in Split View command: the page it opens beside this one. The title is that page's."
