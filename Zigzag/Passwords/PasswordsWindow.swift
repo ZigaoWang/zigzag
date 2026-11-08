@@ -17,7 +17,7 @@ final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
         }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
-        window.title = "Passwords"
+        window.title = String(localized: "Passwords", comment: "Title of the Passwords window.")
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
@@ -51,10 +51,10 @@ private enum Category: CaseIterable {
 
     var title: String {
         switch self {
-        case .all: "All Passwords"
-        case .weak: "Weak"
-        case .reused: "Reused"
-        case .never: "Never Saved"
+        case .all: String(localized: "All Passwords", comment: "A kind of password in the Passwords window's column, and the list's title: every saved password.")
+        case .weak: String(localized: "Weak", comment: "A kind of password in the Passwords window's column: easy to guess.")
+        case .reused: String(localized: "Reused", comment: "A kind of password in the Passwords window's column: used on more than one site.")
+        case .never: String(localized: "Never Saved", comment: "A kind of entry in the Passwords window's column: sites where the person chose never to save a password.")
         }
     }
 
@@ -83,14 +83,14 @@ private final class CategoryItem: ListItem {
 
 final class PasswordsView: NSView {
     private let column = FlippedView()
-    private let columnTitle = PageTitleView("Passwords")
+    private let columnTitle = PageTitleView(String(localized: "Passwords", comment: "Title over the column of kinds in the Passwords window."))
     private let columnEdge = ColorView(color: Tokens.Color.separator)
     private var items: [CategoryItem] = []
     private let header = PageHeader()
-    private let paneTitle = PageTitleView("All Passwords")
-    private let search = FilledField.search("Search sites and usernames")
-    private let importButton = PillButton(title: "Import…", symbol: "square.and.arrow.down", style: .plain)
-    private let exportButton = PillButton(title: "Export", symbol: "square.and.arrow.up", style: .plain)
+    private let paneTitle = PageTitleView(String(localized: "All Passwords", comment: "A kind of password in the Passwords window's column, and the list's title: every saved password."))
+    private let search = FilledField.search(String(localized: "Search sites and usernames", comment: "Placeholder of the search field in the Passwords window."))
+    private let importButton = PillButton(title: String(localized: "Import…", comment: "Button in the Passwords window that imports passwords."), symbol: "square.and.arrow.down", style: .plain)
+    private let exportButton = PillButton(title: String(localized: "Export", comment: "Button in the Passwords window that exports passwords to a file."), symbol: "square.and.arrow.up", style: .plain)
     private let listScroll = NSScrollView()
     private let list = FlippedView()
     private let listEdge = ColorView(color: Tokens.Color.separator)
@@ -122,8 +122,8 @@ final class PasswordsView: NSView {
         [column, columnEdge, header, listScroll, listEdge, detail, empty, locked].forEach { addSubview($0) }
         header.leading = paneTitle
         header.trailing = [search, importButton, exportButton]
-        importButton.toolTip = "Import passwords from another browser or a file"
-        exportButton.toolTip = "Export passwords to a file"
+        importButton.toolTip = String(localized: "Import passwords from another browser or a file", comment: "Tooltip of the Import button in the Passwords window.")
+        exportButton.toolTip = String(localized: "Export passwords to a file", comment: "Tooltip of the Export button in the Passwords window.")
         importButton.onClick = { _ in ImportWindowController.show() }
         exportButton.onClick = { [weak self] _ in self?.export() }
         search.field.delegate = self
@@ -135,7 +135,7 @@ final class PasswordsView: NSView {
         listScroll.useSlimScroller()
         listScroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.boundsDidChangeNotification, object: listScroll.contentView)
-        let unlockButton = PillButton(title: "Unlock", symbol: "lock.open", style: .prominent)
+        let unlockButton = PillButton(title: String(localized: "Unlock", comment: "Button in the locked Passwords window: unlocks with Touch ID or the Mac's password."), symbol: "lock.open", style: .prominent)
         unlockButton.onClick = { [weak self] _ in self?.unlock() }
         locked.action = unlockButton
         importPasswords.onClick = { _ in ImportWindowController.show() }
@@ -200,15 +200,15 @@ final class PasswordsView: NSView {
         Task { @MainActor in
             locked.action?.isEnabled = false
             locked.text = Self.lockedPrompt
-            let ok = await PasswordAuthentication.authenticate("see your saved passwords", keepUnlockedFor: PasswordAuthentication.unlockDuration)
+            let ok = await PasswordAuthentication.authenticate(String(localized: "see your saved passwords", comment: "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”."), keepUnlockedFor: PasswordAuthentication.unlockDuration)
             locked.action?.isEnabled = true
-            guard ok else { locked.text = "Not unlocked. Try again when you’re ready."; return }
+            guard ok else { locked.text = String(localized: "Not unlocked. Try again when you’re ready.", comment: "Shown in the locked Passwords window after Touch ID was cancelled or failed."); return }
             setLocked(false)
             reload()
         }
     }
 
-    private static let lockedPrompt = "Your passwords are locked. Unlock with Touch ID or your Mac’s password."
+    private static let lockedPrompt = String(localized: "Your passwords are locked. Unlock with Touch ID or your Mac’s password.", comment: "Shown in the locked Passwords window.")
 
     private func lock() {
         PasswordAuthentication.lock()
@@ -220,8 +220,8 @@ final class PasswordsView: NSView {
     private var isLoadingVault = false
     /// The keychain wouldn't give up the list: say so, rather than look like there are no passwords at all.
     private var readFailed = false
-    private let importPasswords = PillButton(title: "Import Passwords…", style: .prominent)
-    private let tryAgain = PillButton(title: "Try Again", style: .prominent)
+    private let importPasswords = PillButton(title: String(localized: "Import Passwords…", comment: "Button in the empty Passwords window."), style: .prominent)
+    private let tryAgain = PillButton(title: String(localized: "Try Again", comment: "Button in the Passwords window after the passwords couldn't be read."), style: .prominent)
 
     private func setLocked(_ isLocked: Bool) {
         self.isLocked = isLocked
@@ -315,7 +315,7 @@ final class PasswordsView: NSView {
         rows.forEach { $0.removeFromSuperview() }
         if category == .never {
             rows = visibleNever.map { origin in
-                let row = SiteRow(title: origin.displayName, subtitle: origin.scheme == "https" ? "Never offer to save" : origin.description, origin: origin)
+                let row = SiteRow(title: origin.displayName, subtitle: origin.scheme == "https" ? String(localized: "Never offer to save", comment: "Under a site in the Passwords window's Never Saved list.") : origin.description, origin: origin)
                 row.onClick = { [weak self] _ in self?.selectNever(origin) }
                 return row
             }
@@ -324,7 +324,7 @@ final class PasswordsView: NSView {
             let shown = visibleCredentials
             rows = shown.map { credential in
                 let row = SiteRow(title: credential.title.isEmpty ? credential.origin.displayName : credential.title,
-                                  subtitle: credential.username.isEmpty ? "No username" : credential.username, origin: credential.origin)
+                                  subtitle: credential.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : credential.username, origin: credential.origin)
                 row.credentialID = credential.id
                 row.onClick = { [weak self] _ in self?.select(credential.id) }
                 return row
@@ -372,20 +372,20 @@ final class PasswordsView: NSView {
         empty.showsAction = false
         empty.action = readFailed ? tryAgain : importPasswords
         if isLoadingVault {
-            empty.text = "Opening your passwords…"
+            empty.text = String(localized: "Opening your passwords…", comment: "Shown in the Passwords window while the saved passwords are read.")
         } else if readFailed {
-            empty.text = "Couldn’t read your passwords. Nothing was deleted."
+            empty.text = String(localized: "Couldn’t read your passwords. Nothing was deleted.", comment: "Shown in the Passwords window when the Keychain wouldn't give up the passwords.")
             empty.showsAction = true
         } else if !query.isEmpty {
-            empty.text = "No sites or usernames match “\(search.stringValue)”."
+            empty.text = String(localized: "No sites or usernames match “\(search.stringValue)”.", comment: "Shown in the Passwords window when a search finds nothing. The placeholder is what was typed.")
         } else {
             switch category {
             case .all:
-                empty.text = "Passwords you save while signing in, or bring over from another browser, show up here."
+                empty.text = String(localized: "Passwords you save while signing in, or bring over from another browser, show up here.", comment: "Shown in the Passwords window with no passwords saved yet.")
                 empty.showsAction = true
-            case .weak: empty.text = "No weak passwords. Every one is long and varied enough to stand up to guessing."
-            case .reused: empty.text = "No reused passwords. Each site has a password of its own."
-            case .never: empty.text = "Sites where you choose Never when Zigzag offers to save show up here, so you can change your mind."
+            case .weak: empty.text = String(localized: "No weak passwords. Every one is long and varied enough to stand up to guessing.", comment: "Shown in the Passwords window's Weak list when it's empty.")
+            case .reused: empty.text = String(localized: "No reused passwords. Each site has a password of its own.", comment: "Shown in the Passwords window's Reused list when it's empty.")
+            case .never: empty.text = String(localized: "Sites where you choose Never when Zigzag offers to save show up here, so you can change your mind.", comment: "Shown in the Passwords window's Never Saved list when it's empty. Never is the button in the save-password prompt.")
             }
         }
         empty.appear()
@@ -396,22 +396,22 @@ final class PasswordsView: NSView {
     private func export() {
         guard !credentials.isEmpty else { return }
         let count = credentials.count
-        ConfirmSheet.show(in: self, title: "Export \(count) \(count == 1 ? "password" : "passwords")?",
-                          message: "The file isn’t protected: anyone who opens it can read every password. Keep it somewhere safe and delete it when you’re done.",
-                          confirmTitle: "Export") { [weak self] confirmed in
+        ConfirmSheet.show(in: self, title: String(localized: "Export \(count) passwords?", comment: "Title of the sheet that confirms exporting passwords."),
+                          message: String(localized: "The file isn’t protected: anyone who opens it can read every password. Keep it somewhere safe and delete it when you’re done.", comment: "Message of the sheet that confirms exporting passwords."),
+                          confirmTitle: String(localized: "Export", comment: "Button in the sheet that confirms exporting passwords.")) { [weak self] confirmed in
             guard confirmed, let self else { return }
             Task { @MainActor in
                 // Always asked fresh, even while unlocked.
-                guard await PasswordAuthentication.authenticate("export your passwords") else { return }
+                guard await PasswordAuthentication.authenticate(String(localized: "export your passwords", comment: "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”.")) else { return }
                 let panel = NSSavePanel()
-                panel.nameFieldStringValue = "Zigzag Passwords.csv"
+                panel.nameFieldStringValue = String(localized: "Zigzag Passwords.csv", comment: "The file name suggested when exporting passwords. Keep .csv.")
                 panel.allowedContentTypes = [.commaSeparatedText]
                 guard let window = self.window, await panel.beginSheetModal(for: window) == .OK, let url = panel.url else { return }
                 do {
                     let written = try await PasswordExport.write(self.credentials, to: url)
-                    Toast.show("Exported \(written) \(written == 1 ? "password" : "passwords")", symbol: "square.and.arrow.up", duration: 2, over: self, area: self.detail.frame)
+                    Toast.show(String(localized: "Exported \(written) passwords", comment: "Toast after passwords were exported to a file."), symbol: "square.and.arrow.up", duration: 2, over: self, area: self.detail.frame)
                 } catch {
-                    Toast.show("Couldn’t write the file. Choose another folder and try again.", symbol: "exclamationmark.triangle", duration: 3, over: self, area: self.detail.frame)
+                    Toast.show(String(localized: "Couldn’t write the file. Choose another folder and try again.", comment: "Toast in the Passwords window when the export file couldn't be written."), symbol: "exclamationmark.triangle", duration: 3, over: self, area: self.detail.frame)
                 }
             }
         }
@@ -629,7 +629,7 @@ private final class SiteRow: InteractiveView {
         [icon, self.title, self.subtitle].forEach { addSubview($0) }
         if let url = origin.url, FaviconStore.shared.cachedIcon(for: url) == nil { FaviconStore.shared.prefetch(for: url) }
         setAccessibilityRole(.row)
-        setAccessibilityLabel("\(title), \(subtitle)")
+        setAccessibilityLabel(String(localized: "\(title), \(subtitle)", comment: "What VoiceOver says for a row in the Passwords window: the site, then the username."))
         stateDidChange(animated: false)
     }
 
@@ -682,19 +682,19 @@ private final class DetailView: NSView, NSTextFieldDelegate {
     private let warning = WarningBanner()
     /// The login's details as quiet grouped rows, as Settings groups its own.
     private let card = FormGroup()
-    private let usernameRow = FieldRow(name: "Username")
-    private let passwordRow = FieldRow(name: "Password")
-    private let websiteRow = FieldRow(name: "Website")
-    private let notesRow = FieldRow(name: "Notes")
-    private let editButton = PillButton(title: "Edit", style: .plain)
-    private let deleteButton = PillButton(title: "Delete", style: .plain)
-    private let saveButton = PillButton(title: "Save", style: .prominent)
-    private let cancelButton = PillButton(title: "Cancel", style: .plain)
-    private let usernameField = FilledField(placeholder: "Username")
-    private let passwordField = FilledField(placeholder: "Password")
-    private let notesField = FilledField(placeholder: "Notes")
+    private let usernameRow = FieldRow(name: String(localized: "Username", comment: "Name of a field of a saved login in the Passwords window."))
+    private let passwordRow = FieldRow(name: String(localized: "Password", comment: "Name of a field of a saved login in the Passwords window."))
+    private let websiteRow = FieldRow(name: String(localized: "Website", comment: "Name of a field of a saved login in the Passwords window."))
+    private let notesRow = FieldRow(name: String(localized: "Notes", comment: "Name of a field of a saved login in the Passwords window."))
+    private let editButton = PillButton(title: String(localized: "Edit", comment: "Button on a saved login in the Passwords window."), style: .plain)
+    private let deleteButton = PillButton(title: String(localized: "Delete", comment: "Button on a saved login in the Passwords window."), style: .plain)
+    private let saveButton = PillButton(title: String(localized: "Save", comment: "Button that saves the changes to a login in the Passwords window."), style: .prominent)
+    private let cancelButton = PillButton(title: String(localized: "Cancel", comment: "Button that stops editing a login in the Passwords window."), style: .plain)
+    private let usernameField = FilledField(placeholder: String(localized: "Username", comment: "Name of a field of a saved login in the Passwords window."))
+    private let passwordField = FilledField(placeholder: String(localized: "Password", comment: "Name of a field of a saved login in the Passwords window."))
+    private let notesField = FilledField(placeholder: String(localized: "Notes", comment: "Name of a field of a saved login in the Passwords window."))
     private let neverBody = NSTextField(wrappingLabelWithString: "")
-    private let allowButton = PillButton(title: "Allow Saving", style: .prominent)
+    private let allowButton = PillButton(title: String(localized: "Allow Saving", comment: "Button for a Never Saved site in the Passwords window: offer to save its passwords again."), style: .prominent)
 
     private var credential: Credential?
     private var neverOrigin: Origin?
@@ -714,10 +714,10 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         deleteButton.isDestructive = true
         passwordField.field.font = .monospacedSystemFont(ofSize: Tokens.TypeSize.body, weight: .regular)
 
-        usernameRow.actions = [("doc.on.doc", "Copy Username", { [weak self] in self?.copyUsername() })]
-        passwordRow.actions = [("eye", "Show Password", { [weak self] in self?.toggleReveal() }),
-                               ("doc.on.doc", "Copy Password", { [weak self] in self?.copyPassword() })]
-        websiteRow.actions = [("arrow.up.forward.app", "Open Website", { [weak self] in self?.openWebsite() })]
+        usernameRow.actions = [("doc.on.doc", String(localized: "Copy Username", comment: "Tooltip of a button by a login's username in the Passwords window."), { [weak self] in self?.copyUsername() })]
+        passwordRow.actions = [("eye", String(localized: "Show Password", comment: "Tooltip of a button by a login's password in the Passwords window."), { [weak self] in self?.toggleReveal() }),
+                               ("doc.on.doc", String(localized: "Copy Password", comment: "Tooltip of a button by a login's password in the Passwords window."), { [weak self] in self?.copyPassword() })]
+        websiteRow.actions = [("arrow.up.forward.app", String(localized: "Open Website", comment: "Tooltip of a button by a login's website in the Passwords window."), { [weak self] in self?.openWebsite() })]
         editButton.onClick = { [weak self] _ in self?.beginEditing() }
         cancelButton.onClick = { [weak self] _ in self?.endEditing() }
         saveButton.onClick = { [weak self] _ in self?.saveEdits() }
@@ -738,8 +738,9 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         [neverBody, allowButton].forEach { $0.isHidden = true }
         icon.image = SiteIcon.image(for: credential.origin)
         title.stringValue = credential.title.isEmpty ? credential.origin.displayName : credential.title
-        subtitle.stringValue = "Last changed " + credential.modified.formatted(date: .abbreviated, time: .omitted)
-        usernameRow.value = credential.username.isEmpty ? "No username" : credential.username
+        let changed = credential.modified.formatted(date: .abbreviated, time: .omitted)
+        subtitle.stringValue = String(localized: "Last changed \(changed)", comment: "Under a saved login's name in the Passwords window. The placeholder is a date, like Nov 8, 2026.")
+        usernameRow.value = credential.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : credential.username
         usernameRow.isPlaceholder = credential.username.isEmpty
         usernameRow.showsActions = !credential.username.isEmpty
         updatePasswordRow()
@@ -747,9 +748,9 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         notesRow.value = credential.notes
         notesRow.isHidden = credential.notes.isEmpty
         if isReused {
-            warning.set("This password is used on other sites. If one of them leaks, this account is at risk too. Change it on the site, then update it here.", color: Tokens.Color.caution)
+            warning.set(String(localized: "This password is used on other sites. If one of them leaks, this account is at risk too. Change it on the site, then update it here.", comment: "Warning on a reused password in the Passwords window."), color: Tokens.Color.caution)
         } else if isWeak {
-            warning.set("This password is easy to guess. Change it on the site, and use a strong password Zigzag makes for you.", color: Tokens.Color.warning)
+            warning.set(String(localized: "This password is easy to guess. Change it on the site, and use a strong password Zigzag makes for you.", comment: "Warning on a weak password in the Passwords window."), color: Tokens.Color.warning)
         }
         warning.isHidden = !(isWeak || isReused)
         applyEditing()
@@ -766,7 +767,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
         icon.image = SiteIcon.image(for: origin)
         title.stringValue = origin.displayName
         subtitle.stringValue = origin.description
-        neverBody.stringValue = "Zigzag won’t offer to save passwords on this site. Allow it, and the next time you sign in there you’ll be asked again."
+        neverBody.stringValue = String(localized: "Zigzag won’t offer to save passwords on this site. Allow it, and the next time you sign in there you’ll be asked again.", comment: "Shown for a Never Saved site in the Passwords window.")
         needsLayout = true
     }
 
@@ -775,12 +776,12 @@ private final class DetailView: NSView, NSTextFieldDelegate {
             passwordRow.value = revealed.withUnsafeString { $0 }
             passwordRow.isMonospaced = true
             passwordRow.actions[0].symbol = "eye.slash"
-            passwordRow.actions[0].tip = "Hide Password"
+            passwordRow.actions[0].tip = String(localized: "Hide Password", comment: "Tooltip of the button that hides a shown password in the Passwords window.")
         } else {
             passwordRow.value = String(repeating: "•", count: 12)
             passwordRow.isMonospaced = false
             passwordRow.actions[0].symbol = "eye"
-            passwordRow.actions[0].tip = "Show Password"
+            passwordRow.actions[0].tip = String(localized: "Show Password", comment: "Tooltip of a button by a login's password in the Passwords window.")
         }
     }
 
@@ -798,7 +799,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
     // MARK: Actions
 
     private func password() async -> SecretString? {
-        guard let credential, await PasswordAuthentication.authenticate("show your password for \(credential.origin.displayName)", keepUnlockedFor: PasswordAuthentication.unlockDuration) else { return nil }
+        guard let credential, await PasswordAuthentication.authenticate(String(localized: "show your password for \(credential.origin.displayName)", comment: "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”. The placeholder is a site, like github.com."), keepUnlockedFor: PasswordAuthentication.unlockDuration) else { return nil }
         return try? await PasswordStore.shared.password(for: credential.id)
     }
 
@@ -817,14 +818,14 @@ private final class DetailView: NSView, NSTextFieldDelegate {
     private func copyUsername() {
         guard let credential else { return }
         Clipboard.copy(credential.username, concealed: false)
-        toast("Username copied")
+        toast(String(localized: "Username copied", comment: "Toast in the Passwords window."))
     }
 
     private func copyPassword() {
         Task { @MainActor in
             guard let secret = await password() else { return }
             secret.withUnsafeString { Clipboard.copy($0, concealed: true) }
-            toast("Password copied. It leaves the clipboard in 90 seconds.")
+            toast(String(localized: "Password copied. It leaves the clipboard in 90 seconds.", comment: "Toast in the Passwords window."))
         }
     }
 
@@ -840,23 +841,23 @@ private final class DetailView: NSView, NSTextFieldDelegate {
             // Kept in memory only, so Undo can put it back.
             // Unreadable: deleting now would offer an Undo that can't bring it back.
             guard let kept = try? await store.password(for: credential.id) else {
-                toast("Couldn’t delete it. Try again.")
+                toast(String(localized: "Couldn’t delete it. Try again.", comment: "Toast in the Passwords window when a login couldn't be deleted."))
                 return
             }
             do { try await store.delete(credential.id) } catch {
-                toast("Couldn’t delete it. Try again.")
+                toast(String(localized: "Couldn’t delete it. Try again.", comment: "Toast in the Passwords window when a login couldn't be deleted."))
                 return
             }
             onDeleted?()
             guard let host = superview else { return }
             let area = frame
-            Toast.show("Deleted \(credential.origin.displayName)", symbol: "trash", action: ("Undo", { [weak host] in
+            Toast.show(String(localized: "Deleted \(credential.origin.displayName)", comment: "Toast after a login is deleted in the Passwords window. The placeholder is a site, like github.com."), symbol: "trash", action: (String(localized: "Undo", comment: "Button in the toast after a login is deleted."), { [weak host] in
                 Task { @MainActor in
                     do {
                         _ = try await store.save(origin: credential.origin, username: credential.username, password: kept, title: credential.title.isEmpty ? nil : credential.title,
                                                  notes: credential.notes, otpAuth: credential.otpAuth, created: credential.created)
                     } catch {
-                        if let host { Toast.show("Couldn’t put it back", symbol: "exclamationmark.triangle", duration: 4, over: host, area: area) }
+                        if let host { Toast.show(String(localized: "Couldn’t put it back", comment: "Toast when undoing a deleted login failed."), symbol: "exclamationmark.triangle", duration: 4, over: host, area: area) }
                     }
                 }
             }), duration: 6, over: host, area: frame)
@@ -886,7 +887,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
     private func saveEdits() {
         guard var edited = credential else { return }
         let newPassword = SecretString(passwordField.stringValue)
-        guard !newPassword.isEmpty else { toast("A password can’t be empty."); return }
+        guard !newPassword.isEmpty else { toast(String(localized: "A password can’t be empty.", comment: "Toast when saving a login with its password cleared.")); return }
         edited.username = usernameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         edited.notes = notesField.stringValue
         edited.modified = Date()
@@ -898,9 +899,9 @@ private final class DetailView: NSView, NSTextFieldDelegate {
                     revealed = nil
                     endEditing()
                 }
-                toast("Saved")
+                toast(String(localized: "Saved", comment: "Toast after changes to a login are saved."))
             } catch {
-                toast("Couldn’t save the changes. Try again.")
+                toast(String(localized: "Couldn’t save the changes. Try again.", comment: "Toast when changes to a login couldn't be saved."))
             }
         }
     }
