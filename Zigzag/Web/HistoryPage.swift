@@ -127,7 +127,9 @@ enum HistoryPage {
                 // One page, or every page in a cluster.
                 let strings = (body["urls"] as? [String]) ?? [body["url"] as? String].compactMap { $0 }
                 let urls = strings.compactMap(URL.init(string:))
-                HistoryPage.change(urls.count == 1 ? "Remove Page from History" : "Remove Pages from History", from: message.webView) {
+                HistoryPage.change(urls.count == 1 ? String(localized: "Remove Page from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Page from History”.")
+                                                     : String(localized: "Remove Pages from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."),
+                                   from: message.webView) {
                     HistoryStore.shared.remove(urls)
                 }
                 replyHandler(true, nil)
@@ -181,17 +183,21 @@ enum HistoryPage {
     private static func confirmClear(_ range: String, from webView: WKWebView?, reply: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
         guard let host = webView?.window?.contentView else { reply(false, nil); return }
         let calendar = Calendar.current, now = Date()
-        let (title, since): (String, Date?) = switch range {
-        case "hour": ("the last hour", now.addingTimeInterval(-3600))
-        case "today": ("today", calendar.startOfDay(for: now))
-        case "yesterday": ("today and yesterday", calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)))
-        default: ("all history", nil)
+        let (title, message, since): (String, String, Date?) = switch range {
+        case "hour": (String(localized: "Clear history from the last hour?", comment: "Title of the sheet that asks before clearing part of History."),
+                      String(localized: "Pages you visited in the last hour are forgotten on this Mac. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before clearing part of History."),
+                      now.addingTimeInterval(-3600))
+        case "today": (String(localized: "Clear history from today?", comment: "Title of the sheet that asks before clearing part of History."),
+                       String(localized: "Pages you visited today are forgotten on this Mac. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before clearing part of History."),
+                       calendar.startOfDay(for: now))
+        case "yesterday": (String(localized: "Clear history from today and yesterday?", comment: "Title of the sheet that asks before clearing part of History."),
+                           String(localized: "Pages you visited today and yesterday are forgotten on this Mac. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before clearing part of History."),
+                           calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)))
+        default: (clearTitle, clearMessage, nil)
         }
-        ConfirmSheet.show(in: host, title: since == nil ? clearTitle : "Clear history from \(title)?",
-                          message: since == nil ? clearMessage : "Pages you visited \(range == "hour" ? "in the last hour" : title) are forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
-                          confirmTitle: "Clear History", destructive: true) { confirmed in
+        ConfirmSheet.show(in: host, title: title, message: message, confirmTitle: clearHistory, destructive: true) { confirmed in
             if confirmed {
-                change("Clear History", from: webView) { HistoryStore.shared.remove(since: since) }
+                change(clearHistory, from: webView) { HistoryStore.shared.remove(since: since) }
                 if let controller = controller(for: webView) { clearedToast(in: controller) }
             }
             reply(confirmed, nil)
@@ -200,22 +206,28 @@ enum HistoryPage {
 
     private static func confirmForget(_ urls: [URL], from webView: WKWebView?, reply: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
         guard let host = webView?.window?.contentView, !urls.isEmpty else { reply(false, nil); return }
-        let pages = urls.count == 1 ? "this page" : "these \(urls.count) pages"
-        ConfirmSheet.show(in: host, title: "Remove \(pages) from History?",
-                          message: "They’re forgotten on this Mac. Tabs, pinned tabs and passwords stay.",
-                          confirmTitle: "Remove", destructive: true) { confirmed in
-            if confirmed { change("Remove Pages from History", from: webView) { HistoryStore.shared.remove(urls) } }
+        let title = urls.count == 1 ? String(localized: "Remove this page from History?", comment: "Title of the sheet that asks before removing one page a search found from History.")
+            : String(localized: "Remove these \(urls.count) pages from History?", comment: "Title of the sheet that asks before removing the pages a search found from History. Always two or more.")
+        ConfirmSheet.show(in: host, title: title,
+                          message: String(localized: "They’re forgotten on this Mac. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before removing pages a search found from History."),
+                          confirmTitle: String(localized: "Remove", comment: "Button of the sheet that asks before removing pages from History."), destructive: true) { confirmed in
+            if confirmed { change(String(localized: "Remove Pages from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."), from: webView) { HistoryStore.shared.remove(urls) } }
             reply(confirmed, nil)
         }
     }
 
     /// Clearing all history asks the same way, and says it's done the same way, from the menu, Settings and here.
-    static let clearTitle = "Clear all history?"
-    static let clearMessage = "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay."
+    static var clearTitle: String { String(localized: "Clear all history?", comment: "Title of the sheet that asks before clearing all of History, from the History page, the menu or Settings.") }
+    static var clearMessage: String {
+        String(localized: "Every page you’ve visited is forgotten on this Mac, and the command bar stops suggesting them. Tabs, pinned tabs and passwords stay.", comment: "Message of the sheet that asks before clearing all of History.")
+    }
+    /// The sheet's button, and the change's name in Edit › Undo, which the toast's Undo looks for.
+    static var clearHistory: String { String(localized: "Clear History", comment: "Button that clears History, and the name of that change in the Edit menu, as in “Undo Clear History”.") }
     /// With Undo right there, as ⌘Z does.
     static func clearedToast(in controller: BrowserWindowController) {
-        Toast.show("History cleared", symbol: "clock.arrow.circlepath", action: ("Undo", { [weak controller] in
-            guard let undo = controller?.sidebarUndo, undo.canUndo, undo.undoActionName == "Clear History" else { return }
+        Toast.show(String(localized: "History cleared", comment: "Toast after History is cleared."), symbol: "clock.arrow.circlepath",
+                   action: (String(localized: "Undo", comment: "Button in the toast after History is cleared."), { [weak controller] in
+            guard let undo = controller?.sidebarUndo, undo.canUndo, undo.undoActionName == clearHistory else { return }
             undo.undo()
         }), duration: 5, in: controller)
     }
@@ -245,21 +257,58 @@ enum HistoryPage {
     }
 
     static func html(for webView: WKWebView) -> String {
-        template
+        let history = String(localized: "History", comment: "Title of the History page.")
+        let clear = escape(clearHistory)
+        return template
+            .replacingOccurrences(of: "%LANG%", with: Bundle.main.preferredLocalizations.first ?? "en")
+            .replacingOccurrences(of: "%PAGETITLE%", with: escape(history))
+            .replacingOccurrences(of: "%CLEAR%", with: clear)
+            .replacingOccurrences(of: "%LASTHOUR%", with: escape(String(localized: "The Last Hour…", comment: "Item in the Clear History menu on the History page.")))
+            .replacingOccurrences(of: "%TODAY%", with: escape(String(localized: "Today…", comment: "Item in the Clear History menu on the History page.")))
+            .replacingOccurrences(of: "%YESTERDAY%", with: escape(String(localized: "Today and Yesterday…", comment: "Item in the Clear History menu on the History page.")))
+            .replacingOccurrences(of: "%ALL%", with: escape(String(localized: "All History…", comment: "Item in the Clear History menu on the History page.")))
+            .replacingOccurrences(of: "%WORDS%", with: words)
             .replacingOccurrences(of: "%STYLE%", with: PageStyle.css(theme: theme(for: webView)))
-            .replacingOccurrences(of: "%TITLE%", with: PageStyle.title("History"))
-            .replacingOccurrences(of: "%SEARCH%", with: PageStyle.search(id: "query", placeholder: "Search history"))
+            .replacingOccurrences(of: "%TITLE%", with: PageStyle.title(escape(history)))
+            .replacingOccurrences(of: "%SEARCH%", with: PageStyle.search(id: "query", placeholder: escape(String(localized: "Search history", comment: "Placeholder of the search field on the History page."))))
             .replacingOccurrences(of: "%MARK%", with: WordmarkView.svg(class: "mark", label: nil))
             .replacingOccurrences(of: "%GLOBE%", with: globe?.base64EncodedString() ?? "")
     }
 
+    /// What the page's script says, in Zigzag's language: {n}, {from}, {to} and {query} stand for what it fills in.
+    /// Counts come as the singular and the rest, since the script counts again as pages are removed.
+    private static var words: String {
+        // A number no translation holds, to find where the count goes.
+        let many = 1_000_000_007
+        func counted(_ text: (Int) -> String) -> String { text(many).replacingOccurrences(of: String(many), with: "{n}") }
+        func pages(_ n: Int) -> String { String(localized: "\(n) pages", comment: "Count of pages in a session, or under a site, on the History page.") }
+        let words: [String: String] = [
+            "span": String(localized: "\("{from}") to \("{to}")", comment: "The time a session or a site's pages span on the History page, like “2:10 to 4:45 PM”."),
+            "page": pages(1).replacingOccurrences(of: "1", with: "{n}"),
+            "pages": counted(pages),
+            "removePages": counted { n in String(localized: "Remove \(n) Pages from History", comment: "Tooltip of the × on a site's group of pages on the History page. Always two or more.") },
+            "showMore": counted { n in String(localized: "Show \(n) More", comment: "Button under a site's first hundred pages on the History page.") },
+            "removePage": String(localized: "Remove from History", comment: "Tooltip of the × on a page on the History page."),
+            "removeSession": String(localized: "Remove Session from History", comment: "Tooltip of the × on a session's heading on the History page."),
+            "noMatch": String(localized: "Nothing in your history matches “\("{query}")”.", comment: "On the History page when a search finds nothing. The placeholder is what was typed."),
+            "empty": String(localized: "Pages you visit show up here.", comment: "On the History page while History is empty."),
+        ]
+        let json = (try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        return json.replacingOccurrences(of: "</", with: "<\\/")
+    }
+
+    private static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
     private static let template = #"""
 <!doctype html>
-<html lang="en">
+<html lang="%LANG%">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>History</title>
+<title>%PAGETITLE%</title>
 <style>
 %STYLE%
 /* History's own: sessions of pages, in one grid, under the shared header. */
@@ -334,13 +383,13 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
   %TITLE%
   %SEARCH%
   <div class="clear">
-    <button class="button" id="clearButton" aria-haspopup="menu" aria-expanded="false" aria-controls="clearMenu">Clear History</button>
-    <div class="menu" id="clearMenu" role="menu" aria-label="Clear History">
-      <button role="menuitem" data-range="hour">The Last Hour…</button>
-      <button role="menuitem" data-range="today">Today…</button>
-      <button role="menuitem" data-range="yesterday">Today and Yesterday…</button>
+    <button class="button" id="clearButton" aria-haspopup="menu" aria-expanded="false" aria-controls="clearMenu">%CLEAR%</button>
+    <div class="menu" id="clearMenu" role="menu" aria-label="%CLEAR%">
+      <button role="menuitem" data-range="hour">%LASTHOUR%</button>
+      <button role="menuitem" data-range="today">%TODAY%</button>
+      <button role="menuitem" data-range="yesterday">%YESTERDAY%</button>
       <hr role="separator">
-      <button role="menuitem" class="destructive" data-range="all">All History…</button>
+      <button role="menuitem" class="destructive" data-range="all">%ALL%</button>
     </div>
   </div>
 </div></header>
@@ -351,6 +400,10 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 </main>
 <script>
 const ask = (body) => window.webkit.messageHandlers.zigzagHistory.postMessage(body);
+// Zigzag's words, in its language; fill() puts in what {n}, {from}, {to} or {query} stand for.
+const words = %WORDS%;
+const fill = (text, values) => text.replace(/\{(\w+)\}/g, (m, k) => (k in values ? String(values[k]) : m));
+const pages = (n) => fill(n === 1 ? words.page : words.pages, { n });
 const list = document.getElementById('list');
 const empty = document.getElementById('empty');
 const query = document.getElementById('query');
@@ -366,7 +419,7 @@ const span = (items) => {
   if (newest === oldest) return newest;
   const suffix = / [AP]M$/;
   const from = oldest.match(suffix)?.[0] === newest.match(suffix)?.[0] ? oldest.replace(suffix, '') : oldest;
-  return from + ' to ' + newest;
+  return fill(words.span, { from, to: newest });
 };
 // The address without its scheme, as the address bar shows it.
 const where = (url) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
@@ -397,7 +450,7 @@ const removableByKey = (row, action) => {
 function page(item, session) {
   const a = el('a', 'row'); a.href = item.url; a.title = item.url;
   a.append(icon(item.url), el('span', 'title', item.title), el('span', 'where', where(item.url)), el('time', null, timeOf(item.time)),
-           removeButton('Remove from History', () => forget([item.url], session)));
+           removeButton(words.removePage, () => forget([item.url], session)));
   removableByKey(a, () => forget([item.url], session));
   return a;
 }
@@ -410,9 +463,9 @@ function clusterElement(cluster, session) {
   chevron.setAttribute('class', 'chevron'); chevron.setAttribute('viewBox', '0 0 12 12');
   chevron.innerHTML = '<path d="M4.5 2.5L8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>';
   const count = cluster.items.length;
-  head.append(chevron, icon(cluster.items[0].url), el('span', 'title', cluster.host), el('span', 'where', count + ' pages'),
+  head.append(chevron, icon(cluster.items[0].url), el('span', 'title', cluster.host), el('span', 'where', pages(count)),
               el('time', null, span(cluster.items)),
-              removeButton('Remove ' + count + ' Pages from History', () => forget(cluster.items.map((i) => i.url), session)));
+              removeButton(fill(words.removePages, { n: count }), () => forget(cluster.items.map((i) => i.url), session)));
   removableByKey(head, () => forget(cluster.items.map((i) => i.url), session));
   head.onclick = () => {
     // Opened or closed from the keyboard, the new heading keeps the focus, so the arrows carry on from it.
@@ -429,7 +482,7 @@ function clusterElement(cluster, session) {
     const shown = cluster.shown || batch;
     cluster.items.slice(0, shown).forEach((i) => pages.append(page(i, session)));
     if (count > shown) {
-      const more = el('button', 'more', 'Show ' + Math.min(batch, count - shown) + ' More');
+      const more = el('button', 'more', fill(words.showMore, { n: Math.min(batch, count - shown) }));
       more.onclick = () => { cluster.shown = shown + batch; box.replaceWith(clusterElement(cluster, session)); };
       pages.append(more);
     }
@@ -443,8 +496,8 @@ function sessionElement(session) {
   const items = session.clusters.flatMap((c) => c.items);
   const head = el('div', 'session-head');
   head.append(el('h2', null, session.title), el('span', 'range', span(items)),
-              el('span', 'count', items.length === 1 ? '1 page' : items.length + ' pages'),
-              removeButton('Remove Session from History', () => forget(items.map((i) => i.url), session)));
+              el('span', 'count', pages(items.length)),
+              removeButton(words.removeSession, () => forget(items.map((i) => i.url), session)));
   const rows = el('div', 'rows');
   for (const c of session.clusters) rows.append(c.items.length > 1 ? clusterElement(c, session) : page(c.items[0], session));
   section.append(head, rows);
@@ -466,7 +519,7 @@ function render() {
 
 function showEmpty() {
   empty.hidden = sessions.length > 0 || (!done && !searching);
-  document.getElementById('emptyText').textContent = searching ? 'Nothing in your history matches “' + searching + '”.' : 'Pages you visit show up here.';
+  document.getElementById('emptyText').textContent = searching ? fill(words.noMatch, { query: searching }) : words.empty;
 }
 
 // Removes pages from History, then from the session they were drawn in.
