@@ -51,7 +51,10 @@ final class LinkStatusController {
     /// The whole address, so you know where a link goes before you click it, without the noise: no "https://", no
     /// "www.", no trailing slash. Too long for the pill, it's cut in the middle, keeping the site and the end.
     static func describe(_ url: URL) -> String {
-        if url.scheme == "mailto" { return url.absoluteString.replacingOccurrences(of: "mailto:", with: "Email ") }
+        if url.scheme == "mailto" {
+            let address = url.absoluteString.replacingOccurrences(of: "mailto:", with: "")
+            return String(localized: "Email \(address)", comment: "Shown at the bottom of the window while pointing at an email link. The address is the link's.")
+        }
         guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else { return url.absoluteString }
         var text = url.absoluteString
         if let range = text.range(of: "\(scheme)://") { text.removeSubrange(range) }

@@ -7,12 +7,12 @@ import AppKit
 /// Everything in it belongs to its own pane's page (`show(_:)`), never the selected tab: its buttons act on that page,
 /// and its address and loading state are that page's.
 final class PaneHeaderView: NSView {
-    let back = PaneHeaderView.button("chevron.left", toolTip: "Back")
-    let forward = PaneHeaderView.button("chevron.right", toolTip: "Forward")
-    let reload = PaneHeaderView.button("arrow.clockwise", toolTip: "Reload")
-    let orientation = PaneHeaderView.button("rectangle.split.1x2", toolTip: "Stack Vertically")
-    let swap = PaneHeaderView.button("arrow.left.arrow.right", toolTip: "Swap Sides")
-    let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: "Separate Tabs")
+    let back = PaneHeaderView.button("chevron.left", toolTip: String(localized: "Back", comment: "Tooltip of a button in the strip on top of each page of a split view: goes back."))
+    let forward = PaneHeaderView.button("chevron.right", toolTip: String(localized: "Forward", comment: "Tooltip of a button in the strip on top of each page of a split view: goes forward."))
+    let reload = PaneHeaderView.button("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page."))
+    let orientation = PaneHeaderView.button("rectangle.split.1x2", toolTip: String(localized: "Stack Vertically", comment: "Tooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other."))
+    let swap = PaneHeaderView.button("arrow.left.arrow.right", toolTip: String(localized: "Swap Sides", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages."))
+    let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."))
     /// The page's address: click it to edit it, as the sidebar's address does for the page you're in.
     let address = PaneAddressView()
     private let line = ColorView(color: Tokens.Color.separator)
@@ -47,9 +47,11 @@ final class PaneHeaderView: NSView {
 
     func setVertical(_ vertical: Bool) {
         orientation.symbol = vertical ? "rectangle.split.2x1" : "rectangle.split.1x2"
-        orientation.toolTip = vertical ? "Side by Side" : "Stack Vertically"
+        orientation.toolTip = vertical ? String(localized: "Side by Side", comment: "Tooltip of a button in the strip on top of each page of a split view: lays the two pages side by side.")
+                                     : String(localized: "Stack Vertically", comment: "Tooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other.")
         swap.symbol = vertical ? "arrow.up.arrow.down" : "arrow.left.arrow.right"
-        swap.toolTip = vertical ? "Swap Top and Bottom" : "Swap Sides"
+        swap.toolTip = vertical ? String(localized: "Swap Top and Bottom", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two stacked pages.")
+                              : String(localized: "Swap Sides", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages.")
     }
 
     func show(_ tab: Tab?) {
@@ -69,7 +71,7 @@ final class PaneHeaderView: NSView {
         forward.isEnabled = tab?.canGoForward ?? false
         let loading = tab?.isLoading ?? false
         reload.symbol = loading ? "xmark" : "arrow.clockwise"
-        reload.toolTip = loading ? "Stop" : "Reload"
+        reload.toolTip = loading ? String(localized: "Stop", comment: "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.") : String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page.")
         address.text = tab?.url.map(CommandRanker.displayURL) ?? ""
         needsLayout = true
     }
@@ -107,7 +109,7 @@ final class PaneAddressView: InteractiveView {
         get { label.stringValue }
         set {
             label.stringValue = newValue
-            setAccessibilityLabel(newValue.isEmpty ? "Address" : newValue)
+            setAccessibilityLabel(newValue.isEmpty ? String(localized: "Address", comment: "VoiceOver name of the address in a split view page's strip, while it has none.") : newValue)
             needsLayout = true
         }
     }
@@ -128,7 +130,7 @@ final class PaneAddressView: InteractiveView {
         layer?.cornerCurve = .continuous
         addSubview(label)
         setAccessibilityRole(.button)
-        setAccessibilityHelp("Edit this page’s address")
+        setAccessibilityHelp(String(localized: "Edit this page’s address", comment: "VoiceOver hint of the address in a split view page's strip."))
     }
 
     required init?(coder: NSCoder) { fatalError() }

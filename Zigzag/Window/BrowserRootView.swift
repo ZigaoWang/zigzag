@@ -981,7 +981,8 @@ final class SplitDropHint: NSView {
         let target = NSRect(x: side == .left ? 0 : half, y: 0, width: half, height: bounds.height).insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
         zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
         zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-        label.stringValue = side == .left ? "Open on the Left" : "Open on the Right"
+        label.stringValue = side == .left ? String(localized: "Open on the Left", comment: "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.")
+                                           : String(localized: "Open on the Right", comment: "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view.")
         label.textColor = Tokens.Color.accent
         Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.zone.animator().frame = target }
         if zone.frame.isEmpty { zone.frame = target }

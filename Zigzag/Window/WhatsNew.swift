@@ -61,7 +61,8 @@ enum WhatsNew {
         guard updated, !sections.isEmpty, !WindowManager.needsOnboarding else { return false }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             guard let controller = WindowManager.shared.keyController else { return }
-            Toast.show("Zigzag updated to \(version)", symbol: "sparkles", action: ("What’s New", { show(in: controller) }),
+            Toast.show(String(localized: "Zigzag updated to \(version)", comment: "Toast after an update, with the new version number, like 0.5.2."), symbol: "sparkles",
+                       action: (String(localized: "What’s New", comment: "Button in the toast after an update: shows the release notes."), { show(in: controller) }),
                        duration: 10, in: controller)
         }
         return true
@@ -85,15 +86,15 @@ final class WhatsNewSheet: NSView {
     /// In the app's voice, as a page names itself.
     private let titleLabel: Label = {
         let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
-        label.attributedStringValue = Tokens.Font.voiceText("What’s New")
+        label.attributedStringValue = Tokens.Font.voiceText(String(localized: "What’s New", comment: "Title of the sheet with this version's release notes."))
         return label
     }()
-    private let versionLabel = Label("Version \(WhatsNew.version)", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let versionLabel = Label(String(localized: "Version \(WhatsNew.version)", comment: "Under the title of the What’s New sheet: the version number, like 0.5.2."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var headings: [Label] = []
     private var points: [(dot: ColorView, text: NSTextField)] = []
     private let buttons = DialogButtons()
-    private let done = PillButton(title: "Done", style: .prominent)
-    private let all = PillButton(title: "All Release Notes", style: .quiet)
+    private let done = PillButton(title: String(localized: "Done", comment: "Button that closes the What’s New sheet."), style: .prominent)
+    private let all = PillButton(title: String(localized: "All Release Notes", comment: "Button in the What’s New sheet: opens every version's notes on the website."), style: .quiet)
     private var monitor: Any?
     private var width: CGFloat { min(Tokens.Welcome.cardWidth, bounds.width - Tokens.Space.x6 * 2) }
     private let pad = Tokens.Space.x6
@@ -138,7 +139,7 @@ final class WhatsNewSheet: NSView {
         }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         setAccessibilityRole(.sheet)
-        setAccessibilityLabel("What’s New in Zigzag")
+        setAccessibilityLabel(String(localized: "What’s New in Zigzag", comment: "VoiceOver name of the What’s New sheet."))
     }
 
     required init?(coder: NSCoder) { fatalError() }

@@ -78,11 +78,11 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private weak var window: BrowserWindowController?
     private let panel = FloatingPanelView()
     private let glass = NSImageView(image: Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.body))
-    private let field = PlainTextField(font: Tokens.Font.body(), placeholder: "Find on page")
+    private let field = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Find on page", comment: "Placeholder of the find bar's field."))
     private let countLabel = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let previousButton = IconButton(symbol: "chevron.up", toolTip: "Previous")
-    private let nextButton = IconButton(symbol: "chevron.down", toolTip: "Next")
-    private let doneButton = IconButton(symbol: "xmark", toolTip: "Done")
+    private let previousButton = IconButton(symbol: "chevron.up", toolTip: String(localized: "Previous", comment: "Tooltip of the find bar's button that goes to the previous match."))
+    private let nextButton = IconButton(symbol: "chevron.down", toolTip: String(localized: "Next", comment: "Tooltip of the find bar's button that goes to the next match."))
+    private let doneButton = IconButton(symbol: "xmark", toolTip: String(localized: "Done", comment: "Tooltip of the find bar's close button."))
     private(set) var isVisible = false
     private var query = ""
     var hasQuery: Bool { !query.isEmpty }
@@ -261,7 +261,8 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             let work = DispatchWorkItem { [weak self, weak pdf] in
                 guard let self, let pdf else { return }
                 let found = pdf.find(query, backwards: backwards, fromStart: fromStart)
-                self.showCount(query.isEmpty ? "" : found.count == 0 ? "No matches" : found.count == 1 ? "1 match" : "\(found.place) of \(found.count)")
+                self.showCount(query.isEmpty ? "" : found.count == 0 ? Self.noMatches
+                    : found.count == 1 ? Self.matches(found.count) : Self.place(found.place, of: found.count))
                 self.countLabel.textColor = found.count > 0 ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
                 self.layoutPanel()
             }
@@ -280,6 +281,16 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         webView.find(query, configuration: config) { [weak self] result in
             self?.updateCount(found: result.matchFound)
         }
+    }
+
+    private static var noMatches: String { String(localized: "No matches", comment: "Find bar count when the page has nothing that matches.") }
+
+    /// "12 matches", or "1 match".
+    private static func matches(_ count: Int) -> String { String(localized: "\(count) matches", comment: "Find bar count: how many matches the page has.") }
+
+    /// "3 of 12": the match you're on, and how many there are.
+    private static func place(_ place: Int, of count: Int) -> String {
+        String(localized: "\(place) of \(count)", comment: "Find bar count: the match you're on, and how many there are, like 3 of 12.")
     }
 
     private func updateCount(found: Bool) {
@@ -303,8 +314,8 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
                 guard let self else { return }
                 let pair = ((try? result.get()) as? [Int]) ?? [0, 0]
                 let count = max(pair.count > 1 ? pair[1] : 0, 1), place = pair.first ?? 0
-                self.showCount(!found ? "No matches" : count == 1 ? "1 match"
-                    : (1...count).contains(place) ? "\(place) of \(count)" : "\(count) matches")
+                self.showCount(!found ? Self.noMatches : count == 1 ? Self.matches(count)
+                    : (1...count).contains(place) ? Self.place(place, of: count) : Self.matches(count))
                 self.countLabel.textColor = found ? Tokens.Color.textSecondary : Tokens.Color.textTertiary
                 self.layoutPanel()
             }
@@ -657,7 +668,7 @@ final class ToastView: FloatingPanelView {
     let actionButton = PillButton(style: .plain)
     /// Puts an offer away before it goes on its own ("This page is in French"), as the other offers at the top of
     /// the page are put away.
-    let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Not Now")
+    let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Not Now", comment: "Tooltip of the close button on a toast that offers something, like translating the page."))
     /// Something under way ("Writing report…"): the ribbon turns where the icon goes.
     let spinner = Spinner()
 
