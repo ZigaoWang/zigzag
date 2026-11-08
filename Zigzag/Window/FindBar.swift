@@ -775,12 +775,17 @@ enum Toast {
     /// `closes` adds a close button, for an offer you may want gone before it goes on its own.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: controller.root.cardFrame)
+        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller))
+    }
+
+    /// Over the page, or with the desk open, over the desk, clear of its search field.
+    private static func area(in controller: BrowserWindowController) -> NSRect {
+        controller.desk.toastArea ?? controller.root.cardFrame
     }
 
     /// Something that takes a moment: the spinner and what's happening, up until the next toast or `hide` replaces it.
     static func working(_ text: String, in controller: BrowserWindowController) {
-        show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: controller.root.cardFrame, busy: true)
+        show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: area(in: controller), busy: true)
     }
 
     /// Top center of the page: where your eyes already are, clear of the content you're reading.
@@ -797,7 +802,7 @@ enum Toast {
         let host = controller.root.overlay
         guard let toast = showing[ObjectIdentifier(host)]?.toast, toast.superview === host, !toast.dismissing else { return }
         let old = toast.frame
-        place(toast, in: controller.root.cardFrame)
+        place(toast, in: area(in: controller))
         let dx = old.minX - toast.frame.minX, dy = old.minY - toast.frame.minY
         // Dragging the window's edge, it simply stays with the page; gliding there would trail behind.
         guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, controller.window?.inLiveResize != true,
@@ -820,6 +825,8 @@ enum Toast {
         if let existing = state.toast, existing.superview === host {
             toast = existing
             isNew = false
+            // Something opened over it since (the desk): it comes back on top.
+            if host.subviews.last !== existing { host.addSubview(existing, positioned: .above, relativeTo: nil) }
         } else {
             toast = ToastView()
             isNew = true

@@ -609,6 +609,8 @@ final class DeskController {
     func hide(openingTab tab: Tab?) {
         guard isVisible, let controller else { return }
         isVisible = false
+        // A toast from the desk goes back over the page.
+        Toast.reposition(in: controller)
         transition += 1
         // Closed before the page's picture took over from a pinch: the pages go back to full size.
         shrinkPages(to: 1)
@@ -766,6 +768,13 @@ final class DeskController {
         reload(animated: true)
         // Return opens the best match; with the search cleared, it's back on the tab you were on.
         setFocus(query.isEmpty ? currentCardID : orderedCardIDs.first)
+    }
+
+    /// Where a toast goes while the desk is open: across the window, under the search field rather than over it.
+    var toastArea: NSRect? {
+        guard isVisible, let overlay = backdrop.superview else { return nil }
+        let search = overlay.convert(searchBox.bounds, from: searchBox)
+        return NSRect(x: overlay.bounds.minX, y: search.maxY, width: overlay.bounds.width, height: max(0, overlay.bounds.maxY - search.maxY))
     }
 
     /// The search field, centered at the top, clear of the window's buttons.
@@ -1124,7 +1133,12 @@ final class DeskController {
             let after = order[index...].first { !ids.contains($0) } ?? order[..<index].last { !ids.contains($0) }
             setFocus(after, scroll: false)
         }
-        if let controller { controller.closeManyWithUndo(pages) } else { manager.close(pages) }
+        // Several cards at once say how many, with Undo, as closing several from the sidebar does; one goes quietly.
+        if let controller {
+            if ids.count > 1 { controller.closeManyWithUndoToast(pages) } else { controller.closeManyWithUndo(pages) }
+        } else {
+            manager.close(pages)
+        }
         reload(animated: true)
     }
 
