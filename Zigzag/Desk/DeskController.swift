@@ -1016,8 +1016,14 @@ final class DeskController {
     // MARK: Selection
 
     private func cardClicked(_ tab: Tab, event: NSEvent) {
+        let anchor = focused
         if let id = cards.first(where: { $0.value.tab === tab || $0.value.partner === tab })?.key { setFocus(id, scroll: false) }
-        if event.modifierFlags.contains(.command) || event.modifierFlags.contains(.shift) {
+        // ⇧-click picks every card from the one you were on to here, as in the sidebar and Finder; ⌘-click one.
+        let order = orderedCardIDs
+        if event.modifierFlags.contains(.shift), let anchor, let a = order.firstIndex(of: anchor), let b = order.firstIndex(of: tab.id) {
+            selection.formUnion(order[min(a, b)...max(a, b)])
+            updateSelection()
+        } else if event.modifierFlags.contains(.command) || event.modifierFlags.contains(.shift) {
             if selection.contains(tab.id) { selection.remove(tab.id) } else { selection.insert(tab.id) }
             updateSelection()
         } else if !selection.isEmpty {
