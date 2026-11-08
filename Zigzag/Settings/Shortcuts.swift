@@ -147,11 +147,14 @@ enum Shortcuts {
 
     static func caps(_ item: NSMenuItem) -> [String] { caps(combo(of: item)) }
 
-    /// " (⌘S)" for a tooltip: the shortcut as it is now (set in Settings), or nothing if there isn't one.
-    static func hint(for action: Selector) -> String {
-        guard let item = allItems.first(where: { $0.action == action }) else { return "" }
+    /// "Reload (⌘R)" for a tooltip: the name with the shortcut as it is now (set in Settings), or just the name if
+    /// there isn't one.
+    static func tooltip(_ title: String, for action: Selector) -> String {
+        guard let item = allItems.first(where: { $0.action == action }) else { return title }
         let keys = caps(item)
-        return keys.isEmpty ? "" : " (" + keys.joined() + ")"
+        guard !keys.isEmpty else { return title }
+        let shortcut = keys.joined()
+        return String(localized: "\(title) (\(shortcut))", comment: "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.")
     }
 
     private static func name(of key: String) -> String {
@@ -163,7 +166,8 @@ enum Shortcuts {
         guard let scalar = key.unicodeScalars.first else { return key }
         if let name = special[Int(scalar.value)] { return name }
         if (NSF1FunctionKey...NSF20FunctionKey).contains(Int(scalar.value)) { return "F\(Int(scalar.value) - NSF1FunctionKey + 1)" }
-        if key == " " { return "Space" }
+        if key == " " { return String(localized: "key.space-bar", defaultValue: "Space",
+                                                    comment: "The space bar's name in a keyboard shortcut, like ⌥Space. Not a Zigzag space.") }
         return key.uppercased()
     }
 

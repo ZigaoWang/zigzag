@@ -84,7 +84,9 @@ final class AddressView: InteractiveView {
     func setReader(available: Bool, active: Bool) {
         readerButton.isHidden = !available && !active
         readerButton.isSelected = active
-        readerButton.toolTip = (active ? "Hide Reader" : "Show Reader") + Shortcuts.hint(for: #selector(BrowserWindowController.toggleReader(_:)))
+        readerButton.toolTip = Shortcuts.tooltip(active ? String(localized: "Hide Reader", comment: "Tooltip of the address bar's Reader button while Reader is on.")
+                                                         : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."),
+                                                  for: #selector(BrowserWindowController.toggleReader(_:)))
         needsLayout = true
     }
 
@@ -540,8 +542,10 @@ final class SidebarView: NSView {
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.
     static func reloadTip(loading: Bool) -> String {
-        loading ? "Stop" + Shortcuts.hint(for: #selector(BrowserWindowController.stopLoading(_:)))
-                : "Reload" + Shortcuts.hint(for: #selector(BrowserWindowController.reloadPage(_:)))
+        loading ? Shortcuts.tooltip(String(localized: "Stop", comment: "Tooltip of the sidebar's reload button while the page loads: stops loading."),
+                                    for: #selector(BrowserWindowController.stopLoading(_:)))
+                : Shortcuts.tooltip(String(localized: "Reload", comment: "Tooltip of the sidebar's reload button."),
+                                    for: #selector(BrowserWindowController.reloadPage(_:)))
     }
 
     func reloadSpaces(current: UUID) {

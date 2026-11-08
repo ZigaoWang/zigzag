@@ -1255,12 +1255,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         sidebar.trafficLightsWidth = window.styleMask.contains(.fullScreen) ? 0 : window.trafficLightsWidth
-        sidebar.sidebarButton.toolTip = (docked ? "Hide Sidebar" : "Show Sidebar") + Shortcuts.hint(for: #selector(toggleBrowserSidebar(_:)))
-        sidebar.backButton.toolTip = "Back" + Shortcuts.hint(for: #selector(goBack(_:)))
-        sidebar.forwardButton.toolTip = "Forward" + Shortcuts.hint(for: #selector(goForward(_:)))
+        sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
+                                                                  : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),
+                                                           for: #selector(toggleBrowserSidebar(_:)))
+        sidebar.backButton.toolTip = Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(goBack(_:)))
+        sidebar.forwardButton.toolTip = Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(goForward(_:)))
         sidebar.reloadButton.toolTip = SidebarView.reloadTip(loading: selectedTab?.isLoading ?? false)
-        sidebar.downloadsButton.toolTip = "Downloads" + Shortcuts.hint(for: #selector(showDownloads(_:)))
-        sidebar.newSpaceButton.toolTip = "New Space" + Shortcuts.hint(for: #selector(newSpace(_:)))
+        sidebar.downloadsButton.toolTip = Shortcuts.tooltip(String(localized: "Downloads", comment: "Tooltip of the sidebar's downloads button."), for: #selector(showDownloads(_:)))
+        sidebar.newSpaceButton.toolTip = Shortcuts.tooltip(String(localized: "New Space", comment: "Tooltip of the button that adds a space, at the bottom of the sidebar."), for: #selector(newSpace(_:)))
         sidebar.sidebarButton.isSelected = false
     }
 
