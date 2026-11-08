@@ -130,8 +130,36 @@
           if (match && Array.isArray(filter.urls)) return { ...filter, urls: filter.urls.filter((url) => url !== match[1]) };
           return null;
         };
+        // A filter with only main_frame hears nothing in WebKit, and one with only sub_frame hears main frames too.
+        // Violentmonkey watches main_frame for .user.js loads, so opening a script's address never opened its install
+        // page. WebKit is asked for both, and the listener hears only the kinds it named, as in Chrome.
+        const remove = event.removeListener && event.removeListener.bind(event);
+        const has = event.hasListener && event.hasListener.bind(event);
+        const sorted = new WeakMap();
+        const frames = (listener, filter) => {
+          const types = filter && Array.isArray(filter.types) ? filter.types : null;
+          if (typeof listener !== 'function' || !types || !types.some((type) => type === 'main_frame' || type === 'sub_frame')) return null;
+          if (!sorted.has(listener)) {
+            const wanted = new Set();
+            const heard = (details, ...more) => { if (!details || wanted.has(details.type)) return listener(details, ...more); };
+            sorted.set(listener, Object.assign(heard, { wanted }));
+          }
+          const heard = sorted.get(listener);
+          types.forEach((type) => heard.wanted.add(type));
+          return { listener: heard, filter: { ...filter, types: [...new Set([...types, 'main_frame', 'sub_frame'])] } };
+        };
+        try {
+          if (remove) setMember(['webRequest', name], 'removeListener', (listener) => {
+            const heard = sorted.get(listener);
+            sorted.delete(listener);
+            return remove(heard || listener);
+          });
+          if (has) setMember(['webRequest', name], 'hasListener', (listener) => has(sorted.get(listener) || listener));
+        } catch (e) {}
         try {
           setMember(['webRequest', name], 'addListener', (listener, filter, ...rest) => {
+            const framed = frames(listener, filter);
+            if (framed) ({ listener, filter } = framed);
             for (let tries = 0; ; tries++) {
               try { return add(listener, filter, ...rest); } catch (error) {
                 const next = filter && tries < 30 ? narrowed(filter, String(error && error.message)) : null;
