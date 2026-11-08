@@ -100,8 +100,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let host = tab.url?.host() else { return }
             MenuPanel.show([
-                .item(.init(title: "Stop Camera and Microphone", symbol: "stop.circle") { tab.stopCapture() }),
-                .item(.init(title: "Ask Again Next Time", symbol: "arrow.counterclockwise") { SitePermissions.forget(host: host) }),
+                .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
+                .item(.init(title: String(localized: "Ask Again Next Time", comment: "Menu item of the address bar's camera button: forgets the site's camera and microphone answer."), symbol: "arrow.counterclockwise") { SitePermissions.forget(host: host) }),
             ], from: self.sidebar.address.captureButton)
         }
         sidebar.nowPlaying.onClick = { [weak self] _ in
@@ -207,14 +207,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.favorites.onJoin = { [weak self] favorite, targetID, onRight in
             guard let self, !self.tabManager.isPrivate else { return }
-            self.pageChange("Split View") { [tabManager = self.tabManager] in
+            self.pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager = self.tabManager] in
                 Library.shared.joinFavorite(favorite, onto: targetID, onRight: onRight)
                 tabManager.openBookmark(favorite)
             }
         }
         sidebar.favorites.onReorder = { [weak self] favorite, index in
             guard let self, !self.tabManager.isPrivate else { return }
-            self.pageChange("Move Favorite") { Library.shared.moveFavorite(favorite.id, to: index) }
+            self.pageChange(String(localized: "Move Favorite", comment: "Undo action name, shown in the Edit menu as Undo Move Favorite.")) { Library.shared.moveFavorite(favorite.id, to: index) }
         }
         reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID
@@ -323,7 +323,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let landing = sidebar.list.dropTarget(at: screenPoint, allowsPinned: true)
         let space = tabManager.currentSpaceID
         if landing.section == .bookmarks {
-            pageChange("Pin Tab") {
+            pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) {
                 Library.shared.pinFavorite(favorite.id, in: space, at: landing.index)
                 if let folder = landing.folder { Library.shared.moveBookmark(favorite.id, to: landing.index, in: space, folder: .some(folder)) }
             }
@@ -349,10 +349,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let space = tabManager.currentSpaceID
         window?.makeKeyAndOrderFront(nil)
         if landing.section == .bookmarks {
-            pageChange("Move Pinned Tab") { Library.shared.moveBookmark(bookmarkID, to: landing.index, in: space, folder: .some(landing.folder)) }
+            pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(bookmarkID, to: landing.index, in: space, folder: .some(landing.folder)) }
             return sidebar.list.row(forBookmark: bookmarkID)
         }
-        pageChange("Unpin Tab") { [tabManager] in
+        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in
             // Into this space first, so it comes down among the tabs you're looking at.
             Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space)
             tabManager.unbookmark(bookmarkID, toIndex: landing.index)
@@ -535,23 +535,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Where an extension may read and change pages, Chrome's three choices.
     private func siteAccessItem(for id: String) -> NSMenuItem {
-        let item = NSMenuItem(title: "Site Access", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: String(localized: "Site Access", comment: "Submenu of an extension's menu: which sites the extension may read and change."), action: nil, keyEquivalent: "")
         item.image = Tokens.Symbol.image("globe")
         let menu = NSMenu()
         menu.autoenablesItems = false
         let access = ExtensionStore.siteAccess(id)
         let tab = tabManager.selectedTab
         let site = ContentBlocker.site(of: tab?.url)
-        let all = SidebarMenus.Item("On All Sites") { ExtensionStore.setSiteAccess(id, .all); tab?.reload() }
+        let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { ExtensionStore.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all ? .on : .off
-        let click = SidebarMenus.Item("When You Click It") { ExtensionStore.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { ExtensionStore.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
         menu.addItem(click)
         if let site {
             let sites = access == .sites ? ExtensionStore.accessSites(id) : []
             let listed = sites.contains(site)
-            let only = SidebarMenus.Item(access == .sites ? "On \(site)" : "Only on \(site)") {
+            let only = SidebarMenus.Item(access == .sites ? String(localized: "On \(site)", comment: "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.")
+                                                                 : String(localized: "Only on \(site)", comment: "Site Access choice: the extension works only on this site. The site is a domain.")) {
                 let next = listed ? sites.filter { $0 != site } : sites + [site]
                 ExtensionStore.setSiteAccess(id, .sites, sites: next)
                 tab?.reload()
@@ -561,7 +562,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             menu.addItem(only)
             if access == .sites {
                 for other in sites where other != site {
-                    let entry = SidebarMenus.Item("On \(other)") { ExtensionStore.setSiteAccess(id, .sites, sites: sites.filter { $0 != other }) }
+                    let entry = SidebarMenus.Item(String(localized: "On \(other)", comment: "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.")) { ExtensionStore.setSiteAccess(id, .sites, sites: sites.filter { $0 != other }) }
                     entry.state = .on
                     menu.addItem(entry)
                 }
@@ -574,27 +575,27 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// What you can change for the site you're on: right-click the address.
     /// Clearing can't be taken back, so it asks first, even for the cache, which only costs a slower first load.
     func confirmClearCache() {
-        ConfirmSheet.show(in: root.overlay, title: "Clear the cache for every site?",
-                          message: "Pages load a little slower the first time you open them again. You stay signed in.",
-                          confirmTitle: "Clear Cache", destructive: false) { [weak self] confirmed in
+        ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear the cache for every site?", comment: "Title of the sheet that asks before clearing every site's cache."),
+                          message: String(localized: "Pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that asks before clearing every site's cache."),
+                          confirmTitle: String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: false) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
                 await WebsiteData.clear(.cache)
-                if let self { Toast.show("Cache cleared", symbol: "arrow.clockwise", duration: 2, in: self) }
+                if let self { Toast.show(String(localized: "Cache cleared", comment: "Toast after every site's cache is cleared."), symbol: "arrow.clockwise", duration: 2, in: self) }
             }
         }
     }
 
     /// Signing out of every site is a big step, so it asks first.
     func confirmClearCookies() {
-        ConfirmSheet.show(in: root.overlay, title: "Clear cookies for every site?",
-                          message: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.",
-                          confirmTitle: "Clear Cookies", destructive: true) { [weak self] confirmed in
+        ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies."),
+                          message: String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies."),
+                          confirmTitle: String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
                 await WebsiteData.clear(.cookies)
                 self?.tabManager.selectedTab?.reload()
-                if let self { Toast.show("Cookies cleared. You’re signed out everywhere.", symbol: "trash", duration: 2.4, in: self) }
+                if let self { Toast.show(String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared."), symbol: "trash", duration: 2.4, in: self) }
             }
         }
     }
@@ -630,10 +631,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if let progress { progress(stage); return }
             guard let self else { return }
             switch stage {
-            case .downloading: Toast.show("Downloading extension…", symbol: "arrow.down.circle", duration: 3600, in: self)
+            case .downloading: Toast.show(String(localized: "Downloading extension…", comment: "Toast while an extension downloads from the Chrome Web Store."), symbol: "arrow.down.circle", duration: 3600, in: self)
             case .reviewing, .cancelled: Toast.hide(in: self)
-            case .adding: Toast.show("Adding…", symbol: "arrow.down.circle", duration: 3600, in: self)
-            case .added(let name): Toast.show("Added \(name)", symbol: "checkmark.circle", duration: 2, in: self)
+            case .adding: Toast.show(String(localized: "Adding…", comment: "Toast while an extension is being added."), symbol: "arrow.down.circle", duration: 3600, in: self)
+            case .added(let name): Toast.show(String(localized: "Added \(name)", comment: "Toast after an extension is added. The name is the extension's."), symbol: "checkmark.circle", duration: 2, in: self)
             case .failed(let message): Toast.show(message, symbol: "exclamationmark.triangle", duration: 4, in: self)
             }
         }
@@ -649,11 +650,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 let info = prepared.extensionInfo
                 let content = ExtensionSheet.Content(
                     icon: info.icon(for: NSSize(width: 40, height: 40)),
-                    title: "Add \(info.displayName ?? "this extension")?",
-                    subtitle: "Version \(prepared.version), from the Chrome Web Store",
-                    heading: "It will be able to",
+                    title: info.displayName.map { String(localized: "Add \($0)?", comment: "Title of the sheet that asks before adding an extension. The name is the extension's.") }
+                        ?? String(localized: "Add this extension?", comment: "Title of the sheet that asks before adding an extension that has no name."),
+                    subtitle: String(localized: "Version \(prepared.version), from the Chrome Web Store", comment: "Under the title of the sheet that asks before adding an extension."),
+                    heading: String(localized: "It will be able to", comment: "Heading over the list of what an extension can do, in the sheet that asks before adding it."),
                     report: prepared.report,
-                    confirm: "Add Extension", cancel: "Cancel")
+                    confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),
+                    cancel: String(localized: "Cancel", comment: "Button that closes a sheet without doing anything."))
                 ExtensionSheet.present(content, in: self, onConfirm: {
                     report(.adding)
                     Task {
@@ -676,14 +679,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard #available(macOS 15.4, *) else { return }
         Task { [weak self] in
             guard let (info, report) = await ExtensionStore.pendingUpdateReport(id), let self else { return }
-            let name = info.displayName ?? "This extension"
             let content = ExtensionSheet.Content(
                 icon: info.icon(for: NSSize(width: 40, height: 40)),
-                title: "\(name) wants more access",
-                subtitle: (info.version.map { "Version \($0) is ready." } ?? "An update is ready.") + " Until you allow it, the current version keeps running.",
-                heading: "It would also be able to",
+                title: info.displayName.map { String(localized: "\($0) wants more access", comment: "Title of the sheet shown when an extension's update asks for more access. The name is the extension's.") }
+                    ?? String(localized: "This extension wants more access", comment: "Title of the sheet shown when an update of an extension with no name asks for more access."),
+                subtitle: info.version.map { String(localized: "Version \($0) is ready. Until you allow it, the current version keeps running.", comment: "Under the title of the sheet shown when an extension's update asks for more access.") }
+                    ?? String(localized: "An update is ready. Until you allow it, the current version keeps running.", comment: "Under the title of the sheet shown when an extension's update asks for more access, when the update has no version."),
+                heading: String(localized: "It would also be able to", comment: "Heading over the list of what an extension's update could also do."),
                 report: report,
-                confirm: "Allow and Update", cancel: "Not Now")
+                confirm: String(localized: "Allow and Update", comment: "Button that allows an extension's update its new access."),
+                cancel: String(localized: "Not Now", comment: "Button that leaves an extension's update waiting."))
             ExtensionSheet.present(content, in: self, onConfirm: {
                 Task { await ExtensionStore.approvePendingUpdate(id) }
             })
@@ -773,7 +778,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A round glass button, the button filling it so its hover is the same circle.
         let chip = FloatingPanelView()
         chip.radius = Tokens.Metric.floatingButton / 2
-        let button = IconButton(symbol: "arrow.down.circle", size: Tokens.Metric.floatingButton, symbolSize: Tokens.Symbol.glyph, toolTip: "Downloads")
+        let button = IconButton(symbol: "arrow.down.circle", size: Tokens.Metric.floatingButton, symbolSize: Tokens.Symbol.glyph, toolTip: String(localized: "Downloads", comment: "Tooltip of the floating downloads button, shown while the sidebar is hidden."))
         button.onClick = { [weak self] _ in self?.showDownloads(nil) }
         chip.addSubview(button)
         chip.onLayout = { [weak chip, weak button] in
@@ -857,7 +862,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         _ = tab?.url
         var attention = false
         if #available(macOS 15.4, *) { attention = ExtensionHost.shared.actions(for: tab).contains { $0.attention != nil } }
-        sidebar.address.setActions([AddressView.ActionButton(symbol: "slider.horizontal.3", label: "Site Controls", needsAttention: attention,
+        sidebar.address.setActions([AddressView.ActionButton(symbol: "slider.horizontal.3",
+            label: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."),
+            needsAttention: attention,
             action: { [weak self] anchor in if let self { SitePanel.toggle(in: self, from: self.sidebar.address) } },
             menu: { [weak self] in
                 if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
@@ -870,10 +877,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func extensionsFooterMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item("Manage Extensions…", symbol: "puzzlepiece.extension") { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Manage Extensions…", comment: "Item at the bottom of the extensions menu: opens Settings › Extensions."), symbol: "puzzlepiece.extension") { [weak self] in
             if let self { SettingsPage.open(.extensions, in: self) }
         })
-        menu.addItem(SidebarMenus.Item("Get Extensions…", symbol: "bag") { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Get Extensions…", comment: "Item at the bottom of the extensions menu: opens the Chrome Web Store."), symbol: "bag") { [weak self] in
             self?.tabManager.newTab(url: ExtensionStore.webStoreURL)
         })
         return menu
@@ -884,17 +891,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let id = context.uniqueIdentifier
-        let title = NSMenuItem(title: context.webExtension.displayName ?? "Extension", action: nil, keyEquivalent: "")
+        let title = NSMenuItem(title: context.webExtension.displayName ?? String(localized: "Extension", comment: "Heading of an extension's menu when the extension has no name."), action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
         if let options = context.optionsPageURL {
-            menu.addItem(SidebarMenus.Item("Settings", symbol: "gearshape") { [weak self] in
+            menu.addItem(SidebarMenus.Item(String(localized: "Settings", comment: "Item in an extension's menu: opens the extension's own settings page."), symbol: "gearshape") { [weak self] in
                 self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
             })
         }
         menu.addItem(siteAccessItem(for: id))
-        menu.addItem(SidebarMenus.Item("Turn Off", symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
-        menu.addItem(SidebarMenus.Item("Remove from Zigzag…", symbol: "trash") { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Turn Off", comment: "Item in an extension's menu: turns the extension off."), symbol: "pause.circle") { ExtensionStore.setEnabled(id, false) })
+        menu.addItem(SidebarMenus.Item(String(localized: "Remove from Zigzag…", comment: "Item in an extension's menu: removes the extension."), symbol: "trash") { [weak self] in
             guard let self else { return }
             ConfirmSheet.removeExtension(id: id, name: context.webExtension.displayName, in: self.root.overlay)
         })
@@ -954,8 +961,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if translatedSites.contains(site) || PageTranslator.translatesAlways(language) { translatePage(); return }
         guard PageTranslator.offers, !translationOffered.contains(site) else { return }
         translationOffered.insert(site)
-        Toast.show("This page is in \(PageTranslator.name(of: language))", symbol: "translate",
-                   action: (title: "Translate", run: { [weak self] in self?.translatePage() }), duration: 6, closes: true, in: self)
+        Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
+                   action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self] in self?.translatePage() }), duration: 6, closes: true, in: self)
     }
 
     func translatePage() {
@@ -969,11 +976,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         guard let language = tab.foreignLanguage else {
-            Toast.show("This page is already in \(PageTranslator.name(of: PageTranslator.readerLanguage))", symbol: "translate", duration: 2, in: self)
+            Toast.show(String(localized: "This page is already in \(PageTranslator.name(of: PageTranslator.readerLanguage))", comment: "Toast when the page is already in the person's language. The language is its name, like English."), symbol: "translate", duration: 2, in: self)
             return
         }
         let name = PageTranslator.name(of: language)
-        Toast.show("Translating from \(name)…", symbol: "translate", duration: 3600, in: self)
+        Toast.show(String(localized: "Translating from \(name)…", comment: "Toast while a page is translated. The language is its name, like French."), symbol: "translate", duration: 3600, in: self)
         let page = webView.url
         translator.translate(webView, from: language, progress: { _ in }, completion: { [weak self] result in
             guard let self else { return }
@@ -984,10 +991,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             case .success:
                 tab.isTranslated = true
                 if let site { self.translatedSites.insert(site) }
-                Toast.show("Translated from \(name)", symbol: "translate",
-                           action: (title: "Show Original", run: { [weak self] in self?.translatePage() }), duration: 4, in: self)
+                Toast.show(String(localized: "Translated from \(name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
+                           action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self] in self?.translatePage() }), duration: 4, in: self)
             case .failure:
-                Toast.show("Couldn’t translate this page. Try again in a moment.", symbol: "exclamationmark.triangle", duration: 3, in: self)
+                Toast.show(String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."), symbol: "exclamationmark.triangle", duration: 3, in: self)
             }
         })
     }
@@ -1010,7 +1017,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let reader, readerTab === tabManager.selectedTab else { return false }
         let size = reader.stepTextSize(delta)
         let percent = Int((Double(size) / 19 * 100).rounded())
-        Toast.show("Text \(percent)%", symbol: delta < 0 ? "textformat.size.smaller" : "textformat.size.larger", in: self)
+        Toast.show(String(localized: "Text \(percent)%", comment: "Toast when Reader's text size changes, like Text 120%."), symbol: delta < 0 ? "textformat.size.smaller" : "textformat.size.larger", in: self)
         return true
     }
 
@@ -1026,7 +1033,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let tab = tabManager.selectedTab, let webView = tab.webView, let url = tab.url else { return }
         Task { [weak self] in
             guard let article = await Reader.article(in: webView), let self else {
-                if let self { Toast.show("This page doesn’t have an article to read", symbol: "doc.plaintext", duration: 2, in: self) }
+                if let self { Toast.show(String(localized: "This page doesn’t have an article to read", comment: "Toast when Reader can't find an article on the page."), symbol: "doc.plaintext", duration: 2, in: self) }
                 return
             }
             guard self.tabManager.selectedTab === tab, self.reader == nil else { return }
@@ -1501,7 +1508,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listClose(_ tabs: [Tab]) { closeManyWithUndo(tabs) }
 
     func listRenameBookmark(_ id: UUID, to name: String) {
-        libraryChange("Rename Pinned Tab") { Library.shared.updateBookmark(id, title: name) }
+        libraryChange(String(localized: "Rename Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Rename Pinned Tab.")) { Library.shared.updateBookmark(id, title: name) }
     }
 
     // MARK: Undo (⌘Z) for sidebar actions
@@ -1519,8 +1526,9 @@ extension BrowserWindowController: SidebarDelegate {
             tabManager.close(tab)
             // A private window never writes where it's been into your pins, so there's nothing to offer.
             guard !tabManager.isPrivate else { return }
-            Toast.show("\(pin.title) stays pinned to its own page", symbol: "pin", action: ("Pin This Page", { [weak self] in
-                self?.libraryChange("Update Pinned Page") { Library.shared.updateBookmark(bookmarkID, url: here) }
+            Toast.show(String(localized: "\(pin.title) stays pinned to its own page", comment: "Toast after closing a pinned tab that had wandered to another page. The title is the pinned tab's."), symbol: "pin",
+                       action: (String(localized: "Pin This Page", comment: "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead."), { [weak self] in
+                self?.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in the Edit menu as Undo Update Pinned Page.")) { Library.shared.updateBookmark(bookmarkID, url: here) }
             }), duration: 6, in: self)
             return
         }
@@ -1529,14 +1537,14 @@ extension BrowserWindowController: SidebarDelegate {
         sidebarUndo.registerUndo(withTarget: self) { controller in
             guard let reopened = controller.tabManager.reopenClosedTab(id) else { return }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.closeWithUndo(reopened) }
-            controller.sidebarUndo.setActionName("Close Tab")
+            controller.sidebarUndo.setActionName(String(localized: "Close Tab", comment: "Undo action name, shown in the Edit menu as Undo Close Tab."))
         }
-        sidebarUndo.setActionName("Close Tab")
+        sidebarUndo.setActionName(String(localized: "Close Tab", comment: "Undo action name, shown in the Edit menu as Undo Close Tab."))
     }
 
     /// Moves a tab within or between spaces, undoably.
     func moveWithUndo(_ tab: Tab, to index: Int, in spaceID: UUID) {
-        pageChange(spaceID == tab.spaceID ? "Move Tab" : "Move to Space") { [weak self] in
+        pageChange(spaceID == tab.spaceID ? String(localized: "Move Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Tab.") : String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.")) { [weak self] in
             guard let self else { return }
             let oldSpace = tab.spaceID
             if spaceID == oldSpace { tabManager.move(tab, to: index) } else { tabManager.moveTabToSpace(tab, spaceID: spaceID, at: index) }
@@ -1550,8 +1558,8 @@ extension BrowserWindowController: SidebarDelegate {
         guard let name = Library.shared.space(spaceID)?.name, spaceID != tab.spaceID else { return }
         moveWithUndo(tab, to: 0, in: spaceID)
         // Undo brings back this tab, never whatever else was done since.
-        Toast.show("Moved to \(name)", symbol: "arrow.right.square", action: ("Undo", { [weak self] in
-            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Move to Space" else { return }
+        Toast.show(String(localized: "Moved to \(name)", comment: "Toast after a tab moves to another space. The name is the space's."), symbol: "arrow.right.square", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.") else { return }
             undo.undo()
         }), duration: 4, in: self)
     }
@@ -1559,24 +1567,24 @@ extension BrowserWindowController: SidebarDelegate {
     /// Turns a tab into a bookmark, undoably. Half of a split pins the pair.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
         Tutorial.complete("pin")
-        pageChange("Pin Tab") { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID) }
+        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID) }
     }
 
     /// Turns a bookmark back into a tab, undoably. Half of a pinned split unpins the pair.
     func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
-        pageChange("Unpin Tab") { [tabManager] in tabManager.unbookmark(bookmarkID, toIndex: index) }
+        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in tabManager.unbookmark(bookmarkID, toIndex: index) }
     }
 
     /// A tab dropped on a pinned page: the two become one pinned split where the pinned page is, open side by side.
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool) {
         guard !tabManager.isPrivate else { return }
-        pageChange("Split View") { [tabManager] in tabManager.pinSplit(tab, with: bookmarkID, tabOnRight: tabOnRight) }
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.pinSplit(tab, with: bookmarkID, tabOnRight: tabOnRight) }
     }
 
     /// A pinned page dropped on a tab: it comes down among the tabs, beside that one, and the two open side by side.
     func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {
         guard !tabManager.isPrivate else { return }
-        pageChange("Split View") { [tabManager] in
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in
             // From another space: into the tab's first, so the two end up side by side where the tab is.
             if Library.shared.spaceID(ofBookmark: bookmarkID) != tab.spaceID { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: tab.spaceID) }
             let index = tabManager.tabs(in: tab.spaceID).firstIndex { $0 === tab }.map { $0 + 1 }
@@ -1592,14 +1600,16 @@ extension BrowserWindowController: SidebarDelegate {
         let (closing, faded) = tabManager.tabsToClear(in: tabManager.currentSpaceID)
         guard !closing.isEmpty else { return }
         closeManyWithUndo(closing, leavingSpaceEmpty: true)
-        showClosedToast(closing.count, kind: faded ? "old tab" : "tab")
+        showClosedToast(closing.count, old: faded)
     }
 
     /// "Closed 3 tabs", with an Undo that brings back these tabs, never whatever else was done since.
-    func showClosedToast(_ count: Int, kind: String) {
-        let what = count == 1 ? "Closed 1 \(kind)" : "Closed \(count) \(kind)s"
-        Toast.show(what, symbol: "xmark.circle", action: ("Undo", { [weak self] in
-            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Close Tabs" else { return }
+    /// `old`: they were the tabs left untouched long enough to fade.
+    func showClosedToast(_ count: Int, old: Bool = false) {
+        let what = old ? String(localized: "Closed \(count) old tabs", comment: "Toast after Clear closed the tabs that had faded, with Undo.")
+                       : String(localized: "Closed \(count) tabs", comment: "Toast after tabs are closed, with Undo.")
+        Toast.show(what, symbol: "xmark.circle", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Close Tabs", comment: "Undo action name, shown in the Edit menu as Undo Close Tabs.") else { return }
             undo.undo()
         }), duration: 4, in: self)
     }
@@ -1632,33 +1642,33 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
-        pageChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID) }
+        pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID) }
     }
     /// A pinned page dropped at a place in the list, landing in a folder or out of one.
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
-        pageChange("Move Pinned Tab") { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
+        pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
     }
     func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?) {
-        pageChange(parent == nil ? "Move Folder" : "Move into Folder") { Library.shared.moveFolder(id, to: index, in: spaceID, parent: .some(parent)) }
+        pageChange(parent == nil ? String(localized: "Move Folder", comment: "Undo action name, shown in the Edit menu as Undo Move Folder.") : String(localized: "Move into Folder", comment: "Undo action name, shown in the Edit menu as Undo Move into Folder.")) { Library.shared.moveFolder(id, to: index, in: spaceID, parent: .some(parent)) }
     }
     func listSetFolderOpen(_ id: UUID, _ open: Bool) {
         // Opening and closing isn't an edit to undo.
         Library.shared.setFolderOpen(id, open)
     }
     func listRenameFolder(_ id: UUID, to name: String) {
-        libraryChange("Rename Folder") { Library.shared.renameFolder(id, to: name) }
+        libraryChange(String(localized: "Rename Folder", comment: "Undo action name, shown in the Edit menu as Undo Rename Folder.")) { Library.shared.renameFolder(id, to: name) }
     }
     func listAsOne(_ name: String, _ body: @escaping () -> Void) { pageChange(name, body) }
     func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {
-        pageChange(folderID == nil ? "Remove from Folder" : "Add to Folder") { Library.shared.setFolder(of: bookmarkID, to: folderID) }
+        pageChange(folderID == nil ? String(localized: "Remove from Folder", comment: "Undo action name, shown in the Edit menu as Undo Remove from Folder.") : String(localized: "Add to Folder", comment: "Undo action name, shown in the Edit menu as Undo Add to Folder.")) { Library.shared.setFolder(of: bookmarkID, to: folderID) }
     }
 
     /// A new folder in the current space, holding these pinned pages (or none), named right away in the sidebar.
     /// `inside`: the folder it goes in; left out, the folder its pages share, if any.
     func newFolder(with bookmarkIDs: [UUID] = [], inside: UUID? = nil) {
         var made: BookmarkFolder?
-        libraryChange("New Folder") {
-            made = Library.shared.addFolder(named: "New Folder", with: bookmarkIDs, in: tabManager.currentSpaceID,
+        libraryChange(String(localized: "New Folder", comment: "Undo action name, shown in the Edit menu as Undo New Folder.")) {
+            made = Library.shared.addFolder(named: String(localized: "New Folder", comment: "Name a new folder of pinned tabs gets, until it's renamed."), with: bookmarkIDs, in: tabManager.currentSpaceID,
                                             parent: inside.map { .some($0) } ?? .none)
         }
         guard let made else { return }
@@ -1681,7 +1691,7 @@ extension BrowserWindowController: SidebarDelegate {
         // Pins are shared by every window: a private one doesn't take them away.
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpaceID
-        pageChange("Unpin Tab") { [tabManager] in
+        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in
             // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
             if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
             tabManager.unbookmark(bookmarkID, toIndex: index)
@@ -1714,7 +1724,7 @@ extension BrowserWindowController: SidebarDelegate {
                 if closesTarget, target.tabManager.allTabs.isEmpty { target.window?.performClose(nil) }
                 self.window?.makeKeyAndOrderFront(nil)
             }
-            target.sidebarUndo.setActionName("Move to Window")
+            target.sidebarUndo.setActionName(String(localized: "Move to Window", comment: "Undo action name, shown in the Edit menu as Undo Move to Window."))
         }
     }
 
@@ -1785,7 +1795,7 @@ extension BrowserWindowController: SidebarDelegate {
         sidebar.favorites.isDropTarget = false
         if let split {
             // A pinned page not loaded yet opens as part of the change, so ⌘Z puts it back unloaded.
-            pageChange("Split View") { [weak self] in
+            pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [weak self] in
                 guard let self else { return }
                 let tab: Tab? = switch dragged {
                 case .tab(let id): tabManager.tab(with: id)
@@ -1802,7 +1812,7 @@ extension BrowserWindowController: SidebarDelegate {
             let tiles = Library.shared.favoriteTiles.count, at = slot
             switch item {
             case .tab(let id): if let tab = tabManager.tab(with: id) { favoriteWithUndo(tab, at: at) }
-            case .bookmark(let id): pageChange("Add to Favorites") { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
+            case .bookmark(let id): pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
             default: break
             }
             slot = slot.map { $0 + Library.shared.favoriteTiles.count - tiles }
@@ -1815,7 +1825,7 @@ extension BrowserWindowController: SidebarDelegate {
         guard let folder = Library.shared.folder(id), let row = sidebar.list.folderRow(id) else { return }
         closeFloatingPanels()
         let panel = IconPickerPanel(noneSymbol: "folder", selected: folder.icon) { [weak self] icon in
-            self?.libraryChange("Change Icon") { Library.shared.setIcon(icon, forFolder: id) }
+            self?.libraryChange(String(localized: "Change Icon", comment: "Undo action name, shown in the Edit menu as Undo Change Icon.")) { Library.shared.setIcon(icon, forFolder: id) }
         }
         panel.show(beside: row, in: root.overlay, x: root.sidebarContainer.frame.maxX + Tokens.Space.x2)
     }
@@ -1835,7 +1845,7 @@ extension BrowserWindowController: SidebarDelegate {
         // The page showing, which after a space flip mid-drag isn't that space's selected tab.
         guard let side, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { return false }
         // A pinned page not loaded yet opens as part of the change, so ⌘Z puts it back unloaded.
-        pageChange("Split View") { [weak self] in
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [weak self] in
             guard let self else { return }
             let tab: Tab? = switch item {
             case .tab(let id): tabManager.tab(with: id)

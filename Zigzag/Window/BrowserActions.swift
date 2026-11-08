@@ -43,7 +43,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     func copyLink(_ url: URL) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show("Link copied", symbol: "link", in: self)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
     }
 
     @objc func showDownloads(_ sender: Any?) {
@@ -66,9 +66,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// It's all of it, so it asks first; ⌘Z (or Undo on the toast) brings it back.
     @objc func clearHistory(_ sender: Any?) {
         ConfirmSheet.show(in: root.overlay, title: HistoryPage.clearTitle, message: HistoryPage.clearMessage,
-                          confirmTitle: "Clear History", destructive: true) { [weak self] confirmed in
+                          confirmTitle: String(localized: "Clear History", comment: "Button that clears all history, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed, let self else { return }
-            self.historyChange("Clear History") { HistoryStore.shared.remove() }
+            self.historyChange(String(localized: "Clear History", comment: "Undo action name, shown in the Edit menu as Undo Clear History.")) { HistoryStore.shared.remove() }
             HistoryPage.clearedToast(in: self)
         }
     }
@@ -130,7 +130,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
-        Toast.show(success ? "Exported as PDF" : "Couldn’t export the PDF", symbol: success ? "doc.richtext" : "exclamationmark.triangle", in: self)
+        Toast.show(success ? String(localized: "Exported as PDF", comment: "Toast after the page is exported as a PDF.") : String(localized: "Couldn’t export the PDF", comment: "Toast when exporting the page as a PDF fails."),
+                    symbol: success ? "doc.richtext" : "exclamationmark.triangle", in: self)
     }
 
     /// File › Share…: the page's address and title to Messages, Mail, AirDrop, Notes and the rest, from the address bar.
@@ -170,9 +171,9 @@ extension BrowserWindowController: NSMenuItemValidation {
                 MainActor.assumeIsolated {
                     do {
                         try result.get().write(to: destination)
-                        Toast.show("Page saved", symbol: "square.and.arrow.down", in: self)
+                        Toast.show(String(localized: "Page saved", comment: "Toast after File › Save Page As saves the page."), symbol: "square.and.arrow.down", in: self)
                     } catch {
-                        Toast.show(SaveFailure.message("Couldn’t save the page", error), symbol: "exclamationmark.triangle", duration: 4, in: self)
+                        Toast.show(SaveFailure.message(String(localized: "Couldn’t save the page", comment: "Toast when saving the page fails; a reason may follow as its own sentence."), error), symbol: "exclamationmark.triangle", duration: 4, in: self)
                     }
                 }
             }
@@ -185,14 +186,14 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let url = selectedTab?.url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show("Link copied", symbol: "link", in: self)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
     }
 
     @objc func copyPageURLAsMarkdown(_ sender: Any?) {
         guard let tab = selectedTab, let url = tab.url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("[\(tab.displayTitle)](\(url.absoluteString))", forType: .string)
-        Toast.show("Markdown link copied", symbol: "link", in: self)
+        Toast.show(String(localized: "Markdown link copied", comment: "Toast after the page's title and address are copied as a Markdown link."), symbol: "link", in: self)
     }
 
     @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
@@ -275,8 +276,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             MainActor.assumeIsolated {
                 guard let html = result as? String, let self else { return }
                 let escaped = html.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
-                let page = "<!doctype html><meta charset=utf-8><title>Source of \(url.host() ?? "")</title><style>:root{color-scheme:light dark}body{margin:16px;font:12px ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}</style>\(escaped)"
-                let tab = self.tabManager.newTab(url: nil, title: "Source of \(url.host() ?? "page")")
+                let page = "<!doctype html><meta charset=utf-8><title>\(String(localized: "Source of \(url.host() ?? "")", comment: "Title of the tab that shows a page's HTML source. The host is the site's, like example.com."))</title><style>:root{color-scheme:light dark}body{margin:16px;font:12px ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}</style>\(escaped)"
+                let tab = self.tabManager.newTab(url: nil, title: url.host().map { String(localized: "Source of \($0)", comment: "Title of the tab that shows a page's HTML source. The host is the site's, like example.com.") }
+                                                         ?? String(localized: "Source of page", comment: "Title of the tab that shows a page's HTML source, for a page with no host."))
                 tab.ensureWebView().loadHTMLString(page, baseURL: nil)
             }
         }
@@ -297,7 +299,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         if webView.canTogglePictureInPicture || webView.isPictureInPictureActive {
             webView.togglePictureInPicture()
         } else {
-            Toast.show("Point at a video and choose Picture in Picture", symbol: "pip", duration: 2.5, in: self)
+            Toast.show(String(localized: "Point at a video and choose Picture in Picture", comment: "Toast when Picture in Picture finds no video to float."), symbol: "pip", duration: 2.5, in: self)
         }
     }
 
@@ -325,7 +327,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func addToFavorites(_ sender: Any?) {
         guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, tab.bookmarkID != nil || !tabManager.isPrivate else { return }
         favoriteWithUndo(tab)
-        Toast.show("Added to Favorites", symbol: "star.fill", in: self)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
     }
     @objc func moveTabToNewWindow(_ sender: Any?) {
         guard let tab = selectedTab else { return }
@@ -338,13 +340,13 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let bookmarkID = tab.bookmarkID, tab.isFavorite {
             // A favorite stays open as a tab; ⌘Z puts it back in Favorites.
             unfavoriteWithUndo(bookmarkID, to: 0)
-            Toast.show("Moved to Tabs", symbol: "star.slash", in: self)
+            Toast.show(String(localized: "Moved to Tabs", comment: "Toast after a favorite moves back to the tabs."), symbol: "star.slash", in: self)
         } else if let bookmarkID = tab.bookmarkID {
             unbookmarkWithUndo(bookmarkID, to: 0)
-            Toast.show("Unpinned", symbol: "pin.slash", in: self)
+            Toast.show(String(localized: "Unpinned", comment: "Toast after a pinned tab is unpinned."), symbol: "pin.slash", in: self)
         } else {
             bookmarkWithUndo(tab, at: nil, in: tab.spaceID)
-            Toast.show("Pinned", symbol: "pin", in: self)
+            Toast.show(String(localized: "Pinned", comment: "Toast after a tab is pinned."), symbol: "pin", in: self)
         }
     }
 
@@ -419,7 +421,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     func closeManyWithUndoToast(_ tabs: [Tab]) {
         guard !tabs.isEmpty else { return }
         closeManyWithUndo(tabs)
-        showClosedToast(tabs.count, kind: "tab")
+        showClosedToast(tabs.count)
     }
 
     // MARK: Spaces
@@ -446,7 +448,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Spaces are kept for good; a private window keeps nothing.
         guard !tabManager.isPrivate else { return }
         var created: SpaceInfo?
-        libraryChange("New Space") { created = Library.shared.addSpace() }
+        libraryChange(String(localized: "New Space", comment: "Undo action name, shown in the Edit menu as Undo New Space.")) { created = Library.shared.addSpace() }
         guard let space = created else { return }
         let previous = tabManager.currentSpaceID
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
@@ -492,7 +494,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(toggleSplitOrientation(_:)):
             // Named for what it does, as the pane's own button is.
             let split = tab.flatMap { tabManager.split(for: $0) }
-            item.title = split?.vertical == true ? "Side by Side" : "Stack Vertically"
+            item.title = split?.vertical == true ? String(localized: "Side by Side", comment: "Menu bar item: lays the split view's two pages side by side.")
+                                                 : String(localized: "Stack Vertically", comment: "Menu bar item: stacks the split view's two pages one above the other.")
             return split != nil
         case #selector(closeTab(_:)):
             // Says how many when ⌘W would close several picked rows.
@@ -502,25 +505,30 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
         case #selector(toggleBrowserSidebar(_:)):
-            item.title = root.sidebarVisible ? "Hide Sidebar" : "Show Sidebar"
+            item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
+                                              : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
             return true
         case #selector(toggleBookmark(_:)):
             // As the sidebar names them: a favorite moves back to the tabs, and half of a split pins with its other half.
             let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
-            item.title = tab?.isFavorite == true ? "Move to Tabs" : tab?.bookmarkID != nil ? "Unpin Tab" : pinsPair ? "Pin Split View" : "Pin Tab"
+            item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
+                : tab?.bookmarkID != nil ? String(localized: "Unpin Tab", comment: "Menu bar item: unpins the tab.")
+                : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
+                : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)): return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
         case #selector(newSpace(_:)), #selector(renameSpace(_:)): return !tabManager.isPrivate
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
         case #selector(toggleReader(_:)):
-            item.title = isReaderOpen ? "Hide Reader" : "Show Reader"
+            item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil
         case #selector(translatePage(_:)):
-            item.title = tab?.isTranslated == true ? "Show Original" : "Translate Page"
+            item.title = tab?.isTranslated == true ? String(localized: "Show Original", comment: "Menu bar item: shows the translated page as it was.")
+                                                  : String(localized: "Translate Page", comment: "Menu bar item: translates the page.")
             return tab?.url != nil
         case #selector(toggleMute(_:)):
-            item.title = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
+            item.title = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Menu bar item: turns the tab's sound back on.") : String(localized: "Mute Tab", comment: "Menu bar item: silences the tab.")
             return tab != nil
         case #selector(moveTabUp(_:)): return tabMoveTarget(by: -1) != nil
         case #selector(moveTabDown(_:)): return tabMoveTarget(by: 1) != nil

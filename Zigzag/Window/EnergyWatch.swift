@@ -89,17 +89,19 @@ final class EnergyWatch {
         guard told.insert("\(tab.id)|\(site)").inserted else { return }
         // An extension's own page: name the extension, and offer to close the page.
         if url.scheme == "webkit-extension", #available(macOS 15.4, *) {
-            let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName ?? "An extension"
-            Toast.show("\(name)’s page is using a lot of energy", symbol: "bolt",
-                       action: ("Close Tab", { [weak controller, weak tab] in
+            let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName
+            Toast.show(name.map { String(localized: "\($0)’s page is using a lot of energy", comment: "Toast when an extension's own page uses a lot of energy. The name is the extension's.") }
+                           ?? String(localized: "An extension’s page is using a lot of energy", comment: "Toast when the page of an extension with no name uses a lot of energy."),
+                       symbol: "bolt",
+                       action: (String(localized: "Close Tab", comment: "Button in the toast about a tab using a lot of energy: closes that tab."), { [weak controller, weak tab] in
                            guard let tab, !tab.isClosed else { return }
                            // The window it's in now: it may have been moved to another since.
                            (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab)
                        }), duration: 15, in: controller)
             return
         }
-        Toast.show("A tab on \(site) is using a lot of energy in the background", symbol: "bolt",
-                   action: ("Close Tab", { [weak controller, weak tab] in
+        Toast.show(String(localized: "A tab on \(site) is using a lot of energy in the background", comment: "Toast when a tab in the background uses a lot of energy. The site is a domain, like example.com."), symbol: "bolt",
+                   action: (String(localized: "Close Tab", comment: "Button in the toast about a tab using a lot of energy: closes that tab."), { [weak controller, weak tab] in
                        guard let tab, !tab.isClosed else { return }
                        (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab)
                    }), duration: 12, in: controller)

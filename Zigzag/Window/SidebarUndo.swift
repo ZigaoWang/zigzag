@@ -62,7 +62,7 @@ extension BrowserWindowController {
     /// Whether the library is still as a change left it; if not, says why ⌘Z did nothing.
     func libraryUnchanged(since snapshot: Library.Snapshot) -> Bool {
         guard Library.shared.snapshot != snapshot else { return true }
-        Toast.show("Can’t undo: spaces or pinned tabs have changed since then", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        Toast.show(String(localized: "Can’t undo: spaces or pinned tabs have changed since then", comment: "Toast when ⌘Z can't take back a change because the sidebar changed since."), symbol: "arrow.uturn.backward", duration: 2.5, in: self)
         return false
     }
 
@@ -93,7 +93,7 @@ extension BrowserWindowController {
     /// Whether this window's tabs are still as a change left them; if not, says why ⌘Z did nothing.
     private func tabsUnchanged(since arrangement: TabManager.Arrangement) -> Bool {
         guard !tabManager.isUnchanged(since: arrangement) else { return true }
-        Toast.show("Can’t undo: tabs have changed since then", symbol: "arrow.uturn.backward", duration: 2.5, in: self)
+        Toast.show(String(localized: "Can’t undo: tabs have changed since then", comment: "Toast when ⌘Z can't take back a change because the tabs changed since."), symbol: "arrow.uturn.backward", duration: 2.5, in: self)
         return false
     }
 
@@ -101,14 +101,14 @@ extension BrowserWindowController {
 
     func splitWithUndo(_ tab: Tab, with other: Tab, otherOnRight: Bool = true) {
         guard tabManager.canSplit(tab, with: other) else { return }
-        pageChange("Split View") { [tabManager] in tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight) }
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.makeSplit(tab, with: other, otherOnRight: otherOnRight) }
     }
 
     /// Ends a split, showing `keep` (or the tab itself) on its own. A pinned split ends too: both pages stay pinned,
     /// no longer a pair.
     func unsplitWithUndo(_ tab: Tab, keep: Tab? = nil) {
         guard tabManager.split(for: tab) != nil else { return }
-        pageChange("Separate Tabs") { [tabManager] in
+        pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
             if let keep { tabManager.unsplit(tab, keep: keep) } else { tabManager.unsplit(tab) }
             if let id = tab.bookmarkID { Library.shared.removePinnedSplit(containing: id) }
         }
@@ -117,7 +117,7 @@ extension BrowserWindowController {
     /// A split favorite parted into two favorites, side by side in the grid; open, its pages part on screen too.
     func separateFavoriteSplitWithUndo(_ favoriteID: UUID) {
         guard let pair = Library.shared.pinnedSplit(containing: favoriteID) else { return }
-        pageChange("Separate Tabs") { [tabManager] in
+        pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
             for id in [pair.left, pair.right] { if let live = tabManager.bookmarkTab(for: id) { tabManager.unsplit(live) } }
             Library.shared.removePinnedSplit(containing: favoriteID)
         }
@@ -127,23 +127,23 @@ extension BrowserWindowController {
 
     /// A tab (and a split's other half) into the favorites at a tile's place (nil: the end).
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {
-        pageChange("Add to Favorites") { [tabManager] in tabManager.favoriteTab(tab, at: index) }
+        pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteTab(tab, at: index) }
     }
 
     /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side.
     func joinFavoriteWithUndo(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) {
-        pageChange("Split View") { [tabManager] in tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) }
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) }
     }
 
     /// A favorite back to a regular tab in a space's list (nil: the space you're in).
     func unfavoriteWithUndo(_ id: UUID, to index: Int, in spaceID: UUID? = nil) {
-        pageChange("Move to Tabs") { [tabManager] in tabManager.unbookmark(id, toIndex: index, in: spaceID) }
+        pageChange(String(localized: "Move to Tabs", comment: "Undo action name, shown in the Edit menu as Undo Move to Tabs.")) { [tabManager] in tabManager.unbookmark(id, toIndex: index, in: spaceID) }
     }
 
     func removeFavoriteWithUndo(_ id: UUID) {
         // A split favorite goes as one: both its pages.
         let ids = Library.shared.pinnedSplit(containing: id).map { [$0.left, $0.right] } ?? [id]
-        libraryChange("Remove from Favorites") {
+        libraryChange(String(localized: "Remove from Favorites", comment: "Undo action name, shown in the Edit menu as Undo Remove from Favorites.")) {
             for id in ids { if let live = tabManager.bookmarkTab(for: id) { tabManager.close(live) } }
             Library.shared.removeBookmarks(ids)
         }
@@ -170,9 +170,9 @@ extension BrowserWindowController {
             }
             if let selected { controller.tabManager.select(selected) }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.closeManyWithUndo(reopened) }
-            controller.sidebarUndo.setActionName("Close Tabs")
+            controller.sidebarUndo.setActionName(String(localized: "Close Tabs", comment: "Undo action name, shown in the Edit menu as Undo Close Tabs."))
         }
-        sidebarUndo.setActionName("Close Tabs")
+        sidebarUndo.setActionName(String(localized: "Close Tabs", comment: "Undo action name, shown in the Edit menu as Undo Close Tabs."))
     }
 
     // MARK: Spaces
@@ -219,9 +219,9 @@ extension BrowserWindowController {
             }
             if let shown { controller.tabManager.select(shown) } else { controller.tabManager.switchToSpace(id) }
             controller.sidebarUndo.registerUndo(withTarget: controller) { $0.removeSpaceWithUndo(id) }
-            controller.sidebarUndo.setActionName("Delete Space")
+            controller.sidebarUndo.setActionName(String(localized: "Delete Space", comment: "Undo action name, shown in the Edit menu as Undo Delete Space."))
         }
-        sidebarUndo.setActionName("Delete Space")
+        sidebarUndo.setActionName(String(localized: "Delete Space", comment: "Undo action name, shown in the Edit menu as Undo Delete Space."))
     }
 }
 
