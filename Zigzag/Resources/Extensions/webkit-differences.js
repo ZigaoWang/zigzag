@@ -14,6 +14,42 @@
     }
   }
 
+  const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
+
+  // importScripts: WebKit hands the worker its events while a load is under way (between one script and the next),
+  // which Chrome never does, and a worker that's starting can get messages before its install event. Rabby, like the
+  // other MetaMask-style wallets, loads its scripts on install or on the first message, whichever comes first. After a
+  // relaunch its restored pages message it first: that load began, install and activate ran inside it, and its main
+  // script, reached after them, was refused (WebKit loads new scripts only while installing), so its popup said "Rabby
+  // failed to start". Install's own load, inside the other, ran its code a second time as well. So install waits for
+  // a load under way to finish, and a load from inside another leaves out the scripts that one is loading; they still
+  // run, once, as it goes on.
+  if (isWorker && typeof globalThis.importScripts === 'function') {
+    const load = globalThis.importScripts;
+    const loading = [];
+    let loaded = null;
+    const address = (url) => { try { return new URL(String(url), location.href).href; } catch (e) { return String(url); } };
+    const importScripts = function importScripts(...urls) {
+      const fresh = urls.filter((url) => !loading.includes(address(url)));
+      if (urls.length && !fresh.length) return undefined;
+      const mine = fresh.map(address);
+      loading.push(...mine);
+      try {
+        return load.apply(globalThis, fresh);
+      } finally {
+        loading.splice(loading.length - mine.length, mine.length);
+        if (!loading.length && loaded) { loaded(); loaded = null; }
+      }
+    };
+    try { Object.defineProperty(globalThis, 'importScripts', { value: importScripts, configurable: true, writable: true }); } catch (e) {}
+    // Added before the extension's own install listeners, so the wait covers theirs too.
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener('install', (event) => {
+        if (loading.length && !loaded) event.waitUntil(new Promise((resolve) => { loaded = resolve; }));
+      });
+    }
+  }
+
   // An extension's pages and its background service worker posting to each other (navigator.serviceWorker and the
   // worker's clients): in Chrome the worker controls its extension's pages and they reach it, in WebKit nothing the
   // pages post arrives, and the worker's clients don't include them. Violentmonkey's popup and dashboard ask its
@@ -23,7 +59,6 @@
   // workers that never use it are left exactly as WebKit has them.
   const WORKER_PORT = '__zigzagWorkerClient';
   const TAB_PORT = '__zigzagTabPage';
-  const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
   // What can travel over a port: Chrome would carry an Error across, so its name and message go along.
   const portable = (value) => {
     try { return JSON.parse(JSON.stringify(value, (key, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v))); } catch (e) { return value; }

@@ -191,6 +191,37 @@ struct ExtensionScriptTests {
         #expect(offscreen.evaluateScript("clients.matchAll !== __matchAll").toBool())
     }
 
+    @Test func aLoadUnderWayRunsEachScriptOnceAndHoldsInstall() {
+        // WebKit runs a worker's events between the scripts of one importScripts, and can message it before install.
+        // Rabby loads its scripts on install or the first message: after a relaunch install came inside the message's
+        // load, loaded them again, and the worker left installing before that load reached its main script.
+        let worker = Self.workerWorld(worker: true, setup: """
+        var __ran = [], __during = {}, __install = [], __held = [];
+        globalThis.importScripts = function (...urls) {
+          for (const url of urls) { __ran.push(url.split('/').pop()); if (__during[url]) __during[url](); }
+        };
+        var addEventListener = (type, listener) => { if (type === 'install') __install.push(listener); };
+        var __installEvent = () => __install.forEach((listener) => listener({ waitUntil: (promise) => __held.push(promise) }));
+        """)
+        worker.evaluateScript("""
+        let loaded = false, installed = false;
+        const loadAll = () => { if (!loaded) { importScripts('/polyfill.js', '/background.js'); loaded = true; } };
+        addEventListener('install', () => loadAll());
+        // Install arrives as the polyfill finishes; the background loads a chunk of its own, which loads two more.
+        __during['/polyfill.js'] = () => { __installEvent(); Promise.all(__held).then(() => { installed = true; }); };
+        __during['/background.js'] = () => importScripts('chunk.js');
+        __during['chunk.js'] = () => importScripts('/background.js', 'extra.js');
+        loadAll();
+        """)
+        #expect(worker.evaluateScript("__ran.join()").toString() == "polyfill.js,background.js,chunk.js,extra.js")
+        #expect(worker.evaluateScript("__held.length").toInt32() == 1)
+        #expect(worker.evaluateScript("installed && loaded").toBool())
+        // Once that load is over, a later one loads what it asks for again, as in Chrome, and install isn't held.
+        worker.evaluateScript("importScripts('/polyfill.js'); __held = []; __installEvent();")
+        #expect(worker.evaluateScript("__ran.join()").toString() == "polyfill.js,background.js,chunk.js,extra.js,polyfill.js")
+        #expect(worker.evaluateScript("__held.length").toInt32() == 0)
+    }
+
     @Test func aPageReachedOverThePortRefusesAPortHandedOver() {
         // Tampermonkey hands its offscreen page a MessageChannel port and waits on it: refused at once, so it goes on.
         let worker = Self.workerWorld(worker: true)
