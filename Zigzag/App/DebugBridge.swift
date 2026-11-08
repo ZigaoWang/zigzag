@@ -300,6 +300,21 @@ enum DebugBridge {
                 }
             }
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
+        case "scrolllist":
+            // scrolllist <y>: scrolls the sidebar's list to that many points from its top.
+            if let clip = controller.sidebar.list.enclosingScrollView?.contentView, let y = Double(arg) {
+                clip.scroll(to: NSPoint(x: 0, y: y))
+                clip.enclosingScrollView?.reflectScrolledClipView(clip)
+            }
+        case "openfolders":
+            // openfolders [shut]: opens (or shuts) every folder in the current space at once.
+            let start = CACurrentMediaTime()
+            Library.shared.together {
+                for folder in Library.shared.folders(in: controller.tabManager.currentSpaceID) { Library.shared.setFolderOpen(folder.id, arg != "shut") }
+            }
+            controller.window?.displayIfNeeded()
+            CATransaction.flush()
+            debugLog(String(format: "openfolders %@ => %.1f ms", arg, (CACurrentMediaTime() - start) * 1000))
         case "listhover": controller.sidebar.list.debugHover(arg != "off")
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
