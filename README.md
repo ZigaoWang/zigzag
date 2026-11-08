@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.producthunt.com/products/zigzag-3?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-zigzag-browser"><img alt="Zigzag Browser on Product Hunt" width="200" height="43" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1307776&amp;theme=light"></a>
+  <a href="https://www.producthunt.com/products/zigzag-browser?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-zigzag-browser"><img alt="Zigzag Browser on Product Hunt" width="200" height="43" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1307776&amp;theme=light"></a>
 </p>
 
 <p align="center">
