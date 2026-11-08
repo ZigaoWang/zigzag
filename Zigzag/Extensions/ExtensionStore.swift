@@ -706,7 +706,8 @@ enum ExtensionProfile {
         ExtensionStore.onePasswordID: Profile(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         // Bitwarden: its popup loop is answered by the prelude; its popup draws again (checked 2026-11-08).
-        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"]),
+        "nngceckbapebfimnlniiiahkandclblb": Profile(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
+                                                    patches: [bitwardenInlineMenuPatch]),
         // Return YouTube Dislike, as "Bring Back YouTube Dislikes".
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
@@ -907,6 +908,13 @@ enum ExtensionProfile {
     })();
 
     """
+
+    /// Bitwarden's autofill menu in a login field is a frame of its own page, which builds the menu only once it has
+    /// checked that the page it's told to show is an extension's: it knows the "chrome-extension:", "moz-extension:"
+    /// and "safari-web-extension:" addresses, not WebKit's "webkit-extension:". So it showed nothing; filling from the
+    /// right-click menu and the shortcut worked all along.
+    private static let bitwardenInlineMenuPatch = Patch(file: "overlay/menu.js", find: #""safari-web-extension:","#,
+                                                        replace: #""safari-web-extension:", "webkit-extension:","#)
 
     /// Bitwarden's background reads the `scripting.ExecutionWorld` constants (WebKit supports the worlds but not
     /// the names) and asks for contexts and offscreen documents before falling back to its popup for clipboard work.
