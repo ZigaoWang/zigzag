@@ -752,6 +752,34 @@ enum Toast {
         show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: controller.root.cardFrame, busy: true)
     }
 
+    /// Top center of the page: where your eyes already are, clear of the content you're reading.
+    private static func place(_ toast: ToastView, in area: NSRect) {
+        let size = toast.size(maxWidth: max(160, area.width - Tokens.Space.x12))
+        toast.frame = NSRect(x: round(area.midX - size.width / 2), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
+        toast.needsLayout = true
+    }
+
+    /// Keeps the window's toast over the middle of the page when the page moves under it: the sidebar shown or
+    /// hidden, full screen, a resize. Riding a sidebar slide (`slide` is its duration) it moves with the page, on the
+    /// same curve.
+    static func reposition(in controller: BrowserWindowController, slide: TimeInterval? = nil) {
+        let host = controller.root.overlay
+        guard let toast = showing[ObjectIdentifier(host)]?.toast, toast.superview === host, !toast.dismissing else { return }
+        let old = toast.frame
+        place(toast, in: controller.root.cardFrame)
+        let dx = old.minX - toast.frame.minX, dy = old.minY - toast.frame.minY
+        // Dragging the window's edge, it simply stays with the page; gliding there would trail behind.
+        guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, controller.window?.inLiveResize != true,
+              let layer = toast.layer else { return }
+        let move = CABasicAnimation(keyPath: "transform")
+        move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
+        move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        move.duration = slide ?? 0.24
+        move.timingFunction = slide == nil ? Tokens.Motion.easeInOut : Tokens.Motion.slide.timing
+        move.fillMode = .backwards
+        layer.add(move, forKey: "follow")
+    }
+
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, over host: NSView, area: NSRect, busy: Bool = false) {
@@ -778,10 +806,7 @@ enum Toast {
                 toast?.dismiss(always: true)
             }
         }
-        let size = toast.size(maxWidth: max(160, area.width - Tokens.Space.x12))
-        // Top center of the page: where your eyes already are, clear of the content you're reading.
-        toast.frame = NSRect(x: round(area.midX - size.width / 2), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
-        toast.needsLayout = true
+        place(toast, in: area)
         if isNew {
             host.addSubview(toast)
             // Springs down out of the top of the page, as a notice does, and eases back up when it goes.

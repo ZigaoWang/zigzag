@@ -54,6 +54,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.findBar.reposition()
             self.peek.reposition()
             PermissionPrompt.reposition(in: self)
+            Toast.reposition(in: self)
             if self.floatingDownloads.superview != nil {
                 if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
             }
@@ -63,6 +64,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             self.sidebarSliding(duration)
             PermissionPrompt.reposition(in: self, slide: duration)
+            Toast.reposition(in: self, slide: duration)
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         // So does the guide while it points at something in it.
