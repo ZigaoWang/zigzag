@@ -579,6 +579,10 @@ enum DebugBridge {
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsPage.open(in: controller)
         case "engine": if let engine = SearchEngine(rawValue: arg) { Library.shared.searchEngine = engine }
+        case "engineinfo":
+            // The engine searched with, its address for "zigzag test", and the engines extensions give.
+            let engine = Library.shared.searchEngine
+            debugLog("engine \(engine.rawValue) \(engine.name) \(engine.searchURL("zigzag test").absoluteString) home=\(engine.homeURL.absoluteString) offered=\(ExtensionSearchProvider.available.map(\.name)) before=\(ExtensionSearchProvider.previousEngine.rawValue)")
         case "largenames": SpaceHeaderView.isLarge = arg != "off"
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         case "cancelsheet":
@@ -623,6 +627,14 @@ enum DebugBridge {
             func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
             if let content = controller.window?.contentView { find(content)?.toggleOptions() }
         case "hidetoasts": Toast.hide(in: controller)
+        case "toast":
+            // toast [press]: logs the toast showing and its button; press clicks the button.
+            if let toast = controller.root.overlay.subviews.compactMap({ $0 as? ToastView }).last {
+                debugLog("toast \(toast.label.stringValue) [\(toast.actionButton.isHidden ? "" : toast.actionButton.title)]")
+                if arg == "press", !toast.actionButton.isHidden, let event = NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0) {
+                    toast.actionButton.onClick?(event)
+                }
+            } else { debugLog("toast none") }
         case "clearsite":
             // clearsite <cache|cookies> <site>
             let f = arg.split(separator: " ").map(String.init)
@@ -641,6 +653,7 @@ enum DebugBridge {
         case "addext": controller.installExtension(arg)
         case "storeadd": WebStoreOffer.debugAdd()
         case "sheetcancel": ExtensionSheet.debugCancel()
+        case "sheetconfirm": ExtensionSheet.debugConfirm()
         case "addextnow": Task { _ = await ExtensionStore.install(arg) }
         case "rmext": ExtensionStore.uninstall(arg)
         case "extupdate": Task { await ExtensionStore.updateIfNewer(arg) }

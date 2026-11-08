@@ -113,6 +113,7 @@ final class ExtensionSheet: FloatingPanelView {
 
     #if DEBUG
     static func debugCancel() { current?.finish(confirmed: false) }
+    static func debugConfirm() { current?.finish(confirmed: true) }
     #endif
 
     private func finish(confirmed: Bool) {
