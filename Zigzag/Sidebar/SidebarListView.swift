@@ -8,6 +8,8 @@ protocol SidebarListDelegate: AnyObject {
     func listClose(_ tab: Tab)
     /// Closes several at once; ⌘Z brings them all back.
     func listClose(_ tabs: [Tab])
+    /// ⌫ on picked rows: their tabs close and their pinned pages come out of the sidebar, as one change.
+    func listRemove(_ items: [SidebarItem])
     func listNewTab()
     /// Clear: every tab in the space but the one you're on; with only that one left, it too.
     func listClearTabs()
@@ -828,8 +830,8 @@ final class SidebarListView: NSView {
 
     // MARK: Keys for picked rows
 
-    /// Picking rows gives the list the keyboard, as selecting in Finder does: ⌘W closes them all. Clicking into the
-    /// page takes the keys back, and the picked rows wait.
+    /// Picking rows gives the list the keyboard, as selecting in Finder does: Esc lets go, ⌫ removes them, ⌘A picks
+    /// the rest, ⌘W closes them all. Clicking into the page takes the keys back, and the picked rows wait.
     override var acceptsFirstResponder: Bool { marked.count > 1 }
     /// Where the keys were before picking started, to hand them back when it ends.
     private weak var focusBeforeMarking: NSResponder?
@@ -848,6 +850,34 @@ final class SidebarListView: NSView {
         let back = focusBeforeMarking.flatMap { $0 as? NSView }.flatMap { $0.window === window ? $0 : nil }
         focusBeforeMarking = nil
         window.makeFirstResponder(back)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        if event.keyCode == 53, mods.isEmpty {
+            clearMarks()
+        } else if event.keyCode == 51 || event.keyCode == 117, mods.isEmpty || mods == .command {
+            delegate?.listRemove(marked)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    /// Edit › Select All (⌘A) while rows are picked: every row of the section they're in, or both when they're in
+    /// both.
+    override func selectAll(_ sender: Any?) {
+        let all = Self.rowsToPick(all: items.filter(\.isPickable), marked: marked)
+        guard all.count > 1 else { return }
+        marked = all
+        refreshRows()
+    }
+
+    /// The rows ⌘A picks: the tabs when only tabs are picked, the pinned pages when only those are, else all of them.
+    nonisolated static func rowsToPick(all: [SidebarItem], marked: [SidebarItem]) -> [SidebarItem] {
+        func isTab(_ item: SidebarItem) -> Bool { if case .tab = item { true } else { false } }
+        if !marked.isEmpty, marked.allSatisfy(isTab) { return all.filter(isTab) }
+        if !marked.isEmpty, !marked.contains(where: isTab) { return all.filter { !isTab($0) } }
+        return all
     }
 
     #if DEBUG

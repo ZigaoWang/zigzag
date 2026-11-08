@@ -530,4 +530,13 @@ extension BrowserWindowController {
     func closingCount(_ items: [SidebarItem]) -> Int {
         markedTabRows(items).count + markedPinRows(items).filter { id in markedPinPages([id]).contains { tabManager.bookmarkTab(for: $0) != nil } }.count
     }
+
+    /// ⌫ on picked rows: their tabs close and their pinned pages come out of the sidebar, as one ⌘Z.
+    func listRemove(_ items: [SidebarItem]) {
+        let pins = markedPinRows(items)
+        let tabs = markedTabs(items)
+        if !pins.isEmpty, !tabManager.isPrivate { removePinnedWithUndo(pins) }
+        // The tabs last, so the toast's Undo (Close Tabs) takes back both: they're one step.
+        if !tabs.isEmpty { closeManyWithUndoToast(tabs) }
+    }
 }
