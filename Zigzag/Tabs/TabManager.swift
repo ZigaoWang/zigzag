@@ -127,6 +127,32 @@ final class TabManager {
 
     // MARK: Creating
 
+    /// Where a new tab goes in the list (Settings › General). Next to the current tab is what Chrome and Safari do, so
+    /// a tab shows up where you were looking; Arc's way, on top, and the bottom are choices.
+    enum NewTabPlace: String, CaseIterable { case next, top, bottom }
+    static var newTabPlace: NewTabPlace {
+        get { UserDefaults.standard.string(forKey: "NewTabPlace").flatMap(NewTabPlace.init(rawValue:)) ?? .next }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "NewTabPlace") }
+    }
+
+    /// Where a new tab lands in a space's list: next to the tab it came from (after the others it already opened, so a
+    /// row of links stays in reading order), or below the tab you're on; on top when neither is in the list.
+    private func newTabIndex(in space: UUID, opener: Tab?) -> Int {
+        let list = tabsBySpace[space] ?? []
+        switch Self.newTabPlace {
+        case .top: return 0
+        case .bottom: return list.count
+        case .next:
+            if let opener, let at = list.firstIndex(where: { $0 === opener }) {
+                var index = at + 1
+                while index < list.count, list[index].opener === opener { index += 1 }
+                return index
+            }
+            if space == currentSpaceID, let here = selectedTab, let at = list.firstIndex(where: { $0 === here }) { return at + 1 }
+            return 0
+        }
+    }
+
     @discardableResult
     func newTab(url: URL?, spaceID: UUID? = nil, select: Bool = true, configuration: WKWebViewConfiguration? = nil,
                 opener: Tab? = nil, title: String? = nil) -> Tab {
@@ -135,8 +161,8 @@ final class TabManager {
         tab.host = host
         watch(tab)
         tab.opener = opener
-        // New tabs go on top. The list never reorders itself after that.
-        tabsBySpace[space, default: []].insert(tab, at: 0)
+        // Placed once, as Settings says; the list never reorders itself after that.
+        tabsBySpace[space, default: []].insert(tab, at: newTabIndex(in: space, opener: opener))
         if #available(macOS 15.4, *) { ExtensionHost.shared.tabOpened(tab) }
         // Opened in front from a page in split view: it takes that page's pane, so the split stays on screen and
         // the page it came from waits in the list. A pinned split keeps its pages; the new tab shows on its own.

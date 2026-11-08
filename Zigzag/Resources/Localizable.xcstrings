@@ -2164,6 +2164,28 @@
         }
       }
     },
+    "At the Bottom" : {
+      "comment" : "A choice for “New tabs open” in Settings › General: below the other tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在最下面"
+          }
+        }
+      }
+    },
+    "At the Top" : {
+      "comment" : "A choice for “New tabs open” in Settings › General: above the other tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在最上面"
+          }
+        }
+      }
+    },
     "Attach the report from Finder to your email" : {
       "comment" : "Toast after the problem report email opens; the report is shown in Finder.",
       "localizations" : {
@@ -6657,6 +6679,17 @@
         }
       }
     },
+    "New tabs open" : {
+      "comment" : "A setting in Settings › General: where a new tab goes in the sidebar's list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新标签页位置"
+          }
+        }
+      }
+    },
     "Next" : {
       "comment" : "Tooltip of the find bar's button that goes to the next match.",
       "localizations" : {
@@ -6697,6 +6730,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一个色相"
+          }
+        }
+      }
+    },
+    "Next to the Current Tab" : {
+      "comment" : "A choice for “New tabs open” in Settings › General: just below the tab you're on, or the page a link came from.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在当前标签页旁边"
           }
         }
       }
@@ -12728,6 +12772,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当页面是其他语言时，Zigzag 会在每个网站上询问一次。"
+          }
+        }
+      }
+    },
+    "Where ⌘T and links put a new tab in the sidebar." : {
+      "comment" : "Explanation under “New tabs open” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘T 和链接打开的新标签页在边栏中的位置。"
           }
         }
       }

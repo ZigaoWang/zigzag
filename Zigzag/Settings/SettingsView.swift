@@ -544,6 +544,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
+    private let newTabPlace = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let languagePicker = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
@@ -710,6 +711,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         windowGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › General: how many favorites' tiles sit side by side in the sidebar."),
                                 detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › General."),
                                 control: favoritesPerRow))
+        newTabPlace.options = TabManager.NewTabPlace.allCases.map { place in
+            let title = switch place {
+            case .next: String(localized: "Next to the Current Tab", comment: "A choice for “New tabs open” in Settings › General: just below the tab you're on, or the page a link came from.")
+            case .top: String(localized: "At the Top", comment: "A choice for “New tabs open” in Settings › General: above the other tabs.")
+            case .bottom: String(localized: "At the Bottom", comment: "A choice for “New tabs open” in Settings › General: below the other tabs.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        newTabPlace.onSelect = { index in TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index] }
+        windowGroup.add(FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › General: where a new tab goes in the sidebar's list."),
+                                detail: String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › General."),
+                                control: newTabPlace))
         pinOfferToggle.onChange = { on in BrowserWindowController.offersToPinWanderedPage = on }
         windowGroup.add(FormRow(title: String(localized: "Offer to pin the page you moved to", comment: "A setting in Settings › General."),
                                 detail: String(localized: "After you close a pinned tab that went to another page, like a new chat.", comment: "Explanation under “Offer to pin the page you moved to” in Settings › General."),
@@ -1434,6 +1447,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.isOn = BrowserRootView.isBorderless
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
+        newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
         refreshDownloadPlace()
