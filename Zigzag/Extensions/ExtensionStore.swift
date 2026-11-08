@@ -158,6 +158,8 @@ enum ExtensionStore {
     /// sets up 1Password when its app is on this Mac, and checks for updates once a day.
     static func setUpIfNeeded() {
         guard #available(macOS 15.4, *) else { return }
+        // An extension engine whose extension went while Zigzag was closed: the one you had before.
+        ExtensionSearchProvider.reconcile()
         Task {
             await migrateLegacyInstalls()
             await ExtensionHost.shared.loadInstalled()
@@ -437,6 +439,8 @@ enum ExtensionStore {
             update(id) { $0.version = previous }
             await ExtensionHost.shared.load(id)
         }
+        // A version that no longer gives a search engine gives back the one you had.
+        ExtensionSearchProvider.reconcile()
     }
 
     private static func latestVersion(of id: String, current: String) async -> String? {
@@ -489,6 +493,7 @@ enum ExtensionStore {
         ExtensionHost.shared.forget(id)
         // Only now is it gone from disk: removing a password manager brings back the passkey fallback.
         Passkeys.refresh()
+        ExtensionSearchProvider.reconcile()
     }
 
     static func setEnabled(_ id: String, _ enabled: Bool) {
@@ -497,6 +502,8 @@ enum ExtensionStore {
         if enabled {
             Task { await ExtensionHost.shared.load(id) }
         } else {
+            // Its search engine goes with it, if it was yours.
+            ExtensionSearchProvider.reconcile()
             ExtensionHost.shared.unload(id)
         }
     }

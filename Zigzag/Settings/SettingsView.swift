@@ -529,6 +529,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var shortcutGroups: [(String, FormGroup)] = []
 
     private let engine = DropdownButton()
+    /// The engines extensions give, listed after Zigzag's own, in the order the menu shows them.
+    private var engineProviders: [ExtensionSearchProvider] = []
     /// Your own search address, shown when the engine is Custom.
     private let customSearch: FilledField = {
         let field = FilledField(placeholder: "https://example.com/search?q=%s")
@@ -572,6 +574,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var spaceRows: [SpaceSettingsRow] = []
     private var token: SignalToken?
     private var extensionsToken: SignalToken?
+    private var engineToken: SignalToken?
 
     private var keyToken: NSObjectProtocol?
 
@@ -585,10 +588,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             guard let self, self.window != nil else { return }
             self.reloadSpaces()
         }
+        // An extension's engine chosen from its toast, or gone with it, while Settings is open.
+        engineToken = ExtensionSearchProvider.changed.observe { [weak self] in
+            self?.refreshEngines()
+            self?.refreshCustomSearch()
+        }
         if #available(macOS 15.4, *) {
             extensionsToken = ExtensionHost.shared.changed.observe { [weak self] in
                 guard let self, self.window != nil else { return }
                 self.reloadExtensions()
+                // One turned on or off may give a search engine, or take yours with it.
+                self.refreshEngines()
+                self.refreshCustomSearch()
             }
         }
     }
@@ -626,14 +637,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         themeToken = Brand.themeChanged.observe { [weak self] in self?.needsDisplay = true }
 
         // General
-        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: Self.engineIcon($0)) }
-        SearchEngine.allCases.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
+        refreshEngines()
+        SearchEngine.builtIn.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
         engine.onSelect = { [weak self] index in
-            Library.shared.searchEngine = SearchEngine.allCases[index]
-            self?.refreshCustomSearch()
+            guard let self else { return }
+            let builtIn = SearchEngine.builtIn
+            if index >= builtIn.count {
+                ExtensionSearchProvider.use(self.engineProviders[index - builtIn.count])
+            } else {
+                Library.shared.searchEngine = builtIn[index]
+            }
+            self.refreshCustomSearch()
             // Choosing Custom with no address yet: straight into the field to type one.
-            if SearchEngine.allCases[index] == .custom, SearchEngine.customTemplate.isEmpty {
-                DispatchQueue.main.async { self?.window?.makeFirstResponder(self?.customSearch.field) }
+            if index < builtIn.count, builtIn[index] == .custom, SearchEngine.customTemplate.isEmpty {
+                DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(self?.customSearch.field) }
             }
         }
         customSearch.stringValue = SearchEngine.customTemplate
@@ -1416,6 +1433,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ?? (engine == .custom ? Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline) : nil)
     }
 
+    /// Zigzag's engines, then those extensions give, with the one you search with picked.
+    private func refreshEngines() {
+        engineProviders = ExtensionSearchProvider.available
+        engineProviders.forEach { if FaviconStore.shared.cachedIcon(for: $0.homeURL) == nil { FaviconStore.shared.prefetch(for: $0.homeURL) } }
+        let builtIn = SearchEngine.builtIn
+        engine.options = builtIn.map { DropdownButton.Option(title: $0.name, image: Self.engineIcon($0)) }
+            + engineProviders.map { DropdownButton.Option(title: $0.name, image: FaviconStore.shared.cachedIcon(for: $0.homeURL).map(Self.menuIcon)) }
+        let chosen = ExtensionSearchProvider.chosen.flatMap { engineProviders.firstIndex(of: $0) }.map { builtIn.count + $0 }
+        engine.selectedIndex = chosen ?? builtIn.firstIndex(of: Library.shared.searchEngine) ?? 0
+    }
+
     /// The custom address row shows only with Custom chosen.
     private func refreshCustomSearch() {
         let shown = Library.shared.searchEngine == .custom
@@ -1441,8 +1469,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     private func refresh() {
-        engine.options = SearchEngine.allCases.map { DropdownButton.Option(title: $0.name, image: Self.engineIcon($0)) }
-        engine.selectedIndex = SearchEngine.allCases.firstIndex(of: Library.shared.searchEngine) ?? 0
+        refreshEngines()
         let isDefault = DefaultBrowser.isDefault
         defaultStatus.isHidden = !isDefault
         defaultButton.isHidden = isDefault

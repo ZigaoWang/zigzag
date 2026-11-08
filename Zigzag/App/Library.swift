@@ -257,6 +257,11 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 
 enum SearchEngine: String, Codable, CaseIterable {
     case google, duckDuckGo, brave, bing, kagi, ecosia, startpage, perplexity, yahoo, baidu, yandex, custom
+    /// The one an extension gives ("ChatGPT search"), while it's on: see ExtensionSearchProvider.
+    case fromExtension
+
+    /// Zigzag's own engines, the ones Settings always lists.
+    static var builtIn: [SearchEngine] { allCases.filter { $0 != .fromExtension } }
 
     /// An engine this version doesn't know (saved by a newer one) reads as Google, rather than making the whole
     /// library unreadable and losing every space with it.
@@ -268,6 +273,11 @@ enum SearchEngine: String, Codable, CaseIterable {
     static var customTemplate: String {
         get { UserDefaults.standard.string(forKey: "CustomSearchTemplate") ?? "" }
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "CustomSearchTemplate") }
+    }
+
+    /// What you typed, encoded to go into a search address where the words go.
+    static func encodedWords(_ query: String) -> String {
+        query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+?#"))) ?? query
     }
 
     /// Whether a custom address can search: http or https, with a host and a %s for the words.
@@ -293,6 +303,7 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .custom:
             URL(string: Self.customTemplate.replacingOccurrences(of: "%s", with: "q")).flatMap { Self.isValidTemplate(Self.customTemplate) ? $0.host() : nil }
                 ?? String(localized: "Custom", comment: "A search engine choice in Settings: one you give an address for.")
+        case .fromExtension: ExtensionSearchProvider.chosen?.name ?? ExtensionSearchProvider.previousEngine.name
         }
     }
 
@@ -314,9 +325,11 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .custom:
             // The words go where %s is, encoded; an address that can't search falls back to Google.
             let template = Self.customTemplate
-            let words = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+?#"))) ?? query
-            if Self.isValidTemplate(template), let url = URL(string: template.replacingOccurrences(of: "%s", with: words)) { return url }
+            if Self.isValidTemplate(template), let url = URL(string: template.replacingOccurrences(of: "%s", with: Self.encodedWords(query))) { return url }
             return SearchEngine.google.searchURL(query)
+        case .fromExtension:
+            // The extension went off since: the engine you had before it.
+            return ExtensionSearchProvider.chosen?.searchURL(query) ?? ExtensionSearchProvider.previousEngine.searchURL(query)
         }
         components.queryItems = [URLQueryItem(name: key, value: query)]
         return components.url!
@@ -340,6 +353,7 @@ enum SearchEngine: String, Codable, CaseIterable {
             URL(string: Self.customTemplate.replacingOccurrences(of: "%s", with: "q")).flatMap { url in
                 url.host().flatMap { URL(string: "\(url.scheme ?? "https")://\($0)") }
             } ?? URL(string: "https://www.google.com")!
+        case .fromExtension: ExtensionSearchProvider.chosen?.homeURL ?? ExtensionSearchProvider.previousEngine.homeURL
         }
     }
 
@@ -367,6 +381,9 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .startpage, .perplexity, .yahoo, .baidu, .yandex, .custom:
             // No suggestions service these engines offer in a form Zigzag reads: what you type stays on your Mac.
             return nil
+        case .fromExtension:
+            // Only when the extension names a suggestions address of its own.
+            return ExtensionSearchProvider.chosen?.suggestionsURL(query)
         }
         return components.url
     }
