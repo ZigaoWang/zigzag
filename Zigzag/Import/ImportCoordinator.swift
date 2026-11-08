@@ -234,10 +234,10 @@ enum ImportCoordinator {
             if bookmarks > 0 { parts.append(count(bookmarks, "bookmark", "bookmarks")) }
             if spaces > 0 { parts.append(count(spaces, "space", "spaces")) }
             if history > 0 { parts.append(count(history, "page of history", "pages of history")) }
-            let signedIn = signedInSites > 0 ? " Signed in to \(count(signedInSites, "site", "sites"))." : ""
+            let signedIn = signedInSites > 0 ? " Brought over sign-ins for \(count(signedInSites, "site", "sites"))." : ""
             let kept = keptPasswords > 0 ? " Kept \(count(keptPasswords, "password", "passwords")) already in Zigzag instead of the imported \(keptPasswords == 1 ? "one" : "ones")." : ""
             guard !parts.isEmpty else {
-                if signedInSites > 0 { return "Signed in to \(count(signedInSites, "site", "sites")) from \(source)." + kept }
+                if signedInSites > 0 { return "Brought over sign-ins for \(count(signedInSites, "site", "sites")) from \(source)." + kept }
                 return (updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source).") + kept
             }
             let list = ListFormatter.localizedString(byJoining: parts)

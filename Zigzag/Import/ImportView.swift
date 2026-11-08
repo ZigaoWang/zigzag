@@ -716,7 +716,7 @@ private final class ImportHero: NSView {
         var lead: (Int, String)?
         var rest: [String] = []
         for (n, one, many) in [(passwords, "password", "passwords"), (bookmarks, "bookmark", "bookmarks"), (spaces, "space", "spaces"),
-                             (signedIn, "site signed in", "sites signed in"), (history, "page of history", "pages of history")] where n > 0 {
+                             (signedIn, "site with sign-ins", "sites with sign-ins"), (history, "page of history", "pages of history")] where n > 0 {
             if lead == nil { lead = (n, (n == 1 ? one : many) + from) } else { rest.append(plural(n, one, many)) }
         }
         wordmark.isHidden = true

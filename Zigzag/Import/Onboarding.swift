@@ -849,7 +849,7 @@ private final class BrowserRow: InteractiveView {
     private static func sentence(_ s: ImportCoordinator.Summary) -> String {
         func n(_ v: Int, _ one: String, _ many: String) -> String? { v > 0 ? "\(v.formatted()) \(v == 1 ? one : many)" : nil }
         let parts = [n(s.passwords + s.updatedPasswords, "password", "passwords"), n(s.spaces, "space", "spaces"),
-                     n(s.bookmarks, "bookmark", "bookmarks"), n(s.signedInSites, "site signed in", "sites signed in"),
+                     n(s.bookmarks, "bookmark", "bookmarks"), n(s.signedInSites, "site with sign-ins", "sites with sign-ins"),
                      n(s.history, "page of history", "pages of history")].compactMap { $0 }
         return parts.isEmpty ? "Nothing new: it was already here" : ListFormatter.localizedString(byJoining: parts)
     }
