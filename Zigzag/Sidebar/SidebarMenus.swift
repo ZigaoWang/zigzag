@@ -498,13 +498,13 @@ extension BrowserWindowController {
     func fileMarked(_ items: [SidebarItem], in folder: UUID?) {
         var ids: [UUID] = []
         var made: BookmarkFolder?
-        pageChange(folder == nil ? "New Folder" : "Add to Folder") { [self] in
+        pageChange(folder == nil ? String(localized: "New Folder", comment: "Undo action name, shown in Edit › Undo.") : String(localized: "Add to Folder", comment: "Undo action name, shown in Edit › Undo.")) { [self] in
             Library.shared.together {
                 ids = pinnedIDs(for: items)
                 if let folder {
                     for id in ids { Library.shared.setFolder(of: id, to: folder) }
                 } else {
-                    made = Library.shared.addFolder(named: "New Folder", with: ids, in: tabManager.currentSpaceID)
+                    made = Library.shared.addFolder(named: String(localized: "New Folder", comment: "Name a new folder of pinned tabs gets, until it's renamed."), with: ids, in: tabManager.currentSpaceID)
                 }
             }
         }
@@ -547,7 +547,7 @@ extension BrowserWindowController {
         }
         Toast.show(String(localized: "Moved \(items.count) to \(name)", comment: "Toast after moving several picked sidebar rows to another space"),
                    symbol: "arrow.right.square", action: (String(localized: "Undo", comment: "Toast button"), { [weak self] in
-            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Move to Space" else { return }
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.") else { return }
             undo.undo()
         }), duration: 4, in: self)
     }
@@ -565,7 +565,7 @@ extension BrowserWindowController {
         let what = pins.count == 1 ? String(localized: "Removed 1 pinned page", comment: "Toast")
             : String(localized: "Removed \(pins.count) pinned pages", comment: "Toast after removing several pinned pages")
         Toast.show(what, symbol: "pin.slash", action: (String(localized: "Undo", comment: "Toast button"), { [weak self] in
-            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Remove Pinned Pages" else { return }
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Remove Pinned Pages", comment: "Undo action name, shown in Edit › Undo.") else { return }
             undo.undo()
         }), duration: 4, in: self)
     }
@@ -577,7 +577,7 @@ extension BrowserWindowController {
         let pages = markedPinPages(markedPinRows(items)).compactMap(tabManager.bookmarkTab(for:))
         if tabs.isEmpty { tabManager.close(pages); return }
         closeManyWithUndo(pages + tabs)
-        showClosedToast(tabs.count, kind: "tab")
+        showClosedToast(tabs.count)
     }
 
     /// What ⌘W closes with these rows picked, for the File menu to say: their tabs and open pinned pages.
