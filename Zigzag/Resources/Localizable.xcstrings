@@ -2082,7 +2082,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "归档你没在用的标签页"
+            "value" : "归档闲置的标签页"
           }
         }
       }
@@ -2412,7 +2412,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "导入"
+            "value" : "要导入的内容"
           }
         }
       }
@@ -8129,7 +8129,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已固定标签页会一直保留，即使退出也不会消失"
+            "value" : "已固定的标签页在退出后也会保留"
           }
         }
       }
@@ -10291,7 +10291,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "网站数据"
+            "value" : "各网站的数据"
           }
         }
       }
@@ -10313,7 +10313,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "网站"
+            "value" : "各网站的设置"
           }
         }
       }
@@ -11287,7 +11287,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它们会离开边栏。在地址栏中键入几个字母即可找回。"
+            "value" : "它们会从边栏中移走。在地址栏中键入几个字母即可找回。"
           }
         }
       }
@@ -11474,7 +11474,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此页面已经是%@"
+            "value" : "此页面已是%@"
           }
         }
       }
@@ -11485,7 +11485,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此页面的语言是%@"
+            "value" : "此页面为%@"
           }
         }
       }
@@ -14124,7 +14124,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "© %1$@ Zigao Wang。%2$@。"
+            "value" : "© %1$@ Zigao Wang. %2$@."
           }
         }
       }
