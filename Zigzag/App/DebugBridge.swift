@@ -29,10 +29,75 @@ enum DebugBridge {
     }
 
     #if DEBUG
+    /// mini [url] (blank: the address field), miniext <url> (as a link from another app), minisetting on|off,
+    /// minitype <text> (typed into the address field and entered), minimove (Open in Zigzag), miniclose,
+    /// minimenu <char> [cmd|shift|ctrl|opt...] (a menu item's action, sent as the menu would to the mini window),
+    /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
+    /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit.
+    private static func runMini(_ name: String, _ arg: String) {
+        let mini = MiniWindowController.all.last
+        switch name {
+        case "mini": MiniWindowController.open(url: arg.isEmpty ? nil : URL(string: arg))
+        case "miniext": if let url = URL(string: arg) { WindowManager.shared.openExternal(url) }
+        case "minisetting": MiniWindowController.opensExternalLinks = arg == "on"
+        case "minitype": mini?.debugEnter(arg)
+        case "minimove": mini?.openInZigzag()
+        case "miniclose": mini?.window?.performClose(nil)
+        case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
+        case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
+        case "miniesc": mini?.debugEscape()
+        case "miniquit": NSApp.terminate(nil)
+        case "minimenu":
+            let f = arg.split(separator: " ").map(String.init)
+            guard let ch = f.first, let window = mini?.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            for m in f.dropFirst() {
+                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
+            }
+            func find(in menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(in: sub) { return found }
+                    if item.keyEquivalent == ch, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == flags, item.action != nil { return item }
+                }
+                return nil
+            }
+            guard let item = NSApp.mainMenu.flatMap(find(in:)), let action = item.action else { debugLog("minimenu \(arg): no item"); break }
+            var responder: NSResponder? = window.firstResponder ?? window
+            while let r = responder, !r.responds(to: action) { responder = r.nextResponder }
+            let target: AnyObject? = responder ?? (NSApp.responds(to: action) ? NSApp : NSApp.delegate as AnyObject?)
+            let enabled = (target as? NSMenuItemValidation)?.validateMenuItem(item) ?? true
+            if enabled { NSApp.sendAction(action, to: target, from: item) }
+            debugLog("minimenu \(arg): item=\(item.title) target=\(target.map { "\(type(of: $0))" } ?? "nil") enabled=\(enabled)")
+        case "ministate":
+            let minis: [[String: Any]] = MiniWindowController.all.map { m in
+                let f = m.window?.frame ?? .zero
+                return ["frame": [f.minX, f.minY, f.width, f.height], "url": m.tab.url?.absoluteString ?? "", "title": m.window?.title ?? "",
+                        "key": m.window?.isKeyWindow == true, "visible": m.window?.isVisible == true, "debug": m.debugState,
+                        "screen": m.window?.screen.map { [$0.visibleFrame.minX, $0.visibleFrame.minY, $0.visibleFrame.width, $0.visibleFrame.height] } ?? []]
+            }
+            let windows: [[String: Any]] = WindowManager.shared.controllers.map { c in
+                ["tabs": c.tabManager.tabs(in: c.tabManager.currentSpaceID).map { $0.url?.absoluteString ?? "" },
+                 "selected": c.tabManager.selectedTab?.url?.absoluteString ?? "",
+                 "key": c.window?.isKeyWindow == true, "visible": c.window?.isVisible == true,
+                 "pageShown": c.selectedWebView.map { $0.window === c.window } ?? false]
+            }
+            let saved = JSONStore.load(SessionState.self, from: Paths.session)?.windows.map { $0.spaces.flatMap { $0.tabs.compactMap { $0.url?.absoluteString } } } ?? []
+            let json: [String: Any] = ["minis": minis, "windows": windows, "savedTabs": saved, "setting": MiniWindowController.opensExternalLinks]
+            if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "minishot":
+            guard let view = mini?.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: arg))
+        default: break
+        }
+    }
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
         let arg = parts.count > 1 ? parts[1] : ""
+        // Mini windows come first: they work with no browser window open, and must not bring one forward.
+        if name.hasPrefix("mini") { runMini(name, arg); return }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
         NSApp.activate()
         controller.window?.makeKeyAndOrderFront(nil)
