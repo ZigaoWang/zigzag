@@ -408,6 +408,11 @@ private enum Onboard {
     /// Fills and outlines on the light side, used with alpha.
     static let tint = Tokens.Color.dynamic(light: Tokens.Color.hex(0x1E3A5F), dark: Tokens.Color.hex(0xDAE5F2))
     static func dim(_ alpha: CGFloat = 0.72) -> NSColor { Tokens.Color.textPrimary.withAlphaComponent(alpha * 0.85) }
+    /// Every checkbox in the welcome: checked, all accent, with no darker ring around it; unchecked, a soft outline.
+    static func tintCheckbox(_ box: NSView, on: Bool) {
+        box.layer?.backgroundColor = on ? box.cgColor(accent) : nil
+        box.layer?.borderColor = box.cgColor(on ? accent : tint.withAlphaComponent(0.45))
+    }
 
     /// A step's title, on the blue: large and light, set a little tight, as the space's name is.
     static func title(_ text: String) -> NSTextField {
@@ -625,36 +630,34 @@ private final class DataToggle: InteractiveView {
 }
 
 /// One browser: checkbox, icon, name and what it holds; then progress, what came over, or the problem in full.
-/// A choice that sits in the browser list as one of its rows: the same checkbox in the same column, a symbol where a
-/// browser's icon would be, its name and a line under it. For a choice worth reading before you make it (staying
-/// signed in), where a pill would be too small to say what it does.
+/// A choice about the import itself (staying signed in), under the browser list: a quiet strip of its own, set
+/// apart from the browsers so it never reads as one more place to bring things from. Its checkbox is a browser
+/// row's, its words lighter: a setting for the import, not something to import.
 private final class OptionRow: InteractiveView {
     var isOn = true { didSet { refresh() } }
     override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
     var isLocked = false { didSet { refresh() } }
     var onChange: (() -> Void)?
-    static let height: CGFloat = 50
+    static let height: CGFloat = 52
     private let box = ColorView(color: .clear)
     private let tick = NSImageView()
-    private let symbol = NSImageView()
     private let name: Label
     private let detail: Label
 
-    init(_ title: String, detail text: String, symbol name: String) {
-        self.name = Label(title, font: Tokens.Font.body(.semibold), color: Onboard.ink)
+    init(_ title: String, detail text: String) {
+        name = Label(title, font: Tokens.Font.body(), color: Onboard.ink)
         detail = Label(text, font: Tokens.Font.small(), color: Onboard.dim(0.62))
         super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.control
+        layer?.cornerCurve = .continuous
         box.wantsLayer = true
         box.layer?.cornerRadius = Tokens.Radius.control
         box.layer?.borderWidth = Tokens.Metric.fieldRing
         tick.image = Tokens.Symbol.image("checkmark", size: 10)
         tick.contentTintColor = Onboard.onAccent
         box.addSubview(tick)
-        symbol.image = Tokens.Symbol.image(name, size: 18)
-        symbol.contentTintColor = Onboard.dim(0.7)
-        symbol.imageScaling = .scaleNone
         detail.lineBreakMode = .byTruncatingTail
-        [box, symbol, self.name, detail].forEach { addSubview($0) }
+        [box, name, detail].forEach { addSubview($0) }
         onClick = { [weak self] _ in
             guard let self, !self.isLocked else { return }
             self.isOn.toggle()
@@ -662,6 +665,7 @@ private final class OptionRow: InteractiveView {
         }
         setAccessibilityRole(.checkBox)
         setAccessibilityLabel(title)
+        setAccessibilityHelp(text)
         refresh()
     }
 
@@ -669,38 +673,34 @@ private final class OptionRow: InteractiveView {
     override var isFlipped: Bool { true }
 
     private func refresh() {
-        tintBox()
+        Onboard.tintCheckbox(box, on: isOn)
         tick.isHidden = !isOn
         alphaValue = isLocked ? 0.5 : 1
         stateDidChange(animated: false)
     }
 
-    /// The checkbox's colors, as a browser row's, resolved for light or dark.
-    private func tintBox() {
-        box.layer?.backgroundColor = isOn ? cgColor(Onboard.accent) : nil
-        box.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(isOn ? 1 : 0.45))
-    }
-
+    /// Always a faint wash, so it reads as its own place; a step more under the pointer.
     override func stateDidChange(animated: Bool) {
-        layer?.backgroundColor = !isLocked && isHovered ? cgColor(Onboard.tint.withAlphaComponent(isPressed ? 0.1 : 0.05)) : nil
+        let step: CGFloat = isLocked ? 0.04 : isPressed ? 0.1 : isHovered ? 0.07 : 0.04
+        layer?.backgroundColor = cgColor(Onboard.tint.withAlphaComponent(step))
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        tintBox()
+        refresh()
     }
 
     override func layout() {
         super.layout()
-        // Measured as a browser row is, so the checkbox, picture and words line up with the rows above.
-        let pad = Tokens.Space.x4, top = Self.height
-        box.frame = NSRect(x: pad, y: (top - 18) / 2, width: 18, height: 18)
+        // The checkbox in the browser rows' column; the words right after it, the note under the name, so a longer
+        // language never cuts it short.
+        let pad = Tokens.Space.x4, mid = bounds.height / 2
+        box.frame = NSRect(x: pad, y: mid - 9, width: 18, height: 18)
         tick.frame = box.bounds.insetBy(dx: 3, dy: 3)
-        symbol.frame = NSRect(x: box.frame.maxX + Tokens.Space.x3, y: (top - 30) / 2, width: 30, height: 30)
-        let x = symbol.frame.maxX + Tokens.Space.x3
+        let x = box.frame.maxX + Tokens.Space.x3, width = max(0, bounds.width - x - pad)
         let block = name.lineHeight + 1 + detail.lineHeight
-        name.frame = NSRect(x: x, y: (top - block) / 2, width: bounds.width - x - pad, height: name.lineHeight)
-        detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: bounds.width - x - pad, height: detail.lineHeight)
+        name.frame = NSRect(x: x, y: mid - block / 2, width: width, height: name.lineHeight)
+        detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: width, height: detail.lineHeight)
     }
 }
 
@@ -923,8 +923,7 @@ private final class BrowserRow: InteractiveView {
     /// The checkbox's colors, resolved for light or dark; set again whenever that changes.
     private func tintBox() {
         let on = isChosen || isFinished
-        box.layer?.backgroundColor = on ? cgColor(Onboard.accent) : nil
-        box.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(on ? 1 : 0.45))
+        Onboard.tintCheckbox(box, on: on)
     }
 
     /// "6 passwords, 3 spaces and 58 bookmarks".
@@ -1023,10 +1022,7 @@ private final class BringPicker: StepContent {
     /// The one choice shown here: unlike bookmarks or history, sign-ins open your accounts, so you see it and can
     /// leave it off. On to start with, as passwords are.
     private let signIns = OptionRow(String(localized: "Stay signed in to your sites", comment: "Row with a checkbox in the welcome window’s import step: bring over the sites you’re signed in to."),
-                                    detail: String(localized: "Brings over your sign-ins from this Mac. Nothing leaves it.", comment: "Under Stay signed in to your sites, in the welcome window’s import step."),
-                                    symbol: "person.badge.key")
-    /// Between the browsers and the sign-ins choice, as between two browsers.
-    private let signInsRule = ColorView(color: Onboard.tint.withAlphaComponent(0.09))
+                                    detail: String(localized: "Brings over your sign-ins from this Mac. Nothing leaves it.", comment: "Under Stay signed in to your sites, in the welcome window’s import step."))
     private var isImporting = false
     /// Many browsers or profiles: the list scrolls inside its box instead of running into the buttons.
     private let scroll = NSScrollView()
@@ -1046,7 +1042,7 @@ private final class BringPicker: StepContent {
         scroll.contentView.drawsBackground = false
         scroll.documentView = list
         hint.alignment = .center
-        [scroll, bringLabel, fileLink, hint, signInsRule, signIns].forEach { addSubview($0) }
+        [scroll, bringLabel, fileLink, hint, signIns].forEach { addSubview($0) }
         signIns.onChange = { [weak self] in self?.refresh() }
         let sources = ImportCoordinator.detectedSources()
         let suggested = ImportCoordinator.suggested(sources)
@@ -1182,7 +1178,6 @@ private final class BringPicker: StepContent {
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
         signIns.isHidden = !offersSignIns
-        signInsRule.isHidden = signIns.isHidden
         // One line: with sign-ins too, it says the one prompt covers both rather than listing them.
         hint.stringValue = isImporting
             ? (choice.contains(.signIns) ? String(localized: "macOS will ask for your Mac’s password once. Type it, then click Always Allow.",
@@ -1317,7 +1312,7 @@ private final class BringPicker: StepContent {
     private var linkHeight: CGFloat { (fileLink.isHidden ? 0 : Tokens.Space.x3 + Tokens.Space.x8) + signInsHeight }
 
     /// Room for the sign-ins choice and its line under the list, while they show.
-    private var signInsHeight: CGFloat { signIns.isHidden ? 0 : Tokens.Metric.hairline + OptionRow.height }
+    private var signInsHeight: CGFloat { signIns.isHidden ? 0 : Tokens.Space.x3 + OptionRow.height }
 
     override func layout() {
         super.layout()
@@ -1338,9 +1333,8 @@ private final class BringPicker: StepContent {
         // Right under the list, lined up with its text.
         let below = rows.isEmpty ? 40 : scroll.frame.maxY
         if !signIns.isHidden {
-            // One more row of the list, under a line as between two browsers.
-            signInsRule.frame = NSRect(x: 62, y: below, width: width - 62, height: Tokens.Metric.hairline)
-            signIns.frame = NSRect(x: pad, y: signInsRule.frame.maxY, width: width, height: OptionRow.height)
+            // Its own strip a little below the list: about the import, not one more browser in it.
+            signIns.frame = NSRect(x: pad, y: below + Tokens.Space.x3, width: width, height: OptionRow.height)
         }
         fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: below + signInsHeight + Tokens.Space.x3, width: fileLink.fittingWidth, height: Tokens.Space.x8)
         hint.alignment = .left
@@ -1991,8 +1985,7 @@ private final class ExtensionRow: InteractiveView {
     private func refresh() {
         let added = state == .added
         let on = isChosen || added
-        box.layer?.backgroundColor = on ? cgColor(Onboard.accent) : nil
-        box.layer?.borderColor = cgColor(Onboard.tint.withAlphaComponent(on ? 1 : 0.45))
+        Onboard.tintCheckbox(box, on: on)
         tick.isHidden = !on
         box.alphaValue = added ? 0.5 : 1
         layer?.backgroundColor = isHovered && state == .idle && !isLocked ? cgColor(Onboard.tint.withAlphaComponent(0.05)) : nil
