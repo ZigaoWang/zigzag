@@ -116,7 +116,7 @@ enum SitePermissions {
         if let known = notifications(host: host) { return known }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return nil }
         let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
-                                                title: "Show notifications",
+                                                title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 answered: { notifications(host: host).map { $0 ? .allow : .deny } })
         switch answer {
         case .allow, .deny:
@@ -134,6 +134,7 @@ enum SitePermissions {
         if let known = all["\(host)|location"] { return known ? .grant : .deny }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return .deny }
         let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", in: controller, tab: tab,
+                                                title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 answered: {
                                                     let now = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
                                                     return now["\(host)|location"].map { $0 ? .allow : .deny }
@@ -155,18 +156,18 @@ enum SitePermissions {
                         tab: Tab? = nil) async -> WKPermissionDecision {
         let host = origin.host
         if let known = decision(host: host, type: type) { return known ? .grant : .deny }
-        let what: String
+        let what: String, title: String
         switch type {
-        case .camera: what = "your camera"
-        case .microphone: what = "your microphone"
-        default: what = "your camera and microphone"
+        case .camera: (what, title) = ("your camera", String(localized: "Use your camera", comment: "A site's permission question, without its question mark."))
+        case .microphone: (what, title) = ("your microphone", String(localized: "Use your microphone", comment: "A site's permission question, without its question mark."))
+        default: (what, title) = ("your camera and microphone", String(localized: "Use your camera and microphone", comment: "A site's permission question, without its question mark."))
         }
         guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else {
             // Nowhere to ask (a popup window): say no this time, without remembering it.
             return .deny
         }
         let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
-                                                in: controller, tab: tab,
+                                                in: controller, tab: tab, title: title,
                                                 answered: { decision(host: host, type: type).map { $0 ? .allow : .deny } })
         // Only a clicked answer is remembered; Esc, or the window closing, is "not now".
         switch answer {
@@ -193,7 +194,7 @@ final class PermissionPrompt: FloatingPanelView {
     private let badge = ColorView(color: .clear)
     private let request = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let closeButton = IconButton(symbol: "xmark", toolTip: "Not Now")
+    private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the × on a site's permission question."))
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
     private var askingHost = ""
     /// When it came up. Allow takes no click for the first half second, so a page can't ask just as you click
@@ -242,14 +243,14 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     static func ask(host: String, what: String, symbol: String, icon: NSImage? = nil,
-                    in controller: BrowserWindowController, tab: Tab? = nil, title: String? = nil, allowTitle: String = "Allow",
-                    denyTitle: String = "Don’t Allow", answered: @escaping () -> Answer? = { nil }) async -> Answer {
+                    in controller: BrowserWindowController, tab: Tab? = nil, title: String? = nil, allowTitle: String = String(localized: "Allow", comment: "Button on a site's permission question."),
+                    denyTitle: String = String(localized: "Don’t Allow", comment: "Button on a site's permission question."), answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
         let task = Task { @MainActor in
             _ = await before?.value
             if let known = answered() { return known }
-            return await show(host: host, request: title ?? "Use \(what)", symbol: symbol, icon: icon, allowTitle: allowTitle,
+            return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."), symbol: symbol, icon: icon, allowTitle: allowTitle,
                               denyTitle: denyTitle, in: controller, tab: tab)
         }
         queue[key] = task
@@ -274,7 +275,7 @@ final class PermissionPrompt: FloatingPanelView {
         let accent = Brand.Theme.of(controller.tabManager.currentSpace).accent
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
-            prompt.request.stringValue = "\(request)?"
+            prompt.request.stringValue = String(localized: "\(request)?", comment: "A site's permission question: the request, then a question mark, like “Use your camera?”.")
             prompt.asker.stringValue = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
             prompt.askingHost = host
             if let icon {
@@ -302,7 +303,7 @@ final class PermissionPrompt: FloatingPanelView {
             // Side by side at one width, as a Mac dialog sets its answers.
             let width = max(deny.fittingWidth, allow.fittingWidth, Tokens.Dialog.minButtonWidth)
             prompt.buttons = [(deny, width), (allow, width)]
-            prompt.setAccessibilityLabel("\(host): \(request)?")
+            prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { continuation.resume(returning: $0) }
             prompt.askingTab = asking
             prompt.controller = controller

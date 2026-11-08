@@ -85,13 +85,13 @@ final class PopupNotice: NSObject, WKScriptMessageHandler {
             return
         }
         if !host.isEmpty, !isPrivate {
-            Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: ("Always Allow", { [weak controller] in
+            Toast.show(String(localized: "Pop-up blocked", comment: "Toast when Zigzag blocks a page's pop-up window."), symbol: "macwindow.badge.plus", action: (String(localized: "Always Allow", comment: "Button in the toast when Zigzag blocks a page's pop-up: allows the site's pop-ups from now on."), { [weak controller] in
                 SitePermissions.setPopups(true, host: host)
                 guard let controller else { return }
-                Toast.show("Pop-ups allowed. Click the button again.", symbol: "macwindow.badge.plus", duration: 4, in: controller)
+                Toast.show(String(localized: "Pop-ups allowed. Click the button again.", comment: "Toast after allowing a site's pop-ups."), symbol: "macwindow.badge.plus", duration: 4, in: controller)
             }), duration: 6, in: controller)
         } else if let url {
-            Toast.show("Pop-up blocked", symbol: "macwindow.badge.plus", action: ("Open in New Tab", { [weak controller, weak opener] in
+            Toast.show(String(localized: "Pop-up blocked", comment: "Toast when Zigzag blocks a page's pop-up window."), symbol: "macwindow.badge.plus", action: (String(localized: "Open in New Tab", comment: "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead."), { [weak controller, weak opener] in
                 controller?.open(url, disposition: .foregroundTab, opener: opener, allowSwitch: false)
             }), duration: 6, in: controller)
         }

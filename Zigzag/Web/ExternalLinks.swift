@@ -39,7 +39,7 @@ enum ExternalLinks {
         guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
             Diagnostics.note("No app for a link", site: webView.url?.host(), "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             if isMainFrame, webView.window != nil, let controller {
-                Toast.show("No app on this Mac opens “\(scheme):” links", symbol: "questionmark.app", duration: 3, in: controller)
+                Toast.show(String(localized: "No app on this Mac opens “\(scheme):” links", comment: "Toast when a page opens a link no app handles. The placeholder is the link's scheme, like “zoommtg”."), symbol: "questionmark.app", duration: 3, in: controller)
             }
             return
         }
@@ -69,10 +69,11 @@ enum ExternalLinks {
         // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
         if popup != nil { controller.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
-            let answer = await PermissionPrompt.ask(host: host.isEmpty ? "This page" : host, what: name, symbol: "arrow.up.forward.app",
+            let answer = await PermissionPrompt.ask(host: host.isEmpty ? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.") : host, what: name, symbol: "arrow.up.forward.app",
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: controller,
-                                                    tab: tab, title: "Open \(name)", allowTitle: "Open",
-                                                    denyTitle: "Don’t Open",
+                                                    tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
+                                                    allowTitle: String(localized: "Open", comment: "Button on a page's question to open an app."),
+                                                    denyTitle: String(localized: "Don’t Open", comment: "Button on a page's question to open an app."),
                                                     answered: { canRemember && !host.isEmpty && SitePermissions.opensApp(host: host, scheme: scheme) ? .allow : nil })
             asking.remove(key)
             switch answer {

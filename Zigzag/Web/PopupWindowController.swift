@@ -308,7 +308,7 @@ final class PopupHeaderView: NSView {
             label.stringValue = context.webExtension.displayName ?? ""
             lock.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
             lock.isHidden = false
-            lock.setAccessibilityLabel("Extension")
+            lock.setAccessibilityLabel(String(localized: "Extension", comment: "VoiceOver label of the icon before an extension's address in a pop-up window."))
             needsLayout = true
             return
         }
@@ -317,7 +317,8 @@ final class PopupHeaderView: NSView {
         label.stringValue = (url?.host() ?? "") + (url?.port.flatMap { $0 == usual ? nil : ":\($0)" } ?? "")
         lock.image = Tokens.Symbol.image(secure ? "lock" : "exclamationmark.triangle", size: Tokens.Symbol.inline)
         lock.isHidden = url == nil
-        lock.setAccessibilityLabel(secure ? "Secure connection" : "Not secure")
+        lock.setAccessibilityLabel(secure ? String(localized: "Secure connection", comment: "VoiceOver label of the lock before the address in a pop-up window.")
+                                           : String(localized: "Not secure", comment: "VoiceOver label of the warning before the address in a pop-up window."))
         needsLayout = true
     }
 
