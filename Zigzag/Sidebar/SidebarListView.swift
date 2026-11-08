@@ -582,7 +582,8 @@ final class SidebarListView: NSView {
                 let folding = menu ?? NSMenu()
                 folding.autoenablesItems = false
                 if !folding.items.isEmpty { folding.insertItem(.separator(), at: 0) }
-                folding.insertItem(SidebarMenus.Item(header.isCollapsed ? "Show Pinned Tabs" : "Hide Pinned Tabs") { [weak self] in
+                folding.insertItem(SidebarMenus.Item(header.isCollapsed ? String(localized: "Show Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: unfolds them.")
+                                                                          : String(localized: "Hide Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: folds them away.")) { [weak self] in
                     self?.toggleCollapsed()
                 }, at: 0)
                 return folding
@@ -699,7 +700,7 @@ final class SidebarListView: NSView {
             let spaceName = Library.shared.space(spaceID)?.name ?? ""
             (view as? SpaceHeaderView)?.canCollapse = !Library.shared.bookmarks(in: spaceID).isEmpty
             (view as? SpaceHeaderView)?.isCollapsed = Self.isCollapsed(spaceID)
-            (view as? SpaceHeaderView)?.name = privateLabel ? "Private" : spaceName
+            (view as? SpaceHeaderView)?.name = privateLabel ? String(localized: "Private", comment: "The heading at the top of a private window's sidebar, where a space's name would be.") : spaceName
             (view as? SpaceHeaderView)?.refreshInk()
             (view as? SpaceHeaderView)?.icon = privateLabel ? nil : Library.shared.space(spaceID)?.icon
             view.needsLayout = true
@@ -1686,7 +1687,7 @@ final class SidebarListView: NSView {
         if let folder = drag.folderTarget {
             let together = drag.together
             // Pinning a tab and putting it in the folder is one step to undo.
-            delegate?.listAsOne("Add to Folder") { [weak self] in
+            delegate?.listAsOne(String(localized: "Add to Folder", comment: "Undo action name, shown in Edit › Undo.")) { [weak self] in
                 for item in together {
                     if let id = self?.pin(item, in: space) { self?.delegate?.listSetFolder(of: id, to: folder) }
                 }
@@ -1705,7 +1706,7 @@ final class SidebarListView: NSView {
         case (.tab, .bookmarks):
             if let tab {
                 let index = drag.targetIndex
-                delegate?.listAsOne("Pin Tab") { [weak self] in
+                delegate?.listAsOne(String(localized: "Pin Tab", comment: "Undo action name, shown in Edit › Undo.")) { [weak self] in
                     if tab.spaceID != space { self?.delegate?.listMove(tab, to: 0, in: space) }
                     self?.delegate?.listBookmark(tab, at: index, in: space)
                     // Among a folder's pages: into that folder.

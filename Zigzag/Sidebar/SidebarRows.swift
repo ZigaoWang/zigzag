@@ -165,11 +165,11 @@ final class SelectionCardView: NSView {
 final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
-    let closeButton = TabRowView.rowButton("xmark", toolTip: "Close Tab")
+    let closeButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
     /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
     /// the partner's half. Clicking one mutes or unmutes that page.
-    let audioButton = TabRowView.rowButton("speaker.wave.2", toolTip: "Mute Tab")
-    let partnerAudioButton = TabRowView.rowButton("speaker.wave.2", toolTip: "Mute Tab")
+    let audioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
+    let partnerAudioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
 
     static func rowButton(_ symbol: String, toolTip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: Tokens.Sidebar.rowButton, symbolSize: Tokens.Sidebar.rowGlyph, toolTip: toolTip)
@@ -187,7 +187,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Double-click: the title becomes a field, the whole name selected. Return keeps it, Escape doesn't.
     func beginRename() {
         guard renameField == nil, let window else { return }
-        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: "Name")
+        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: String(localized: "Name", comment: "Placeholder of the field that renames a tab, in its sidebar row."))
         field.stringValue = title.stringValue
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
@@ -328,7 +328,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
         partnerAudioButton.symbol = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-        partnerAudioButton.toolTip = partner?.isMuted == true ? "Unmute Tab" : "Mute Tab"
+        partnerAudioButton.toolTip = partner?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         refreshAccessories()
         refreshAccessibilityLabel()
         refreshTitleColor()
@@ -337,15 +337,20 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
-        setAccessibilityLabel(!isSplit ? title.stringValue : "\(title.stringValue), split with \(partnerTitle.stringValue)")
+        setAccessibilityLabel(!isSplit ? title.stringValue : String(localized: "\(title.stringValue), split with \(partnerTitle.stringValue)", comment: "Accessibility label of a split view's row in the sidebar: the two pages' titles."))
         // What VoiceOver says after the name: the tab you're on, and whether either page is playing or muted.
         func sound(_ tab: Tab?, _ name: String?) -> String? {
-            let state = tab?.isMuted == true ? "muted" : tab?.isPlayingAudio == true ? "playing audio" : nil
-            return state.map { state in name.map { "\($0) \(state)" } ?? state }
+            if tab?.isMuted == true {
+                return name.map { String(localized: "\($0) muted", comment: "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it's muted.") }
+                    ?? String(localized: "muted", comment: "Spoken by VoiceOver after a tab row's name: the tab is muted.")
+            }
+            guard tab?.isPlayingAudio == true else { return nil }
+            return name.map { String(localized: "\($0) playing audio", comment: "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it plays sound.") }
+                ?? String(localized: "playing audio", comment: "Spoken by VoiceOver after a tab row's name: the tab plays sound.")
         }
         let split = partner != nil
-        let state = [isSelected ? "current tab" : nil, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
-            .compactMap { $0 }.joined(separator: ", ")
+        let state = [isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+            .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
     }
@@ -392,7 +397,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         icon.image = tab?.favicon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
         audioButton.symbol = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-        audioButton.toolTip = tab?.isMuted == true ? "Unmute Tab" : "Mute Tab"
+        audioButton.toolTip = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         refreshAccessibilityLabel()
         refreshTitleColor()
         refreshAccessories()
@@ -415,7 +420,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // pointer. A plain tab you're on keeps its close button in view.
         let showClose = (isHovered || (isSelected && !isBookmark)) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil
         closeButton.isHidden = !showClose
-        closeButton.toolTip = isAway ? "Back to Pinned Page" : isBookmark ? "Unload Page" : "Close Tab"
+        closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
+            : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         needsLayout = true
@@ -518,12 +524,12 @@ final class NewTabRowView: SidebarRowView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        title.stringValue = "New Tab"
+        title.stringValue = String(localized: "New Tab", comment: "The New Tab row in the sidebar, above the tabs.")
         icon.isHidden = true
         plus.image = LineGlyph.plus
         plus.imageScaling = .scaleNone
         addSubview(plus)
-        setAccessibilityLabel("New Tab")
+        setAccessibilityLabel(String(localized: "New Tab", comment: "The New Tab row in the sidebar, above the tabs."))
     }
 
     override func stateDidChange(animated: Bool) {
@@ -579,7 +585,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         title.stringValue = name
         folderIcon.image = IconChoice.folder(icon, open: open, size: Tokens.Sidebar.favicon)
         isOpen = open
-        setAccessibilityLabel("\(name), folder, \(count) pinned")
+        setAccessibilityLabel(String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
         setAccessibilityValue(open ? 1 : 0)
         needsLayout = true
     }
@@ -633,7 +639,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     func beginRename() {
         guard renameField == nil, let window else { return }
-        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: "Folder name")
+        let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: String(localized: "Folder name", comment: "Placeholder of the field that renames a folder, in its sidebar row."))
         field.stringValue = title.stringValue
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
@@ -779,10 +785,11 @@ final class SpaceHeaderView: InteractiveView {
         chevron.image = Tokens.Symbol.image(isCollapsed ? "chevron.right" : "chevron.down", size: Tokens.TypeSize.body)
         // The chevron shows on hover, and stays while folded so you know something is tucked away.
         chevron.isHidden = !canCollapse || !(isHovered || isCollapsed)
-        setAccessibilityLabel(label.stringValue + (isCollapsed ? ", pinned tabs hidden" : ""))
-        setAccessibilityHelp(isCollapsed ? "Show pinned tabs" : "Hide pinned tabs")
+        setAccessibilityLabel(isCollapsed ? String(localized: "\(label.stringValue), pinned tabs hidden", comment: "Accessibility label of the space's name above its pinned tabs, while they're folded away.") : label.stringValue)
+        setAccessibilityHelp(isCollapsed ? String(localized: "Show pinned tabs", comment: "Accessibility help of the space's name above its pinned tabs, while they're folded away.") : String(localized: "Hide pinned tabs", comment: "Accessibility help of the space's name above its pinned tabs."))
         setAccessibilityCustomActions(canCollapse ? [
-            NSAccessibilityCustomAction(name: isCollapsed ? "Show Pinned Tabs" : "Hide Pinned Tabs") { [weak self] in
+            NSAccessibilityCustomAction(name: isCollapsed ? String(localized: "Show Pinned Tabs", comment: "VoiceOver action on the space's name: unfolds its pinned tabs.")
+                                                        : String(localized: "Hide Pinned Tabs", comment: "VoiceOver action on the space's name: folds its pinned tabs away.")) { [weak self] in
                 self?.onToggleCollapsed?()
                 return true
             },
@@ -794,7 +801,7 @@ final class SpaceHeaderView: InteractiveView {
 /// as in Arc: on a line of its own, apart from New Tab and the pinned tabs it leaves alone, and only while the
 /// pointer is over the list and there are tabs to clear.
 final class SeparatorRowView: NSView {
-    private let label = Label("Tabs", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    private let label = Label(String(localized: "Tabs", comment: "The quiet label above today's tabs in the sidebar, below the pinned tabs."), font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
     /// The label and Clear in the space's quiet ink.
     func refreshInk() {
@@ -919,7 +926,7 @@ final class InsertionLineView: NSView {
 final class ClearTabsButton: InteractiveView {
     /// The tabs below get swept away, the way Arc says it: an arrow pointing down at them.
     private let arrow = NSImageView()
-    private let label = Label("Clear", font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
+    private let label = Label(String(localized: "Clear", comment: "Button at the end of the Tabs label in the sidebar: closes tabs."), font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     private static let arrowSide: CGFloat = Tokens.Symbol.inline
 
     override init(frame: NSRect) {
@@ -940,14 +947,15 @@ final class ClearTabsButton: InteractiveView {
         didSet {
             switch step {
             case .old(let n):
-                label.stringValue = "Clear Old"
-                toolTip = n == 1 ? "Close the tab you haven’t used in a while" : "Close the \(n) tabs you haven’t used in a while"
+                label.stringValue = String(localized: "Clear Old", comment: "Button at the end of the Tabs label in the sidebar, while some tabs went unused for a while: closes those.")
+                toolTip = String(localized: "Close the \(n) tabs you haven’t used in a while", comment: "Tooltip of the sidebar's Clear Old button.")
             case .others(let n):
-                label.stringValue = "Clear"
-                toolTip = n == 1 ? "Close the other tab" : "Close the other \(n) tabs"
+                label.stringValue = String(localized: "Clear", comment: "Button at the end of the Tabs label in the sidebar: closes tabs.")
+                toolTip = String(localized: "Close the other \(n) tabs", comment: "Tooltip of the sidebar's Clear button: closes every tab but the one you're on.")
             case .last(let n):
-                label.stringValue = "Clear"
-                toolTip = n == 1 ? "Close this tab too, leaving the space empty" : "Close these tabs too, leaving the space empty"
+                label.stringValue = String(localized: "Clear", comment: "Button at the end of the Tabs label in the sidebar: closes tabs.")
+                toolTip = n == 1 ? String(localized: "Close this tab too, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tab left is the one you're on.")
+                                 : String(localized: "Close these tabs too, leaving the space empty", comment: "Tooltip of the sidebar's Clear button when the only tabs left are the split view you're on.")
             }
             setAccessibilityLabel(toolTip)
             if oldValue != step { needsLayout = true; superview?.needsLayout = true }

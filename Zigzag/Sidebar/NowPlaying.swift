@@ -5,8 +5,8 @@ import AppKit
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
-    let playButton = TabRowView.rowButton("pause", toolTip: "Pause")
-    let muteButton = TabRowView.rowButton("speaker.wave.2", toolTip: "Mute Tab")
+    let playButton = TabRowView.rowButton("pause", toolTip: String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
+    let muteButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."))
     private(set) weak var tab: Tab?
     var isPaused = false { didSet { refresh() } }
 
@@ -16,9 +16,9 @@ final class NowPlayingView: InteractiveView {
         layer?.cornerCurve = .continuous
         [icon, title, playButton, muteButton].forEach { addSubview($0) }
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Now playing")
+        setAccessibilityLabel(String(localized: "Now playing", comment: "Accessibility label of the sidebar's control for a tab playing sound in the background."))
         // VoiceOver goes to the playing tab as a click on the title does; the buttons speak for themselves.
-        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: "Show Tab") { [weak self] in
+        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.")) { [weak self] in
             MainActor.assumeIsolated { self?.accessibilityPerformPress() ?? false }
         }])
     }
@@ -34,11 +34,11 @@ final class NowPlayingView: InteractiveView {
         guard let tab else { return }
         icon.image = tab.favicon
         title.stringValue = tab.displayTitle
-        setAccessibilityLabel("Now playing: \(tab.displayTitle)")
+        setAccessibilityLabel(String(localized: "Now playing: \(tab.displayTitle)", comment: "Accessibility label of the sidebar's Now Playing control. The placeholder is the playing tab's title."))
         playButton.symbol = isPaused ? "play" : "pause"
-        playButton.toolTip = isPaused ? "Play" : "Pause"
+        playButton.toolTip = isPaused ? String(localized: "Play", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.") : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
         muteButton.symbol = tab.isMuted ? "speaker.slash" : "speaker.wave.2"
-        muteButton.toolTip = tab.isMuted ? "Unmute Tab" : "Mute Tab"
+        muteButton.toolTip = tab.isMuted ? String(localized: "Unmute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.") : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
         needsLayout = true
     }
 

@@ -19,15 +19,16 @@ final class AddressView: InteractiveView {
     static func button(_ symbol: String, toolTip: String) -> IconButton {
         IconButton(symbol: symbol, size: buttonSide, symbolSize: Tokens.Sidebar.addressGlyph, toolTip: toolTip)
     }
-    let captureButton = AddressView.button("video.fill", toolTip: "Camera and Microphone")
+    let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: opens Reader.
-    let readerButton = AddressView.button("doc.plaintext", toolTip: "Show Reader")
+    let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
         captureButton.symbol = camera ? "video.fill" : "mic.fill"
         captureButton.tint = .systemOrange
-        captureButton.toolTip = camera && microphone ? "Using your camera and microphone" : camera ? "Using your camera" : "Using your microphone"
+        captureButton.toolTip = camera && microphone ? String(localized: "Using your camera and microphone", comment: "Tooltip of the address bar's capture button: the page uses both.")
+            : camera ? String(localized: "Using your camera", comment: "Tooltip of the address bar's capture button: the page uses the camera.") : String(localized: "Using your microphone", comment: "Tooltip of the address bar's capture button: the page uses the microphone.")
         needsLayout = true
     }
 
@@ -76,7 +77,7 @@ final class AddressView: InteractiveView {
         readerButton.isHidden = true
         addSubview(readerButton)
         setAccessibilityRole(.button)
-        setAccessibilityHelp("Opens the command bar")
+        setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -103,11 +104,11 @@ final class AddressView: InteractiveView {
         if #available(macOS 15.4, *), let url, url.scheme == "webkit-extension",
            let context = ExtensionHost.shared.contexts.first(where: { $0.baseURL.host() == url.host() }) {
             // An extension's own page (its settings) is named after the extension, not its random address.
-            label.stringValue = context.webExtension.displayName ?? "Extension"
+            label.stringValue = context.webExtension.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
         } else if HistoryPage.isHistory(url) {
-            label.stringValue = "History"
+            label.stringValue = String(localized: "History", comment: "The address bar's name for Zigzag's History page.")
         } else if SettingsPage.isSettings(url) {
-            label.stringValue = "Settings"
+            label.stringValue = String(localized: "Settings", comment: "The address bar's name for Zigzag's Settings page.")
         } else if let url, let host = url.host() {
             label.stringValue = Self.site(host, port: url.port, scheme: url.scheme)
         } else if let url, url.isFileURL {
@@ -117,19 +118,19 @@ final class AddressView: InteractiveView {
             label.stringValue = Self.site(host, port: inner.port, scheme: inner.scheme)
         } else if let url, let scheme = url.scheme, scheme != "about" || url.absoluteString != "about:blank" {
             // A page with no site (data:): said so, never left looking like an empty address bar.
-            label.stringValue = scheme == "about" ? url.absoluteString : "\(scheme): page"
+            label.stringValue = scheme == "about" ? url.absoluteString : String(localized: "\(scheme): page", comment: "The address bar's name for a page with no site, like a data: page. The placeholder is the address's scheme, like “data”.")
         } else {
             label.stringValue = ""
         }
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
-        if label.stringValue.isEmpty { label.stringValue = "Search or enter address" }
+        if label.stringValue.isEmpty { label.stringValue = String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab.") }
         // Only a plain http page marks itself, with the not-secure symbol before the host.
         let insecure = url?.scheme == "http"
         lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
         lock.isHidden = !insecure
         lock.toolTip = insecure ? SitePanel.notSecure : nil
-        setAccessibilityLabel(insecure ? "\(label.stringValue), \(SitePanel.notSecure)" : label.stringValue)
+        setAccessibilityLabel(insecure ? String(localized: "\(label.stringValue), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.") : label.stringValue)
         needsLayout = true
     }
 
@@ -233,7 +234,7 @@ final class SpaceDotView: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         // VoiceOver says which space you're in.
-        setAccessibilityValue(isSelected ? "current space" : nil)
+        setAccessibilityValue(isSelected ? String(localized: "current space", comment: "Spoken by VoiceOver after a space's button at the bottom of the sidebar: it's the space you're in.") : nil)
         setAccessibilitySelected(isSelected)
         let side = Tokens.Sidebar.spaceKey
         let share = swipeShare ?? (isSelected ? 1 : 0)
@@ -301,12 +302,12 @@ final class SidebarView: NSView {
         return button
     }
     // The four top controls are one set: Apple's own symbols, drawn at one size and weight, so they match and line up.
-    let backButton = SidebarView.chromeButton("chevron.left", toolTip: "Back")
-    let forwardButton = SidebarView.chromeButton("chevron.right", toolTip: "Forward")
-    let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: "Reload")
+    let backButton = SidebarView.chromeButton("chevron.left", toolTip: String(localized: "Back", comment: "Tooltip of the sidebar's back button."))
+    let forwardButton = SidebarView.chromeButton("chevron.right", toolTip: String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."))
+    let reloadButton = SidebarView.chromeButton("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of the sidebar's reload button."))
     /// Stand-in for the traffic lights while the sidebar slides.
     private let trafficLightsPicture = NSImageView()
-    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: "Hide Sidebar")
+    let sidebarButton = SidebarView.chromeButton("sidebar.left", toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
     let address = AddressView()
     let favorites = FavoritesView()
     let list = SidebarListView()
@@ -326,12 +327,12 @@ final class SidebarView: NSView {
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
     let downloadsButton: IconButton = {
-        let button = SidebarView.chromeButton("arrow.down.circle", toolTip: "Downloads")
+        let button = SidebarView.chromeButton("arrow.down.circle", toolTip: String(localized: "Downloads", comment: "Tooltip of the sidebar's downloads button."))
         button.glyph = DownloadGlyph.image(.arrow)
         return button
     }()
     let newSpaceButton: IconButton = {
-        let button = SidebarView.chromeButton("plus", toolTip: "New Space")
+        let button = SidebarView.chromeButton("plus", toolTip: String(localized: "New Space", comment: "Tooltip of the button that adds a space, at the bottom of the sidebar."))
         button.glyph = LineGlyph.plus
         return button
     }()
@@ -572,8 +573,9 @@ final class SidebarView: NSView {
             dot.icon = space.icon
             dot.isSelected = space.id == current
             // The first nine have ⌃1 to ⌃9 (fixed keys, not in Settings › Shortcuts), so the name says which.
-            dot.toolTip = i < 9 ? "\(space.name) (⌃\(i + 1))" : space.name
-            dot.setAccessibilityLabel("Space \(space.name)")
+            let shortcut = "⌃\(i + 1)"
+            dot.toolTip = i < 9 ? String(localized: "\(space.name) (\(shortcut))", comment: "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.") : space.name
+            dot.setAccessibilityLabel(String(localized: "Space \(space.name)", comment: "Accessibility label of a space's button at the bottom of the sidebar. The placeholder is the space's name."))
         }
         // A single space needs no switcher, and a private window switches nothing.
         dots.forEach { $0.isHidden = isPrivate || dots.count < 2 }

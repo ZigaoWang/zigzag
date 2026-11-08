@@ -322,7 +322,7 @@ final class FavoriteTile: InteractiveView {
     /// From the tile's top and right edges to the button: inside the tile's rounded corner, not on it.
     private static let closeInset = Tokens.Sidebar.favoriteCloseInset
     private lazy var closeButton: IconButton = {
-        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph, toolTip: "Unload Page")
+        let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph, toolTip: String(localized: "Unload Page", comment: "Tooltip of a favorite's close button: unloads its page; the favorite stays."))
         button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
         button.radius = Self.closeSide / 2
@@ -371,7 +371,7 @@ final class FavoriteTile: InteractiveView {
     }
 
     private func describe() {
-        let name = [bookmark?.title, partner?.title].compactMap { $0 }.joined(separator: " and ")
+        let name = Words.list([bookmark?.title, partner?.title].compactMap { $0 })
         toolTip = name
         setAccessibilityLabel(name)
         refreshIcon()
@@ -441,7 +441,7 @@ final class FavoriteTile: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         // VoiceOver says which favorite you're on and which are open, as it does for tab rows.
-        setAccessibilityValue(isSelected ? "current tab" : isOpen ? "open" : nil)
+        setAccessibilityValue(isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : isOpen ? String(localized: "open", comment: "Spoken by VoiceOver after a favorite's name: its page is loaded.") : nil)
         setAccessibilitySelected(isSelected)
         if isPlaceholder {
             // Where the first favorite will land: the drop target's look.
