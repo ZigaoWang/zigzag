@@ -395,17 +395,17 @@ final class DownloadManager: NSObject {
         let error = error as NSError
         if error.domain == NSURLErrorDomain {
             switch error.code {
-            case NSURLErrorNotConnectedToInternet: return "You’re offline"
-            case NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut, NSURLErrorCannotConnectToHost: return "The connection dropped"
+            case NSURLErrorNotConnectedToInternet: return String(localized: "You’re offline", comment: "Why a download failed, under its name in the downloads panel.")
+            case NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut, NSURLErrorCannotConnectToHost: return String(localized: "The connection dropped", comment: "Why a download failed, under its name in the downloads panel.")
             case NSURLErrorCannotCreateFile, NSURLErrorCannotWriteToFile, NSURLErrorCannotOpenFile:
-                return "Couldn’t save it in that folder"
-            case NSURLErrorBadServerResponse, NSURLErrorResourceUnavailable, NSURLErrorFileDoesNotExist: return "The site couldn’t send it"
-            case NSURLErrorUserAuthenticationRequired, NSURLErrorNoPermissionsToReadFile: return "The site refused it"
+                return String(localized: "Couldn’t save it in that folder", comment: "Why a download failed, under its name in the downloads panel.")
+            case NSURLErrorBadServerResponse, NSURLErrorResourceUnavailable, NSURLErrorFileDoesNotExist: return String(localized: "The site couldn’t send it", comment: "Why a download failed, under its name in the downloads panel.")
+            case NSURLErrorUserAuthenticationRequired, NSURLErrorNoPermissionsToReadFile: return String(localized: "The site refused it", comment: "Why a download failed, under its name in the downloads panel.")
             default: break
             }
         }
         if (error.domain == NSPOSIXErrorDomain && error.code == Int(ENOSPC)) || (error.domain == NSCocoaErrorDomain && error.code == NSFileWriteOutOfSpaceError) {
-            return "Not enough space on your Mac"
+            return String(localized: "Not enough space on your Mac", comment: "Why a download failed, under its name in the downloads panel.")
         }
         return nil
     }

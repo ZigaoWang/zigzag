@@ -8,8 +8,8 @@ enum DownloadPlace {
         let icon = NSWorkspace.shared.icon(forFile: folder.path)
         icon.size = NSSize(width: 16, height: 16)
         button.options = [DropdownButton.Option(title: FileManager.default.displayName(atPath: folder.path), image: icon),
-                          DropdownButton.Option(title: "Ask Each Time", image: nil),
-                          DropdownButton.Option(title: "Choose Folder…", image: nil)]
+                          DropdownButton.Option(title: String(localized: "Ask Each Time", comment: "Choice in the menu of where downloads go, in Settings and the downloads panel."), image: nil),
+                          DropdownButton.Option(title: String(localized: "Choose Folder…", comment: "Choice in the menu of where downloads go, in Settings and the downloads panel."), image: nil)]
         button.selectedIndex = DownloadManager.asksWhereToSave ? 1 : 0
     }
 
@@ -23,8 +23,8 @@ enum DownloadPlace {
             panel.canChooseDirectories = true
             panel.canChooseFiles = false
             panel.canCreateDirectories = true
-            panel.prompt = "Choose"
-            panel.message = "Choose where downloads are saved."
+            panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks the downloads folder.")
+            panel.message = String(localized: "Choose where downloads are saved.", comment: "Message of the panel that picks the downloads folder.")
             panel.directoryURL = DownloadManager.folder
             if panel.runModal() == .OK, let url = panel.url {
                 DownloadManager.folder = url
