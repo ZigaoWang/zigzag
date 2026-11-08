@@ -69,6 +69,23 @@ enum DebugBridge {
         case "tour": Tutorial.restart(); GuidedTour.start(in: controller)
         case "tourresume": GuidedTour.start(in: controller)
         case "markrow": controller.sidebar.list.debugMark(Int(arg.prefix { $0.isNumber }) ?? 0, shift: arg.hasSuffix("s"))
+        case "marked":
+            // marked <path>: the picked rows, whether the keys act on them, and what their menu and File › Close say.
+            let list = controller.sidebar.list
+            let titles = list.marked.isEmpty ? [] : SidebarMenus.markedMenu(for: list.marked, controller: controller).items.map(\.title)
+            let close = NSApp.mainMenu.flatMap { $0.items.lazy.compactMap { $0.submenu?.items.first { $0.action == #selector(BrowserWindowController.closeTab(_:)) } }.first }
+            if let close { _ = controller.validateMenuItem(close) }
+            let json: [String: Any] = ["marked": list.marked.map { String(describing: $0) }, "count": list.marked.count,
+                                       "focus": list.marksHaveFocus, "menu": titles, "close": close?.title ?? ""]
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
+        case "markedmenu":
+            // markedmenu <title>: runs that item of the picked rows' menu, as choosing it would (a submenu's by "Parent>Item").
+            let list = controller.sidebar.list
+            guard !list.marked.isEmpty else { break }
+            let path = arg.split(separator: ">").map(String.init)
+            var menu: NSMenu? = SidebarMenus.markedMenu(for: list.marked, controller: controller)
+            for name in path.dropLast() { menu = menu?.items.first { $0.title == name }?.submenu }
+            if let menu, let last = path.last, case let index = menu.indexOfItem(withTitle: last), index >= 0 { menu.performActionForItem(at: index) }
         case "markedfolder": controller.newFolder(with: controller.pinnedIDs(for: controller.sidebar.list.marked)); controller.sidebar.list.clearMarks()
         case "newspaceui": controller.newSpace(nil)
         case "editspace": SpaceEditorPanel.toggle(spaceID: controller.tabManager.currentSpaceID, in: controller)
@@ -449,11 +466,11 @@ enum DebugBridge {
             for m in f.dropFirst() {
                 switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
             }
-            let named: [String: String] = ["esc": "\u{1b}", "tab": "\t", "return": "\r", "space": " ",
+            let named: [String: String] = ["esc": "\u{1b}", "tab": "\t", "return": "\r", "space": " ", "delete": "\u{7f}",
                                            "down": String(UnicodeScalar(NSDownArrowFunctionKey)!), "up": String(UnicodeScalar(NSUpArrowFunctionKey)!)]
             let chars = named[ch] ?? ch
             let codes: [String: UInt16] = ["s": 1, "j": 38, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35,
-                                          "down": 125, "up": 126, "return": 36, "space": 49]
+                                          "down": 125, "up": 126, "return": 36, "space": 49, "delete": 51, "a": 0]
             if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                         windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
                                         isARepeat: false, keyCode: codes[ch] ?? 0) {
