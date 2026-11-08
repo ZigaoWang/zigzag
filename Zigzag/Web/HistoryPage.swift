@@ -525,10 +525,22 @@ function redraw(session) {
   session.el = fresh;
 }
 
+// A search can find hundreds of pages: they're drawn a screenful ahead at a time, as browsing loads them, so a
+// letter typed never waits on rows far below.
 function render() {
   list.textContent = '';
-  for (const s of sessions) { s.el = null; redraw(s); }
+  for (const s of sessions) s.el = null;
+  drawMore();
   showEmpty();
+}
+
+function drawMore() {
+  const more = document.getElementById('more');
+  for (const s of sessions) {
+    if (s.el) continue;
+    if (more.getBoundingClientRect().top > innerHeight + 600) break;
+    redraw(s);
+  }
 }
 
 function showEmpty() {
@@ -688,7 +700,7 @@ items.forEach((b) => b.onclick = async (e) => {
 // Session headings stick just under the toolbar, which grows when a narrow window wraps the search field.
 new ResizeObserver(() => document.documentElement.style.setProperty('--header', bar.offsetHeight + 'px')).observe(bar);
 addEventListener('scroll', () => bar.classList.toggle('scrolled', scrollY > 0), { passive: true });
-new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) loadMore(); }, { rootMargin: '600px' })
+new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) searching ? drawMore() : loadMore(); }, { rootMargin: '600px' })
   .observe(document.getElementById('more'));
 loadMore();
 </script>
