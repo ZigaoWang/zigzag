@@ -1174,7 +1174,15 @@
       }
     },
     "A password can’t be empty." : {
-      "comment" : "Toast when saving a login with its password cleared."
+      "comment" : "Toast when saving a login with its password cleared.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码不能为空。"
+          }
+        }
+      }
     },
     "A playing video floats in its own window until you come back." : {
       "comment" : "Explanation under “Keep videos playing when you switch tabs” in Settings › General.",
@@ -1528,7 +1536,15 @@
       "comment" : "Item in the Clear History menu on the History page."
     },
     "All Passwords" : {
-      "comment" : "A kind of password in the Passwords window's column, and the list's title: every saved password."
+      "comment" : "A kind of password in the Passwords window's column, and the list's title: every saved password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有密码"
+          }
+        }
+      }
     },
     "All Release Notes" : {
       "comment" : "Button in the What’s New sheet: opens every version's notes on the website."
@@ -1578,7 +1594,15 @@
       }
     },
     "Allow Saving" : {
-      "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again."
+      "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许存储"
+          }
+        }
+      }
     },
     "Allow and Update" : {
       "comment" : "Button that allows an extension's update its new access.",
@@ -1917,7 +1941,15 @@
       }
     },
     "Bring your passwords from %@" : {
-      "comment" : "A row in the fill-password menu when nothing is saved yet. The placeholder is a browser, like Chrome."
+      "comment" : "A row in the fill-password menu when nothing is saved yet. The placeholder is a browser, like Chrome.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 %@ 导入你的密码"
+          }
+        }
+      }
     },
     "Bring your stuff over" : {
       "comment" : "Title of the Import window.\nTitle of the welcome window’s import step.",
@@ -2088,7 +2120,15 @@
       "comment" : "Row in the site panel's This Site group."
     },
     "Cancel" : {
-      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nTooltip of a download's button in the downloads panel: stops the download."
+      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nTooltip of a download's button in the downloads panel: stops the download.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
     },
     "Canceled" : {
       "comment" : "Under a download's name in the downloads panel: the download was stopped."
@@ -2885,10 +2925,26 @@
       }
     },
     "Copy Password" : {
-      "comment" : "Tooltip of a button by a login's password in the Passwords window."
+      "comment" : "Tooltip of a button by a login's password in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝密码"
+          }
+        }
+      }
     },
     "Copy Username" : {
-      "comment" : "Tooltip of a button by a login's username in the Passwords window."
+      "comment" : "Tooltip of a button by a login's username in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝用户名"
+          }
+        }
+      }
     },
     "Copyright %@ Zigao Wang. The code is licensed under the Apache License, Version 2.0, in full at the end." : {
       "comment" : "In the Acknowledgments window, under Zigzag. “Apache License, Version 2.0” is the license's name."
@@ -2916,7 +2972,15 @@
       }
     },
     "Couldn’t delete it. Try again." : {
-      "comment" : "Toast in the Passwords window when a login couldn't be deleted."
+      "comment" : "Toast in the Passwords window when a login couldn't be deleted.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能删除。请再试一次。"
+          }
+        }
+      }
     },
     "Couldn’t download %@" : {
       "comment" : "Toast when a download fails; the file's name."
@@ -2964,13 +3028,37 @@
       "comment" : "Toast when moving the app into Applications fails."
     },
     "Couldn’t open that password. Try again from the Passwords window." : {
-      "comment" : "Toast when a saved password couldn't be read to fill a form."
+      "comment" : "Toast when a saved password couldn't be read to fill a form.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能打开该密码。请从“密码”窗口再试一次。"
+          }
+        }
+      }
     },
     "Couldn’t put it back" : {
-      "comment" : "Toast when undoing a deleted login failed."
+      "comment" : "Toast when undoing a deleted login failed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能恢复"
+          }
+        }
+      }
     },
     "Couldn’t read your passwords. Nothing was deleted." : {
-      "comment" : "Shown in the Passwords window when the Keychain wouldn't give up the passwords."
+      "comment" : "Shown in the Passwords window when the Keychain wouldn't give up the passwords.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能读取你的密码。没有删除任何内容。"
+          }
+        }
+      }
     },
     "Couldn’t save it in that folder" : {
       "comment" : "Why a download failed, under its name in the downloads panel."
@@ -2979,16 +3067,40 @@
       "comment" : "Toast when saving a copy of a PDF fails; a reason may follow as its own sentence."
     },
     "Couldn’t save the changes. Try again." : {
-      "comment" : "Toast when changes to a login couldn't be saved."
+      "comment" : "Toast when changes to a login couldn't be saved.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能存储更改。请再试一次。"
+          }
+        }
+      }
     },
     "Couldn’t save the new password. Copy it before you leave this page." : {
-      "comment" : "Toast when a strong password was filled but couldn't be saved."
+      "comment" : "Toast when a strong password was filled but couldn't be saved.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能存储新密码。请在离开此页面前拷贝它。"
+          }
+        }
+      }
     },
     "Couldn’t save the page" : {
       "comment" : "Toast when saving the page fails; a reason may follow as its own sentence."
     },
     "Couldn’t save the password. Try again from the Passwords window." : {
-      "comment" : "Toast when the save-password prompt couldn't save."
+      "comment" : "Toast when the save-password prompt couldn't save.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能存储密码。请从“密码”窗口再试一次。"
+          }
+        }
+      }
     },
     "Couldn’t save the screenshot" : {
       "comment" : "Toast when saving a screenshot fails; a reason may follow as its own sentence."
@@ -3000,7 +3112,15 @@
       "comment" : "Toast when translating a page fails."
     },
     "Couldn’t write the file. Choose another folder and try again." : {
-      "comment" : "Toast in the Passwords window when the export file couldn't be written."
+      "comment" : "Toast in the Passwords window when the export file couldn't be written.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能写入文件。请选取另一个文件夹，然后再试一次。"
+          }
+        }
+      }
     },
     "Couldn’t write the report" : {
       "comment" : "Toast when the problem report can't be written."
@@ -3081,7 +3201,15 @@
       }
     },
     "Delete" : {
-      "comment" : "Button on a saved login in the Passwords window."
+      "comment" : "Button on a saved login in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        }
+      }
     },
     "Delete Space" : {
       "comment" : "Button of the sheet that deletes a space from Settings.\nItem in a space's context menu.\nTooltip of the trash button on a space's row in Settings › Spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Delete Space.",
@@ -3117,7 +3245,15 @@
       }
     },
     "Deleted %@" : {
-      "comment" : "Toast after a login is deleted in the Passwords window. The placeholder is a site, like github.com."
+      "comment" : "Toast after a login is deleted in the Passwords window. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已删除 %@"
+          }
+        }
+      }
     },
     "Deleted “%@”" : {
       "comment" : "Toast after a space is deleted. The name is the space's."
@@ -3448,7 +3584,15 @@
       }
     },
     "Export" : {
-      "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords."
+      "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出"
+          }
+        }
+      }
     },
     "Export %lld passwords?" : {
       "comment" : "Title of the sheet that confirms exporting passwords.",
@@ -3470,6 +3614,18 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "要导出 %lld 个密码吗？"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -3485,7 +3641,15 @@
       }
     },
     "Export passwords to a file" : {
-      "comment" : "Tooltip of the Export button in the Passwords window."
+      "comment" : "Tooltip of the Export button in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将密码导出到文件"
+          }
+        }
+      }
     },
     "Exported %lld passwords" : {
       "comment" : "Toast after passwords were exported to a file.",
@@ -3503,6 +3667,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Exported %lld passwords"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已导出 %lld 个密码"
                 }
               }
             }
@@ -3569,7 +3745,15 @@
       }
     },
     "Fill from My Card" : {
-      "comment" : "A row in the menu that fills a form. My Card is the person's own card in Contacts, as macOS calls it."
+      "comment" : "A row in the menu that fills a form. My Card is the person's own card in Contacts, as macOS calls it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用“我的名片”填写"
+          }
+        }
+      }
     },
     "Fill saved passwords" : {
       "comment" : "A setting in Settings › Passwords.",
@@ -3594,7 +3778,15 @@
       }
     },
     "Fills %@ from Contacts" : {
-      "comment" : "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”."
+      "comment" : "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从“通讯录”填写%@"
+          }
+        }
+      }
     },
     "Find" : {
       "comment" : "Submenu of the Edit menu.",
@@ -3722,7 +3914,15 @@
       "comment" : "Name of the space imported bookmarks go into. The placeholder is a browser's name: From Chrome."
     },
     "From your card in Contacts" : {
-      "comment" : "Under the person's name in the menu that fills a form from Contacts."
+      "comment" : "Under the person's name in the menu that fills a form from Contacts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自你在“通讯录”中的名片"
+          }
+        }
+      }
     },
     "Frost" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale, see-through icy blue.",
@@ -3951,7 +4151,15 @@
       }
     },
     "Hide Password" : {
-      "comment" : "Tooltip of the button that hides a shown password in the Passwords window."
+      "comment" : "Tooltip of the button that hides a shown password in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏密码"
+          }
+        }
+      }
     },
     "Hide Pinned Tabs" : {
       "comment" : "Item in the context menu of the space's name above its pinned tabs: folds them away.\nVoiceOver action on the space's name: folds its pinned tabs away.",
@@ -4026,7 +4234,15 @@
       }
     },
     "Import Passwords…" : {
-      "comment" : "Button in the empty Passwords window."
+      "comment" : "Button in the empty Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入密码…"
+          }
+        }
+      }
     },
     "Import a password file…" : {
       "comment" : "Link in the welcome window’s import step: choose a passwords export file.",
@@ -4062,10 +4278,26 @@
       }
     },
     "Import passwords from another browser or a file" : {
-      "comment" : "Tooltip of the Import button in the Passwords window."
+      "comment" : "Tooltip of the Import button in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从其他浏览器或文件导入密码"
+          }
+        }
+      }
     },
     "Import them, and sign in here in one click" : {
-      "comment" : "Under the row offering to import passwords, in the fill-password menu."
+      "comment" : "Under the row offering to import passwords, in the fill-password menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入它们，在这里一键登录"
+          }
+        }
+      }
     },
     "Imported %@ from %@." : {
       "comment" : "Import window: a list like “214 passwords and 86 bookmarks”, then a browser's name, like Chrome.",
@@ -4394,7 +4626,15 @@
       }
     },
     "Last changed %@" : {
-      "comment" : "Under a saved login's name in the Passwords window. The placeholder is a date, like Nov 8, 2026."
+      "comment" : "Under a saved login's name in the Passwords window. The placeholder is a date, like Nov 8, 2026.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次更改于 %@"
+          }
+        }
+      }
     },
     "Last night" : {
       "comment" : "Name of a History session that began yesterday."
@@ -4821,7 +5061,15 @@
       }
     },
     "My Card" : {
-      "comment" : "The person's own card in Contacts, as macOS calls it, in the menu that fills a form."
+      "comment" : "The person's own card in Contacts, as macOS calls it, in the menu that fills a form.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的名片"
+          }
+        }
+      }
     },
     "Name" : {
       "comment" : "Placeholder of the field that renames a favorite.\nPlaceholder of the field that renames a tab, in its sidebar row."
@@ -4849,7 +5097,15 @@
       }
     },
     "Name, email, phone and address, from Contacts" : {
-      "comment" : "Under Fill from My Card in the menu that fills a form."
+      "comment" : "Under Fill from My Card in the menu that fills a form.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姓名、电子邮件、电话和地址，来自“通讯录”"
+          }
+        }
+      }
     },
     "Narrow" : {
       "comment" : "Choice of column width in Reader's text and color choices."
@@ -4910,13 +5166,37 @@
       }
     },
     "Never Saved" : {
-      "comment" : "A kind of entry in the Passwords window's column: sites where the person chose never to save a password."
+      "comment" : "A kind of entry in the Passwords window's column: sites where the person chose never to save a password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从不存储"
+          }
+        }
+      }
     },
     "Never offer to save" : {
-      "comment" : "Under a site in the Passwords window's Never Saved list."
+      "comment" : "Under a site in the Passwords window's Never Saved list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不提示存储"
+          }
+        }
+      }
     },
     "Never offer to save on %@" : {
-      "comment" : "Tooltip of the Never button in the save-password prompt. The placeholder is a site, like github.com."
+      "comment" : "Tooltip of the Never button in the save-password prompt. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不在 %@ 上提示存储"
+          }
+        }
+      }
     },
     "New Folder" : {
       "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder.",
@@ -5077,10 +5357,26 @@
       }
     },
     "No reused passwords. Each site has a password of its own." : {
-      "comment" : "Shown in the Passwords window's Reused list when it's empty."
+      "comment" : "Shown in the Passwords window's Reused list when it's empty.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有重复使用的密码。每个网站都有自己的密码。"
+          }
+        }
+      }
     },
     "No saved password for %@" : {
-      "comment" : "A row in the fill-password menu. The placeholder is a site, like github.com."
+      "comment" : "A row in the fill-password menu. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 没有存储的密码"
+          }
+        }
+      }
     },
     "No settings match “%@”." : {
       "comment" : "In Settings when Find a setting finds nothing; what was typed.",
@@ -5094,7 +5390,15 @@
       }
     },
     "No sites or usernames match “%@”." : {
-      "comment" : "Shown in the Passwords window when a search finds nothing. The placeholder is what was typed."
+      "comment" : "Shown in the Passwords window when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的网站或用户名。"
+          }
+        }
+      }
     },
     "No tabs" : {
       "comment" : "In the tab overview (all spaces' tabs as cards), in a space with no tabs."
@@ -5103,10 +5407,26 @@
       "comment" : "In the tab overview (all spaces' tabs as cards), when no tab matches the search."
     },
     "No username" : {
-      "comment" : "Shown in place of a login's username when it has none."
+      "comment" : "Shown in place of a login's username when it has none.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无用户名"
+          }
+        }
+      }
     },
     "No weak passwords. Every one is long and varied enough to stand up to guessing." : {
-      "comment" : "Shown in the Passwords window's Weak list when it's empty."
+      "comment" : "Shown in the Passwords window's Weak list when it's empty.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有弱密码。每个密码都足够长、足够多样，不容易被猜到。"
+          }
+        }
+      }
     },
     "None" : {
       "comment" : "In place of the keys of a command with no shortcut, in Settings › Shortcuts.",
@@ -5162,7 +5482,15 @@
       "comment" : "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.\nVoiceOver label of the warning before the address in a pop-up window."
     },
     "Not unlocked. Try again when you’re ready." : {
-      "comment" : "Shown in the locked Passwords window after Touch ID was cancelled or failed."
+      "comment" : "Shown in the locked Passwords window after Touch ID was cancelled or failed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未解锁。准备好后再试一次。"
+          }
+        }
+      }
     },
     "Not yet" : {
       "comment" : "Shown large when an import finishes and nothing came over because of a problem.",
@@ -5187,7 +5515,15 @@
       }
     },
     "Notes" : {
-      "comment" : "Name of a field of a saved login in the Passwords window."
+      "comment" : "Name of a field of a saved login in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备注"
+          }
+        }
+      }
     },
     "Nothing came over" : {
       "comment" : "Under “Not yet” when an import finishes with a problem.",
@@ -5537,7 +5873,15 @@
       }
     },
     "Open Website" : {
-      "comment" : "Tooltip of a button by a login's website in the Passwords window."
+      "comment" : "Tooltip of a button by a login's website in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开网站"
+          }
+        }
+      }
     },
     "Open a new tab" : {
       "comment" : "A step's title in the getting-started guide, a card in the window.",
@@ -5574,7 +5918,15 @@
       "comment" : "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view."
     },
     "Opening your passwords…" : {
-      "comment" : "Shown in the Passwords window while the saved passwords are read."
+      "comment" : "Shown in the Passwords window while the saved passwords are read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在打开你的密码…"
+          }
+        }
+      }
     },
     "Opens the command bar" : {
       "comment" : "Accessibility help of the address in the sidebar."
@@ -5704,19 +6056,59 @@
       }
     },
     "Password" : {
-      "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the password field in a site's HTTP sign-in sheet."
+      "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the password field in a site's HTTP sign-in sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码"
+          }
+        }
+      }
     },
     "Password copied. It leaves the clipboard in 90 seconds." : {
-      "comment" : "Toast in the Passwords window."
+      "comment" : "Toast in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝密码。它会在 90 秒后从剪贴板中移除。"
+          }
+        }
+      }
     },
     "Password for %@" : {
-      "comment" : "Under a login in the menu that fills a password into a page. The placeholder is a site, like github.com."
+      "comment" : "Under a login in the menu that fills a password into a page. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的密码"
+          }
+        }
+      }
     },
     "Password saved" : {
-      "comment" : "Toast after the save-password prompt saved a password."
+      "comment" : "Toast after the save-password prompt saved a password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储密码"
+          }
+        }
+      }
     },
     "Password updated" : {
-      "comment" : "Toast after the save-password prompt updated a password."
+      "comment" : "Toast after the save-password prompt updated a password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更新密码"
+          }
+        }
+      }
     },
     "Passwords" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nA section of Settings.\nChoice in the Import window: bring passwords over.\nLink at the bottom of the menu that fills a password into a page: opens the Passwords window.\nTitle of the Passwords window.\nTitle over the column of kinds in the Passwords window.\nWhat VoiceOver calls the menu that fills a password into a page.\nZigzag menu item.",
@@ -5730,7 +6122,15 @@
       }
     },
     "Passwords you save while signing in, or bring over from another browser, show up here." : {
-      "comment" : "Shown in the Passwords window with no passwords saved yet."
+      "comment" : "Shown in the Passwords window with no passwords saved yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在登录时存储的密码，或从其他浏览器导入的密码，会显示在这里。"
+          }
+        }
+      }
     },
     "Passwords, bookmarks and history, from any browser on this Mac." : {
       "comment" : "Subtitle of the Import window.",
@@ -6821,7 +7221,15 @@
       }
     },
     "Reused" : {
-      "comment" : "A kind of password in the Passwords window's column: used on more than one site."
+      "comment" : "A kind of password in the Passwords window's column: used on more than one site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复使用"
+          }
+        }
+      }
     },
     "Review Update" : {
       "comment" : "Button on an extension's row in Settings › Extensions, when its update asks for more access.",
@@ -6918,7 +7326,15 @@
       "comment" : "Choice of typeface in Reader's text and color choices: sans serif."
     },
     "Save" : {
-      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton that saves the changes to a login in the Passwords window."
+      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton that saves the changes to a login in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储"
+          }
+        }
+      }
     },
     "Save Downloads To" : {
       "comment" : "Heading in the downloads panel's … menu, over the folder choices."
@@ -6949,10 +7365,26 @@
       }
     },
     "Save password?" : {
-      "comment" : "Title of the save-password prompt."
+      "comment" : "Title of the save-password prompt.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要存储密码吗？"
+          }
+        }
+      }
     },
     "Saved" : {
-      "comment" : "Toast after changes to a login are saved."
+      "comment" : "Toast after changes to a login are saved.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储"
+          }
+        }
+      }
     },
     "Saved %@" : {
       "comment" : "Under “Restore from before the last update” in Settings › General: when the backup was made.",
@@ -7016,7 +7448,15 @@
       }
     },
     "Saved to your Keychain for %@" : {
-      "comment" : "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com."
+      "comment" : "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储到你的钥匙串，用于 %@"
+          }
+        }
+      }
     },
     "Saves pages to Notion" : {
       "comment" : "Under Notion Web Clipper in the welcome window’s list of extensions. Notion is a product name.",
@@ -7089,7 +7529,15 @@
       }
     },
     "Search sites and usernames" : {
-      "comment" : "Placeholder of the search field in the Passwords window."
+      "comment" : "Placeholder of the search field in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索网站和用户名"
+          }
+        }
+      }
     },
     "Search suggestions" : {
       "comment" : "A setting in Settings › General.",
@@ -7120,7 +7568,15 @@
       }
     },
     "Search your passwords" : {
-      "comment" : "Under the row saying nothing is saved for a site, in the fill-password menu."
+      "comment" : "Under the row saying nothing is saved for a site, in the fill-password menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索你的密码"
+          }
+        }
+      }
     },
     "Second color" : {
       "comment" : "Accessibility label of the chip of a gradient's second color, in the space editor.\nVoiceOver, in the space editor's color wheel: the knob of a gradient's second color.",
@@ -7444,7 +7900,15 @@
       }
     },
     "Show Password" : {
-      "comment" : "Tooltip of a button by a login's password in the Passwords window."
+      "comment" : "Tooltip of a button by a login's password in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示密码"
+          }
+        }
+      }
     },
     "Show Passwords" : {
       "comment" : "Button in the Import window after passwords came over.",
@@ -7691,7 +8155,15 @@
       }
     },
     "Sites where you choose Never when Zigzag offers to save show up here, so you can change your mind." : {
-      "comment" : "Shown in the Passwords window's Never Saved list when it's empty. Never is the button in the save-password prompt."
+      "comment" : "Shown in the Passwords window's Never Saved list when it's empty. Never is the button in the save-password prompt.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 Zigzag 提示存储密码时，你选择“永不”的网站会显示在这里，方便你改变主意。"
+          }
+        }
+      }
     },
     "Sites you visit can keep cookies and files here, to keep you signed in and load faster." : {
       "comment" : "Explanation under “None yet” in Settings › Privacy.",
@@ -8005,7 +8477,15 @@
       }
     },
     "Strong password saved for %@" : {
-      "comment" : "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."
+      "comment" : "Toast after a strong password was filled and saved. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已为 %@ 存储强密码"
+          }
+        }
+      }
     },
     "Substitutions" : {
       "comment" : "Submenu of the Edit menu.",
@@ -8211,7 +8691,15 @@
       }
     },
     "That name or password didn’t work. Try again." : {
-      "comment" : "Message in the sheet a site's HTTP sign-in asks with, after a wrong name or password."
+      "comment" : "Message in the sheet a site's HTTP sign-in asks with, after a wrong name or password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该名称或密码无效。请再试一次。"
+          }
+        }
+      }
     },
     "That’s Peek" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
@@ -8267,7 +8755,15 @@
       "comment" : "Why a download failed, under its name in the downloads panel."
     },
     "The file isn’t protected: anyone who opens it can read every password. Keep it somewhere safe and delete it when you’re done." : {
-      "comment" : "Message of the sheet that confirms exporting passwords."
+      "comment" : "Message of the sheet that confirms exporting passwords.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该文件未受保护：任何打开它的人都能读取所有密码。请把它存放在安全的地方，用完后删除。"
+          }
+        }
+      }
     },
     "The file still holds your passwords unprotected. It’s safer to move it to the Trash." : {
       "comment" : "Import window, after passwords came over from an exported file.",
@@ -8469,16 +8965,40 @@
       "comment" : "Title of the page Zigzag shows when a page can't load."
     },
     "This password is easy to guess. Change it on the site, and use a strong password Zigzag makes for you." : {
-      "comment" : "Warning on a weak password in the Passwords window."
+      "comment" : "Warning on a weak password in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个密码很容易被猜到。请在网站上更改它，并使用 Zigzag 为你生成的强密码。"
+          }
+        }
+      }
     },
     "This password is used on other sites. If one of them leaks, this account is at risk too. Change it on the site, then update it here." : {
-      "comment" : "Warning on a reused password in the Passwords window."
+      "comment" : "Warning on a reused password in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个密码在其他网站上也在使用。只要其中一个泄露，这个账户也会有风险。请在网站上更改它，然后在这里更新。"
+          }
+        }
+      }
     },
     "This site needs a name and password." : {
       "comment" : "Message in the sheet a site's HTTP sign-in asks with."
     },
     "This site’s password rules didn’t fit a strong password. Type one yourself." : {
-      "comment" : "Toast when Zigzag couldn't make a strong password the site accepts."
+      "comment" : "Toast when Zigzag couldn't make a strong password the site accepts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站的密码规则不接受强密码。请自己键入一个。"
+          }
+        }
+      }
     },
     "Tidy tabs you haven’t used in a day?" : {
       "comment" : "Toast offered once when a space has many tabs: archive the ones unused for a day."
@@ -8898,7 +9418,15 @@
       "comment" : "Toast after a pinned tab is unpinned."
     },
     "Update" : {
-      "comment" : "Button in the prompt that offers to update a saved password."
+      "comment" : "Button in the prompt that offers to update a saved password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
     },
     "Update Favorite" : {
       "comment" : "Undo action name, shown in Edit › Undo.",
@@ -8923,7 +9451,15 @@
       }
     },
     "Update password?" : {
-      "comment" : "Title of the prompt that offers to update a saved password."
+      "comment" : "Title of the prompt that offers to update a saved password.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要更新密码吗？"
+          }
+        }
+      }
     },
     "Update wants more access" : {
       "comment" : "Under an extension's name in Settings › Extensions.",
@@ -9006,7 +9542,15 @@
       }
     },
     "Use Strong Password" : {
-      "comment" : "A row in the fill-password menu on a sign-up form: fill in a password Zigzag makes."
+      "comment" : "A row in the fill-password menu on a sign-up form: fill in a password Zigzag makes.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用强密码"
+          }
+        }
+      }
     },
     "Use a web address with %s where the words go." : {
       "comment" : "Toast when the custom search address in Settings › General isn't valid. Keep %s as it is.",
@@ -9054,10 +9598,26 @@
       }
     },
     "Username" : {
-      "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the name field in a site's HTTP sign-in sheet.\nPlaceholder of the username field in the save-password prompt."
+      "comment" : "Name of a field of a saved login in the Passwords window.\nPlaceholder of the name field in a site's HTTP sign-in sheet.\nPlaceholder of the username field in the save-password prompt.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名"
+          }
+        }
+      }
     },
     "Username copied" : {
-      "comment" : "Toast in the Passwords window."
+      "comment" : "Toast in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝用户名"
+          }
+        }
+      }
     },
     "Uses EasyList and EasyPrivacy, by the EasyList authors." : {
       "comment" : "Explanation under “Block ads and trackers” in Settings › Privacy.",
@@ -9171,7 +9731,15 @@
       }
     },
     "Weak" : {
-      "comment" : "A kind of password in the Passwords window's column: easy to guess."
+      "comment" : "A kind of password in the Passwords window's column: easy to guess.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "弱"
+          }
+        }
+      }
     },
     "Web Inspector" : {
       "comment" : "View › Developer menu item.",
@@ -9185,7 +9753,15 @@
       }
     },
     "Website" : {
-      "comment" : "Name of a field of a saved login in the Passwords window.\nRow in the About window."
+      "comment" : "Name of a field of a saved login in the Passwords window.\nRow in the About window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站"
+          }
+        }
+      }
     },
     "Website data" : {
       "comment" : "A setting in Settings › Privacy.",
@@ -9441,7 +10017,15 @@
       }
     },
     "Your passwords are locked. Unlock with Touch ID or your Mac’s password." : {
-      "comment" : "Shown in the locked Passwords window."
+      "comment" : "Shown in the locked Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的密码已锁定。请使用触控 ID 或你的 Mac 密码解锁。"
+          }
+        }
+      }
     },
     "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords." : {
       "comment" : "Import window when the import is done. Zigzag › Passwords is the menu item's path; Keychain and iCloud Keychain are Apple's names.",
@@ -9528,7 +10112,15 @@
       }
     },
     "Zigzag Passwords.csv" : {
-      "comment" : "The file name suggested when exporting passwords. Keep .csv."
+      "comment" : "The file name suggested when exporting passwords. Keep .csv.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 密码.csv"
+          }
+        }
+      }
     },
     "Zigzag can’t open this address" : {
       "comment" : "Title of the page Zigzag shows when a page can't load."
@@ -9665,7 +10257,15 @@
       "comment" : "Toast after an update, with the new version number, like 0.5.2."
     },
     "Zigzag won’t offer to save passwords on this site. Allow it, and the next time you sign in there you’ll be asked again." : {
-      "comment" : "Shown for a Never Saved site in the Passwords window."
+      "comment" : "Shown for a Never Saved site in the Passwords window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 不会在此网站上提示存储密码。允许后，下次你在那里登录时会再次询问。"
+          }
+        }
+      }
     },
     "Zigzag won’t open this port" : {
       "comment" : "Title of the page Zigzag shows when a page can't load."
@@ -9751,7 +10351,15 @@
       }
     },
     "address" : {
-      "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”."
+      "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址"
+          }
+        }
+      }
     },
     "ads allowed" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
@@ -9859,10 +10467,26 @@
       "comment" : "Spoken by VoiceOver after a tab row's name: it's the tab you're on."
     },
     "email" : {
-      "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”."
+      "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电子邮件"
+          }
+        }
+      }
     },
     "export your passwords" : {
-      "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”."
+      "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出你的密码"
+          }
+        }
+      }
     },
     "extensions off" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
@@ -10285,7 +10909,15 @@
       }
     },
     "phone" : {
-      "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”."
+      "comment" : "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电话"
+          }
+        }
+      }
     },
     "playing audio" : {
       "comment" : "Spoken by VoiceOver after a tab row's name: the tab plays sound."
@@ -10313,7 +10945,15 @@
       }
     },
     "see your saved passwords" : {
-      "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”."
+      "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看你存储的密码"
+          }
+        }
+      }
     },
     "selected" : {
       "comment" : "What VoiceOver says after a checked item in one of Zigzag's menus."
@@ -10330,7 +10970,15 @@
       }
     },
     "show your password for %@" : {
-      "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”. The placeholder is a site, like github.com."
+      "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”. The placeholder is a site, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示你在 %@ 的密码"
+          }
+        }
+      }
     },
     "sign-ins" : {
       "comment" : "Item in the short list of what a browser holds, in the Import window: the sites it keeps you signed in to.",
