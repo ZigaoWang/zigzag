@@ -108,6 +108,22 @@ final class BrowserWebView: WKWebView {
                 break
             }
         }
+        Self.placeInspectElementLast(in: menu)
+    }
+
+    /// WebKit's Inspect Element stays the menu's last item, below extensions' own, where Chrome keeps it.
+    static func placeInspectElementLast(in menu: NSMenu) {
+        guard let inspect = menu.items.first(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierInspectElement" }),
+              inspect !== menu.items.last else { return }
+        menu.removeItem(inspect)
+        // The separator it had above it went with nothing; one goes above it at the end instead.
+        while menu.items.last?.isSeparatorItem == true { menu.removeItem(at: menu.items.count - 1) }
+        var index = 1
+        while index < menu.items.count {
+            if menu.items[index].isSeparatorItem, menu.items[index - 1].isSeparatorItem { menu.removeItem(at: index) } else { index += 1 }
+        }
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        menu.addItem(inspect)
     }
 
     @objc private func openInPeek(_ sender: NSMenuItem) {
