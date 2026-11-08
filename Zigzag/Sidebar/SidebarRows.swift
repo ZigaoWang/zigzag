@@ -385,8 +385,28 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private var showsClose: Bool { !closeButton.isHidden }
 
+    /// While ⌘ is held: the number that goes to this row with ⌘, where its close button sits (which steps aside).
+    var number: Int? {
+        didSet {
+            guard oldValue != number else { return }
+            if let number {
+                let hint = numberHint ?? NumberHintView()
+                if numberHint == nil { numberHint = hint; addSubview(hint) }
+                hint.number = number
+                hint.show(true)
+            } else {
+                numberHint?.show(false)
+            }
+            refreshAccessories()
+        }
+    }
+    private var numberHint: NumberHintView?
+    private var showsNumber: Bool { number != nil && numberHint != nil }
+    /// The close button's place at the row's end, or the number's while it's there.
+    private var endSlot: CGFloat { showsClose ? closeButton.frame.width : showsNumber ? numberHint?.width ?? 0 : 0 }
+
     override var trailingAccessoryWidth: CGFloat {
-        let close = showsClose ? closeButton.frame.width : 0
+        let close = endSlot
         // In a split each half's speaker sits at that half's end (laid out with the halves).
         let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close > 0 ? Self.buttonGap : 0) : 0
         return close + audio
@@ -418,7 +438,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshAccessories() {
         // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
         // pointer. A plain tab you're on keeps its close button in view.
-        let showClose = (isHovered || (isSelected && !isBookmark)) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil
+        let showClose = (isHovered || (isSelected && !isBookmark)) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil && number == nil
         closeButton.isHidden = !showClose
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
             : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
@@ -484,7 +504,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let edge = Self.buttonEdge
         let y = (bounds.height - size.height) / 2
         closeButton.frame.origin = NSPoint(x: bounds.width - edge - size.width, y: y)
-        let end = showsClose ? closeButton.frame.minX - Self.buttonGap : bounds.width - edge
+        if let hint = numberHint, showsNumber {
+            let height = NumberHintView.height
+            hint.frame = NSRect(x: bounds.width - edge - hint.width, y: (bounds.height - height) / 2, width: hint.width, height: height)
+        }
+        let end = endSlot > 0 ? bounds.width - edge - endSlot - Self.buttonGap : bounds.width - edge
         layoutDropHalf()
 
         guard isSplit else {
@@ -507,7 +531,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let x = icon.frame.maxX + Self.titleOffset
             title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd + Label.inset - x), height: titleH)
         }
-        let leadEnd = mid - edge, trailEnd = showsClose ? end : bounds.width - edge
+        let leadEnd = mid - edge, trailEnd = end
         if partnerLeads {
             place(icon: partnerIcon, title: partnerTitle, audio: partnerAudioButton, from: 0, to: leadEnd)
             place(icon: icon, title: title, audio: audioButton, from: mid, to: trailEnd)

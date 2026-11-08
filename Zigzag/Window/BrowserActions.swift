@@ -372,9 +372,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         // In the tab overview, the number picks the card in that place, as you see them.
         if desk.isVisible { desk.openCard(number: sender.tag); return }
         let rows = Library.shared.favoriteTiles.map { SidebarItem.bookmark($0.0.id) } + sidebar.list.pageRows
-        guard !rows.isEmpty else { return }
         // Cmd+9 always means the last tab, like every browser. An index past the end means the last too.
-        switch rows[sender.tag == 9 ? rows.count - 1 : min(sender.tag - 1, rows.count - 1)] {
+        guard let index = TabNumbers.index(for: sender.tag, count: rows.count) else { return }
+        switch rows[index] {
         case .bookmark(let id): if let bookmark = Library.shared.bookmark(id) { tabManager.openBookmark(bookmark) }
         case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.select(tab) }
         default: break

@@ -21,6 +21,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
     lazy var switcher = TabSwitcher(controller: self)
+    /// Holding ⌘ a moment: the number on each favorite and row that ⌘ goes to.
+    private(set) var numberHints: NumberHints?
     /// ⌘Z for sidebar actions; also the window's undo manager, so page text editing shares it.
     /// Each step it remembers holds on to the tabs it can bring back, closed ones too, so it keeps the last hundred
     /// rather than a whole day's worth.
@@ -222,6 +224,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showSelectedTab()
         downloadsChanged()
         window.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
+        numberHints = NumberHints(controller: self)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -243,6 +246,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.reload(animated: window?.isVisible == true)
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()
+            numberHints?.placesChanged()
             desk.tabsChanged()
             // A playing tab closed in the background: Now Playing lets it go.
             updateNowPlaying()
@@ -1366,6 +1370,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         fadeTimer?.invalidate()
+        numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()

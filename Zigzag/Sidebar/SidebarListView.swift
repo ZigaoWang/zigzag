@@ -129,6 +129,11 @@ final class SidebarListView: NSView {
     /// The pinned and tab rows showing, top to bottom, a split's one row once: what ⌘1–⌘9 count after the favorites.
     var pageRows: [SidebarItem] { items.filter(\.isPickable) }
 
+    /// While ⌘ is held: each row's number, by its place in `pageRows`. Empty: none.
+    func showNumbers(_ numbers: [SidebarItem: Int]) {
+        for (item, view) in rows { (view as? TabRowView)?.number = numbers[item] }
+    }
+
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?

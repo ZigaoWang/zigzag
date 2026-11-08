@@ -237,6 +237,11 @@ final class FavoritesView: NSView {
         }
     }
 
+    /// While ⌘ is held: each tile's number, by its favorite (the left page's, for a split one). Empty: none.
+    func showNumbers(_ numbers: [UUID: Int]) {
+        for tile in tiles { tile.number = tile.bookmark.flatMap { numbers[$0.id] } }
+    }
+
     /// The tile showing a favorite (either page of a split one).
     func tile(for bookmarkID: UUID) -> NSView? { tiles.first { $0.bookmark?.id == bookmarkID || $0.partner?.id == bookmarkID } }
 
@@ -375,6 +380,23 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
+    /// While ⌘ is held: the number that opens it with ⌘, in the corner its × uses (the × steps aside meanwhile).
+    var number: Int? {
+        didSet {
+            guard oldValue != number else { return }
+            if let number {
+                let hint = numberHint ?? NumberHintView()
+                if numberHint == nil { numberHint = hint; addSubview(hint) }
+                hint.number = number
+                layoutNumber()
+                hint.show(true)
+            } else {
+                numberHint?.show(false)
+            }
+            stateDidChange(animated: false)
+        }
+    }
+    private var numberHint: NumberHintView?
     private weak var tab: Tab?
     private var tabToken: SignalToken?
     /// An icon that arrives later (fetched, or saved by a visit) shows at once, not only after a relaunch.
@@ -477,6 +499,16 @@ final class FavoriteTile: InteractiveView {
         }
         let side = Self.closeSide, edge = Self.closeInset
         closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
+        layoutNumber()
+    }
+
+    /// The number tucked into the top-right corner, as far in as the ×: the digit alone, as the × is one mark, so it
+    /// stays clear of the icon however narrow the tile.
+    private func layoutNumber() {
+        guard let hint = numberHint, number != nil else { return }
+        let edge = Self.closeInset, height = NumberHintView.height
+        hint.showsCommand = false
+        hint.frame = NSRect(x: bounds.width - edge - hint.width, y: isFlipped ? edge : bounds.height - height - edge, width: hint.width, height: height)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -490,7 +522,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = Tokens.Metric.dropEdge
             return
         }
-        closeButton.isHidden = !(isOpen && isHovered)
+        closeButton.isHidden = !(isOpen && isHovered) || number != nil
         // A soft tile of the space's own color, a step lighter under the pointer; a fine edge while its page is open,
         // so you can tell which are loaded. The one you're on is the selected tab's card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
