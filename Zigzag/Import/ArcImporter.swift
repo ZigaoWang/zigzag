@@ -119,14 +119,27 @@ enum ArcImporter {
 
     static func parseSidebar(_ data: Data) throws -> (spaces: [SpaceInfo], favorites: [Bookmark]) {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw FormatError() }
-        let main = ((root["sidebar"] as? [String: Any])?["containers"] as? [[String: Any]])?.first(where: { $0["spaces"] != nil })
-        // Arc with sync keeps the sidebar it shows in sidebarSyncState, and the classic copy above can be stale or
-        // empty: a space then came over with no name and nothing in it. An older version synced through
-        // firebaseSyncState. Read every copy there is, the synced ones winning.
-        let sync = root["sidebarSyncState"] as? [String: Any]
-        let firebase = (root["firebaseSyncState"] as? [String: Any])?["syncData"] as? [String: Any]
-        guard main != nil || sync != nil || firebase != nil else { throw FormatError() }
-        let syncContainer = (sync?["container"] as? [String: Any]).flatMap { ($0["value"] as? [String: Any]) ?? $0 }
+        // Arc keeps more than one copy of the sidebar: one or more classic containers, and, for sync, sidebarSyncState
+        // (or firebaseSyncState in older versions). Which one is current varies: with sync on, the synced copy holds
+        // everything and a classic one may be stale; with sync off, the synced copy is a small leftover (one person's
+        // held only Arc Basics while their pins sat in the fourth classic container). Read them all, and where they
+        // disagree, the fullest copy wins.
+        struct Copy { var items: [Any] = []; var spaces: [Any] = []; var order: [String] = []; var top: [Any] = []; var synced = false }
+        var copies: [Copy] = []
+        for container in (root["sidebar"] as? [String: Any])?["containers"] as? [[String: Any]] ?? [] where container["items"] != nil || container["spaces"] != nil {
+            copies.append(Copy(items: container["items"] as? [Any] ?? [], spaces: container["spaces"] as? [Any] ?? [],
+                               top: container["topAppsContainerIDs"] as? [Any] ?? []))
+        }
+        for synced in [(root["firebaseSyncState"] as? [String: Any])?["syncData"] as? [String: Any], root["sidebarSyncState"] as? [String: Any]] {
+            guard let synced else { continue }
+            let container = (synced["container"] as? [String: Any]).flatMap { ($0["value"] as? [String: Any]) ?? $0 }
+            let order = (container?["orderedSpaceIDs"] ?? synced["orderedSpaceIDs"]) as? [Any] ?? []
+            copies.append(Copy(items: synced["items"] as? [Any] ?? [], spaces: synced["spaceModels"] as? [Any] ?? [],
+                               order: order.compactMap { $0 as? String }, top: container?["topAppsContainerIDs"] as? [Any] ?? [], synced: true))
+        }
+        guard !copies.isEmpty else { throw FormatError() }
+        // Smallest first, so the fullest copy is read last and wins.
+        copies.sort { $0.items.count < $1.items.count }
 
         // Arc stores lists as [key, value, key, value…] or as plain arrays, and newer versions (and Arc Sync) wrap each
         // value as {"value": …}; collect the dictionaries either way.
@@ -136,21 +149,20 @@ enum ArcImporter {
             return dict
         }
         var items: [String: [String: Any]] = [:]
-        for source in [main?["items"], firebase?["items"], sync?["items"]] {
-            for item in (source as? [Any] ?? []).compactMap(unwrapped) { if let id = item["id"] as? String { items[id] = item } }
-        }
-        // Spaces by id, the synced copy winning; in the order Arc shows them, which also leaves out spaces it no
-        // longer shows.
         var spaceByID: [String: [String: Any]] = [:]
         var classicOrder: [String] = []
-        for (index, source) in [main?["spaces"], firebase?["spaceModels"], sync?["spaceModels"]].enumerated() {
-            for space in (source as? [Any] ?? []).compactMap(unwrapped) where space["containerIDs"] != nil || space["title"] != nil {
+        for copy in copies {
+            for item in copy.items.compactMap(unwrapped) { if let id = item["id"] as? String { items[id] = item } }
+            for space in copy.spaces.compactMap(unwrapped) where space["containerIDs"] != nil || space["title"] != nil {
                 guard let id = space["id"] as? String else { continue }
-                if index == 0 { classicOrder.append(id) }
+                if !copy.synced, !classicOrder.contains(id) { classicOrder.append(id) }
                 spaceByID[id] = space
             }
         }
-        let shownOrder = (syncContainer?["orderedSpaceIDs"] as? [Any] ?? []).compactMap { $0 as? String }.filter { spaceByID[$0] != nil }
+        // The spaces in the order Arc shows them: the synced order when the synced copy is the current one, which also
+        // leaves out spaces Arc no longer shows; otherwise the classic order.
+        let fullest = copies[copies.count - 1]
+        let shownOrder = fullest.synced ? fullest.order.filter { spaceByID[$0] != nil } : []
         let spaceList = (shownOrder.isEmpty ? (classicOrder.isEmpty ? Array(spaceByID.keys).sorted() : classicOrder) : shownOrder)
             .compactMap { spaceByID[$0] }
         /// A container's kind as Arc writes it: the word ("pinned"), or, in newer files, an object keyed by it
@@ -242,9 +254,9 @@ enum ArcImporter {
 
         var favorites: [Bookmark] = []
         var topIDs: [String] = []
-        for top in [syncContainer?["topAppsContainerIDs"], main?["topAppsContainerIDs"]] {
+        for copy in copies.reversed() {
             // IDs, between the markers that say whose they are; only IDs name an item.
-            for case let id as String in top as? [Any] ?? [] where items[id] != nil && !topIDs.contains(id) { topIDs.append(id) }
+            for case let id as String in copy.top where items[id] != nil && !topIDs.contains(id) { topIDs.append(id) }
         }
         for id in topIDs { favorites += bookmarks(under: id) }
         return (spaces, favorites)

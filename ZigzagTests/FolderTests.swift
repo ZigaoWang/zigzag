@@ -190,6 +190,45 @@ struct ArcFolderTests {
         #expect(favorites.map(\.url.lastPathComponent) == ["fav"])
     }
 
+    /// With sync off, the synced copy is a small leftover and the pins sit in a later classic container: the fullest
+    /// copy wins, so the folder Arc shows comes over.
+    @Test func fullestCopyWins() throws {
+        func tab(_ id: String, _ url: String) -> [String: Any] {
+            ["id": id, "title": id, "data": ["tab": ["savedURL": url]], "childrenIds": [String]()]
+        }
+        let full: [Any] = [
+            ["id": "pinned", "childrenIds": ["basics", "chrome"], "data": ["itemContainer": [:]]],
+            ["id": "basics", "title": "Arc Basics", "data": ["list": [:]], "childrenIds": ["t1"]],
+            tab("t1", "https://example.com/1"),
+            ["id": "chrome", "title": "Imported From Chrome", "data": ["list": [:]], "childrenIds": ["swift"]],
+            ["id": "swift", "title": "Swift", "data": ["list": [:]], "childrenIds": ["t2", "t3"]],
+            tab("t2", "https://example.com/2"),
+            tab("t3", "https://example.com/3"),
+        ]
+        let leftover: [Any] = [
+            "pinned", ["value": ["id": "pinned", "childrenIds": ["basics"], "data": ["itemContainer": [:]]]],
+            "basics", ["value": ["id": "basics", "title": "Arc Basics", "data": ["list": [:]], "childrenIds": ["t1"]]],
+            "t1", ["value": tab("t1", "https://example.com/1")],
+        ]
+        let root: [String: Any] = [
+            "sidebar": ["containers": [
+                ["global": [:]],
+                ["spaces": ["s1", ["id": "s1", "containerIDs": ["unpinned", "u", "pinned", "pinned"]]], "items": [Any]()],
+                ["global": [:]],
+                ["items": full],
+            ]],
+            "sidebarSyncState": [
+                "container": ["value": ["orderedSpaceIDs": ["s1"]]],
+                "spaceModels": ["s1", ["value": ["id": "s1", "containerIDs": ["unpinned", "u", "pinned", "pinned"]]]],
+                "items": leftover,
+            ],
+        ]
+        let (spaces, _) = try ArcImporter.parseSidebar(JSONSerialization.data(withJSONObject: root))
+        #expect(spaces.count == 1)
+        #expect(spaces.first?.bookmarks.map(\.url.lastPathComponent) == ["1", "2", "3"])
+        #expect((spaces.first?.folders ?? []).map(\.name) == ["Arc Basics", "Imported From Chrome", "Swift"])
+    }
+
     @Test func movedFolderLandsBetweenGroups() {
         let b = (0..<6).map { _ in UUID() }
         let folders = [BookmarkFolder(name: "F", bookmarkIDs: [b[1], b[2], b[3]])]
