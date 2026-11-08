@@ -52,6 +52,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 .tag { margin: 26px 0 0; font-size: clamp(34px, 4.6vw, 56px); line-height: 1.08; font-weight: 600; letter-spacing: -0.012em; }
 .sub { margin: 14px 0 0; font-size: clamp(17px, 1.5vw, 20px); color: rgba(31, 45, 64, .72); }
 .hero .actions { margin-top: 28px; }
+/* The window on its own, for phones only (below). */
+.hero-window { display: none; }
 /* Product Hunt's own badge, under the closing Download. */
 .ph-badge { display: inline-block; margin-top: 20px; line-height: 0; }
 .hero .button { background: var(--navy); color: #fff; }
@@ -502,13 +504,17 @@ main, .nav { max-width: 1240px; }
 /* Phones, and large text in phone browsers (WeChat's included): the top grows with its words instead of a set height,
    so the picture always starts below the buttons. */
 @media (max-width: 760px) {
-  /* A phone: the hero fills the screen. The words take what they need (more with large text), and the picture
-     takes the rest below them, its window filling that room from just under the buttons to the bottom. */
-  .hero { height: auto; min-height: calc(100svh - 16px); padding-bottom: 0; flex-direction: column; align-items: stretch;
-    background-image: none; }
+  /* A phone: the hero is as tall as what's in it, the words and then the window. The window is its own picture (the
+     desktop picture's sky and window together can't fit a narrow screen): the sidebar and the page beside it span the
+     screen but a margin, the split view runs off the right edge, and its bottom meets the hero's, as on a laptop. */
+  .hero { height: auto; min-height: 0; padding-bottom: 0; flex-direction: column; align-items: stretch; background-image: none; }
   .hero::before { display: none; }
-  .hero::after { content: ""; flex: 1 1 auto; min-height: 62vw; margin-top: 24px;
-    background: image-set(url(/assets/hero-1600.jpg?v=1) 1x, url(/assets/hero.jpg?v=1) 2x) 32% bottom / auto calc(100% / .535) no-repeat; }
+  .hero-text { padding-top: 104px; padding-bottom: 40px; }
+  /* One gap after the hero, not the page's padding and the section's margin stacked. */
+  .hero + main { padding-top: 0; }
+  .hero + main .intro { margin-top: 64px; }
+  .hero-window { display: block; flex: none; width: calc((100vw - 32px) / .587); max-width: none; height: auto; margin-left: 16px;
+    border-radius: 10px 10px 0 0; box-shadow: 0 10px 40px rgba(31, 45, 64, .18); }
   .hero .actions { flex-wrap: wrap; justify-content: center; row-gap: 14px; }
   .hero .actions > * { white-space: nowrap; }
 }
