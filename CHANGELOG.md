@@ -39,6 +39,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Rabby and other wallets built like MetaMask start again after Zigzag relaunches, instead of saying their background isn't responding. ([#12](https://github.com/ZigaoWang/zigzag/issues/12))
 - When your network or proxy changes, sites connect afresh instead of reusing a remembered HTTP/3 route that could go around a VPN or proxy.
 
+Thanks to [@maxacarvalho](https://github.com/maxacarvalho) for #11 and [@vandenbulckjean](https://github.com/vandenbulckjean) for #12, to neooo on LINUX DO for the Bitwarden and IPv6 reports, and to Philip and Harry on Product Hunt for asking for the mini window, proxy extensions and ChatGPT search.
+
 ## [0.6.2] - 2026-11-08
 
 ### Fixed
