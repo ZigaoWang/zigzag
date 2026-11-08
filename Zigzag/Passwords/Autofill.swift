@@ -140,7 +140,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     }
 
     private func show(_ items: [AutofillMenu.Item], under field: NSRect, in webView: BrowserWebView, frame: WKFrameInfo, origin: Origin) {
-        guard let overlay = WindowManager.shared.controllers.first(where: { $0.window === webView.window })?.root.overlay else { return }
+        guard let overlay = Self.overlay(for: webView) else { return }
         menu?.removeFromSuperview()
         let menu = AutofillMenu(items: Array(items.prefix(8)), origin: origin)
         menu.onPick = { [weak self] item in self?.pick(item) }
@@ -159,6 +159,18 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     }
 
     var isShowing: Bool { menu != nil }
+
+    /// Where the menu floats over a page: its browser window's overlay, or a mini window's.
+    private static func overlay(for webView: WKWebView) -> NSView? {
+        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) { return controller.root.overlay }
+        return MiniWindowController.all.first { $0.tab.webView === webView }?.overlay
+    }
+
+    /// The page is the one on screen in its window: the selected tab's, or a mini window's only page.
+    private static func isInFront(_ webView: WKWebView) -> Bool {
+        if let controller = WindowManager.shared.controllers.first(where: { $0.window === webView.window }) { return controller.selectedWebView === webView }
+        return MiniWindowController.all.contains { $0.tab.webView === webView && $0.window === webView.window }
+    }
 
     #if DEBUG
     private var lastFrame: WKFrameInfo?
@@ -258,7 +270,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         // the card is read (asking for Contacts can take a while), and by the page script as it fills.
         let stillThere = {
             Origin(target.webView.url) == target.origin
-                && WindowManager.shared.controllers.first(where: { $0.window === target.webView.window })?.selectedWebView === target.webView
+                && Self.isInFront(target.webView)
         }
         guard stillThere() else { return }
         Task {
@@ -280,9 +292,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         hide()
         // The page may have moved on since the menu opened: it must still be the login's own site, in the tab
         // you're looking at. The page script checks again at the moment it fills.
-        let controller = WindowManager.shared.controllers.first { $0.window === target.webView.window }
         guard login.origin.fills(on: target.origin), Origin(target.webView.url) == target.origin,
-              controller?.selectedWebView === target.webView else { return }
+              Self.isInFront(target.webView) else { return }
         Task {
             guard let password = try? await PasswordStore.shared.password(for: login.id) else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {

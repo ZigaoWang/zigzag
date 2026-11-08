@@ -459,6 +459,16 @@ final class ExtensionHost: NSObject {
         controller.didCloseTab(popup.tab, windowIsClosing: true)
         controller.didCloseWindow(popup)
     }
+    // Mini windows: a window with its one tab, like a sign-in popup. Its tab is a real one, so its changes are told
+    // as any tab's are.
+    func miniOpened(_ mini: MiniWindowController) {
+        controller.didOpenWindow(mini)
+        controller.didOpenTab(mini.tab)
+        controller.didFocusWindow(mini)
+        controller.didActivateTab(mini.tab, previousActiveTab: nil)
+    }
+    func miniFocused(_ mini: MiniWindowController) { controller.didFocusWindow(mini) }
+    func miniClosed(_ mini: MiniWindowController) { controller.didCloseWindow(mini) }
     func windowClosed(_ window: BrowserWindowController) {
         guard !window.tabManager.isPrivate else { return }
         controller.didCloseWindow(window)
@@ -484,14 +494,15 @@ final class ExtensionHost: NSObject {
 extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
         // The focused window first, as extensions expect; sign-in popups count too.
-        let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter { !$0.isPrivate }
+        let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter { !$0.isPrivate } + MiniWindowController.all
         let windows: [any WKWebExtensionWindow] = openWindows
-        let key = PopupWindowController.key
-        return key.map { [$0] + windows + popups.filter { $0 !== key } } ?? windows + popups
+        let key: (any WKWebExtensionWindow)? = PopupWindowController.key ?? MiniWindowController.key
+        return key.map { key in [key] + windows + popups.filter { $0 !== key } } ?? windows + popups
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
         if let popup = PopupWindowController.key { return popup }
+        if let mini = MiniWindowController.key { return mini }
         return WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
     }
 
@@ -703,7 +714,10 @@ extension Tab: WKWebExtensionTab {
         return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
 
-    func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { windowController }
+    /// The mini window it's the page of, while it is.
+    private var miniWindow: MiniWindowController? { (host as? MiniWindowController).flatMap { $0.tab === self ? $0 : nil } }
+
+    func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
         windowController?.tabManager.navigableTabs.firstIndex { $0 === self } ?? 0
     }
@@ -711,13 +725,14 @@ extension Tab: WKWebExtensionTab {
     func title(for context: WKWebExtensionContext) -> String? { displayTitle }
     func url(for context: WKWebExtensionContext) -> URL? { url }
     func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { !isLoading }
-    func isSelected(for context: WKWebExtensionContext) -> Bool { windowController?.tabManager.selectedTab === self }
+    func isSelected(for context: WKWebExtensionContext) -> Bool { miniWindow != nil || windowController?.tabManager.selectedTab === self }
     func isPinned(for context: WKWebExtensionContext) -> Bool { bookmarkID != nil }
     func isPlayingAudio(for context: WKWebExtensionContext) -> Bool { isPlayingAudio }
     func isMuted(for context: WKWebExtensionContext) -> Bool { isMuted }
     func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { true }
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        miniWindow?.window?.makeKeyAndOrderFront(nil)
         windowController?.tabManager.select(self)
         completionHandler(nil)
     }
@@ -735,6 +750,7 @@ extension Tab: WKWebExtensionTab {
     }
 
     func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        miniWindow?.window?.close()
         windowController?.tabManager.close(self)
         completionHandler(nil)
     }

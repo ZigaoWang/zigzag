@@ -21,7 +21,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
     private(set) weak var parentWindow: NSWindow?
     /// The strip at the top with the traffic lights and whose page it is.
-    private static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
+    static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?) -> WKWebView {
@@ -285,6 +285,8 @@ private final class PopupWindow: NSWindow {
 final class PopupHeaderView: NSView {
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private let lock = NSImageView()
+    /// Room kept clear at the right end for buttons laid over the strip (a mini window's Open in Zigzag).
+    var trailingInset: CGFloat = 0 { didSet { needsLayout = true } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -330,7 +332,7 @@ final class PopupHeaderView: NSView {
         let x = max(Tokens.Space.x16 + Tokens.Space.x4, (bounds.width - total) / 2)
         let h = ceil(textSize.height)
         lock.frame = NSRect(x: x, y: 0, width: lockWidth, height: bounds.height)
-        label.frame = NSRect(x: lock.frame.maxX + Tokens.Space.x1, y: (bounds.height - h) / 2, width: min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4), height: h)
+        label.frame = NSRect(x: lock.frame.maxX + Tokens.Space.x1, y: (bounds.height - h) / 2, width: max(0, min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4 - trailingInset)), height: h)
     }
 }
 

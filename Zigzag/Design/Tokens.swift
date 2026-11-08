@@ -105,6 +105,10 @@ enum Tokens {
         static let peekInsetRatio: CGFloat = 0.08
         static let findBarWidth: CGFloat = 320
         static let popupDefaultSize = NSSize(width: 520, height: 640)
+        /// A mini window, for one page opened from another app: big enough to read, small enough to stay out of the way.
+        static let miniWindowSize = NSSize(width: 900, height: 640)
+        /// The address field in a mini window's top strip, at its widest.
+        static let miniAddressWidth: CGFloat = 480
         static let windowDefaultSize = NSSize(width: 1280, height: 820)
         static let windowMinSize = NSSize(width: 560, height: 400)
         static let deskCardWidth: CGFloat = 176

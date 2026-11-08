@@ -89,6 +89,7 @@
 		666CC5A457A95E2BD07EA5FF /* PasswordCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9875E3DF61E5A98363065101 /* PasswordCapture.swift */; };
 		66E5020894B420AEB3943EAC /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 256245226DA14768B001589E /* Tokens.swift */; };
 		67DE4B72AEFDE5639A0A3EB9 /* PowerSaving.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652311E240EBA758AAC17D38 /* PowerSaving.swift */; };
+		683F5B85A025D428AE54D386 /* MiniWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */; };
 		686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18895E549507CE748D20047 /* TabDropIndexTests.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
 		694A0100C79943F9F99EAFD1 /* NetworkChanges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */; };
@@ -295,6 +296,7 @@
 		5E3E2C413D61E7DBFC4242F2 /* BridgeUserScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeUserScripts.swift; sourceTree = "<group>"; };
 		5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSearchTests.swift; sourceTree = "<group>"; };
 		5F60DCC2C5651A80DAADE8E8 /* Readability-readerable.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "Readability-readerable.js"; sourceTree = "<group>"; };
+		60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniWindowController.swift; sourceTree = "<group>"; };
 		62342912C2566D4F242E9B14 /* GuidedTour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedTour.swift; sourceTree = "<group>"; };
 		6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBar.swift; sourceTree = "<group>"; };
 		652311E240EBA758AAC17D38 /* PowerSaving.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerSaving.swift; sourceTree = "<group>"; };
@@ -827,6 +829,7 @@
 				6323BAF70FFBE52DBC8D1ED6 /* FindBar.swift */,
 				62342912C2566D4F242E9B14 /* GuidedTour.swift */,
 				672B7AF38828D9E9738B29FD /* LinkStatus.swift */,
+				60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */,
 				979ECE3AE8285E787E972E3E /* PageCardView.swift */,
 				0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */,
 				95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */,
@@ -1055,6 +1058,7 @@
 				75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */,
 				C98C23949C56DEB824D49CA7 /* Materials.swift in Sources */,
 				A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */,
+				683F5B85A025D428AE54D386 /* MiniWindowController.swift in Sources */,
 				B3E930E711A57185C86F557F /* MoveToApplications.swift in Sources */,
 				FAF549DD3B7D4C4893E5DA34 /* NativeAudioOut.swift in Sources */,
 				694A0100C79943F9F99EAFD1 /* NetworkChanges.swift in Sources */,

@@ -243,6 +243,11 @@ final class TabManager {
         select(tab)
     }
 
+    /// A page that comes in from outside the list (a mini window's), placed where a new tab would go, and shown.
+    func insertAsNewTab(_ tab: Tab) {
+        insert(tab, at: newTabIndex(in: currentSpaceID, opener: nil, select: true))
+    }
+
     /// Inserts already-built tabs (session restore, imports) without selecting.
     func adopt(_ tabs: [Tab], in spaceID: UUID) {
         for tab in tabs { tab.host = host; watch(tab) }
