@@ -715,7 +715,8 @@ final class BridgeSidePanel: BridgeNamespace {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.load(URLRequest(url: url))
         let image = context.webExtension.icon(for: NSSize(width: 32, height: 32))
-        root.sidePanel.show(webView, extensionID: extensionID, name: context.webExtension.displayName ?? "Extension", image: image)
+        root.sidePanel.show(webView, extensionID: extensionID, name: context.webExtension.displayName
+                                ?? String(localized: "Extension", comment: "Name on an extension's side panel when the extension has none."), image: image)
         root.sidePanel.onClose = { [weak self, weak controller] in if let controller { self?.hide(in: controller) } }
         Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true) {
             root.showsSidePanel = true
