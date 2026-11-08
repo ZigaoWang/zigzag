@@ -114,7 +114,7 @@ enum SitePermissions {
     /// Asked like the camera. A private window never remembers the answer, and never shows notifications anyway.
     static func requestNotifications(host: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(host: host) { return known }
-        guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return nil }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
         let answer = await PermissionPrompt.ask(host: host, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 answered: { notifications(host: host).map { $0 ? .allow : .deny } })
@@ -132,7 +132,7 @@ enum SitePermissions {
         let host = origin.host
         var all = UserDefaults.standard.dictionary(forKey: key) as? [String: Bool] ?? [:]
         if let known = all["\(host)|location"] { return known ? .grant : .deny }
-        guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else { return .deny }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
         let answer = await PermissionPrompt.ask(host: host, what: "your location", symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 answered: {
@@ -162,8 +162,8 @@ enum SitePermissions {
         case .microphone: (what, title) = ("your microphone", String(localized: "Use your microphone", comment: "A site's permission question, without its question mark."))
         default: (what, title) = ("your camera and microphone", String(localized: "Use your camera and microphone", comment: "A site's permission question, without its question mark."))
         }
-        guard let window, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else {
-            // Nowhere to ask (a popup window): say no this time, without remembering it.
+        guard let controller = WindowManager.shared.promptHost(for: window) else {
+            // Nowhere to ask (a sign-in popup): say no this time, without remembering it.
             return .deny
         }
         let answer = await PermissionPrompt.ask(host: host, what: what, symbol: type == .microphone ? "mic.fill" : "video.fill",
@@ -209,7 +209,7 @@ final class PermissionPrompt: FloatingPanelView {
     private var monitor: Any?
     /// The tab whose page asked, and the window it's in.
     private weak var askingTab: Tab?
-    private weak var controller: BrowserWindowController?
+    private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
 
     enum Answer { case allow, deny, notNow }
@@ -221,7 +221,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// Puts the window's question back under the address after the sidebar or the window changed. It never jumps:
     /// riding a sidebar slide (`slide` is its duration) it moves with the sidebar, on the same curve; going between
     /// the address and the top of the page, it glides there.
-    static func reposition(in controller: BrowserWindowController, slide: TimeInterval? = nil) {
+    static func reposition(in controller: PromptHost, slide: TimeInterval? = nil) {
         guard let prompt = shown[ObjectIdentifier(controller)], prompt.superview != nil, !prompt.isHidden else { return }
         let old = prompt.frame
         prompt.place(in: controller)
@@ -243,7 +243,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     static func ask(host: String, what: String, symbol: String, icon: NSImage? = nil,
-                    in controller: BrowserWindowController, tab: Tab? = nil, title: String? = nil, allowTitle: String = String(localized: "Allow", comment: "Button on a site's permission question."),
+                    in controller: PromptHost, tab: Tab? = nil, title: String? = nil, allowTitle: String = String(localized: "Allow", comment: "Button on a site's permission question."),
                     denyTitle: String = String(localized: "Don’t Allow", comment: "Button on a site's permission question."), answered: @escaping () -> Answer? = { nil }) async -> Answer {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -256,13 +256,13 @@ final class PermissionPrompt: FloatingPanelView {
         queue[key] = task
         let answer = await task.value
         Diagnostics.note("Asked: \(title ?? "Use \(what)")", site: host, answer == .allow ? "allowed" : answer == .deny ? "not allowed" : "put off",
-                         isPrivate: controller.tabManager.isPrivate)
+                         isPrivate: controller.promptIsPrivate)
         if queue[key] == task { queue[key] = nil }
         return answer
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, allowTitle: String,
-                             denyTitle: String, in controller: BrowserWindowController, tab: Tab?) async -> Answer {
+                             denyTitle: String, in controller: PromptHost, tab: Tab?) async -> Answer {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -270,9 +270,9 @@ final class PermissionPrompt: FloatingPanelView {
         guard controller.window?.isVisible == true else { return .notNow }
         // The asking tab closed while an earlier question waited.
         if let tab, tab.isClosed { return .notNow }
-        let asking = tab ?? controller.tabManager.selectedTab
+        let asking = tab ?? controller.promptFrontTab
         // In the space's own color, like every other button in the window.
-        let accent = Brand.Theme.of(controller.tabManager.currentSpace).accent
+        let accent = controller.promptAccent
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
             prompt.request.stringValue = String(localized: "\(request)?", comment: "A site's permission question: the request, then a question mark, like “Use your camera?”.")
@@ -308,13 +308,10 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.askingTab = asking
             prompt.controller = controller
             shown[ObjectIdentifier(controller)] = prompt
-            controller.root.overlay.addSubview(prompt)
+            controller.promptOverlay.addSubview(prompt)
             prompt.isHidden = true
             prompt.followTab()
-            prompt.tabsToken = controller.tabManager.changed.observe { [weak prompt] change in
-                guard change == .selection || change == .structure || change == .space else { return }
-                prompt?.followTab()
-            }
+            prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }
             // The tab went to another site: this question was that site's, so it's put off.
             prompt.urlToken = asking?.changed.observe { [weak prompt, weak asking] change in
                 guard change == .url, let prompt, let now = asking?.url?.host() else { return }
@@ -324,9 +321,9 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak prompt, weak controller] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
                 // The command bar over it has its own clicks.
-                if controller?.commandBar.isVisible == true { return event }
+                if controller?.promptIsCovered == true { return event }
                 let inside = prompt.bounds.contains(prompt.convert(event.locationInWindow, from: nil))
-                let address = controller?.sidebar.address
+                let address = controller?.promptAnchor
                 let onAddress = address.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
                 if !inside && !onAddress { prompt.finish(.notNow) }
                 return event
@@ -334,7 +331,7 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt, weak controller] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
                 // Under notes or the command bar opened after it, Esc is theirs.
-                if WhatsNewSheet.isShowing(in: prompt.window) || controller?.commandBar.isVisible == true { return event }
+                if WhatsNewSheet.isShowing(in: prompt.window) || controller?.promptIsCovered == true { return event }
                 // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.
                 if event.keyCode == 53 { prompt.finish(.notNow); return nil }
                 return event
@@ -346,13 +343,10 @@ final class PermissionPrompt: FloatingPanelView {
     /// and "not now" once it's closed or has gone to another window.
     private func followTab() {
         guard answer != nil, let controller else { return }
-        let manager = controller.tabManager
-        guard let tab = askingTab, !tab.isClosed, manager.allTabs.contains(where: { $0 === tab }) else { finish(.notNow); return }
-        let front = manager.selectedTab
-        let inFront = front === tab || front.map { manager.partner(of: $0) === tab } == true
+        guard let tab = askingTab, !tab.isClosed, controller.promptHolds(tab) else { finish(.notNow); return }
+        let inFront = controller.promptShows(tab)
         if inFront, isHidden {
-            controller.closeFloatingPanels()
-            Toast.hide(in: controller)
+            controller.clearForPrompt()
             place(in: controller)
             isHidden = false
             slideIn()
@@ -363,7 +357,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     /// Always on the page that asked, at the top in the middle (over the pane that asked, in a split): the same
     /// place whether the sidebar is out or not, so it never moves away from the page it belongs to.
-    private func place(in controller: BrowserWindowController) {
+    private func place(in controller: PromptHost) {
         surfaceTint = nil
         tintStrength = nil
         isElevated = true

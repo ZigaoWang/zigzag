@@ -28,7 +28,7 @@ final class SavePasswordPrompt: FloatingPanelView {
     private var keyMonitor: Any?
     /// The tab that signed in, and the window it's in.
     private weak var tab: Tab?
-    private weak var controller: BrowserWindowController?
+    private weak var controller: PromptHost?
     /// The site it's about: the tab going anywhere else ends the question.
     private var site = ""
     private var tabsToken: SignalToken?
@@ -83,7 +83,7 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     /// Shows the prompt for a captured login in its tab's window.
     @MainActor static func show(_ kind: Kind, origin: Origin, password: SecretString, in tab: Tab) {
-        guard let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) else { return }
+        guard let controller = WindowManager.shared.promptHost(holding: tab) else { return }
         current?.close(saved: false)
         let prompt = SavePasswordPrompt(kind: kind, origin: origin)
         prompt.finish = { saved in
@@ -102,9 +102,9 @@ final class SavePasswordPrompt: FloatingPanelView {
                         try await store.update(credential, password: password)
                         done = String(localized: "Password updated", comment: "Toast after the save-password prompt updated a password.")
                     }
-                    Toast.show(done, symbol: "key", duration: 1.6, in: controller)
+                    controller.promptToast(done, symbol: "key", duration: 1.6)
                 } catch {
-                    Toast.show(String(localized: "Couldn’t save the password. Try again from the Passwords window.", comment: "Toast when the save-password prompt couldn't save."), symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    controller.promptToast(String(localized: "Couldn’t save the password. Try again from the Passwords window.", comment: "Toast when the save-password prompt couldn't save."), symbol: "exclamationmark.triangle", duration: 3)
                 }
             }
         }
@@ -120,20 +120,17 @@ final class SavePasswordPrompt: FloatingPanelView {
         // It slides down from the top edge of its page, like every question a page asks.
         prompt.slidesFromTop = true
         prompt.isHidden = true
-        controller.root.overlay.addSubview(prompt)
+        controller.promptOverlay.addSubview(prompt)
         current = prompt
         prompt.followTab()
-        prompt.tabsToken = controller.tabManager.changed.observe { [weak prompt] change in
-            guard change == .selection || change == .structure || change == .space else { return }
-            prompt?.followTab()
-        }
+        prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }
         // The tab went to another site: this was the last site's question.
         prompt.urlToken = tab.changed.observe { [weak prompt, weak tab] change in
             guard change == .url, let prompt, let host = tab?.url?.host(), Self.site(of: host) != prompt.site else { return }
             prompt.close(saved: false)
         }
         // The window resizing, the sidebar coming or going, or the split moving: it stays on its page.
-        for card in [controller.root.card, controller.root.secondCard] {
+        for card in controller.promptPageViews {
             prompt.frameObservers.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: card, queue: .main) { [weak prompt] _ in
                 MainActor.assumeIsolated { prompt?.reposition() }
             })
@@ -163,10 +160,8 @@ final class SavePasswordPrompt: FloatingPanelView {
     /// once its tab has closed or left the window. It only counts down while it can be seen.
     private func followTab() {
         guard superview != nil, let controller else { return }
-        let manager = controller.tabManager
-        guard let tab, !tab.isClosed, manager.allTabs.contains(where: { $0 === tab }) else { close(saved: false); return }
-        let front = manager.selectedTab
-        if front === tab || front.map({ manager.partner(of: $0) === tab }) == true {
+        guard let tab, !tab.isClosed, controller.promptHolds(tab) else { close(saved: false); return }
+        if controller.promptShows(tab) {
             // The window puts the tab's page in its card as it comes in front, maybe after this: it's placed once
             // the page is there.
             DispatchQueue.main.async { [weak self] in
@@ -184,7 +179,7 @@ final class SavePasswordPrompt: FloatingPanelView {
             hideWork?.cancel()
             // Typing that was in it goes back to the page in front.
             if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: self) {
-                window.makeFirstResponder(controller.tabManager.selectedTab?.webView)
+                window.makeFirstResponder(controller.promptFrontTab?.webView)
             }
             isHidden = true
         }
@@ -257,7 +252,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         frameObservers.forEach { NotificationCenter.default.removeObserver($0) }
         frameObservers = []
         if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: self) {
-            window.makeFirstResponder(BrowserWindowController.undoTarget?.selectedWebView)
+            window.makeFirstResponder(controller?.promptFrontTab?.webView ?? BrowserWindowController.undoTarget?.selectedWebView)
         }
         if Self.current === self { Self.current = nil }
         let finish = self.finish

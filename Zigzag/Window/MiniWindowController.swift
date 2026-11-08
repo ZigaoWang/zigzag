@@ -19,6 +19,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var token: SignalToken?
     /// The page went into a browser window: closing this one must leave it alone.
     private var movedOut = false
+    /// Sent once the page has left (into a browser window, or closed with the window), so questions over it go too.
+    private let pageGone = Signal<Void>()
+    private var isClosing = false
 
     /// Settings › General: links from other apps open in a mini window instead of a tab. Off unless you turn it on.
     static var opensExternalLinks: Bool {
@@ -204,6 +207,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         guard tab.url != nil, !movedOut else { return }
         let target = Self.browserWindow()
         movedOut = true
+        pageGone.send()
         token = nil
         linkStatus.hide()
         Autofill.shared.forget(windowOf: window)
@@ -259,6 +263,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Closing
 
     func windowWillClose(_ notification: Notification) {
+        isClosing = true
+        pageGone.send()
         linkStatus.hide()
         Autofill.shared.forget(windowOf: window)
         if !movedOut {
@@ -403,5 +409,31 @@ extension MiniWindowController: WKWebExtensionWindow {
     func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         window?.close()
         completionHandler(nil)
+    }
+}
+
+// MARK: - Its page's questions
+
+/// A site's permission question and Save password? come up here over the one page, as they do in a browser window.
+extension MiniWindowController: PromptHost {
+    var promptOverlay: NSView { overlay }
+    func pageFrame(showing tab: Tab) -> NSRect? { promptHolds(tab) ? overlay.bounds : nil }
+    var focusedPaneFrame: NSRect { overlay.bounds }
+    var promptFrontTab: Tab? { movedOut || isClosing ? nil : tab }
+    func promptHolds(_ tab: Tab) -> Bool { tab === self.tab && !movedOut && !isClosing }
+    func promptShows(_ tab: Tab) -> Bool { promptHolds(tab) }
+    var promptIsPrivate: Bool { false }
+    var promptAccent: NSColor { Brand.Theme.of(Library.shared.space(tab.spaceID)).accent }
+    /// Its one page never changes places; it only leaves, into Zigzag or with the window.
+    func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? { pageGone.observe { _ in body() } }
+    var promptPageViews: [NSView] { [page] }
+    func clearForPrompt() {
+        linkStatus.hide()
+        if strip.isEditing, tab.url != nil { endEditing() }
+    }
+    var promptIsCovered: Bool { false }
+    var promptAnchor: NSView? { strip }
+    func promptToast(_ text: String, symbol: String, duration: TimeInterval) {
+        Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)
     }
 }

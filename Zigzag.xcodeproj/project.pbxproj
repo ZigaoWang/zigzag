@@ -162,6 +162,7 @@
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
 		C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */ = {isa = PBXBuildFile; fileRef = B030A4C0601F5AE1232B9288 /* chrome-runtime.js */; };
+		C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */; };
 		C48183B2BC3873DC93F30DF6 /* CommandBarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */; };
 		C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765C1F36BCEE463F8B5316BE /* Paths.swift */; };
 		C64B09DFE581D1E682CA640C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C1C41B2C9BBE721DA739A7A /* Assets.xcassets */; };
@@ -361,6 +362,7 @@
 		B030A4C0601F5AE1232B9288 /* chrome-runtime.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "chrome-runtime.js"; sourceTree = "<group>"; };
 		B0560887D19F137BADD3B098 /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
 		B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDropTests.swift; sourceTree = "<group>"; };
+		B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptHost.swift; sourceTree = "<group>"; };
 		BAD3351437EE20BC819F95CD /* ConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmSheet.swift; sourceTree = "<group>"; };
 		BCA8F1625F7717F1444D8B29 /* Words.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Words.swift; sourceTree = "<group>"; };
 		BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */ = {isa = PBXFileReference; path = blocklist.json.lzfse; sourceTree = "<group>"; };
@@ -835,6 +837,7 @@
 				60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */,
 				979ECE3AE8285E787E972E3E /* PageCardView.swift */,
 				0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */,
+				B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */,
 				95BE2DC23683FEEFF817A678 /* SidebarUndo.swift */,
 				9B14798B8A091AAE19C57100 /* SitePanel.swift */,
 				D5AB7730FF54C85E4477E76E /* TourDemo.swift */,
@@ -1089,6 +1092,7 @@
 				4ED32AFE347485CC2CB9D8EE /* PopupWindowController.swift in Sources */,
 				67DE4B72AEFDE5639A0A3EB9 /* PowerSaving.swift in Sources */,
 				0E327AA7CF01C1AB193DDFA3 /* ProblemReport.swift in Sources */,
+				C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */,
 				D2985616CED5916351C99C8F /* PublicSuffix.swift in Sources */,
 				E341CC4E85411227052D3A17 /* Reader.swift in Sources */,
 				BEC7556625226B96D886206F /* SafariImporter.swift in Sources */,

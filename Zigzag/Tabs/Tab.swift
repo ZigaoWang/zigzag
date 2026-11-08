@@ -984,7 +984,7 @@ extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, requestDisplayCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  withSystemAudio: Bool, decisionHandler: @escaping (Int) -> Void) {
         Task { @MainActor in
-            guard let window = host?.hostWindow, let controller = WindowManager.shared.controllers.first(where: { $0.window === window }) else {
+            guard let controller = WindowManager.shared.promptHost(for: host?.hostWindow) else {
                 decisionHandler(0)
                 return
             }
