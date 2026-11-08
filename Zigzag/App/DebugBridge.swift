@@ -679,6 +679,17 @@ enum DebugBridge {
         case "undo":
             controller.sidebarUndo.undo()
             debugLog("after undo selected=\(controller.tabManager.selectedTab?.url?.absoluteString ?? "nil")")
+        case "menutitles":
+            // menutitles <path>: every item of the menu bar, indented under its menu, as the person reads them.
+            var lines: [String] = []
+            func list(_ menu: NSMenu, _ depth: Int) {
+                for item in menu.items where !item.isSeparatorItem {
+                    lines.append(String(repeating: "  ", count: depth) + item.title + (item.isHidden ? " (hidden)" : "") + (item.isAlternate ? " (alternate)" : ""))
+                    if let sub = item.submenu { list(sub, depth + 1) }
+                }
+            }
+            if let main = NSApp.mainMenu { list(main, 0) }
+            try? lines.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "menuaudit":
             var lines: [String] = []
             func walk(_ menu: NSMenu, _ path: String) {
