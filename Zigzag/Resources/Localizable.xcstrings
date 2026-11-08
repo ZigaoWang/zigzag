@@ -91,6 +91,17 @@
         }
       }
     },
+    "%@ can be your search engine" : {
+      "comment" : "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以把 %@ 设为你的搜索引擎"
+          }
+        }
+      }
+    },
     "%@ can’t prove it is who it says it is, so Zigzag didn’t open it." : {
       "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name.",
       "localizations" : {
@@ -7216,6 +7227,17 @@
         }
       }
     },
+    "Offer %@ as your search engine" : {
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings. The name is the search engine's, like ChatGPT.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提供 %@ 作为你的搜索引擎"
+          }
+        }
+      }
+    },
     "Offer to pin the page you moved to" : {
       "comment" : "A setting in Settings › General.",
       "localizations" : {
@@ -12324,6 +12346,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Use" : {
+      "comment" : "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用"
           }
         }
       }

@@ -23,7 +23,9 @@ struct ExtensionReport {
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
         // Not a permission, but worth saying up front: it changes what ⌘T does.
         let replacesNewTab = (manifest["chrome_url_overrides"] as? [String: Any])?["newtab"] != nil
-        abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id, replacesNewTab: replacesNewTab)
+        // Nor is a search engine of its own, offered once it's added.
+        let searchEngine = ExtensionSearchProvider(manifest: manifest, extensionID: id)?.name
+        abilities = Self.abilities(permissions: requested, patterns: ext.allRequestedMatchPatterns.map(\.string), id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
 
         var limits: [String] = ExtensionProfile.profile(for: id)?.knownIssue.map { [$0] } ?? []
         let covered = (ExtensionProfile.profile(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
@@ -39,7 +41,9 @@ struct ExtensionReport {
         let full = ExtensionReport(extension: ext, manifest: manifest, id: id)
         let oldPatterns = Self.strings(old, ["host_permissions", "optional_host_permissions"])
             .union(Self.strings(old, ["permissions"]).filter { $0.contains("://") || $0 == "<all_urls>" })
-        let oldLines = Set(Self.abilities(permissions: Self.strings(old, ["permissions", "optional_permissions"]), patterns: Array(oldPatterns), id: id))
+        let oldLines = Set(Self.abilities(permissions: Self.strings(old, ["permissions", "optional_permissions"]), patterns: Array(oldPatterns), id: id,
+                                          replacesNewTab: (old["chrome_url_overrides"] as? [String: Any])?["newtab"] != nil,
+                                          searchEngine: ExtensionSearchProvider(manifest: old, extensionID: id)?.name))
         abilities = full.abilities.filter { !oldLines.contains($0) }
         limits = full.limits
     }
@@ -50,7 +54,7 @@ struct ExtensionReport {
 
     // MARK: Plain words
 
-    private static func abilities(permissions: Set<String>, patterns: [String], id: String, replacesNewTab: Bool = false) -> [Line] {
+    private static func abilities(permissions: Set<String>, patterns: [String], id: String, replacesNewTab: Bool = false, searchEngine: String? = nil) -> [Line] {
         var lines: [Line] = []
         let hosts = patterns.compactMap(host(of:))
         if patterns.contains(where: { $0 == "<all_urls>" || $0.hasPrefix("*://*/") || $0.hasPrefix("http://*/") || $0.hasPrefix("https://*/") }) {
@@ -82,6 +86,9 @@ struct ExtensionReport {
         }
         if replacesNewTab {
             lines.append(Line(symbol: "plus.square", text: String(localized: "Show its own page when you open a new tab", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))
+        }
+        if let searchEngine {
+            lines.append(Line(symbol: "magnifyingglass", text: String(localized: "Offer \(searchEngine) as your search engine", comment: "One thing an extension can do, listed in its install sheet and in Settings. The name is the search engine's, like ChatGPT.")))
         }
         if permissions.contains("declarativeNetRequest") || permissions.contains("declarativeNetRequestWithHostAccess") {
             lines.append(Line(symbol: "hand.raised", text: String(localized: "Block content on pages", comment: "One thing an extension can do, listed in its install sheet and in Settings.")))

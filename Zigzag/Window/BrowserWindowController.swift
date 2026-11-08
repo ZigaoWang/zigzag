@@ -667,7 +667,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                     report(.adding)
                     Task {
                         switch await ExtensionStore.finishInstall(prepared) {
-                        case .success(let name): report(.added(name))
+                        case .success(let name):
+                            report(.added(name))
+                            // After the store bar has gone, when it's up, so the two never sit on each other.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + (progress == nil ? 1.5 : 3.4)) { [weak self] in self?.offerSearchEngine(of: id) }
                         case .failure(let error): report(.failed(error.message))
                         }
                     }
@@ -679,6 +682,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+
+    /// An extension just added that gives a search engine ("ChatGPT search"): asked, never switched to behind your
+    /// back. Not now, it stays one of the engines in Settings.
+    private func offerSearchEngine(of id: String) {
+        guard let provider = ExtensionSearchProvider.provider(for: id), !ExtensionSearchProvider.isChosen(id) else { return }
+        Toast.show(String(localized: "\(provider.name) can be your search engine", comment: "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT."),
+                   symbol: "magnifyingglass",
+                   action: (String(localized: "Use", comment: "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with."), { ExtensionSearchProvider.use(provider) }),
+                   duration: 10, closes: true, in: self)
+    }
 
     /// An update that wants more access waits for this.
     func reviewExtensionUpdate(_ id: String) {
