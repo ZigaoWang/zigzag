@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
+        settleSpaceNameStyle()
         Tutorial.migrate()
         // Getting started picks up where you left off, if you'd begun and haven't ended it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -197,6 +198,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return false }
         open(url)
         return true
+    }
+
+    /// Space names start small, a plain heading most people coming from Arc read at a glance; large and light is one
+    /// right-click away. Someone who used Zigzag before small became the start keeps the large names they had.
+    private func settleSpaceNameStyle() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: "LargeSpaceNames") == nil else { return }
+        defaults.set(defaults.integer(forKey: "LaunchCount") > 0, forKey: "LargeSpaceNames")
     }
 
     /// One quiet offer, on the second launch, never repeated: by then you know whether you like it here.
