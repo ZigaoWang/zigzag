@@ -301,9 +301,9 @@ enum DebugBridge {
             }
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
         case "scrolllist":
-            // scrolllist <y>: scrolls the sidebar's list to that many points from its top.
+            // scrolllist <y>: scrolls the sidebar's list to that many points from its top, or as far as it goes.
             if let clip = controller.sidebar.list.enclosingScrollView?.contentView, let y = Double(arg) {
-                clip.scroll(to: NSPoint(x: 0, y: y))
+                clip.scroll(to: NSPoint(x: 0, y: max(0, min(y, controller.sidebar.list.frame.height - clip.bounds.height))))
                 clip.enclosingScrollView?.reflectScrolledClipView(clip)
             }
         case "openfolders":
