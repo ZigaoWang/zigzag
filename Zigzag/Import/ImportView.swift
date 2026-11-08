@@ -23,7 +23,7 @@ final class ImportView: NSView {
     }
     /// The welcome window follows along, retitling its brand panel at each step.
     var onStageChange: ((Stage) -> Void)?
-    private let showPasswords = TextButton(title: "Show Passwords", font: Tokens.Font.body(.medium))
+    private let showPasswords = TextButton(title: String(localized: "Show Passwords", comment: "Button in the Import window after passwords came over."), font: Tokens.Font.body(.medium))
 
     private let hero = ImportHero()
     private let banner = BrandBanner()
@@ -36,14 +36,16 @@ final class ImportView: NSView {
     /// The browsers scroll when there are more than fit, so the choices and Import stay in view.
     private let rowScroll = NSScrollView()
     private let rowList = FlippedView()
-    private let choiceLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
+    private let choiceLabel = Label(String(localized: "Bring", comment: "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"), font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private var choiceButtons: [(ImportCoordinator.Choice, ChoicePill)] = []
-    private let chooseFile = TextButton(title: "Choose File…", font: Tokens.Font.body(.medium))
-    private let primary = PrimaryButton(title: "Import")
-    private let secondary = TextButton(title: "Not Now", font: Tokens.Font.body(.medium))
+    private let chooseFile = TextButton(title: String(localized: "Choose File…", comment: "Button in the Import window: choose a passwords export or Safari export file."), font: Tokens.Font.body(.medium))
+    private let primary = PrimaryButton(title: String(localized: "Import", comment: "Main button in the Import window."))
+    private let secondary = TextButton(title: String(localized: "Not Now", comment: "Button in the Import window: close it without importing."), font: Tokens.Font.body(.medium))
     /// What Sign-ins means, in a line, while it's offered.
-    private let signInsNote = NSTextField(wrappingLabelWithString: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.")
-    private let emptyNote = NSTextField(wrappingLabelWithString: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.")
+    private let signInsNote = NSTextField(wrappingLabelWithString: String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
+                                                                              comment: "Note under the choices in the Import window, explaining Sign-ins."))
+    private let emptyNote = NSTextField(wrappingLabelWithString: String(localized: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.",
+                                                                            comment: "Import window, when no other browser was found."))
 
     init(presentation: Presentation) {
         self.presentation = presentation
@@ -53,14 +55,14 @@ final class ImportView: NSView {
         case .welcome:
             title.stringValue = ""
             subtitle.stringValue = ""
-            secondary.title = "Skip"
+            secondary.title = String(localized: "Skip", comment: "Button in the welcome window's import step: go on without importing.")
         case .window:
             title.stringValue = ""
             subtitle.stringValue = ""
-            banner.title = "Bring your stuff over"
+            banner.title = String(localized: "Bring your stuff over", comment: "Title of the Import window.")
             // Words only: the ribbon stays the app's icon, not a decoration on a form.
             banner.ribbonMark.isHidden = true
-            banner.subtitle = "Passwords, bookmarks and history, from any browser on this Mac."
+            banner.subtitle = String(localized: "Passwords, bookmarks and history, from any browser on this Mac.", comment: "Subtitle of the Import window.")
             addSubview(banner)
         }
         subtitle.font = Tokens.Font.body()
@@ -81,8 +83,11 @@ final class ImportView: NSView {
         rowScroll.documentView = rowList
         [title, subtitle, rowScroll, choiceLabel, signInsNote, chooseFile, primary, secondary].forEach { addSubview($0) }
         // Sign-ins start on, as passwords do; the line under the choices says what they are.
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces and Tabs"),
-                               (.signIns, "Sign-ins")] {
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, String(localized: "Passwords", comment: "Choice in the Import window: bring passwords over.")),
+                               (.bookmarks, String(localized: "Bookmarks", comment: "Choice in the Import window: bring bookmarks over.")),
+                               (.history, String(localized: "History", comment: "Choice in the Import window: bring browsing history over.")),
+                               (.tabs, String(localized: "Spaces and Tabs", comment: "Choice in the Import window: bring Arc's spaces and tabs over.")),
+                               (.signIns, String(localized: "Sign-ins", comment: "Choice in the Import window: bring over the sites you're signed in to."))] {
             let box = ChoicePill(title: name)
             box.tint = Brand.Theme.brand.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }
@@ -149,13 +154,21 @@ final class ImportView: NSView {
         guard !chosen.isEmpty else { return }
         let data = data ?? chosenData
         stage = .importing
-        title.stringValue = "Bringing it over…"
+        title.stringValue = String(localized: "Bringing it over…", comment: "Title of the Import window while importing.")
         // Only Chrome and its kin keep their passwords and sign-ins behind a Keychain item that macOS asks about.
         let fromChromium = chosen.contains { if case .chromium = $0.source.kind { true } else { false } }
-        let locked = [data.contains(.passwords) ? "passwords" : nil, data.contains(.signIns) ? "sign-ins" : nil].compactMap { $0 }
-        subtitle.stringValue = fromChromium && !locked.isEmpty
-            ? "macOS will ask for your Mac’s password to open your \(locked.joined(separator: " and ")). Type it, then click Always Allow." : ""
-        primary.title = "Importing…"
+        let note: String
+        switch (data.contains(.passwords), data.contains(.signIns)) {
+        case (true, true): note = String(localized: "macOS will ask for your Mac’s password to open your passwords and sign-ins. Type it, then click Always Allow.",
+                                            comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.")
+        case (true, false): note = String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.",
+                                             comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.")
+        case (false, true): note = String(localized: "macOS will ask for your Mac’s password to open your sign-ins. Type it, then click Always Allow.",
+                                             comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button.")
+        case (false, false): note = ""
+        }
+        subtitle.stringValue = fromChromium ? note : ""
+        primary.title = String(localized: "Importing…", comment: "Main button in the Import window while importing.")
         primary.isEnabled = false
         secondary.isHidden = true
         chooseFile.isHidden = true
@@ -187,15 +200,17 @@ final class ImportView: NSView {
 
     private func finish() {
         stage = .done
-        title.stringValue = presentation == .window ? "You’re all set" : ""
+        title.stringValue = presentation == .window ? String(localized: "You’re all set", comment: "Title of the Import window when the import is done.") : ""
         let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
         let signedIn = summaries.map(\.signedInSites).reduce(0, +)
         // In the welcome window the brand panel already says where everything went; here only the count and the
         // next step remain.
         subtitle.stringValue = presentation == .welcome ? "" : passwords > 0
-            ? "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords."
-            : signedIn > 0 ? "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings."
-            : "Everything that came over is in your sidebar. You can bring more over anytime from Settings."
+            ? String(localized: "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords.",
+                     comment: "Import window when the import is done. Zigzag › Passwords is the menu item's path; Keychain and iCloud Keychain are Apple's names.")
+            : signedIn > 0 ? String(localized: "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings.",
+                                    comment: "Import window when the import is done and sign-ins came over.")
+            : String(localized: "Everything that came over is in your sidebar. You can bring more over anytime from Settings.", comment: "Import window when the import is done.")
         // Rows that hit a problem stay, with their fix; the ones that went fine give way to the summary.
         if presentation == .welcome {
             for row in rows {
@@ -207,7 +222,8 @@ final class ImportView: NSView {
         if hero.superview == nil { addSubview(hero) }
         banner.isHidden = true
         hero.showSuccess(summaries)
-        primary.title = presentation == .welcome ? "Start Browsing" : "Done"
+        primary.title = presentation == .welcome ? String(localized: "Start Browsing", comment: "Last button of the welcome window, after importing.")
+                                                  : String(localized: "Done", comment: "Button that closes the Import window when the import is done.")
         fitWindow()
         primary.isEnabled = true
         needsLayout = true
@@ -290,8 +306,8 @@ final class ImportView: NSView {
     private func pickFile() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file)."
-        panel.prompt = "Import"
+        panel.message = String(localized: "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
+        panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
             let row = SourceRow(source: ImportCoordinator.fileSource(url))
@@ -438,7 +454,7 @@ private final class SourceRow: InteractiveView {
     private var fixViews: [NSView] = []
     private var passwordField: FilledField?
     /// What the browser holds, filled in once counted.
-    private var preview = "Looking…" { didSet { refresh() } }
+    private var preview = String(localized: "Looking…", comment: "Under a browser's name in the Import window while counting what it holds.") { didSet { refresh() } }
 
     init(source: ImportCoordinator.Source) {
         self.source = source
@@ -514,9 +530,9 @@ private final class SourceRow: InteractiveView {
             check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.title)
             check.contentTintColor = Brand.Theme.brand.accent
         case .waiting:
-            detail.stringValue = "Waiting…"
+            detail.stringValue = String(localized: "Waiting…", comment: "Under a browser's name in the Import window, while another browser is imported first.")
         case .working:
-            detail.stringValue = "Bringing it over…"
+            detail.stringValue = String(localized: "Bringing it over…", comment: "Under a browser's name in the Import window while importing from it.")
             spinner.isHidden = false
             spinner.startLooping()
         case .done(let summary):
@@ -527,19 +543,21 @@ private final class SourceRow: InteractiveView {
             check.contentTintColor = clean ? Tokens.Color.success : Tokens.Color.warning
             for problem in summary.problems { addFix(problem.fix) }
             if let exportFile, summary.passwords + summary.updatedPasswords > 0, FileManager.default.fileExists(atPath: exportFile.path) {
-                detail.stringValue += "\nThe file still holds your passwords unprotected. It’s safer to move it to the Trash."
-                let button = TextButton(title: "Move to Trash", font: Tokens.Font.body(.medium))
+                detail.stringValue += "\n" + String(localized: "The file still holds your passwords unprotected. It’s safer to move it to the Trash.",
+                                                     comment: "Import window, after passwords came over from an exported file.")
+                let button = TextButton(title: String(localized: "Move to Trash", comment: "Button in the Import window: move the exported passwords file to the Trash."), font: Tokens.Font.body(.medium))
                 button.showsFillAtRest = true
                 button.onClick = { [weak self, weak button] _ in
                     NSWorkspace.shared.recycle([exportFile]) { _, error in
                         DispatchQueue.main.async {
                             if error == nil {
-                                button?.title = "Moved to Trash"
+                                button?.title = String(localized: "Moved to Trash", comment: "The Move to Trash button in the Import window, once the file is in the Trash.")
                                 button?.isEnabled = false
                             } else {
                                 // Not a dead end: say so, and take you to the file to delete it yourself.
-                                self?.detail.stringValue += "\nZigzag couldn’t move it to the Trash. Show it in Finder and delete it there."
-                                button?.title = "Show in Finder"
+                                self?.detail.stringValue += "\n" + String(localized: "Zigzag couldn’t move it to the Trash. Show it in Finder and delete it there.",
+                                                                                     comment: "Import window, when the exported passwords file couldn't be moved to the Trash.")
+                                button?.title = String(localized: "Show in Finder", comment: "Button in the Import window: show the exported passwords file in Finder.")
                                 button?.onClick = { _ in NSWorkspace.shared.activateFileViewerSelecting([exportFile]) }
                             }
                             self?.needsLayout = true
@@ -557,21 +575,21 @@ private final class SourceRow: InteractiveView {
     private func addFix(_ fix: ImportProblem.Fix) {
         let title: String
         switch fix {
-        case .retry: title = "Try Again"
-        case .fullDiskAccess: title = "Open System Settings"
+        case .retry: title = String(localized: "Try Again", comment: "Button under a problem in the Import window.")
+        case .fullDiskAccess: title = String(localized: "Open System Settings", comment: "Button under a problem in the Import window. System Settings is macOS's app.")
         // Named for the app it opens to export from, so it says what happens.
         case .exportFromApplePasswords:
             switch source.kind {
-            case .safari: title = "Open Safari"
-            case .firefox(let browser): title = "Open \(browser.name)"
-            default: title = "Open Passwords"
+            case .safari: title = String(localized: "Open Safari", comment: "Button under a note in the Import window: open Safari to export from it.")
+            case .firefox(let browser): title = String(localized: "Open \(browser.name)", comment: "Button under a problem in the Import window: open a browser, like Firefox, to export from it.")
+            default: title = String(localized: "Open Passwords", comment: "Button under a note in the Import window: open Apple's Passwords app to export from it.")
             }
-        case .primaryPassword: title = "Unlock"
+        case .primaryPassword: title = String(localized: "Unlock", comment: "Button in the Import window after typing Firefox's primary password.")
         case .none: return
         }
         guard !fixViews.contains(where: { ($0 as? TextButton)?.title == title }) else { return }
         if fix == .primaryPassword {
-            let field = FilledField(placeholder: "Primary password", secure: true)
+            let field = FilledField(placeholder: String(localized: "Primary password", comment: "Placeholder of the field for Firefox's primary password, in the Import window."), secure: true)
             addSubview(field)
             fixViews.append(field)
             passwordField = field
@@ -635,7 +653,7 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 560), styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
         window.titlebarAppearsTransparent = true
-        window.title = "Import"
+        window.title = String(localized: "Import", comment: "Title of the Import window.")
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.backgroundColor = Tokens.Color.formBackground
@@ -710,30 +728,52 @@ private final class ImportHero: NSView {
         let spaces = summaries.map(\.spaces).reduce(0, +)
         let history = summaries.map(\.history).reduce(0, +)
         let signedIn = summaries.map(\.signedInSites).reduce(0, +)
-        let from = summaries.count == 1 ? " from \(summaries[0].source)" : ""
-        func plural(_ n: Int, _ one: String, _ many: String) -> String { "\(n.formatted()) \(n == 1 ? one : many)" }
-        // The biggest thing that came over leads; the rest follow in a line.
+        // The biggest thing that came over leads, its number large and what it counts under it; the rest follow in a line.
+        let kinds: [(n: Int, unit: (Int) -> String, phrase: (Int) -> String)] = [
+            (passwords, { String(localized: "import.lead.passwords", defaultValue: "\($0) passwords",
+                                 comment: "Under the big number when an import finishes, so without the number: password or passwords.") },
+             { String(localized: "\($0) passwords", comment: "Item in a list of what a browser holds or what came over, in the Import window.") }),
+            (bookmarks, { String(localized: "import.lead.bookmarks", defaultValue: "\($0) bookmarks",
+                                 comment: "Under the big number when an import finishes, so without the number: bookmark or bookmarks.") },
+             { String(localized: "\($0) bookmarks", comment: "Item in a list of what a browser holds or what came over, in the Import window.") }),
+            (spaces, { String(localized: "import.lead.spaces", defaultValue: "\($0) spaces",
+                              comment: "Under the big number when an import finishes, so without the number: space or spaces.") },
+             { String(localized: "\($0) spaces", comment: "Item in the list of what came over, in the Import window.") }),
+            (signedIn, { String(localized: "import.lead.sites-with-sign-ins", defaultValue: "\($0) sites with sign-ins",
+                                comment: "Under the big number when an import finishes, so without the number: site with sign-ins or sites with sign-ins.") },
+             { String(localized: "\($0) sites with sign-ins", comment: "Item in the list of what came over, in the Import window.") }),
+            (history, { String(localized: "import.lead.pages-of-history", defaultValue: "\($0) pages of history",
+                               comment: "Under the big number when an import finishes, so without the number: page of history or pages of history.") },
+             { String(localized: "\($0) pages of history", comment: "Item in the list of what came over, in the Import window.") }),
+        ]
         var lead: (Int, String)?
         var rest: [String] = []
-        for (n, one, many) in [(passwords, "password", "passwords"), (bookmarks, "bookmark", "bookmarks"), (spaces, "space", "spaces"),
-                             (signedIn, "site with sign-ins", "sites with sign-ins"), (history, "page of history", "pages of history")] where n > 0 {
-            if lead == nil { lead = (n, (n == 1 ? one : many) + from) } else { rest.append(plural(n, one, many)) }
+        for kind in kinds where kind.n > 0 {
+            if lead == nil {
+                let unit = kind.unit(kind.n)
+                lead = (kind.n, summaries.count == 1
+                    ? String(localized: "\(unit) from \(summaries[0].source)",
+                             comment: "Under the big number when an import finishes: what it counts, then a browser's name, like “passwords from Arc”.")
+                    : unit)
+            } else {
+                rest.append(kind.phrase(kind.n))
+            }
         }
         wordmark.isHidden = true
         [count, caption, detail].forEach { $0.isHidden = false }
         if let lead {
             caption.stringValue = lead.1
-            detail.stringValue = rest.isEmpty ? "" : "Plus " + ListFormatter.localizedString(byJoining: rest) + "."
+            detail.stringValue = rest.isEmpty ? "" : String(localized: "Plus \(Words.list(rest)).", comment: "Under the big number when an import finishes: the rest of what came over, like “Plus 86 bookmarks and 3 spaces.”")
             count.attributedStringValue = Brand.display(lead.0.formatted(), size: 60, color: theme.tint)
         } else if summaries.contains(where: { !$0.problems.isEmpty }) {
             // Never a cheerful "all set" over a failure: say nothing came, and the rows below say why.
-            count.attributedStringValue = Brand.display("Not yet", size: 44, color: theme.tint)
-            caption.stringValue = "Nothing came over"
-            detail.stringValue = "What stopped it is below, with a way to fix it."
+            count.attributedStringValue = Brand.display(String(localized: "Not yet", comment: "Shown large when an import finishes and nothing came over because of a problem."), size: 44, color: theme.tint)
+            caption.stringValue = String(localized: "Nothing came over", comment: "Under “Not yet” when an import finishes with a problem.")
+            detail.stringValue = String(localized: "What stopped it is below, with a way to fix it.", comment: "Under “Not yet” when an import finishes with a problem.")
         } else {
-            count.attributedStringValue = Brand.display("All set", size: 44, color: theme.tint)
-            caption.stringValue = "Nothing new to bring over"
-            detail.stringValue = "Everything was already here."
+            count.attributedStringValue = Brand.display(String(localized: "All set", comment: "Shown large when an import finishes and everything was already in Zigzag."), size: 44, color: theme.tint)
+            caption.stringValue = String(localized: "Nothing new to bring over", comment: "Under “All set” when an import finishes and everything was already in Zigzag.")
+            detail.stringValue = String(localized: "Everything was already here.", comment: "Under “All set” when an import finishes and everything was already in Zigzag.")
         }
         needsLayout = true
         layoutSubtreeIfNeeded()

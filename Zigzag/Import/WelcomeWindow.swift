@@ -10,7 +10,7 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
         let size = NSSize(width: 1000, height: 660)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
-        window.title = "Welcome to Zigzag"
+        window.title = String(localized: "Welcome to Zigzag", comment: "Title of the welcome window shown on first launch.")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
