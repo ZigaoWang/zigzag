@@ -953,7 +953,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard PageTranslator.offers, !translationOffered.contains(site) else { return }
         translationOffered.insert(site)
         Toast.show("This page is in \(PageTranslator.name(of: language))", symbol: "translate",
-                   action: (title: "Translate", run: { [weak self] in self?.translatePage() }), duration: 6, in: self)
+                   action: (title: "Translate", run: { [weak self] in self?.translatePage() }), duration: 6, closes: true, in: self)
     }
 
     func translatePage() {

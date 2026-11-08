@@ -655,6 +655,9 @@ final class ToastView: FloatingPanelView {
     let icon = NSImageView()
     let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     let actionButton = PillButton(style: .plain)
+    /// Puts an offer away before it goes on its own ("This page is in French"), as the other offers at the top of
+    /// the page are put away.
+    let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: "Not Now")
     /// Something under way ("Writing report…"): the ribbon turns where the icon goes.
     let spinner = Spinner()
 
@@ -666,7 +669,9 @@ final class ToastView: FloatingPanelView {
         addSubview(spinner)
         addSubview(label)
         addSubview(actionButton)
+        addSubview(closeButton)
         actionButton.isHidden = true
+        closeButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -675,8 +680,15 @@ final class ToastView: FloatingPanelView {
     static let height = Tokens.Metric.toastHeight
 
     var fittingWidth: CGFloat {
-        (icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth
-            + (actionButton.isHidden ? Tokens.Space.x4 : Tokens.Space.x3 + actionButton.fittingWidth + (Self.height - Tokens.Metric.toastButtonHeight) / 2)
+        (icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth + trailingWidth
+    }
+
+    /// The right end: padding, or the action and the close button, the last one inset as evenly as it sits.
+    private var trailingWidth: CGFloat {
+        guard !actionButton.isHidden || !closeButton.isHidden else { return Tokens.Space.x4 }
+        var width = actionButton.isHidden ? 0 : Tokens.Space.x3 + actionButton.fittingWidth
+        if !closeButton.isHidden { width += (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1) + closeButton.frame.width }
+        return width + (Self.height - (closeButton.isHidden ? Tokens.Metric.toastButtonHeight : closeButton.frame.height)) / 2
     }
 
     /// The space around the text: the icon on the left, the action (or padding) on the right.
@@ -705,11 +717,18 @@ final class ToastView: FloatingPanelView {
             x = icon.frame.maxX + Tokens.Space.x2
         }
         let actionWidth = actionButton.isHidden ? 0 : actionButton.fittingWidth
+        var right = bounds.width
+        if !closeButton.isHidden {
+            let side = closeButton.frame.width
+            closeButton.frame.origin = NSPoint(x: bounds.width - (Self.height - side) / 2 - side, y: (bounds.height - side) / 2)
+            right = closeButton.frame.minX - Tokens.Space.x1
+        }
         if !actionButton.isHidden {
             // Inset evenly from the toast's edge, top, bottom and right alike, so the pill runs with the capsule. The
             // right inset is a one-line toast's, the room `fittingWidth` keeps, so wrapped text never runs under it.
             let h = Tokens.Metric.toastButtonHeight
-            actionButton.frame = NSRect(x: bounds.width - (Self.height - h) / 2 - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
+            let end = closeButton.isHidden ? bounds.width - (Self.height - h) / 2 : right
+            actionButton.frame = NSRect(x: end - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
         }
         let textWidth = bounds.width - chromeWidth
         let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
@@ -742,9 +761,10 @@ enum Toast {
         state.toast = nil
     }
 
+    /// `closes` adds a close button, for an offer you may want gone before it goes on its own.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, duration: duration, over: controller.root.overlay, area: controller.root.cardFrame)
+                     duration: TimeInterval = 1.3, closes: Bool = false, in controller: BrowserWindowController) {
+        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: controller.root.cardFrame)
     }
 
     /// Something that takes a moment: the spinner and what's happening, up until the next toast or `hide` replaces it.
@@ -782,7 +802,7 @@ enum Toast {
 
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, over host: NSView, area: NSRect, busy: Bool = false) {
+                     duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -805,6 +825,12 @@ enum Toast {
                 action.run()
                 toast?.dismiss(always: true)
             }
+        }
+        toast.closeButton.isHidden = !closes
+        toast.closeButton.onClick = { [weak toast] _ in
+            state.hideWork?.cancel()
+            toast?.dismiss(always: true)
+            state.toast = nil
         }
         place(toast, in: area)
         if isNew {
