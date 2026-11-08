@@ -111,7 +111,15 @@
       }
     },
     "%@ is listening to this tab" : {
-      "comment" : "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name."
+      "comment" : "Toast when an extension starts hearing a tab's sound. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 正在收听此标签页"
+          }
+        }
+      }
     },
     "%@ is on a port kept for other things, like email, so browsers don’t open it." : {
       "comment" : "Message on the page Zigzag shows when a page can't load. The placeholder is the site's host name."
@@ -190,7 +198,15 @@
       "comment" : "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it's muted."
     },
     "%@ needs its app" : {
-      "comment" : "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."
+      "comment" : "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 需要配套的 App"
+          }
+        }
+      }
     },
     "%@ night" : {
       "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”."
@@ -227,7 +243,15 @@
       "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
     },
     "%@ side panel" : {
-      "comment" : "What VoiceOver calls an extension's side panel. The placeholder is the extension's name."
+      "comment" : "What VoiceOver calls an extension's side panel. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 边栏面板"
+          }
+        }
+      }
     },
     "%@ stays pinned to its own page" : {
       "comment" : "Toast after closing a pinned tab that had wandered to another page. The title is the pinned tab's."
@@ -250,10 +274,26 @@
       "comment" : "Title of the page Zigzag shows when a page can't load. The placeholder is the site's host name."
     },
     "%@ wants more access" : {
-      "comment" : "Title of the sheet shown when an extension's update asks for more access. The name is the extension's."
+      "comment" : "Title of the sheet shown when an extension's update asks for more access. The name is the extension's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 请求更多权限"
+          }
+        }
+      }
     },
     "%@ works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag." : {
-      "comment" : "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."
+      "comment" : "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 需要配合 Mac 上的一个 App 使用，但 Zigzag 找不到它。请安装该 App，然后重新打开 Zigzag。"
+          }
+        }
+      }
     },
     "%@, %@" : {
       "comment" : "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nJoins the items of a short list in the Import window, like “6 passwords, history”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.",
@@ -365,10 +405,26 @@
       }
     },
     "%@: in its settings, choose Browser, then Add Browser" : {
-      "comment" : "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings."
+      "comment" : "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：在其设置中选取“浏览器”，然后选取“添加浏览器”"
+          }
+        }
+      }
     },
     "%@: needs attention" : {
-      "comment" : "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's."
+      "comment" : "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：需要你留意"
+          }
+        }
+      }
     },
     "%@: no shortcut" : {
       "comment" : "Accessibility label of a command with no keys in Settings › Shortcuts.",
@@ -388,7 +444,15 @@
       "comment" : "A site's permission question: the request, then a question mark, like “Use your camera?”."
     },
     "%@’s page is using a lot of energy" : {
-      "comment" : "Toast when an extension's own page uses a lot of energy. The name is the extension's."
+      "comment" : "Toast when an extension's own page uses a lot of energy. The name is the extension's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的页面耗电较多"
+          }
+        }
+      }
     },
     "%@’s passwords and sign-ins stayed locked. Click Try Again, type your Mac’s password when macOS asks, and click Always Allow." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome; Try Again is a button here, Always Allow is macOS's own button.",
@@ -1088,7 +1152,15 @@
       }
     },
     "1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks." : {
-      "comment" : "Toast when the 1Password extension waits on the 1Password app."
+      "comment" : "Toast when the 1Password extension waits on the 1Password app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1Password 正在它的 App 中等你。请解锁它；如果它询问，请允许 Zigzag。"
+          }
+        }
+      }
     },
     "A few of your sign-ins from %@ couldn’t come over, so some sites may ask you to sign in again." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.",
@@ -1169,7 +1241,15 @@
       "comment" : "Row in the site panel's This Site group."
     },
     "Add %@?" : {
-      "comment" : "Title of the sheet that asks before adding an extension. The name is the extension's."
+      "comment" : "Title of the sheet that asks before adding an extension. The name is the extension's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加“%@”吗？"
+          }
+        }
+      }
     },
     "Add %lld" : {
       "comment" : "Main button of the welcome window’s extensions step: add the ones picked, with how many.",
@@ -1216,7 +1296,15 @@
       }
     },
     "Add Extension" : {
-      "comment" : "Button that adds the extension, in the sheet that asks first."
+      "comment" : "Button that adds the extension, in the sheet that asks first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加扩展"
+          }
+        }
+      }
     },
     "Add Second Color" : {
       "comment" : "Tooltip and accessibility label of the slot that adds a gradient's second color, in the space editor.",
@@ -1230,7 +1318,15 @@
       }
     },
     "Add this extension?" : {
-      "comment" : "Title of the sheet that asks before adding an extension that has no name."
+      "comment" : "Title of the sheet that asks before adding an extension that has no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加此扩展吗？"
+          }
+        }
+      }
     },
     "Add to Favorites" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
@@ -1266,7 +1362,15 @@
       }
     },
     "Add to Zigzag" : {
-      "comment" : "Button on the bar over a Chrome Web Store page: installs the extension."
+      "comment" : "Button on the bar over a Chrome Web Store page: installs the extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到 Zigzag"
+          }
+        }
+      }
     },
     "Add ⌘, ⌥ or ⌃" : {
       "comment" : "In Settings › Shortcuts while recording, when the keys need a modifier.",
@@ -1291,13 +1395,29 @@
       }
     },
     "Added %@" : {
-      "comment" : "Toast after an extension is added. The name is the extension's."
+      "comment" : "Toast after an extension is added. The name is the extension's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加 %@"
+          }
+        }
+      }
     },
     "Added to Favorites" : {
       "comment" : "Toast after the tab is added to Favorites."
     },
     "Added. Find it in site controls, by the address." : {
-      "comment" : "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address."
+      "comment" : "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加。可在地址旁的网站设置中找到它。"
+          }
+        }
+      }
     },
     "Adding" : {
       "comment" : "By an extension in the welcome window while it’s added.",
@@ -1311,7 +1431,15 @@
       }
     },
     "Adding to Zigzag…" : {
-      "comment" : "On the bar over a Chrome Web Store page while the extension installs."
+      "comment" : "On the bar over a Chrome Web Store page while the extension installs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在添加到 Zigzag…"
+          }
+        }
+      }
     },
     "Adding…" : {
       "comment" : "Main button of the welcome window’s extensions step while it adds them.\nToast while an extension is being added.",
@@ -1328,7 +1456,15 @@
       "comment" : "VoiceOver name of the address in a split view page's strip, while it has none."
     },
     "Address bar keyword" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址栏关键词"
+          }
+        }
+      }
     },
     "Ads and trackers blocked" : {
       "comment" : "Badge on a sample page in the welcome window’s picture of Zigzag.",
@@ -1445,7 +1581,15 @@
       "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again."
     },
     "Allow and Update" : {
-      "comment" : "Button that allows an extension's update its new access."
+      "comment" : "Button that allows an extension's update its new access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许并更新"
+          }
+        }
+      }
     },
     "Allowed" : {
       "comment" : "Under a row's name in the site panel's This Site group, what it's set to: the site may use it."
@@ -1468,10 +1612,26 @@
       "comment" : "Under a language's name in the site panel's This Site group: pages in it are always translated."
     },
     "An extension’s page is using a lot of energy" : {
-      "comment" : "Toast when the page of an extension with no name uses a lot of energy."
+      "comment" : "Toast when the page of an extension with no name uses a lot of energy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个扩展的页面耗电较多"
+          }
+        }
+      }
     },
     "An update is ready. Until you allow it, the current version keeps running." : {
-      "comment" : "Under the title of the sheet shown when an extension's update asks for more access, when the update has no version."
+      "comment" : "Under the title of the sheet shown when an extension's update asks for more access, when the update has no version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新已准备就绪。在你允许之前，当前版本会继续运行。"
+          }
+        }
+      }
     },
     "Another app is using the file" : {
       "comment" : "Why a file couldn't be saved, said after what failed, like “Couldn’t save the page. Not enough space on your Mac.”"
@@ -1586,7 +1746,15 @@
       }
     },
     "Background audio and clipboard" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台音频和剪贴板"
+          }
+        }
+      }
     },
     "Beta updates" : {
       "comment" : "A setting in Settings › General.",
@@ -1661,7 +1829,15 @@
       "comment" : "Under a row's name in the site panel's This Site group, what it's set to: the site may not use it."
     },
     "Blocking requests the old way" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用旧方式拦截请求"
+          }
+        }
+      }
     },
     "Blue" : {
       "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
@@ -2135,7 +2311,15 @@
       }
     },
     "Choose the folder that contains the extension’s manifest.json." : {
-      "comment" : "Message of the panel that loads an unpacked extension. manifest.json is a file name."
+      "comment" : "Message of the panel that loads an unpacked extension. manifest.json is a file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取包含该扩展 manifest.json 的文件夹。"
+          }
+        }
+      }
     },
     "Choose where downloads are saved." : {
       "comment" : "Message of the panel that picks the downloads folder."
@@ -2412,7 +2596,15 @@
       "comment" : "Tooltip of the close button in Peek's top strip."
     },
     "Close Side Panel" : {
-      "comment" : "Tooltip of the close button on an extension's side panel."
+      "comment" : "Tooltip of the close button on an extension's side panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭边栏面板"
+          }
+        }
+      }
     },
     "Close Tab" : {
       "comment" : "Button in the toast about a tab using a lot of energy: closes that tab.\nFile menu item\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu item\nTooltip of a button on a card in the tab switcher (Control-Tab).\nTooltip of a button on a tab's row in the sidebar.\nUndo action name, shown in the Edit menu as Undo Close Tab.",
@@ -2582,7 +2774,15 @@
       "comment" : "VoiceOver label of the column width choice in Reader's text and color choices."
     },
     "Connect 1Password to Zigzag" : {
-      "comment" : "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag."
+      "comment" : "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 1Password 连接到 Zigzag"
+          }
+        }
+      }
     },
     "Contents" : {
       "comment" : "Switch in the PDF viewer's sidebar: shows the document's table of contents."
@@ -2722,19 +2922,43 @@
       "comment" : "Toast when a download fails; the file's name."
     },
     "Couldn’t download it. Check your connection." : {
-      "comment" : "One line beside an extension's name when its update couldn't be downloaded."
+      "comment" : "One line beside an extension's name when its update couldn't be downloaded.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能下载。请检查你的网络连接。"
+          }
+        }
+      }
     },
     "Couldn’t download the PDF" : {
       "comment" : "Toast when downloading a PDF fails; a reason may follow as its own sentence."
     },
     "Couldn’t download this extension. Check your connection and try again." : {
-      "comment" : "Shown when an extension couldn't be installed because its download failed."
+      "comment" : "Shown when an extension couldn't be installed because its download failed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能下载此扩展。请检查你的网络连接，然后再试一次。"
+          }
+        }
+      }
     },
     "Couldn’t export the PDF" : {
       "comment" : "Toast when exporting the page as a PDF fails."
     },
     "Couldn’t load this extension" : {
-      "comment" : "Title of the notice when an unpacked extension can't load."
+      "comment" : "Title of the notice when an unpacked extension can't load.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能载入此扩展"
+          }
+        }
+      }
     },
     "Couldn’t move Zigzag to Applications" : {
       "comment" : "Toast when moving the app into Applications fails."
@@ -2835,7 +3059,15 @@
       }
     },
     "Debugging pages" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调试页面"
+          }
+        }
+      }
     },
     "Default browser" : {
       "comment" : "A setting in Settings › General.",
@@ -2919,7 +3151,15 @@
       "comment" : "Under a download's name in the downloads panel: the download failed, then why, like Not enough space on your Mac."
     },
     "Display information" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示器信息"
+          }
+        }
+      }
     },
     "Done" : {
       "comment" : "Button that closes the Import window when the import is done.\nButton that closes the What’s New sheet.\nIn the tab overview (all spaces' tabs as cards), a button that leaves the overview.\nTooltip of the find bar's close button.",
@@ -2933,7 +3173,15 @@
       }
     },
     "Don’t Allow" : {
-      "comment" : "Button in the prompt asking whether an extension may hear a tab's sound.\nButton on a site's permission question."
+      "comment" : "Button in the prompt asking whether an extension may hear a tab's sound.\nButton on a site's permission question.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不允许"
+          }
+        }
+      }
     },
     "Don’t Open" : {
       "comment" : "Button on a page's question to open an app."
@@ -2973,10 +3221,26 @@
       "comment" : "Toast when a download finishes; the file's name."
     },
     "Downloading extension…" : {
-      "comment" : "Toast while an extension downloads from the Chrome Web Store."
+      "comment" : "Toast while an extension downloads from the Chrome Web Store.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载扩展…"
+          }
+        }
+      }
     },
     "Downloading…" : {
-      "comment" : "On the bar over a Chrome Web Store page while the extension downloads."
+      "comment" : "On the bar over a Chrome Web Store page while the extension downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载…"
+          }
+        }
+      }
     },
     "Downloads" : {
       "comment" : "A heading in Settings › General.\nFeature name in the list of things an extension uses that won’t work in Zigzag.\nTitle of the downloads panel.\nTooltip of the floating downloads button, shown while the sidebar is hidden.\nTooltip of the sidebar's downloads button.\nWindow menu item.",
@@ -3250,10 +3514,26 @@
       "comment" : "Toast after the page is exported as a PDF."
     },
     "Extension" : {
-      "comment" : "Heading of an extension's menu when the extension has no name.\nName on an extension's side panel when the extension has none.\nThe address bar's name for an extension's own page, when the extension has no name.\nVoiceOver label of the icon before an extension's address in a pop-up window."
+      "comment" : "Heading of an extension's menu when the extension has no name.\nName on an extension's side panel when the extension has none.\nThe address bar's name for an extension's own page, when the extension has no name.\nVoiceOver label of the icon before an extension's address in a pop-up window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展"
+          }
+        }
+      }
     },
     "Extension page" : {
-      "comment" : "Under the site's name in the site panel, for an extension's own page."
+      "comment" : "Under the site's name in the site panel, for an extension's own page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展页面"
+          }
+        }
+      }
     },
     "Extensions" : {
       "comment" : "A section of Settings.\nHeading in the site panel, in the welcome window’s picture of Zigzag.\nRow in the site panel's This Site group.\nSection label over the extensions' buttons in the site panel.",
@@ -3303,7 +3583,15 @@
       }
     },
     "Filling in sign-in dialogs" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写登录对话框"
+          }
+        }
+      }
     },
     "Fills %@ from Contacts" : {
       "comment" : "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”."
@@ -3387,7 +3675,15 @@
       "comment" : "Placeholder of the field that renames a folder, in its sidebar row."
     },
     "Font settings" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字体设置"
+          }
+        }
+      }
     },
     "For example: lofi music" : {
       "comment" : "Under a hint in the getting-started guide, a card in the window: something to search YouTube for.",
@@ -3473,7 +3769,15 @@
       }
     },
     "Get Extensions…" : {
-      "comment" : "Item at the bottom of the extensions menu: opens the Chrome Web Store."
+      "comment" : "Item at the bottom of the extensions menu: opens the Chrome Web Store.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "获取扩展…"
+          }
+        }
+      }
     },
     "Get Started" : {
       "comment" : "Button on the first screen of the welcome window.",
@@ -3603,7 +3907,15 @@
       }
     },
     "Hear what this tab plays" : {
-      "comment" : "Title of the prompt asking whether an extension may hear the sound a tab plays."
+      "comment" : "Title of the prompt asking whether an extension may hear the sound a tab plays.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收听此标签页播放的声音"
+          }
+        }
+      }
     },
     "Help" : {
       "comment" : "A menu in the menu bar.",
@@ -3851,10 +4163,26 @@
       }
     },
     "It will be able to" : {
-      "comment" : "Heading over the list of what an extension can do, in the sheet that asks before adding it."
+      "comment" : "Heading over the list of what an extension can do, in the sheet that asks before adding it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它将能够"
+          }
+        }
+      }
     },
     "It would also be able to" : {
-      "comment" : "Heading over the list of what an extension's update could also do."
+      "comment" : "Heading over the list of what an extension's update could also do.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它还将能够"
+          }
+        }
+      }
     },
     "Its own tabs and pinned tabs, in its own color" : {
       "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
@@ -3868,16 +4196,40 @@
       }
     },
     "Its package couldn’t be verified." : {
-      "comment" : "One line beside an extension's name when its update didn't pass the signature check."
+      "comment" : "One line beside an extension's name when its update didn't pass the signature check.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法验证它的安装包。"
+          }
+        }
+      }
     },
     "Its package is damaged." : {
-      "comment" : "One line beside an extension's name when its update's package is damaged."
+      "comment" : "One line beside an extension's name when its update's package is damaged.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的安装包已损坏。"
+          }
+        }
+      }
     },
     "Its pages load fresh next time." : {
       "comment" : "Message of the sheet that removes one site's data."
     },
     "Its settings and data on this Mac are deleted too. You can add it again from the Chrome Web Store." : {
-      "comment" : "Message of the sheet that asks before removing an extension."
+      "comment" : "Message of the sheet that asks before removing an extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在这台 Mac 上的设置和数据也会被删除。你可以从 Chrome 网上应用店重新添加它。"
+          }
+        }
+      }
     },
     "Its tabs and pinned tabs close. This can’t be undone." : {
       "comment" : "Message of the sheet that deletes a space from Settings.",
@@ -3938,7 +4290,15 @@
       }
     },
     "Keeping your Mac awake" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 Mac 保持唤醒"
+          }
+        }
+      }
     },
     "Kept %lld passwords already in Zigzag instead of the imported ones." : {
       "comment" : "Import window: passwords that stayed as they were because the imported ones weren't known to be newer.",
@@ -3976,7 +4336,15 @@
       }
     },
     "Knowing when you’re away" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检测你是否离开"
+          }
+        }
+      }
     },
     "Language" : {
       "comment" : "A setting in Settings › General.",
@@ -4077,7 +4445,15 @@
       }
     },
     "Load" : {
-      "comment" : "Button of the panel that loads an unpacked extension from a folder."
+      "comment" : "Button of the panel that loads an unpacked extension from a folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "载入"
+          }
+        }
+      }
     },
     "Load Unpacked…" : {
       "comment" : "Button in Settings › Extensions, in developer mode: loads an extension from a folder.",
@@ -4182,7 +4558,15 @@
       }
     },
     "Managing other extensions" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理其他扩展"
+          }
+        }
+      }
     },
     "Markdown link copied" : {
       "comment" : "Toast after the page's title and address are copied as a Markdown link."
@@ -4493,7 +4877,15 @@
       }
     },
     "Needs attention" : {
-      "comment" : "VoiceOver value of an extension's button in the site panel when the extension asks for attention."
+      "comment" : "VoiceOver value of an extension's button in the site panel when the extension asks for attention.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要你留意"
+          }
+        }
+      }
     },
     "Needs your OK once" : {
       "comment" : "Under a browser’s name in the welcome window: macOS has to allow reading it first.",
@@ -4862,7 +5254,15 @@
       }
     },
     "Notifications" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.\nRow in the site panel's This Site group."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.\nRow in the site panel's This Site group.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
     },
     "Now playing" : {
       "comment" : "Accessibility label of the sidebar's control for a tab playing sound in the background."
@@ -4882,7 +5282,15 @@
       }
     },
     "OK" : {
-      "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.\nButton that closes the note about an extension's missing app."
+      "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.\nButton that closes the note about an extension's missing app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
+          }
+        }
+      }
     },
     "Oat" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A warm pale beige.",
@@ -4932,16 +5340,40 @@
       }
     },
     "On %@" : {
-      "comment" : "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain."
+      "comment" : "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 上"
+          }
+        }
+      }
     },
     "On All Sites" : {
-      "comment" : "Site Access choice: the extension works on every site."
+      "comment" : "Site Access choice: the extension works on every site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所有网站上"
+          }
+        }
+      }
     },
     "On for this site" : {
       "comment" : "Under a row's name in the site panel's This Site group, what it's set to: on."
     },
     "Only on %@" : {
-      "comment" : "Site Access choice: the extension works only on this site. The site is a domain."
+      "comment" : "Site Access choice: the extension works only on this site. The site is a domain.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在 %@ 上"
+          }
+        }
+      }
     },
     "Open" : {
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app."
@@ -5696,13 +6128,29 @@
       }
     },
     "Privacy settings" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私设置"
+          }
+        }
+      }
     },
     "Private" : {
       "comment" : "The heading at the top of a private window's sidebar, where a space's name would be."
     },
     "Proxy settings" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理设置"
+          }
+        }
+      }
     },
     "Purple" : {
       "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
@@ -5871,10 +6319,26 @@
       "comment" : "Action in the site panel, under its icon: opens or closes Reader."
     },
     "Reading aloud" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "朗读"
+          }
+        }
+      }
     },
     "Reading what you copy" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取你拷贝的内容"
+          }
+        }
+      }
     },
     "Recipes" : {
       "comment" : "A sample tab’s title in the welcome window’s picture of Zigzag.",
@@ -5899,10 +6363,26 @@
       }
     },
     "Recording tabs" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制标签页"
+          }
+        }
+      }
     },
     "Recording your screen" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制你的屏幕"
+          }
+        }
+      }
     },
     "Red" : {
       "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
@@ -5977,10 +6457,26 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes one site's data.\nTooltip of a download's button in the downloads panel: takes the download off the list."
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes one site's data.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
     },
     "Remove %@?" : {
-      "comment" : "Title of the sheet that asks before removing an extension. The placeholder is the extension's name."
+      "comment" : "Title of the sheet that asks before removing an extension. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除“%@”吗？"
+          }
+        }
+      }
     },
     "Remove %lld Pages from History" : {
       "comment" : "Tooltip of the × on a site's group of pages on the History page. Always two or more."
@@ -6094,7 +6590,15 @@
       }
     },
     "Remove from Zigzag…" : {
-      "comment" : "Item in an extension's menu: removes the extension."
+      "comment" : "Item in an extension's menu: removes the extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Zigzag 中移除…"
+          }
+        }
+      }
     },
     "Remove second color" : {
       "comment" : "VoiceOver action on the second color's chip in the space editor: ends the gradient.",
@@ -6111,7 +6615,15 @@
       "comment" : "Title of the sheet that asks before removing the pages a search found from History. Always two or more."
     },
     "Remove this extension?" : {
-      "comment" : "Title of the sheet that asks before removing an extension without a name."
+      "comment" : "Title of the sheet that asks before removing an extension without a name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除此扩展吗？"
+          }
+        }
+      }
     },
     "Remove this page from History?" : {
       "comment" : "Title of the sheet that asks before removing one page a search found from History."
@@ -6323,7 +6835,15 @@
       }
     },
     "Review what it can do, then Add" : {
-      "comment" : "On the bar over a Chrome Web Store page while the install sheet is up. Add is the sheet's button."
+      "comment" : "On the bar over a Chrome Web Store page while the install sheet is up. Add is the sheet's button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看它能做什么，然后点按“添加”"
+          }
+        }
+      }
     },
     "Rose" : {
       "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale pink.",
@@ -6510,7 +7030,15 @@
       }
     },
     "Saving pages" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储页面"
+          }
+        }
+      }
     },
     "Screenshot copied" : {
       "comment" : "Toast after taking a screenshot of the whole page."
@@ -7052,13 +7580,29 @@
       }
     },
     "Side panel" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏面板"
+          }
+        }
+      }
     },
     "Sign In" : {
       "comment" : "Button in a site's HTTP sign-in sheet."
     },
     "Sign In for %@" : {
-      "comment" : "Title of the window where an extension signs in to an account. The placeholder is the extension's name."
+      "comment" : "Title of the window where an extension signs in to an account. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录 %@"
+          }
+        }
+      }
     },
     "Sign in to %@" : {
       "comment" : "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."
@@ -7097,7 +7641,15 @@
       }
     },
     "Signing in with your account" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用你的账户登录"
+          }
+        }
+      }
     },
     "Site Access" : {
       "comment" : "Submenu of an extension's menu: which sites the extension may read and change.",
@@ -7264,7 +7816,15 @@
       "comment" : "Under the site's name in the site panel, for an https page with some parts loaded over plain http."
     },
     "Some couldn’t be added. You can add them later from the Chrome Web Store." : {
-      "comment" : "Welcome window’s extensions step, when some failed. Chrome Web Store is Google’s name."
+      "comment" : "Welcome window’s extensions step, when some failed. Chrome Web Store is Google’s name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有些扩展未能添加。你可以稍后从 Chrome 网上应用店添加。"
+          }
+        }
+      }
     },
     "Something went wrong on the site’s side. Try again in a moment." : {
       "comment" : "Message on the page Zigzag shows when a page can't load."
@@ -7504,7 +8064,15 @@
       }
     },
     "Tab groups" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页组"
+          }
+        }
+      }
     },
     "Tabs" : {
       "comment" : "A heading in Settings › General.\nThe quiet label above today's tabs in the sidebar, below the pinned tabs.",
@@ -7621,7 +8189,15 @@
       "comment" : "Why a file couldn't be saved, said after what failed, like “Couldn’t save the page. Not enough space on your Mac.”"
     },
     "That folder needs a manifest.json that Zigzag can read. Choose the folder that holds it." : {
-      "comment" : "Message of the notice when an unpacked extension can't load. manifest.json is a file name."
+      "comment" : "Message of the notice when an unpacked extension can't load. manifest.json is a file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该文件夹需要一个 Zigzag 能读取的 manifest.json。请选取包含它的文件夹。"
+          }
+        }
+      }
     },
     "That isn’t %@’s primary password. Check it and try again." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Firefox; primary password is Firefox's own term.",
@@ -7822,19 +8398,51 @@
       "comment" : "Name of a History session that began today."
     },
     "This extension" : {
-      "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.\nStands in for an extension's name when it has none, at the start of a sentence."
+      "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.\nStands in for an extension's name when it has none, at the start of a sentence.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展"
+          }
+        }
+      }
     },
     "This extension isn’t here" : {
       "comment" : "Title of the page Zigzag shows when a page can't load."
     },
     "This extension wants more access" : {
-      "comment" : "Title of the sheet shown when an update of an extension with no name asks for more access."
+      "comment" : "Title of the sheet shown when an update of an extension with no name asks for more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展请求更多权限"
+          }
+        }
+      }
     },
     "This extension’s package couldn’t be verified, so it wasn’t installed." : {
-      "comment" : "Shown when an extension couldn't be installed because its package didn't pass the signature check."
+      "comment" : "Shown when an extension couldn't be installed because its package didn't pass the signature check.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展的安装包无法验证，所以没有安装。"
+          }
+        }
+      }
     },
     "This extension’s package is damaged, so it wasn’t installed." : {
-      "comment" : "Shown when an extension couldn't be installed because its package is damaged."
+      "comment" : "Shown when an extension couldn't be installed because its package is damaged.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展的安装包已损坏，所以没有安装。"
+          }
+        }
+      }
     },
     "This file isn’t there" : {
       "comment" : "Title of the page Zigzag shows when a page can't load."
@@ -8032,7 +8640,15 @@
       }
     },
     "Turn Off" : {
-      "comment" : "Item in an extension's menu: turns the extension off."
+      "comment" : "Item in an extension's menu: turns the extension off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
     },
     "Turn On" : {
       "comment" : "Button in the toast that offers to archive unused tabs."
@@ -8486,10 +9102,26 @@
       }
     },
     "Version %@ is ready. Until you allow it, the current version keeps running." : {
-      "comment" : "Under the title of the sheet shown when an extension's update asks for more access."
+      "comment" : "Under the title of the sheet shown when an extension's update asks for more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@ 已准备就绪。在你允许之前，当前版本会继续运行。"
+          }
+        }
+      }
     },
     "Version %@, from the Chrome Web Store" : {
-      "comment" : "Under the title of the sheet that asks before adding an extension."
+      "comment" : "Under the title of the sheet that asks before adding an extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@，来自 Chrome 网上应用店"
+          }
+        }
+      }
     },
     "View" : {
       "comment" : "A menu in the menu bar.",
@@ -8628,7 +9260,15 @@
       }
     },
     "When You Click It" : {
-      "comment" : "Site Access choice: the extension works on a site only after its button is clicked."
+      "comment" : "Site Access choice: the extension works on a site only after its button is clicked.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你点按它时"
+          }
+        }
+      }
     },
     "When a page is in another language, Zigzag asks once per site." : {
       "comment" : "Explanation under “Offer to translate” in Settings › Translation.",
@@ -8681,7 +9321,15 @@
       "comment" : "Heading in the Acknowledgments window, above the open source works Zigzag ships with."
     },
     "Works in Zigzag" : {
-      "comment" : "On the bar over a Chrome Web Store page for an extension that works in Zigzag."
+      "comment" : "On the bar over a Chrome Web Store page for an extension that works in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可在 Zigzag 中使用"
+          }
+        }
+      }
     },
     "Writing report…" : {
       "comment" : "Toast while the problem report is written."
@@ -8738,13 +9386,37 @@
       }
     },
     "Your bookmarks" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的书签"
+          }
+        }
+      }
     },
     "Your browsing history" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的浏览历史记录"
+          }
+        }
+      }
     },
     "Your location" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的位置"
+          }
+        }
+      }
     },
     "Your name, email, phone and address, from your own card in Contacts." : {
       "comment" : "Explanation under “Fill forms from My Card” in Settings › Passwords.",
@@ -8800,7 +9472,15 @@
       "comment" : "Message of the sheet that asks before quitting; “it” is Zigzag."
     },
     "Your top sites" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag."
+      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的常用网站"
+          }
+        }
+      }
     },
     "You’ll be signed out of %@, and its pages load fresh next time." : {
       "comment" : "Message of the sheet that removes one site's data."
@@ -9085,7 +9765,15 @@
       }
     },
     "an extension" : {
-      "comment" : "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”."
+      "comment" : "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个扩展"
+          }
+        }
+      }
     },
     "backup undo update rollback" : {
       "comment" : "Words that find the restore row with Find a setting in Settings. Not shown.",
