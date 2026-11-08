@@ -405,7 +405,8 @@ final class SitePanel: FloatingPanelView {
         let textX = pad + iconSide + Tokens.Space.x3
         let textWidth = width - textX - pad - moreSide
         siteName.attributedStringValue = Self.fitted(site, in: textWidth)
-        place(siteName, NSRect(x: textX, y: y, width: textWidth, height: siteName.lineHeight))
+        // Its ink, not the text field's inset edge, starts over the lock below, with all of `textWidth` to fit in.
+        place(siteName, NSRect(x: textX - Label.inset, y: y, width: textWidth + Label.inset * 2, height: siteName.lineHeight))
         let lockSide: CGFloat = 10
         place(securityIcon, NSRect(x: textX, y: y + siteName.lineHeight + 3, width: lockSide, height: lockSide))
         place(security, NSRect(x: textX + lockSide + 4, y: y + siteName.lineHeight + 1, width: textWidth - lockSide - 4, height: security.lineHeight))
