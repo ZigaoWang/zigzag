@@ -140,14 +140,10 @@ nonisolated enum ChromiumImporter {
         }
         // Without a key ever saved, whatever the browser kept unencrypted still comes; denied, nothing would open.
         if !cookieFiles.isEmpty, key != .failure(.denied) {
-            var unreadable = 0
             for file in cookieFiles {
                 let read = SignInImporter.chromium(at: file, key: try? key?.get())
                 batch.cookies += read.cookies
-                unreadable += read.unreadable
-            }
-            if let problem = SignInImporter.problem(unreadable: unreadable, broughtAny: !batch.cookies.isEmpty, from: browser.name) {
-                batch.problems.append(problem)
+                batch.unreadableCookies += read.unreadable
             }
         }
         if choice.contains(.bookmarks) {

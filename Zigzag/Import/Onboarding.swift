@@ -49,6 +49,12 @@ final class OnboardingView: NSView {
 
     /// Return presses Get Started or Continue, and Esc goes Back where there's a Back. Not while you type in a
     /// field or an input method is mid-word, nor from a control you've tabbed to, which presses itself.
+    #if DEBUG
+    /// For the debug bridge: Continue (or Import) on the current step, and the import step's choices.
+    func debugNext() { _ = shell?.pressNext() }
+    func debugChoose(_ name: String, on: Bool) { (shell?.debugContent as? BringPicker)?.debugChoose(name, on: on) }
+    #endif
+
     private func handleKey(_ event: NSEvent) -> Bool {
         guard let window, event.window === window, event.modifierFlags.intersection([.command, .option, .control]).isEmpty else { return false }
         let responder = window.firstResponder
@@ -236,6 +242,11 @@ private final class StepPage: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
+
+    #if DEBUG
+    /// For the debug bridge: the step's own content.
+    var debugContent: StepContent { content }
+    #endif
 
     // MARK: Changing step
 
@@ -798,7 +809,7 @@ private final class BrowserRow: InteractiveView {
             spinner.startLooping()
         case .done(let summary):
             if let first = summary.problems.first {
-                problem.stringValue = summary.problems.map(\.message).joined(separator: " ")
+                problem.stringValue = (summary.problems.map(\.message) + summary.notes).joined(separator: " ")
                 problem.textColor = Tokens.Color.caution
                 fixKind = first.fix
                 switch first.fix {
@@ -810,7 +821,9 @@ private final class BrowserRow: InteractiveView {
                 }
                 fixButton.isHidden = first.fix == .none
             } else {
-                problem.stringValue = ""
+                // A note (some sign-ins stayed behind) reads quietly under a row that went fine.
+                problem.stringValue = summary.notes.joined(separator: " ")
+                problem.textColor = Onboard.dim(0.8)
                 status.stringValue = ""
                 status.isHidden = true
                 doneMark.isHidden = false
@@ -836,7 +849,8 @@ private final class BrowserRow: InteractiveView {
     private static func sentence(_ s: ImportCoordinator.Summary) -> String {
         func n(_ v: Int, _ one: String, _ many: String) -> String? { v > 0 ? "\(v.formatted()) \(v == 1 ? one : many)" : nil }
         let parts = [n(s.passwords + s.updatedPasswords, "password", "passwords"), n(s.spaces, "space", "spaces"),
-                     n(s.bookmarks, "bookmark", "bookmarks"), n(s.history, "page of history", "pages of history")].compactMap { $0 }
+                     n(s.bookmarks, "bookmark", "bookmarks"), n(s.signedInSites, "site signed in", "sites signed in"),
+                     n(s.history, "page of history", "pages of history")].compactMap { $0 }
         return parts.isEmpty ? "Nothing new: it was already here" : ListFormatter.localizedString(byJoining: parts)
     }
 
@@ -911,6 +925,10 @@ private final class BringPicker: StepContent {
     private let bringLabel = Label("Bring", font: Tokens.Font.small(.medium), color: Onboard.dim(0.6))
     private var pills: [(ImportCoordinator.Choice, DataToggle)] = []
     private let fileLink = Onboard.quiet("Import a password file…")
+    /// The one choice shown here: unlike bookmarks or history, sign-ins open your accounts, so you see it and can
+    /// leave it off. On to start with, as passwords are.
+    private let signIns = DataToggle("Stay signed in to your sites")
+    private let signInsNote = Label("Brings over your sign-ins from this Mac. Nothing leaves it.", font: Tokens.Font.small(), color: Onboard.dim(0.62))
     private var isImporting = false
     /// Many browsers or profiles: the list scrolls inside its box instead of running into the buttons.
     private let scroll = NSScrollView()
@@ -930,7 +948,8 @@ private final class BringPicker: StepContent {
         scroll.contentView.drawsBackground = false
         scroll.documentView = list
         hint.alignment = .center
-        [scroll, bringLabel, fileLink, hint].forEach { addSubview($0) }
+        [scroll, bringLabel, fileLink, hint, signIns, signInsNote].forEach { addSubview($0) }
+        signIns.onChange = { [weak self] in self?.refresh() }
         let sources = ImportCoordinator.detectedSources()
         let suggested = ImportCoordinator.suggested(sources)
         // The browser you use comes first, already checked.
@@ -1033,14 +1052,35 @@ private final class BringPicker: StepContent {
     /// Chosen and not yet imported. A row that came over with a problem is retried from its own fix, never by
     /// importing everything from it again.
     private var waiting: [BrowserRow] { rows.filter { row in if case .done = row.state { false } else { row.isChosen } } }
-    private var choice: ImportCoordinator.Choice { pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } } }
+    private var choice: ImportCoordinator.Choice {
+        var choice: ImportCoordinator.Choice = pills.reduce(into: []) { r, p in if p.1.isOn { r.insert(p.0) } }
+        if signIns.isOn { choice.insert(.signIns) }
+        return choice
+    }
+
+    /// Shown while a browser still to import has sign-ins to bring (Safari's stay behind).
+    private var offersSignIns: Bool { !isImporting && waiting.contains { $0.source.offers.contains(.signIns) } }
+
+    #if DEBUG
+    /// A choice by name ("Passwords", or "Sign-ins" for the toggle), hidden or not, or a browser ("Chrome").
+    func debugChoose(_ name: String, on: Bool) {
+        if name == "Sign-ins" { signIns.isOn = on }
+        pills.first { $0.1.accessibilityLabel() == name }?.1.isOn = on
+        rows.first { $0.source.name == name }?.isChosen = on
+        refresh()
+    }
+    #endif
 
     private func refresh() {
         pills.forEach { $0.1.isHidden = true }
         arrow.show(rows.filter(\.isChosen).map(\.source.icon))
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
-        hint.stringValue = isImporting ? "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow."
+        signIns.isHidden = !offersSignIns
+        signInsNote.isHidden = signIns.isHidden
+        // One line: with sign-ins too, it says the one prompt covers both rather than listing them.
+        hint.stringValue = isImporting ? (choice.contains(.signIns) ? "macOS will ask for your Mac’s password once. Type it, then click Always Allow."
+                                                                    : "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.")
             : problems ? "Not everything came over yet." : ""
         needsLayout = true
         onChange?()
@@ -1162,7 +1202,10 @@ private final class BringPicker: StepContent {
     }
 
     /// Room for the file link under the list, while it shows.
-    private var linkHeight: CGFloat { fileLink.isHidden ? 0 : Tokens.Space.x3 + Tokens.Space.x8 }
+    private var linkHeight: CGFloat { (fileLink.isHidden ? 0 : Tokens.Space.x3 + Tokens.Space.x8) + signInsHeight }
+
+    /// Room for the sign-ins choice and its line under the list, while they show.
+    private var signInsHeight: CGFloat { signIns.isHidden ? 0 : Tokens.Space.x4 + Tokens.Space.x7Height + Tokens.Space.x1 + signInsNote.lineHeight }
 
     override func layout() {
         super.layout()
@@ -1182,7 +1225,12 @@ private final class BringPicker: StepContent {
         if rows.isEmpty { empty.frame = NSRect(x: pad, y: 0, width: width, height: 40) }
         // Right under the list, lined up with its text.
         let below = rows.isEmpty ? 40 : scroll.frame.maxY
-        fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: below + Tokens.Space.x3, width: fileLink.fittingWidth, height: Tokens.Space.x8)
+        if !signIns.isHidden {
+            signIns.frame = NSRect(x: pad, y: below + Tokens.Space.x4, width: signIns.fittingWidth, height: Tokens.Space.x7Height)
+            // Under the toggle, lined up with its check.
+            signInsNote.frame = NSRect(x: pad + Tokens.Space.x3 - Label.inset, y: signIns.frame.maxY + Tokens.Space.x1, width: width - Tokens.Space.x3, height: signInsNote.lineHeight)
+        }
+        fileLink.frame = NSRect(x: pad - Tokens.Space.x2, y: below + signInsHeight + Tokens.Space.x3, width: fileLink.fittingWidth, height: Tokens.Space.x8)
         hint.alignment = .left
         hint.frame = NSRect(x: 0, y: bounds.height - hint.lineHeight, width: width, height: hint.lineHeight)
     }

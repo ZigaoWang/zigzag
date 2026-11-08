@@ -64,14 +64,34 @@ nonisolated enum SignInImporter {
         case unreadable
     }
 
-    /// Said gently, with nothing to fix: trying again wouldn't open them, and the sites themselves just ask you to
-    /// sign in once more.
-    static func problem(unreadable: Int, broughtAny: Bool, from browser: String) -> ImportProblem? {
+    /// Said gently, as a note rather than a problem: trying again wouldn't open them, and the sites themselves just
+    /// ask you to sign in once more.
+    static func note(unreadable: Int, broughtAny: Bool, from browser: String) -> String? {
         guard unreadable > 0 else { return nil }
-        let message = broughtAny
+        return broughtAny
             ? "A few of your sign-ins from \(browser) couldn’t come over, so some sites may ask you to sign in again."
             : "Your sign-ins from \(browser) couldn’t come over, so sites will ask you to sign in again."
-        return ImportProblem(message: message, fix: .none)
+    }
+
+    /// Whether a browser keeps any sign-ins, for the line under its name; nothing is decrypted or read out.
+    static func hasAny(chromium profiles: [URL]) -> Bool {
+        profiles.contains { profile in
+            let file = chromiumFile(in: profile)
+            guard FileManager.default.fileExists(atPath: file.path), let db = SQLiteReader(file) else { return false }
+            var any = false
+            db.rows("SELECT 1 FROM cookies LIMIT 1") { _ in any = true }
+            return any
+        }
+    }
+
+    static func hasAny(firefox profiles: [URL]) -> Bool {
+        profiles.contains { profile in
+            let file = profile.appendingPathComponent("cookies.sqlite")
+            guard FileManager.default.fileExists(atPath: file.path), let db = SQLiteReader(file) else { return false }
+            var any = false
+            db.rows("SELECT 1 FROM moz_cookies WHERE originAttributes = '' LIMIT 1") { _ in any = true }
+            return any
+        }
     }
 
     // MARK: Chromium

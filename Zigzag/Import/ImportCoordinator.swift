@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// "Bring your stuff from another browser": finds the browsers on this Mac, imports what the person picks,
 /// merges with what's already here, and says plainly what came over and what couldn't.
@@ -29,8 +30,9 @@ enum ImportCoordinator {
         /// What can come over from it.
         var offers: Choice {
             switch kind {
-            case .chromium(let browser): browser.name == "Arc" ? [.passwords, .bookmarks, .history, .tabs] : [.passwords, .bookmarks, .history]
-            case .firefox: [.passwords, .bookmarks, .history]
+            case .chromium(let browser): browser.name == "Arc" ? [.passwords, .bookmarks, .history, .tabs, .signIns] : [.passwords, .bookmarks, .history, .signIns]
+            case .firefox: [.passwords, .bookmarks, .history, .signIns]
+            // Safari's cookies sit behind Full Disk Access, and a file holds none: nothing to offer.
             case .safari: [.passwords, .bookmarks, .history]
             case .file: [.passwords, .bookmarks, .history]
             }
@@ -44,6 +46,8 @@ enum ImportCoordinator {
         static let history = Choice(rawValue: 4)
         /// Arc's spaces, pinned tabs and favorites.
         static let tabs = Choice(rawValue: 8)
+        /// The sites you're signed in to there, so you stay signed in here.
+        static let signIns = Choice(rawValue: 16)
 
         /// What trying again after these problems should run: just the parts that failed, or everything.
         static func retrying(_ problems: [ImportProblem], else all: Choice) -> Choice {
@@ -60,6 +64,7 @@ enum ImportCoordinator {
             if contains(.passwords) { choice.insert(.passwords) }
             if contains(.bookmarks) { choice.insert(.bookmarks) }
             if contains(.history) { choice.insert(.history) }
+            if contains(.signIns) { choice.insert(.cookies) }
             return choice
         }
     }
@@ -190,11 +195,13 @@ enum ImportCoordinator {
                 let counts = ChromiumImporter.counts(browser)
                 // Short enough for one line in the list: Arc's spaces first, then what's counted.
                 let parts = [browser.name == "Arc" ? "spaces" : nil, phrase(counts.passwords, "password", "passwords"),
-                             phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
+                             phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil,
+                             SignInImporter.hasAny(chromium: profiles) ? "sign-ins" : nil].compactMap { $0 }
                 return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
             case .firefox(let browser):
                 let counts = FirefoxImporter.counts(browser)
-                let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil].compactMap { $0 }
+                let parts = [phrase(counts.passwords, "password", "passwords"), phrase(counts.bookmarks, "bookmark", "bookmarks"), counts.history > 0 ? "history" : nil,
+                             SignInImporter.hasAny(firefox: FirefoxImporter.profiles(of: browser)) ? "sign-ins" : nil].compactMap { $0 }
                 return parts.isEmpty ? "Nothing to bring over" : Self.sentence(parts)
             case .safari:
                 return SafariImporter.hasAccess ? "Bookmarks and history, no passwords" : "Bookmarks and history, with your permission"
@@ -213,7 +220,11 @@ enum ImportCoordinator {
         var bookmarks = 0
         var history = 0
         var spaces = 0
+        /// Sites whose sign-ins came over.
+        var signedInSites = 0
         var problems: [ImportProblem] = []
+        /// Worth saying, with nothing to fix: the import still went fine.
+        var notes: [String] = []
 
         /// "Imported 214 passwords and 86 bookmarks from Arc."
         var sentence: String {
@@ -223,10 +234,14 @@ enum ImportCoordinator {
             if bookmarks > 0 { parts.append(count(bookmarks, "bookmark", "bookmarks")) }
             if spaces > 0 { parts.append(count(spaces, "space", "spaces")) }
             if history > 0 { parts.append(count(history, "page of history", "pages of history")) }
+            let signedIn = signedInSites > 0 ? " Signed in to \(count(signedInSites, "site", "sites"))." : ""
             let kept = keptPasswords > 0 ? " Kept \(count(keptPasswords, "password", "passwords")) already in Zigzag instead of the imported \(keptPasswords == 1 ? "one" : "ones")." : ""
-            guard !parts.isEmpty else { return (updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source).") + kept }
+            guard !parts.isEmpty else {
+                if signedInSites > 0 { return "Signed in to \(count(signedInSites, "site", "sites")) from \(source)." + kept }
+                return (updatedPasswords > 0 ? "Updated \(count(updatedPasswords, "password", "passwords")) from \(source)." : "Nothing new to bring over from \(source).") + kept
+            }
             let list = ListFormatter.localizedString(byJoining: parts)
-            return "Imported \(list) from \(source)." + kept
+            return "Imported \(list) from \(source)." + signedIn + kept
         }
     }
 
@@ -259,7 +274,7 @@ enum ImportCoordinator {
                     summary.problems.append(ArcImporter.historyProblem(error))
                 }
             }
-            arcReading = reading.intersection(.passwords)
+            arcReading = reading.intersection([.passwords, .cookies])
         }
 
         let kind = source.kind
@@ -283,6 +298,16 @@ enum ImportCoordinator {
         if choice.contains(.history), !batch.history.isEmpty {
             HistoryStore.shared.importVisits(batch.history)
             summary.history += batch.history.count
+        }
+        // Only ever the default store: private windows each have their own, which nothing imported reaches.
+        if choice.contains(.signIns) {
+            var applied = SignInImporter.Applied()
+            if !batch.cookies.isEmpty { applied = await SignInImporter.apply(batch.cookies, to: WKWebsiteDataStore.default().httpCookieStore) }
+            summary.signedInSites = applied.sites
+            if let note = SignInImporter.note(unreadable: batch.unreadableCookies + applied.failed,
+                                              broughtAny: applied.cookies + applied.kept > 0, from: source.name) {
+                summary.notes.append(note)
+            }
         }
         return summary
     }

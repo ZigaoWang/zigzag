@@ -41,6 +41,8 @@ final class ImportView: NSView {
     private let chooseFile = TextButton(title: "Choose File…", font: Tokens.Font.body(.medium))
     private let primary = PrimaryButton(title: "Import")
     private let secondary = TextButton(title: "Not Now", font: Tokens.Font.body(.medium))
+    /// What Sign-ins means, in a line, while it's offered.
+    private let signInsNote = NSTextField(wrappingLabelWithString: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.")
     private let emptyNote = NSTextField(wrappingLabelWithString: "No other browsers with data were found on this Mac. You can still bring passwords from a CSV export.")
 
     init(presentation: Presentation) {
@@ -64,6 +66,9 @@ final class ImportView: NSView {
         subtitle.font = Tokens.Font.body()
         subtitle.textColor = Tokens.Color.textSecondary
         subtitle.isSelectable = false
+        signInsNote.font = Tokens.Font.small()
+        signInsNote.textColor = Tokens.Color.textSecondary
+        signInsNote.isSelectable = false
         emptyNote.font = Tokens.Font.body()
         emptyNote.textColor = Tokens.Color.textSecondary
         emptyNote.isSelectable = false
@@ -74,8 +79,10 @@ final class ImportView: NSView {
         rowScroll.contentView = FlippedClipView()
         rowScroll.contentView.drawsBackground = false
         rowScroll.documentView = rowList
-        [title, subtitle, rowScroll, choiceLabel, chooseFile, primary, secondary].forEach { addSubview($0) }
-        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces and Tabs")] {
+        [title, subtitle, rowScroll, choiceLabel, signInsNote, chooseFile, primary, secondary].forEach { addSubview($0) }
+        // Sign-ins start on, as passwords do; the line under the choices says what they are.
+        for (choice, name) in [(ImportCoordinator.Choice.passwords, "Passwords"), (.bookmarks, "Bookmarks"), (.history, "History"), (.tabs, "Spaces and Tabs"),
+                               (.signIns, "Sign-ins")] {
             let box = ChoicePill(title: name)
             box.tint = Brand.Theme.brand.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }
@@ -115,6 +122,9 @@ final class ImportView: NSView {
     @objc private func choicesChanged() {
         let anyArc = rows.contains { $0.isChosen && $0.source.offers.contains(.tabs) }
         choiceButtons.first { $0.0 == .tabs }?.1.isHidden = !anyArc
+        // Safari's stay behind (they need Full Disk Access), so Sign-ins shows only for a browser that has them.
+        let anySignIns = rows.contains { $0.isChosen && $0.source.offers.contains(.signIns) }
+        choiceButtons.first { $0.0 == .signIns }?.1.isHidden = !anySignIns
         primary.isEnabled = stage != .choose || (rows.contains(where: \.isChosen) && !chosenData.isEmpty)
         needsLayout = true
     }
@@ -140,14 +150,17 @@ final class ImportView: NSView {
         let data = data ?? chosenData
         stage = .importing
         title.stringValue = "Bringing it over…"
-        // Only Chrome and its kin keep their passwords behind a Keychain item that macOS asks about.
-        let asksKeychain = data.contains(.passwords) && chosen.contains { if case .chromium = $0.source.kind { true } else { false } }
-        subtitle.stringValue = asksKeychain ? "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow." : ""
+        // Only Chrome and its kin keep their passwords and sign-ins behind a Keychain item that macOS asks about.
+        let fromChromium = chosen.contains { if case .chromium = $0.source.kind { true } else { false } }
+        let locked = [data.contains(.passwords) ? "passwords" : nil, data.contains(.signIns) ? "sign-ins" : nil].compactMap { $0 }
+        subtitle.stringValue = fromChromium && !locked.isEmpty
+            ? "macOS will ask for your Mac’s password to open your \(locked.joined(separator: " and ")). Type it, then click Always Allow." : ""
         primary.title = "Importing…"
         primary.isEnabled = false
         secondary.isHidden = true
         chooseFile.isHidden = true
         choiceLabel.isHidden = true
+        signInsNote.isHidden = true
         choiceButtons.forEach { $0.1.isHidden = true }
         rows.filter { !$0.isChosen }.forEach { $0.isHidden = true }
         chosen.forEach { $0.state = .waiting }
@@ -176,10 +189,12 @@ final class ImportView: NSView {
         stage = .done
         title.stringValue = presentation == .window ? "You’re all set" : ""
         let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
+        let signedIn = summaries.map(\.signedInSites).reduce(0, +)
         // In the welcome window the brand panel already says where everything went; here only the count and the
         // next step remain.
         subtitle.stringValue = presentation == .welcome ? "" : passwords > 0
             ? "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords."
+            : signedIn > 0 ? "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings."
             : "Everything that came over is in your sidebar. You can bring more over anytime from Settings."
         // Rows that hit a problem stay, with their fix; the ones that went fine give way to the summary.
         if presentation == .welcome {
@@ -221,10 +236,20 @@ final class ImportView: NSView {
         arc.spaces = 3
         summaries = [arc]
         rows.filter { !$0.isChosen }.forEach { $0.isHidden = true }
-        [secondary, chooseFile, choiceLabel].forEach { $0.isHidden = true }
+        [secondary, chooseFile, choiceLabel, signInsNote].forEach { $0.isHidden = true }
         choiceButtons.forEach { $0.1.isHidden = true }
         finish()
     }
+
+    /// For the debug bridge: a choice ("Sign-ins") or a browser ("Chrome") turned on or off, and Import pressed,
+    /// as clicks would.
+    func debugChoose(_ name: String, on: Bool) {
+        choiceButtons.first { $0.1.accessibilityLabel() == name }?.1.isOn = on
+        rows.first { $0.source.name == name }?.isChosen = on
+        choicesChanged()
+    }
+
+    func debugImport() { primaryAction() }
     #endif
 
     private func fix(_ fix: ImportProblem.Fix, for row: SourceRow, data: ImportCoordinator.Choice, primaryPassword: String) {
@@ -297,7 +322,16 @@ final class ImportView: NSView {
         let rowHeights: [CGFloat] = visibleRows.map { $0.preferredHeight(for: width) }
         let rowsHeight: CGFloat = rowHeights.reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
         let showsChoices = stage == .choose && !sources.isEmpty
-        let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + Tokens.Space.x8 : 0
+        let signInsShown = showsChoices && choiceButtons.contains { $0.0 == .signIns && !$0.1.isHidden }
+        let noteHeight: CGFloat = signInsShown ? Tokens.Space.x2 + ceil(signInsNote.sizeThatFits(NSSize(width: width, height: 200)).height) : 0
+        // The choices wrap onto a second line when they don't fit one (Arc's Spaces and Tabs with Sign-ins).
+        var pillLines = 1, used: CGFloat = 0
+        for (_, box) in choiceButtons where !box.isHidden {
+            if used > 0, used + box.fittingWidth > width { pillLines += 1; used = 0 }
+            used += box.fittingWidth + Tokens.Space.x2
+        }
+        let pillsHeight = CGFloat(pillLines) * Tokens.Space.x8 + CGFloat(pillLines - 1) * Tokens.Space.x2
+        let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + pillsHeight + noteHeight : 0
         let emptyHeight: CGFloat = sources.isEmpty && stage == .choose ? ceil(emptyNote.sizeThatFits(NSSize(width: width, height: 200)).height) + Tokens.Space.x4 : 0
         let showsHero = hero.superview != nil
         let heroHeight: CGFloat = showsHero ? ImportHero.height + Tokens.Space.x8 : 0
@@ -352,6 +386,13 @@ final class ImportView: NSView {
                 cx += w + Tokens.Space.x2
             }
             y += Tokens.Space.x8
+            signInsNote.isHidden = !signInsShown
+            if signInsShown {
+                y += Tokens.Space.x2
+                place(signInsNote, height: noteHeight - Tokens.Space.x2)
+            }
+        } else {
+            signInsNote.isHidden = true
         }
         y += Tokens.Space.x8
         let buttonHeight = Tokens.Space.x8
@@ -479,7 +520,7 @@ private final class SourceRow: InteractiveView {
             spinner.isHidden = false
             spinner.startLooping()
         case .done(let summary):
-            detail.stringValue = ([summary.sentence] + summary.problems.map(\.message)).joined(separator: "\n")
+            detail.stringValue = ([summary.sentence] + summary.problems.map(\.message) + summary.notes).joined(separator: "\n")
             check.isHidden = false
             let clean = summary.problems.isEmpty
             check.image = Tokens.Symbol.image(clean ? "checkmark.circle.fill" : "exclamationmark.circle.fill", size: Tokens.TypeSize.title)
@@ -668,12 +709,14 @@ private final class ImportHero: NSView {
         let bookmarks = summaries.map(\.bookmarks).reduce(0, +)
         let spaces = summaries.map(\.spaces).reduce(0, +)
         let history = summaries.map(\.history).reduce(0, +)
+        let signedIn = summaries.map(\.signedInSites).reduce(0, +)
         let from = summaries.count == 1 ? " from \(summaries[0].source)" : ""
         func plural(_ n: Int, _ one: String, _ many: String) -> String { "\(n.formatted()) \(n == 1 ? one : many)" }
         // The biggest thing that came over leads; the rest follow in a line.
         var lead: (Int, String)?
         var rest: [String] = []
-        for (n, one, many) in [(passwords, "password", "passwords"), (bookmarks, "bookmark", "bookmarks"), (spaces, "space", "spaces"), (history, "page of history", "pages of history")] where n > 0 {
+        for (n, one, many) in [(passwords, "password", "passwords"), (bookmarks, "bookmark", "bookmarks"), (spaces, "space", "spaces"),
+                             (signedIn, "site signed in", "sites signed in"), (history, "page of history", "pages of history")] where n > 0 {
             if lead == nil { lead = (n, (n == 1 ? one : many) + from) } else { rest.append(plural(n, one, many)) }
         }
         wordmark.isHidden = true
