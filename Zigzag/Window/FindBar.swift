@@ -691,7 +691,7 @@ final class ToastView: FloatingPanelView {
     static let height = Tokens.Metric.toastHeight
 
     var fittingWidth: CGFloat {
-        (icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2) + label.textWidth + trailingWidth
+        (icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2) + label.inkWidth + trailingWidth
     }
 
     /// The right end: padding, or the action and the close button, the last one inset as evenly as it sits.
@@ -703,19 +703,19 @@ final class ToastView: FloatingPanelView {
     }
 
     /// The space around the text: the icon on the left, the action (or padding) on the right.
-    private var chromeWidth: CGFloat { fittingWidth - label.textWidth }
+    private var chromeWidth: CGFloat { fittingWidth - label.inkWidth }
 
     /// Fits `maxWidth`: one line when it can, two wrapped lines when it can't, never past the page.
     func size(maxWidth: CGFloat) -> NSSize {
         let width = min(ceil(fittingWidth), maxWidth)
         let textWidth = width - chromeWidth
-        let wraps = label.textWidth > textWidth + 0.5
+        let wraps = label.inkWidth > textWidth + 0.5
         label.usesSingleLineMode = !wraps
         label.maximumNumberOfLines = wraps ? 2 : 1
         label.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
         label.cell?.wraps = wraps
         label.cell?.truncatesLastVisibleLine = true
-        let textHeight = wraps ? ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth, height: 200)).height ?? label.lineHeight * 2) : label.lineHeight
+        let textHeight = wraps ? ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth + Label.inset * 2, height: 200)).height ?? label.lineHeight * 2) : label.lineHeight
         radius = wraps ? Tokens.Radius.panel : Self.height / 2
         return NSSize(width: width, height: max(Self.height, textHeight + Tokens.Space.x4))
     }
@@ -743,7 +743,9 @@ final class ToastView: FloatingPanelView {
         }
         let textWidth = bounds.width - chromeWidth
         let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
-        label.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: textWidth, height: h)
+        // The text field draws its text Label.inset in from its edges: set it that much wider, so the ink sits
+        // exactly where the padding ends, the same both ends.
+        label.frame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: textWidth + Label.inset * 2, height: h)
     }
 }
 
