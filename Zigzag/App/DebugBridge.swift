@@ -35,7 +35,7 @@ enum DebugBridge {
     /// ministate <path> (JSON), minishot <path> (the window's own drawing, as a PNG; web content may be blank),
     /// miniclosebrowsers, minijs <script> (run in the mini page), miniesc (Esc in the address field), miniquit,
     /// miniask notifications, minianswer allow|deny|notnow (the site's question), minisave save|notnow,
-    /// minieval <path> <script>.
+    /// minieval <path> <script>. With no mini window open, miniask and minianswer use the front browser window.
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
@@ -52,14 +52,16 @@ enum DebugBridge {
         case "miniask":
             // miniask notifications: the question a page's Notification.requestPermission() asks, without the click
             // it needs first.
-            guard let mini, let host = mini.tab.url?.host() else { break }
+            let browser = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
+            guard let tab = mini?.tab ?? browser?.tabManager.selectedTab, let host = tab.url?.host() else { break }
+            let window = mini?.window ?? browser?.window
             Task {
-                let answer = await SitePermissions.requestNotifications(host: host, window: mini.window, isPrivate: false, tab: mini.tab)
+                let answer = await SitePermissions.requestNotifications(host: host, window: window, isPrivate: tab.isPrivate, tab: tab)
                 debugLog("miniask \(arg): \(answer.map { $0 ? "allowed" : "not allowed" } ?? "put off")")
             }
         case "minianswer":
-            guard let mini else { break }
-            PermissionPrompt.debugAnswer(arg == "allow" ? .allow : arg == "deny" ? .deny : .notNow, in: mini)
+            guard let host: PromptHost = mini ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { break }
+            PermissionPrompt.debugAnswer(arg == "allow" ? .allow : arg == "deny" ? .deny : .notNow, in: host)
         case "minisave": SavePasswordPrompt.debugAnswer(saved: arg == "save")
         case "minieval":
             // minieval <path> <script>: the script's result (it may await), written to the file.
@@ -107,6 +109,7 @@ enum DebugBridge {
             var json: [String: Any] = ["minis": minis, "windows": windows, "savedTabs": saved, "setting": MiniWindowController.opensExternalLinks]
             // The questions on screen, and which window each is in.
             if let mini { json["permissionInMini"] = PermissionPrompt.debugShowing(in: mini) ?? "" }
+            json["permissionInBrowsers"] = WindowManager.shared.controllers.map { PermissionPrompt.debugShowing(in: $0) ?? "" }
             if let save = SavePasswordPrompt.debugShowing {
                 json["savePrompt"] = save.text
                 json["savePromptInMini"] = save.window != nil && save.window === mini?.window
