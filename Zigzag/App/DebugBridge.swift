@@ -379,6 +379,7 @@ enum DebugBridge {
         case "quit": NSApp.terminate(nil)
         case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
+        case "seedhistory": seedHistory(Int(arg) ?? 50_000)
         case "newwindow": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false)
         case "closekey": WindowManager.shared.keyController?.window?.performClose(nil)
         case "reopenwindow": WindowManager.shared.reopenClosedWindow()
@@ -929,6 +930,49 @@ enum DebugBridge {
     }
 
     static func cpuTime(_ pid: Int32) -> Double { ProcessCPU.seconds(pid) }
+
+    /// A made-up year of browsing, for timing History with a big one: sittings of pages on a few thousand sites, titles
+    /// in English and Chinese, and an icon for every other site. Only into a test copy's own data.
+    static func seedHistory(_ count: Int) {
+        guard ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil else { debugLog("seedhistory refused: not a test copy"); return }
+        var rng = SystemRandomNumberGenerator()
+        let words = ["swift", "release", "notes", "guide", "design", "kitchen", "travel", "shanghai", "weather", "github", "issue",
+                     "pull", "request", "video", "music", "review", "price", "laptop", "garden", "recipe", "news", "market",
+                     "python", "docs", "api", "school", "map", "train", "flight", "hotel", "photo", "camera", "game", "chess",
+                     "上海", "天气", "新闻", "视频", "音乐", "美食", "旅行", "地图", "学习", "编程", "文档", "电影", "游戏", "购物"]
+        let tlds = ["com", "org", "net", "io", "cn", "dev", "co.uk"]
+        let hosts = (0..<2500).map { i in
+            (i % 3 == 0 ? "www." : "") + words[i % words.count].unicodeScalars.filter(\.isASCII).map(String.init).joined()
+                + "\(i)" + "." + tlds[i % tlds.count]
+        }
+        let icon = NSImage(size: NSSize(width: 32, height: 32), flipped: false) { rect in
+            NSColor.systemOrange.setFill(); NSBezierPath(ovalIn: rect).fill(); return true
+        }
+        if let tiff = icon.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            for host in hosts.enumerated() where host.offset % 2 == 0 {
+                let site = host.element.hasPrefix("www.") ? String(host.element.dropFirst(4)) : host.element
+                try? png.write(to: Paths.favicons.appendingPathComponent(site + ".png"))
+            }
+        }
+        var entries: [(URL, String, Int, Date)] = []
+        var time = Date().addingTimeInterval(-60)
+        while entries.count < count {
+            // A sitting of a few dozen pages, a handful of sites in turn, then a break.
+            let sitting = Int.random(in: 10...80, using: &rng)
+            var host = hosts[Int.random(in: 0..<hosts.count, using: &rng)]
+            for _ in 0..<sitting {
+                if Int.random(in: 0..<4, using: &rng) == 0 { host = hosts[Int.random(in: 0..<hosts.count, using: &rng)] }
+                let title = (0..<Int.random(in: 2...6, using: &rng)).map { _ in words.randomElement(using: &rng)! }.joined(separator: " ")
+                let path = title.unicodeScalars.filter(\.isASCII).map(String.init).joined().replacingOccurrences(of: " ", with: "-")
+                guard let url = URL(string: "https://\(host)/\(path)/\(entries.count)") else { continue }
+                entries.append((url, title.capitalized, Int.random(in: 1...20, using: &rng), time))
+                time.addTimeInterval(-Double.random(in: 10...300, using: &rng))
+            }
+            time.addTimeInterval(-Double.random(in: 3600...30000, using: &rng))
+        }
+        HistoryStore.shared.importVisits(entries)
+        debugLog("seedhistory => \(entries.count) visits back to \(time)")
+    }
     #endif
 }
 
