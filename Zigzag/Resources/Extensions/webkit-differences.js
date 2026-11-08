@@ -92,6 +92,49 @@
       if (has) setMember(['cookies', 'onChanged'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // runtime.sendMessage's answer: WebKit cuts a string in the answer short at its first NUL character, which Chrome
+    // carries whole; the message itself and port messages arrive whole. Tampermonkey's dashboard gets site icons from
+    // its background as binary strings, so each arrived as "PNG" and showed a question mark. Between the extension's
+    // own pages and background (both run this), such an answer travels as JSON, which writes NUL as text, and is
+    // read back on arrival. Content scripts don't run this, so what they're sent stays as WebKit carries it.
+    const ownPages = (() => { try { return api.runtime.getURL(''); } catch (e) { return null; } })();
+    const NUL_KEY = '__zigzagWithNul';
+    const withNul = (value) => {
+      if (value == null || (typeof value !== 'object' && typeof value !== 'string')) return value;
+      let text;
+      try { text = JSON.stringify(value); } catch (e) { return value; }
+      return text && text.includes('\\u0000') ? { [NUL_KEY]: text } : value;
+    };
+    const unwrapNul = (value) => (value && typeof value === 'object' && typeof value[NUL_KEY] === 'string' ? JSON.parse(value[NUL_KEY]) : value);
+    const onMessage = api.runtime.onMessage;
+    if (ownPages && onMessage && typeof onMessage.addListener === 'function') {
+      const add = onMessage.addListener.bind(onMessage);
+      const remove = onMessage.removeListener && onMessage.removeListener.bind(onMessage);
+      const has = onMessage.hasListener && onMessage.hasListener.bind(onMessage);
+      const answering = new WeakMap();
+      setMember(['runtime', 'onMessage'], 'addListener', (listener) => {
+        if (typeof listener !== 'function') return add(listener);
+        const wrapped = (message, sender, sendResponse) => {
+          if (!sender || typeof sender.url !== 'string' || !sender.url.startsWith(ownPages)) return listener(message, sender, sendResponse);
+          const result = listener(message, sender, (value) => sendResponse(withNul(value)));
+          return result && typeof result.then === 'function' ? result.then(withNul) : result;
+        };
+        answering.set(listener, wrapped);
+        return add(wrapped);
+      });
+      if (remove) setMember(['runtime', 'onMessage'], 'removeListener', (listener) => remove(answering.get(listener) || listener));
+      if (has) setMember(['runtime', 'onMessage'], 'hasListener', (listener) => has(answering.get(listener) || listener));
+    }
+    if (ownPages && typeof api.runtime.sendMessage === 'function') {
+      const sendMessage = api.runtime.sendMessage.bind(api.runtime);
+      setMember(['runtime'], 'sendMessage', (...args) => {
+        const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+        if (callback) return sendMessage(...args, (value) => callback(unwrapNul(value)));
+        const sent = sendMessage(...args);
+        return sent && typeof sent.then === 'function' ? sent.then(unwrapNul) : sent;
+      });
+    }
+
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
     // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
     if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {
