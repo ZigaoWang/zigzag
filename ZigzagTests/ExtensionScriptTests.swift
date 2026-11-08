@@ -40,4 +40,85 @@ struct ExtensionScriptTests {
         #expect((api["debugger"]?["events"] as? [String])?.contains("onEvent") == true)
         #expect(((api["runtime"]?["enums"] as? [String: [String: String]])?["ContextType"])?["OFFSCREEN_DOCUMENT"] == "OFFSCREEN_DOCUMENT")
     }
+
+    /// A fake extension world for webkit-differences.js: the background or one of its pages in a tab, with ports
+    /// that the test carries between the two.
+    private static let fakeWorld = """
+    var __timers = [];
+    var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+    var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+    var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+    const event = () => { const l = []; return { addListener: (f) => l.push(f), removeListener: (f) => { const i = l.indexOf(f); if (i >= 0) l.splice(i, 1); }, hasListener: (f) => l.includes(f), fire: (...a) => l.map((f) => f(...a)) }; };
+    var __port = (name, sender, send) => ({ name, sender, onMessage: event(), onDisconnect: event(), postMessage: (m) => send(JSON.stringify(m)), disconnect: () => {} });
+    var location = { protocol: 'webkit-extension:', origin: 'webkit-extension://x', href: __background ? 'webkit-extension://x/background.js' : 'webkit-extension://x/frame.html', pathname: '/frame.html', search: '' };
+    var __scriptCalls = [];
+    var chrome = {
+      runtime: { id: 'x', getURL: (p) => 'webkit-extension://x/' + p, getManifest: () => ({}), onMessage: event(), onConnect: event(),
+                 sendMessage: () => Promise.resolve(), connect: (info) => { __page = __port(info.name, {}, __toBackground); __connectToBackground(info.name); return __page; } },
+      extension: { getBackgroundPage: () => (__background ? globalThis : null) },
+      tabs: { sendMessage: (tabId, message, options) => { __scriptCalls.push([tabId, message, options]); return Promise.resolve(__background && 'script answer'); } },
+    };
+    """
+
+    @Test func tabMessagesReachTheExtensionsOwnFramesInThatTab() throws {
+        // WebKit sends tabs.sendMessage to content scripts only; Chrome also to the extension's own pages in that
+        // tab, which is how 1Password tells its sign-in banner on a site to close.
+        let background = JSContext()!, frame = JSContext()!
+        for (context, isBackground) in [(background, true), (frame, false)] {
+            context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+            context.evaluateScript("var __background = \(isBackground), __page = null, __backgroundPort = null;")
+        }
+        // What one side posts arrives at the other after the current script, as over a real port.
+        final class Mail { var queue: [(JSContext, String)] = [] }
+        let mail = Mail()
+        let toBackground: @convention(block) (String) -> Void = { json in
+            mail.queue.append((background, "__backgroundPort.onMessage.fire(JSON.parse(\(Self.quoted(json))))"))
+        }
+        let toFrame: @convention(block) (String) -> Void = { json in
+            mail.queue.append((frame, "__page.onMessage.fire(JSON.parse(\(Self.quoted(json))))"))
+        }
+        let connect: @convention(block) (String) -> Void = { name in
+            mail.queue.append((background, "__backgroundPort = __port(\(Self.quoted(name)), { tab: { id: 7 }, frameId: 3 }, __toFrame); chrome.runtime.onConnect.fire(__backgroundPort)"))
+        }
+        frame.setObject(toBackground, forKeyedSubscript: "__toBackground" as NSString)
+        frame.setObject(connect, forKeyedSubscript: "__connectToBackground" as NSString)
+        background.setObject(toFrame, forKeyedSubscript: "__toFrame" as NSString)
+        for context in [background, frame] {
+            context.evaluateScript(Self.fakeWorld)
+            context.evaluateScript(ExtensionBridgeScript.differences)
+        }
+        func run(_ context: JSContext, _ script: String) {
+            context.evaluateScript(script)
+            for _ in 0..<50 {
+                for side in [background, frame] { side.evaluateScript("__flush()") }
+                if mail.queue.isEmpty { break }
+                let (target, delivery) = mail.queue.removeFirst()
+                target.evaluateScript(delivery)
+            }
+        }
+        // The frame listens; the background's own onConnect listeners never see its port.
+        run(background, "var __seen = 0; chrome.runtime.onConnect.addListener(() => __seen++);")
+        run(frame, "var __got = []; chrome.runtime.onMessage.addListener((m, s, reply) => { __got.push(m.n); reply('frame answer ' + m.n); });")
+        #expect(background.evaluateScript("__seen").toInt32() == 0)
+
+        // To the whole tab: the frame hears it too, and its answer comes back.
+        run(background, "chrome.tabs.sendMessage(7, { n: 1 }).then((v) => { globalThis.__one = v; });")
+        #expect(frame.evaluateScript("__got.join()").toString() == "1")
+        #expect(background.evaluateScript("__scriptCalls.length").toInt32() == 1)
+        #expect(["frame answer 1", "script answer"].contains(background.evaluateScript("__one").toString()))
+
+        // To the frame by its frameId, with a callback: only the frame, not the content scripts.
+        run(background, "chrome.tabs.sendMessage(7, { n: 2 }, { frameId: 3 }, (v) => { globalThis.__two = v; });")
+        #expect(background.evaluateScript("__two").toString() == "frame answer 2")
+        #expect(background.evaluateScript("__scriptCalls.length").toInt32() == 1)
+
+        // Another tab: left to WebKit exactly as before.
+        run(background, "chrome.tabs.sendMessage(8, { n: 3 }).then((v) => { globalThis.__three = v; });")
+        #expect(frame.evaluateScript("__got.join()").toString() == "1,2")
+        #expect(background.evaluateScript("__three").toString() == "script answer")
+    }
+
+    private static func quoted(_ text: String) -> String {
+        String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
+    }
 }
