@@ -9,6 +9,11 @@ import WebKit
 @MainActor
 final class EnergyWatch {
     static let shared = EnergyWatch()
+    /// Settings › General. Off, a busy background tab is left alone and nothing is said.
+    static var sleepsBusyTabs: Bool {
+        get { UserDefaults.standard.object(forKey: "SleepsBusyTabs") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "SleepsBusyTabs") }
+    }
 
     /// Busy, as a share of one core, for long enough to be more than a page finishing its load.
     private static let busy = 0.7
@@ -37,6 +42,7 @@ final class EnergyWatch {
     }
 
     private func look() {
+        guard Self.sleepsBusyTabs else { last = [:]; streak = [:]; lastLook = nil; return }
         var seen: Set<Int32> = []
         let now = Date()
         let elapsed = lastLook.map { now.timeIntervalSince($0) } ?? Self.interval

@@ -1548,6 +1548,17 @@
         }
       }
     },
+    "A tab you’re not using that keeps working hard sleeps until you open it again." : {
+      "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没在用却一直占用大量资源的标签页会休眠，再次打开时唤醒。"
+          }
+        }
+      }
+    },
     "AD" : {
       "comment" : "Label on a sample ad in the welcome window’s picture of Zigzag.",
       "localizations" : {
@@ -8390,6 +8401,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在搜索词所在的位置放上 %s。"
+          }
+        }
+      }
+    },
+    "Put busy background tabs to sleep" : {
+      "comment" : "A setting in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让耗电的后台标签页休眠"
           }
         }
       }
