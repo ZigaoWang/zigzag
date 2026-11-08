@@ -6888,6 +6888,17 @@
         }
       }
     },
+    "Not everything came over yet" : {
+      "comment" : "Title of the Import window when some things came over and others hit a problem.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有一些内容没有导入"
+          }
+        }
+      }
+    },
     "Not everything came over yet." : {
       "comment" : "Welcome window’s import step when something didn’t come over.",
       "localizations" : {
@@ -6961,6 +6972,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有导入任何内容"
+          }
+        }
+      }
+    },
+    "Nothing came over yet." : {
+      "comment" : "Welcome window’s import step when nothing came over because of a problem, explained under each browser.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有导入任何内容。"
           }
         }
       }
@@ -10505,6 +10527,17 @@
         }
       }
     },
+    "Something got in the way" : {
+      "comment" : "Title of the Import window when nothing came over because of a problem.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入时遇到了问题"
+          }
+        }
+      }
+    },
     "Something went wrong on the site’s side. Try again in a moment." : {
       "comment" : "Message on the page Zigzag shows when a page can't load.",
       "localizations" : {
@@ -12568,12 +12601,23 @@
       }
     },
     "What stopped it is below, with a way to fix it." : {
-      "comment" : "Under “Not yet” when an import finishes with a problem.",
+      "comment" : "Import window when nothing came over because of a problem.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "下面列出了导致问题的原因，以及解决方法。"
+          }
+        }
+      }
+    },
+    "What stopped the rest is below, with a way to fix it." : {
+      "comment" : "Import window when some things came over and others hit a problem, which the rows below explain.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下面列出了其余内容没有导入的原因，以及解决方法。"
           }
         }
       }

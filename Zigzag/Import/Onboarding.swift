@@ -1177,6 +1177,7 @@ private final class BringPicker: StepContent {
         arrow.show(rows.filter(\.isChosen).map(\.source.icon))
         rows.forEach { $0.isLocked = isImporting }
         let problems = rows.contains { if case .done(let s) = $0.state { !s.problems.isEmpty } else { false } }
+        let broughtAny = rows.contains { if case .done(let s) = $0.state { s.broughtAny } else { false } }
         signIns.isHidden = !offersSignIns
         // One line: with sign-ins too, it says the one prompt covers both rather than listing them.
         hint.stringValue = isImporting
@@ -1184,7 +1185,9 @@ private final class BringPicker: StepContent {
                                                   comment: "Welcome window’s import step while importing. Always Allow is macOS's own button.")
                                          : String(localized: "macOS will ask for your Mac’s password to open your passwords. Type it, then click Always Allow.",
                                                   comment: "Import window while importing from Chrome or a browser like it. Always Allow is macOS's own button."))
-            : problems ? String(localized: "Not everything came over yet.", comment: "Welcome window’s import step when something didn’t come over.") : ""
+            : !problems ? ""
+            : broughtAny ? String(localized: "Not everything came over yet.", comment: "Welcome window’s import step when something didn’t come over.")
+            : String(localized: "Nothing came over yet.", comment: "Welcome window’s import step when nothing came over because of a problem, explained under each browser.")
         needsLayout = true
         onChange?()
     }

@@ -244,6 +244,9 @@ enum ImportCoordinator {
         /// Worth saying, with nothing to fix: the import still went fine.
         var notes: [String] = []
 
+        /// Something came over: anything counted above.
+        var broughtAny: Bool { passwords + updatedPasswords + bookmarks + history + spaces + signedInSites > 0 }
+
         /// "Imported 214 passwords and 86 bookmarks from Arc."
         var sentence: String {
             var parts: [String] = []

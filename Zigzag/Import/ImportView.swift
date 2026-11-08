@@ -200,12 +200,22 @@ final class ImportView: NSView {
 
     private func finish() {
         stage = .done
-        title.stringValue = presentation == .window ? String(localized: "You’re all set", comment: "Title of the Import window when the import is done.") : ""
         let passwords = summaries.map { $0.passwords + $0.updatedPasswords }.reduce(0, +)
         let signedIn = summaries.map(\.signedInSites).reduce(0, +)
+        let problems = summaries.contains { !$0.problems.isEmpty }
+        let broughtAny = summaries.contains(where: \.broughtAny)
+        // Only "all set" when it is: with a problem, the title says how far it got and the rows below say why.
+        title.stringValue = presentation == .welcome ? ""
+            : !problems ? String(localized: "You’re all set", comment: "Title of the Import window when the import is done.")
+            : broughtAny ? String(localized: "Not everything came over yet", comment: "Title of the Import window when some things came over and others hit a problem.")
+            : String(localized: "Something got in the way", comment: "Title of the Import window when nothing came over because of a problem.")
         // In the welcome window the brand panel already says where everything went; here only the count and the
         // next step remain.
-        subtitle.stringValue = presentation == .welcome ? "" : passwords > 0
+        subtitle.stringValue = presentation == .welcome ? ""
+            : problems ? (broughtAny ? String(localized: "What stopped the rest is below, with a way to fix it.",
+                                              comment: "Import window when some things came over and others hit a problem, which the rows below explain.")
+                                     : String(localized: "What stopped it is below, with a way to fix it.", comment: "Import window when nothing came over because of a problem."))
+            : passwords > 0
             ? String(localized: "Your passwords are saved in Zigzag, in your Mac’s Keychain, and sync with iCloud Keychain. Find them in Zigzag › Passwords.",
                      comment: "Import window when the import is done. Zigzag › Passwords is the menu item's path; Keychain and iCloud Keychain are Apple's names.")
             : signedIn > 0 ? String(localized: "You’re signed in to your sites here too, and everything else is in your sidebar. You can bring more over anytime from Settings.",
@@ -789,10 +799,10 @@ private final class ImportHero: NSView {
             detail.stringValue = rest.isEmpty ? "" : String(localized: "Plus \(Words.list(rest)).", comment: "Under the big number when an import finishes: the rest of what came over, like “Plus 86 bookmarks and 3 spaces.”")
             setCount(lead.0.formatted(), size: Tokens.Welcome.countSize)
         } else if summaries.contains(where: { !$0.problems.isEmpty }) {
-            // Never a cheerful "all set" over a failure: say nothing came, and the rows below say why.
+            // Never a cheerful "all set" over a failure: say nothing came; the window's own lines say why.
             setCount(String(localized: "Not yet", comment: "Shown large when an import finishes and nothing came over because of a problem."), size: 44)
             caption.stringValue = String(localized: "Nothing came over", comment: "Under “Not yet” when an import finishes with a problem.")
-            detail.stringValue = String(localized: "What stopped it is below, with a way to fix it.", comment: "Under “Not yet” when an import finishes with a problem.")
+            detail.stringValue = ""
         } else {
             setCount(String(localized: "All set", comment: "Shown large when an import finishes and everything was already in Zigzag."), size: 44)
             caption.stringValue = String(localized: "Nothing new to bring over", comment: "Under “All set” when an import finishes and everything was already in Zigzag.")
