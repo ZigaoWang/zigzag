@@ -188,6 +188,7 @@ final class SidebarContainer: NSView {
 
 /// Invisible strip for resizing: between sidebar and page, and between split panes.
 final class ResizeHandle: NSView {
+    var onBegin: (() -> Void)?
     var onDrag: ((CGFloat) -> Void)?
     var onEnd: (() -> Void)?
     var onDoubleClick: (() -> Void)?
@@ -203,6 +204,7 @@ final class ResizeHandle: NSView {
 
     override func mouseDown(with event: NSEvent) {
         startX = event.locationInWindow.x
+        onBegin?()
         if event.clickCount == 2 { onDoubleClick?() }
     }
 
@@ -312,6 +314,10 @@ final class BrowserRootView: ColorView {
     /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation).
     var onSlide: ((TimeInterval) -> Void)?
     var onSidebarWidthChange: ((CGFloat) -> Void)?
+    /// The width when a drag on the sidebar's edge began, kept if the drag closes it.
+    private var widthBeforeDrag: CGFloat = Tokens.Metric.sidebarMinWidth
+    /// Through the whole drag, closed or not, so it can be dragged back out.
+    private var isDraggingSidebarEdge = false
 
     private var trackingArea: NSTrackingArea?
     private var borderlessToken: NSObjectProtocol?
@@ -374,8 +380,27 @@ final class BrowserRootView: ColorView {
                 }
             }
         }
+        resizeHandle.onBegin = { [weak self] in
+            guard let self else { return }
+            self.widthBeforeDrag = self.sidebarWidth
+            self.isDraggingSidebarEdge = true
+        }
         resizeHandle.onDrag = { [weak self] x in
             guard let self else { return }
+            // Dragged well past its narrowest, it closes, as a Mac sidebar does; dragged back out in the same drag, it
+            // opens again. Closed this way it keeps the width it had, for when it opens next.
+            let closesAt = Tokens.Metric.sidebarMinWidth / 2
+            if self.sidebarVisible, x < closesAt {
+                self.sidebarWidth = self.widthBeforeDrag
+                self.setSidebarVisible(false, animated: true)
+                return
+            }
+            if !self.sidebarVisible {
+                guard x >= closesAt else { return }
+                self.sidebarWidth = Tokens.Metric.sidebarMinWidth
+                self.setSidebarVisible(true, animated: true)
+                return
+            }
             let width = Tokens.Space.snap(min(max(x, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
             guard width != self.sidebarWidth else { return }
             self.sidebarWidth = width
@@ -384,6 +409,8 @@ final class BrowserRootView: ColorView {
         }
         resizeHandle.onEnd = { [weak self] in
             guard let self else { return }
+            self.isDraggingSidebarEdge = false
+            self.needsLayout = true
             self.onSidebarWidthChange?(self.sidebarWidth)
         }
         // Links and files dropped on the page area open as tabs too: an empty window, or with the sidebar hidden.
@@ -740,7 +767,7 @@ final class BrowserRootView: ColorView {
         sidebarContainer.isFloating = !sidebarVisible
         let handleWidth = Tokens.Metric.resizeHandleWidth
         resizeHandle.frame = NSRect(x: sidebarWidth - handleWidth / 2, y: 0, width: handleWidth, height: bounds.height)
-        resizeHandle.isHidden = !sidebarVisible
+        resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
         overlay.frame = bounds
         onLayoutChange?()
     }
