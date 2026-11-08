@@ -82,8 +82,19 @@ fi
 ZIP="$OUT/updates/Zigzag-$VERSION.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
+# Apple's notary service is a long upload from here, and it sometimes times out ("connectTimeout") though nothing is
+# wrong with the build. A few tries before giving up; a build Apple rejects still stops at stapling, as before.
+notarize() {
+  for attempt in 1 2 3; do
+    xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait && return 0
+    [[ $attempt -lt 3 ]] && { echo "Apple's notary service didn't answer; trying again ($((attempt + 1)) of 3)…"; sleep 20; }
+  done
+  echo "Couldn't reach Apple's notary service after 3 tries. Nothing was published; run the release again later."
+  exit 1
+}
+
 echo "Notarizing…"
-xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait
+notarize "$ZIP"
 xcrun stapler staple "$APP"
 rm "$ZIP" && ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 spctl --assess --type execute --verbose "$APP"
@@ -148,7 +159,7 @@ rm -rf "$STAGE"
 IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')
 codesign --sign "$IDENTITY" --timestamp "$DMG"
 echo "Notarizing the DMG…"
-xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+notarize "$DMG"
 xcrun stapler staple "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 
