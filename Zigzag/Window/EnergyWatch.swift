@@ -1,7 +1,8 @@
 import AppKit
 import WebKit
 
-/// Notices a tab you're not looking at that keeps a CPU core busy, and says so once, with a way to close it. The page
+/// Notices a tab you're not looking at that keeps a CPU core busy, puts it to sleep (it wakes where it was when you
+/// go back to it), and says so once per site, with a way to find it. The page
 /// in front isn't flagged: you can see what it's doing, and a busy one is usually busy on purpose (an animation, a
 /// game). Nor is an extension blamed just for being on the page: password managers are on every page, so naming one
 /// would mostly be wrong. Nothing about the page is recorded; only how busy its process is.
@@ -12,7 +13,10 @@ final class EnergyWatch {
     /// Busy, as a share of one core, for long enough to be more than a page finishing its load.
     private static let busy = 0.7
     private static let interval: TimeInterval = 10
-    private static let rounds = 3
+    /// A minute busy: long past a load, and long enough to be the page's habit.
+    private static let rounds = 6
+    /// A page you left this recently stays awake, so a reply you were writing in it isn't lost.
+    private static let recentlySeen: TimeInterval = 2 * 60
 
     private var timer: Timer?
     /// Each page process's CPU seconds at the last look, and how many looks in a row it's been busy.
@@ -20,7 +24,7 @@ final class EnergyWatch {
     private var streak: [Int32: Int] = [:]
     /// When the last look was, since a timer with slack doesn't fire exactly on the interval.
     private var lastLook: Date?
-    /// Pages already told about, by tab and site, so it's said once.
+    /// Sites already told about, so it's said once however many of their tabs are open.
     private var told: Set<String> = []
 
     func start() {
@@ -57,7 +61,8 @@ final class EnergyWatch {
                 // Playing something is meant to work hard.
                 guard streak[pid] ?? 0 >= Self.rounds, !tab.isPlayingAudio,
                       let url = tab.url else { continue }
-                warn(about: tab, url: url, in: controller)
+                streak[pid] = 0
+                settle(pid, tab: tab, url: url, in: controller)
             }
         }
         // Forget processes that have gone.
@@ -84,9 +89,28 @@ final class EnergyWatch {
         WindowManager.shared.controllers.first { $0.tabManager.allTabs.contains { $0 === tab } }
     }
 
-    private func warn(about tab: Tab, url: URL, in controller: BrowserWindowController) {
+    /// A page process busy in the background: its tabs that can sleep, sleep; one that can't is only pointed out.
+    /// Tabs of a site share a process, so all of that site's background tabs count.
+    private func settle(_ pid: Int32, tab busiest: Tab, url: URL, in controller: BrowserWindowController) {
+        let now = Date()
+        var slept: [Tab] = [], awake: [Tab] = [], soon = false
+        for owner in WindowManager.shared.controllers {
+            for tab in owner.tabManager.allTabs where tab.webView.flatMap(Self.processID) == pid && !Self.isOnScreen(tab, in: owner) {
+                let mustStay = url.scheme == "webkit-extension" || tab.isPlayingAudio || tab.isInUse || tab.notifiesUser
+                if mustStay { awake.append(tab) } else if now.timeIntervalSince(tab.lastActivated) <= Self.recentlySeen { soon = true } else {
+                    tab.suspend()
+                    slept.append(tab)
+                }
+            }
+        }
+        // One you only just left sleeps at a later look, and is spoken of then.
+        guard !(soon && awake.isEmpty && slept.isEmpty) else { return }
+        warn(about: awake.first ?? slept.first ?? busiest, url: url, asleep: awake.isEmpty && !slept.isEmpty, in: controller)
+    }
+
+    private func warn(about tab: Tab, url: URL, asleep: Bool, in controller: BrowserWindowController) {
         let site = ContentBlocker.site(of: url) ?? url.host() ?? url.absoluteString
-        guard told.insert("\(tab.id)|\(site)").inserted else { return }
+        guard told.insert(url.scheme == "webkit-extension" ? "\(tab.id)" : site).inserted else { return }
         // An extension's own page: name the extension, and offer to close the page.
         if url.scheme == "webkit-extension", #available(macOS 15.4, *) {
             let name = ExtensionHost.shared.contexts.first { $0.baseURL.host() == url.host() }?.webExtension.displayName
@@ -100,11 +124,15 @@ final class EnergyWatch {
                        }), duration: 15, in: controller)
             return
         }
-        Toast.show(String(localized: "A tab on \(site) is using a lot of energy in the background", comment: "Toast when a tab in the background uses a lot of energy. The site is a domain, like example.com."), symbol: "bolt",
-                   action: (String(localized: "Close Tab", comment: "Button in the toast about a tab using a lot of energy: closes that tab."), { [weak controller, weak tab] in
-                       guard let tab, !tab.isClosed else { return }
-                       (Self.window(holding: tab) ?? controller)?.closeWithUndo(tab)
-                   }), duration: 12, in: controller)
+        let text = asleep
+            ? String(localized: "A tab on \(site) was using a lot of energy, so it’s asleep now", comment: "Toast after Zigzag put a background tab to sleep because it used a lot of energy. The site is a domain, like example.com. The tab wakes when you open it.")
+            : String(localized: "A tab on \(site) is using a lot of energy in the background", comment: "Toast when a tab in the background uses a lot of energy. The site is a domain, like example.com.")
+        Toast.show(text, symbol: "bolt",
+                   action: (String(localized: "Show Tab", comment: "Button in the toast about a tab using a lot of energy: switches to that tab."), { [weak controller, weak tab] in
+                       guard let tab, !tab.isClosed, let owner = Self.window(holding: tab) ?? controller else { return }
+                       owner.tabManager.select(tab)
+                       owner.window?.makeKeyAndOrderFront(nil)
+                   }), duration: 12, closes: true, in: controller)
     }
 }
 

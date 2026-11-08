@@ -1537,6 +1537,17 @@
         }
       }
     },
+    "A tab on %@ was using a lot of energy, so it’s asleep now" : {
+      "comment" : "Toast after Zigzag put a background tab to sleep because it used a lot of energy. The site is a domain, like example.com. The tab wakes when you open it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 上的一个标签页耗电较多，已让它休眠"
+          }
+        }
+      }
+    },
     "AD" : {
       "comment" : "Label on a sample ad in the welcome window’s picture of Zigzag.",
       "localizations" : {
@@ -10139,7 +10150,7 @@
       }
     },
     "Show Tab" : {
-      "comment" : "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.",
+      "comment" : "Button in the toast about a tab using a lot of energy: switches to that tab.\nVoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
