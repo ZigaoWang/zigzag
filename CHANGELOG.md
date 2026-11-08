@@ -5,6 +5,32 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
+### New
+- Clear keeps the tabs you're working with and closes the ones you've drifted away from, with no fixed age to wait for: hover it to see which go, and Undo brings them all back.
+- New tabs open next to the one you're on, and a link's tab right below its page, in order. Settings › General › Tabs can put them at the top, as before, or at the bottom.
+- Hold ⌘ for a moment and each favorite and tab shows the number that jumps to it.
+- A background tab that keeps working hard goes to sleep on its own and wakes where it was when you open it. Zigzag says so once per site, with Show Tab. Settings can turn it off.
+- Settings can turn off the offer to pin the page a pinned tab moved to, for sites like DeepSeek where every new chat is a new address.
+- Drop a pinned page on another pinned page to open them in split view, as tabs and favorites already do.
+
+### Faster
+- History search keeps up with your typing, however long your history.
+- Folders of hundreds of imported bookmarks open at once, even with every folder open after an import.
+
+### Fixed
+- Bitwarden's autofill menu shows in login fields.
+- 1Password's sign-in banner closes once you've signed in, on single-page and two-step logins too.
+- Violentmonkey's buttons open its editor and dashboard, so new scripts can be made and saved, and its toolbar icon updates.
+- Imported bookmarks keep up to eight levels of folders, and an open folder's arrow points down at every depth.
+- Favorites' rows come out whole: four sit in one row, never three and one left alone below.
+- The Site Controls button in the address field is as big as the toolbar's and easy to hit, and a long site name in the site panel ends with an ellipsis instead of being cut off.
+- Toasts, the link preview and the Clear button have the same space at both ends.
+- Undo after Clear brings back every tab it closed, in place, with a split view coming back as a split.
+- Several tabs opened in the background beside yours keep the order they were opened in.
+- Extensions that check their access to a local address with a port, as 1Password does, no longer fail there.
+
 ## [0.6.2] - 2026-11-08
 
 ### Fixed
