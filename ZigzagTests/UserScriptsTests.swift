@@ -38,4 +38,22 @@ struct UserScriptsTests {
         #expect(error([["id": "b", "matches": [String](), "js": [["code": "1"]]]]) == "Script with ID 'b' must specify at least one match.")
         #expect(error([["id": "c", "matches": ["<all_urls>"], "js": [["code": "1", "file": "x.js"]]]])?.contains("exactly one of 'code' or 'file'") == true)
     }
+
+    @Test func withBothManagersOnAScriptAddressGoesToTampermonkey() {
+        let vm = ExtensionProfile.violentmonkeyID, tm = ExtensionProfile.tampermonkeyID
+        let confirm = URL(string: "webkit-extension://\(vm)/confirm/index.html#abc")!
+        func leaves(_ tab: String, on: Bool = true, from id: String = ExtensionProfile.violentmonkeyID, url: URL? = nil) -> Bool {
+            ExtensionProfile.leavesInstallToTampermonkey(id, loading: url ?? confirm, tabURL: URL(string: tab), tampermonkeyOn: on)
+        }
+        #expect(leaves("https://greasyfork.org/scripts/1/code/x.user.js"))
+        #expect(leaves("webkit-extension://\(tm)/ask.html?aid=1"))
+        // Only Violentmonkey: its page opens.
+        #expect(!leaves("https://greasyfork.org/scripts/1/code/x.user.js", on: false))
+        // Its own pages and other tabs, as from its dashboard's "Install from URL".
+        #expect(!leaves("webkit-extension://\(vm)/options/index.html"))
+        #expect(!leaves("https://example.com/"))
+        // Anything else it opens, and any other extension.
+        #expect(!leaves("https://a.test/x.user.js", url: URL(string: "webkit-extension://\(vm)/options/index.html")!))
+        #expect(!leaves("https://a.test/x.user.js", from: tm, url: URL(string: "webkit-extension://\(tm)/ask.html")!))
+    }
 }
