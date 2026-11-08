@@ -755,6 +755,16 @@ final class Library {
         return added
     }
 
+    /// Pages already in a space, each into the folder its path names (made if missing), in one change.
+    func fileBookmarks(_ ids: [UUID], paths: [[String]], in spaceID: UUID) {
+        guard let s = self.index(of: spaceID), !ids.isEmpty else { return }
+        for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { ids.contains($0) } }
+        let folders = Self.filed(ids, paths: paths, into: spaces[s].folders ?? [])
+        if !folders.isEmpty { spaces[s].folders = folders }
+        tidyFolders(s)
+        commit()
+    }
+
     /// Puts pages in folders by their paths (outermost first), making the folders that aren't there yet, nested as
     /// the paths say; a folder of the same name in the same place is used again. Deeper than four levels flattens.
     nonisolated static func filed(_ ids: [UUID], paths: [[String]], into existing: [BookmarkFolder]) -> [BookmarkFolder] {

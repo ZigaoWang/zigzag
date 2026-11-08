@@ -80,15 +80,38 @@ enum ArcImporter {
         result.spaces = newSpaces.count
         result.bookmarks = newSpaces.map(\.bookmarks.count).reduce(0, +)
 
-        // Importing again merges: spaces with the same name gain only the bookmarks they don't have yet.
+        // Importing again merges: spaces with the same name gain only the bookmarks they don't have yet, in their Arc
+        // folders, and pages already there but in no folder move into theirs (an earlier merge left them loose).
         var merged = 0
         newSpaces = newSpaces.filter { incoming in
             guard let existing = Library.shared.spaces.first(where: { $0.name == incoming.name }) else { return true }
-            let known = Set(existing.bookmarks.map { TabManager.normalize($0.url) })
-            for bookmark in incoming.bookmarks where !known.contains(TabManager.normalize(bookmark.url)) {
-                Library.shared.addBookmark(url: bookmark.url, title: bookmark.title, to: existing.id)
-                merged += 1
+            let folders = incoming.folders ?? []
+            func path(of id: UUID) -> [String] {
+                var names: [String] = []
+                var folder = folders.first { $0.bookmarkIDs.contains(id) }
+                while let current = folder, names.count < 8 {
+                    names.insert(current.name, at: 0)
+                    folder = current.parentID.flatMap { parent in folders.first { $0.id == parent } }
+                }
+                return names
             }
+            var known: [String: Bookmark] = [:]
+            for bookmark in existing.bookmarks { known[TabManager.normalize(bookmark.url)] = known[TabManager.normalize(bookmark.url)] ?? bookmark }
+            let filedAlready = Set((existing.folders ?? []).flatMap(\.bookmarkIDs))
+            var new: [(url: URL, title: String)] = [], newPaths: [[String]] = []
+            var loose: [UUID] = [], loosePaths: [[String]] = []
+            for bookmark in incoming.bookmarks {
+                if let mine = known[TabManager.normalize(bookmark.url)] {
+                    if !filedAlready.contains(mine.id), !loose.contains(mine.id), case let p = path(of: bookmark.id), !p.isEmpty {
+                        loose.append(mine.id); loosePaths.append(p)
+                    }
+                } else {
+                    new.append((bookmark.url, bookmark.title)); newPaths.append(path(of: bookmark.id))
+                    known[TabManager.normalize(bookmark.url)] = bookmark
+                }
+            }
+            Library.shared.fileBookmarks(loose, paths: loosePaths, in: existing.id)
+            merged += Library.shared.appendBookmarks(new, to: existing.id, folders: newPaths).count
             return false
         }
         result.spaces = newSpaces.count
