@@ -178,7 +178,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
     var onClose: (() -> Void)?
     /// Bookmarks keep their own title; only the icon and state follow the page.
-    var fixedTitle: String? { didSet { refresh() } }
+    var fixedTitle: String? { didSet { if fixedTitle != oldValue { refresh() } } }
     var isBookmark = false
     /// Called with the new name when a rename is committed (empty: go back to the page's own title).
     var onRename: ((String) -> Void)?
@@ -243,7 +243,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         layer?.addSublayer(mark)
         return mark
     }()
-    var isUnloaded = false { didSet { refreshTitleColor(); showsOpenEdge = isBookmark && !isUnloaded } }
+    var isUnloaded = false { didSet { if oldValue != isUnloaded { refreshTitleColor() }; showsOpenEdge = isBookmark && !isUnloaded } }
     /// The other half of a split: shown in the same row, to the right.
     private(set) var partner: Tab?
     /// A pinned split's other page, by its pinned name and icon: there whether or not its page is open.
@@ -251,7 +251,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Two pages in one row: a split of tabs, or a pinned split.
     var isSplit: Bool { partner != nil || pinnedPartner != nil }
     /// Which page you're working in, when split (0 = this row's own, 1 = its partner).
-    var focusedHalf = 0 { didSet { refreshTitleColor() } }
+    var focusedHalf = 0 { didSet { if oldValue != focusedHalf { refreshTitleColor() } } }
     /// The partner is on the left of the page, so it's on the left of the row too (a pinned page beside a tab).
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
     private var partnerToken: SignalToken?
@@ -318,6 +318,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     func configure(pinnedPartner title: String?, icon: NSImage?, unloaded: Bool) {
+        // Not a pinned split, and wasn't: nothing to redo.
+        guard title != nil || pinnedPartner != nil else { return }
         pinnedPartner = title.map { ($0, icon, unloaded) }
         [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
@@ -327,7 +329,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
         partnerIcon.image = partner?.favicon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
-        partnerAudioButton.symbol = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
+        // A symbol set again is drawn again: only when it changes.
+        let partnerSound = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
+        if partnerAudioButton.symbol != partnerSound { partnerAudioButton.symbol = partnerSound }
         partnerAudioButton.toolTip = partner?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         refreshAccessories()
         refreshAccessibilityLabel()
@@ -416,7 +420,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
         icon.image = tab?.favicon ?? (fixedTitle != nil ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
-        audioButton.symbol = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
+        let sound = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
+        if audioButton.symbol != sound { audioButton.symbol = sound }
         audioButton.toolTip = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         refreshAccessibilityLabel()
         refreshTitleColor()
