@@ -31,6 +31,7 @@
 		1845DD30334A776382156546 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */; };
 		1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */; };
 		1F06D849CF746C1FF6AEE48B /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */; };
+		202F156ED958778A3916C4D1 /* SpaceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B636331176C086C6157403B /* SpaceSwitcher.swift */; };
 		242E316E28B214F1B75E2B6F /* blocklist.info.json in Resources */ = {isa = PBXBuildFile; fileRef = F3B051247D50C308EF2FDA69 /* blocklist.info.json */; };
 		247132AF897197093E229872 /* CRXPackageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDEABD45FB2EBC981E67F43 /* CRXPackageTests.swift */; };
 		2519AB56C923531EC8C11096 /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */; };
@@ -269,6 +270,7 @@
 		3EA686DC56C7EA8E8C9FFD3D /* webkit-differences.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "webkit-differences.js"; sourceTree = "<group>"; };
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		4A8DEA66B0550FB3754D7255 /* PasswordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordStore.swift; sourceTree = "<group>"; };
+		4B636331176C086C6157403B /* SpaceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceSwitcher.swift; sourceTree = "<group>"; };
 		4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSheet.swift; sourceTree = "<group>"; };
 		4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Passkeys.swift; sourceTree = "<group>"; };
 		4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindowController.swift; sourceTree = "<group>"; };
@@ -448,6 +450,7 @@
 		0DA4CA999A3CAEBA6DD1E436 /* Switcher */ = {
 			isa = PBXGroup;
 			children = (
+				4B636331176C086C6157403B /* SpaceSwitcher.swift */,
 				175D363890A811683DC2D9E7 /* TabSwitcher.swift */,
 			);
 			path = Switcher;
@@ -1087,6 +1090,7 @@
 				DFB7FFE90CE40670E90BB664 /* SiteSearch.swift in Sources */,
 				D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */,
 				0F7420EF801E473BA2A58F2A /* SpaceEditor.swift in Sources */,
+				202F156ED958778A3916C4D1 /* SpaceSwitcher.swift in Sources */,
 				FAC7B9D0E2590199CED38D23 /* SwipeNavigation.swift in Sources */,
 				4796C99DFA31C01F7EBCB5AF /* SystemAudioTap.swift in Sources */,
 				8CB207822183B9D650B3F443 /* Tab.swift in Sources */,

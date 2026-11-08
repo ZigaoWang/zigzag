@@ -21,6 +21,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var desk = DeskController(window: self)
     lazy var previews = TabPreviewController(controller: self)
     lazy var switcher = TabSwitcher(controller: self)
+    lazy var spaceSwitcher = SpaceSwitcher(controller: self)
     /// Holding ⌘ a moment: the number on each favorite and row that ⌘ goes to.
     private(set) var numberHints: NumberHints?
     /// ⌘Z for sidebar actions; also the window's undo manager, so page text editing shares it.
@@ -1371,7 +1372,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         layoutTrafficLights()
         root.needsLayout = true
     }
-    func windowDidResignKey(_ notification: Notification) { switcher.windowResignedKey() }
+    func windowDidResignKey(_ notification: Notification) {
+        switcher.windowResignedKey()
+        spaceSwitcher.windowResignedKey()
+    }
 
     func windowDidBecomeKey(_ notification: Notification) {
         updateHandoff()
@@ -1452,6 +1456,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
+        if spaceSwitcher.handle(event) { return true }
         if event.type == .leftMouseDown, root.splitRatio != nil { focusPane(at: event.locationInWindow) }
         // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,
         // so without this the name stays open through drags and ⌘Z keeps going to it.
@@ -2023,6 +2028,21 @@ extension BrowserWindowController {
         let down = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.control], timestamp: 0, windowNumber: window?.windowNumber ?? 0,
                                     context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48)!
         _ = switcher.handle(down)
+    }
+    func debugSpaceSwitcher(_ arg: String) {
+        if arg.hasPrefix("state ") {
+            try? spaceSwitcher.debugState.write(toFile: String(arg.dropFirst(6)), atomically: true, encoding: .utf8)
+            return
+        }
+        // "again" and "back": ⌥⌘S and ⇧⌥⌘S pressed while it's up, as the window hands them over.
+        let keys: [String: (UInt16, String, NSEvent.ModifierFlags)] = [
+            "down": (125, "", []), "up": (126, "", []), "tab": (48, "\t", []), "return": (36, "\r", []), "esc": (53, "\u{1b}", []),
+            "again": (1, "s", [.command, .option]), "back": (1, "S", [.command, .option, .shift]),
+        ]
+        guard let (code, chars, flags) = keys[arg] ?? Int(arg).map({ (UInt16(18), String($0), []) }) else { showSpaceSwitcher(nil); return }
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: window?.windowNumber ?? 0,
+                                     context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!
+        _ = spaceSwitcher.handle(event)
     }
 }
 #endif

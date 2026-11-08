@@ -137,6 +137,7 @@ enum MainMenu {
             item(String(localized: "Move Tab Down", comment: "View menu item."), #selector(C.moveTabDown(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.control, .shift]),
             item(String(localized: "Next Space", comment: "View menu item."), #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
             item(String(localized: "Previous Space", comment: "View menu item."), #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
+            item(String(localized: "Switch Space…", comment: "View menu item: lists the spaces to pick one with the arrow keys."), #selector(C.showSpaceSwitcher(_:)), "s", [.command, .option]),
             item(String(localized: "New Space", comment: "View menu item."), #selector(C.newSpace(_:)), "n", [.command, .option]),
             item(String(localized: "Edit Space…", comment: "View menu item."), #selector(C.renameSpace(_:)), ""),
             .separator(),

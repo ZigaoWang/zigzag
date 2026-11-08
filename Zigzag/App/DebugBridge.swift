@@ -131,6 +131,9 @@ enum DebugBridge {
         case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
         case "peekclose": controller.peek.close()
         case "switcher": controller.debugSwitcher()
+        // spaceswitcher [down|up|tab|return|esc|again|back|1-9|state <path>]: opens the space switcher (or moves it on, as its
+        // shortcut does), presses a key in it, or writes its rows, ">" on the choice and "*" on the space you're in.
+        case "spaceswitcher": controller.debugSpaceSwitcher(arg)
         case "appearance":
             NSApp.appearance = arg == "dark" ? NSAppearance(named: .darkAqua) : arg == "light" ? NSAppearance(named: .aqua) : nil
         case "resize":

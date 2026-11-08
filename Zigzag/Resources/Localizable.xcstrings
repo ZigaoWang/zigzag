@@ -531,6 +531,17 @@
         }
       }
     },
+    "%@, current space" : {
+      "comment" : "Spoken by VoiceOver as the space switcher's choice moves to the space you're in. The placeholder is its name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，当前空间"
+          }
+        }
+      }
+    },
     "%@, folder, %lld pinned" : {
       "comment" : "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds.",
       "localizations" : {
@@ -10724,7 +10735,7 @@
       }
     },
     "Spaces" : {
-      "comment" : "A section of Settings.",
+      "comment" : "A section of Settings.\nVoiceOver name of the space switcher: the list of spaces to pick one from with the keyboard.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10934,6 +10945,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在边栏上双指轻扫，或点按它的圆点"
+          }
+        }
+      }
+    },
+    "Switch Space…" : {
+      "comment" : "View menu item: lists the spaces to pick one with the arrow keys.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换空间…"
           }
         }
       }
