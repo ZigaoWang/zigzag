@@ -463,6 +463,21 @@ enum DebugBridge {
                 let info = "\(window.windowNumber) \(ProcessInfo.processInfo.processIdentifier) \(Int(window.frame.minX)) \(Int(screenHeight - window.frame.maxY))"
                 try? info.write(toFile: String(arg[arg.index(after: space)...]), atomically: true, encoding: .utf8)
             }
+        case "altsvc":
+            // altsvc [forget]: the sites WebKit keeps HTTP/3 for, and the other data they have, before and after forgetting.
+            Task { @MainActor in
+                let store = WKWebsiteDataStore.default()
+                let kept = await store.dataRecords(ofTypes: [NetworkChanges.alternativeServices])
+                let sites = Set(kept.map(\.displayName))
+                @MainActor func describe() async -> String {
+                    let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes().union([NetworkChanges.alternativeServices]))
+                    return records.filter { sites.contains($0.displayName) }.map { "\($0.displayName) \($0.dataTypes.sorted())" }.sorted().joined(separator: " | ")
+                }
+                debugLog("altsvc => \(await describe())")
+                guard arg == "forget" else { return }
+                await NetworkChanges.forget()
+                debugLog("altsvc after forget => \(await describe())")
+            }
         case "cookies":
             // cookies <path>: the cookies in the default store and in every private window's, by name and domain.
             // Never their values.

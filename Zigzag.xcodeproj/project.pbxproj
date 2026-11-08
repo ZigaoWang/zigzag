@@ -91,6 +91,7 @@
 		67DE4B72AEFDE5639A0A3EB9 /* PowerSaving.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652311E240EBA758AAC17D38 /* PowerSaving.swift */; };
 		686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18895E549507CE748D20047 /* TabDropIndexTests.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
+		694A0100C79943F9F99EAFD1 /* NetworkChanges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
 		6A33BB5CABADE7C1D292DE54 /* SaveFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = E95FE283163E55EA089497AE /* SaveFailure.swift */; };
 		6BD966C3F37EC0E45F62CB2A /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D065BFB53F6E46623C3C39E /* Page.swift */; };
@@ -218,6 +219,7 @@
 
 /* Begin PBXFileReference section */
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
+		0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChanges.swift; sourceTree = "<group>"; };
 		014C509EA75D15344BB68028 /* ShipFixesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShipFixesTests.swift; sourceTree = "<group>"; };
 		016FF1BFB8B47B23AE450117 /* ads.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = ads.html; sourceTree = "<group>"; };
 		02C322374F6FF1EF842FDB10 /* PDFViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFViewer.swift; sourceTree = "<group>"; };
@@ -649,6 +651,7 @@
 				05040A784BBF98D3612C0A6A /* HistoryClusters.swift */,
 				9318C9D9C45049E8105EA1CE /* HistoryPage.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
+				0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */,
 				CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */,
 				88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */,
 				0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */,
@@ -1048,6 +1051,7 @@
 				A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */,
 				B3E930E711A57185C86F557F /* MoveToApplications.swift in Sources */,
 				FAF549DD3B7D4C4893E5DA34 /* NativeAudioOut.swift in Sources */,
+				694A0100C79943F9F99EAFD1 /* NetworkChanges.swift in Sources */,
 				EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */,
 				529A6EE9C8FC1FAFA5D383A8 /* NumberHints.swift in Sources */,
 				A2ACCFEF365397393F528C75 /* Onboarding.swift in Sources */,

@@ -50,6 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CrashReports.shared.start()
         // What goes wrong from now on, kept for the same report, and whether the last run ended badly.
         Diagnostics.start()
+        // HTTP/3 kept from another network can go around a VPN or proxy: forgotten now and whenever the network changes.
+        NetworkChanges.start()
         // New lists or settings reach open pages on their next load.
         blockerToken = ContentBlocker.changed.observe {
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
