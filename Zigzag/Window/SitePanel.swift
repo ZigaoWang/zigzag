@@ -29,17 +29,17 @@ final class SitePanel: FloatingPanelView {
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
     private let security = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let securityIcon = NSImageView()
-    private let moreButton = IconButton(symbol: "ellipsis", toolTip: "More")
+    private let moreButton = IconButton(symbol: "ellipsis", toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     private var actionTiles: [PanelTile] = []
-    private let extensionsLabel = Label.section("Extensions")
+    private let extensionsLabel = Label.section(String(localized: "Extensions", comment: "Section label over the extensions' buttons in the site panel."))
     private var extensionTiles: [PanelTile] = []
-    private let siteLabel = Label.section("This Site")
+    private let siteLabel = Label.section(String(localized: "This Site", comment: "Section label over the site's settings in the site panel."))
     private var rows: [PanelRow] = []
     private let group = PanelGroup()
 
     static let width: CGFloat = 300
     /// How a plain http page is marked, here and in the address bar: one symbol and one wording.
-    static let notSecure = "Not secure"
+    static let notSecure = String(localized: "Not secure", comment: "How a page loaded over plain http is marked, in the site panel and the address bar's tooltip.")
     static let notSecureSymbol = "lock.open.fill"
     static let minimumWidth: CGFloat = 256
     private var width: CGFloat = SitePanel.width
@@ -53,7 +53,7 @@ final class SitePanel: FloatingPanelView {
         self.controller = controller
         self.tab = tab
         self.url = url ?? URL(string: "about:blank")!
-        site = url.map { ContentBlocker.site(of: $0) ?? $0.host() ?? $0.absoluteString } ?? "New Tab"
+        site = url.map { ContentBlocker.site(of: $0) ?? $0.host() ?? $0.absoluteString } ?? String(localized: "New Tab", comment: "Name the site panel shows for a new tab with no page.")
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         icon.image = tab.favicon
@@ -63,11 +63,13 @@ final class SitePanel: FloatingPanelView {
         let secure = page.scheme == "https" && (tab.webView?.hasOnlySecureContent ?? true)
         if page.scheme == "webkit-extension" {
             // An extension's own page never crosses the network: there's no connection to judge.
-            security.stringValue = "Extension page"
+            security.stringValue = String(localized: "Extension page", comment: "Under the site's name in the site panel, for an extension's own page.")
             securityIcon.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
             securityIcon.contentTintColor = Tokens.Color.textSecondary
         } else {
-            security.stringValue = secure ? "Secure connection" : page.scheme == "https" ? "Some content isn’t secure" : Self.notSecure
+            security.stringValue = secure ? String(localized: "Secure connection", comment: "Under the site's name in the site panel, for a page loaded over https.")
+                : page.scheme == "https" ? String(localized: "Some content isn’t secure", comment: "Under the site's name in the site panel, for an https page with some parts loaded over plain http.")
+                : Self.notSecure
             securityIcon.image = Tokens.Symbol.image(secure ? "lock" : Self.notSecureSymbol, size: Tokens.Symbol.inline)
             securityIcon.contentTintColor = secure ? Tokens.Color.textSecondary : Tokens.Color.warning
         }
@@ -89,7 +91,7 @@ final class SitePanel: FloatingPanelView {
         buildExtensions()
         onLayout = { [weak self] in self?.layoutContent() }
         frame.size = NSSize(width: width, height: layoutContent(dryRun: true))
-        setAccessibilityLabel("Site controls for \(site)")
+        setAccessibilityLabel(String(localized: "Site controls for \(site)", comment: "VoiceOver name of the site panel. The site is a domain, like example.com."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -154,14 +156,19 @@ final class SitePanel: FloatingPanelView {
         let readerOn = controller.isShowingReader
         // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
         var specs: [(String, String, String, Bool, () -> Void)] = []
-        specs.append(("square.and.arrow.up", "Share", "Share", false, { [weak self] in self?.close(); self?.controller?.sharePage(nil) }))
-        specs.append(("link", "Copy Link", "Copy Link", false, { [weak self] in
+        let share = String(localized: "Share", comment: "Action in the site panel: shares the page.")
+        specs.append(("square.and.arrow.up", share, share, false, { [weak self] in self?.close(); self?.controller?.sharePage(nil) }))
+        let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
+        specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
             self.controller?.copyLink(self.url)
             self.close()
         }))
         if PageScreenshot.canTake(tab), !readerOn {
-            specs.append(("camera.viewfinder", "Capture", "Take Screenshot of Whole Page", false, { [weak self] in
+            specs.append(("camera.viewfinder",
+                          String(localized: "Capture", comment: "Action in the site panel, under its icon: takes a screenshot of the whole page."),
+                          String(localized: "Take Screenshot of Whole Page", comment: "Tooltip of the Capture action in the site panel."),
+                          false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 PageScreenshot.take(self.tab, in: controller)
@@ -169,13 +176,23 @@ final class SitePanel: FloatingPanelView {
         }
         // Always here, as in the menu, for when the offer went by or never came: a page that's already in your
         // language says so, and a translated one goes back to its original.
-        specs.append(("translate", tab.isTranslated ? "Original" : "Translate", tab.isTranslated ? "Show Original" : "Translate", tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
+        let translate = String(localized: "Translate", comment: "Action in the site panel: translates the page.")
+        specs.append(("translate",
+                      tab.isTranslated ? String(localized: "Original", comment: "Action in the site panel, under its icon: shows the translated page as it was.") : translate,
+                      tab.isTranslated ? String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel.") : translate,
+                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }))
         if tab.isArticle || readerOn {
-            specs.append(("doc.plaintext", "Reader", readerOn ? "Hide Reader" : "Show Reader", readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
+            specs.append(("doc.plaintext", String(localized: "Reader", comment: "Action in the site panel, under its icon: opens or closes Reader."),
+                          readerOn ? String(localized: "Hide Reader", comment: "Tooltip of the Reader action in the site panel, while Reader is on.")
+                                   : String(localized: "Show Reader", comment: "Tooltip of the Reader action in the site panel."),
+                          readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
         }
         let floating = tab.webView?.isPictureInPictureActive ?? false
         if floating || tab.webView?.canTogglePictureInPicture ?? false {
-            specs.append(("pip", "Float", floating ? "Back to Page" : "Picture in Picture", floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
+            specs.append(("pip", String(localized: "Float", comment: "Action in the site panel, under its icon: plays the page's video in Picture in Picture."),
+                          floating ? String(localized: "Back to Page", comment: "Tooltip of the Float action in the site panel, while the video floats: puts it back in its page.")
+                                   : String(localized: "Picture in Picture", comment: "Tooltip of the Float action in the site panel."),
+                          floating, { [weak self] in self?.controller?.togglePictureInPicture(nil); self?.close() }))
         }
         actionTiles = specs.map { symbol, caption, title, on, run in
             // The panel's own short action words; the tooltip and VoiceOver keep the full name.
@@ -196,8 +213,8 @@ final class SitePanel: FloatingPanelView {
     private func showMoreMenu() {
         guard canClear else { return }
         MenuPanel.show([
-            .item(.init(title: "Clear Cache for This Site…") { [weak self] in self?.clear(.cache) }),
-            .item(.init(title: "Clear Cookies for This Site…") { [weak self] in self?.clear(.cookies) }),
+            .item(.init(title: String(localized: "Clear Cache for This Site…", comment: "Item in the … menu of the site panel.")) { [weak self] in self?.clear(.cache) }),
+            .item(.init(title: String(localized: "Clear Cookies for This Site…", comment: "Item in the … menu of the site panel.")) { [weak self] in self?.clear(.cookies) }),
         ], from: moreButton)
     }
 
@@ -206,10 +223,10 @@ final class SitePanel: FloatingPanelView {
         let items = ExtensionHost.shared.actions(for: tab)
         extensionTiles = items.map { item in
             let tile = PanelTile(image: item.icon, symbol: "puzzlepiece.extension", caption: nil)
-            tile.toolTip = item.attention != nil ? "\(item.label): needs attention" : item.label
+            tile.toolTip = item.attention != nil ? String(localized: "\(item.label): needs attention", comment: "Tooltip of an extension's button in the site panel when the extension asks for attention. The name is the extension's.") : item.label
             // VoiceOver reads the extension's name, then what its badge says.
             tile.setAccessibilityLabel(item.label)
-            tile.setAccessibilityValue(item.attention != nil ? "Needs attention" : item.badge.isEmpty ? nil : item.badge)
+            tile.setAccessibilityValue(item.attention != nil ? String(localized: "Needs attention", comment: "VoiceOver value of an extension's button in the site panel when the extension asks for attention.") : item.badge.isEmpty ? nil : item.badge)
             // Attention first: the badge takes its look from it.
             tile.isAttention = item.attention != nil
             tile.badge = item.attention != nil ? "!" : item.badge
@@ -222,8 +239,8 @@ final class SitePanel: FloatingPanelView {
             return tile
         }
         let add = PanelTile(symbol: "plus", caption: nil)
-        add.toolTip = "Get Extensions"
-        add.setAccessibilityLabel("Get Extensions")
+        add.toolTip = String(localized: "Get Extensions", comment: "Tooltip and VoiceOver name of the + button after the extensions in the site panel: opens the Chrome Web Store.")
+        add.setAccessibilityLabel(add.toolTip)
         add.onClick = { [weak self] _ in
             self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
             self?.close()
@@ -233,11 +250,18 @@ final class SitePanel: FloatingPanelView {
         addSubview(extensionsLabel)
     }
 
+    // What the rows of This Site say they're set to, and the button that forgets an answer.
+    private static let onHere = String(localized: "On for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: on.")
+    private static let offHere = String(localized: "Off for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: off.")
+    private static let allowed = String(localized: "Allowed", comment: "Under a row's name in the site panel's This Site group, what it's set to: the site may use it.")
+    private static let blocked = String(localized: "Blocked", comment: "Under a row's name in the site panel's This Site group, what it's set to: the site may not use it.")
+    private static let askAgain = String(localized: "Ask Again", comment: "Button on a row in the site panel's This Site group: forgets the answer, so the site asks next time.")
+
     private func buildRows() {
         rows = []
         if ContentBlocker.isEnabled {
             let blocked = !ContentBlocker.isAllowed(on: url)
-            rows.append(.toggle("Ad blocking", on: blocked, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
+            rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
                 ContentBlocker.setAllowed(!on, on: self.url)
                 self.tab.reload()
@@ -245,7 +269,7 @@ final class SitePanel: FloatingPanelView {
         }
         if #available(macOS 15.4, *), !ExtensionHost.shared.contexts.isEmpty {
             let off = ExtensionStore.extensionsOffSites.contains(site)
-            rows.append(.toggle("Extensions", on: !off, status: { $0 ? "On for this site" : "Off for this site" }) { [weak self] on in
+            rows.append(.toggle(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), on: !off, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
                 var sites = ExtensionStore.extensionsOffSites
                 if on { sites.remove(self.site) } else { sites.insert(self.site) }
@@ -255,7 +279,9 @@ final class SitePanel: FloatingPanelView {
         }
         if let language = tab.foreignLanguage {
             let name = PageTranslator.name(of: language)
-            rows.append(.toggle(name, status: { $0 ? "Always translated" : "Translated when you ask" }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
+            let always = String(localized: "Always translated", comment: "Under a language's name in the site panel's This Site group: pages in it are always translated.")
+            let asked = String(localized: "Translated when you ask", comment: "Under a language's name in the site panel's This Site group: pages in it are translated only when asked.")
+            rows.append(.toggle(name, status: { $0 ? always : asked }, on: PageTranslator.translatesAlways(language)) { [weak self] on in
                 PageTranslator.setTranslatesAlways(on, language)
                 if on, self?.tab.isTranslated == false { self?.controller?.translatePage() }
             })
@@ -265,13 +291,13 @@ final class SitePanel: FloatingPanelView {
         let media = [WKMediaCaptureType.camera, .microphone, .cameraAndMicrophone].compactMap { SitePermissions.decision(host: host, type: $0) }
         if !media.isEmpty {
             let allowed = media.allSatisfy { $0 }
-            rows.append(.value("Camera and microphone", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+            rows.append(.value(String(localized: "Camera and microphone", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
                 SitePermissions.forget(host: host)
                 self?.rebuildRows()
             })
         }
         if let allowed = SitePermissions.location(host: host) {
-            rows.append(.value("Location", allowed ? "Allowed" : "Blocked", action: "Ask Again") { [weak self] in
+            rows.append(.value(String(localized: "Location", comment: "Row in the site panel's This Site group."), allowed ? Self.allowed : Self.blocked, action: Self.askAgain) { [weak self] in
                 SitePermissions.forgetLocation(host: host)
                 self?.rebuildRows()
             })
@@ -281,21 +307,24 @@ final class SitePanel: FloatingPanelView {
         let answer = SitePermissions.notifications(host: host.lowercased())
         if !tab.isPrivate, answer != nil || WebNotifications.shared.hasAsked(host: host) {
             var decided = answer != nil
-            rows.append(.toggle("Notifications", on: answer ?? false, status: { $0 ? "Allowed" : (decided ? "Blocked" : "Not allowed yet") }) { on in
+            let unanswered = String(localized: "Not allowed yet", comment: "Under Notifications in the site panel's This Site group: the site asked to send notifications, and no one answered yet.")
+            rows.append(.toggle(String(localized: "Notifications", comment: "Row in the site panel's This Site group."), on: answer ?? false,
+                                status: { $0 ? Self.allowed : (decided ? Self.blocked : unanswered) }) { on in
                 decided = true
                 SitePermissions.setNotifications(on, host: host.lowercased())
                 if !on { WebNotifications.shared.removeAll(host: host.lowercased()) }
             })
         }
         if !tab.isPrivate, SitePermissions.popups(host: host.lowercased()) {
-            rows.append(.toggle("Pop-ups", on: true, status: { $0 ? "Allowed" : "Blocked" }) { on in
+            rows.append(.toggle(String(localized: "Pop-ups", comment: "Row in the site panel's This Site group."), on: true, status: { $0 ? Self.allowed : Self.blocked }) { on in
                 SitePermissions.setPopups(on ? true : nil, host: host.lowercased())
             })
         }
         // The page's zoom as it is: in a private window that's its own, which isn't saved for the site.
         let zoom = tab.webView?.pageZoom ?? ZoomLevels.zoom(for: url)
         if abs(zoom - 1) > 0.001 {
-            rows.append(.value("Zoom", "\(Int((zoom * 100).rounded()))%", action: "Reset") { [weak self] in
+            rows.append(.value(String(localized: "Zoom", comment: "Row in the site panel's This Site group."), "\(Int((zoom * 100).rounded()))%",
+                                action: String(localized: "Reset", comment: "Button on the Zoom row of the site panel. It sets the page back to 100%.")) { [weak self] in
                 guard let self else { return }
                 if !self.tab.isPrivate { ZoomLevels.set(1, for: self.url) }
                 self.tab.webView?.pageZoom = 1
@@ -322,9 +351,12 @@ final class SitePanel: FloatingPanelView {
         guard let controller else { return }
         let cookies = kind == .cookies
         ConfirmSheet.show(in: controller.root.overlay,
-                          title: cookies ? "Clear cookies for \(site)?" : "Clear the cache for \(site)?",
-                          message: cookies ? "You’ll be signed out of \(site). Other sites aren’t touched." : "It loads a little slower the first time. You stay signed in.",
-                          confirmTitle: cookies ? "Clear Cookies" : "Clear Cache", destructive: cookies) { [weak controller] confirmed in
+                          title: cookies ? String(localized: "Clear cookies for \(site)?", comment: "Title of the sheet that asks before clearing one site's cookies. The site is a domain, like example.com.")
+                                         : String(localized: "Clear the cache for \(site)?", comment: "Title of the sheet that asks before clearing one site's cache. The site is a domain, like example.com."),
+                          message: cookies ? String(localized: "You’ll be signed out of \(site). Other sites aren’t touched.", comment: "Message of the sheet that asks before clearing one site's cookies.")
+                                           : String(localized: "It loads a little slower the first time. You stay signed in.", comment: "Message of the sheet that asks before clearing one site's cache."),
+                          confirmTitle: cookies ? String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first.")
+                                                : String(localized: "Clear Cache", comment: "Button that clears the cache, in the sheet that asks first."), destructive: cookies) { [weak controller] confirmed in
             guard confirmed else { return }
             Self.clearNow(kind, site: site, tab: tab, controller: controller)
         }
@@ -334,7 +366,9 @@ final class SitePanel: FloatingPanelView {
         Task { @MainActor [weak controller] in
             await WebsiteData.clear(kind, site: site)
             tab.reload()
-            if let controller { Toast.show(kind == .cache ? "Cache cleared for \(site)" : "Cookies cleared for \(site)", symbol: "checkmark.circle", in: controller) }
+            if let controller { Toast.show(kind == .cache ? String(localized: "Cache cleared for \(site)", comment: "Toast after one site's cache is cleared. The site is a domain, like example.com.")
+                                                       : String(localized: "Cookies cleared for \(site)", comment: "Toast after one site's cookies are cleared. The site is a domain, like example.com."),
+                                        symbol: "checkmark.circle", in: controller) }
         }
     }
 
