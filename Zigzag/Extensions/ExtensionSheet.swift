@@ -65,7 +65,9 @@ final class ExtensionSheet: FloatingPanelView {
             limitsIcon.contentTintColor = Tokens.Color.textSecondary
             // One sentence: the names run on in lower case ("…: side panel, notifications.").
             let names = content.report.limits.map { $0.prefix(1).lowercased() + $0.dropFirst() }
-            limitsText.stringValue = "Won’t work in Zigzag: " + ListFormatter.localizedString(byJoining: names) + "."
+            let list = Words.list(names)
+            limitsText.stringValue = String(localized: "Won’t work in Zigzag: \(list).",
+                                            comment: "In the extension install sheet. The placeholder lists features the extension uses that Zigzag lacks, like “side panel and notifications”.")
             limitsText.font = Tokens.Font.small()
             limitsText.textColor = Tokens.Color.textSecondary
             limitsText.isSelectable = false

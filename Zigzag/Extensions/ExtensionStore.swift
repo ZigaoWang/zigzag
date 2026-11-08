@@ -172,17 +172,17 @@ enum ExtensionStore {
         /// What to tell the person, in plain words.
         var message: String {
             switch self {
-            case .download: "Couldn’t download this extension. Check your connection and try again."
-            case .verification: "This extension’s package couldn’t be verified, so it wasn’t installed."
-            case .unpack: "This extension’s package is damaged, so it wasn’t installed."
+            case .download: String(localized: "Couldn’t download this extension. Check your connection and try again.", comment: "Shown when an extension couldn't be installed because its download failed.")
+            case .verification: String(localized: "This extension’s package couldn’t be verified, so it wasn’t installed.", comment: "Shown when an extension couldn't be installed because its package didn't pass the signature check.")
+            case .unpack: String(localized: "This extension’s package is damaged, so it wasn’t installed.", comment: "Shown when an extension couldn't be installed because its package is damaged.")
             }
         }
         /// The same, short enough for one line beside the extension's name.
         var reason: String {
             switch self {
-            case .download: "Couldn’t download it. Check your connection."
-            case .verification: "Its package couldn’t be verified."
-            case .unpack: "Its package is damaged."
+            case .download: String(localized: "Couldn’t download it. Check your connection.", comment: "One line beside an extension's name when its update couldn't be downloaded.")
+            case .verification: String(localized: "Its package couldn’t be verified.", comment: "One line beside an extension's name when its update didn't pass the signature check.")
+            case .unpack: String(localized: "Its package is damaged.", comment: "One line beside an extension's name when its update's package is damaged.")
             }
         }
     }

@@ -7,9 +7,9 @@ final class WebStoreOffer: FloatingPanelView {
     private weak var controller: BrowserWindowController?
     private let icon = NSImageView()
     private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let line = Label("Works in Zigzag", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let add = PillButton(title: "Add to Zigzag", style: .prominent)
-    private let close = IconButton(symbol: "xmark", toolTip: "Not Now")
+    private let line = Label(String(localized: "Works in Zigzag", comment: "On the bar over a Chrome Web Store page for an extension that works in Zigzag."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    private let add = PillButton(title: String(localized: "Add to Zigzag", comment: "Button on the bar over a Chrome Web Store page: installs the extension."), style: .prominent)
+    private let close = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the close button on the bar over a Chrome Web Store page."))
     private let id: String
     private let spinner = Spinner()
     private let done = NSImageView(image: Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display))
@@ -68,7 +68,7 @@ final class WebStoreOffer: FloatingPanelView {
         let title = controller?.tabManager.selectedTab?.title ?? ""
         // "Dark Reader - Chrome Web Store" → "Dark Reader"; until the page has a title, a plain stand-in.
         let clean = title.components(separatedBy: " - Chrome Web Store").first ?? ""
-        name.stringValue = clean.isEmpty || clean.contains("chromewebstore") ? "This extension" : clean
+        name.stringValue = clean.isEmpty || clean.contains("chromewebstore") ? String(localized: "This extension", comment: "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.") : clean
     }
 
     /// Each stage on the bar itself: downloading, then the review sheet, then adding, then done or what failed.
@@ -80,29 +80,29 @@ final class WebStoreOffer: FloatingPanelView {
             // with whatever you chose.
             self.step(aside: stage.isReviewing)
             switch stage {
-            case .downloading: self.busy("Downloading…")
+            case .downloading: self.busy(String(localized: "Downloading…", comment: "On the bar over a Chrome Web Store page while the extension downloads."))
             case .reviewing:
-                self.busy("Review what it can do, then Add")
+                self.busy(String(localized: "Review what it can do, then Add", comment: "On the bar over a Chrome Web Store page while the install sheet is up. Add is the sheet's button."))
                 self.spinner.stopAnimation(nil)
-            case .adding: self.busy("Adding to Zigzag…")
+            case .adding: self.busy(String(localized: "Adding to Zigzag…", comment: "On the bar over a Chrome Web Store page while the extension installs."))
             case .added(let added):
                 self.spinner.stopAnimation(nil)
                 self.add.isHidden = true
                 self.done.isHidden = false
                 self.name.stringValue = added.isEmpty ? shown : added
-                self.line.stringValue = "Added. Find it in site controls, by the address."
+                self.line.stringValue = String(localized: "Added. Find it in site controls, by the address.", comment: "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.")
                 self.line.textColor = Tokens.Color.textSecondary
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) { Self.hide() }
             case .failed(let message):
                 self.spinner.stopAnimation(nil)
                 self.add.isHidden = false
-                self.add.title = "Try Again"
+                self.add.title = String(localized: "Try Again", comment: "Button on the bar over a Chrome Web Store page after installing failed.")
                 self.line.stringValue = message
                 self.line.textColor = Tokens.Color.warning
             case .cancelled:
                 self.spinner.stopAnimation(nil)
                 self.add.isHidden = false
-                self.line.stringValue = "Works in Zigzag"
+                self.line.stringValue = String(localized: "Works in Zigzag", comment: "On the bar over a Chrome Web Store page for an extension that works in Zigzag.")
                 self.line.textColor = Tokens.Color.textSecondary
             }
             self.needsLayout = true
