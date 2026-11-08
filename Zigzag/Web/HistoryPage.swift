@@ -47,8 +47,7 @@ enum HistoryPage {
             let data: Data
             let type: String
             if url.host() == "icon", let target = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value.flatMap(URL.init(string:)),
-               let icon = FaviconStore.shared.cachedIcon(for: target),
-               let png = HistoryPage.png(FaviconView.isMonochrome(icon) ? HistoryPage.inked(icon, dark: webView.effectiveAppearance.isDark) : icon) {
+               let png = HistoryPage.icon(for: target, dark: webView.effectiveAppearance.isDark) {
                 data = png
                 type = "image/png"
             } else if url.host() == "history" {
@@ -68,6 +67,20 @@ enum HistoryPage {
 
         func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
     }
+
+    /// A site's icon as the page gets it. Every row asks, and most rows are on sites already shown, so each one's PNG
+    /// is kept while the store hands back the same icon: a new or cleared icon is never served from here.
+    private static func icon(for target: URL, dark: Bool) -> Data? {
+        guard let icon = FaviconStore.shared.cachedIcon(for: target) else { return nil }
+        let key = (FaviconStore.shared.iconKey(for: target) ?? target.absoluteString) + (dark ? " dark" : "")
+        if let kept = icons[key], kept.image === icon { return kept.png }
+        guard let png = png(FaviconView.isMonochrome(icon) ? inked(icon, dark: dark) : icon) else { return nil }
+        if icons.count >= 500 { icons.removeAll(keepingCapacity: true) }
+        icons[key] = (icon, png)
+        return png
+    }
+
+    private static var icons: [String: (image: NSImage, png: Data)] = [:]
 
     /// A site with no icon gets the sidebar's fallback, the globe: drawn black at 2x, set in the page as a mask that
     /// takes the page's own muted text color.
