@@ -982,8 +982,8 @@ extension ExtensionStore {
         let patches = profile?.patches ?? []
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(for: id, version: state.version)
-        // What this overlay was made from: rebuilt whenever the prelude or a patch changes.
-        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined()
+        // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
+        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill
         let marker = overlay.appendingPathComponent("zigzag-profile.txt")
         if (try? String(contentsOf: marker, encoding: .utf8)) == signature { return overlay }
         try? FileManager.default.removeItem(at: overlay.deletingLastPathComponent())
@@ -997,6 +997,7 @@ extension ExtensionStore {
         for file in Array(NSOrderedSet(array: patches.map(\.file))) as? [String] ?? [] {
             apply(patches.filter { $0.file == file }, to: file, in: overlay, from: package, id: id)
         }
+        fillLanguage(in: overlay)
         try? signature.write(to: marker, atomically: true, encoding: .utf8)
         return overlay
     }
@@ -1011,6 +1012,31 @@ extension ExtensionStore {
 
     private static func overlayFolder(for id: String, version: String) -> URL {
         folder(for: id).appendingPathComponent("loaded", isDirectory: true).appendingPathComponent(version, isDirectory: true)
+    }
+
+    /// JavaScript that Chrome runs and this WebKit doesn't yet: explicit resource management's Symbol.dispose and
+    /// Symbol.asyncDispose. Code compiled for `using` checks they exist and stops without them (Bitwarden: its vault
+    /// never loads, its autofill menu never shows). The compatibility layer adds them to an extension's background and
+    /// pages, but content scripts run inside web pages, where it doesn't; so each script that names them gets them
+    /// first, in whatever world it runs. Registered symbols, so every copy is the same one.
+    private static let languageFill = #"(()=>{for(const n of["dispose","asyncDispose"])if(typeof Symbol[n]!=="symbol")try{Object.defineProperty(Symbol,n,{value:Symbol.for("Symbol."+n)})}catch(e){}})();"#
+
+    /// Puts `languageFill` at the top of the overlay's scripts that need it, after a "use strict" that opens the file
+    /// (it must stay first to count). A script already patched is a copy; the rest become copies here.
+    private static func fillLanguage(in overlay: URL) {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(at: overlay, includingPropertiesForKeys: nil) else { return }
+        for case let file as URL in enumerator where ["js", "mjs"].contains(file.pathExtension) {
+            guard let text = try? String(contentsOf: file, encoding: .utf8),
+                  text.contains("Symbol.dispose") || text.contains("Symbol.asyncDispose"), !text.hasPrefix(languageFill) else { continue }
+            var filled = languageFill + "\n" + text
+            for directive in ["\"use strict\";", "'use strict';"] where text.hasPrefix(directive) {
+                filled = directive + languageFill + String(text.dropFirst(directive.count))
+            }
+            // A new file in place of the link, so the package's own stays exactly as it came.
+            try? fm.removeItem(at: file)
+            try? filled.write(to: file, atomically: true, encoding: .utf8)
+        }
     }
 
     /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
