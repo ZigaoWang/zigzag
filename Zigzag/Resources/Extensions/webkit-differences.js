@@ -202,6 +202,41 @@
       if (has) setMember(['runtime', 'onInstalled'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
+    // Ports into a service worker background: WebKit unloads such a background 30 seconds after the last event it
+    // was sent, even while a page or content script is talking to it over a port (it means to keep it for open ports,
+    // but doesn't count a worker's), and doesn't tell the other end, whose port goes quiet for good. Chrome keeps a
+    // worker going while its ports are in use. Bitwarden's popup reads its vault over one, so it hung on a spinner.
+    // While a port into the worker is open, it asks for its background page every 20 seconds: WebKit wakes the
+    // background to answer, which starts its 30 seconds over.
+    const isWorker = typeof ServiceWorkerGlobalScope !== 'undefined' && globalThis instanceof ServiceWorkerGlobalScope;
+    const onConnect = api.runtime.onConnect;
+    if (isWorker && onConnect && typeof onConnect.addListener === 'function' && typeof api.runtime.getBackgroundPage === 'function') {
+      const open = new Set();
+      let beat = null;
+      const ask = () => { try { const asked = api.runtime.getBackgroundPage(); if (asked && asked.catch) asked.catch(() => {}); } catch (e) {} };
+      const settle = () => {
+        if (open.size && !beat) beat = setInterval(ask, 20000);
+        if (!open.size && beat) { clearInterval(beat); beat = null; }
+      };
+      // Only once the extension listens itself: a port nothing listens for should still end at once, as in Chrome.
+      const add = onConnect.addListener.bind(onConnect);
+      let watching = false;
+      const watch = () => {
+        if (watching) return;
+        watching = true;
+        add((port) => {
+          open.add(port);
+          port.onDisconnect.addListener(() => { open.delete(port); settle(); });
+          settle();
+        });
+      };
+      setMember(['runtime', 'onConnect'], 'addListener', (listener) => {
+        const result = add(listener);
+        if (typeof listener === 'function') watch();
+        return result;
+      });
+    }
+
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
     // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
     if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {
