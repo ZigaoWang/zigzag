@@ -233,7 +233,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let result = try? await webView.callAsyncJavaScript(Self.generatedFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient) as? [String: Any]
             let controller = WindowManager.shared.controllers.first { $0.window === webView.window }
             guard let index = result?["index"] as? Int, candidates.indices.contains(index) else {
-                if let controller { Toast.show("This site’s password rules didn’t fit a strong password. Type one yourself.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                if let controller { Toast.show(String(localized: "This site’s password rules didn’t fit a strong password. Type one yourself.", comment: "Toast when Zigzag couldn't make a strong password the site accepts."), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
                 return
             }
             let password = candidates[index]
@@ -243,9 +243,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 // another saved without a name (an account made earlier), whose password would be lost.
                 let named = !(username ?? "").isEmpty
                 try await PasswordStore.shared.save(origin: origin, username: username ?? "", password: password, replacingExisting: named)
-                if let controller { Toast.show("Strong password saved for \(origin.displayName)", symbol: "key", duration: 2, in: controller) }
+                if let controller { Toast.show(String(localized: "Strong password saved for \(origin.displayName)", comment: "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."), symbol: "key", duration: 2, in: controller) }
             } catch {
-                if let controller { Toast.show("Couldn’t save the new password. Copy it before you leave this page.", symbol: "exclamationmark.triangle", duration: 4, in: controller) }
+                if let controller { Toast.show(String(localized: "Couldn’t save the new password. Copy it before you leave this page.", comment: "Toast when a strong password was filled but couldn't be saved."), symbol: "exclamationmark.triangle", duration: 4, in: controller) }
             }
         }
     }
@@ -264,7 +264,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         Task {
             guard let values = await ContactCard.values() else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
-                    Toast.show("Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts.",
+                    Toast.show(String(localized: "Zigzag can’t read your card. Allow it in System Settings › Privacy › Contacts, and set My Card in Contacts.", comment: "Toast when filling a form from Contacts isn't allowed. System Settings › Privacy › Contacts and My Card are names macOS uses; match them."),
                                symbol: "person.crop.circle.badge.exclamationmark", duration: 5, in: controller)
                 }
                 return
@@ -286,7 +286,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         Task {
             guard let password = try? await PasswordStore.shared.password(for: login.id) else {
                 if let controller = WindowManager.shared.controllers.first(where: { $0.window === target.webView.window }) {
-                    Toast.show("Couldn’t open that password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    Toast.show(String(localized: "Couldn’t open that password. Try again from the Passwords window.", comment: "Toast when a saved password couldn't be read to fill a form."), symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }
                 return
             }
@@ -586,7 +586,7 @@ final class AutofillMenu: FloatingPanelView {
     }
 
     private var rows: [AutofillRow] = []
-    private let footer = TextButton(title: "Passwords", font: Tokens.Font.small(.medium))
+    private let footer = TextButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), font: Tokens.Font.small(.medium))
     private let footerLine = ColorView(color: Tokens.Color.separator)
     private let hasFooter: Bool
     private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }
@@ -613,7 +613,7 @@ final class AutofillMenu: FloatingPanelView {
             return row
         }
         setAccessibilityRole(.menu)
-        setAccessibilityLabel("Passwords")
+        setAccessibilityLabel(String(localized: "Passwords", comment: "What VoiceOver calls the menu that fills a password into a page."))
         onLayout = { [weak self] in self?.layoutRows() }
     }
 
@@ -656,29 +656,29 @@ private final class AutofillRow: InteractiveView {
         self.item = item
         switch item {
         case .login(let login):
-            name = Label(login.username.isEmpty ? "No username" : login.username, font: Tokens.Font.body(.medium),
+            name = Label(login.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : login.username, font: Tokens.Font.body(.medium),
                          color: login.username.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary)
-            detail = Label("Password for \(login.origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            detail = Label(String(localized: "Password for \(login.origin.displayName)", comment: "Under a login in the menu that fills a password into a page. The placeholder is a site, like github.com."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = origin.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? Tokens.Symbol.image("key")
             icon.contentTintColor = Tokens.Color.textSecondary
         case .importFrom(let browser):
-            name = Label("Bring your passwords from \(browser)", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-            detail = Label("Import them, and sign in here in one click", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            name = Label(String(localized: "Bring your passwords from \(browser)", comment: "A row in the fill-password menu when nothing is saved yet. The placeholder is a browser, like Chrome."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "Import them, and sign in here in one click", comment: "Under the row offering to import passwords, in the fill-password menu."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("square.and.arrow.down")
             icon.contentTintColor = Tokens.Color.accent
         case .missing:
-            name = Label("No saved password for \(PublicSuffix.registrableDomain(origin.host) ?? origin.displayName)", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-            detail = Label("Search your passwords", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            name = Label(String(localized: "No saved password for \(PublicSuffix.registrableDomain(origin.host) ?? origin.displayName)", comment: "A row in the fill-password menu. The placeholder is a site, like github.com."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "Search your passwords", comment: "Under the row saying nothing is saved for a site, in the fill-password menu."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("key")
             icon.contentTintColor = Tokens.Color.textSecondary
         case .contact:
-            name = Label("Fill from My Card", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-            detail = Label("Name, email, phone and address, from Contacts", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            name = Label(String(localized: "Fill from My Card", comment: "A row in the menu that fills a form. My Card is the person's own card in Contacts, as macOS calls it."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "Name, email, phone and address, from Contacts", comment: "Under Fill from My Card in the menu that fills a form."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("person.crop.circle")
             icon.contentTintColor = Tokens.Color.accent
         case .generate:
-            name = Label("Use Strong Password", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-            detail = Label("Saved to your Keychain for \(origin.displayName)", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+            name = Label(String(localized: "Use Strong Password", comment: "A row in the fill-password menu on a sign-up form: fill in a password Zigzag makes."), font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+            detail = Label(String(localized: "Saved to your Keychain for \(origin.displayName)", comment: "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com."), font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
             icon.image = Tokens.Symbol.image("key.viewfinder")
             icon.contentTintColor = Tokens.Color.accent
         }

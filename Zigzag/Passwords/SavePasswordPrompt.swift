@@ -15,14 +15,14 @@ final class SavePasswordPrompt: FloatingPanelView {
     /// The site's icon, the question and exactly where the password goes: the one header every dialog has.
     private let header = DialogHeader(title: "")
     private let usernameBox = ColorView(color: Tokens.Color.fieldFill)
-    private let usernameField = PlainTextField(font: Tokens.Font.body(), placeholder: "Username")
+    private let usernameField = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Username", comment: "Placeholder of the username field in the save-password prompt."))
     private let usernameText = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
     private let isUpdate: Bool
     private let buttons = DialogButtons()
     private let saveButton: PillButton
-    private let notNowButton = PillButton(title: "Not Now", style: .plain)
+    private let notNowButton = PillButton(title: String(localized: "Not Now", comment: "Button in the save-password prompt."), style: .plain)
     // The quiet choice, on its own at the left: the two answers on the right are the ones you see.
-    private let neverButton = PillButton(title: "Never", style: .quiet)
+    private let neverButton = PillButton(title: String(localized: "Never", comment: "Button in the save-password prompt: never offer to save on this site."), style: .quiet)
     private var hideWork: DispatchWorkItem?
     private var finish: (Bool) -> Void = { _ in }
     private var keyMonitor: Any?
@@ -42,10 +42,10 @@ final class SavePasswordPrompt: FloatingPanelView {
 
     private init(kind: Kind, origin: Origin) {
         isUpdate = { if case .update = kind { true } else { false } }()
-        saveButton = PillButton(title: isUpdate ? "Update" : "Save", style: .prominent)
+        saveButton = PillButton(title: isUpdate ? String(localized: "Update", comment: "Button in the prompt that offers to update a saved password.") : String(localized: "Save", comment: "Button in the save-password prompt."), style: .prominent)
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: 0))
         radius = Tokens.Radius.panel
-        header.title.stringValue = isUpdate ? "Update password?" : "Save password?"
+        header.title.stringValue = isUpdate ? String(localized: "Update password?", comment: "Title of the prompt that offers to update a saved password.") : String(localized: "Save password?", comment: "Title of the save-password prompt.")
         // Exactly where this password goes, in full.
         header.subtitle.stringValue = origin.displayName
         header.subtitle.toolTip = origin.displayName
@@ -63,14 +63,14 @@ final class SavePasswordPrompt: FloatingPanelView {
             usernameField.stringValue = username
             usernameBox.addSubview(usernameField)
         case .update(let credential):
-            usernameText.stringValue = credential.username.isEmpty ? "No username" : credential.username
+            usernameText.stringValue = credential.username.isEmpty ? String(localized: "No username", comment: "Shown in place of a login's username when it has none.") : credential.username
             usernameBox.addSubview(usernameText)
         }
         [header, usernameBox, buttons].forEach { addSubview($0) }
         buttons.leading = [neverButton]
         buttons.trailing = [notNowButton, saveButton]
         neverButton.isHidden = isUpdate
-        neverButton.toolTip = "Never offer to save on \(origin.displayName)"
+        neverButton.toolTip = String(localized: "Never offer to save on \(origin.displayName)", comment: "Tooltip of the Never button in the save-password prompt. The placeholder is a site, like github.com.")
         frame.size.height = measuredHeight
         onLayout = { [weak self] in self?.layoutContent() }
     }
@@ -96,15 +96,15 @@ final class SavePasswordPrompt: FloatingPanelView {
                     switch kind {
                     case .save:
                         try await store.save(origin: origin, username: username, password: password)
-                        done = "Password saved"
+                        done = String(localized: "Password saved", comment: "Toast after the save-password prompt saved a password.")
                     case .update(var credential):
                         credential.modified = Date()
                         try await store.update(credential, password: password)
-                        done = "Password updated"
+                        done = String(localized: "Password updated", comment: "Toast after the save-password prompt updated a password.")
                     }
                     Toast.show(done, symbol: "key", duration: 1.6, in: controller)
                 } catch {
-                    Toast.show("Couldn’t save the password. Try again from the Passwords window.", symbol: "exclamationmark.triangle", duration: 3, in: controller)
+                    Toast.show(String(localized: "Couldn’t save the password. Try again from the Passwords window.", comment: "Toast when the save-password prompt couldn't save."), symbol: "exclamationmark.triangle", duration: 3, in: controller)
                 }
             }
         }

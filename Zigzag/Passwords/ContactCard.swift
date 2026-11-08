@@ -53,9 +53,13 @@ enum ContactCard {
 
     /// What the menu says about the card: the name, and what else it holds.
     static func summary(_ values: [String: String]) -> (title: String, detail: String) {
-        let title = values["name"] ?? values["email"] ?? "My Card"
-        let extra = [values["email"].map { _ in "email" }, values["tel"].map { _ in "phone" }, values["street-address"].map { _ in "address" }]
+        let title = values["name"] ?? values["email"] ?? String(localized: "My Card", comment: "The person's own card in Contacts, as macOS calls it, in the menu that fills a form.")
+        let extra = [values["email"].map { _ in String(localized: "email", comment: "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.") },
+                     values["tel"].map { _ in String(localized: "phone", comment: "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.") },
+                     values["street-address"].map { _ in String(localized: "address", comment: "What a card in Contacts can fill, in “Fills email, phone and address from Contacts”.") }]
             .compactMap { $0 }
-        return (title, extra.isEmpty ? "From your card in Contacts" : "Fills " + ListFormatter.localizedString(byJoining: extra) + " from Contacts")
+        let list = Words.list(extra)
+        return (title, extra.isEmpty ? String(localized: "From your card in Contacts", comment: "Under the person's name in the menu that fills a form from Contacts.")
+                                     : String(localized: "Fills \(list) from Contacts", comment: "Under the person's name in the menu that fills a form. The placeholder lists what the card holds, like “email, phone and address”."))
     }
 }
