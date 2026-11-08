@@ -5,6 +5,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-08
+
+### Fixed
+- Importing from Arc with sync turned on brings over the sidebar Arc actually shows: each space's name, pinned tabs, folders and Favorites, in Arc's order. Before, it could read an older copy Arc keeps alongside and bring over empty, unnamed spaces.
+
 ## [0.6.1] - 2026-11-08
 
 ### New
