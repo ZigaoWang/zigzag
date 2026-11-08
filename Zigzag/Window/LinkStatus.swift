@@ -18,7 +18,10 @@ final class LinkStatusController {
         pill.onLayout = { [weak self] in
             guard let self else { return }
             let h = self.label.lineHeight
-            self.label.frame = NSRect(x: Self.padding, y: (self.pill.bounds.height - h) / 2, width: self.pill.bounds.width - Self.padding * 2, height: h)
+            // The text field draws its text Label.inset in from its edges: set it that much wider, so the ink sits
+            // the same padding from each end.
+            self.label.frame = NSRect(x: Self.padding - Label.inset, y: (self.pill.bounds.height - h) / 2,
+                                      width: self.pill.bounds.width - Self.padding * 2 + Label.inset * 2, height: h)
         }
     }
 
@@ -31,8 +34,8 @@ final class LinkStatusController {
         label.stringValue = Self.describe(url)
         label.lineBreakMode = .byTruncatingMiddle
         let height = Tokens.Metric.linkStatusHeight
-        // The pill is the padding wider than the text on each side, so a short address is whole.
-        let width = min(label.textWidth + Self.padding * 2, area.width * 0.6)
+        // The pill is the padding wider than the text's ink on each side, the same both ends.
+        let width = min(label.inkWidth + Self.padding * 2, area.width * 0.6)
         pill.frame = NSRect(x: area.minX + Tokens.Space.x2, y: area.maxY - height - Tokens.Space.x2, width: ceil(width), height: height)
         pill.needsLayout = true
         if !visible {
