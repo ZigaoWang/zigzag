@@ -712,7 +712,8 @@ enum ExtensionProfile {
         "jleldmehlnopjhbldegndecakdemocah": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         "gebbhagfogifgggkldgodflihgfeippi": Profile(patches: [dislikeCountPatch, dislikeWritePatch, dislikeObserverPatch]),
         // Tampermonkey.
-        "dhdgffkkebhmkfjojejmpbldmpobfkfo": Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch]),
+        "dhdgffkkebhmkfjojejmpbldmpobfkfo": Profile(patches: [tampermonkeyStartPatch, tampermonkeyPagesPatch, tampermonkeyInstallPatch,
+                                                              tampermonkeyInlineCheckPatch, tampermonkeyInlinePatch]),
     ]
 
     /// Tampermonkey's background lets itself add listeners only in the first moment of starting, until the first
@@ -734,6 +735,15 @@ enum ExtensionProfile {
     /// that way in its "Auto" setting too.
     private static let tampermonkeyInstallPatch = Patch(file: "background.js", find: #""legacy"==wn.values.scriptUrlDetection||"#,
                                                         replace: #""legacy"==wn.values.scriptUrlDetection||"auto"==wn.values.scriptUrlDetection||"#)
+
+    /// Tampermonkey puts a script into the page as an inline <script>. In Chrome its own world's CSP decides whether
+    /// that may run; in WebKit the page's does, so on sites that allow no inline scripts (GitHub) nothing ran, and
+    /// only its "Force DOM" setting helped. Once per page it now checks whether an inline script runs there; where it
+    /// doesn't, a script runs in Tampermonkey's own world instead, as Force DOM does, and everywhere else as before.
+    private static let tampermonkeyInlineCheckPatch = Patch(file: "content.js", find: #"var E;return L},Ss=function(e,t,n,o,s){"#,
+                                                            replace: #"var E;return L},Zz=e=>{if(void 0===Zz.v){const d=e.ownerDocument||document,x=d.documentElement,k="data-zigzag-inline",p=d.createElement("script"),n=xo();n&&p.setAttribute("nonce",n),x.setAttribute(k,""),p.textContent="document.documentElement.removeAttribute('"+k+"')";try{e.appendChild(p),p.remove()}catch(e){}Zz.v=!x.hasAttribute(k),x.removeAttribute(k)}return Zz.v},Ss=function(e,t,n,o,s){"#)
+    private static let tampermonkeyInlinePatch = Patch(file: "content.js", find: #"try{c.textContent=t,e.appendChild(c)}catch(e){r=e.message||e}"#,
+                                                       replace: #"try{Zz(e)?(c.textContent=t,e.appendChild(c)):(0,eval)(t)}catch(e){r=e.message||e}"#)
 
     /// Return YouTube Dislike writes its count into a copy of YouTube's label, class names and all. YouTube's
     /// own like and dislike code find their labels by class, so both write into the copy, in turns ("0", the
