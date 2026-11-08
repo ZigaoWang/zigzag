@@ -123,10 +123,22 @@ enum ArcImporter {
               let containers = sidebar["containers"] as? [[String: Any]],
               let main = containers.first(where: { $0["spaces"] != nil }) else { throw FormatError() }
 
-        // Arc stores lists as [key, value, key, value…] or as plain arrays; collect the dictionaries.
-        let itemList = (main["items"] as? [Any] ?? []).compactMap { $0 as? [String: Any] }
+        // Arc stores lists as [key, value, key, value…] or as plain arrays, and newer versions (and Arc Sync) wrap each
+        // value as {"value": …}; collect the dictionaries either way.
+        func unwrapped(_ any: Any) -> [String: Any]? {
+            guard let dict = any as? [String: Any] else { return nil }
+            if dict["id"] == nil, let inner = dict["value"] as? [String: Any] { return inner }
+            return dict
+        }
+        let itemList = (main["items"] as? [Any] ?? []).compactMap(unwrapped)
         var items: [String: [String: Any]] = [:]
         for item in itemList { if let id = item["id"] as? String { items[id] = item } }
+        /// A container's kind as Arc writes it: the word ("pinned"), or, in newer files, an object keyed by it
+        /// ({"pinned": {…}}).
+        func kind(_ any: Any) -> String? {
+            if let word = any as? String { return word }
+            return (any as? [String: Any]).flatMap { $0.count == 1 ? $0.keys.first : nil }
+        }
 
         /// A pinned tab's page, if it's a web page.
         func tabPage(_ node: [String: Any]) -> [Bookmark] {
@@ -154,11 +166,11 @@ enum ArcImporter {
         }
 
         var spaces: [SpaceInfo] = []
-        for case let space as [String: Any] in main["spaces"] as? [Any] ?? [] {
+        for space in (main["spaces"] as? [Any] ?? []).compactMap(unwrapped) where space["containerIDs"] != nil || space["title"] != nil {
             let name = (space["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Space \(spaces.count + 1)", comment: "Name of an imported space that had none in Arc: Space 1, Space 2…")
             let containerIDs = space["containerIDs"] as? [Any] ?? []
             var pinnedID: String?
-            for (i, value) in containerIDs.enumerated() where (value as? String) == "pinned" && i + 1 < containerIDs.count {
+            for (i, value) in containerIDs.enumerated() where kind(value) == "pinned" && i + 1 < containerIDs.count {
                 pinnedID = containerIDs[i + 1] as? String
             }
             var info = SpaceInfo(name: name, color: color(of: space))
@@ -210,7 +222,8 @@ enum ArcImporter {
 
         var favorites: [Bookmark] = []
         if let top = main["topAppsContainerIDs"] as? [Any] {
-            for case let id as String in top { favorites += bookmarks(under: id) }
+            // IDs, between the markers that say whose they are; only IDs name an item.
+            for case let id as String in top where items[id] != nil { favorites += bookmarks(under: id) }
         }
         return (spaces, favorites)
     }

@@ -130,6 +130,34 @@ struct ArcFolderTests {
         #expect(folders.last?.parentID == folders.first?.id)
     }
 
+    /// Newer Arc (and Arc Sync) wraps each item as {"value": …} and writes a container's kind as an object keyed by
+    /// it: the same sidebar must come over, folders and favorites included.
+    @Test func newerLayoutWithWrappedItems() throws {
+        func tab(_ id: String, _ url: String) -> [String: Any] {
+            ["value": ["id": id, "title": id, "data": ["tab": ["savedURL": url]], "childrenIds": [String]()]]
+        }
+        let items: [Any] = [
+            "pinned", ["value": ["id": "pinned", "childrenIds": ["t1", "folder"], "data": ["itemContainer": [:]]]],
+            "t1", tab("t1", "https://example.com/1"),
+            "folder", ["value": ["id": "folder", "title": "Imported From Chrome", "data": ["list": [:]], "childrenIds": ["inner"]]],
+            "inner", ["value": ["id": "inner", "title": "Swift", "data": ["list": [:]], "childrenIds": ["t2"]]],
+            "t2", tab("t2", "https://example.com/2"),
+            "top", ["value": ["id": "top", "childrenIds": ["f1"], "data": ["itemContainer": [:]]]],
+            "f1", tab("f1", "https://example.com/fav"),
+        ]
+        let space: [String: Any] = ["id": "s1", "containerIDs": [["unpinned": ["_0": [:]]], "u", ["pinned": ["_0": [:]]], "pinned"]]
+        let root: [String: Any] = ["sidebar": ["containers": [
+            ["global": [:]],
+            ["spaces": ["s1", ["value": space]], "items": items, "topAppsContainerIDs": [["default": true], "top"]],
+        ]]]
+        let (spaces, favorites) = try ArcImporter.parseSidebar(JSONSerialization.data(withJSONObject: root))
+        let first = try #require(spaces.first)
+        #expect(spaces.count == 1)
+        #expect(first.bookmarks.map(\.url.lastPathComponent) == ["1", "2"])
+        #expect((first.folders ?? []).map(\.name) == ["Imported From Chrome", "Swift"])
+        #expect(favorites.map(\.url.lastPathComponent) == ["fav"])
+    }
+
     @Test func movedFolderLandsBetweenGroups() {
         let b = (0..<6).map { _ in UUID() }
         let folders = [BookmarkFolder(name: "F", bookmarkIDs: [b[1], b[2], b[3]])]
