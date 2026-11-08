@@ -853,6 +853,9 @@ final class SidebarListView: NSView {
         if !card.isHidden, let shown = card.layer?.presentation() {
             start = card.frame.offsetBy(dx: shown.transform.m41, dy: shown.transform.m42)
         }
+        // Rows made since the card was go in under everything, the card too: it's put back under them, or it would
+        // slide over their titles.
+        if subviews.first !== card { addSubview(card, positioned: .below, relativeTo: nil) }
         Tokens.Motion.withoutAnimation { card.frame = start }
         card.isHidden = false
         card.refresh()
