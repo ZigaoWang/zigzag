@@ -10,9 +10,9 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     private let status = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let bar = ColorView(color: Tokens.Color.fieldFill)
     private let fill = ColorView(color: Tokens.Color.accent)
-    let actionButton = IconButton(symbol: "magnifyingglass", size: .compact, toolTip: "Show in Finder")
+    let actionButton = IconButton(symbol: "magnifyingglass", size: .compact, toolTip: String(localized: "Show in Finder", comment: "Tooltip of a download's button in the downloads panel: shows the file in Finder."))
     /// Pause or resume, beside Cancel, while a download is under way or paused.
-    let pauseButton = IconButton(symbol: "pause", size: .compact, toolTip: "Pause")
+    let pauseButton = IconButton(symbol: "pause", size: .compact, toolTip: String(localized: "Pause", comment: "Tooltip of a download's button in the downloads panel: pauses the download."))
     /// What the trailing button does for this download: Show in Finder, Cancel, Try Again…
     var onAction: (() -> Void)?
     private(set) var item: DownloadItem?
@@ -69,17 +69,26 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     static func progress(_ done: Int64, of total: Int64, _ formatter: ByteCountFormatter) -> String {
         let a = formatter.string(fromByteCount: done), b = formatter.string(fromByteCount: total)
         let unitA = a.split(separator: " ").last, unitB = b.split(separator: " ").last
-        guard unitA == unitB, let number = a.split(separator: " ").first else { return "\(a) of \(b)" }
-        return "\(number) of \(b)"
+        guard unitA == unitB, let number = a.split(separator: " ").first else {
+            return String(localized: "\(a) of \(b)", comment: "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.")
+        }
+        return String(localized: "\(number) of \(b)", comment: "Under a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.")
     }
 
     private static func timeLeft(_ seconds: Double) -> String {
-        if seconds < 5 { return "a few seconds left" }
-        if seconds < 60 { return "\(Int(seconds.rounded())) seconds left" }
+        if seconds < 5 { return String(localized: "a few seconds left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.") }
+        if seconds < 60 {
+            let seconds = Int(seconds.rounded())
+            return String(localized: "\(seconds) seconds left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.")
+        }
         let minutes = Int((seconds / 60).rounded())
-        if minutes < 60 { return minutes == 1 ? "a minute left" : "\(minutes) minutes left" }
+        if minutes < 60 {
+            return minutes == 1 ? String(localized: "a minute left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.")
+                                : String(localized: "\(minutes) minutes left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.")
+        }
         let hours = Int((seconds / 3600).rounded())
-        return hours == 1 ? "about an hour left" : "about \(hours) hours left"
+        return hours == 1 ? String(localized: "about an hour left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.")
+                          : String(localized: "about \(hours) hours left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.")
     }
 
     /// The file's own icon, as Finder shows it (a disk image looks like one); a picture of it for images, PDFs and
@@ -112,37 +121,46 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         case .downloading:
             let done = formatter.string(fromByteCount: item.completedBytes)
             let amount = item.totalBytes > 0 ? Self.progress(item.completedBytes, of: item.totalBytes, formatter) : done
-            status.stringValue = item.secondsLeft.map { "\(amount), \(Self.timeLeft($0))" } ?? amount
+            status.stringValue = item.secondsLeft.map {
+                let left = Self.timeLeft($0)
+                return String(localized: "\(amount), \(left)", comment: "Under a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.")
+            } ?? amount
             actionButton.symbol = "xmark"
-            actionButton.toolTip = "Cancel"
+            actionButton.toolTip = String(localized: "Cancel", comment: "Tooltip of a download's button in the downloads panel: stops the download.")
             pauseButton.symbol = "pause"
-            pauseButton.toolTip = "Pause"
+            pauseButton.toolTip = String(localized: "Pause", comment: "Tooltip of a download's button in the downloads panel: pauses the download.")
         case .paused:
             let done = formatter.string(fromByteCount: item.completedBytes)
-            status.stringValue = item.totalBytes > 0 ? "Paused, \(done) of \(formatter.string(fromByteCount: item.totalBytes))" : "Paused"
+            let total = formatter.string(fromByteCount: item.totalBytes)
+            status.stringValue = item.totalBytes > 0 ? String(localized: "Paused, \(done) of \(total)", comment: "Under a download's name in the downloads panel: a paused download, and how much of it has come, like 3.7 MB of 9 MB.")
+                                                     : String(localized: "Paused", comment: "Under a download's name in the downloads panel: the download is paused.")
             actionButton.symbol = "xmark"
-            actionButton.toolTip = "Cancel"
+            actionButton.toolTip = String(localized: "Cancel", comment: "Tooltip of a download's button in the downloads panel: stops the download.")
             pauseButton.symbol = "play"
-            pauseButton.toolTip = "Resume"
+            pauseButton.toolTip = String(localized: "Resume", comment: "Tooltip of a download's button in the downloads panel: carries on with a paused download.")
         case .finished where item.fileIsMissing:
             // Deleted or moved since: say so, and offer to fetch it again when that's possible.
             let canFetch = ["http", "https"].contains(item.sourceURL?.scheme?.lowercased() ?? "")
-            status.stringValue = "Moved or deleted"
+            status.stringValue = String(localized: "Moved or deleted", comment: "Under a download's name in the downloads panel: the downloaded file is no longer where it was saved.")
             actionButton.symbol = canFetch ? "arrow.down" : "xmark"
-            actionButton.toolTip = canFetch ? "Download Again" : "Remove"
+            actionButton.toolTip = canFetch ? String(localized: "Download Again", comment: "Tooltip of a download's button in the downloads panel: downloads the missing file again.") : String(localized: "Remove", comment: "Tooltip of a download's button in the downloads panel: takes the download off the list.")
         case .finished:
             let size = formatter.string(fromByteCount: max(item.totalBytes, item.completedBytes))
             let site = item.sourceURL.flatMap { ["http", "https"].contains($0.scheme ?? "") ? $0.host() : nil }
                 .map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
-            status.stringValue = isFresh ? "Just downloaded" : site.map { "\(size) from \($0)" } ?? size
+            status.stringValue = isFresh ? String(localized: "Just downloaded", comment: "Under a download's name in the downloads panel: the file has just finished downloading.")
+                : site.map { String(localized: "\(size) from \($0)", comment: "Under a download's name in the downloads panel: the file's size and the site it came from, like 9 MB from example.com.") } ?? size
             actionButton.symbol = "magnifyingglass"
-            actionButton.toolTip = "Show in Finder"
+            actionButton.toolTip = String(localized: "Show in Finder", comment: "Tooltip of a download's button in the downloads panel: shows the file in Finder.")
         case .failed, .cancelled:
             // Say what happened, and offer to try again rather than only to remove it.
             let canRetry = DownloadManager.shared.canRetry(item)
-            status.stringValue = item.state == .failed ? (item.failure.map { "Didn’t finish. \($0)." } ?? "Didn’t finish") : "Canceled"
+            status.stringValue = item.state == .failed
+                ? (item.failure.map { String(localized: "Didn’t finish. \($0).", comment: "Under a download's name in the downloads panel: the download failed, then why, like Not enough space on your Mac.") }
+                   ?? String(localized: "Didn’t finish", comment: "Under a download's name in the downloads panel: the download failed."))
+                : String(localized: "Canceled", comment: "Under a download's name in the downloads panel: the download was stopped.")
             actionButton.symbol = canRetry ? "arrow.clockwise" : "xmark"
-            actionButton.toolTip = canRetry ? "Try Again" : "Remove"
+            actionButton.toolTip = canRetry ? String(localized: "Try Again", comment: "Tooltip of a download's button in the downloads panel: downloads the file again.") : String(localized: "Remove", comment: "Tooltip of a download's button in the downloads panel: takes the download off the list.")
         }
         bar.isHidden = item.state != .downloading && item.state != .paused
         stateDidChange(animated: false)
@@ -156,7 +174,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         status.textColor = item.state == .failed ? Tokens.Color.caution : isFresh ? Brand.Theme.for(self).accent : Tokens.Color.textSecondary
         alphaValue = (item.state == .cancelled || missing) ? 0.6 : 1
         setAccessibilityRole(.button)
-        setAccessibilityLabel(item.filename + ", " + status.stringValue)
+        setAccessibilityLabel(String(localized: "\(item.filename), \(status.stringValue)", comment: "VoiceOver name of a download in the downloads panel: the file's name, then what's under it."))
         // VoiceOver offers the row's button as an action, hidden or not.
         let title = actionButton.toolTip ?? ""
         setAccessibilityCustomActions(title.isEmpty ? nil : [NSAccessibilityCustomAction(name: title) { [weak self] in
@@ -250,19 +268,19 @@ final class DownloadsPanelView: FloatingPanelView {
     private static let recentCount = 5
     private let title: Label = {
         let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
-        label.attributedStringValue = Tokens.Font.voiceText("Downloads")
+        label.attributedStringValue = Tokens.Font.voiceText(String(localized: "Downloads", comment: "Title of the downloads panel."))
         return label
     }()
-    private let clearButton = PillButton(title: "Clear", style: .quiet)
+    private let clearButton = PillButton(title: String(localized: "Clear", comment: "Button in the downloads panel: takes finished downloads off the list."), style: .quiet)
     /// The last row: the folder, or the whole list when the panel opened on one download.
-    private let folderButton = CardRow(title: "Open Downloads Folder", symbol: "folder", font: Tokens.Font.body())
+    private let folderButton = CardRow(title: String(localized: "Open Downloads Folder", comment: "Last row of the downloads panel: opens the folder downloads are saved to."), symbol: "folder", font: Tokens.Font.body())
     /// The folder button shows the rest of the list here, rather than opening the folder.
     private var offersAll = false
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
     private let emptyIcon = NSImageView(image: Tokens.Symbol.image("arrow.down.circle", size: Tokens.TypeSize.display))
-    private let emptyNote = Label("Nothing downloaded yet", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    private let emptyNote = Label(String(localized: "Nothing downloaded yet", comment: "The downloads panel when nothing was downloaded yet."), font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
     /// More: where new downloads are saved (the same choice as in Settings), in a menu rather than on the panel.
-    private let more = IconButton(symbol: "ellipsis", toolTip: "More")
+    private let more = IconButton(symbol: "ellipsis", toolTip: String(localized: "More", comment: "Tooltip of the … button in the downloads panel."))
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
@@ -320,14 +338,14 @@ final class DownloadsPanelView: FloatingPanelView {
         let clearable = all.contains { ![.downloading, .paused].contains($0.state) }
         MenuPanel.show([
             // Clear lives here rather than beside the title, so the title always has its room.
-            .item(.init(title: "Clear Finished Downloads", isEnabled: clearable) { [weak self] in
+            .item(.init(title: String(localized: "Clear Finished Downloads", comment: "Item in the downloads panel's … menu."), isEnabled: clearable) { [weak self] in
                 DownloadManager.shared.clearFinished(isPrivate: self?.isPrivate ?? false)
             }),
             .separator,
-            .header("Save Downloads To"),
+            .header(String(localized: "Save Downloads To", comment: "Heading in the downloads panel's … menu, over the folder choices.")),
             .item(.init(title: FileManager.default.displayName(atPath: folder.path), isChecked: !asks) { DownloadPlace.pick(0) }),
-            .item(.init(title: "Ask Each Time", isChecked: asks) { DownloadPlace.pick(1) }),
-            .item(.init(title: "Choose Folder…") { DownloadPlace.pick(2) }),
+            .item(.init(title: String(localized: "Ask Each Time", comment: "Item in the downloads panel's … menu: asks where to save each download."), isChecked: asks) { DownloadPlace.pick(1) }),
+            .item(.init(title: String(localized: "Choose Folder…", comment: "Item in the downloads panel's … menu: picks the folder downloads are saved to.")) { DownloadPlace.pick(2) }),
         ], from: more)
     }
 
@@ -406,7 +424,8 @@ final class DownloadsPanelView: FloatingPanelView {
         // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
         let more = focused != nil && all.count > items.count
         offersAll = more
-        folderButton.title.stringValue = more ? "Show All Downloads" : "Open Downloads Folder"
+        folderButton.title.stringValue = more ? String(localized: "Show All Downloads", comment: "Last row of the downloads panel, opened on one download: shows the rest of the list.")
+                                               : String(localized: "Open Downloads Folder", comment: "Last row of the downloads panel: opens the folder downloads are saved to.")
         folderButton.symbol = more ? "list.bullet" : "folder"
         folderButton.setAccessibilityLabel(folderButton.title.stringValue)
         while rows.count < items.count {
