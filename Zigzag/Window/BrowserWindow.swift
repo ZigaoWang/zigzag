@@ -64,6 +64,12 @@ final class BrowserWindow: NSWindow {
         // Only the four modifier keys count: arrow keys always carry .function and .numericPad, and Caps Lock may be
         // on, so comparing all of the flags would never match and the guards below would never run.
         let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        // ⌃Tab often comes this way instead of through sendEvent: once a page has the focus, AppKit offers it as a key
+        // equivalent first, and the page would take it.
+        if event.keyCode == 48, mods.contains(.control), let controller = windowController as? BrowserWindowController,
+           controller.switcher.handle(event) {
+            return true
+        }
         if event.charactersIgnoringModifiers?.lowercased() == "z", mods == .command || mods == [.command, .shift],
            let controller = windowController as? BrowserWindowController, controller.handleUndoKey(redo: mods.contains(.shift)) {
             return true
