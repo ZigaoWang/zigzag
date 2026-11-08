@@ -276,7 +276,9 @@ enum SearchEngine: String, Codable, CaseIterable {
         case .yahoo: "Yahoo"
         case .baidu: "Baidu"
         case .yandex: "Yandex"
-        case .custom: Self.isValidTemplate(Self.customTemplate) ? (URL(string: Self.customTemplate.replacingOccurrences(of: "%s", with: "q"))?.host() ?? "Custom") : "Custom"
+        case .custom:
+            URL(string: Self.customTemplate.replacingOccurrences(of: "%s", with: "q")).flatMap { Self.isValidTemplate(Self.customTemplate) ? $0.host() : nil }
+                ?? String(localized: "Custom", comment: "A search engine choice in Settings: one you give an address for.")
         }
     }
 
@@ -388,7 +390,7 @@ final class Library {
             searchEngine = stored.searchEngine
             importedFromArc = stored.importedFromArc ?? false
         } else {
-            spaces = [SpaceInfo(name: "Personal", color: .sky)]
+            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky)]
             searchEngine = .google
             importedFromArc = false
             saveNow()
@@ -434,7 +436,8 @@ final class Library {
     func addSpace(name: String? = nil, color: SpaceColor? = nil) -> SpaceInfo {
         let used = Set(spaces.map(\.color))
         let pick = color ?? SpaceColor.allCases.first { !$0.isNeutral && !used.contains($0) } ?? SpaceColor.allCases[spaces.count % SpaceColor.allCases.count]
-        let space = SpaceInfo(name: name ?? "Space \(spaces.count + 1)", color: pick)
+        let space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
+                              color: pick)
         spaces.append(space)
         commit()
         return space
