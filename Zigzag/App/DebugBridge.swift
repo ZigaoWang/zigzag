@@ -389,6 +389,43 @@ enum DebugBridge {
             if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
                let step = Int(arg.prefix(1)).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: arg.hasSuffix("a")) }
         case "importwindow": ImportWindowController.show()
+        case "importchoice", "onboardchoice":
+            // importchoice <name> <on|off>: a choice in the Import window ("Sign-ins"), as a click would set it;
+            // onboardchoice the same on the welcome's import step.
+            let words = arg.split(separator: " ").map(String.init)
+            if let state = words.last, words.count >= 2 {
+                let choice = words.dropLast().joined(separator: " ")
+                if name == "importchoice" {
+                    (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugChoose(choice, on: state == "on")
+                } else {
+                    (WelcomeWindowController.shared?.window?.contentView as? OnboardingView)?.debugChoose(choice, on: state == "on")
+                }
+            }
+        case "importgo": (ImportWindowController.shared?.window?.contentView as? ImportView)?.debugImport()
+        case "onboardgo": (WelcomeWindowController.shared?.window?.contentView as? OnboardingView)?.debugNext()
+        case "windowof":
+            // windowof <title> <path>: as windowid, for Zigzag's window with that title (Import, Welcome to Zigzag).
+            if let space = arg.lastIndex(of: " "), let window = NSApp.windows.first(where: { $0.title == String(arg[..<space]) && $0.isVisible }) {
+                let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+                let info = "\(window.windowNumber) \(ProcessInfo.processInfo.processIdentifier) \(Int(window.frame.minX)) \(Int(screenHeight - window.frame.maxY))"
+                try? info.write(toFile: String(arg[arg.index(after: space)...]), atomically: true, encoding: .utf8)
+            }
+        case "cookies":
+            // cookies <path>: the cookies in the default store and in every private window's, by name and domain.
+            // Never their values.
+            Task { @MainActor in
+                func describe(_ cookies: [HTTPCookie]) -> [[String: Any]] {
+                    cookies.map { ["name": $0.name, "domain": $0.domain, "path": $0.path, "secure": $0.isSecure, "httpOnly": $0.isHTTPOnly,
+                                   "sameSite": $0.sameSitePolicy?.rawValue ?? "", "session": $0.isSessionOnly,
+                                   "expires": $0.expiresDate.map { ISO8601DateFormatter().string(from: $0) } ?? ""] }
+                }
+                var privateCookies: [[String: Any]] = []
+                for store in WindowManager.shared.controllers.compactMap(\.tabManager.privateStore) {
+                    privateCookies += describe(await store.httpCookieStore.allCookies())
+                }
+                let json: [String: Any] = ["default": describe(await WKWebsiteDataStore.default().httpCookieStore.allCookies()), "private": privateCookies]
+                if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+            }
         case "closewindow":
             // closewindow <title>: closes Zigzag's window with that title (Import, Passwords, Settings).
             NSApp.windows.first { $0.title == arg }?.close()
