@@ -23,6 +23,10 @@ settings:
     DEAD_CODE_STRIPPING: YES
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: 432GL3WKY2
+    # Every word Zigzag says is in Resources/Localizable.xcstrings (and the permission prompts in InfoPlist.xcstrings):
+    # the compiler lists each String(localized:) it finds, so the catalog can be kept in step with the code.
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
   configs:
     Debug:
       # The dev build is its own app, "Zigzag Dev", with its own settings, data and website logins, so it never
@@ -67,6 +71,9 @@ targets:
     info:
       path: Zigzag/Info.plist
       properties:
+        # English only for now. The catalogs are ready for Simplified Chinese (zh-Hans), but it joins
+        # CFBundleLocalizations only once its translations are in: listed sooner, the app would claim a language it
+        # can't yet speak, and macOS would offer it in Language & Region.
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
         CFBundleIconName: AppIcon
         CFBundleName: $(APP_DISPLAY_NAME)
@@ -86,6 +93,8 @@ targets:
         NSHighResolutionCapable: true
         NSSupportsAutomaticTermination: false
         NSSupportsSuddenTermination: false
+        # What macOS shows when it asks for each permission. Translations go in Resources/InfoPlist.xcstrings, keyed
+        # by these names; keep its English the same as here.
         NSCameraUsageDescription: Websites you visit can ask to use your camera.
         NSContactsUsageDescription: Zigzag fills your name, email, phone and address into forms from your own card in Contacts.
         NSMicrophoneUsageDescription: Websites you visit can ask to use your microphone.
