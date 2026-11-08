@@ -180,6 +180,8 @@ enum Tokens {
         /// Favorites: as many to a row as fit at least `favoriteMinWidth` wide (three at the sidebar's usual width,
         /// four from about 255, up to `favoriteMaxColumns`), or as many as chosen in Settings; soft tiles.
         static let favoriteMinWidth: CGFloat = 56
+        /// The narrowest a favorite gets so its row comes out whole instead of leaving one tile alone below.
+        static let favoriteTightWidth: CGFloat = 46
         static let favoriteMaxColumns = 6
         static let favoriteHeight: CGFloat = 36
         static let favoriteIcon: CGFloat = 18

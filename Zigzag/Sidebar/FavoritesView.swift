@@ -132,12 +132,19 @@ final class FavoritesView: NSView {
     static let perRowChanged = Notification.Name("FavoritesPerRowChanged")
     static let perRowChoices = [0, 2, 3, 4]
 
-    /// The columns a grid this wide has: the chosen count, or as many tiles as fit at their narrowest.
-    static func columns(for width: CGFloat) -> Int {
+    /// The columns a grid this wide has for this many favorites: the chosen count, or, on Automatic, rows that look
+    /// whole. As few columns as fill every row, so tiles stay large; failing that, a last row of at least two, never
+    /// one tile left on its own. Tiles may narrow from their comfortable width to their tightest for that: four at the
+    /// usual width sit in one row rather than three and a lone one.
+    static func columns(for width: CGFloat, count: Int) -> Int {
         if perRow > 0 { return perRow }
         let gap = Tokens.Sidebar.favoriteGap
-        let fit = Int((width + gap) / (Tokens.Sidebar.favoriteMinWidth + gap))
-        return min(max(fit, 2), Tokens.Sidebar.favoriteMaxColumns)
+        func fitting(_ tile: CGFloat) -> Int { min(max(Int((width + gap) / (tile + gap)), 2), Tokens.Sidebar.favoriteMaxColumns) }
+        let roomy = fitting(Tokens.Sidebar.favoriteMinWidth), tight = max(roomy, fitting(Tokens.Sidebar.favoriteTightWidth))
+        guard count > roomy else { return roomy }
+        if let whole = (roomy...tight).first(where: { count % $0 == 0 }) { return whole }
+        // Then fewer, larger columns; when every count leaves one over (13 does), the roomy one.
+        return (roomy...tight).first { count % $0 != 1 } ?? (2..<roomy).reversed().first { count % $0 != 1 } ?? roomy
     }
 
     /// The setting changing: the tiles glide to their new rows and widths, and the sidebar makes room.
@@ -174,7 +181,7 @@ final class FavoritesView: NSView {
     /// How tall the grid is at a width: its rows of tiles and the gaps between them.
     func preferredHeight(for width: CGFloat) -> CGFloat {
         guard tileCount > 0 else { return 0 }
-        let columns = Self.columns(for: width)
+        let columns = Self.columns(for: width, count: tileCount)
         let rows = (tileCount + columns - 1) / columns
         return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Sidebar.favoriteGap
     }
@@ -303,7 +310,7 @@ final class FavoritesView: NSView {
         let gap = Tokens.Sidebar.favoriteGap
         // As many columns as fit or were chosen, every tile one size, a shorter last row from the left. A lone
         // favorite is never wider than two would be: half the row, not a long bar around a small icon.
-        let columns = max(2, min(Self.columns(for: bounds.width), all.count))
+        let columns = max(2, min(Self.columns(for: bounds.width, count: all.count), all.count))
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
         for (i, tile) in all.enumerated() {
             let row = i / columns, column = i % columns
