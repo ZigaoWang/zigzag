@@ -68,6 +68,7 @@ enum SidebarMenus {
             // Pins are shared by every window: a private one doesn't take them away.
             if !isPrivate {
                 menu.addItem(Item(pins.count == 1 ? "Unpin Tab" : "Unpin \(pins.count) Tabs") { controller.unpinMarked(pins) })
+                menu.addItem(Item(Self.removePinsTitle(pins.count)) { controller.removePinnedWithUndo(pins) })
             }
         }
         if !tabs.isEmpty {
@@ -82,6 +83,12 @@ enum SidebarMenus {
             })
         }
         return menu
+    }
+
+    /// "Remove Pinned Page", or for several, how many.
+    static func removePinsTitle(_ count: Int) -> String {
+        count == 1 ? String(localized: "Remove Pinned Page", comment: "Menu item: takes a pinned page out of the sidebar")
+            : String(localized: "Remove \(count) Pinned Pages", comment: "Menu item: takes several picked pinned pages out of the sidebar")
     }
 
     static func tabMenu(for tab: Tab, controller: BrowserWindowController) -> NSMenu {
@@ -208,14 +215,20 @@ enum SidebarMenus {
             if !pages.isEmpty {
                 menu.addItem(Item("Unload Pages") { manager.close(pages) })
             }
-            if !manager.isPrivate { menu.addItem(Item("Unpin Split View") { controller.unbookmarkWithUndo(bookmark.id, to: 0) }) }
+            if !manager.isPrivate {
+                menu.addItem(Item("Unpin Split View") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+                menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
+            }
             return menu
         }
         if let live {
             menu.addItem(Item("Unload Page") { manager.close(live) })
         }
         // Pins are shared by every window: a private one doesn't take them away.
-        if !manager.isPrivate { menu.addItem(Item("Unpin Tab") { controller.unbookmarkWithUndo(bookmark.id, to: 0) }) }
+        if !manager.isPrivate {
+            menu.addItem(Item("Unpin Tab") { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+            menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
+        }
         return menu
     }
 
@@ -483,6 +496,24 @@ extension BrowserWindowController {
         }
         if let made { revealNewFolder(made.id) }
         sidebar.list.mark(pins: ids)
+    }
+
+    /// Takes pinned pages out of the sidebar, open ones closing first. ⌘Z (or Undo on the toast) puts them back.
+    func removePinnedWithUndo(_ pins: [UUID]) {
+        guard !tabManager.isPrivate, !pins.isEmpty else { return }
+        let ids = markedPinPages(pins)
+        pageChange("Remove Pinned Pages") { [tabManager] in
+            Library.shared.together {
+                tabManager.close(ids.compactMap(tabManager.bookmarkTab(for:)))
+                Library.shared.removeBookmarks(ids)
+            }
+        }
+        let what = pins.count == 1 ? String(localized: "Removed 1 pinned page", comment: "Toast")
+            : String(localized: "Removed \(pins.count) pinned pages", comment: "Toast after removing several pinned pages")
+        Toast.show(what, symbol: "pin.slash", action: (String(localized: "Undo", comment: "Toast button"), { [weak self] in
+            guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == "Remove Pinned Pages" else { return }
+            undo.undo()
+        }), duration: 4, in: self)
     }
 
     /// ⌘W on picked rows: what it does to one row, to all of them. Tabs close, with the count and Undo; pinned
