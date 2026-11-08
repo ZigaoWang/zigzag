@@ -50,11 +50,11 @@ final class ColorWheel: NSView {
         layer?.addSublayer(link)
         knobs.forEach { layer?.addSublayer($0.layer) }
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Color")
+        setAccessibilityLabel(String(localized: "Color", comment: "Accessibility label of the color wheel in the space editor."))
         for (i, element) in elements.enumerated() {
             element.setAccessibilityParent(self)
             element.setAccessibilityRole(.slider)
-            element.setAccessibilityLabel(i == 0 ? "Color" : "Second color")
+            element.setAccessibilityLabel(i == 0 ? String(localized: "Color", comment: "VoiceOver, in the space editor's color wheel: the knob of the space's color.") : String(localized: "Second color", comment: "VoiceOver, in the space editor's color wheel: the knob of a gradient's second color."))
             element.step = { [weak self] amount, hue in self?.nudge(i, amount: amount, hue: hue) }
             element.addHueActions()
         }
@@ -191,11 +191,15 @@ final class ColorWheel: NSView {
 
     /// What VoiceOver says for a knob: the color's family, and how much of it.
     static func describe(_ spot: Spot) -> String {
-        guard spot.amount > 0.005 else { return "No color" }
-        let names: [(Double, String)] = [(0.04, "Red"), (0.11, "Orange"), (0.18, "Yellow"), (0.43, "Green"), (0.53, "Teal"),
-                                         (0.7, "Blue"), (0.83, "Purple"), (0.96, "Pink"), (1.01, "Red")]
-        let name = names.first { spot.hue < $0.0 }?.1 ?? "Red"
-        return "\(name), \(Int((spot.amount * 100).rounded())) percent color"
+        guard spot.amount > 0.005 else { return String(localized: "No color", comment: "VoiceOver, in the space editor's color wheel: the knob sits in the middle, white.") }
+        let red = String(localized: "Red", comment: "VoiceOver, in the space editor's color wheel: a color's family.")
+        let names: [(Double, String)] = [(0.04, red), (0.11, String(localized: "Orange", comment: "VoiceOver, in the space editor's color wheel: a color's family.")),
+                                         (0.18, String(localized: "Yellow", comment: "VoiceOver, in the space editor's color wheel: a color's family.")), (0.43, String(localized: "Green", comment: "VoiceOver, in the space editor's color wheel: a color's family.")),
+                                         (0.53, String(localized: "Teal", comment: "VoiceOver, in the space editor's color wheel: a color's family.")), (0.7, String(localized: "Blue", comment: "VoiceOver, in the space editor's color wheel: a color's family.")),
+                                         (0.83, String(localized: "Purple", comment: "VoiceOver, in the space editor's color wheel: a color's family.")), (0.96, String(localized: "Pink", comment: "VoiceOver, in the space editor's color wheel: a color's family.")), (1.01, red)]
+        let name = names.first { spot.hue < $0.0 }?.1 ?? red
+        let amount = Int((spot.amount * 100).rounded())
+        return String(localized: "\(name), \(amount) percent color", comment: "VoiceOver, in the space editor's color wheel: a knob's color family, then how much color, like “Blue, 40 percent color”.")
     }
 
     /// Within a knob's reach, clicking takes hold of it without moving it.
@@ -293,8 +297,8 @@ nonisolated private final class KnobElement: NSAccessibilityElement {
     func addHueActions() {
         let step = step
         setAccessibilityCustomActions([
-            NSAccessibilityCustomAction(name: "Next hue") { MainActor.assumeIsolated { step?(0, 1 / 12) }; return true },
-            NSAccessibilityCustomAction(name: "Previous hue") { MainActor.assumeIsolated { step?(0, -1 / 12) }; return true },
+            NSAccessibilityCustomAction(name: String(localized: "Next hue", comment: "VoiceOver, in the space editor's color wheel: an action that turns the knob to the next hue.")) { MainActor.assumeIsolated { step?(0, 1 / 12) }; return true },
+            NSAccessibilityCustomAction(name: String(localized: "Previous hue", comment: "VoiceOver, in the space editor's color wheel: an action that turns the knob to the previous hue.")) { MainActor.assumeIsolated { step?(0, -1 / 12) }; return true },
         ])
     }
 
@@ -431,24 +435,24 @@ struct SpaceLook {
     /// glass, then the deep ones. Then paper and the light ones, warm to cool, the last of them glass. Every one is a
     /// spot on the wheel, a Shade and the effects, so whatever a preset gives, the controls show and can reach.
     static let presets: [SpaceLook] = [
-        SpaceLook(name: "White", tint: 0, depth: 0),
-        SpaceLook(name: "Black", tint: 0, depth: 1),
-        SpaceLook(name: "Glass", tint: 0, depth: 0.02, seeThrough: 0.7),
-        SpaceLook(name: "Smoke", tint: 0, depth: 0.9, seeThrough: 0.6),
-        fade("Charcoal", 0.08, 0.84, 0.08, 0.94, tint: 0.12, grain: 0.3),
-        fade("Espresso", 0.07, 0.8, 0.07, 0.93, tint: 0.45),
-        fade("Oxblood", 0.99, 0.78, 0.99, 0.92, tint: 0.5),
-        fade("Pine", 0.42, 0.8, 0.42, 0.93, tint: 0.45),
-        fade("Slate", 0.62, 0.76, 0.62, 0.9, tint: 0.35),
-        SpaceLook(name: "Paper", hue: 0.11, tint: 0.55, depth: 0.1, grain: 0.5),
-        fade("Oat", 0.1, 0.02, 0.1, 0.26, tint: 0.45),
-        fade("Butter", 0.13, 0.02, 0.13, 0.26),
-        fade("Clay", 0.075, 0.06, 0.06, 0.36, tint: 0.55),
-        fade("Rose", 0.97, 0.04, 0.97, 0.32, tint: 0.55),
-        fade("Matcha", 0.12, 0.02, 0.27, 0.32),
-        fade("Mint", 0.46, 0.03, 0.46, 0.32, tint: 0.55),
-        fade("Sky", 0.6, 0.04, 0.6, 0.34, tint: 0.6),
-        fade("Frost", 0.6, 0.02, 0.6, 0.18, tint: 0.3, seeThrough: 0.5),
+        SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0),
+        SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1),
+        SpaceLook(name: String(localized: "Glass", comment: "Tooltip and accessibility label of a preset look in the space editor. Clear, see-through glass."), tint: 0, depth: 0.02, seeThrough: 0.7),
+        SpaceLook(name: String(localized: "Smoke", comment: "Tooltip and accessibility label of a preset look in the space editor. Dark, smoky see-through glass."), tint: 0, depth: 0.9, seeThrough: 0.6),
+        fade(String(localized: "Charcoal", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.08, 0.84, 0.08, 0.94, tint: 0.12, grain: 0.3),
+        fade(String(localized: "Espresso", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.07, 0.8, 0.07, 0.93, tint: 0.45),
+        fade(String(localized: "Oxblood", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep red."), 0.99, 0.78, 0.99, 0.92, tint: 0.5),
+        fade(String(localized: "Pine", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep green."), 0.42, 0.8, 0.42, 0.93, tint: 0.45),
+        fade(String(localized: "Slate", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray."), 0.62, 0.76, 0.62, 0.9, tint: 0.35),
+        SpaceLook(name: String(localized: "Paper", comment: "Tooltip and accessibility label of a preset look in the space editor."), hue: 0.11, tint: 0.55, depth: 0.1, grain: 0.5),
+        fade(String(localized: "Oat", comment: "Tooltip and accessibility label of a preset look in the space editor. A warm pale beige."), 0.1, 0.02, 0.1, 0.26, tint: 0.45),
+        fade(String(localized: "Butter", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale yellow."), 0.13, 0.02, 0.13, 0.26),
+        fade(String(localized: "Clay", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale warm brown."), 0.075, 0.06, 0.06, 0.36, tint: 0.55),
+        fade(String(localized: "Rose", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale pink."), 0.97, 0.04, 0.97, 0.32, tint: 0.55),
+        fade(String(localized: "Matcha", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale green, after the tea."), 0.12, 0.02, 0.27, 0.32),
+        fade(String(localized: "Mint", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale green."), 0.46, 0.03, 0.46, 0.32, tint: 0.55),
+        fade(String(localized: "Sky", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale blue."), 0.6, 0.04, 0.6, 0.34, tint: 0.6),
+        fade(String(localized: "Frost", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale, see-through icy blue."), 0.6, 0.02, 0.6, 0.18, tint: 0.3, seeThrough: 0.5),
     ]
 
     /// A quiet fade, top to bottom, from one color to a shade (or a neighbor) of it.
@@ -597,7 +601,9 @@ final class LookSlider: NSView {
         knob.borderColor = NSColor.black.withAlphaComponent(0.08).cgColor
         layer?.addSublayer(knob)
         setAccessibilityRole(.slider)
-        setAccessibilityLabel(kind == .shade ? "Shade" : kind == .seeThrough ? "See-through" : "Grain")
+        setAccessibilityLabel(kind == .shade ? String(localized: "Shade", comment: "A slider in the space editor: how light or deep the color is.")
+                              : kind == .seeThrough ? String(localized: "See-through", comment: "A slider in the space editor: how much of the desktop shows through the window.")
+                              : String(localized: "Grain", comment: "A slider in the space editor: how much film grain the color has."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -646,11 +652,13 @@ final class LookSlider: NSView {
         }
         // Held, the knob swells a little under your finger.
         knob.setAffineTransform(pressed ? CGAffineTransform(scaleX: 1.12, y: 1.12) : .identity)
-        let percent = "\(Int((value * 100).rounded())) percent"
+        let amount = Int((value * 100).rounded())
+        let percent = String(localized: "\(amount) percent", comment: "VoiceOver, a slider's value in the space editor, like “40 percent”.")
         switch kind {
-        case .shade: setAccessibilityValue(value < 0.01 ? "Lightest" : value > 0.99 ? "Darkest" : "\(percent) dark")
-        case .seeThrough: setAccessibilityValue(value < 0.01 ? "Solid" : percent)
-        case .grain: setAccessibilityValue(value < 0.01 ? "Smooth" : percent)
+        case .shade: setAccessibilityValue(value < 0.01 ? String(localized: "Lightest", comment: "VoiceOver, the Shade slider's value at its lightest.") : value > 0.99 ? String(localized: "Darkest", comment: "VoiceOver, the Shade slider's value at its deepest.")
+                                           : String(localized: "\(amount) percent dark", comment: "VoiceOver, the Shade slider's value, like “40 percent dark”."))
+        case .seeThrough: setAccessibilityValue(value < 0.01 ? String(localized: "Solid", comment: "VoiceOver, the See-through slider's value when nothing shows through.") : percent)
+        case .grain: setAccessibilityValue(value < 0.01 ? String(localized: "Smooth", comment: "VoiceOver, the Grain slider's value with no grain.") : percent)
         }
     }
 
@@ -771,9 +779,9 @@ final class DirectionKnob: NSView {
         layer?.addSublayer(thumb)
         notch.backgroundColor = NSColor(white: 0.32, alpha: 1).cgColor
         layer?.addSublayer(notch)
-        toolTip = "Gradient Direction"
+        toolTip = String(localized: "Gradient Direction", comment: "Tooltip and accessibility label of the dial that turns a space's gradient, in the space editor.")
         setAccessibilityRole(.slider)
-        setAccessibilityLabel("Gradient Direction")
+        setAccessibilityLabel(String(localized: "Gradient Direction", comment: "Tooltip and accessibility label of the dial that turns a space's gradient, in the space editor."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -826,7 +834,8 @@ final class DirectionKnob: NSView {
             notch.position = CGPoint(x: c.x + cos(a) * reach, y: c.y + sin(a) * reach)
             notch.setAffineTransform(CGAffineTransform(rotationAngle: a))
         }
-        setAccessibilityValue("\(Int(angle)) degrees")
+        let degrees = Int(angle)
+        setAccessibilityValue(String(localized: "\(degrees) degrees", comment: "VoiceOver, the gradient dial's angle in the space editor, like “90 degrees”."))
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -915,7 +924,7 @@ final class ColorChip: InteractiveView {
     var onRemove: (() -> Void)? {
         didSet {
             setAccessibilityCustomActions(onRemove == nil ? nil : [
-                NSAccessibilityCustomAction(name: "Remove second color") { [weak self] in self?.onRemove?(); return true },
+                NSAccessibilityCustomAction(name: String(localized: "Remove second color", comment: "VoiceOver action on the second color's chip in the space editor: ends the gradient.")) { [weak self] in self?.onRemove?(); return true },
             ])
         }
     }
@@ -1010,9 +1019,9 @@ final class AddColorSlot: InteractiveView {
         plus.lineWidth = 1.5
         plus.lineCap = .round
         layer?.addSublayer(plus)
-        toolTip = "Add Second Color"
+        toolTip = String(localized: "Add Second Color", comment: "Tooltip and accessibility label of the slot that adds a gradient's second color, in the space editor.")
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Add Second Color")
+        setAccessibilityLabel(String(localized: "Add Second Color", comment: "Tooltip and accessibility label of the slot that adds a gradient's second color, in the space editor."))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1097,26 +1106,28 @@ final class DisclosureRow: InteractiveView {
 /// `onCommit` when you let go or pick something.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
-    private let colorsLabel = SpaceLookEditor.rowLabel("Gradient")
+    private let colorsLabel = SpaceLookEditor.rowLabel(String(localized: "Gradient", comment: "A row's label in the space editor's Effects: the space's one or two colors."))
     /// The space's colors, one per knob on the wheel; clicking one selects its knob.
-    private let chips = [ColorChip(label: "Color"), ColorChip(label: "Second color")]
+    private let chips = [ColorChip(label: String(localized: "Color", comment: "Accessibility label of the chip of the space's color, in the space editor.")),
+                         ColorChip(label: String(localized: "Second color", comment: "Accessibility label of the chip of a gradient's second color, in the space editor."))]
     /// Adds a second color for a gradient; the second chip's × takes it away again.
     private let addSlot = AddColorSlot()
     private let dial = DirectionKnob()
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     /// Gradient, see-through and grain: there when you want them, folded away until then.
-    private let effects = DisclosureRow(title: "Effects")
+    private let effects = DisclosureRow(title: String(localized: "Effects", comment: "A folding section of the space editor: gradient, see-through and grain."))
     private var showsEffects = false
     /// Whether the Frosted or Clear row is out (a see-through space with Effects open).
     private var showsGlass = false
-    private let shadeLabel = SpaceLookEditor.rowLabel("Shade")
+    private let shadeLabel = SpaceLookEditor.rowLabel(String(localized: "Shade", comment: "A slider in the space editor: how light or deep the color is."))
     private let shadeSlider = LookSlider(.shade)
-    private let clearLabel = SpaceLookEditor.rowLabel("See-through")
+    private let clearLabel = SpaceLookEditor.rowLabel(String(localized: "See-through", comment: "A slider in the space editor: how much of the desktop shows through the window."))
     private let clearSlider = LookSlider(.seeThrough)
     /// Frosted or clear glass, for a see-through space.
-    private let glassLabel = SpaceLookEditor.rowLabel("Glass")
-    private let glassSwitch = SlidingSwitch([.text("Clear"), .text("Frosted")])
-    private let grainLabel = SpaceLookEditor.rowLabel("Grain")
+    private let glassLabel = SpaceLookEditor.rowLabel(String(localized: "Glass", comment: "A row in the space editor's Effects, for a see-through space: clear or frosted glass."))
+    private let glassSwitch = SlidingSwitch([.text(String(localized: "glass.clear", defaultValue: "Clear", comment: "In the space editor, for a see-through space: clear glass, the desktop sharp behind it. Not the sidebar's Clear button.")),
+                                                 .text(String(localized: "Frosted", comment: "In the space editor, for a see-through space: frosted glass, the desktop blurred behind it."))])
+    private let grainLabel = SpaceLookEditor.rowLabel(String(localized: "Grain", comment: "A slider in the space editor: how much film grain the color has."))
     private let grainSlider = LookSlider(.grain)
 
     var onPreview: ((SpaceInfo) -> Void)?
@@ -1450,12 +1461,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private weak var controller: BrowserWindowController?
     let spaceID: UUID
     /// The name in the app's voice, as the sidebar shows it.
-    private let nameField = PlainTextField(font: Tokens.Font.voice(20), placeholder: "Name this space")
+    private let nameField = PlainTextField(font: Tokens.Font.voice(20), placeholder: String(localized: "Name this space", comment: "Placeholder of the name field in the space editor."))
     /// The name sits on a soft field, so it reads as something you can type into.
     private let nameBackground = ColorView(color: Tokens.Color.fieldFill)
     private let editor: SpaceLookEditor
     /// The space's icon, at the start of its name; click it to choose one in place of the colors.
-    private let iconButton = IconButton(symbol: "circle.dashed", size: .compact, toolTip: "Choose Icon")
+    private let iconButton = IconButton(symbol: "circle.dashed", size: .compact, toolTip: String(localized: "Choose Icon", comment: "Tooltip of the icon button before the space's name, in the space editor."))
     private var iconGrid: IconGrid?
     private var monitor: Any?
     static let width: CGFloat = 300
@@ -1598,7 +1609,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         // The cursor at the end, not the whole name selected: you came to change the color as often as the name. A
         // name Zigzag made up ("Space 2") is selected instead, so typing replaces it.
         if let editor = nameField.currentEditor() {
-            let placeholder = nameField.stringValue.range(of: #"^Space \d+$"#, options: .regularExpression) != nil
+            let name = nameField.stringValue
+            let placeholder = name.range(of: #"^Space \d+$"#, options: .regularExpression) != nil
+                || (1...99).contains { name == String(localized: "Space \($0)", comment: "A new space's made-up name, like “Space 2”.") }
             editor.selectedRange = placeholder ? NSRange(location: 0, length: nameField.stringValue.utf16.count)
                                                : NSRange(location: nameField.stringValue.utf16.count, length: 0)
         }
@@ -1664,7 +1677,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if !cancelled { commitName() }
-        if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo("Edit Space", before: before) }
+        if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo(String(localized: "Edit Space", comment: "Undo action name, shown in Edit › Undo."), before: before) }
         if let controller {
             controller.root.holdReveal = false
             dismiss()
