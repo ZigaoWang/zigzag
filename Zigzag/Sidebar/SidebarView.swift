@@ -157,7 +157,7 @@ final class AddressView: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         // A soft field of the space's own color, a step lighter under the pointer and pressed.
-        let fill = isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
+        let fill = isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         Tokens.Motion.withoutAnimation {
             layer?.borderWidth = 0

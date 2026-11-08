@@ -969,6 +969,8 @@ enum Tokens {
         /// The address and the favorites: a soft field of the space's color, no line around it.
         static let field = Color.dynamic(light: white(0.45), dark: white(0.065))
         static let fieldHover = Color.dynamic(light: white(0.62), dark: white(0.095))
+        /// A field or a favorite held down: a step back from its hover, never below the field at rest.
+        static let fieldPressed = Color.dynamic(light: white(0.52), dark: white(0.08))
         /// A space key: its matte face, the hairline around it, and the shade along its lower lip.
         static let key = Color.dynamic(light: white(0.5), dark: white(0.07))
         static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09))

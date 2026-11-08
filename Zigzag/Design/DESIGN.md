@@ -181,7 +181,8 @@ One look for each state, everywhere:
   (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
   dark primary. Instant, both ways: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
-  once. Things that read as objects (space keys, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
+  once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
+  rest. Things that read as objects (space keys, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
   `Motion.pressSink` (1pt) in `pressIn` (80ms), eased out, and back over `pressSettle` (180ms), eased out, with
   weight and no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
   `Motion.pressScale` (0.97) and a critically damped spring back. Both start from wherever they are, and the action
