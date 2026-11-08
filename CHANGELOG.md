@@ -18,6 +18,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Closing, unpinning or moving many tabs at once is quick, and redraws the window once.
 - Shift-click on the tab overview picks a run of cards, as in the sidebar.
 - In the welcome, staying signed in reads as a setting under the browsers instead of one more browser, and checked boxes are solid, with no dark ring.
+- Translating a page reads its language again as you ask, waits while macOS downloads the language, and never leaves "Translating…" stuck: it goes with the page if you move on, and says so if no answer comes.
+- Site controls have the same room under their last row as above their first.
+- The Language menu lists each language once.
 
 ## [0.5.19] - 2026-11-08
 
