@@ -4,6 +4,16 @@
 // background and pages. Each fix is for something seen stopping real extensions; each leaves alone anything that
 // already behaves.
 (() => {
+  // Explicit resource management (`using`): Chrome has Symbol.dispose and Symbol.asyncDispose, this WebKit doesn't
+  // yet. Code compiled for it checks they exist and stops with "Symbol.dispose is not defined." (Bitwarden, as you
+  // sign in). They're well-known symbols, so one of each is all that code needs; registered ones, so any other copy
+  // of this answer, in another page or a library's own, is the same symbol.
+  for (const name of ['dispose', 'asyncDispose']) {
+    if (typeof Symbol[name] !== 'symbol') {
+      try { Object.defineProperty(Symbol, name, { value: Symbol.for(`Symbol.${name}`) }); } catch (e) {}
+    }
+  }
+
   const start = () => {
     const api = globalThis.chrome || globalThis.browser;
     if (globalThis.__zigzagDifferences) return true;
