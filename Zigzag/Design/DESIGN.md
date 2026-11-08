@@ -147,7 +147,7 @@ A 4pt grid (`Space.x1`...`x16`). Rhythm:
   lights and every icon at 12, every title and section label at 36. The address 40pt from the top, the favorites 8pt
   under it, the list 12pt (`Sidebar.sectionGap`) under them.
 - Sections are separated by space and a quiet label, low in its slot (`Metric.sectionLabelHeight`, 32, on pages and
-  panels; `Sidebar.labelHeight`, 28, in the sidebar's compact scale), never by divider lines.
+  panels; `Sidebar.labelHeight`, 24, in the sidebar's compact scale), never by divider lines.
 - Panels: 12pt padding (`Space.x3`), 4pt inset for rows inside them so a row's corners run with the panel's.
 - Pages: `Tokens.Page` (gutter 28, header 16 + 28 + 12, max width 880). Grouped rows are at least 44 tall with 16pt
   (`groupPad`) from the group's edge and 12pt (`groupRowPad`) above and below their two lines; list rows are 34.
