@@ -502,7 +502,13 @@ main, .nav { max-width: 1240px; }
 /* Phones, and large text in phone browsers (WeChat's included): the top grows with its words instead of a set height,
    so the picture always starts below the buttons. */
 @media (max-width: 760px) {
-  .hero { height: auto; min-height: 0; padding-bottom: calc(62vw + 20px); }
+  /* A phone: the hero fills the screen. The words take what they need (more with large text), and the picture
+     takes the rest below them, its window filling that room from just under the buttons to the bottom. */
+  .hero { height: auto; min-height: calc(100svh - 16px); padding-bottom: 0; flex-direction: column; align-items: stretch;
+    background-image: none; }
+  .hero::before { display: none; }
+  .hero::after { content: ""; flex: 1 1 auto; min-height: 62vw; margin-top: 24px;
+    background: image-set(url(/assets/hero-1600.jpg?v=1) 1x, url(/assets/hero.jpg?v=1) 2x) 32% bottom / auto calc(100% / .535) no-repeat; }
   .hero .actions { flex-wrap: wrap; justify-content: center; row-gap: 14px; }
   .hero .actions > * { white-space: nowrap; }
 }
