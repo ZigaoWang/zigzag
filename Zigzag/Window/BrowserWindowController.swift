@@ -1645,6 +1645,12 @@ extension BrowserWindowController: SidebarDelegate {
         pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.pinSplit(tab, with: bookmarkID, tabOnRight: tabOnRight) }
     }
 
+    /// A pinned page dropped on another: the two become one pinned split, open side by side.
+    func listJoinPinned(_ bookmarkID: UUID, onto targetID: UUID, onRight: Bool) {
+        guard !tabManager.isPrivate else { return }
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.joinPinned(bookmarkID, onto: targetID, onRight: onRight) }
+    }
+
     /// A pinned page dropped on a tab: it comes down among the tabs, beside that one, and the two open side by side.
     func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {
         guard !tabManager.isPrivate else { return }

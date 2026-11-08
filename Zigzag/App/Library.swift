@@ -1108,6 +1108,15 @@ final class Library {
         commit()
     }
 
+    /// Moves a pinned page beside another of the same space as a pinned split, in that one's place and folder.
+    func joinPinned(_ id: UUID, beside pinnedID: UUID, onRight: Bool) {
+        guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == pinnedID } }),
+              let page = spaces[s].bookmarks.first(where: { $0.id == id }) else { return }
+        spaces[s].bookmarks.removeAll { $0.id == id }
+        for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == id } }
+        pinBeside(page, pinnedID, onRight: onRight)
+    }
+
     /// Pins a new page beside a pinned one as a pinned split, in its place and its folder.
     func pinBeside(_ page: Bookmark, _ pinnedID: UUID, onRight: Bool) {
         guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == pinnedID } }),

@@ -614,6 +614,15 @@ final class TabManager {
         openBookmark(mark)
     }
 
+    /// A pinned page dropped on another in the same space: the two become one pinned split where the other is, in its
+    /// folder, and open side by side.
+    func joinPinned(_ bookmarkID: UUID, onto targetID: UUID, onRight: Bool) {
+        guard let space = Library.shared.spaceID(ofBookmark: targetID), Library.shared.spaceID(ofBookmark: bookmarkID) == space,
+              Self.canSplit(splitSide(ofBookmark: bookmarkID), onto: splitSide(ofBookmark: targetID)) else { return }
+        Library.shared.joinPinned(bookmarkID, beside: targetID, onRight: onRight)
+        if let page = Library.shared.bookmark(bookmarkID) { openBookmark(page) }
+    }
+
     /// Turns a bookmark's live tab back into a normal tab, removing the bookmark. Returns the tab now in the list:
     /// the live one, or, for an unloaded bookmark dropped at an index, a new one. `spaceID`: where a favorite goes
     /// (nil: the space you're in); a pinned page stays in its own.
@@ -1002,8 +1011,8 @@ final class TabManager {
     nonisolated static func canSplit(_ carried: SplitSide, onto target: SplitSide) -> Bool {
         guard !carried.inSplit, !target.inSplit, carried.hasPage, target.hasPage else { return false }
         switch (carried.kind, target.kind) {
-        case (.tab, .tab), (.tab, .pinned), (.pinned, .tab), (_, .favorite): return true
-        case (.pinned, .pinned), (.favorite, _): return false
+        case (.tab, .tab), (.tab, .pinned), (.pinned, .tab), (.pinned, .pinned), (_, .favorite): return true
+        case (.favorite, _): return false
         }
     }
 

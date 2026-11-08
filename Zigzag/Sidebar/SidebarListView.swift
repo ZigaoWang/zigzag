@@ -54,6 +54,8 @@ protocol SidebarListDelegate: AnyObject {
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool)
     /// A pinned page dropped on a tab's middle: a split of tabs.
     func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool)
+    /// A pinned page dropped on another pinned page's middle: a pinned split.
+    func listJoinPinned(_ bookmarkID: UUID, onto targetID: UUID, onRight: Bool)
     /// Tabs and pinned pages dropped on the favorites grid: each a favorite, open or not, in order where the grid
     /// showed; on a favorite's middle, the dragged one alone joins it. Returns true if the grid took them.
     func listDropOnFavorites(_ items: [SidebarItem], dragged: SidebarItem) -> Bool
@@ -1637,6 +1639,10 @@ final class SidebarListView: NSView {
             if case .bookmark(let id) = drag.item, let ontoTab {
                 delegate?.listUnpinSplit(id, onto: ontoTab, pinnedOnRight: split.onRight)
                 return row(for: ontoTab)
+            }
+            if case .bookmark(let id) = drag.item {
+                delegate?.listJoinPinned(id, onto: split.id, onRight: split.onRight)
+                return rows[.bookmark(split.id)]
             }
         }
 

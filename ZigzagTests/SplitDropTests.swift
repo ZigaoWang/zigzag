@@ -14,7 +14,7 @@ struct SplitDropTests {
         #expect(TabManager.canSplit(tab, onto: favorite))
         #expect(TabManager.canSplit(pinned, onto: favorite))
         #expect(TabManager.canSplit(favorite, onto: favorite))
-        #expect(!TabManager.canSplit(pinned, onto: pinned))
+        #expect(TabManager.canSplit(pinned, onto: pinned))
         #expect(!TabManager.canSplit(favorite, onto: tab))
         #expect(!TabManager.canSplit(favorite, onto: pinned))
     }
