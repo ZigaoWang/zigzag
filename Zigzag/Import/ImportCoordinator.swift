@@ -89,7 +89,12 @@ enum ImportCoordinator {
                 sources.append(Source(kind: .chromium(browser), name: browser.name, bundleID: browser.bundleID))
             }
         }
-        if NSWorkspace.shared.urlForApplication(withBundleIdentifier: SafariImporter.bundleID) != nil {
+        #if DEBUG
+        let realSafari = BrowserFolders.fake == nil
+        #else
+        let realSafari = true
+        #endif
+        if realSafari, NSWorkspace.shared.urlForApplication(withBundleIdentifier: SafariImporter.bundleID) != nil {
             sources.append(Source(kind: .safari, name: "Safari", bundleID: SafariImporter.bundleID))
         }
         for browser in FirefoxImporter.browsers where FirefoxImporter.isInstalled(browser) {

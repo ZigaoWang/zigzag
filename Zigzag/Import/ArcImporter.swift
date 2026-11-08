@@ -27,7 +27,7 @@ enum ArcImporter {
     }
 
     nonisolated static var arcSupport: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Arc")
+        BrowserFolders.applicationSupport.appendingPathComponent("Arc", isDirectory: true)
     }
 
     static var isAvailable: Bool {

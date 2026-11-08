@@ -40,7 +40,7 @@ nonisolated enum ChromiumImporter {
     ]
 
     static func rootURL(of browser: Browser) -> URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support").appendingPathComponent(browser.root, isDirectory: true)
+        BrowserFolders.applicationSupport.appendingPathComponent(browser.root, isDirectory: true)
     }
 
     /// Profile folders, from `Local State` (falling back to "Default").
@@ -166,6 +166,17 @@ nonisolated enum ChromiumImporter {
     }
 
     private static func askForKey(_ browser: Browser) -> Result<Data, KeyError> {
+        #if DEBUG
+        // Fake profiles never touch the Keychain: their secret comes from ZIGZAG_FAKE_SAFE_STORAGE, "deny" plays the
+        // person clicking Deny, and none plays a browser that never saved one.
+        if BrowserFolders.fake != nil {
+            switch ProcessInfo.processInfo.environment["ZIGZAG_FAKE_SAFE_STORAGE"] {
+            case nil, "": return .failure(.missing)
+            case "deny": return .failure(.denied)
+            case let secret?: return .success(deriveKey(Data(secret.utf8)))
+            }
+        }
+        #endif
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: browser.keychainService,

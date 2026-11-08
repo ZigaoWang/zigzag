@@ -21,7 +21,7 @@ nonisolated enum FirefoxImporter {
     ]
 
     static func rootURL(of browser: Browser) -> URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support").appendingPathComponent(browser.root, isDirectory: true)
+        BrowserFolders.applicationSupport.appendingPathComponent(browser.root, isDirectory: true)
     }
 
     /// Profile folders with data in them, the one the browser opens first.

@@ -49,6 +49,25 @@ nonisolated struct ImportProblem: Sendable, Hashable {
     var retries: Int = 0
 }
 
+/// Where other browsers keep their data: ~/Library/Application Support.
+nonisolated enum BrowserFolders {
+    static var applicationSupport: URL {
+        #if DEBUG
+        if let fake { return fake }
+        #endif
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
+    }
+
+    #if DEBUG
+    /// A debug copy checked by script reads made-up profiles from this folder instead (ZIGZAG_FAKE_BROWSERS, a path),
+    /// so no run ever opens a real browser's data, its Keychain item, or Safari's.
+    static let fake: URL? = {
+        guard let path = ProcessInfo.processInfo.environment["ZIGZAG_FAKE_BROWSERS"], path.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }()
+    #endif
+}
+
 /// Reads a browser's SQLite database through a private copy: browsers keep theirs open and locked.
 nonisolated final class SQLiteReader {
     private var db: OpaquePointer?

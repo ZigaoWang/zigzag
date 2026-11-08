@@ -724,7 +724,7 @@ private final class BrowserRow: InteractiveView {
     /// Zigzag in Files & Folders) instead of only being asked whether it would be allowed.
     private func touchFiles() async {
         guard case .chromium(let browser) = source.kind else { return }
-        let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/\(browser.root)")
+        let root = BrowserFolders.applicationSupport.appendingPathComponent(browser.root)
         await Task.detached {
             for name in ["Local State", "Default/Bookmarks"] {
                 if let handle = try? FileHandle(forReadingFrom: root.appendingPathComponent(name)) { try? handle.close() }
@@ -1110,7 +1110,7 @@ private final class BringPicker: StepContent {
             row.awaitSettings()
         case .chromium(let browser):
             row.triedPicker = true
-            let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/\(browser.root)")
+            let folder = BrowserFolders.applicationSupport.appendingPathComponent(browser.root)
             let panel = NSOpenPanel()
             panel.canChooseDirectories = true
             panel.canChooseFiles = false
