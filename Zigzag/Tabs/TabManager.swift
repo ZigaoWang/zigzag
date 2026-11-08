@@ -19,7 +19,8 @@ final class TabManager {
     /// Most recently used first. Drives Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     private var closedTabs: [ClosedTab] = []
-    /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty, or every one of the last lot closed at once.
+    /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty more than the biggest lot closed at once. It never
+    /// shrinks back, or closing two more after Clear took sixty would leave ⌘Z on the sixty short.
     private var closedLimit = 50
 
     weak var host: TabHost? {
@@ -759,7 +760,7 @@ final class TabManager {
         let closingSelected = tabs.contains { $0 === selected }
         let order = tabs.filter { $0 !== selected } + (closingSelected ? [selected].compactMap { $0 } : [])
         let ids = order.filter { $0.bookmarkID == nil }.map(\.id)
-        closedLimit = max(50, ids.count)
+        closedLimit = max(closedLimit, ids.count + 50)
         together { order.forEach { close($0) } }
         return ids
     }
