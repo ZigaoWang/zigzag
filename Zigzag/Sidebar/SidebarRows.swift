@@ -588,7 +588,7 @@ final class NewTabRowView: SidebarRowView {
 final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     private let chevron = NSImageView()
     private let folderIcon = NSImageView()
-    var isOpen = true { didSet { if oldValue != isOpen { turnChevron(animated: true) } } }
+    var isOpen = true { didSet { if oldValue != isOpen { showChevron(turning: true) } } }
     /// While a pinned page or tab is dragged over it: it lights up to say it will take it.
     var isDropTarget = false { didSet { stateDidChange(animated: true) } }
     var onRename: ((String) -> Void)?
@@ -596,7 +596,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        chevron.image = Tokens.Symbol.image("chevron.right", size: Tokens.Symbol.inline)
+        chevron.image = Tokens.Symbol.image("chevron.down", size: Tokens.Symbol.inline)
         chevron.contentTintColor = Tokens.Color.textTertiary
         chevron.imageScaling = .scaleNone
         chevron.wantsLayer = true
@@ -619,22 +619,21 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         needsLayout = true
     }
 
-    private func turnChevron(animated: Bool) {
-        guard let layer = chevron.layer else { return }
+    /// Down while the folder is open, right while it's shut, at every depth: the chevron is drawn pointing that way
+    /// rather than kept turned, since AppKit can put a view's layer back as it was when it lays the view out. Opened
+    /// or shut with a click, it turns there from where it pointed.
+    private func showChevron(turning: Bool) {
+        chevron.image = Tokens.Symbol.image(isOpen ? "chevron.down" : "chevron.right", size: Tokens.Symbol.inline)
+        guard turning, window != nil, !Tokens.Motion.reduceMotion, let layer = chevron.layer else { return }
+        // A quarter turn back to where the other one pointed, about its middle, and on to rest.
         let size = chevron.bounds.size
-        let angle: CGFloat = isOpen ? .pi / 2 : 0
-        let turn = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-size.width / 2, -size.height / 2, 0),
-                                                           CATransform3DMakeRotation(angle, 0, 0, 1)),
+        let from = CATransform3DConcat(CATransform3DConcat(CATransform3DMakeTranslation(-size.width / 2, -size.height / 2, 0),
+                                                           CATransform3DMakeRotation(isOpen ? -.pi / 2 : .pi / 2, 0, 0, 1)),
                                        CATransform3DMakeTranslation(size.width / 2, size.height / 2, 0))
-        if animated && !Tokens.Motion.reduceMotion {
-            CATransaction.begin()
-            CATransaction.setAnimationDuration(Tokens.Motion.standard)
-            CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
-            layer.transform = turn
-            CATransaction.commit()
-        } else {
-            Tokens.Motion.withoutAnimation { layer.transform = turn }
-        }
+        let turn = Tokens.Motion.easeAnimation(keyPath: "transform")
+        turn.fromValue = from
+        turn.toValue = CATransform3DIdentity
+        layer.add(turn, forKey: "turn")
     }
 
     override func layout() {
@@ -644,7 +643,6 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let column = bounds.width - Self.buttonEdge - Tokens.Sidebar.rowButton / 2
         chevron.frame = NSRect(x: round(column - side / 2), y: (bounds.height - side) / 2, width: side, height: side)
         folderIcon.frame = icon.frame
-        turnChevron(animated: false)
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
         if let field = renameField {
             let height = ceil(field.intrinsicContentSize.height)
