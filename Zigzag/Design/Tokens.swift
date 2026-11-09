@@ -221,6 +221,8 @@ enum Tokens {
         static let addressRadius: CGFloat = Radius.field
         static let addressButton: CGFloat = button
         static let addressGlyph: CGFloat = glyph
+        /// Copy Link's chain is drawn a point smaller, as it fills more of its box: its ink matches Site Controls' sliders.
+        static let addressLinkGlyph: CGFloat = 13
         /// The room the site's name always keeps: pinned extensions give way before it gets narrower.
         static let addressMinText: CGFloat = 72
         /// How many extensions can be pinned to the address.

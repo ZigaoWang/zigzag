@@ -423,7 +423,7 @@ enum DebugBridge {
             if arg == "resume" { DownloadManager.shared.resume(item) }
             if arg == "cancel" { DownloadManager.shared.cancel(item) }
             debugLog("dl => \(item.state) \(item.completedBytes)/\(item.totalBytes) \(item.destination?.lastPathComponent ?? "-")")
-        case "action": controller.sidebar.address.actionButtons[min(Int(arg) ?? 0, controller.sidebar.address.actionButtons.count - 1)].onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
+        case "action": controller.sidebar.address.siteControlsButton.onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!)
         case "importsuggest":
             // Which browsers and profiles the import would start with checked; reads no passwords.
             let sources = ImportCoordinator.detectedSources()

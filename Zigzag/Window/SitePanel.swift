@@ -124,7 +124,8 @@ final class SitePanel: FloatingPanelView {
         controller.root.overlay.addSubview(panel)
         panel.needsLayout = true
         // Out of the button that opened it (the site controls, at the address's right end), not a corner.
-        if let button = controller.sidebar.address.actionButtons.last, panel.frame.width > 0 {
+        if panel.frame.width > 0 {
+            let button = controller.sidebar.address.siteControlsButton
             let b = button.convert(button.bounds, to: controller.root.overlay)
             panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / panel.frame.width, 0), 1), y: 0)
         } else {
