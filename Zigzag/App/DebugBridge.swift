@@ -48,6 +48,14 @@ enum DebugBridge {
         case "miniquickenter": MiniQuickOpen.current?.debugBar.debugEnter()
         case "miniquickesc": MiniQuickOpen.current?.debugBar.debugEscape()
         case "minibar": mini?.debugBar(arg)
+        case "miniesc2":
+            // A real Esc through the event path: the page first, then Zigzag Mini if the page left it alone.
+            if let window = mini?.window, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                                    windowNumber: window.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                                                                    isARepeat: false, keyCode: 53) {
+                window.makeKeyAndOrderFront(nil)
+                NSApp.postEvent(e, atStart: false)
+            }
         case "miniext": if let url = URL(string: arg) { WindowManager.shared.openExternal(url) }
         case "minisetting": MiniWindowController.opensExternalLinks = arg == "on"
         case "minitype": mini?.debugEnter(arg)
