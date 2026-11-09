@@ -5,6 +5,15 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-09
+
+### New
+- The mini window is now Zigzag Mini, and looks like the rest of Zigzag: your space's color around it, the page in the same card as in your browser window, and its title on top. ⌃⌘N opens the command bar you know from ⌘T, with the same suggestions, and Return opens the page in Zigzag Mini right there. ⌘L changes the address, Esc closes it (while you're typing in a field or a site has its own dialog open, the first Esc goes to that), and ⌘O or the button at the top moves the page into your browser window without reloading. Settings › General has its own Zigzag Mini group.
+
+### Fixed
+- Control-Tab sits in the middle of the window. With many tabs the cards go into rows instead of shrinking, and the one you'll switch to is outlined. The arrow keys move in all four directions. ([#11](https://github.com/ZigaoWang/zigzag/issues/11))
+- The space switcher (⌥⌘S) sits in the middle of the window too.
+
 ## [0.7.0] - 2026-11-09
 
 ### New
