@@ -810,8 +810,27 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     private var pending: [String: Pending] = [:]
     /// Tabs whose capture is being set up.
     private var starting = Set<UUID>()
-    /// Web views given the message handler (in both worlds), so it's added once each.
-    private var handled = Set<ObjectIdentifier>()
+    /// Pages' content controllers given the message handler (in both worlds), only while a capture in one of their
+    /// pages is live: at other times a page can't see it. Kept by controller, which a page's pop-ups share with it.
+    private var listening: [ObjectIdentifier: WKUserContentController] = [:]
+
+    func listen(in webView: WKWebView) {
+        let controller = webView.configuration.userContentController
+        guard listening.updateValue(controller, forKey: ObjectIdentifier(controller)) == nil else { return }
+        controller.add(self, contentWorld: Self.world, name: "zigzagTap")
+        controller.add(self, contentWorld: .page, name: "zigzagTap")
+    }
+
+    /// The handler goes from every page with no capture live, once none is being set up.
+    func stopListeningWhereDone() {
+        guard starting.isEmpty else { return }
+        let live = Set(taps.values.compactMap { $0.webView.map { ObjectIdentifier($0.configuration.userContentController) } })
+        for (key, controller) in listening where !live.contains(key) {
+            controller.removeScriptMessageHandler(forName: "zigzagTap", contentWorld: Self.world)
+            controller.removeScriptMessageHandler(forName: "zigzagTap", contentWorld: .page)
+            listening[key] = nil
+        }
+    }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -843,11 +862,12 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
             try ensureNotCaptured(tab)
             // Counted as captured from here: a second request while this one starts is refused, not run alongside.
             starting.insert(tab.id)
-            defer { starting.remove(tab.id) }
-            if handled.insert(ObjectIdentifier(webView)).inserted {
-                webView.configuration.userContentController.add(self, contentWorld: Self.world, name: "zigzagTap")
-                webView.configuration.userContentController.add(self, contentWorld: .page, name: "zigzagTap")
+            // A capture that doesn't start takes the handler away again.
+            defer {
+                starting.remove(tab.id)
+                stopListeningWhereDone()
             }
+            listen(in: webView)
             let id = UUID().uuidString
             // The page's own Web Audio first: when it plays through that (YouTube does), its elements can't be tapped.
             var routed: Int?
@@ -959,6 +979,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         guard let tap = taps.removeValue(forKey: id) else { return }
         ExtensionLog.write("tab capture for \(ExtensionHost.shared.displayName(for: tap.extensionID)) ended after \(Int(Date().timeIntervalSince(tap.started))) s: \(reason)")
         tap.webView?.callAsyncJavaScript(tap.script, arguments: ["tap": id, "stop": true], in: nil, in: tap.world, completionHandler: nil)
+        stopListeningWhereDone()
     }
 
     private func tab(_ id: UUID) -> (Tab, BrowserWindowController)? {

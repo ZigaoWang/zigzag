@@ -3,6 +3,30 @@ import Testing
 import WebKit
 @testable import Zigzag
 
+/// Waits for a web view's page to finish loading.
+@MainActor
+private final class PageLoad: NSObject, WKNavigationDelegate {
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var done = false
+
+    func wait() async throws {
+        if done { return }
+        try await withCheckedThrowingContinuation { continuation = $0 }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        done = true
+        continuation?.resume()
+        continuation = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        done = true
+        continuation?.resume(throwing: error)
+        continuation = nil
+    }
+}
+
 /// What keeps an extension inside its lines: the files its package may hold, and what Zigzag opens for it.
 @MainActor
 struct ExtensionSecurityTests {
@@ -156,6 +180,25 @@ struct ExtensionSecurityTests {
         #expect(!BridgeTabCapture.siteAllows(url, offSites: ["music.example"], hasAccess: true, allSites: true))
         #expect(!BridgeTabCapture.siteAllows(URL(string: "https://player.music.example/")!, offSites: ["music.example"], hasAccess: true, allSites: true))
         #expect(BridgeTabCapture.siteAllows(URL(string: "https://notmusic.example/")!, offSites: ["music.example"], hasAccess: true, allSites: true))
+    }
+
+    /// The page sees the tap's message handler only while a capture of it is live; with none, it goes again.
+    @Test func pagesSeeTheTapHandlerOnlyWhileCapturing() async throws {
+        let webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let loaded = PageLoad()
+        webView.navigationDelegate = loaded
+        webView.loadHTMLString("<p>hi</p>", baseURL: URL(string: "https://example.com/"))
+        try await loaded.wait()
+        func seen() async throws -> Bool {
+            try await webView.evaluateJavaScript("typeof window.webkit?.messageHandlers?.zigzagTap") as? String == "object"
+        }
+        #expect(try await !seen())
+        let capture = BridgeTabCapture()
+        capture.listen(in: webView)
+        capture.listen(in: webView)
+        #expect(try await seen())
+        capture.stopListeningWhereDone()
+        #expect(try await !seen())
     }
 
     @Test func onlyAServiceWorkerGetsTheSocketStandIn() {
