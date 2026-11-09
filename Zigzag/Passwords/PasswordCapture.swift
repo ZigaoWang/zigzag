@@ -246,9 +246,14 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         const before = all.slice(0, all.indexOf(password)).filter((el) => el.type !== 'password' && el.value && (isUserField(el) || el.type === 'text'));
         return before.length ? before[before.length - 1].value : '';
       };
-      let typed = new WeakSet(), last = '';
-      // A password typed again (after a failed try, often the same length) is a new login to report.
-      document.addEventListener('input', (e) => { if (e.target && e.target.type === 'password') { typed.add(e.target); last = ''; } }, true);
+      let typed = new WeakSet(), last = '', pressed = -Infinity;
+      // A password typed again (after a failed try, often the same length) is a new login to report. Only typing a
+      // person did counts: a page can fill in a password of its own, but mustn't get it offered for saving.
+      document.addEventListener('input', (e) => { if (e.isTrusted && e.target && e.target.type === 'password') { typed.add(e.target); last = ''; } }, true);
+      // Typed here, or filled from Zigzag's own menu (which marks the fields it fills).
+      const yours = (el) => typed.has(el) || !!(window.__zigzagFilled && window.__zigzagFilled.has(el));
+      // A form sent just after a click or key press of yours, not one the page sends by itself.
+      for (const kind of ['mousedown', 'keydown']) document.addEventListener(kind, (e) => { if (e.isTrusted) pressed = performance.now(); }, true);
       const capture = (scope) => {
         const passwords = fields(scope).filter((el) => el.type === 'password' && el.value);
         if (!passwords.length) {
@@ -260,12 +265,13 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         const fresh = passwords.filter((el) => /new-password/.test(el.autocomplete || ''));
         const change = fresh.length > 0 || passwords.length >= 2;
         const chosen = change ? (fresh.length ? fresh[fresh.length - 1] : passwords[passwords.length - 1]) : passwords[0];
+        if (!yours(chosen)) return;
         const signature = chosen.value.length + ':' + location.href;
         if (signature === last) return;
         last = signature;
         post({ kind: change ? 'change' : 'login', username: usernameBefore(passwords[0], scope), password: chosen.value });
       };
-      document.addEventListener('submit', (e) => capture(e.target), true);
+      document.addEventListener('submit', (e) => { if (e.isTrusted && performance.now() - pressed < 1000) capture(e.target); }, true);
       // A button that sends the form, not one that shows the password or links to "Forgot?": a submit button, or
       // one labelled like signing in.
       const label = (el) => ((el.getAttribute('aria-label') || '') + ' ' + (el.value || '') + ' ' + (el.textContent || '')).trim();

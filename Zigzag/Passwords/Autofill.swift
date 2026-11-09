@@ -429,7 +429,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     if (index < 0) return { index: -1 };
     const password = candidates[index];
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    // Marked as filled by Zigzag, so sending the form still names the login just saved.
+    const filled = (window.__zigzagFilled = window.__zigzagFilled || new WeakSet());
     for (const el of targets) {
+      filled.add(el);
       setter.call(el, password);
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -570,6 +573,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       || (active && userFields.includes(active) ? active : null);
     const set = (el, value) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      // Filled by Zigzag, as you asked: signing in with it counts as your login.
+      (window.__zigzagFilled = window.__zigzagFilled || new WeakSet()).add(el);
       el.focus();
       setter.call(el, value);
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));

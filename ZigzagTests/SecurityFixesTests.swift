@@ -386,10 +386,10 @@ struct PasswordSafetyTests {
     }
 
     /// A made-up page on https://example.com, in a window that's never shown.
-    private func page(_ html: String) async -> (WKWebView, NSWindow, Loading) {
+    private func page(_ html: String, configuration: WKWebViewConfiguration = WKWebViewConfiguration()) async -> (WKWebView, NSWindow, Loading) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         window.contentView = webView
         let loading = Loading()
         webView.navigationDelegate = loading
@@ -430,5 +430,44 @@ struct PasswordSafetyTests {
         try await fillMyCard(webView, focusing: "name")
         #expect(await value("email", in: webView) == "ada@example.com")
         #expect(await value("billing", in: webView) == "")
+    }
+
+    /// What the password watcher tells Zigzag, by kind.
+    private final class Heard: NSObject, WKScriptMessageHandler {
+        var kinds: [String] = []
+        var waiting: (kind: String, done: CheckedContinuation<Void, Never>)?
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let kind = (message.body as? [String: Any])?["kind"] as? String else { return }
+            kinds.append(kind)
+            if let waiting, waiting.kind == kind { self.waiting = nil; waiting.done.resume() }
+        }
+        func wait(for kind: String) async {
+            if kinds.contains(kind) { return }
+            await withCheckedContinuation { waiting = (kind, $0) }
+        }
+    }
+
+    @Test func aPageCantOfferItsOwnPasswordForSaving() async throws {
+        let heard = Heard()
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addUserScript(PasswordCapture.script)
+        configuration.userContentController.add(heard, contentWorld: .defaultClient, name: PasswordCapture.messageName)
+        let (webView, _, _) = await page("""
+        <form action="#"><input id="user" name="username" autocomplete="username"><input id="pass" type="password"><button>Sign in</button></form>
+        """, configuration: configuration)
+        await heard.wait(for: "page")
+        // The page fills in values of its own, says they were typed, and sends the form, all without you.
+        _ = try await webView.evaluateJavaScript("""
+        user.value = 'sam@example.com'; pass.value = 'page-chosen';
+        pass.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        document.querySelector('button').click();
+        document.querySelector('form').requestSubmit();
+        """)
+        // Anything the watcher posted arrives before this.
+        _ = try await webView.callAsyncJavaScript("window.webkit.messageHandlers.zigzagPassword.postMessage({ kind: 'done' })", arguments: [:],
+                                                  in: nil, contentWorld: .defaultClient)
+        await heard.wait(for: "done")
+        #expect(!heard.kinds.contains("login"))
+        #expect(!heard.kinds.contains("change"))
     }
 }
