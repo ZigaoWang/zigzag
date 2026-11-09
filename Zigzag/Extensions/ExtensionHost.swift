@@ -682,8 +682,37 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissions permissions: Set<WKWebExtension.Permission>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.Permission>, Date?) -> Void) {
-        completionHandler(permissions, nil)
-        DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
+        // What Chrome grants quietly is granted; the rest only if you allow it, asked only in answer to something you
+        // just did with the extension, as Chrome requires. Allowed is kept; not allowed holds until Zigzag quits.
+        let (asked, quiet) = Self.sort(permissions)
+        let finish = { (granted: Set<WKWebExtension.Permission>) in
+            completionHandler(granted, nil)
+            DispatchQueue.main.async { self.saveGrants(of: extensionContext) }
+        }
+        guard !asked.isEmpty else { finish(permissions); return }
+        guard hasRecentGesture(extensionContext.uniqueIdentifier), !ExtensionSheet.isShowing,
+              let window = WindowManager.shared.keyController.flatMap({ $0.tabManager.isPrivate ? nil : $0 }) ?? openWindows.first else {
+            ExtensionLog.write("\(extensionContext.webExtension.displayName ?? "extension") asked for \(asked.map(\.rawValue).sorted()) without a click; not granted")
+            finish(quiet)
+            return
+        }
+        let ext = extensionContext.webExtension
+        let content = ExtensionSheet.Content(
+            icon: ext.icon(for: NSSize(width: 40, height: 40)),
+            title: ext.displayName.map { String(localized: "\($0) wants more access", comment: "Title of the sheet shown when an extension asks for more access. The name is the extension's.") }
+                ?? String(localized: "This extension wants more access", comment: "Title of the sheet shown when an extension with no name asks for more access."),
+            subtitle: String(localized: "Allow it only if it needs this for what you just asked it to do.", comment: "Under the title of the sheet shown when an extension asks for more access."),
+            heading: String(localized: "It would also be able to", comment: "Heading over the list of what an extension could also do, in the sheet shown when it asks for more access."),
+            report: ExtensionReport(requesting: Set(asked.map(\.rawValue)), id: extensionContext.uniqueIdentifier),
+            confirm: String(localized: "Allow", comment: "Button in the sheet shown when an extension asks for more access: gives it."),
+            cancel: String(localized: "Don’t Allow", comment: "Button in the sheet shown when an extension asks for more access: refuses it."))
+        ExtensionSheet.present(content, in: window, onConfirm: { finish(permissions) }, onCancel: { finish(quiet) })
+    }
+
+    /// The permissions asked for that need your say, and those granted without asking.
+    static func sort(_ permissions: Set<WKWebExtension.Permission>) -> (asked: Set<WKWebExtension.Permission>, quiet: Set<WKWebExtension.Permission>) {
+        let asked = permissions.filter { ExtensionReport.askedPermissions.contains($0.rawValue) }
+        return (asked, permissions.subtracting(asked))
     }
 
     /// An extension asking for sites (`permissions.request`, or a page it wants to reach) gets only what your

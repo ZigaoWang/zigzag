@@ -49,6 +49,42 @@ struct ExtensionReport {
         limits = full.limits
     }
 
+    /// What an extension asking for more (`permissions.request`) would gain, for asking you first. Every permission
+    /// asked for shows in a line, if only in the last one.
+    init(requesting permissions: Set<String>, id: String) {
+        var lines = Self.abilities(permissions: permissions, patterns: [], id: id)
+        var worded: Set<String> = ["nativeMessaging", "history", "tabs", "webNavigation", "bookmarks", "downloads", "notifications",
+                                   "declarativeNetRequest", "declarativeNetRequestWithHostAccess", "userScripts", "cookies", "proxy", "management"]
+        if permissions.contains("downloads") { worded.insert("downloads.open") }
+        if permissions.contains("tabCapture") {
+            lines.append(Line(symbol: "waveform", text: String(localized: "Hear the sound of tabs you use it on", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
+        }
+        if permissions.contains("topSites"), !permissions.contains("history") {
+            lines.append(Line(symbol: "clock", text: String(localized: "See the sites you visit most", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
+        }
+        if !permissions.isDisjoint(with: ["webRequest", "webRequestBlocking", "webRequestAuthProvider"]) {
+            lines.append(Line(symbol: "network", text: String(localized: "See what sites load as you browse", comment: "One thing an extension can do, in the sheet that asks before it gets more access: watch the requests pages make.")))
+        }
+        if permissions.contains("clipboardRead") {
+            lines.append(Line(symbol: "doc.on.clipboard", text: String(localized: "Read what you copy", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
+        }
+        worded.formUnion(["tabCapture", "topSites", "webRequest", "webRequestBlocking", "webRequestAuthProvider", "clipboardRead"])
+        if !permissions.subtracting(worded).isEmpty {
+            lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "Use more of Zigzag’s features", comment: "One thing an extension can do, in the sheet that asks before it gets more access: stands in for permissions with no line of their own.")))
+        }
+        abilities = lines
+        limits = []
+    }
+
+    /// Permissions an extension gets only when you say so, when it asks for one later: what Chrome warns about, and
+    /// what Zigzag's bridge opens (history, downloads, a proxy, tab sound, sites' sign-ins). Others it gets quietly.
+    static let askedPermissions: Set<String> = [
+        "bookmarks", "clipboardRead", "contentSettings", "cookies", "debugger", "declarativeNetRequest", "declarativeNetRequestFeedback",
+        "declarativeNetRequestWithHostAccess", "desktopCapture", "downloads", "downloads.open", "geolocation", "history", "management",
+        "nativeMessaging", "notifications", "pageCapture", "privacy", "proxy", "readingList", "sessions", "tabCapture", "tabGroups", "tabs",
+        "topSites", "userScripts", "webNavigation", "webRequest", "webRequestAuthProvider", "webRequestBlocking",
+    ]
+
     private static func strings(_ manifest: [String: Any], _ keys: [String]) -> Set<String> {
         Set(keys.flatMap { manifest[$0] as? [String] ?? [] })
     }

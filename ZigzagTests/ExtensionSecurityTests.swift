@@ -201,6 +201,28 @@ struct ExtensionSecurityTests {
         #expect(try await !seen())
     }
 
+    @Test func morePermissionsAreAskedForOnlyWhenTheyMatter() {
+        let requested = Set(["history", "storage", "alarms", "tabCapture", "webRequestAuthProvider", "contextMenus"].map(WKWebExtension.Permission.init(rawValue:)))
+        let (asked, quiet) = ExtensionHost.sort(requested)
+        #expect(Set(asked.map(\.rawValue)) == ["history", "tabCapture", "webRequestAuthProvider"])
+        #expect(Set(quiet.map(\.rawValue)) == ["storage", "alarms", "contextMenus"])
+        // Everything the bridge opens that reaches your data or the network is asked for.
+        for permission in ["history", "downloads", "downloads.open", "proxy", "tabCapture", "webRequest", "webRequestAuthProvider",
+                           "nativeMessaging", "management", "cookies", "bookmarks", "topSites", "userScripts"] {
+            #expect(ExtensionReport.askedPermissions.contains(permission), "\(permission)")
+        }
+    }
+
+    @Test func theQuestionNamesWhatItWouldGet() {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        #expect(ExtensionReport(requesting: ["tabCapture"], id: id).abilities.map(\.text) == ["Hear the sound of tabs you use it on"])
+        #expect(ExtensionReport(requesting: ["downloads", "downloads.open"], id: id).abilities.map(\.text) == ["Download files and open them"])
+        #expect(ExtensionReport(requesting: ["history", "topSites"], id: id).abilities.map(\.text) == ["Read and change your browsing history"])
+        // One with no words of its own still shows.
+        #expect(ExtensionReport(requesting: ["debugger"], id: id).abilities.map(\.text) == ["Use more of Zigzag’s features"])
+        #expect(ExtensionReport(requesting: ["webRequest", "webRequestAuthProvider"], id: id).abilities.count == 1)
+    }
+
     @Test func onlyAServiceWorkerGetsTheSocketStandIn() {
         #expect(ExtensionProfile.usesWebSocketShim(manifest: ["background": ["service_worker": "background.js"]]))
         #expect(!ExtensionProfile.usesWebSocketShim(manifest: ["background": ["scripts": ["background.js"]]]))

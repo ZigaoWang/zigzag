@@ -459,7 +459,7 @@
       }
     },
     "%@ wants more access" : {
-      "comment" : "Title of the sheet shown when an extension's update asks for more access. The name is the extension's.",
+      "comment" : "Title of the sheet shown when an extension asks for more access. The name is the extension's.\nTitle of the sheet shown when an extension's update asks for more access. The name is the extension's.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2022,7 +2022,7 @@
       }
     },
     "Allow" : {
-      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
+      "comment" : "Button by a browser in the welcome window: let Zigzag read it.\nButton in the sheet shown when an extension asks for more access: gives it.\nButton of the folder panel that lets Zigzag read a browser’s data, from the welcome window.\nButton on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2061,6 +2061,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许并更新"
+          }
+        }
+      }
+    },
+    "Allow it only if it needs this for what you just asked it to do." : {
+      "comment" : "Under the title of the sheet shown when an extension asks for more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有当它需要这项权限来完成你刚才让它做的事时，才允许。"
           }
         }
       }
@@ -4383,7 +4394,7 @@
       }
     },
     "Don’t Allow" : {
-      "comment" : "Button on a site's permission question.",
+      "comment" : "Button in the sheet shown when an extension asks for more access: refuses it.\nButton on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5360,6 +5371,17 @@
         }
       }
     },
+    "Hear the sound of tabs you use it on" : {
+      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收听你使用它时所在标签页的声音"
+          }
+        }
+      }
+    },
     "Help" : {
       "comment" : "A menu in the menu bar.",
       "localizations" : {
@@ -5719,7 +5741,7 @@
       }
     },
     "It would also be able to" : {
-      "comment" : "Heading over the list of what an extension's update could also do.",
+      "comment" : "Heading over the list of what an extension could also do, in the sheet shown when it asks for more access.\nHeading over the list of what an extension's update could also do.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8776,6 +8798,17 @@
         }
       }
     },
+    "Read what you copy" : {
+      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取你拷贝的内容"
+          }
+        }
+      }
+    },
     "Reader" : {
       "comment" : "Action in the site panel, under its icon: opens or closes Reader.",
       "localizations" : {
@@ -9955,6 +9988,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看你访问的网站"
+          }
+        }
+      }
+    },
+    "See the sites you visit most" : {
+      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看你最常访问的网站"
+          }
+        }
+      }
+    },
+    "See what sites load as you browse" : {
+      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access: watch the requests pages make.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看你浏览时网站所加载的内容"
           }
         }
       }
@@ -11748,7 +11803,7 @@
       }
     },
     "This extension wants more access" : {
-      "comment" : "Title of the sheet shown when an update of an extension with no name asks for more access.",
+      "comment" : "Title of the sheet shown when an extension with no name asks for more access.\nTitle of the sheet shown when an update of an extension with no name asks for more access.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12594,6 +12649,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请使用一个网址，并在搜索词所在的位置放上 %s。"
+          }
+        }
+      }
+    },
+    "Use more of Zigzag’s features" : {
+      "comment" : "One thing an extension can do, in the sheet that asks before it gets more access: stands in for permissions with no line of their own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Zigzag 的更多功能"
           }
         }
       }

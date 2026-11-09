@@ -16,6 +16,8 @@ final class ExtensionSheet: FloatingPanelView {
     }
 
     private static weak var current: ExtensionSheet?
+    /// Whether one is up, so an extension's own question never takes the place of one you're answering.
+    static var isShowing: Bool { current != nil }
 
     private let header: DialogHeader
     private let headingLabel: Label
