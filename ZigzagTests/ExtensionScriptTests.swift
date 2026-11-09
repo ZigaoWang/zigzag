@@ -291,6 +291,108 @@ struct ExtensionScriptTests {
         #expect(worker.evaluateScript("__held.length").toInt32() == 0)
     }
 
+    @Test func webLocksKeepTheirRulesWithoutAskingWebKit() {
+        // WebKit kills an extension's process when it asks for a lock, so nothing here may reach the real one.
+        let page = Self.workerWorld(worker: false, setup: """
+        var DOMException = class extends Error { constructor(message, name) { super(message); this.name = name; } };
+        Object.setPrototypeOf(navigator, { locks: { request() { globalThis.__real = true; } } });
+        var __order = [], __release = {}, __held = (key) => new Promise((resolve) => { __release[key] = resolve; });
+        var __note = (key) => (lock) => { __order.push(key + ':' + (lock && lock.mode)); return __held(key); };
+        """)
+        page.evaluateScript("""
+        navigator.locks.request('a', { mode: 'shared' }, __note('s1'));
+        navigator.locks.request('a', { mode: 'shared' }, __note('s2'));
+        navigator.locks.request('a', __note('x'));
+        navigator.locks.request('a', { mode: 'shared' }, __note('s3'));
+        navigator.locks.request('a', { ifAvailable: true }, (lock) => { __order.push('busy:' + lock); });
+        navigator.locks.request('b', __note('other'));
+        const cancel = { aborted: false, listeners: [], addEventListener(t, f) { this.listeners.push(f); }, removeEventListener() {} };
+        navigator.locks.request('a', { signal: cancel }, __note('never')).catch((e) => __order.push(e.name));
+        cancel.aborted = true; cancel.listeners.forEach((f) => f());
+        navigator.locks.query().then((q) => { globalThis.__query = q.held.length + '/' + q.pending.length; });
+        """)
+        // Shared together, an exclusive waits for them, what's queued keeps its place, and another name is free.
+        #expect(page.evaluateScript("[...__order].sort().join()").toString() == "AbortError,busy:null,other:exclusive,s1:shared,s2:shared")
+        #expect(page.evaluateScript("__query").toString() == "3/2")
+        page.evaluateScript("__release.s1(); __release.s2();")
+        #expect(page.evaluateScript("__order[__order.length - 1]").toString() == "x:exclusive")
+        page.evaluateScript("__release.x()")
+        #expect(page.evaluateScript("__order[__order.length - 1]").toString() == "s3:shared")
+        #expect(page.evaluateScript("globalThis.__real === undefined").toBool())
+        // What the API refuses, it refuses here too.
+        page.evaluateScript("""
+        globalThis.__refused = [];
+        for (const [name, options] of [['-x', {}], ['m', { mode: 'other' }], ['s', { steal: true }]]) navigator.locks.request(name, options, () => {}).catch((e) => __refused.push(e.name));
+        const reason = new Error('mine'); navigator.locks.request('r', { signal: { aborted: true, reason } }, () => {}).catch((e) => __refused.push(e.message));
+        """)
+        #expect(page.evaluateScript("__refused.sort().join()").toString() == "NotSupportedError,NotSupportedError,TypeError,mine")
+    }
+
+    @Test func registeredScriptsLoseFilePatternsOnlyIfWebKitRefusesThem() {
+        // One file: pattern and WebKit refuses the whole registration: Rabby's provider reached no site.
+        let worker = Self.workerWorld(worker: true, setup: """
+        var __calls = [], __acceptsFiles = false, __notes = [];
+        chrome.runtime.sendNativeMessage = (host, message) => { __notes.push(message.text); return Promise.resolve(); };
+        chrome.scripting = {
+          registerContentScripts: (scripts, callback) => {
+            __calls.push(scripts);
+            const refused = !__acceptsFiles && scripts.some((s) => (s.matches || []).some((m) => m.startsWith('file:')));
+            const answer = scripts[0].id === 'broken' ? Promise.reject(new Error('Script with ID already exists'))
+              : refused ? Promise.reject(new Error("Script has an invalid match pattern 'file://*/*'.")) : Promise.resolve();
+            if (!callback) return answer;
+            answer.then(() => callback(), () => callback());
+          },
+        };
+        var __script = (id) => ({ id, js: ['p.js'], world: 'MAIN', matches: ['file://*/*', 'http://*/*', 'https://*/*'] });
+        """)
+        worker.evaluateScript("chrome.scripting.registerContentScripts([__script('p'), { id: 'local', matches: ['file:///*'] }])")
+        #expect(worker.evaluateScript("__calls.length").toInt32() == 2)
+        #expect(worker.evaluateScript("__calls[1].length").toInt32() == 1)
+        #expect(worker.evaluateScript("__calls[1][0].matches.join()").toString() == "http://*/*,https://*/*")
+        #expect(worker.evaluateScript("__calls[1][0].world").toString() == "MAIN")
+        #expect(worker.evaluateScript("__notes.length").toInt32() == 1)
+        // A WebKit that takes them keeps them, and any other refusal stays the extension's to hear about.
+        worker.evaluateScript("__calls = []; __acceptsFiles = true; chrome.scripting.registerContentScripts([__script('p')])")
+        #expect(worker.evaluateScript("__calls.length + ' ' + __calls[0][0].matches[0]").toString() == "1 file://*/*")
+        // Asked again without them if it fails for any reason, and a failure either way is the extension's to hear.
+        worker.evaluateScript("__calls = []; __acceptsFiles = false; chrome.scripting.registerContentScripts([__script('broken')]).catch((e) => { globalThis.__error = e.message; })")
+        #expect(worker.evaluateScript("__calls.length").toInt32() == 2)
+        #expect(worker.evaluateScript("__error").toString() == "Script with ID already exists")
+        // Only local files: nothing else to register, so the refusal stands.
+        worker.evaluateScript("__calls = []; __error = ''; chrome.scripting.registerContentScripts([{ id: 'local', matches: ['file:///*'] }]).catch((e) => { globalThis.__error = e.message; })")
+        #expect(worker.evaluateScript("__calls.length").toInt32() == 1)
+        #expect(worker.evaluateScript("__error").toString().contains("match pattern"))
+        // A callback hears once, after the retry.
+        worker.evaluateScript("__calls = []; globalThis.__heard = 0; chrome.scripting.registerContentScripts([__script('p')], () => { globalThis.__heard += 1; })")
+        #expect(worker.evaluateScript("__calls.length + ' ' + __calls[1][0].matches.length + ' ' + __heard").toString() == "2 2 1")
+    }
+
+    @Test func scriptsNamingLocksBringTheStandIn() throws {
+        // A dedicated worker gets no prelude: its own file has to carry it, or a lock request kills the process.
+        let worker = try #require(ExtensionStore.filled("navigator.locks.request('a', () => {});"))
+        #expect(worker.contains(ExtensionBridgeScript.webLocksMark))
+        #expect(worker.hasSuffix("navigator.locks.request('a', () => {});"))
+        let strict = try #require(ExtensionStore.filled("'use strict';navigator.locks.query();"))
+        #expect(strict.hasPrefix("'use strict';"))
+        #expect(ExtensionStore.filled("const a = 1;") == nil)
+        #expect(ExtensionStore.filled(worker) == nil)
+    }
+
+    @Test func theLockStandInStaysOffWebsitesAndInstallsOnce() {
+        let run = { (origin: String) -> JSContext in
+            let context = JSContext()!
+            context.evaluateScript("var location = { protocol: '\(origin)' }; var navigator = Object.create({ locks: { real: true } });")
+            context.evaluateScript(ExtensionBridgeScript.webLocks)
+            return context
+        }
+        #expect(run("https:").evaluateScript("navigator.locks.real === true").toBool())
+        let page = run("webkit-extension:")
+        #expect(page.evaluateScript("navigator.locks.real === undefined").toBool())
+        page.evaluateScript("globalThis.__first = navigator.locks")
+        page.evaluateScript(ExtensionBridgeScript.webLocks)
+        #expect(page.evaluateScript("navigator.locks === __first").toBool())
+    }
+
     @Test func aPageReachedOverThePortRefusesAPortHandedOver() {
         // Tampermonkey hands its offscreen page a MessageChannel port and waits on it: refused at once, so it goes on.
         let worker = Self.workerWorld(worker: true)
