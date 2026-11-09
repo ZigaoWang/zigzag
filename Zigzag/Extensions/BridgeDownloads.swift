@@ -43,6 +43,8 @@ final class BridgeDownloads: BridgeNamespace {
             return nil
         case "open":
             guard ExtensionBridge.allows("downloads.open", for: extensionID) else { throw BridgeError("Opening downloads needs the “downloads.open” permission") }
+            // As in Chrome, only in answer to you: a click on the extension, or in its popup or pages, a moment ago.
+            guard ExtensionHost.shared.hasRecentGesture(extensionID) else { throw BridgeError("downloads.open() may only be called in response to a user gesture.") }
             guard let item = item(Int(args.number(0) ?? -1)), item.state == .finished else { throw BridgeError("Download must be complete") }
             manager.open(item)
             return nil
