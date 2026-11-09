@@ -17,6 +17,9 @@ import WebKit
         web.loadFileURL(page, allowingReadAccessTo: root)
     }
 
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fatalError("\(error)") }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { fatalError("\(error)") }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // Fonts and the pictures settle a moment after load.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.shoot() }
@@ -27,7 +30,10 @@ import WebKit
         let config = WKSnapshotConfiguration()
         config.snapshotWidth = 640
         web.takeSnapshot(with: config) { image, _ in
-            guard let cg = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { fatalError("snapshot failed") }
+            // Taken at the screen's scale: on a 1x screen there's nothing sharp to make the Retina picture from.
+            guard let cg = image?.cgImage(forProposedRect: nil, context: nil, hints: nil), cg.width >= 1280 else {
+                fatalError("Needs a Retina screen: the snapshot came out \(image.map { "\($0.size)" } ?? "empty")")
+            }
             self.writeTIFF(cg)
         }
     }
