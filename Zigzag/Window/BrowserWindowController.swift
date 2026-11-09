@@ -1467,8 +1467,7 @@ extension BrowserWindowController: TabHost {
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
-        if let pending = BrowserWebView.pendingDisposition {
-            BrowserWebView.pendingDisposition = nil
+        if let pending = BrowserWebView.takePendingDisposition(for: tab.webView) {
             if pending == .peek { return showPeek(url: nil, configuration: configuration) }
             // A new window gets its own fresh page, not one tied to this tab (and a private one never shares anything).
             // From a private window, it is private too.

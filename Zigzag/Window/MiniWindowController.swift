@@ -495,8 +495,7 @@ extension MiniWindowController: TabHost {
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
-        let pending = BrowserWebView.pendingDisposition
-        BrowserWebView.pendingDisposition = nil
+        let pending = BrowserWebView.takePendingDisposition(for: tab.webView)
         if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
             WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow)
             return nil

@@ -56,8 +56,25 @@ final class BrowserWebView: WKWebView {
         if event.deltaX < 0, canGoForward { goForward(); return }
         super.swipe(with: event)
     }
-    /// Set by a context menu item right before WebKit asks for a new web view.
-    static var pendingDisposition: OpenDisposition?
+    /// Set by a context menu item right before WebKit asks this page for a new web view. WebKit asks the page first,
+    /// so on a busy page (a forum's long topic list) the request can come well after the item was chosen: the choice
+    /// waits for it, a few seconds at most, rather than going and leaving the request to look like a pop-up nobody
+    /// clicked for. It belongs to the page it was chosen on: another tab's pop-up in that time is still a pop-up.
+    private static var pending: (disposition: OpenDisposition, source: Source, until: Date)?
+    private struct Source { weak var value: WKWebView? }
+
+    /// The disposition chosen in this page's menu, while its request is still to come.
+    static func pendingDisposition(for webView: WKWebView?) -> OpenDisposition? {
+        guard let pending, let webView, pending.source.value === webView, Date() < pending.until else { return nil }
+        return pending.disposition
+    }
+
+    /// The same, used up: the new web view it was for is being made.
+    static func takePendingDisposition(for webView: WKWebView?) -> OpenDisposition? {
+        guard let disposition = pendingDisposition(for: webView) else { return nil }
+        pending = nil
+        return disposition
+    }
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
@@ -154,9 +171,8 @@ final class BrowserWebView: WKWebView {
 
     private func trigger(_ original: NSMenuItem?, disposition: OpenDisposition) {
         guard let original, let action = original.action else { return }
-        BrowserWebView.pendingDisposition = disposition
+        BrowserWebView.pending = (disposition, Source(value: self), Date().addingTimeInterval(3))
         NSApp.sendAction(action, to: original.target, from: original)
-        DispatchQueue.main.async { BrowserWebView.pendingDisposition = nil }
     }
 }
 

@@ -928,7 +928,7 @@ extension Tab: WKNavigationDelegate {
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Peek always opens; a page's own request needs a click or your say.
-        guard BrowserWebView.pendingDisposition != nil || PopupNotice.allows(navigationAction, from: url, isPrivate: isPrivate) else { return nil }
+        guard BrowserWebView.pendingDisposition(for: webView) != nil || PopupNotice.allows(navigationAction, from: url, isPrivate: isPrivate) else { return nil }
         lastOpenedWindow = Date()
         return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
     }
