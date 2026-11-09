@@ -225,8 +225,8 @@ final class SpaceSwitcher {
             panel.addSubview(row)
             return row
         }
-        // Over the page, beside the sidebar when it shows, as Control+Tab is: centered where you're looking.
-        let area = controller.root.convert(controller.root.cardFrame, to: controller.root.overlay)
+        // Centered on the whole window, as Control+Tab is.
+        let area = controller.root.overlay.bounds
         let inset = Self.listInset
         let fitting = rows.map(\.fittingWidth).max() ?? 0
         let width = round(min(max(fitting + inset * 2, Tokens.Metric.switcherThumbWidth + Tokens.Space.x8), min(Tokens.Metric.previewWidth + Tokens.Space.x16, area.width - Tokens.Space.x16)))
