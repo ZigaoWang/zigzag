@@ -572,7 +572,7 @@ final class GuidedTour: NSView {
         ring.add(beat, forKey: "pulse")
     }
 
-    /// What the step is shown doing: the drag, click, swipe or pinch it asks for, on the real thing.
+    /// What the step is shown doing: the drag, click or swipe it asks for, on the real thing.
     private func gesture(for d: Display, target: NSView?, hole: NSRect, ringed: Bool, page: NSRect) -> TourDemo.Gesture? {
         guard !d.isDone, !d.isFinal, !isAside, let controller else { return nil }
         let center = CGPoint(x: hole.midX, y: hole.midY)
@@ -593,8 +593,6 @@ final class GuidedTour: NSView {
         case "article":
             findPeekLink()
             return peekLink.map { .click(at: $0, holding: "⇧") }
-        case "overview":
-            return .pinch(at: CGPoint(x: page.midX, y: page.minY + page.height * 0.4))
         default:
             return nil
         }

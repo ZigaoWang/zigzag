@@ -5,7 +5,7 @@ import WebKit
 final class BrowserWindow: NSWindow {
     /// Where the traffic lights should sit, in window coordinates (top-left of the close button), or nil to hide them.
     var trafficLightOrigin: NSPoint? { didSet { layoutTrafficLights() } }
-    /// Intercepts events before the web view sees them (pinch for desk view, Control+Tab).
+    /// Intercepts events before the web view sees them (Control+Tab, the back and forward mouse buttons).
     var eventInterceptor: ((NSEvent) -> Bool)?
 
     init(contentRect: NSRect) {

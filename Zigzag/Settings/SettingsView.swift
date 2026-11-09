@@ -572,7 +572,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
     private let motionToggle = Toggle()
-    private let pinchToggle = Toggle()
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
     private var downloadPlaceToken: SignalToken?
@@ -737,10 +736,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(FormRow(title: String(localized: "Offer to pin the page you moved to", comment: "A setting in Settings › Tabs."),
                               detail: String(localized: "After you close a pinned tab that went to another page, like a new chat.", comment: "Explanation under “Offer to pin the page you moved to” in Settings › Tabs."),
                               control: pinOfferToggle))
-        pinchToggle.onChange = { on in DeskController.pinchOpens = on }
-        tabsGroup.add(FormRow(title: String(localized: "Pinch to see all tabs", comment: "A setting in Settings › Tabs: whether pinching in on the trackpad opens the tab overview."),
-                              detail: String(localized: "When off, websites get the pinch, for maps and games that zoom with it.", comment: "Explanation under “Pinch to see all tabs” in Settings › Tabs."),
-                              control: pinchToggle))
 
         // Spaces
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
@@ -1525,7 +1520,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
         energyToggle.isOn = EnergyWatch.sleepsBusyTabs
         motionToggle.isOn = Tokens.Motion.reducesMotionHere
-        pinchToggle.isOn = DeskController.pinchOpens
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0

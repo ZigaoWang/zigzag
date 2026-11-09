@@ -3404,13 +3404,13 @@
         }
       }
     },
-    "Click one to go to it, or pinch out to go back" : {
+    "Click one to go to it, or press Esc to go back" : {
       "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按一个即可前往，或双指张开返回"
+            "value" : "点按一个即可前往，或按 Esc 键返回"
           }
         }
       }
@@ -7827,17 +7827,6 @@
         }
       }
     },
-    "Or pinch in on the trackpad" : {
-      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "或在触控板上双指捏合"
-          }
-        }
-      }
-    },
     "Or type an emoji" : {
       "comment" : "Placeholder of the field under the icon choices, for a space's or a folder's icon.",
       "localizations" : {
@@ -8380,17 +8369,6 @@
         }
       }
     },
-    "Pinch to see all tabs" : {
-      "comment" : "A setting in Settings › Tabs: whether pinching in on the trackpad opens the tab overview.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "双指捏合查看所有标签页"
-          }
-        }
-      }
-    },
     "Pine" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep green.",
       "localizations" : {
@@ -8519,6 +8497,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按下这些键，然后在 YouTube 上搜索"
+          }
+        }
+      }
+    },
+    "Press these keys, then type to find a tab" : {
+      "comment" : "Under a step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下这些键，然后输入文字查找标签页"
           }
         }
       }
@@ -13095,17 +13084,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当页面是其他语言时，Zigzag 会在每个网站上询问一次。"
-          }
-        }
-      }
-    },
-    "When off, websites get the pinch, for maps and games that zoom with it." : {
-      "comment" : "Explanation under “Pinch to see all tabs” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭后，捏合手势交给网页，方便地图和用它缩放的游戏。"
           }
         }
       }

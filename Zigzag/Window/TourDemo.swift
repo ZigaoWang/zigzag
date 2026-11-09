@@ -1,7 +1,7 @@
 import AppKit
 
 /// The getting-started guide showing a step in the window itself, on your real tabs and buttons: a cursor that clicks
-/// or drags, or fingertips that swipe or pinch, over and over until you do it. While you hold the mouse down it gets
+/// or drags, or fingertips that swipe, over and over until you do it. While you hold the mouse down it gets
 /// out of the way, so it never mixes with what you're doing.
 @MainActor
 final class TourDemo {
@@ -12,8 +12,6 @@ final class TourDemo {
         case click(at: CGPoint, holding: String?)
         /// Two fingertips across a stretch of the sidebar, toward the right or the left.
         case swipe(across: NSRect, toRight: Bool)
-        /// Two fingertips closing in on a point.
-        case pinch(at: CGPoint)
 
         static func == (a: Gesture, b: Gesture) -> Bool { a.key == b.key }
 
@@ -24,7 +22,6 @@ final class TourDemo {
                 return "drag \(ObjectIdentifier(row)) \((row as? TabRowView)?.title.stringValue ?? "") \(from) \(drop)"
             case .click(let at, let holding): return "click \(at) \(holding ?? "")"
             case .swipe(let across, let toRight): return "swipe \(across) \(toRight)"
-            case .pinch(let at): return "pinch \(at)"
             }
         }
     }
@@ -68,7 +65,6 @@ final class TourDemo {
         case .drag(let row, let from, let drop): drag(row, from: from, drop: drop, in: view)
         case .click(let at, let holding): click(at: at, holding: holding, in: view)
         case .swipe(let across, let toRight): swipe(across: across, toRight: toRight)
-        case .pinch(let at): pinch(at: at)
         }
     }
 
@@ -201,21 +197,6 @@ final class TourDemo {
             let tip = fingertip()
             stage.addSublayer(tip)
             let a = CGPoint(x: from + offset, y: y), b = CGPoint(x: to + offset, y: y)
-            run([
-                (tip, keyframes("position", [a, a, b, b, b].map { NSValue(point: $0) }, times, eased: true)),
-                (tip, keyframes("opacity", [0, 1, 1, 0, 0], times)),
-            ])
-        }
-    }
-
-    /// Two fingertips apart on a diagonal, closing in on the point.
-    private func pinch(at point: CGPoint) {
-        let times: [NSNumber] = [0, 0.12, 0.62, 0.78, 1]
-        for sign: CGFloat in [-1, 1] {
-            let tip = fingertip()
-            stage.addSublayer(tip)
-            let a = CGPoint(x: point.x + sign * 90, y: point.y + sign * 60)
-            let b = CGPoint(x: point.x + sign * 22, y: point.y + sign * 15)
             run([
                 (tip, keyframes("position", [a, a, b, b, b].map { NSValue(point: $0) }, times, eased: true)),
                 (tip, keyframes("opacity", [0, 1, 1, 0, 0], times)),
