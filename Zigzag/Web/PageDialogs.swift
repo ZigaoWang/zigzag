@@ -178,10 +178,12 @@ enum AuthenticationPrompt {
         let space = challenge.protectionSpace
         let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
         let asker = store.isPersistent ? tab : nil
+        // Extensions never hear of a private tab's sign-ins, as they never see its pages.
+        let asksExtensions = store.isPersistent
         if challenge.previousFailureCount == 0, let asking = signingIn[key] {
             // Asked again while the sheet is up: the page loaded again, often because an extension was told what to
             // fill (1Password reloads the tab once you pick a login in it). Its answer answers the sheet too.
-            if asking.sheetShown, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
+            if asking.sheetShown, asksExtensions, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
                 PageDialogSheet.answer(tag: key, with: [username, password])
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             }
@@ -190,14 +192,13 @@ enum AuthenticationPrompt {
         let attempt = SigningIn()
         signingIn[key] = attempt
         let task = Task { @MainActor () -> (URLSession.AuthChallengeDisposition, URLCredential?) in
-            switch await askExtensions(challenge, page: page, tab: asker) {
+            switch asksExtensions ? await askExtensions(challenge, page: page, tab: asker) : .none {
             case .credentials(let username, let password):
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             case .cancel:
                 return (.cancelAuthenticationChallenge, nil)
             case .none:
-                attempt.sheetShown = true
-                return await ask(challenge, window: window, page: page, tag: key)
+                return await ask(challenge, window: window, page: page, tag: key) { attempt.sheetShown = true }
             }
         }
         attempt.task = task
@@ -228,7 +229,7 @@ enum AuthenticationPrompt {
 
     @MainActor
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
-                            page: WKWebView?, tag: String) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+                            page: WKWebView?, tag: String, shown: () -> Void) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let isPrivate = page?.configuration.websiteDataStore.isPersistent != true
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: isPrivate)
@@ -242,6 +243,10 @@ enum AuthenticationPrompt {
             fields[1].value = values[1]
         }
         let offered = saved.flatMap { $0.logins.count > 1 || challenge.previousFailureCount > 0 ? $0 : nil }
+        // The tab or window may have gone while extensions and saved passwords were asked: nothing to put a sheet on,
+        // and a sheet on nothing would never be answered, leaving the site's next sign-in waiting on it.
+        guard window.isVisible, page.map({ $0.window === window }) ?? true else { return (.cancelAuthenticationChallenge, nil) }
+        shown()
         let result = await PageDialogSheet.ask(in: window, title: String(localized: "Sign in to \(challenge.protectionSpace.host)", comment: "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."), message: message,
                                                fields: fields, confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page,
                                                savedLogins: offered, tag: tag)
