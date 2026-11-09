@@ -533,7 +533,8 @@ final class SidebarView: NSView {
         dotStrip.contentWidth = total
         var x = max(0, (available - total) / 2)
         for dot in dots {
-            dot.frame = NSRect(x: x, y: (h - dotSize) / 2, width: dotSize, height: dotSize)
+            let frame = NSRect(x: x, y: (h - dotSize) / 2, width: dotSize, height: dotSize)
+            if glidesDots, dot.frame.size == frame.size { Tokens.Motion.glide(dot, to: frame) } else { dot.frame = frame }
             x += dotSize
         }
         if let current = dots.first(where: \.isSelected) { dotStrip.reveal(current.frame) }
@@ -570,8 +571,15 @@ final class SidebarView: NSView {
     func reloadSpaces(current: UUID) {
         let spaces = Library.shared.spaces
         if dots.map(\.spaceID) != spaces.map(\.id) {
-            dots.forEach { $0.removeFromSuperview() }
+            // The same spaces in a new order (a drag, its undo) keep their dots, which glide to their new places.
+            var kept = Dictionary(dots.map { ($0.spaceID, $0) }, uniquingKeysWith: { first, _ in first })
+            glidesDots = Set(kept.keys) == Set(spaces.map(\.id)) && window != nil
+            for dot in dots where !spaces.contains(where: { $0.id == dot.spaceID }) {
+                dot.removeFromSuperview()
+                kept[dot.spaceID] = nil
+            }
             dots = spaces.map { space in
+                if let dot = kept[space.id] { return dot }
                 let dot = SpaceDotView(spaceID: space.id)
                 dot.onClick = { [weak self, weak dot] _ in
                     guard let self, let dot else { return }
@@ -580,6 +588,10 @@ final class SidebarView: NSView {
                 }
                 dot.onDoubleClick = { [weak self] in self?.onEditSpace?(space.id) }
                 dot.onRightClick = { [weak self] _ in self?.delegate?.sidebarSpaceMenu(for: space.id) }
+                dot.onDragStart = { [weak self, weak dot] event in
+                    guard let self, let dot else { return false }
+                    return self.dragSpace(dot, event: event)
+                }
                 dotStrip.addSubview(dot)
                 return dot
             }
@@ -598,6 +610,122 @@ final class SidebarView: NSView {
         // A single space needs no switcher, and a private window switches nothing.
         dots.forEach { $0.isHidden = isPrivate || dots.count < 2 }
         layoutBottomBar()
+        glidesDots = false
+    }
+
+    // MARK: Reordering spaces
+
+    /// A space dropped in a new place along the row: its id and new index. The window makes the move, undoably.
+    var onMoveSpace: ((UUID, Int) -> Void)?
+    /// While the order of the dots changes, those already in place glide to their new places.
+    private var glidesDots = false
+    /// A dot being carried along the row: where it started, its copy, and the gap it would drop into (nil: off the row).
+    private struct SpaceDrag {
+        let dot: SpaceDotView
+        let from: Int
+        let copy: CarriedCopy
+        var slot: Int?
+        /// Where the pointer is, on screen.
+        var point: NSPoint
+        /// Scrolls the row while the pointer rests near either end of a row too long to show at once.
+        var edgeTimer: Timer?
+    }
+    private var spaceDrag: SpaceDrag?
+    /// Where a carried dot would go, between two others: the favorites' bar, at the dots' size.
+    private let spaceDropBar: ColorView = {
+        let bar = ColorView(color: Tokens.Color.accent)
+        bar.wantsLayer = true
+        bar.layer?.cornerRadius = 1
+        bar.isHidden = true
+        return bar
+    }()
+
+    /// Picks a dot up, as a favorite is: it stays in its place, faint, a see-through copy follows the pointer, and a
+    /// bar between two dots shows where it would go. Let go on the row, it moves there; off it, or with Esc, it goes back.
+    private func dragSpace(_ dot: SpaceDotView, event: NSEvent) -> Bool {
+        guard let window, beginSpaceDrag(dot, at: window.convertPoint(toScreen: event.locationInWindow)) else { return false }
+        let released = CarriedCopy.track(in: window) { event in
+            self.moveSpaceDrag(to: window.convertPoint(toScreen: event.locationInWindow))
+        }
+        endSpaceDrag(drop: released != nil)
+        return true
+    }
+
+    private func beginSpaceDrag(_ dot: SpaceDotView, at screenPoint: NSPoint) -> Bool {
+        guard spaceDrag == nil, !isPrivate, dots.count > 1, let from = dots.firstIndex(where: { $0 === dot }) else { return false }
+        let copy = CarriedCopy(of: dot, picture: CarriedCopy.picture(of: dot), grabbedAt: screenPoint,
+                               ground: Tokens.Color.panelBackground, radius: Tokens.Radius.control)
+        dot.isHovered = false
+        dot.alphaValue = CarriedCopy.faint
+        copy.lift()
+        var drag = SpaceDrag(dot: dot, from: from, copy: copy, slot: nil, point: screenPoint)
+        if dotStrip.scrolls {
+            // In the tracking loop's mode too, so it runs while the button is held.
+            let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.carrySpaceDragToEdge() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            drag.edgeTimer = timer
+        }
+        spaceDrag = drag
+        return true
+    }
+
+    /// Whether a pointer at this window point is on the row: anywhere along the bar, a little above and below it
+    /// too; past its ends is the first or last place.
+    private func isOnSpaceRow(_ point: NSPoint) -> Bool {
+        bottomBar.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(bottomBar.convert(point, from: nil))
+    }
+
+    private func carrySpaceDragToEdge() {
+        guard let drag = spaceDrag, let window else { return }
+        let point = window.convertPoint(fromScreen: drag.point)
+        guard isOnSpaceRow(point), dotStrip.carry(at: dotStrip.convert(point, from: nil).x) else { return }
+        moveSpaceDrag(to: drag.point)
+    }
+
+    private func moveSpaceDrag(to screenPoint: NSPoint) {
+        guard var drag = spaceDrag, let window else { return }
+        drag.copy.follow(screenPoint)
+        drag.point = screenPoint
+        let point = window.convertPoint(fromScreen: screenPoint)
+        if isOnSpaceRow(point) {
+            let x = drag.dot.superview?.convert(point, from: nil).x ?? 0
+            drag.slot = SpaceReorder.slot(at: x, middles: dots.map(\.frame.midX))
+        } else {
+            drag.slot = nil
+        }
+        spaceDrag = drag
+        let from = drag.from
+        placeSpaceDropBar(drag.slot.flatMap { SpaceReorder.destination(slot: $0, from: from) == nil ? nil : $0 })
+    }
+
+    /// Lets go: dropped on the row (`drop`) the space moves to the gap the bar showed and the copy lands in its new
+    /// place; called off, it lands back where it was.
+    private func endSpaceDrag(drop: Bool) {
+        guard let drag = spaceDrag else { return }
+        spaceDrag = nil
+        drag.edgeTimer?.invalidate()
+        placeSpaceDropBar(nil)
+        if drop, let slot = drag.slot, let to = SpaceReorder.destination(slot: slot, from: drag.from) {
+            onMoveSpace?(drag.dot.spaceID, to)
+        }
+        drag.dot.alphaValue = 1
+        drag.copy.land(on: drag.dot)
+    }
+
+    /// The bar in the gap before dot `slot` (after the last for the end); nil hides it.
+    private func placeSpaceDropBar(_ slot: Int?) {
+        guard let slot, let first = dots.first, let last = dots.last else { spaceDropBar.isHidden = true; return }
+        let size = first.frame.height
+        let x = slot < dots.count ? dots[slot].frame.minX : last.frame.maxX
+        let width: CGFloat = 2, height = max(Tokens.Space.x2, size - 12)
+        if spaceDropBar.superview == nil { dotStrip.addSubview(spaceDropBar) }
+        let room = spaceDropBar.superview?.bounds.width ?? x
+        Tokens.Motion.withoutAnimation {
+            spaceDropBar.frame = NSRect(x: min(max(x - width / 2, 0), room - width), y: first.frame.midY - height / 2, width: width, height: height)
+        }
+        spaceDropBar.isHidden = false
     }
 
     func dot(for spaceID: UUID) -> NSView? { dots.first { $0.spaceID == spaceID } }
@@ -1515,6 +1643,22 @@ private final class DotStrip: NSView {
         scroll(to: offset - delta * (event.hasPreciseScrollingDeltas ? 1 : Tokens.Space.x4), animated: false)
     }
 
+    /// More dots than fit: the row scrolls.
+    var scrolls: Bool { contentWidth > bounds.width }
+
+    /// A dot held near either end (`x` in the row's own terms) scrolls the row on toward it, a step a frame, faster
+    /// the closer it is. Returns whether it moved.
+    func carry(at x: CGFloat) -> Bool {
+        guard scrolls else { return false }
+        let edge = Tokens.Space.x6
+        let depth = x < edge ? x - edge : x > bounds.width - edge ? x - (bounds.width - edge) : 0
+        guard depth != 0 else { return false }
+        let before = offset
+        let step = min(abs(depth), edge) / edge * 4 + 1
+        scroll(to: offset + (depth < 0 ? -step : step), animated: false)
+        return offset != before
+    }
+
     private func scroll(to target: CGFloat, animated: Bool) {
         offset = min(max(0, target), max(0, contentWidth - bounds.width))
         let frame = NSRect(x: -offset, y: 0, width: max(contentWidth, bounds.width), height: bounds.height)
@@ -1532,5 +1676,19 @@ private final class DotStrip: NSView {
         fade.locations = [0, NSNumber(value: edge), NSNumber(value: 1 - edge), 1]
         Tokens.Motion.withoutAnimation { fade.frame = bounds }
         layer?.mask = fade
+    }
+}
+
+/// Where a space's dot carried along the row lands.
+enum SpaceReorder {
+    /// The gap a pointer at `x` is over, among dots whose middles are `middles`, left to right: 0 before the first,
+    /// `middles.count` after the last. The carried dot's own middle counts, as it still holds its place.
+    static func slot(at x: CGFloat, middles: [CGFloat]) -> Int { middles.filter { $0 < x }.count }
+
+    /// The index the space carried from `from` ends up at when dropped in `slot`; nil where it wouldn't move (the
+    /// gaps either side of it).
+    static func destination(slot: Int, from: Int) -> Int? {
+        let to = slot > from ? slot - 1 : slot
+        return to == from ? nil : to
     }
 }
