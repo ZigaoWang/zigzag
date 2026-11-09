@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- The disk image's window, 640 × 400: a welcome with the wordmark over the site's sky, and an arrow from Zigzag to Applications.
+     Finder draws the two icons on it, at x 180 and 460, y 200 (their centers). -->
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 640px; height: 400px; overflow: hidden; }
+  body { background: #93C2F1 url(../../site/assets/sky-card.jpg) 62% 40% / cover no-repeat; color: #1F2D40;
+         font-family: -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; }
+  p { position: absolute; left: 0; right: 0; margin: 0; text-align: center; }
+  /* The rounded face, heavy and navy, so the words and the wordmark's round strokes read as one line. */
+  .hello { top: 48px; font-family: ui-rounded, -apple-system, sans-serif; font-size: 31px; font-weight: 700; letter-spacing: -0.2px; }
+  /* The wordmark in the line, at the words' cap height, as the download page writes "ZIGZAG is downloading". */
+  .hello img { height: .7em; vertical-align: baseline; margin-left: .02em; }
+  /* As far below the icons' names (they end near 280) as the headline is above the icons (they start at 144). */
+  .how { top: 328px; font-size: 14px; color: rgba(31, 45, 64, .7); }
+  svg { position: absolute; left: 0; top: 0; }
+</style></head><body>
+  <p class="hello">Welcome to <img src="../../site/assets/wordmark-ink.svg" alt="Zigzag"></p>
+  <svg width="640" height="400" viewBox="0 0 640 400" aria-hidden="true">
+    <g fill="none" stroke="#1F2D40" stroke-opacity=".45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M266 200 H 374" /><path d="M366 192 L 374 200 L 366 208" />
+    </g>
+  </svg>
+  <p class="how">Drag Zigzag into Applications</p>
+</body></html>

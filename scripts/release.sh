@@ -144,7 +144,8 @@ fi
 
 # The DMG people download: the app beside an Applications shortcut, signed, notarized and stapled itself, so it
 # opens without a warning on a Mac that has never seen Zigzag. (Updates use the zip above.)
-# The window it opens to: Zigzag on the left, Applications on the right, an arrow between, the wordmark above.
+# The window it opens to: Zigzag on the left, Applications on the right, an arrow between, a welcome above, on the
+# site's sky (scripts/dmg/background.html, drawn by scripts/dmg/render.swift).
 # 500 tall: Finder's tab and status bars take ~100 of it, leaving the 400 the background is drawn for.
 DMG="$OUT/Zigzag-$VERSION.dmg"
 STAGE=$(mktemp -d)
