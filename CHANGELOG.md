@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Settings has its own sections for Appearance, Tabs, Search and Zigzag Mini, so General keeps just the basics.
 
 ### Fixed
+- In full screen, the window buttons no longer flash on the sidebar as it slides out. Thanks to [philigrin](https://github.com/philigrin). ([#21](https://github.com/ZigaoWang/zigzag/pull/21))
 - 1Password and other extensions keep working after Zigzag restarts. Before, from the second launch on, their popup could spin forever. Thanks to [philigrin](https://github.com/philigrin) for tracking it down and writing the fix. ([#15](https://github.com/ZigaoWang/zigzag/issues/15))
 - Swiping sideways in web apps that pan with two fingers, like Canva or Figma, moves around the page instead of going back.
 - Pinching always reaches the page, for maps and editors that zoom with it. ⌘⇧\ still shows all your tabs.
