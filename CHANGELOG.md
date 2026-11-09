@@ -5,6 +5,20 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-09
+
+### New
+- Zigzag Mini takes after Arc's Little Arc: a slim strip in your space's color with the page's site in the middle, the space it belongs to on the left (click it to pick another), and Copy Link and Open in Work ⌘O, named for that space, on the right. The page sits in a thin frame of the space's color.
+- A mouse's side buttons go back and forward.
+- Settings › General can leave the trackpad pinch to websites, for maps and games like GeoGuessr that zoom with it. ⌘⇧\ still shows all tabs.
+- Settings › Shortcuts shows an × beside a shortcut when you point at it: click it and the command has no shortcut, for one that gets in a website's way.
+
+### Fixed
+- Site permissions are kept for each exact site, its address's scheme, host and port together. Before, allowing the microphone, camera, location, notifications, pop-ups or opening an app for one port of a host allowed every other port of it too. Sites you had allowed ask once more.
+- Right-click › Open Link in New Tab, Open Link in Peek and the new window items work on busy pages, like a forum's long topic list, where they could do nothing.
+- In a text box, ⌘← and ⌘→ jump to the start and end of the line again, as on any Mac, instead of going back or forward a page. Away from a text box they still go back and forward.
+- With the sidebar hidden, touching the window's left edge and coming straight back, as when clicking a website's own list along that side, no longer pulls the sidebar out. Going to the edge still opens it right away.
+
 ## [0.7.1] - 2026-11-09
 
 ### New
