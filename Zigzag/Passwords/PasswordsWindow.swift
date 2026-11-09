@@ -1144,9 +1144,6 @@ enum PasswordExport {
     /// Returns how many passwords went into the file: one that can't be read from the Keychain is left out.
     @discardableResult
     static func write(_ credentials: [Credential], to url: URL) async throws -> Int {
-        func field(_ text: String) -> String {
-            text.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) ? "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : text
-        }
         // Chrome's columns, which every password manager reads, and the one-time-code secret as Apple's Passwords
         // writes it, so codes come along too.
         var data = Data("name,url,username,password,note,otpauth\n".utf8)
@@ -1155,9 +1152,9 @@ enum PasswordExport {
         for credential in credentials {
             guard let password = try? await PasswordStore.shared.password(for: credential.id) else { continue }
             let line = password.withUnsafeString { secret in
-                [credential.title.isEmpty ? credential.origin.displayName : credential.title, credential.origin.description, credential.username, secret,
-                 credential.notes, credential.otpAuth]
-                    .map(field).joined(separator: ",") + "\n"
+                [field(credential.title.isEmpty ? credential.origin.displayName : credential.title), field(credential.origin.description),
+                 field(credential.username), field(secret, neutralized: false), field(credential.notes), field(credential.otpAuth)]
+                    .joined(separator: ",") + "\n"
             }
             data.append(Data(line.utf8))
             written += 1
@@ -1165,5 +1162,13 @@ enum PasswordExport {
         try data.write(to: url, options: [.atomic, .completeFileProtection])
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         return written
+    }
+
+    /// One CSV field, quoted when it must be. Text a spreadsheet would run as a formula (starting with =, +, -, @,
+    /// a tab or a return) gets a leading ' so opening the file can't run it. Not the password: it must stay exactly
+    /// what it is for the file to sign you in anywhere.
+    nonisolated static func field(_ text: String, neutralized: Bool = true) -> String {
+        let text = neutralized && text.unicodeScalars.first.map({ "=+-@\t\r".unicodeScalars.contains($0) }) == true ? "'" + text : text
+        return text.unicodeScalars.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) ? "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : text
     }
 }

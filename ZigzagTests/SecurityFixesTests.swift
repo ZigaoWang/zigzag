@@ -342,3 +342,19 @@ struct PageNoticeTests {
         #expect(PopupHeaderView.site(of: nil) == nil)
     }
 }
+
+/// Passwords and sign-ins stay where they belong: in the file you export, the cookies you bring over, the menu
+/// that fills a page, and the sheet a site's sign-in asks with.
+@MainActor
+struct PasswordSafetyTests {
+    @Test func exportedFieldsNeverRunAsFormulas() {
+        #expect(PasswordExport.field("=HYPERLINK(\"https://evil.example\")") == "\"'=HYPERLINK(\"\"https://evil.example\"\")\"")
+        for start in ["+1", "-2", "@SUM(A1)", "\tx"] { #expect(PasswordExport.field(start) == "'" + start) }
+        #expect(PasswordExport.field("\rx") == "\"'\rx\"")
+        #expect(PasswordExport.field("\r\nx") == "\"'\r\nx\"")
+        #expect(PasswordExport.field("sam@example.com") == "sam@example.com")
+        #expect(PasswordExport.field("a,b") == "\"a,b\"")
+        // The password stays exactly as it is, or the file wouldn't sign you in.
+        #expect(PasswordExport.field("=secret", neutralized: false) == "=secret")
+    }
+}
