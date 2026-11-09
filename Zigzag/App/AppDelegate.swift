@@ -54,6 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Diagnostics.start()
         // HTTP/3 kept from another network can go around a VPN or proxy: forgotten now and whenever the network changes.
         NetworkChanges.start()
+        // The app you were in, for Zigzag Mini to go back to.
+        AppSwitching.start()
         // New lists or settings reach open pages on their next load.
         blockerToken = ContentBlocker.changed.observe {
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
@@ -87,6 +89,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DockProgress.shared.start()
         DebugBridge.start()
     }
+
+    func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Only a Zigzag Mini up counts as no window: the Dock icon brings the browser back.
@@ -194,8 +198,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func open(_ url: URL) {
         guard launched else { pendingURLs.append(url); return }
+        // Zigzag Mini comes forward on its own, as Little Arc does: activating the whole app would bring every browser
+        // window up behind it.
+        let mini = WindowManager.shared.opensInMini(url)
         WindowManager.shared.openExternal(url)
-        NSApp.activate()
+        if !mini { NSApp.activate() }
     }
 
     /// Right-click the Dock icon: a new window, or a private one, as every browser offers.

@@ -174,17 +174,7 @@ final class WindowManager {
         // Settings › Zigzag Mini can send links to a Zigzag Mini of their own instead; files and links before onboarding
         // still open here. Zigzag Mini is never saved, so nothing about the session changes.
         if opensInMini(url) {
-            // The app the link came from, as it was in front when the link arrived: macOS brings every Zigzag window
-            // forward with the link, and Zigzag Mini is meant to come up alone over it, as Little Arc does.
-            let from = Self.frontWindowOfAnotherApp()
-            MiniWindowController.open(url: url)
-            if let from {
-                DispatchQueue.main.async { [weak self] in
-                    for window in self?.controllers.compactMap(\.window) ?? [] where window.isVisible && !window.isMiniaturized {
-                        window.order(.below, relativeTo: from)
-                    }
-                }
-            }
+            MiniWindowController.open(url: url, fromAnotherApp: true)
             return
         }
         // A link opened before onboarding was finished: you're browsing now, so the next launch restores this window
@@ -284,13 +274,6 @@ final class WindowManager {
     }
 
     // MARK: Restoring
-
-    /// The window in front that isn't Zigzag's, on the main level: where a link from another app came from.
-    static func frontWindowOfAnotherApp() -> Int? {
-        let me = ProcessInfo.processInfo.processIdentifier
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
-        return list.first { ($0[kCGWindowLayer as String] as? Int) == 0 && ($0[kCGWindowOwnerPID as String] as? Int32) != me }?[kCGWindowNumber as String] as? Int
-    }
 
     /// Zigzag opened for a link going to Zigzag Mini, as Arc's Little Arc does: the browser windows weren't brought back.
     /// Whatever asks for a browser window next brings them back first.

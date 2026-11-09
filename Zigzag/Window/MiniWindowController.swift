@@ -47,7 +47,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// Opens one on `url`. `origin`: where on screen it grows from (the quick open bar it came out of); without
     /// one it takes the middle of the screen, a step down from any already there.
     @discardableResult
-    static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil) -> MiniWindowController {
+    static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil, fromAnotherApp: Bool = false) -> MiniWindowController {
         let controller = MiniWindowController(url: url, origin: origin, overFullScreen: overFullScreen ?? (NSApp.keyWindow?.styleMask.contains(.fullScreen) == true))
         controller.tab.isSearchTab = isSearch
         all.append(controller)
@@ -55,8 +55,18 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         controller.appear(from: origin)
         if #available(macOS 15.4, *) { ExtensionHost.shared.miniOpened(controller) }
         if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
+        if fromAnotherApp {
+            // From a link in another app, as Little Arc: only this window comes forward, the browser windows stay
+            // where they were, and closing it goes back to the app the link came from.
+            controller.returnTo = AppSwitching.lastOtherApp
+            if !NSApp.isActive { NSRunningApplication.current.activate(options: []) }
+            MiniLinkWake.linkOpenedInMini()
+        }
         return controller
     }
+
+    /// The app a link came from, to go back to when this closes, if you're still only here.
+    private var returnTo: NSRunningApplication?
 
     private init(url: URL, origin: NSRect?, overFullScreen: Bool) {
         let spaceID = MiniQuickOpen.space.id
@@ -436,6 +446,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// Closing fades it away first, however it's closed (⌘W, the red light, an extension); the page goes with it.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard !isLeaving else { return false }
+        // Opened from another app and closed straight from here: back to that app, before this one fades, so no
+        // browser window comes forward in its place.
+        if let app = returnTo, !app.isTerminated, NSApp.keyWindow === window, Self.all.count == 1 {
+            app.activate()
+        }
         commandBar.dismiss(restoringFocus: false)
         fadeAway { [weak self] in self?.window?.close() }
         return false
@@ -914,5 +929,67 @@ extension MiniWindowController: PromptHost {
     var promptAnchor: NSView? { strip }
     func promptToast(_ text: String, symbol: String, duration: TimeInterval) {
         Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)
+    }
+}
+
+/// A link for Zigzag Mini from another app wakes Zigzag, and macOS brings every Zigzag window forward with it, a moment
+/// before Zigzag hears of the link. So when Zigzag is woken from the background (not by ⌘Tab or a click on one of its
+/// windows), its browser windows wait unseen for that moment: a link for Zigzag Mini puts them back where they were,
+/// behind the app you clicked in, before they show again; anything else shows them right where macOS put them.
+enum MiniLinkWake {
+    private static var waiting: [NSWindow] = []
+    /// The window in front, of the app you were in, as Zigzag woke.
+    private static var front: Int?
+    private static var timeout: DispatchWorkItem?
+
+    static func appWillActivate() {
+        guard MiniWindowController.opensExternalLinks, waiting.isEmpty else { return }
+        // ⌘Tab holds ⌘; a click on a Zigzag window is that window's.
+        if NSEvent.modifierFlags.contains(.command) { return }
+        let windows = WindowManager.shared.controllers.compactMap(\.window).filter { $0.isVisible && !$0.isMiniaturized }
+        let pointer = NSEvent.mouseLocation
+        guard !windows.isEmpty, !(NSEvent.pressedMouseButtons != 0 && windows.contains { $0.frame.contains(pointer) }) else { return }
+        front = frontWindowOfAnotherApp()
+        waiting = windows
+        windows.forEach { $0.alphaValue = 0 }
+        let work = DispatchWorkItem { release(backTo: nil) }
+        timeout = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+    }
+
+    /// The link went to Zigzag Mini: the browser windows go back behind the app it came from.
+    static func linkOpenedInMini() {
+        guard !waiting.isEmpty else { return }
+        release(backTo: front)
+    }
+
+    private static func release(backTo front: Int?) {
+        timeout?.cancel()
+        timeout = nil
+        let windows = waiting
+        waiting = []
+        if let front { windows.reversed().forEach { $0.order(.below, relativeTo: front) } }
+        windows.forEach { $0.alphaValue = 1 }
+    }
+
+    private static func frontWindowOfAnotherApp() -> Int? {
+        let me = ProcessInfo.processInfo.processIdentifier
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        return list.first { ($0[kCGWindowLayer as String] as? Int) == 0 && ($0[kCGWindowOwnerPID as String] as? Int32) != me }?[kCGWindowNumber as String] as? Int
+    }
+}
+
+/// The app you were in before Zigzag: where a link for Zigzag Mini came from, to go back to when it closes.
+enum AppSwitching {
+    private(set) static var lastOtherApp: NSRunningApplication?
+    private static var token: NSObjectProtocol?
+
+    static func start() {
+        guard token == nil else { return }
+        lastOtherApp = NSWorkspace.shared.frontmostApplication.flatMap { $0 == .current ? nil : $0 }
+        token = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, app != .current else { return }
+            MainActor.assumeIsolated { lastOtherApp = app }
+        }
     }
 }
