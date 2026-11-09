@@ -2106,6 +2106,11 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         isRecording = false
     }
 
+    #if DEBUG
+    func debugRecord() { startRecording() }
+    var debugTitle: String { title.stringValue }
+    #endif
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil { stopRecording() }

@@ -659,10 +659,11 @@ enum DebugBridge {
                 switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
             }
             let named: [String: String] = ["esc": "\u{1b}", "tab": "\t", "return": "\r", "space": " ", "delete": "\u{7f}",
-                                           "down": String(UnicodeScalar(NSDownArrowFunctionKey)!), "up": String(UnicodeScalar(NSUpArrowFunctionKey)!)]
+                                           "down": String(UnicodeScalar(NSDownArrowFunctionKey)!), "up": String(UnicodeScalar(NSUpArrowFunctionKey)!),
+                                           "left": String(UnicodeScalar(NSLeftArrowFunctionKey)!), "right": String(UnicodeScalar(NSRightArrowFunctionKey)!)]
             let chars = named[ch] ?? ch
             let codes: [String: UInt16] = ["s": 1, "j": 38, "t": 17, "l": 37, "w": 13, "esc": 53, "tab": 48, "f": 3, "r": 15, "p": 35,
-                                          "down": 125, "up": 126, "return": 36, "space": 49, "delete": 51, "a": 0]
+                                          "down": 125, "up": 126, "left": 123, "right": 124, "return": 36, "space": 49, "delete": 51, "a": 0]
             if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                         windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
                                         isARepeat: false, keyCode: codes[ch] ?? 0) {
@@ -737,6 +738,10 @@ enum DebugBridge {
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsPage.open(in: controller)
+        case "shortcutrecord":
+            // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.
+            func rows(in view: NSView) -> [ShortcutRow] { view.subviews.flatMap { ($0 as? ShortcutRow).map { [$0] } ?? rows(in: $0) } }
+            if let content = controller.window?.contentView { rows(in: content).first { $0.debugTitle == arg }?.debugRecord() }
         case "engine": if let engine = SearchEngine(rawValue: arg) { Library.shared.searchEngine = engine }
         case "engineinfo":
             // The engine searched with, its address for "zigzag test", and the engines extensions give.
