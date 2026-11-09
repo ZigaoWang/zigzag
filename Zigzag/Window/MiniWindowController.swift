@@ -288,7 +288,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         // What the page was doing as Esc arrived (noted before the page saw it, in `noteEscape`), since by now its
-        // handler may have closed its dialog. Typing: the field lets go of the focus, and the window stays.
+        // handler may have closed its dialog. Typing: the field lets go of the focus, and the window stays. Asked in
+        // Zigzag's own script world, where the page can't see the note or change what the script finds.
         let decide = """
             (() => {
               const was = window.__zigzagEsc ?? (\(Self.escapeState));
@@ -301,9 +302,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
               return was;
             })()
             """
-        webView.evaluateJavaScript(decide) { [weak self] result, _ in
+        webView.evaluateJavaScript(decide, in: nil, in: .defaultClient) { [weak self] result in
             MainActor.assumeIsolated {
-                guard (result as? String) == "" else { return }
+                guard (try? result.get()) as? String == "" else { return }
                 self?.window?.performClose(nil)
             }
         }
@@ -347,15 +348,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
               !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) else { return false }
         // Asked before the page gets the key, as some sites keep Esc for themselves (Bing's search box): just a page,
         // and Esc closes Zigzag Mini; typing in a box with text, or a dialog of the site's showing, it goes to the page.
-        webView.evaluateJavaScript(Self.escapeState) { [weak self, weak webView] result, _ in
+        webView.evaluateJavaScript(Self.escapeState, in: nil, in: .defaultClient) { [weak self, weak webView] result in
             MainActor.assumeIsolated {
                 guard let self, let webView else { return }
-                let state = result as? String ?? ""
+                let state = (try? result.get()) as? String ?? ""
                 if state.isEmpty {
                     self.window?.performClose(nil)
                 } else {
                     // Noted for the Esc the page leaves alone, which comes back to `escape`: typing, the field lets go.
-                    webView.evaluateJavaScript("window.__zigzagEsc = '\(state)'", completionHandler: nil)
+                    webView.evaluateJavaScript("window.__zigzagEsc = '\(state)'", in: nil, in: .defaultClient)
                     webView.keyDown(with: event)
                 }
             }
