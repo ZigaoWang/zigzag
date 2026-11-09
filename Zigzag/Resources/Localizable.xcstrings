@@ -3843,6 +3843,17 @@
         }
       }
     },
+    "Copied" : {
+      "comment" : "The address bar's Copy Link button just after it copied the address: its tooltip and what VoiceOver says.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝"
+          }
+        }
+      }
+    },
     "Copied what’s on screen: this page scrolls inside itself" : {
       "comment" : "Toast after taking a screenshot of the whole page. Only the visible part could be taken.",
       "localizations" : {
@@ -3866,7 +3877,7 @@
       }
     },
     "Copy Link" : {
-      "comment" : "Action in the site panel: copies the page's address.\nEdit menu item.\nItem in a favorite's context menu.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.",
+      "comment" : "Action in the site panel: copies the page's address.\nEdit menu item.\nItem in a favorite's context menu.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nTooltip and VoiceOver name of the address bar's button that copies the page's address.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

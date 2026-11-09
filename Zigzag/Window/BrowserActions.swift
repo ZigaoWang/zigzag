@@ -41,9 +41,21 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     /// Copies a link and says so, wherever the copy came from.
     func copyLink(_ url: URL) {
+        writeLink(url)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
+    }
+
+    /// Puts a link on the pasteboard, without saying so: the address bar's own button answers with its check.
+    func writeLink(_ url: URL) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
+    }
+
+    /// The address bar's Copy Link button: the page you're in, which in split view is the focused pane's.
+    func copyAddressLink() {
+        guard let url = tabManager.selectedTab?.url, url.offersCopyLink else { return }
+        writeLink(url)
+        sidebar.address.showCopied()
     }
 
     @objc func showDownloads(_ sender: Any?) {
@@ -186,9 +198,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = selectedTab?.url else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
+        copyLink(url)
     }
 
     @objc func copyPageURLAsMarkdown(_ sender: Any?) {

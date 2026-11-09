@@ -22,6 +22,31 @@ final class AddressView: InteractiveView {
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: opens Reader.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
+    /// At the field's left end, on any page with an address worth sharing.
+    let copyButton = AddressView.button(AddressView.copySymbol, toolTip: AddressView.copyTitle)
+    private static let copySymbol = "link"
+    private static let copyTitle = String(localized: "Copy Link", comment: "Tooltip and VoiceOver name of the address bar's button that copies the page's address.")
+    private var shownURL: URL?
+    private var copiedReset: DispatchWorkItem?
+
+    /// Copied: the button says so itself, with a check for a moment, rather than a toast across the page.
+    func showCopied() {
+        copiedReset?.cancel()
+        let copied = String(localized: "Copied", comment: "The address bar's Copy Link button just after it copied the address: its tooltip and what VoiceOver says.")
+        copyButton.setSymbol("checkmark", tint: Brand.Theme.for(self).accent, crossfading: true)
+        copyButton.toolTip = copied
+        Announcement.post(copied)
+        let reset = DispatchWorkItem { [weak self] in self?.resetCopied(crossfading: true) }
+        copiedReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.copiedHold, execute: reset)
+    }
+
+    private func resetCopied(crossfading: Bool) {
+        copiedReset?.cancel()
+        copiedReset = nil
+        copyButton.setSymbol(Self.copySymbol, tint: Tokens.Color.icon, crossfading: crossfading)
+        copyButton.toolTip = Self.copyTitle
+    }
 
     func setCapture(camera: Bool, microphone: Bool) {
         captureButton.isHidden = !(camera || microphone)
@@ -76,6 +101,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        copyButton.isHidden = true
+        addSubview(copyButton)
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
     }
@@ -126,6 +153,10 @@ final class AddressView: InteractiveView {
     }
 
     func show(url: URL?, isSecure: Bool) {
+        // Another page: a check still showing was about the last one.
+        if url != shownURL, copiedReset != nil { resetCopied(crossfading: false) }
+        shownURL = url
+        copyButton.isHidden = !(url?.offersCopyLink ?? false)
         label.stringValue = Self.name(of: url)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
@@ -144,12 +175,18 @@ final class AddressView: InteractiveView {
         // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
         // text has room to breathe. After the not-secure mark when there is one.
         let pad = Tokens.Space.x3
+        let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         var x = pad
+        if !copyButton.isHidden {
+            copyButton.frame = NSRect(x: inset, y: inset, width: side, height: side)
+            copyButton.radius = Tokens.Sidebar.addressRadius - inset
+            copyButton.pressOutset = NSEdgeInsets(top: inset, left: inset, bottom: inset, right: 1)
+            x = copyButton.frame.maxX + Tokens.Space.x1
+        }
         if !lock.isHidden {
             lock.frame = NSRect(x: x, y: 0, width: Tokens.Space.x3, height: bounds.height)
             x = lock.frame.maxX + Tokens.Space.x1
         }
-        let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         var right = bounds.width - inset
         let trailingButtons = [readerButton, captureButton].filter { !$0.isHidden } + actionButtons
         for (index, button) in trailingButtons.enumerated().reversed() {
@@ -166,11 +203,11 @@ final class AddressView: InteractiveView {
         label.frame = NSRect(x: x - Label.inset, y: (bounds.height - h) / 2, width: trailing - x + Label.inset * 2, height: h)
     }
 
-    /// The field's trailing end belongs to its buttons (`pressOutset`): a press on the rim around one presses it
-    /// rather than opening the command bar.
+    /// The field's ends belong to its buttons (`pressOutset`): a press on the rim around one presses it rather than
+    /// opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton] + actionButtons where !button.isHidden {
+        for button in [copyButton, readerButton, captureButton] + actionButtons where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         return super.hitTest(point)
@@ -1716,6 +1753,11 @@ private final class DotStrip: NSView {
         Tokens.Motion.withoutAnimation { fade.frame = bounds }
         layer?.mask = fade
     }
+}
+
+extension URL {
+    /// A page with an address worth passing on: the web and an extension's own pages, not a file, Settings or History.
+    var offersCopyLink: Bool { ["http", "https", "webkit-extension"].contains(scheme ?? "") }
 }
 
 /// Where a space's dot carried along the row lands.

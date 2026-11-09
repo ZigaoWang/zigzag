@@ -106,6 +106,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        sidebar.address.copyButton.onClick = { [weak self] _ in self?.copyAddressLink() }
         sidebar.address.captureButton.onClick = { [weak self] _ in
             guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
             MenuPanel.show([

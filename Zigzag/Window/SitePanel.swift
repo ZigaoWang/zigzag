@@ -50,7 +50,7 @@ final class SitePanel: FloatingPanelView {
     private init?(controller: BrowserWindowController) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
         let tab = controller.tabManager.selectedTab ?? Tab(url: nil, spaceID: controller.tabManager.currentSpaceID)
-        let url = tab.url.flatMap { ["http", "https", "webkit-extension"].contains($0.scheme ?? "") ? $0 : nil }
+        let url = tab.url.flatMap { $0.offersCopyLink ? $0 : nil }
         isBlank = url == nil
         self.controller = controller
         self.tab = tab

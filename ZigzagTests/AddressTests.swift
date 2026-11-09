@@ -16,6 +16,15 @@ struct AddressTests {
         #expect(CommandRanker.url(from: "youtube.com/@mkbhd")?.absoluteString == "https://youtube.com/@mkbhd")
     }
 
+    @Test func copyLinkIsOfferedOnPagesWithAnAddressToShare() {
+        for address in ["https://example.com/a?b=1", "http://localhost:3000", "webkit-extension://abc/options.html"] {
+            #expect(URL(string: address)!.offersCopyLink, "\(address)")
+        }
+        for address in ["about:blank", "file:///tmp/a.html", "data:text/plain,hi", "zigzag://history", "zigzag://settings"] {
+            #expect(!URL(string: address)!.offersCopyLink, "\(address)")
+        }
+    }
+
     @Test func searches() {
         #expect(CommandRanker.url(from: "node.js") == nil)
         #expect(CommandRanker.url(from: "main.swiftui") == nil)

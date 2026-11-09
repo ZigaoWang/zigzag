@@ -395,6 +395,22 @@ final class IconButton: InteractiveView {
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
     private let symbolSize: CGFloat
 
+    /// Changes the glyph and its color. `crossfading`, the new one fades in over the old, growing from
+    /// `Motion.glyphFrom` in `Motion.menuIn`; from the keyboard it's simply there, and Reduce Motion keeps only the fade.
+    func setSymbol(_ name: String, tint: NSColor, crossfading: Bool) {
+        symbol = name
+        self.tint = tint
+        guard crossfading, window != nil, !Tokens.Motion.isFromKey, let layer = imageView.layer else { return }
+        let fade = CATransition()
+        fade.type = .fade
+        fade.duration = Tokens.Motion.menuIn
+        fade.timingFunction = Tokens.Motion.easeOut
+        layer.add(fade, forKey: "swap")
+        guard !Tokens.Motion.reduceMotion else { return }
+        Tokens.Motion.animateTransform(of: layer, from: Tokens.Motion.scale(Tokens.Motion.glyphFrom, of: layer), to: CATransform3DIdentity,
+                                       duration: Tokens.Motion.menuIn, forKey: "swap.grow")
+    }
+
     /// The two sizes an icon button comes in.
     enum Size {
         /// The toolbar, the bottom bar, a pane's header, the find bar, a panel's close: big and easy to press.
